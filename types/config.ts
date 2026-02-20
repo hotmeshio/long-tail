@@ -1,0 +1,59 @@
+/**
+ * Full workflow configuration as stored in the database.
+ * Includes all sub-entities (roles, lifecycle hooks, consumers).
+ */
+export interface LTWorkflowConfig {
+  workflow_type: string;
+  is_lt: boolean;
+  is_container: boolean;
+  task_queue: string | null;
+  default_role: string;
+  default_modality: string;
+  description: string | null;
+  roles: string[];
+  lifecycle: {
+    onBefore: LTLifecycleHook[];
+    onAfter: LTLifecycleHook[];
+  };
+  consumers: LTConsumerConfig[];
+}
+
+export interface LTLifecycleHook {
+  target_workflow_type: string;
+  target_task_queue: string | null;
+  ordinal: number;
+}
+
+export interface LTConsumerConfig {
+  provider_name: string;
+  provider_workflow_type: string;
+  ordinal: number;
+}
+
+/**
+ * Resolved config used by interceptor/executeLT at runtime.
+ * Flat structure with camelCase keys — no DB row noise.
+ */
+export interface LTResolvedConfig {
+  isLT: boolean;
+  isContainer: boolean;
+  taskQueue: string | null;
+  role: string;
+  modality: string;
+  roles: string[];
+  onBefore: LTLifecycleHook[];
+  onAfter: LTLifecycleHook[];
+  consumers: LTConsumerConfig[];
+}
+
+/**
+ * Provider data returned by ltGetProviderData.
+ * Keyed by provider_name from LTConsumerConfig.
+ */
+export interface LTProviderData {
+  [providerName: string]: {
+    data: Record<string, any>;
+    completedAt: string;
+    workflowType: string;
+  };
+}

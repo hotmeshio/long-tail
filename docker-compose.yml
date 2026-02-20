@@ -1,0 +1,59 @@
+# Long Tail Workflows
+# Usage:  docker compose up
+# Ports:  3000 (API), 5432 (Postgres), 4222/8222 (NATS)
+# Adjust: Change the left side of any port mapping to resolve collisions
+#         e.g. "5433:5432" to use host port 5433 for Postgres
+
+services:
+  long-tail:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "${LT_PORT:-3000}:3000"
+      - "9229:9229"
+    environment:
+      - NODE_ENV=development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=longtail
+      - NATS_URL=nats://nats:4222
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: longtail
+    ports:
+      - "${LT_PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  nats:
+    image: nats:latest
+    ports:
+      - "${LT_NATS_PORT:-4222}:4222"
+      - "${LT_NATS_MONITOR_PORT:-8222}:8222"
+    command: ["-js", "-m", "8222"]
+
+volumes:
+  pgdata:
