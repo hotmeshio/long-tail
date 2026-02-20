@@ -1,0 +1,102 @@
+import { Client as Postgres } from 'pg';
+import { MemFlow } from '@hotmeshio/hotmesh';
+
+import { postgres_options } from '../modules/config';
+import { createLTInterceptor } from '../interceptor';
+import * as interceptorActivities from '../interceptor/activities';
+import * as reviewContentWorkflow from '../workflows/review-content';
+import * as verifyDocumentWorkflow from '../workflows/verify-document';
+import * as reviewContentOrchWorkflow from '../workflows/review-content/orchestrator';
+import * as verifyDocumentOrchWorkflow from '../workflows/verify-document/orchestrator';
+
+// Leaf workflow queues
+const LT_TASK_QUEUE = 'long-tail';
+const LT_VERIFY_QUEUE = 'long-tail-verify';
+
+// Orchestrator queues
+const LT_REVIEW_ORCH_QUEUE = 'lt-review-orch';
+const LT_VERIFY_ORCH_QUEUE = 'lt-verify-orch';
+
+// Shared interceptor activity queue
+const LT_ACTIVITY_QUEUE = 'lt-interceptor';
+
+/**
+ * Register the shared interceptor activity worker, register the LT
+ * interceptor, and start workflow workers (leaf + orchestrators).
+ */
+export async function startWorkers(): Promise<void> {
+  const connection = {
+    class: Postgres,
+    options: postgres_options,
+  };
+
+  // 1. Register shared activity worker for interceptor DB operations
+  await MemFlow.registerActivityWorker(
+    { connection, taskQueue: LT_ACTIVITY_QUEUE },
+    interceptorActivities,
+    LT_ACTIVITY_QUEUE,
+  );
+
+  // 2. Register the LT interceptor
+  const ltInterceptor = createLTInterceptor({
+    activityTaskQueue: LT_ACTIVITY_QUEUE,
+    defaultRole: 'reviewer',
+    defaultModality: 'default',
+  });
+  MemFlow.registerInterceptor(ltInterceptor);
+
+  // 3. Start leaf workflow workers
+  const reviewWorker = await MemFlow.Worker.create({
+    connection,
+    taskQueue: LT_TASK_QUEUE,
+    workflow: reviewContentWorkflow.reviewContent,
+  });
+  await reviewWorker.run();
+
+  const verifyWorker = await MemFlow.Worker.create({
+    connection,
+    taskQueue: LT_VERIFY_QUEUE,
+    workflow: verifyDocumentWorkflow.verifyDocument,
+  });
+  await verifyWorker.run();
+
+  // 4. Start orchestrator workflow workers
+  const reviewOrchWorker = await MemFlow.Worker.create({
+    connection,
+    taskQueue: LT_REVIEW_ORCH_QUEUE,
+    workflow: reviewContentOrchWorkflow.reviewContentOrchestrator,
+  });
+  await reviewOrchWorker.run();
+
+  const verifyOrchWorker = await MemFlow.Worker.create({
+    connection,
+    taskQueue: LT_VERIFY_ORCH_QUEUE,
+    workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator,
+  });
+  await verifyOrchWorker.run();
+
+  console.log(
+    `[workers] started on queues: ${LT_TASK_QUEUE}, ${LT_VERIFY_QUEUE}, ` +
+    `${LT_REVIEW_ORCH_QUEUE}, ${LT_VERIFY_ORCH_QUEUE}`,
+  );
+}
+
+/**
+ * Create a MemFlow client for starting workflows and sending signals.
+ */
+export function createClient() {
+  return new MemFlow.Client({
+    connection: {
+      class: Postgres,
+      options: postgres_options,
+    },
+  });
+}
+
+export {
+  LT_TASK_QUEUE,
+  LT_VERIFY_QUEUE,
+  LT_REVIEW_ORCH_QUEUE,
+  LT_VERIFY_ORCH_QUEUE,
+  LT_ACTIVITY_QUEUE,
+};
