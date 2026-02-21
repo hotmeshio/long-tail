@@ -39,6 +39,21 @@ export async function verifyDocument(
 ): Promise<VerifyDocumentReturn | VerifyDocumentEscalation> {
   const { documentId } = envelope.data;
 
+  // If this is a re-run with human-provided resolver data, return it
+  if (envelope.resolver) {
+    return {
+      type: 'return',
+      milestones: [
+        { name: 'extraction', value: 'human_resolved' },
+        { name: 'resolved_by_human', value: true },
+      ],
+      data: {
+        documentId,
+        ...envelope.resolver,
+      },
+    };
+  }
+
   // Step 1: List pages
   const pages = await listDocumentPages();
 

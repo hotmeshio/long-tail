@@ -3,14 +3,13 @@ import { Client as Postgres } from 'pg';
 import { MemFlow } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
+import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
 import * as verifyDocumentWorkflow from '../../workflows/verify-document';
-import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
-import type { LTReturn } from '../../types';
 
 const { Connection, Client, Worker } = MemFlow;
 
@@ -90,7 +89,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     const workflowId = `test-vision-mismatch-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: { documentId: 'DOC-001' },
         metadata: {},
@@ -104,13 +103,8 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // Vision calls take a few seconds
     await sleepFor(15_000);
 
-    // Verify the task was escalated
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    expect(task).toBeTruthy();
-    expect(task!.status).toBe('needs_intervention');
-
-    // Verify escalation was created with mismatch details
-    const escalations = await escalationService.getEscalationsByTaskId(task!.id);
+    // Verify escalation was created with mismatch details (found via workflow_id)
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
     expect(escalations.length).toBe(1);
 
     const esc = escalations[0];
@@ -123,17 +117,19 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     expect(payload.extractedInfo.memberId).toBe('MBR-2024-001');
     expect(payload.validationResult).toMatch(/mismatch|not_found/);
 
-    // Human reviews and confirms the correct address
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Resolve via new workflow
+    await resolveEscalation(esc.id, {
       documentId: 'DOC-001',
       memberId: 'MBR-2024-001',
       verified: true,
       note: 'Member moved — address updated in system',
     });
 
-    const result = await handle.result() as LTReturn;
-    expect(result.type).toBe('return');
-    expect(result.data.verified).toBe(true);
+    await sleepFor(10_000);
+
+    // Verify escalation was resolved
+    const resolvedEsc = await escalationService.getEscalation(esc.id);
+    expect(resolvedEsc!.status).toBe('resolved');
   }, 60_000);
 
   // ── Vision: escalation payload contains full context for human review ─────
@@ -143,7 +139,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     const workflowId = `test-vision-context-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: { documentId: 'DOC-002' },
         metadata: {},
@@ -156,8 +152,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     await sleepFor(15_000);
 
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    const escalations = await escalationService.getEscalationsByTaskId(task!.id);
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
     const payload = JSON.parse(escalations[0].escalation_payload!);
 
     // Human reviewer should see:
@@ -173,12 +168,12 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // 3. Why it was escalated
     expect(payload.reason).toBeTruthy();
 
-    // Clean up
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Clean up — resolve via new workflow
+    await resolveEscalation(escalations[0].id, {
       documentId: 'DOC-002',
       verified: true,
     });
-    await handle.result();
+    await sleepFor(10_000);
   }, 60_000);
 
   // ── Vision: multi-page extraction merges data ─────────────────────────────
@@ -188,7 +183,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     const workflowId = `test-vision-merge-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: { documentId: 'DOC-003' },
         metadata: {},
@@ -203,8 +198,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     // The workflow will escalate (address mismatch), but the extracted data
     // should include info from BOTH pages (page 1: member info, page 2: emergency contact)
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    const escalations = await escalationService.getEscalationsByTaskId(task!.id);
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
     const payload = JSON.parse(escalations[0].escalation_payload!);
 
     // Page 1 should provide: memberId, name, address
@@ -214,12 +208,12 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // Page 2 should provide: emergency contact (merged into the record)
     expect(payload.extractedInfo.emergencyContact).toBeTruthy();
 
-    // Clean up
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Clean up — resolve via new workflow
+    await resolveEscalation(escalations[0].id, {
       documentId: 'DOC-003',
       verified: true,
     });
-    await handle.result();
+    await sleepFor(10_000);
   }, 60_000);
 
   // ── Skipped without key ───────────────────────────────────────────────────

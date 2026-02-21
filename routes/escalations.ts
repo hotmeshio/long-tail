@@ -107,8 +107,9 @@ router.post('/:id/claim', async (req, res) => {
 
 /**
  * POST /api/escalations/:id/resolve
- * Signal the paused workflow with resolver data.
- * The interceptor handles marking the escalation as resolved durably.
+ * Start a new workflow with resolver data to re-run the failed step.
+ * The interceptor in the new workflow resolves the escalation record
+ * and signals back to the orchestrator (if any) on success.
  * Body: { resolverPayload: Record<string, any> }
  */
 router.post('/:id/resolve', async (req, res) => {
@@ -119,7 +120,7 @@ router.post('/:id/resolve', async (req, res) => {
       return;
     }
 
-    // 1. Read escalation for routing info (don't update it — interceptor handles that)
+    // 1. Read escalation (verify pending)
     const escalation = await escalationService.getEscalation(req.params.id);
     if (!escalation) {
       res.status(404).json({ error: 'Escalation not found' });
@@ -130,31 +131,41 @@ router.post('/:id/resolve', async (req, res) => {
       return;
     }
 
-    // 2. Signal the paused workflow — interceptor resolves the escalation record
-    const client = createClient();
-
-    if (escalation.workflow_id && escalation.task_queue && escalation.workflow_type) {
-      // Primary path: use escalation's own routing fields
-      const handle = await client.workflow.getHandle(
-        escalation.task_queue,
-        escalation.workflow_type,
-        escalation.workflow_id,
-      );
-      await handle.signal(`lt-resolve-${escalation.workflow_id}`, resolverPayload);
+    // 2. Reconstruct the original envelope from the escalation or task
+    let envelope: Record<string, any> = {};
+    if (escalation.envelope) {
+      try {
+        envelope = JSON.parse(escalation.envelope);
+      } catch { /* use empty */ }
     } else if (escalation.task_id) {
-      // Legacy fallback: look up task for workflow_id
       const task = await taskService.getTask(escalation.task_id);
-      if (task) {
-        const handle = await client.workflow.getHandle(
-          LT_TASK_QUEUE,
-          task.workflow_type || 'reviewContent',
-          task.workflow_id,
-        );
-        await handle.signal(`lt-resolve-${task.workflow_id}`, resolverPayload);
+      if (task?.envelope) {
+        try {
+          envelope = JSON.parse(task.envelope);
+        } catch { /* use empty */ }
       }
     }
 
-    res.json({ signaled: true, escalationId: escalation.id });
+    // 3. Inject resolver data and escalation ID into the envelope
+    envelope.resolver = resolverPayload;
+    envelope.lt = {
+      ...envelope.lt,
+      escalationId: escalation.id,
+    };
+
+    // 4. Start a new workflow to re-run with resolver data
+    const newWorkflowId = `rerun-${escalation.id}-${Date.now()}`;
+    const client = createClient();
+
+    await client.workflow.start({
+      workflowName: escalation.workflow_type!,
+      args: [envelope],
+      taskQueue: escalation.task_queue!,
+      workflowId: newWorkflowId,
+      expire: 180,
+    });
+
+    res.json({ started: true, escalationId: escalation.id, workflowId: newWorkflowId });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -42,6 +42,7 @@ export type {
 
 export type {
   LTUserStatus,
+  LTRoleType,
   LTUserRole,
   LTUserRecord,
 } from './user';

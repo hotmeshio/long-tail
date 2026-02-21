@@ -23,13 +23,27 @@ const CONFIDENCE_THRESHOLD = 0.85;
  *
  * Analyzes content using AI. If confidence is high, auto-approves.
  * If confidence is low (or flags are raised), escalates to a human reviewer.
- * When the human resolves the escalation, the LT interceptor resumes
- * the workflow with the resolver data and returns the final result.
+ * On re-run after human resolution, returns the resolver data directly.
  */
 export async function reviewContent(
   envelope: LTEnvelope,
 ): Promise<ReviewContentReturn | ReviewContentEscalation> {
   const { contentId, content, contentType } = envelope.data;
+
+  // If this is a re-run with human-provided resolver data, return it
+  if (envelope.resolver) {
+    return {
+      type: 'return',
+      milestones: [
+        { name: 'ai_review', value: 'escalated' },
+        { name: 'resolved_by_human', value: true },
+      ],
+      data: {
+        contentId,
+        ...envelope.resolver,
+      },
+    };
+  }
 
   // Step 1: AI analysis
   const analysis: ReviewAnalysis = await analyzeContent(content, contentType);

@@ -20,6 +20,12 @@ export interface LTEnvelope {
     signalId?: string;
     taskId?: string;
     providers?: import('./config').LTProviderData;
+    /** Orchestrator workflow ID — set by executeLT for signal routing */
+    parentWorkflowId?: string;
+    /** Orchestrator task queue — set by executeLT for signal routing */
+    parentTaskQueue?: string;
+    /** Orchestrator workflow function name — set by executeLT for signal routing */
+    parentWorkflowType?: string;
   };
   resolver?: Record<string, any>;
 }

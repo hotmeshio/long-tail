@@ -1,5 +1,7 @@
 import { getPool } from './db';
-import type { LTUserRecord, LTUserRole, LTUserStatus } from '../types';
+import type { LTUserRecord, LTUserRole, LTRoleType, LTUserStatus } from '../types';
+
+const VALID_ROLE_TYPES: LTRoleType[] = ['superadmin', 'admin', 'member'];
 
 // ─── Input types ──────────────────────────────────────────────────────────────
 
@@ -9,7 +11,7 @@ export interface CreateUserInput {
   display_name?: string;
   status?: LTUserStatus;
   metadata?: Record<string, any>;
-  roles?: { role: string; type: string }[];
+  roles?: { role: string; type: LTRoleType }[];
 }
 
 export interface UpdateUserInput {
@@ -145,7 +147,7 @@ export async function deleteUser(id: string): Promise<boolean> {
 
 export async function listUsers(filters: {
   role?: string;
-  roleType?: string;
+  roleType?: LTRoleType;
   status?: LTUserStatus;
   limit?: number;
   offset?: number;
@@ -192,10 +194,14 @@ export async function listUsers(filters: {
 
 // ─── Role management ──────────────────────────────────────────────────────────
 
+export function isValidRoleType(type: string): type is LTRoleType {
+  return VALID_ROLE_TYPES.includes(type as LTRoleType);
+}
+
 export async function addUserRole(
   userId: string,
   role: string,
-  type: string,
+  type: LTRoleType,
 ): Promise<LTUserRole> {
   const pool = getPool();
   const { rows } = await pool.query(
@@ -234,7 +240,7 @@ export async function hasRole(userId: string, role: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-export async function hasRoleType(userId: string, type: string): Promise<boolean> {
+export async function hasRoleType(userId: string, type: LTRoleType): Promise<boolean> {
   const pool = getPool();
   const { rows } = await pool.query(
     'SELECT 1 FROM lt_user_roles WHERE user_id = $1 AND type = $2 LIMIT 1',
@@ -243,6 +249,39 @@ export async function hasRoleType(userId: string, type: string): Promise<boolean
   return rows.length > 0;
 }
 
-export async function isUserAdmin(userId: string): Promise<boolean> {
-  return hasRoleType(userId, 'admin');
+// ─── RBAC helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Is the user a superadmin? (global — can manage all users and roles)
+ */
+export async function isSuperAdmin(userId: string): Promise<boolean> {
+  return hasRoleType(userId, 'superadmin');
+}
+
+/**
+ * Is the user an admin of a specific role group?
+ * Returns true if the user has `type = 'admin'` or `type = 'superadmin'` for that role,
+ * OR if the user is a global superadmin (superadmin on any role).
+ */
+export async function isGroupAdmin(userId: string, role: string): Promise<boolean> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT 1 FROM lt_user_roles
+     WHERE user_id = $1
+       AND (
+         (role = $2 AND type IN ('admin', 'superadmin'))
+         OR type = 'superadmin'
+       )
+     LIMIT 1`,
+    [userId, role],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Can the actor manage members of the given role?
+ * Superadmins can manage any role. Admins can manage roles they belong to.
+ */
+export async function canManageRole(actorId: string, role: string): Promise<boolean> {
+  return isGroupAdmin(actorId, role);
 }
