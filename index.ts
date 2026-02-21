@@ -8,8 +8,8 @@ import routes from './routes';
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
 export { createLTInterceptor } from './interceptor';
-export { executeLT } from './lib/executeLT';
-export type { ExecuteLTOptions } from './lib/executeLT';
+export { executeLT } from './orchestrator';
+export type { ExecuteLTOptions } from './orchestrator';
 export { JwtAuthAdapter, createAuthMiddleware, requireAuth, signToken } from './modules/auth';
 export * from './types';
 export * as TaskService from './services/task';

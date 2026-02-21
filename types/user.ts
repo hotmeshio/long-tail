@@ -1,8 +1,10 @@
 export type LTUserStatus = 'active' | 'inactive' | 'suspended';
 
+export type LTRoleType = 'superadmin' | 'admin' | 'member';
+
 export interface LTUserRole {
   role: string;
-  type: string;
+  type: LTRoleType;
   created_at: Date;
 }
 

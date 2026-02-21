@@ -1,6 +1,7 @@
 import { MemFlow } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from '../interceptor/activities';
+import { getOrchestratorContext } from '../interceptor/context';
 import type { LTEnvelope } from '../types';
 
 type ActivitiesType = typeof interceptorActivities;
@@ -29,10 +30,11 @@ export interface ExecuteLTOptions {
 /**
  * Execute a Long Tail workflow with automatic task tracking.
  *
- * Drop-in replacement for `MemFlow.workflow.execChild` that implicitly
- * creates a task record before execution and completes it afterward.
- * The LT interceptor handles escalation if the child workflow returns
- * `{ type: 'escalation' }` or throws an error.
+ * Uses `ltStartWorkflow` (activity) to start the child with a severed
+ * connection, then `waitFor` to receive the result signal from the
+ * child's interceptor. This protects the orchestrator from child
+ * failures — the child can escalate, fail, and be re-run multiple
+ * times without affecting the parent.
  *
  * Usage (from within an orchestrator workflow):
  * ```typescript
@@ -55,29 +57,41 @@ export async function executeLT<T = any>(
     ltCreateTask,
     ltStartTask,
     ltCompleteTask,
-    ltFailTask,
     ltGetWorkflowConfig,
     ltGetProviderData,
+    ltStartWorkflow,
+    ltGenerateWorkflowId,
   } = MemFlow.workflow.proxyActivities<ActivitiesType>({
     activities: interceptorActivities,
     taskQueue: LT_ACTIVITY_QUEUE,
     retryPolicy: { maximumAttempts: 3 },
   });
 
-  // Generate deterministic child workflow ID
+  // Generate child workflow ID via activity (cached across replays)
   const childWorkflowId =
-    options.workflowId || `${workflowName}-${MemFlow.guid()}`;
-  const signalId = `lt-resolve-${childWorkflowId}`;
+    options.workflowId || await ltGenerateWorkflowId(workflowName);
+  const signalId = `lt-result-${childWorkflowId}`;
 
-  // 1. Create task record
+  // Read orchestrator context (set by interceptor wrapping the container)
+  const orchCtx = getOrchestratorContext();
+
+  // 1. Create task record with routing metadata for the interceptor
   const taskId = await ltCreateTask({
     workflowId: childWorkflowId,
     workflowType: workflowName,
     ltType: workflowName,
     signalId,
-    parentWorkflowId: childWorkflowId,
+    parentWorkflowId: orchCtx?.workflowId || childWorkflowId,
     originId: options.originId,
     envelope: JSON.stringify(args[0] || {}),
+    metadata: orchCtx
+      ? {
+          signalId,
+          parentWorkflowId: orchCtx.workflowId,
+          parentTaskQueue: orchCtx.taskQueue,
+          parentWorkflowType: orchCtx.workflowType,
+        }
+      : { signalId },
   });
 
   await ltStartTask(taskId);
@@ -97,53 +111,54 @@ export async function executeLT<T = any>(
     }
   }
 
-  try {
-    // 4. Execute onBefore lifecycle hooks
-    if (wfConfig?.onBefore?.length) {
-      for (const hook of wfConfig.onBefore) {
-        await MemFlow.workflow.execChild({
-          workflowName: hook.target_workflow_type,
-          args,
-          taskQueue: hook.target_task_queue || taskQueue,
-          expire,
-        });
-      }
-    }
-
-    // 5. Execute child workflow (interceptor handles escalation)
-    const result = await MemFlow.workflow.execChild<T>({
-      workflowName,
-      args,
-      taskQueue,
-      workflowId: childWorkflowId,
-      expire,
-    });
-
-    // 6. Execute onAfter lifecycle hooks
-    if (wfConfig?.onAfter?.length) {
-      for (const hook of wfConfig.onAfter) {
-        await MemFlow.workflow.execChild({
-          workflowName: hook.target_workflow_type,
-          args: [...args, result],
-          taskQueue: hook.target_task_queue || taskQueue,
-          expire,
-        });
-      }
-    }
-
-    // 7. Complete task with result data
-    const resultObj = result as any;
-    await ltCompleteTask({
-      taskId,
-      data: JSON.stringify(resultObj?.data ?? result),
-      milestones: resultObj?.milestones,
-    });
-
-    return result;
-  } catch (err: any) {
-    if (MemFlow.workflow.didInterrupt(err)) throw err;
-
-    await ltFailTask({ taskId, error: err.message || String(err) });
-    throw err;
+  // 4. Inject task ID into the envelope so the interceptor can find the task
+  const envelope = args[0] as LTEnvelope | undefined;
+  if (envelope) {
+    envelope.lt = { ...envelope.lt, taskId };
   }
+
+  // 5. Execute onBefore lifecycle hooks (still use execChild — not LT)
+  if (wfConfig?.onBefore?.length) {
+    for (const hook of wfConfig.onBefore) {
+      await MemFlow.workflow.execChild({
+        workflowName: hook.target_workflow_type,
+        args,
+        taskQueue: hook.target_task_queue || taskQueue,
+        expire,
+      });
+    }
+  }
+
+  // 6. Start child workflow via activity (SEVERED connection)
+  await ltStartWorkflow({
+    workflowName,
+    args,
+    taskQueue,
+    workflowId: childWorkflowId,
+    expire: expire || 180,
+  });
+
+  // 7. Wait for the child's interceptor to signal back with the result
+  const result = await MemFlow.workflow.waitFor<T>(signalId);
+
+  // 8. Complete the task — persist result data
+  await ltCompleteTask({
+    taskId,
+    data: JSON.stringify((result as any)?.data),
+    milestones: (result as any)?.milestones || [],
+  });
+
+  // 9. Execute onAfter lifecycle hooks
+  if (wfConfig?.onAfter?.length) {
+    for (const hook of wfConfig.onAfter) {
+      await MemFlow.workflow.execChild({
+        workflowName: hook.target_workflow_type,
+        args: [...args, result],
+        taskQueue: hook.target_task_queue || taskQueue,
+        expire,
+      });
+    }
+  }
+
+  return result;
 }

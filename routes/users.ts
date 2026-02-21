@@ -1,19 +1,22 @@
 import { Router } from 'express';
 
 import * as userService from '../services/user';
+import type { LTRoleType } from '../types';
 
 const router = Router();
+
+// ── User CRUD ─────────────────────────────────────────────────────────────────
 
 /**
  * GET /api/users
  * List users with optional filters.
- * Query: ?role=admin&roleType=admin&status=active&limit=50&offset=0
+ * Query: ?role=reviewer&roleType=admin&status=active&limit=50&offset=0
  */
 router.get('/', async (req, res) => {
   try {
     const result = await userService.listUsers({
       role: req.query.role as string,
-      roleType: req.query.roleType as string,
+      roleType: req.query.roleType as LTRoleType,
       status: req.query.status as any,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
@@ -52,6 +55,16 @@ router.post('/', async (req, res) => {
     if (!external_id) {
       res.status(400).json({ error: 'external_id is required' });
       return;
+    }
+    if (roles) {
+      for (const r of roles) {
+        if (!r.role || !r.type || !userService.isValidRoleType(r.type)) {
+          res.status(400).json({
+            error: 'Each role must have a role name and type (superadmin, admin, member)',
+          });
+          return;
+        }
+      }
     }
     const user = await userService.createUser({
       external_id,
@@ -105,7 +118,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// ── Role sub-routes ─────────────────────────────────────────────────────────
+// ── Role management ─────────────────────────────────────────────────────────
 
 /**
  * GET /api/users/:id/roles
@@ -123,13 +136,17 @@ router.get('/:id/roles', async (req, res) => {
 /**
  * POST /api/users/:id/roles
  * Add a role to a user.
- * Body: { role, type }
+ * Body: { role, type } — type must be superadmin, admin, or member
  */
 router.post('/:id/roles', async (req, res) => {
   try {
     const { role, type } = req.body || {};
     if (!role || !type) {
       res.status(400).json({ error: 'role and type are required' });
+      return;
+    }
+    if (!userService.isValidRoleType(type)) {
+      res.status(400).json({ error: 'type must be superadmin, admin, or member' });
       return;
     }
     const result = await userService.addUserRole(req.params.id, role, type);

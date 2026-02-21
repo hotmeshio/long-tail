@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { MemFlow } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
+import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
@@ -99,16 +100,16 @@ describe('reviewContent workflow', () => {
     );
   }, 30_000);
 
-  // ── Happy path: task record created on auto-approve ───────────────────────
+  // ── Standalone: no task record without orchestrator ─────────────────────
 
-  it('should create a completed task record for auto-approved content', async () => {
+  it('should not create a task record in standalone mode (no orchestrator)', async () => {
     const workflowId = `test-task-record-${MemFlow.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
         data: {
           contentId: 'auto-2',
-          content: 'Good content that auto-approves. Checking the task record.',
+          content: 'Good content that auto-approves. Checking standalone mode.',
         },
         metadata: {},
       }],
@@ -118,25 +119,22 @@ describe('reviewContent workflow', () => {
       expire: 60,
     });
 
-    await handle.result();
-    await sleepFor(500);
+    const result = await handle.result() as LTReturn;
+    expect(result.type).toBe('return');
+    expect(result.data.approved).toBe(true);
 
+    // Standalone workflows don't create task records —
+    // tasks are the orchestrator's responsibility
     const task = await taskService.getTaskByWorkflowId(workflowId);
-    expect(task).toBeTruthy();
-    expect(task!.status).toBe('completed');
-    expect(task!.workflow_type).toBe('reviewContent');
-    expect(task!.data).toBeTruthy();
-
-    const data = JSON.parse(task!.data!);
-    expect(data.approved).toBe(true);
+    expect(task).toBeNull();
   }, 30_000);
 
   // ── Escalation: low confidence triggers HITL ──────────────────────────────
 
-  it('should escalate low-confidence content and resume on signal', async () => {
+  it('should escalate low-confidence content and resolve via new workflow', async () => {
     const workflowId = `test-escalate-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: {
           contentId: 'esc-1',
@@ -150,32 +148,31 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    // Wait for the workflow to pause at escalation
+    // Wait for the workflow to complete (it ends on escalation now)
     await sleepFor(5000);
 
-    // Verify task is in needs_intervention
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    expect(task).toBeTruthy();
-    expect(task!.status).toBe('needs_intervention');
-
-    // Verify escalation was created
-    const escalations = await escalationService.getEscalationsByTaskId(task!.id);
+    // Verify escalation was created (found via workflow_id, not task)
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
     expect(escalations.length).toBe(1);
     expect(escalations[0].status).toBe('pending');
     expect(escalations[0].role).toBe('reviewer');
     expect(escalations[0].description).toContain('confidence');
 
-    // Signal the workflow with resolver data
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Resolve by starting a new workflow with resolver data
+    const rerunId = await resolveEscalation(escalations[0].id, {
       contentId: 'esc-1',
       approved: true,
       humanNote: 'Reviewed and approved by human',
     });
 
-    const result = await handle.result() as LTReturn;
-    expect(result.type).toBe('return');
-    expect(result.data.approved).toBe(true);
-    expect(result.data.humanNote).toBe('Reviewed and approved by human');
+    // Wait for the re-run workflow to complete
+    await sleepFor(5000);
+
+    // Verify the escalation was resolved by the interceptor
+    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
+    expect(resolvedEsc!.status).toBe('resolved');
+    expect(resolvedEsc!.resolved_at).toBeTruthy();
+    expect(resolvedEsc!.resolver_payload).toBeTruthy();
   }, 45_000);
 
   // ── Escalation: claim → resolve lifecycle ─────────────────────────────────
@@ -183,7 +180,7 @@ describe('reviewContent workflow', () => {
   it('should support the full claim → resolve escalation lifecycle', async () => {
     const workflowId = `test-claim-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: {
           contentId: 'esc-2',
@@ -199,9 +196,8 @@ describe('reviewContent workflow', () => {
 
     await sleepFor(5000);
 
-    // Find the pending escalation
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    const escalations = await escalationService.getEscalationsByTaskId(task!.id);
+    // Find the pending escalation (via workflow_id)
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
     const escalation = escalations[0];
     expect(escalation.status).toBe('pending');
 
@@ -217,19 +213,16 @@ describe('reviewContent workflow', () => {
     expect(claimed!.escalation.claimed_at).toBeTruthy();
     expect(claimed!.isExtension).toBe(false);
 
-    // Signal the workflow — interceptor resolves the escalation durably
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Resolve by starting a new workflow
+    await resolveEscalation(escalation.id, {
       contentId: 'esc-2',
       approved: false,
       reason: 'Content violates policy',
     });
 
-    const result = await handle.result() as LTReturn;
-    expect(result.data.approved).toBe(false);
-    expect(result.data.reason).toBe('Content violates policy');
+    await sleepFor(5000);
 
     // Verify the interceptor resolved the escalation
-    await sleepFor(500);
     const resolvedEsc = await escalationService.getEscalation(escalation.id);
     expect(resolvedEsc!.status).toBe('resolved');
     expect(resolvedEsc!.resolved_at).toBeTruthy();
@@ -241,7 +234,7 @@ describe('reviewContent workflow', () => {
   it('should release expired claims back to pending', async () => {
     const workflowId = `test-expire-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: {
           contentId: 'esc-3',
@@ -257,14 +250,13 @@ describe('reviewContent workflow', () => {
 
     await sleepFor(5000);
 
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    const escalations = await escalationService.getEscalationsByTaskId(task!.id);
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
     const escalation = escalations[0];
 
     // Claim with a 0-minute duration (expires immediately)
     const claimed = await escalationService.claimEscalation(escalation.id, 'reviewer-99', 0);
     expect(claimed).toBeTruthy();
-    expect(claimed!.escalation.status).toBe('pending'); // status unchanged
+    expect(claimed!.escalation.status).toBe('pending');
 
     // Wait a moment for the claim to expire
     await sleepFor(100);
@@ -277,10 +269,6 @@ describe('reviewContent workflow', () => {
     const updated = await escalationService.getEscalation(escalation.id);
     expect(updated!.status).toBe('pending');
     expect(updated!.assigned_to).toBeNull();
-
-    // Clean up: resolve the workflow so it doesn't hang
-    await handle.signal(`lt-resolve-${workflowId}`, { contentId: 'esc-3', approved: true });
-    await handle.result();
   }, 45_000);
 
   // ── Error flag detection ──────────────────────────────────────────────────
@@ -288,7 +276,7 @@ describe('reviewContent workflow', () => {
   it('should escalate content with error flags', async () => {
     const workflowId = `test-error-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: {
           contentId: 'err-1',
@@ -304,18 +292,20 @@ describe('reviewContent workflow', () => {
 
     await sleepFor(5000);
 
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    expect(task!.status).toBe('needs_intervention');
-
-    // Resolve it
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Find and resolve escalation (via workflow_id)
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    expect(escalations.length).toBe(1);
+    await resolveEscalation(escalations[0].id, {
       contentId: 'err-1',
       approved: true,
       note: 'Error was a false positive',
     });
 
-    const result = await handle.result() as LTReturn;
-    expect(result.type).toBe('return');
+    await sleepFor(5000);
+
+    // Verify escalation was resolved
+    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
+    expect(resolvedEsc!.status).toBe('resolved');
   }, 45_000);
 
   // ── Multiple workflows: isolation ─────────────────────────────────────────
@@ -352,7 +342,7 @@ describe('reviewContent workflow', () => {
   it('should escalate very short content', async () => {
     const workflowId = `test-short-${MemFlow.guid()}`;
 
-    const handle = await client.workflow.start({
+    await client.workflow.start({
       args: [{
         data: {
           contentId: 'short-1',
@@ -368,17 +358,18 @@ describe('reviewContent workflow', () => {
 
     await sleepFor(5000);
 
-    const task = await taskService.getTaskByWorkflowId(workflowId);
-    expect(task!.status).toBe('needs_intervention');
-
-    // Resolve
-    await handle.signal(`lt-resolve-${workflowId}`, {
+    // Find and resolve escalation (via workflow_id)
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    expect(escalations.length).toBe(1);
+    await resolveEscalation(escalations[0].id, {
       contentId: 'short-1',
       approved: false,
       reason: 'Content too short to evaluate',
     });
 
-    const result = await handle.result() as LTReturn;
-    expect(result.data.approved).toBe(false);
+    await sleepFor(5000);
+
+    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
+    expect(resolvedEsc!.status).toBe('resolved');
   }, 45_000);
 });

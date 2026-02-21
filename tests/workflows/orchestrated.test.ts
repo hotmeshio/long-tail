@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { MemFlow } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
+import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
@@ -17,7 +18,7 @@ const { Connection, Client, Worker } = MemFlow;
 
 const LEAF_QUEUE = 'long-tail';
 const ORCH_QUEUE = 'test-orch';
-// Must match the default in lib/executeLT.ts so proxyActivities routes correctly
+// Must match the default in orchestrator/index.ts so proxyActivities routes correctly
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
 describe('orchestrated workflows (executeLT)', () => {
@@ -127,9 +128,9 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(task!.status).toBe('completed');
   }, 45_000);
 
-  // ── executeLT: escalation creates task + escalation, resumes on signal ──────
+  // ── executeLT: escalation ends child, resolve starts new child ──────────────
 
-  it('should escalate via orchestrator and resume on signal', async () => {
+  it('should escalate via orchestrator and resolve via new workflow', async () => {
     const orchWorkflowId = `test-orch-escalate-${MemFlow.guid()}`;
 
     const handle = await client.workflow.start({
@@ -143,10 +144,10 @@ describe('orchestrated workflows (executeLT)', () => {
       taskQueue: ORCH_QUEUE,
       workflowName: 'reviewContentOrchestrator',
       workflowId: orchWorkflowId,
-      expire: 120,
+      expire: 180,
     });
 
-    // Wait for the child workflow to escalate
+    // Wait for the child workflow to escalate and end
     await sleepFor(8000);
 
     // Find the escalation — it should have routing fields
@@ -162,27 +163,20 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(esc!.task_queue).toBeTruthy();
     expect(esc!.workflow_type).toBe('reviewContent');
 
-    // Verify task was created and is in needs_intervention
+    // Verify task was created and is still in_progress
+    // (the escalation record signals intervention, not the task status)
     const task = await taskService.getTaskByWorkflowId(esc!.workflow_id!);
     expect(task).toBeTruthy();
-    expect(task!.status).toBe('needs_intervention');
+    expect(task!.status).toBe('in_progress');
 
-    // Signal the CHILD workflow (not the orchestrator) using routing fields
-    const childClient = new Client({
-      connection: { class: Postgres, options: postgres_options },
-    });
-    const childHandle = await childClient.workflow.getHandle(
-      esc!.task_queue!,
-      esc!.workflow_type!,
-      esc!.workflow_id!,
-    );
-    await childHandle.signal(`lt-resolve-${esc!.workflow_id!}`, {
+    // Resolve by starting a new workflow (interceptor resolves escalation + signals orchestrator)
+    await resolveEscalation(esc!.id, {
       contentId: 'orch-esc-1',
       approved: true,
       humanNote: 'Reviewed via orchestrator path',
     });
 
-    // Orchestrator should complete with the resolved data
+    // Orchestrator should complete — the new child signals back
     const result = await handle.result() as LTReturn;
     expect(result.type).toBe('return');
     expect(result.data.approved).toBe(true);
@@ -211,12 +205,12 @@ describe('orchestrated workflows (executeLT)', () => {
       taskQueue: ORCH_QUEUE,
       workflowName: 'reviewContentOrchestrator',
       workflowId: orchWorkflowId,
-      expire: 120,
+      expire: 180,
     });
 
     await sleepFor(8000);
 
-    // Find and signal the escalation
+    // Find and resolve the escalation
     const { escalations } = await escalationService.listEscalations({
       status: 'pending',
       type: 'reviewContent',
@@ -226,15 +220,7 @@ describe('orchestrated workflows (executeLT)', () => {
     );
     expect(esc).toBeTruthy();
 
-    const childClient = new Client({
-      connection: { class: Postgres, options: postgres_options },
-    });
-    const childHandle = await childClient.workflow.getHandle(
-      esc!.task_queue!,
-      esc!.workflow_type!,
-      esc!.workflow_id!,
-    );
-    await childHandle.signal(`lt-resolve-${esc!.workflow_id!}`, {
+    await resolveEscalation(esc!.id, {
       contentId: 'orch-complete-1',
       approved: true,
     });
@@ -242,7 +228,7 @@ describe('orchestrated workflows (executeLT)', () => {
     await handle.result();
     await sleepFor(500);
 
-    // Verify the task is now completed (executeLT completes it)
+    // Verify the task is now completed (orchestrator completes it when signal returns)
     const task = await taskService.getTaskByWorkflowId(esc!.workflow_id!);
     expect(task).toBeTruthy();
     expect(task!.status).toBe('completed');
