@@ -102,7 +102,7 @@ export async function executeLT<T = any>(
   // 3. Inject provider data into envelope if consumers are configured
   if (wfConfig?.consumers?.length && options.originId) {
     const providerData = await ltGetProviderData({
-      consumers: wfConfig.consumers,
+      workflowName,
       originId: options.originId,
     });
     const envelope = args[0] as LTEnvelope | undefined;

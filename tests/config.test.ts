@@ -6,6 +6,7 @@ import { postgres_options } from './setup';
 import { migrate } from '../services/db/migrate';
 import * as configService from '../services/config';
 import { ltConfig } from '../modules/ltconfig';
+import { ltGetWorkflowConfig } from '../interceptor/activities/config';
 import type { LTWorkflowConfig } from '../types';
 
 const { Connection } = Durable;
@@ -231,6 +232,113 @@ describe('LTConfig service and cache', () => {
     // After invalidation, new value
     ltConfig.invalidate();
     expect(await ltConfig.getTargetEscalationRole('testWorkflow')).toBe('moderator');
+  });
+
+  // ── Activity config bridge: uses cache ──────────────────────────────────
+
+  it('ltGetWorkflowConfig should resolve from cache', async () => {
+    ltConfig.invalidate();
+
+    // First call loads from DB into cache
+    const config1 = await ltGetWorkflowConfig('testWorkflow');
+    expect(config1).toBeTruthy();
+    expect(config1!.isLT).toBe(true);
+    expect(config1!.role).toBe('moderator');
+
+    // Second call within TTL should return cached data
+    const config2 = await ltGetWorkflowConfig('testWorkflow');
+    expect(config2).toEqual(config1);
+  });
+
+  it('ltGetWorkflowConfig should return null for unregistered workflows', async () => {
+    const config = await ltGetWorkflowConfig('unregisteredWorkflow');
+    expect(config).toBeNull();
+  });
+
+  it('ltGetWorkflowConfig should reflect config changes after invalidation', async () => {
+    // Current value
+    const before = await ltGetWorkflowConfig('testWorkflow');
+    expect(before!.role).toBe('moderator');
+
+    // Update config in DB
+    await configService.upsertWorkflowConfig({
+      workflow_type: 'testWorkflow',
+      is_lt: true,
+      is_container: false,
+      task_queue: 'final-queue',
+      default_role: 'supervisor',
+      default_modality: 'phone',
+      description: null,
+      roles: ['supervisor'],
+      lifecycle: { onBefore: [], onAfter: [] },
+      consumers: [],
+    });
+
+    // Still returns old value (cached)
+    const stale = await ltGetWorkflowConfig('testWorkflow');
+    expect(stale!.role).toBe('moderator');
+
+    // After invalidation, returns new value
+    ltConfig.invalidate();
+    const fresh = await ltGetWorkflowConfig('testWorkflow');
+    expect(fresh!.role).toBe('supervisor');
+
+    // Restore original value for cleanup test
+    await configService.upsertWorkflowConfig({
+      workflow_type: 'testWorkflow',
+      is_lt: true,
+      is_container: false,
+      task_queue: 'final-queue',
+      default_role: 'moderator',
+      default_modality: 'phone',
+      description: null,
+      roles: ['moderator'],
+      lifecycle: { onBefore: [], onAfter: [] },
+      consumers: [],
+    });
+    ltConfig.invalidate();
+  });
+
+  // ── Config-driven routing decisions ────────────────────────────────────
+
+  it('should identify LT workflows via config', async () => {
+    ltConfig.invalidate();
+    const config = await ltGetWorkflowConfig('testWorkflow');
+    expect(config).toBeTruthy();
+    expect(config!.isLT).toBe(true);
+    expect(config!.isContainer).toBe(false);
+  });
+
+  it('should identify container workflows via config', async () => {
+    // Create a container config
+    await configService.upsertWorkflowConfig({
+      workflow_type: 'testContainerRouting',
+      is_lt: false,
+      is_container: true,
+      task_queue: 'container-queue',
+      default_role: 'reviewer',
+      default_modality: 'default',
+      description: null,
+      roles: [],
+      lifecycle: { onBefore: [], onAfter: [] },
+      consumers: [],
+    });
+    ltConfig.invalidate();
+
+    const config = await ltGetWorkflowConfig('testContainerRouting');
+    expect(config).toBeTruthy();
+    expect(config!.isContainer).toBe(true);
+    expect(config!.isLT).toBe(false);
+
+    await configService.deleteWorkflowConfig('testContainerRouting');
+    ltConfig.invalidate();
+  });
+
+  it('should return null for pass-through (unregistered) workflows', async () => {
+    ltConfig.invalidate();
+    const config = await ltGetWorkflowConfig('plainWorkflowNoConfig');
+    expect(config).toBeNull();
+    // Interceptor would call next() for this workflow (pass-through)
   });
 
   // ── Cleanup ───────────────────────────────────────────────────────────────

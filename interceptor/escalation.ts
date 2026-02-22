@@ -1,6 +1,6 @@
 import type { LTEscalation } from '../types';
-import type { InterceptorState } from './helpers';
-import { buildStoredEnvelope } from './helpers';
+import type { InterceptorState } from './state';
+import { buildStoredEnvelope } from './state';
 
 /**
  * Handle a workflow that returned { type: 'escalation' }.

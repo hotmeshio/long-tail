@@ -2,12 +2,12 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from './activities';
 import { runWithOrchestratorContext } from './context';
-import { extractEnvelope } from './helpers';
+import { extractEnvelope } from './state';
 import { handleEscalation, handleErrorEscalation } from './escalation';
 import { handleCompletion } from './completion';
 
 import type { LTReturn, LTEscalation, LTEnvelope } from '../types';
-import type { InterceptorState } from './helpers';
+import type { InterceptorState } from './state';
 
 type ActivitiesType = typeof interceptorActivities;
 
