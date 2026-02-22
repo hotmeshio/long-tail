@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from './setup';
 import { migrate } from '../services/db/migrate';
@@ -8,7 +8,7 @@ import * as configService from '../services/config';
 import { ltConfig } from '../modules/ltconfig';
 import type { LTWorkflowConfig } from '../types';
 
-const { Connection } = MemFlow;
+const { Connection } = Durable;
 
 describe('LTConfig service and cache', () => {
   beforeAll(async () => {
@@ -27,7 +27,7 @@ describe('LTConfig service and cache', () => {
   }, 30_000);
 
   afterAll(async () => {
-    await MemFlow.shutdown();
+    await Durable.shutdown();
   }, 10_000);
 
   // ── CRUD: create ──────────────────────────────────────────────────────────

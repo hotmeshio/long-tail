@@ -1,8 +1,9 @@
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../modules/config';
 import { createLTInterceptor } from '../interceptor';
+import { createLTActivityInterceptor } from '../interceptor/activity-interceptor';
 import * as interceptorActivities from '../interceptor/activities';
 import * as reviewContentWorkflow from '../workflows/review-content';
 import * as verifyDocumentWorkflow from '../workflows/verify-document';
@@ -31,7 +32,7 @@ export async function startWorkers(): Promise<void> {
   };
 
   // 1. Register shared activity worker for interceptor DB operations
-  await MemFlow.registerActivityWorker(
+  await Durable.registerActivityWorker(
     { connection, taskQueue: LT_ACTIVITY_QUEUE },
     interceptorActivities,
     LT_ACTIVITY_QUEUE,
@@ -43,17 +44,21 @@ export async function startWorkers(): Promise<void> {
     defaultRole: 'reviewer',
     defaultModality: 'default',
   });
-  MemFlow.registerInterceptor(ltInterceptor);
+  Durable.registerInterceptor(ltInterceptor);
+
+  // 2b. Register the LT activity interceptor (pass-through for now)
+  const ltActivityInterceptor = createLTActivityInterceptor();
+  Durable.registerActivityInterceptor(ltActivityInterceptor);
 
   // 3. Start leaf workflow workers
-  const reviewWorker = await MemFlow.Worker.create({
+  const reviewWorker = await Durable.Worker.create({
     connection,
     taskQueue: LT_TASK_QUEUE,
     workflow: reviewContentWorkflow.reviewContent,
   });
   await reviewWorker.run();
 
-  const verifyWorker = await MemFlow.Worker.create({
+  const verifyWorker = await Durable.Worker.create({
     connection,
     taskQueue: LT_VERIFY_QUEUE,
     workflow: verifyDocumentWorkflow.verifyDocument,
@@ -61,14 +66,14 @@ export async function startWorkers(): Promise<void> {
   await verifyWorker.run();
 
   // 4. Start orchestrator workflow workers
-  const reviewOrchWorker = await MemFlow.Worker.create({
+  const reviewOrchWorker = await Durable.Worker.create({
     connection,
     taskQueue: LT_REVIEW_ORCH_QUEUE,
     workflow: reviewContentOrchWorkflow.reviewContentOrchestrator,
   });
   await reviewOrchWorker.run();
 
-  const verifyOrchWorker = await MemFlow.Worker.create({
+  const verifyOrchWorker = await Durable.Worker.create({
     connection,
     taskQueue: LT_VERIFY_ORCH_QUEUE,
     workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator,
@@ -82,10 +87,10 @@ export async function startWorkers(): Promise<void> {
 }
 
 /**
- * Create a MemFlow client for starting workflows and sending signals.
+ * Create a Durable client for starting workflows and sending signals.
  */
 export function createClient() {
-  return new MemFlow.Client({
+  return new Durable.Client({
     connection: {
       class: Postgres,
       options: postgres_options,

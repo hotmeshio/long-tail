@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
+import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
 import * as reviewContentWorkflow from '../../workflows/review-content';
 import * as taskService from '../../services/task';
@@ -13,7 +14,7 @@ import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
 import type { LTReturn } from '../../types';
 
-const { Connection, Client, Worker } = MemFlow;
+const { Connection, Client, Worker } = Durable;
 
 const TASK_QUEUE = 'test-review';
 const ACTIVITY_QUEUE = 'test-lt-interceptor';
@@ -44,7 +45,7 @@ describe('reviewContent workflow', () => {
 
     const connection = { class: Postgres, options: postgres_options };
 
-    await MemFlow.registerActivityWorker(
+    await Durable.registerActivityWorker(
       { connection, taskQueue: ACTIVITY_QUEUE },
       interceptorActivities,
       ACTIVITY_QUEUE,
@@ -53,7 +54,10 @@ describe('reviewContent workflow', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    MemFlow.registerInterceptor(ltInterceptor);
+    Durable.registerInterceptor(ltInterceptor);
+
+    const ltActivityInterceptor = createLTActivityInterceptor();
+    Durable.registerActivityInterceptor(ltActivityInterceptor);
 
     const worker = await Worker.create({
       connection,
@@ -66,9 +70,10 @@ describe('reviewContent workflow', () => {
   }, 60_000);
 
   afterAll(async () => {
-    MemFlow.clearInterceptors();
+    Durable.clearInterceptors();
+    Durable.clearActivityInterceptors();
     await sleepFor(1500);
-    await MemFlow.shutdown();
+    await Durable.shutdown();
   }, 10_000);
 
   // ── Happy path: AI auto-approves ──────────────────────────────────────────
@@ -84,7 +89,7 @@ describe('reviewContent workflow', () => {
       }],
       taskQueue: TASK_QUEUE,
       workflowName: 'reviewContent',
-      workflowId: `test-approve-${MemFlow.guid()}`,
+      workflowId: `test-approve-${Durable.guid()}`,
       expire: 60,
     });
 
@@ -103,7 +108,7 @@ describe('reviewContent workflow', () => {
   // ── Standalone: no task record without orchestrator ─────────────────────
 
   it('should not create a task record in standalone mode (no orchestrator)', async () => {
-    const workflowId = `test-task-record-${MemFlow.guid()}`;
+    const workflowId = `test-task-record-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
@@ -132,7 +137,7 @@ describe('reviewContent workflow', () => {
   // ── Escalation: low confidence triggers HITL ──────────────────────────────
 
   it('should escalate low-confidence content and resolve via new workflow', async () => {
-    const workflowId = `test-escalate-${MemFlow.guid()}`;
+    const workflowId = `test-escalate-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -178,7 +183,7 @@ describe('reviewContent workflow', () => {
   // ── Escalation: claim → resolve lifecycle ─────────────────────────────────
 
   it('should support the full claim → resolve escalation lifecycle', async () => {
-    const workflowId = `test-claim-${MemFlow.guid()}`;
+    const workflowId = `test-claim-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -232,7 +237,7 @@ describe('reviewContent workflow', () => {
   // ── Escalation: expired claim release ─────────────────────────────────────
 
   it('should release expired claims back to pending', async () => {
-    const workflowId = `test-expire-${MemFlow.guid()}`;
+    const workflowId = `test-expire-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -274,7 +279,7 @@ describe('reviewContent workflow', () => {
   // ── Error flag detection ──────────────────────────────────────────────────
 
   it('should escalate content with error flags', async () => {
-    const workflowId = `test-error-${MemFlow.guid()}`;
+    const workflowId = `test-error-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -322,7 +327,7 @@ describe('reviewContent workflow', () => {
           }],
           taskQueue: TASK_QUEUE,
           workflowName: 'reviewContent',
-          workflowId: `test-${id}-${MemFlow.guid()}`,
+          workflowId: `test-${id}-${Durable.guid()}`,
           expire: 60,
         }),
       ),
@@ -340,7 +345,7 @@ describe('reviewContent workflow', () => {
   // ── Short content triggers too_short flag ─────────────────────────────────
 
   it('should escalate very short content', async () => {
-    const workflowId = `test-short-${MemFlow.guid()}`;
+    const workflowId = `test-short-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -372,4 +377,31 @@ describe('reviewContent workflow', () => {
     const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
     expect(resolvedEsc!.status).toBe('resolved');
   }, 45_000);
+
+  // ── Activity interceptor: clean analysis data in result ──────────────────
+
+  it('should return clean analysis data with no wrapper artifacts', async () => {
+    const handle = await client.workflow.start({
+      args: [{
+        data: {
+          contentId: 'clean-1',
+          content: 'Perfect content that passes review without any issues.',
+        },
+        metadata: {},
+      }],
+      taskQueue: TASK_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId: `test-clean-${Durable.guid()}`,
+      expire: 60,
+    });
+
+    const result = await handle.result() as LTReturn;
+
+    // The workflow returns clean ReviewAnalysis data
+    expect(result.type).toBe('return');
+    expect(result.data.approved).toBe(true);
+    expect(result.data.analysis.confidence).toBeGreaterThanOrEqual(0.85);
+    expect(result.data.analysis.flags).toEqual([]);
+    expect(result.data.analysis.summary).toBeTruthy();
+  }, 30_000);
 });

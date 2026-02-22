@@ -107,12 +107,12 @@ Edit any file — `ts-node-dev` watches for changes and restarts the server insi
 A workflow is a function. It receives an envelope, does work (usually via AI), and returns a result or an escalation. That's it.
 
 ```typescript
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 import type { LTEnvelope, LTReturn, LTEscalation } from '@hotmeshio/long-tail';
 
 import * as activities from './activities';
 
-const { analyzeContent } = MemFlow.workflow.proxyActivities<typeof activities>({
+const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({
   activities,
 });
 

@@ -1,4 +1,4 @@
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from './activities';
 import { runWithOrchestratorContext } from './context';
@@ -53,7 +53,7 @@ export function createLTInterceptor(options: {
       const workflowTopic = ctx.get('workflowTopic') as string;
 
       // Proxy the interceptor activities through the shared queue
-      const activities = MemFlow.workflow.proxyActivities<ActivitiesType>({
+      const activities = Durable.workflow.proxyActivities<ActivitiesType>({
         activities: interceptorActivities,
         taskQueue: activityTaskQueue,
         retryPolicy: { maximumAttempts: 3 },
@@ -139,7 +139,7 @@ export function createLTInterceptor(options: {
 
         return result;
       } catch (err: any) {
-        if (MemFlow.workflow.didInterrupt(err)) {
+        if (Durable.workflow.didInterrupt(err)) {
           throw err;
         }
         return handleErrorEscalation(state, err);

@@ -1,4 +1,4 @@
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from '../interceptor/activities';
 import { getOrchestratorContext } from '../interceptor/context';
@@ -61,7 +61,7 @@ export async function executeLT<T = any>(
     ltGetProviderData,
     ltStartWorkflow,
     ltGenerateWorkflowId,
-  } = MemFlow.workflow.proxyActivities<ActivitiesType>({
+  } = Durable.workflow.proxyActivities<ActivitiesType>({
     activities: interceptorActivities,
     taskQueue: LT_ACTIVITY_QUEUE,
     retryPolicy: { maximumAttempts: 3 },
@@ -120,7 +120,7 @@ export async function executeLT<T = any>(
   // 5. Execute onBefore lifecycle hooks (still use execChild — not LT)
   if (wfConfig?.onBefore?.length) {
     for (const hook of wfConfig.onBefore) {
-      await MemFlow.workflow.execChild({
+      await Durable.workflow.execChild({
         workflowName: hook.target_workflow_type,
         args,
         taskQueue: hook.target_task_queue || taskQueue,
@@ -139,7 +139,7 @@ export async function executeLT<T = any>(
   });
 
   // 7. Wait for the child's interceptor to signal back with the result
-  const result = await MemFlow.workflow.waitFor<T>(signalId);
+  const result = await Durable.workflow.waitFor<T>(signalId);
 
   // 8. Complete the task — persist result data
   await ltCompleteTask({
@@ -151,7 +151,7 @@ export async function executeLT<T = any>(
   // 9. Execute onAfter lifecycle hooks
   if (wfConfig?.onAfter?.length) {
     for (const hook of wfConfig.onAfter) {
-      await MemFlow.workflow.execChild({
+      await Durable.workflow.execChild({
         workflowName: hook.target_workflow_type,
         args: [...args, result],
         taskQueue: hook.target_task_queue || taskQueue,

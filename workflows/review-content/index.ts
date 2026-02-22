@@ -1,4 +1,4 @@
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../types';
 import * as activities from './activities';
@@ -7,12 +7,11 @@ import type {
   ReviewContentEscalation,
   ReviewContentReturnData,
   ReviewContentEscalationData,
-  ReviewAnalysis,
 } from './types';
 
 type ActivitiesType = typeof activities;
 
-const { analyzeContent } = MemFlow.workflow.proxyActivities<ActivitiesType>({
+const { analyzeContent } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
 });
 
@@ -45,14 +44,15 @@ export async function reviewContent(
     };
   }
 
-  // Step 1: AI analysis
-  const analysis: ReviewAnalysis = await analyzeContent(content, contentType);
+  // Step 1: AI analysis (activity interceptor creates 'llm' milestone before this runs)
+  const analysis = await analyzeContent(content, contentType);
 
   // Step 2: Confidence check
   if (analysis.confidence >= CONFIDENCE_THRESHOLD && analysis.approved) {
     return {
       type: 'return',
       milestones: [
+        { name: 'llm', value: 'content_analysis' },
         { name: 'ai_review', value: 'approved' },
         { name: 'confidence', value: analysis.confidence },
       ],

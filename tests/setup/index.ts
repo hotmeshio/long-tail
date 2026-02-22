@@ -1,7 +1,7 @@
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
-const { Connection } = MemFlow;
+const { Connection } = Durable;
 
 export const postgres_options = {
   host: process.env.POSTGRES_HOST || 'localhost',

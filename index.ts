@@ -8,6 +8,7 @@ import routes from './routes';
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
 export { createLTInterceptor } from './interceptor';
+export { createLTActivityInterceptor } from './interceptor/activity-interceptor';
 export { executeLT } from './orchestrator';
 export type { ExecuteLTOptions } from './orchestrator';
 export { JwtAuthAdapter, createAuthMiddleware, requireAuth, signToken } from './modules/auth';
