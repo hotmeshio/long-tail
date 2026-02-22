@@ -12,15 +12,48 @@ import * as reviewContentOrchestrator from '../workflows/review-content/orchestr
 import * as configService from '../services/config';
 import { eventRegistry } from '../services/events';
 import { InMemoryEventAdapter } from '../services/events/memory';
-import type { LTReturn } from '../types';
+import type { LTReturn, LTActivity } from '../types';
 
 const { Connection, Client, Worker } = Durable;
 
 // Must match the hardcoded taskQueue in orchestrator workflow
 const LEAF_QUEUE = 'long-tail';
 const ORCH_QUEUE = 'test-events-orch';
+const MILESTONE_QUEUE = 'test-events-milestone';
 // Must match the default in orchestrator/index.ts so proxyActivities routes correctly
 const ACTIVITY_QUEUE = 'lt-interceptor';
+
+// ── Test activity that returns milestones (LTActivity pattern) ─────────────
+
+/** Activity that returns milestones in its result */
+async function processWithMilestones(input: string): Promise<LTActivity<{ processed: string }>> {
+  return {
+    type: 'activity',
+    data: { processed: input.toUpperCase() },
+    milestones: [
+      { name: 'processing_step', value: 'completed' },
+      { name: 'input_length', value: input.length },
+    ],
+  };
+}
+
+const milestoneActivities = { processWithMilestones };
+
+/** Test workflow that calls an activity returning milestones */
+async function milestoneWorkflow(input: { value: string }) {
+  const { processWithMilestones: process } =
+    Durable.workflow.proxyActivities<typeof milestoneActivities>({
+      activities: milestoneActivities,
+    });
+
+  const result = await process(input.value);
+
+  return {
+    type: 'return' as const,
+    data: result.data,
+    milestones: result.milestones,
+  };
+}
 
 describe('events service', () => {
   let client: InstanceType<typeof Client>;
@@ -95,6 +128,19 @@ describe('events service', () => {
       workflow: reviewContentOrchestrator.reviewContentOrchestrator,
     });
     await orchWorker.run();
+
+    // Register milestone activity worker + workflow for activity interceptor tests
+    await Durable.registerActivityWorker(
+      { connection, taskQueue: MILESTONE_QUEUE },
+      milestoneActivities,
+      MILESTONE_QUEUE,
+    );
+    const milestoneWorker = await Worker.create({
+      connection,
+      taskQueue: MILESTONE_QUEUE,
+      workflow: milestoneWorkflow,
+    });
+    await milestoneWorker.run();
 
     client = new Client({ connection });
   }, 60_000);
@@ -240,5 +286,78 @@ describe('events service', () => {
     expect(evt!.milestones.length).toBeGreaterThan(0);
     expect(evt!.data).toBeTruthy();
     expect(evt!.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  }, 30_000);
+
+  // ── Activity interceptor: publishes milestones from activity results ──────
+
+  it('should publish activity-level milestone events when activity returns milestones', async () => {
+    const workflowId = `test-activity-milestones-${Durable.guid()}`;
+
+    const handle = await client.workflow.start({
+      args: [{ value: 'hello world' }],
+      taskQueue: MILESTONE_QUEUE,
+      workflowName: 'milestoneWorkflow',
+      workflowId,
+      expire: 60,
+    });
+
+    await handle.result();
+    await sleepFor(500);
+
+    // The activity interceptor should have published a milestone event
+    const activityEvents = eventAdapter.events.filter(
+      (e) => e.type === 'milestone' && e.source === 'activity',
+    );
+    expect(activityEvents.length).toBeGreaterThanOrEqual(1);
+
+    const evt = activityEvents.find(
+      (e) => e.activityName === 'processWithMilestones',
+    );
+    expect(evt).toBeTruthy();
+    expect(evt!.workflowId).toBe(workflowId);
+    expect(evt!.workflowName).toBe('milestoneWorkflow');
+    expect(evt!.activityName).toBe('processWithMilestones');
+    expect(evt!.milestones).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'processing_step', value: 'completed' }),
+        expect.objectContaining({ name: 'input_length', value: 11 }),
+      ]),
+    );
+  }, 30_000);
+
+  // ── Activity interceptor: skips activities without milestones ──────────────
+
+  it('should not publish activity events for plain activity results', async () => {
+    const workflowId = `test-no-activity-events-${Durable.guid()}`;
+
+    const handle = await client.workflow.start({
+      args: [{
+        data: {
+          contentId: 'no-act-evt',
+          content: 'Good content that auto-approves without activity milestones.',
+        },
+        metadata: {},
+      }],
+      taskQueue: LEAF_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId,
+      expire: 60,
+    });
+
+    await handle.result();
+    await sleepFor(500);
+
+    // analyzeContent returns plain ReviewAnalysis (no milestones field),
+    // so the activity interceptor should NOT publish any activity events
+    const activityEvents = eventAdapter.events.filter(
+      (e) => e.source === 'activity' && e.workflowId === workflowId,
+    );
+    expect(activityEvents).toHaveLength(0);
+
+    // But the workflow interceptor should still publish (via handleCompletion)
+    const interceptorEvents = eventAdapter.events.filter(
+      (e) => e.source === 'interceptor' && e.workflowId === workflowId,
+    );
+    expect(interceptorEvents.length).toBeGreaterThanOrEqual(1);
   }, 30_000);
 });

@@ -6,7 +6,7 @@ import type { LTMilestone } from './task';
 export interface LTEvent {
   /** Event classification: 'milestone', 'escalation', 'task.completed', etc. */
   type: string;
-  /** Where the event originated: 'interceptor' | 'orchestrator' */
+  /** Where the event originated: 'interceptor' | 'orchestrator' | 'activity' */
   source: string;
   /** The workflow instance that produced this event */
   workflowId: string;
@@ -16,6 +16,8 @@ export interface LTEvent {
   taskQueue: string;
   /** The task ID (present when orchestrated) */
   taskId?: string;
+  /** The activity name (present when source is 'activity') */
+  activityName?: string;
   /** Milestones reported by the workflow */
   milestones: LTMilestone[];
   /** Optional result data */
