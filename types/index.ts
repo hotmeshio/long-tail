@@ -46,3 +46,8 @@ export type {
   LTUserRole,
   LTUserRecord,
 } from './user';
+
+export type {
+  LTEvent,
+  LTEventAdapter,
+} from './events';

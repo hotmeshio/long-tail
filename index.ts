@@ -18,6 +18,10 @@ export * as EscalationService from './services/escalation';
 export * as ConfigService from './services/config';
 export * as UserService from './services/user';
 export { ltConfig } from './modules/ltconfig';
+export { eventRegistry } from './services/events';
+export { NatsEventAdapter } from './services/events/nats';
+export { InMemoryEventAdapter } from './services/events/memory';
+export { publishMilestoneEvent } from './services/events/publish';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 

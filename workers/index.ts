@@ -2,6 +2,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../modules/config';
+import { eventRegistry } from '../services/events';
 import { createLTInterceptor } from '../interceptor';
 import { createLTActivityInterceptor } from '../interceptor/activity-interceptor';
 import * as interceptorActivities from '../interceptor/activities';
@@ -79,6 +80,12 @@ export async function startWorkers(): Promise<void> {
     workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator,
   });
   await verifyOrchWorker.run();
+
+  // Connect event adapters (no-op if none registered)
+  if (eventRegistry.hasAdapters) {
+    await eventRegistry.connect();
+    console.log('[workers] event adapters connected');
+  }
 
   console.log(
     `[workers] started on queues: ${LT_TASK_QUEUE}, ${LT_VERIFY_QUEUE}, ` +

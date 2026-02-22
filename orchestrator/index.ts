@@ -146,6 +146,9 @@ export async function executeLT<T = any>(
     taskId,
     data: JSON.stringify((result as any)?.data),
     milestones: (result as any)?.milestones || [],
+    workflowId: childWorkflowId,
+    workflowName,
+    taskQueue,
   });
 
   // 9. Execute onAfter lifecycle hooks

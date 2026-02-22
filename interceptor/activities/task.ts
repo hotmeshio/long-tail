@@ -1,4 +1,5 @@
 import * as taskService from '../../services/task';
+import { publishMilestoneEvent } from '../../services/events/publish';
 import type { LTMilestone, LTTaskRecord } from '../../types';
 
 /**
@@ -45,6 +46,9 @@ export async function ltCompleteTask(input: {
   taskId: string;
   data?: string;
   milestones?: LTMilestone[];
+  workflowId?: string;
+  workflowName?: string;
+  taskQueue?: string;
 }): Promise<void> {
   await taskService.updateTask(input.taskId, {
     status: 'completed',
@@ -52,6 +56,18 @@ export async function ltCompleteTask(input: {
     data: input.data,
     milestones: input.milestones,
   });
+
+  // Publish milestone event from orchestrator context
+  if (input.milestones?.length && input.workflowId) {
+    publishMilestoneEvent({
+      source: 'orchestrator',
+      workflowId: input.workflowId,
+      workflowName: input.workflowName || 'unknown',
+      taskQueue: input.taskQueue || 'unknown',
+      taskId: input.taskId,
+      milestones: input.milestones,
+    });
+  }
 }
 
 /**
