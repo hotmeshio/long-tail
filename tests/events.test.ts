@@ -12,9 +12,24 @@ import * as reviewContentOrchestrator from '../workflows/review-content/orchestr
 import * as configService from '../services/config';
 import { eventRegistry } from '../services/events';
 import { InMemoryEventAdapter } from '../services/events/memory';
-import type { LTReturn, LTActivity } from '../types';
+import type { LTReturn, LTActivity, LTEvent } from '../types';
 
 const { Connection, Client, Worker } = Durable;
+
+/** Poll the adapter until a matching event appears (or timeout). */
+async function waitForEvent(
+  adapter: InMemoryEventAdapter,
+  predicate: (e: LTEvent) => boolean,
+  timeoutMs = 5000,
+): Promise<LTEvent | undefined> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const match = adapter.events.find(predicate);
+    if (match) return match;
+    await sleepFor(100);
+  }
+  return adapter.events.find(predicate);
+}
 
 // Must match the hardcoded taskQueue in orchestrator workflow
 const LEAF_QUEUE = 'long-tail';
@@ -302,17 +317,16 @@ describe('events service', () => {
     });
 
     await handle.result();
-    await sleepFor(500);
 
-    // The activity interceptor should have published a milestone event
-    const activityEvents = eventAdapter.events.filter(
-      (e) => e.type === 'milestone' && e.source === 'activity',
+    // The activity interceptor publishes on replay (after phase).
+    // Poll until the event arrives rather than sleeping a fixed amount.
+    const evt = await waitForEvent(
+      eventAdapter,
+      (e) => e.type === 'milestone'
+        && e.source === 'activity'
+        && e.activityName === 'processWithMilestones',
     );
-    expect(activityEvents.length).toBeGreaterThanOrEqual(1);
 
-    const evt = activityEvents.find(
-      (e) => e.activityName === 'processWithMilestones',
-    );
     expect(evt).toBeTruthy();
     expect(evt!.workflowId).toBe(workflowId);
     expect(evt!.workflowName).toBe('milestoneWorkflow');

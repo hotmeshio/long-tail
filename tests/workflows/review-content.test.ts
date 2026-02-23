@@ -105,9 +105,9 @@ describe('reviewContent workflow', () => {
     );
   }, 30_000);
 
-  // ── Standalone: no task record without orchestrator ─────────────────────
+  // ── Standalone: interceptor creates task automatically ────────────────────
 
-  it('should not create a task record in standalone mode (no orchestrator)', async () => {
+  it('should create a task record in standalone mode (interceptor-managed)', async () => {
     const workflowId = `test-task-record-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
@@ -128,10 +128,16 @@ describe('reviewContent workflow', () => {
     expect(result.type).toBe('return');
     expect(result.data.approved).toBe(true);
 
-    // Standalone workflows don't create task records —
-    // tasks are the orchestrator's responsibility
+    // The interceptor guarantees every LT workflow has a task record
+    await sleepFor(500);
     const task = await taskService.getTaskByWorkflowId(workflowId);
-    expect(task).toBeNull();
+    expect(task).toBeTruthy();
+    expect(task!.status).toBe('completed');
+    expect(task!.workflow_type).toBe('reviewContent');
+    // Standalone: originId = own workflowId (this IS the root)
+    expect(task!.origin_id).toBe(workflowId);
+    // Standalone: no parent
+    expect(task!.parent_id).toBeNull();
   }, 30_000);
 
   // ── Escalation: low confidence triggers HITL ──────────────────────────────
@@ -403,5 +409,85 @@ describe('reviewContent workflow', () => {
     expect(result.data.analysis.confidence).toBeGreaterThanOrEqual(0.85);
     expect(result.data.analysis.flags).toEqual([]);
     expect(result.data.analysis.summary).toBeTruthy();
+  }, 30_000);
+
+  // ── INVARIANT: every escalation is tied to a task ─────────────────────────
+
+  it('should always tie standalone escalations to a task record', async () => {
+    const workflowId = `test-esc-task-inv-${Durable.guid()}`;
+
+    await client.workflow.start({
+      args: [{
+        data: {
+          contentId: 'inv-1',
+          content: 'REVIEW_ME content for task-escalation invariant test',
+        },
+        metadata: {},
+      }],
+      taskQueue: TASK_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId,
+      expire: 120,
+    });
+
+    await sleepFor(5000);
+
+    // The escalation MUST have a task_id
+    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    expect(escalations.length).toBe(1);
+    expect(escalations[0].task_id).toBeTruthy();
+
+    // The task must exist and reflect the escalation state
+    const task = await taskService.getTask(escalations[0].task_id!);
+    expect(task).toBeTruthy();
+    expect(task!.workflow_id).toBe(workflowId);
+    expect(task!.status).toBe('needs_intervention');
+    expect(task!.origin_id).toBe(workflowId);
+    expect(task!.parent_id).toBeNull();
+
+    // Clean up: resolve so the escalation doesn't pollute other tests
+    await resolveEscalation(escalations[0].id, {
+      contentId: 'inv-1',
+      approved: true,
+    });
+    await sleepFor(5000);
+
+    // After resolution, the task should be completed
+    const completedTask = await taskService.getTask(escalations[0].task_id!);
+    expect(completedTask!.status).toBe('completed');
+  }, 60_000);
+
+  // ── Task lifecycle: standalone completion ──────────────────────────────────
+
+  it('should complete the standalone task with result data and milestones', async () => {
+    const workflowId = `test-standalone-complete-${Durable.guid()}`;
+
+    const handle = await client.workflow.start({
+      args: [{
+        data: {
+          contentId: 'complete-1',
+          content: 'Good content for standalone completion lifecycle test.',
+        },
+        metadata: {},
+      }],
+      taskQueue: TASK_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId,
+      expire: 60,
+    });
+
+    const result = await handle.result() as LTReturn;
+    expect(result.type).toBe('return');
+
+    await sleepFor(500);
+
+    const task = await taskService.getTaskByWorkflowId(workflowId);
+    expect(task).toBeTruthy();
+    expect(task!.status).toBe('completed');
+    expect(task!.data).toBeTruthy();
+    expect(task!.milestones.length).toBeGreaterThan(0);
+
+    const data = JSON.parse(task!.data!);
+    expect(data.approved).toBe(true);
   }, 30_000);
 });

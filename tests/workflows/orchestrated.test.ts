@@ -168,11 +168,11 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(esc!.task_queue).toBeTruthy();
     expect(esc!.workflow_type).toBe('reviewContent');
 
-    // Verify task was created and is still in_progress
-    // (the escalation record signals intervention, not the task status)
+    // Verify task was created and marked as needs_intervention
+    // (the interceptor escalation handler sets this status)
     const task = await taskService.getTaskByWorkflowId(esc!.workflow_id!);
     expect(task).toBeTruthy();
-    expect(task!.status).toBe('in_progress');
+    expect(task!.status).toBe('needs_intervention');
 
     // Resolve by starting a new workflow (interceptor resolves escalation + signals orchestrator)
     await resolveEscalation(esc!.id, {

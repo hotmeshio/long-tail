@@ -2,109 +2,11 @@
 
 **AI and humans, working the same queue.**
 
-Your team already has processes. Policies. People. AI doesn't replace that — it joins the team. Long Tail is the workflow engine that makes this real: durable, transactional workflows where AI handles the routine work, and everything it can't handle flows to the right person (or the right AI) automatically.
-
-No work is dropped. No state is lost. Every task is tracked from start to finish. And the only infrastructure you need is PostgreSQL.
-
-## Why This Matters
-
-The hard part of adopting AI isn't the model. It's the **process around the model**.
-
-Every enterprise has business processes — approval chains, compliance checks, document reviews, data validation. These processes exist for good reasons: regulatory requirements, quality standards, institutional knowledge. You can't just hand them to an LLM and hope for the best.
-
-The realistic path is **BPM-first**: start AI on the granular, well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let the existing workforce handle the judgment calls — the ambiguous, high-stakes, long-tail work that requires human context. Then evolve the boundary over time as trust is earned and models improve.
-
-Long Tail gives you the machinery to do this. Write a workflow. If AI is confident, the work completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
-
-## Who Resolves Escalations?
-
-Anyone. That's the point.
-
-The escalation queue is just an API. Who consumes it is a deployment decision, not an architectural one:
-
-- **A human team** using a purpose-built SPA — your HITL reviewers triaging a queue of AI-flagged items
-- **Another AI agent** consuming from the same API with its own RBAC role — a more capable model, a specialized system, a domain-specific pipeline
-- **A hybrid** — AI does a first pass on the escalation, then routes to a human for final sign-off
-
-And it works in the other direction too. A workflow can call out to a human team for input, then use AI to validate what comes back. The system doesn't care who's on either end. It cares that the work gets done, the state is consistent, and the audit trail is complete.
-
-This is the sociotechnical shape of AI in the enterprise: not AI *or* humans, but AI *alongside* humans, as team members with different roles and capabilities. Particularly in regulated industries where policy is immutable, this isn't optional — it's the only way forward.
-
-## Quick Start
-
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/)
-
-That's it.
-
-### Run
-
-```bash
-git clone https://github.com/hotmeshio/long-tail.git
-cd long-tail
-docker compose up
-```
-
-Postgres, NATS, and the API server start together. Migrations run automatically. The server is ready when you see:
-
-```
-long-tail-1  | [long-tail] server running on port 3000
-```
-
-### Try It
-
-**1. Submit content for AI review** (auto-approves — high confidence):
-
-```bash
-curl -s -X POST http://localhost:3000/api/workflows/review-content \
-  -H "Content-Type: application/json" \
-  -d '{"contentId": "doc-1", "content": "Standard content that passes review."}' | jq
-```
-
-**2. Submit content that will escalate** (low confidence — needs intervention):
-
-```bash
-curl -s -X POST http://localhost:3000/api/workflows/review-content \
-  -H "Content-Type: application/json" \
-  -d '{"contentId": "doc-2", "content": "REVIEW_ME this needs human eyes"}' | jq
-```
-
-**3. Check the escalation queue:**
-
-```bash
-curl -s http://localhost:3000/api/escalations?status=pending | jq
-```
-
-**4. Resolve it** (the workflow resumes and completes automatically):
-
-```bash
-curl -s -X POST http://localhost:3000/api/escalations/{id}/resolve \
-  -H "Content-Type: application/json" \
-  -d '{"resolverPayload": {"approved": true, "note": "Looks good after review"}}' | jq
-```
-
-**5. Verify the task completed:**
-
-```bash
-curl -s http://localhost:3000/api/tasks?status=completed | jq
-```
-
-### Port Collisions?
-
-Default ports are `3000` (API), `5432` (Postgres), `4222`/`8222` (NATS). Override any of them:
-
-```bash
-LT_PORT=3001 LT_PG_PORT=5433 LT_NATS_PORT=4223 docker compose up
-```
-
-### Local Development
-
-Edit any file — `ts-node-dev` watches for changes and restarts the server inside the container. Your source is volume-mounted.
+Long Tail is a workflow engine where AI handles the routine work and everything it can't handle flows to the right person automatically. The only infrastructure you need is PostgreSQL.
 
 ## Writing a Workflow
 
-A workflow is a function. It receives an envelope, does work (usually via AI), and returns a result or an escalation. That's it.
+A workflow is a function. It receives an envelope, does work, and returns a result or an escalation.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -119,7 +21,7 @@ const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({
 export async function reviewContent(
   envelope: LTEnvelope,
 ): Promise<LTReturn | LTEscalation> {
-  // On re-entry after human resolution, complete with the resolver's decision
+  // On re-entry after human resolution, return the resolver's decision
   if (envelope.resolver) {
     return {
       type: 'return',
@@ -129,11 +31,8 @@ export async function reviewContent(
   }
 
   const { content } = envelope.data;
-
-  // AI does the work
   const analysis = await analyzeContent(content);
 
-  // Confident? Ship it.
   if (analysis.confidence >= 0.85) {
     return {
       type: 'return',
@@ -142,7 +41,7 @@ export async function reviewContent(
     };
   }
 
-  // Not confident? Escalate.
+  // Not confident — escalate to a human
   return {
     type: 'escalation',
     data: { content, analysis },
@@ -152,11 +51,7 @@ export async function reviewContent(
 }
 ```
 
-The framework handles everything else — task tracking, escalation records, durable pause/resume, audit trails. Your workflow reads like a decision tree because it is one.
-
-### Activities
-
-Activities are where side effects live. They run outside the deterministic workflow sandbox, so they can call APIs, run LLMs, read databases:
+That's the whole workflow. Activities are where side effects live — API calls, LLMs, database reads. They run outside the deterministic sandbox so they can do I/O:
 
 ```typescript
 // activities.ts
@@ -169,18 +64,74 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
 }
 ```
 
-Activities are automatically retried on failure. Every execution is checkpointed. If the process crashes mid-workflow, it replays from the last checkpoint — not from the beginning.
+Activities are retried on failure and checkpointed. If the process crashes mid-workflow, it replays from the last checkpoint — not from the beginning.
 
-### Orchestrating Workflows
+## What Happens When It Runs
 
-Workflows can compose other workflows. An orchestrator coordinates child workflows, each of which can independently succeed or escalate:
+When `reviewContent` executes, the interceptor wraps it with task tracking, escalation management, and audit trails. You don't add any of that to your workflow code — it comes from the config:
+
+```sql
+SELECT workflow_type, is_lt, default_role, roles
+FROM   lt_config_workflows
+WHERE  workflow_type = 'reviewContent';
+
+--  workflow_type  | is_lt | default_role | roles
+-- ----------------+-------+--------------+---------------
+--  reviewContent  | true  | reviewer     | {reviewer}
+```
+
+If the AI is confident, the task completes and you can see it in the `lt_tasks` table:
+
+```sql
+SELECT id, workflow_type, status, origin_id,
+       data::json->>'approved' AS approved
+FROM   lt_tasks
+WHERE  workflow_type = 'reviewContent'
+ORDER  BY created_at DESC
+LIMIT  5;
+```
+
+If the AI isn't confident, an escalation record appears in `lt_escalations`:
+
+```sql
+SELECT id, workflow_type, status, role, message
+FROM   lt_escalations
+WHERE  status = 'pending';
+```
+
+It's just Postgres. You can query it, join it, export it, build dashboards on it.
+
+### Exporting Workflow Execution History
+
+Every workflow's full execution history — input data, activity timeline, state transitions — is available through the export endpoint:
+
+```
+GET /api/workflows/:workflowId/export
+```
+
+This calls HotMesh's `Durable.export()` under the hood, which reads directly from the Postgres-backed execution store. The response includes:
+
+- **data** — workflow input and output
+- **status** — execution status (0 = complete, negative = interrupted/waiting)
+- **timeline** — every activity call with its stored result
+- **transitions** — state machine transitions with timestamps
+
+You can also call it programmatically:
+
+```typescript
+const client = new Durable.Client({ connection });
+const handle = await client.workflow.getHandle(taskQueue, workflowName, workflowId);
+const history = await handle.export();
+```
+
+## Composing Workflows
+
+Workflows can call other workflows. An orchestrator coordinates child workflows, each of which can independently succeed or escalate:
 
 ```typescript
 import { executeLT } from '@hotmeshio/long-tail';
 
 export async function processDocument(envelope: LTEnvelope) {
-  // Each child is independently durable — if it escalates, the
-  // orchestrator waits. When a human resolves, it resumes here.
   const extraction = await executeLT({
     workflowName: 'extractDocument',
     args: [envelope],
@@ -197,63 +148,121 @@ export async function processDocument(envelope: LTEnvelope) {
 }
 ```
 
-If `extractDocument` escalates to a human, the orchestrator simply waits. When the escalation is resolved, the orchestrator resumes exactly where it left off and runs `validateExtraction`. No polling, no callbacks, no state machines — just sequential code.
+If `extractDocument` escalates to a human, the orchestrator waits. When the escalation is resolved, it resumes exactly where it left off and runs `validateExtraction`. No polling, no callbacks — just sequential code.
 
-## The Escalation Queue
+Children that share an `originId` can read each other's completed data through the consumer/provider pattern, so you don't have to pass everything through the envelope:
 
-Escalations are the interface between AI and everyone else. When a workflow escalates, a record lands in the queue with full context: what the AI tried, why it wasn't confident, and what it needs from the resolver.
-
-### Claim and Resolve
-
-```bash
-# See what's available
-curl -s http://localhost:3000/api/escalations/available | jq
-
-# Claim an escalation (30-minute lock)
-curl -s -X POST http://localhost:3000/api/escalations/{id}/claim \
-  -H "Content-Type: application/json" \
-  -d '{"assignedTo": "user-123", "duration": 30}' | jq
-
-# Resolve it — the original workflow resumes automatically
-curl -s -X POST http://localhost:3000/api/escalations/{id}/resolve \
-  -H "Content-Type: application/json" \
-  -d '{"resolverPayload": {"approved": true, "note": "Verified against source"}}' | jq
+```typescript
+// extractDocument completes → its result is stored in lt_tasks
+// validateExtraction's config declares extractDocument as a provider:
+//   consumers: [{ provider_name: 'extraction', provider_workflow_type: 'extractDocument' }]
+// executeLT automatically injects the data into envelope.lt.providers
 ```
 
-Claims expire. If a reviewer doesn't finish in time, the escalation goes back to the queue. No work gets stuck.
+## Escalations
 
-### RBAC
+When a workflow escalates, a record lands in `lt_escalations` with full context — what the AI tried, why it wasn't confident, what it needs from a resolver. Who resolves it is a deployment decision:
 
-Escalations are routed by role. Users are assigned roles with hierarchical types (`superadmin`, `admin`, `member`), and the queue filters accordingly:
+- A human team using a purpose-built UI
+- Another AI agent consuming from the same API
+- A hybrid — AI does a first pass, routes to a human for sign-off
+
+Escalations support claim/release with expiration. If a reviewer doesn't finish in time, the escalation goes back to the queue.
+
+Escalations are routed by role. Users are assigned roles with hierarchical types (`superadmin`, `admin`, `member`), and the queue filters accordingly.
+
+## Quick Start
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+
+### Run
 
 ```bash
-# Create a reviewer
-curl -s -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"email": "reviewer@co.com", "displayName": "Jane", "roles": [{"role": "reviewer"}]}' | jq
-
-# Query escalations by role
-curl -s http://localhost:3000/api/escalations?role=reviewer&status=pending | jq
+git clone https://github.com/hotmeshio/long-tail.git
+cd long-tail
+docker compose up
 ```
 
-The same API serves a human-facing SPA, an AI agent with service credentials, or anything else that can make HTTP requests. The role determines what you see, not what you are.
+Postgres, NATS, and the API server start together. Migrations run automatically.
 
-## How It Works Under the Hood
+Default ports are `3000` (API), `5432` (Postgres), `4222`/`8222` (NATS). Override any of them:
 
-Long Tail is built on [HotMesh](https://github.com/hotmeshio/sdk-typescript), a workflow engine that delivers Temporal-style durable execution using **PostgreSQL as its only dependency**. No Temporal server. No Redis. No message broker infrastructure.
+```bash
+LT_PORT=3001 LT_PG_PORT=5433 LT_NATS_PORT=4223 docker compose up
+```
 
-What this means in practice:
+## Pluggable Services
 
-- **Durable execution** — workflow state is transactionally persisted to Postgres. Process crashes, deploys, restarts — the workflow resumes from its last checkpoint.
-- **Deterministic replay** — workflows replay from persisted state on recovery. Activities (side effects) are only executed once; their results are cached.
+Postgres is the only hard dependency. Everything else — telemetry, events, auth — is pluggable. Long Tail ships reference adapters, but you wire in whatever your team already uses.
+
+### Telemetry
+
+Register a telemetry adapter before starting workers. The adapter configures an OpenTelemetry `TracerProvider`; workflow spans are then exported to whatever backend you choose.
+
+```typescript
+import { telemetryRegistry, HoneycombTelemetryAdapter } from '@hotmeshio/long-tail';
+
+telemetryRegistry.register(new HoneycombTelemetryAdapter({
+  apiKey: process.env.HONEYCOMB_API_KEY,
+  serviceName: 'my-app',
+}));
+```
+
+Write your own by implementing `LTTelemetryAdapter` (`connect` / `disconnect`):
+
+```typescript
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import type { LTTelemetryAdapter } from '@hotmeshio/long-tail';
+
+class DatadogAdapter implements LTTelemetryAdapter {
+  private sdk: NodeSDK | null = null;
+
+  async connect() {
+    this.sdk = new NodeSDK({ /* Datadog exporter config */ });
+    this.sdk.start();
+  }
+  async disconnect() {
+    await this.sdk?.shutdown();
+  }
+}
+
+telemetryRegistry.register(new DatadogAdapter());
+```
+
+Set `HMSH_TELEMETRY` to control span verbosity (`info` for triggers/workers/errors, `debug` for every activity).
+
+### Events
+
+Milestone events follow the same pattern. Register one or more event adapters and workflow milestones are published as they occur:
+
+```typescript
+import { eventRegistry, NatsEventAdapter } from '@hotmeshio/long-tail';
+
+eventRegistry.register(new NatsEventAdapter({ servers: 'nats://localhost:4222' }));
+await eventRegistry.connect();
+```
+
+Implement `LTEventAdapter` (`connect` / `disconnect` / `publish`) to target SNS, Kafka, a webhook, or anything else. See `services/events/` for the interface and the in-memory reference adapter used in tests.
+
+### Auth
+
+Auth uses the same adapter pattern. The built-in `JwtAuthAdapter` handles JWT verification; swap in an API-key adapter, an OAuth adapter, or skip auth entirely in development. See `modules/auth.ts` for the interface.
+
+## How It Works
+
+Long Tail is built on [HotMesh](https://github.com/hotmeshio/sdk-typescript), a workflow engine that delivers Temporal-style durable execution using PostgreSQL as its only dependency. No Temporal server. No Redis. No message broker infrastructure.
+
+- **Durable execution** — workflow state is transactionally persisted to Postgres. Crashes, deploys, restarts — the workflow resumes from its last checkpoint.
+- **Deterministic replay** — workflows replay from persisted state on recovery. Activities are only executed once; their results are cached.
 - **Signals** — workflows can pause and wait for external events (like a human resolving an escalation), then resume with the signal payload.
-- **Child workflows** — compose workflows into pipelines where each step is independently durable and independently escalatable.
 
 The LT interceptor adds the human-in-the-loop layer on top: task tracking, escalation management, claim/release with expiration, milestone recording, and audit trails. All stored in Postgres alongside the workflow state.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Your Workflow Code                   │
+│                    Your Workflow Code                    │
 │                                                         │
 │   envelope ──► AI Processing ──► return (confident)     │
 │                      │                                  │
@@ -289,6 +298,7 @@ The LT interceptor adds the human-in-the-loop layer on top: task tracking, escal
 | `POST` | `/api/workflows/verify-document` | Start a document verification workflow |
 | `GET` | `/api/workflows/:id/status` | Get workflow execution status |
 | `GET` | `/api/workflows/:id/result` | Await workflow result |
+| `GET` | `/api/workflows/:id/export` | Export full execution history (data, timeline, transitions) |
 
 ### Tasks
 

@@ -75,6 +75,15 @@ export async function executeLT<T = any>(
   // Read orchestrator context (set by interceptor wrapping the container)
   const orchCtx = getOrchestratorContext();
 
+  // Derive lineage: originId traces back to the root workflow,
+  // parentId identifies the immediate parent orchestrator.
+  const envelope0 = args[0] as LTEnvelope | undefined;
+  const originId = options.originId
+    || envelope0?.lt?.originId
+    || orchCtx?.workflowId
+    || childWorkflowId;
+  const parentId = orchCtx?.workflowId || childWorkflowId;
+
   // 1. Create task record with routing metadata for the interceptor
   const taskId = await ltCreateTask({
     workflowId: childWorkflowId,
@@ -82,7 +91,8 @@ export async function executeLT<T = any>(
     ltType: workflowName,
     signalId,
     parentWorkflowId: orchCtx?.workflowId || childWorkflowId,
-    originId: options.originId,
+    originId,
+    parentId,
     envelope: JSON.stringify(args[0] || {}),
     metadata: orchCtx
       ? {
@@ -100,10 +110,10 @@ export async function executeLT<T = any>(
   const wfConfig = await ltGetWorkflowConfig(workflowName);
 
   // 3. Inject provider data into envelope if consumers are configured
-  if (wfConfig?.consumers?.length && options.originId) {
+  if (wfConfig?.consumers?.length && originId) {
     const providerData = await ltGetProviderData({
       workflowName,
-      originId: options.originId,
+      originId,
     });
     const envelope = args[0] as LTEnvelope | undefined;
     if (envelope && Object.keys(providerData).length > 0) {
@@ -111,10 +121,11 @@ export async function executeLT<T = any>(
     }
   }
 
-  // 4. Inject task ID into the envelope so the interceptor can find the task
+  // 4. Inject task ID and lineage into the envelope so the interceptor
+  //    can find the task and propagate originId/parentId to escalations
   const envelope = args[0] as LTEnvelope | undefined;
   if (envelope) {
-    envelope.lt = { ...envelope.lt, taskId };
+    envelope.lt = { ...envelope.lt, taskId, originId, parentId };
   }
 
   // 5. Execute onBefore lifecycle hooks (still use execChild — not LT)

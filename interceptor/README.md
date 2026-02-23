@@ -50,6 +50,7 @@ When a workflow is registered with `is_lt: true` in `lt_config_workflows`:
 - **Parent signaling** — On completion, the interceptor signals the parent orchestrator (if any) so `executeLT`'s `waitFor` resolves.
 - **Milestone events** — Milestones in the workflow return value are published to all registered event adapters (NATS, SNS, etc.) via the events service.
 - **Activity-level milestones** — The activity interceptor inspects proxied activity results for a `milestones` field and publishes them as `source: 'activity'` events.
+- **OpenTelemetry tracing** — HotMesh automatically traces every workflow execution, activity call, and stream operation. Connect a telemetry adapter (Honeycomb, Datadog, etc.) and traces flow through without any workflow code changes.
 
 ## Config-Driven Routing
 

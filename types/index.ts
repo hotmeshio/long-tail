@@ -51,3 +51,7 @@ export type {
   LTEvent,
   LTEventAdapter,
 } from './events';
+
+export type {
+  LTTelemetryAdapter,
+} from './telemetry';

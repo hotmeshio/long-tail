@@ -53,6 +53,16 @@ export async function handleCompletion(
       signalId: routing.signalId,
       data: augmentedResult,
     });
+  } else if (state.taskId) {
+    // Standalone mode: no parent to signal — complete the task directly.
+    await activities.ltCompleteTask({
+      taskId: state.taskId,
+      data: JSON.stringify(augmentedResult.data),
+      milestones: augmentedResult.milestones || [],
+      workflowId: state.workflowId,
+      workflowName: state.workflowName,
+      taskQueue: state.taskQueue,
+    });
   }
 
   return augmentedResult;

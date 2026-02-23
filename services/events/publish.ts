@@ -18,11 +18,11 @@ export function publishMilestoneEvent(params: {
   activityName?: string;
   milestones: LTMilestone[];
   data?: Record<string, any>;
-}): void {
-  if (!eventRegistry.hasAdapters) return;
-  if (!params.milestones?.length) return;
+}): Promise<void> {
+  if (!eventRegistry.hasAdapters) return Promise.resolve();
+  if (!params.milestones?.length) return Promise.resolve();
 
-  eventRegistry
+  return eventRegistry
     .publish({
       type: 'milestone',
       source: params.source,

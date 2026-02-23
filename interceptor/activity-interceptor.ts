@@ -51,7 +51,7 @@ export function createLTActivityInterceptor(_options?: {
               )
             : 'long-tail';
 
-          publishMilestoneEvent({
+          await publishMilestoneEvent({
             source: 'activity',
             workflowId,
             workflowName,

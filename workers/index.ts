@@ -2,6 +2,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../modules/config';
+import { telemetryRegistry } from '../services/telemetry';
 import { eventRegistry } from '../services/events';
 import { createLTInterceptor } from '../interceptor';
 import { createLTActivityInterceptor } from '../interceptor/activity-interceptor';
@@ -27,6 +28,12 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  * interceptor, and start workflow workers (leaf + orchestrators).
  */
 export async function startWorkers(): Promise<void> {
+  // 0. Connect telemetry BEFORE HotMesh starts (OTEL TracerProvider must
+  //    be registered before HotMesh creates tracers)
+  if (telemetryRegistry.hasAdapter) {
+    await telemetryRegistry.connect();
+  }
+
   const connection = {
     class: Postgres,
     options: postgres_options,
