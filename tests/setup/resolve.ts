@@ -1,5 +1,5 @@
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from './index';
 import * as escalationService from '../../services/escalation';
@@ -38,7 +38,7 @@ export async function resolveEscalation(
 
   // Start a new workflow
   const newWorkflowId = `rerun-${escalation.id}-${Date.now()}`;
-  const client = new MemFlow.Client({
+  const client = new Durable.Client({
     connection: { class: Postgres, options: postgres_options },
   });
 

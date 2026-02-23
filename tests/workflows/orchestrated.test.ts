@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
+import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
 import * as reviewContentWorkflow from '../../workflows/review-content';
 import * as reviewContentOrchestrator from '../../workflows/review-content/orchestrator';
@@ -14,7 +15,7 @@ import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
 import type { LTReturn } from '../../types';
 
-const { Connection, Client, Worker } = MemFlow;
+const { Connection, Client, Worker } = Durable;
 
 const LEAF_QUEUE = 'long-tail';
 const ORCH_QUEUE = 'test-orch';
@@ -60,7 +61,7 @@ describe('orchestrated workflows (executeLT)', () => {
     const connection = { class: Postgres, options: postgres_options };
 
     // Register shared activity worker
-    await MemFlow.registerActivityWorker(
+    await Durable.registerActivityWorker(
       { connection, taskQueue: ACTIVITY_QUEUE },
       interceptorActivities,
       ACTIVITY_QUEUE,
@@ -70,7 +71,10 @@ describe('orchestrated workflows (executeLT)', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    MemFlow.registerInterceptor(ltInterceptor);
+    Durable.registerInterceptor(ltInterceptor);
+
+    const ltActivityInterceptor = createLTActivityInterceptor();
+    Durable.registerActivityInterceptor(ltActivityInterceptor);
 
     // Register LEAF workflow worker
     const leafWorker = await Worker.create({
@@ -92,15 +96,16 @@ describe('orchestrated workflows (executeLT)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    MemFlow.clearInterceptors();
+    Durable.clearInterceptors();
+    Durable.clearActivityInterceptors();
     await sleepFor(1500);
-    await MemFlow.shutdown();
+    await Durable.shutdown();
   }, 10_000);
 
   // ── executeLT: auto-approve creates task + returns result ───────────────────
 
   it('should auto-approve via orchestrator and create task record', async () => {
-    const workflowId = `test-orch-approve-${MemFlow.guid()}`;
+    const workflowId = `test-orch-approve-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
@@ -131,7 +136,7 @@ describe('orchestrated workflows (executeLT)', () => {
   // ── executeLT: escalation ends child, resolve starts new child ──────────────
 
   it('should escalate via orchestrator and resolve via new workflow', async () => {
-    const orchWorkflowId = `test-orch-escalate-${MemFlow.guid()}`;
+    const orchWorkflowId = `test-orch-escalate-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
@@ -163,11 +168,11 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(esc!.task_queue).toBeTruthy();
     expect(esc!.workflow_type).toBe('reviewContent');
 
-    // Verify task was created and is still in_progress
-    // (the escalation record signals intervention, not the task status)
+    // Verify task was created and marked as needs_intervention
+    // (the interceptor escalation handler sets this status)
     const task = await taskService.getTaskByWorkflowId(esc!.workflow_id!);
     expect(task).toBeTruthy();
-    expect(task!.status).toBe('in_progress');
+    expect(task!.status).toBe('needs_intervention');
 
     // Resolve by starting a new workflow (interceptor resolves escalation + signals orchestrator)
     await resolveEscalation(esc!.id, {
@@ -192,7 +197,7 @@ describe('orchestrated workflows (executeLT)', () => {
   // ── executeLT: task record completed after escalation resolve ───────────────
 
   it('should complete the task record after escalation is resolved', async () => {
-    const orchWorkflowId = `test-orch-complete-${MemFlow.guid()}`;
+    const orchWorkflowId = `test-orch-complete-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
@@ -235,12 +240,53 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(task!.data).toBeTruthy();
   }, 60_000);
 
+  // ── Workflow milestones: persisted to task record via orchestrator ────────────
+
+  it('should persist workflow milestones to the task record', async () => {
+    const workflowId = `test-orch-milestones-${Durable.guid()}`;
+
+    const handle = await client.workflow.start({
+      args: [{
+        data: {
+          contentId: 'milestone-1',
+          content: 'Good content for milestone persistence test.',
+        },
+        metadata: {},
+      }],
+      taskQueue: ORCH_QUEUE,
+      workflowName: 'reviewContentOrchestrator',
+      workflowId,
+      expire: 120,
+    });
+
+    const result = await handle.result() as LTReturn;
+    expect(result.type).toBe('return');
+    expect(result.data.approved).toBe(true);
+
+    // Find the child task created by executeLT
+    await sleepFor(500);
+    const { tasks } = await taskService.listTasks({ workflow_type: 'reviewContent' });
+    const task = tasks.find(t => {
+      if (t.status !== 'completed' || !t.data) return false;
+      const parsed = JSON.parse(t.data);
+      return parsed?.contentId === 'milestone-1';
+    });
+    expect(task).toBeTruthy();
+
+    // The orchestrator persists milestones from the child workflow's return value
+    expect(task!.milestones).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'llm', value: 'content_analysis' }),
+      ]),
+    );
+  }, 45_000);
+
   // ── Orchestrator pass-through: interceptor skips orchestrator workflows ─────
 
   it('should pass orchestrator workflows through without interception', async () => {
     // The orchestrator itself should not get a task record
     // (only the child workflow gets one via executeLT)
-    const orchWorkflowId = `test-orch-passthrough-${MemFlow.guid()}`;
+    const orchWorkflowId = `test-orch-passthrough-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{

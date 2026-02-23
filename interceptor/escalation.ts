@@ -1,6 +1,6 @@
 import type { LTEscalation } from '../types';
-import type { InterceptorState } from './helpers';
-import { buildStoredEnvelope } from './helpers';
+import type { InterceptorState } from './state';
+import { buildStoredEnvelope } from './state';
 
 /**
  * Handle a workflow that returned { type: 'escalation' }.
@@ -22,6 +22,11 @@ export async function handleEscalation(
 
   const storedEnvelope = buildStoredEnvelope(state);
 
+  // Mark the task as needing intervention
+  if (state.taskId) {
+    await activities.ltEscalateTask(state.taskId);
+  }
+
   await activities.ltCreateEscalation({
     type: state.workflowName,
     subtype: state.workflowName,
@@ -29,6 +34,8 @@ export async function handleEscalation(
     description: result.message,
     priority: result.priority,
     taskId: state.taskId,
+    originId: state.envelope?.lt?.originId,
+    parentId: state.envelope?.lt?.parentId,
     role: result.role || wfConfig?.role || defaultRole,
     envelope: JSON.stringify(storedEnvelope),
     escalationPayload: JSON.stringify(result.data),
@@ -55,12 +62,19 @@ export async function handleErrorEscalation(
 
   const storedEnvelope = buildStoredEnvelope(state);
 
+  // Mark the task as needing intervention
+  if (state.taskId) {
+    await activities.ltEscalateTask(state.taskId);
+  }
+
   await activities.ltCreateEscalation({
     type: state.workflowName,
     subtype: state.workflowName,
     modality: wfConfig?.modality || defaultModality,
     description: `Unhandled error: ${err.message || String(err)}`,
     taskId: state.taskId,
+    originId: state.envelope?.lt?.originId,
+    parentId: state.envelope?.lt?.parentId,
     role: wfConfig?.role || defaultRole,
     envelope: JSON.stringify(storedEnvelope),
     escalationPayload: JSON.stringify({ error: err.message, stack: err.stack }),

@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
+import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
 import * as verifyDocumentWorkflow from '../../workflows/verify-document';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
 
-const { Connection, Client, Worker } = MemFlow;
+const { Connection, Client, Worker } = Durable;
 
 const TASK_QUEUE = 'test-verify';
 const ACTIVITY_QUEUE = 'test-lt-verify-interceptor';
@@ -51,7 +52,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     const connection = { class: Postgres, options: postgres_options };
 
-    await MemFlow.registerActivityWorker(
+    await Durable.registerActivityWorker(
       { connection, taskQueue: ACTIVITY_QUEUE },
       interceptorActivities,
       ACTIVITY_QUEUE,
@@ -60,7 +61,10 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    MemFlow.registerInterceptor(ltInterceptor);
+    Durable.registerInterceptor(ltInterceptor);
+
+    const ltActivityInterceptor = createLTActivityInterceptor();
+    Durable.registerActivityInterceptor(ltActivityInterceptor);
 
     const worker = await Worker.create({
       connection,
@@ -73,9 +77,10 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    MemFlow.clearInterceptors();
+    Durable.clearInterceptors();
+    Durable.clearActivityInterceptors();
     await sleepFor(1500);
-    await MemFlow.shutdown();
+    await Durable.shutdown();
   }, 10_000);
 
   // ── Vision: extract → validate → escalate (address mismatch) ─────────────
@@ -87,7 +92,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
   it('should extract member info via vision and escalate on address mismatch', async () => {
     if (!hasOpenAIKey) return;
 
-    const workflowId = `test-vision-mismatch-${MemFlow.guid()}`;
+    const workflowId = `test-vision-mismatch-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -137,7 +142,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
   it('should provide the human reviewer with extracted data and database record', async () => {
     if (!hasOpenAIKey) return;
 
-    const workflowId = `test-vision-context-${MemFlow.guid()}`;
+    const workflowId = `test-vision-context-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{
@@ -181,7 +186,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
   it('should merge multi-page extractions into a single record', async () => {
     if (!hasOpenAIKey) return;
 
-    const workflowId = `test-vision-merge-${MemFlow.guid()}`;
+    const workflowId = `test-vision-merge-${Durable.guid()}`;
 
     await client.workflow.start({
       args: [{

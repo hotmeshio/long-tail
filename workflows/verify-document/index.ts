@@ -1,4 +1,4 @@
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../types';
 import * as activities from './activities';
@@ -16,7 +16,7 @@ const {
   listDocumentPages,
   extractMemberInfo,
   validateMember,
-} = MemFlow.workflow.proxyActivities<ActivitiesType>({
+} = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
   retryPolicy: {
     maximumAttempts: 2,

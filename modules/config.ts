@@ -11,6 +11,8 @@ export const config = {
   NODE_ENV: process.env.NODE_ENV || 'development',
 
   JWT_SECRET: process.env.JWT_SECRET || '',
+
+  HONEYCOMB_API_KEY: process.env.HONEYCOMB_API_KEY || '',
 };
 
 export const postgres_options = {

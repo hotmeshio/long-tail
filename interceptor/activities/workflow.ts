@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../../modules/config';
 
@@ -14,7 +14,7 @@ export async function ltGenerateWorkflowId(prefix: string): Promise<string> {
 }
 
 /**
- * Start a workflow via the MemFlow client. Used by executeLT to start
+ * Start a workflow via the Durable client. Used by executeLT to start
  * child workflows with a severed connection (startChild replacement).
  * Running as an activity gives full client access outside the sandbox.
  */
@@ -25,7 +25,7 @@ export async function ltStartWorkflow(input: {
   workflowId: string;
   expire?: number;
 }): Promise<void> {
-  const client = new MemFlow.Client({
+  const client = new Durable.Client({
     connection: { class: Postgres, options: postgres_options },
   });
   await client.workflow.start({
@@ -49,7 +49,7 @@ export async function ltSignalParent(input: {
   signalId: string;
   data: any;
 }): Promise<void> {
-  const client = new MemFlow.Client({
+  const client = new Durable.Client({
     connection: { class: Postgres, options: postgres_options },
   });
   const handle = await client.workflow.getHandle(

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import {
   createClient,
@@ -29,7 +29,7 @@ router.post('/review-content', async (req, res) => {
     };
 
     const client = createClient();
-    const workflowId = `review-orch-${contentId}-${MemFlow.guid()}`;
+    const workflowId = `review-orch-${contentId}-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [envelope],
@@ -67,7 +67,7 @@ router.post('/verify-document', async (req, res) => {
     };
 
     const client = createClient();
-    const workflowId = `verify-orch-${documentId}-${MemFlow.guid()}`;
+    const workflowId = `verify-orch-${documentId}-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [envelope],
@@ -127,6 +127,33 @@ router.get('/:workflowId/result', async (req, res) => {
     );
     const result = await handle.result();
     res.json({ workflowId: req.params.workflowId, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/workflows/:workflowId/export
+ * Export the full execution history for a workflow — input/output data,
+ * state, activity timeline, and state transitions. Uses HotMesh's
+ * Durable export which reads directly from the Postgres-backed
+ * execution store.
+ *
+ * Query: ?taskQueue=<queue>&workflowName=<name>
+ */
+router.get('/:workflowId/export', async (req, res) => {
+  try {
+    const taskQueue = (req.query.taskQueue as string) || LT_REVIEW_ORCH_QUEUE;
+    const workflowName = (req.query.workflowName as string) || 'reviewContentOrchestrator';
+
+    const client = createClient();
+    const handle = await client.workflow.getHandle(
+      taskQueue,
+      workflowName,
+      req.params.workflowId,
+    );
+    const exported = await handle.export();
+    res.json({ workflowId: req.params.workflowId, ...exported });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -100,6 +100,7 @@ class LTConfigCache {
   invalidate(): void {
     this.configs = null;
     this.loadedAt = 0;
+    this.loadPromise = null;
   }
 
   /** Get the full resolved config for a workflow (used by interceptor activities). */

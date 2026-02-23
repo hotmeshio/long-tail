@@ -3,6 +3,10 @@ import type { ReviewAnalysis } from './types';
 /**
  * Simulates AI content analysis. In production, this would call
  * an LLM or classification model to analyze the content.
+ *
+ * The activity interceptor creates an 'llm' milestone in the
+ * "before" phase when this activity is invoked (configured via
+ * the milestones mapping passed to createLTActivityInterceptor).
  */
 export async function analyzeContent(
   content: string,
@@ -28,8 +32,10 @@ export async function analyzeContent(
     confidence -= 0.4;
   }
 
+  const approved = confidence > 0.85 && flags.length === 0;
+
   return {
-    approved: confidence > 0.85 && flags.length === 0,
+    approved,
     confidence: Math.max(0, Math.min(1, confidence)),
     flags,
     summary: flags.length

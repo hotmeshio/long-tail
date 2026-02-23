@@ -1,13 +1,13 @@
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from './activities';
 import { runWithOrchestratorContext } from './context';
-import { extractEnvelope } from './helpers';
+import { extractEnvelope } from './state';
 import { handleEscalation, handleErrorEscalation } from './escalation';
 import { handleCompletion } from './completion';
 
 import type { LTReturn, LTEscalation, LTEnvelope } from '../types';
-import type { InterceptorState } from './helpers';
+import type { InterceptorState } from './state';
 
 type ActivitiesType = typeof interceptorActivities;
 
@@ -53,7 +53,7 @@ export function createLTInterceptor(options: {
       const workflowTopic = ctx.get('workflowTopic') as string;
 
       // Proxy the interceptor activities through the shared queue
-      const activities = MemFlow.workflow.proxyActivities<ActivitiesType>({
+      const activities = Durable.workflow.proxyActivities<ActivitiesType>({
         activities: interceptorActivities,
         taskQueue: activityTaskQueue,
         retryPolicy: { maximumAttempts: 3 },
@@ -64,17 +64,33 @@ export function createLTInterceptor(options: {
 
       // ── Container pass-through ─────────────────────────────────────
       // Wrap next() in orchestrator context so executeLT can read it.
+      // If this container was launched via executeLT (nested container),
+      // signal back to the parent orchestrator when it completes.
       if (wfConfig?.isContainer) {
-        return runWithOrchestratorContext(
-          {
-            workflowId,
-            taskQueue: workflowTopic
-              ? workflowTopic.replace(new RegExp(`-${workflowName}$`), '')
-              : 'long-tail',
-            workflowType: workflowName,
-          },
+        const existingContainerTask = await activities.ltGetTaskByWorkflowId(workflowId);
+        const containerMeta = existingContainerTask?.metadata as Record<string, any> | null;
+
+        const containerTaskQueue = workflowTopic
+          ? workflowTopic.replace(new RegExp(`-${workflowName}$`), '')
+          : 'long-tail';
+
+        const result = await runWithOrchestratorContext(
+          { workflowId, taskQueue: containerTaskQueue, workflowType: workflowName },
           next,
         );
+
+        // Nested container: signal parent when started via executeLT
+        if (containerMeta?.parentWorkflowId && containerMeta?.signalId) {
+          await activities.ltSignalParent({
+            parentTaskQueue: containerMeta.parentTaskQueue,
+            parentWorkflowType: containerMeta.parentWorkflowType,
+            parentWorkflowId: containerMeta.parentWorkflowId,
+            signalId: containerMeta.signalId,
+            data: result,
+          });
+        }
+
+        return result;
       }
 
       // Pass through non-LT, legacy orchestrators, and unregistered workflows
@@ -111,6 +127,28 @@ export function createLTInterceptor(options: {
         });
       }
 
+      // ── Standalone mode: guarantee a task always exists ──────────
+      // If no task was pre-created by executeLT (and this is not a
+      // re-run that already has one), the interceptor creates one.
+      // This ensures every escalation is tied to a task.
+      let taskId = reRunTask?.id || existingTask?.id;
+      let routing = reRunMetadata || taskMetadata;
+
+      if (!taskId) {
+        const standaloneSignalId = `lt-standalone-${workflowId}`;
+        taskId = await activities.ltCreateTask({
+          workflowId,
+          workflowType: workflowName,
+          ltType: workflowName,
+          signalId: standaloneSignalId,
+          parentWorkflowId: workflowId,
+          originId: envelope?.lt?.originId || workflowId,
+          parentId: envelope?.lt?.parentId,
+          envelope: JSON.stringify(envelope || {}),
+        });
+        await activities.ltStartTask(taskId);
+      }
+
       // ── Build interceptor state ────────────────────────────────────
       const state: InterceptorState = {
         workflowId,
@@ -119,8 +157,8 @@ export function createLTInterceptor(options: {
         wfConfig,
         defaultRole,
         defaultModality,
-        taskId: reRunTask?.id || existingTask?.id,
-        routing: reRunMetadata || taskMetadata,
+        taskId,
+        routing,
         envelope,
         isReRun,
         activities,
@@ -139,7 +177,7 @@ export function createLTInterceptor(options: {
 
         return result;
       } catch (err: any) {
-        if (MemFlow.workflow.didInterrupt(err)) {
+        if (Durable.workflow.didInterrupt(err)) {
           throw err;
         }
         return handleErrorEscalation(state, err);

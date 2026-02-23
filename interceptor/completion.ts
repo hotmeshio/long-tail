@@ -1,5 +1,6 @@
 import type { LTReturn, LTMilestone } from '../types';
-import type { InterceptorState } from './helpers';
+import type { InterceptorState } from './state';
+import { publishMilestoneEvent } from '../services/events/publish';
 
 /**
  * Handle a workflow that returned { type: 'return' }.
@@ -29,6 +30,19 @@ export async function handleCompletion(
       }
     : result;
 
+  // Publish milestone event (non-durable side effect, fire-and-forget)
+  if (augmentedResult.milestones?.length) {
+    publishMilestoneEvent({
+      source: 'interceptor',
+      workflowId: state.workflowId,
+      workflowName: state.workflowName,
+      taskQueue: state.taskQueue,
+      taskId: state.taskId,
+      milestones: augmentedResult.milestones,
+      data: augmentedResult.data,
+    });
+  }
+
   // Signal the parent orchestrator with the result.
   // The orchestrator completes the task when the signal arrives.
   if (routing?.parentWorkflowId && routing?.signalId) {
@@ -38,6 +52,16 @@ export async function handleCompletion(
       parentWorkflowId: routing.parentWorkflowId,
       signalId: routing.signalId,
       data: augmentedResult,
+    });
+  } else if (state.taskId) {
+    // Standalone mode: no parent to signal — complete the task directly.
+    await activities.ltCompleteTask({
+      taskId: state.taskId,
+      data: JSON.stringify(augmentedResult.data),
+      milestones: augmentedResult.milestones || [],
+      workflowId: state.workflowId,
+      workflowName: state.workflowName,
+      taskQueue: state.taskQueue,
     });
   }
 

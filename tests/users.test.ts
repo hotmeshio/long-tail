@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
-import { MemFlow } from '@hotmeshio/hotmesh';
+import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from './setup';
 import { migrate } from '../services/db/migrate';
 import * as userService from '../services/user';
 
-const { Connection } = MemFlow;
+const { Connection } = Durable;
 
 describe('User service', () => {
   let userId: string;
@@ -20,7 +20,7 @@ describe('User service', () => {
   }, 30_000);
 
   afterAll(async () => {
-    await MemFlow.shutdown();
+    await Durable.shutdown();
   }, 10_000);
 
   // ── Create ──────────────────────────────────────────────────────────────
