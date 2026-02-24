@@ -103,26 +103,80 @@ It's just Postgres. You can query it, join it, export it, build dashboards on it
 
 ### Exporting Workflow Execution History
 
-Every workflow's full execution history — input data, activity timeline, state transitions — is available through the export endpoint:
+Every workflow's full execution history is available through the workflow-states endpoints.
+
+**Raw export** — the internal HotMesh format:
 
 ```
-GET /api/workflows/:workflowId/export
+GET /api/workflow-states/:workflowId?taskQueue=...&workflowName=...
 ```
 
-This calls HotMesh's `Durable.export()` under the hood, which reads directly from the Postgres-backed execution store. The response includes:
+Returns data, state, status, timeline, and transitions. Use `allow` / `block` query params to filter facets.
 
-- **data** — workflow input and output
-- **status** — execution status (0 = complete, negative = interrupted/waiting)
-- **timeline** — every activity call with its stored result
-- **transitions** — state machine transitions with timestamps
+**Temporal-compatible execution history** — typed events with ISO timestamps, durations, system/user classification, and event cross-references:
 
-You can also call it programmatically:
+```
+GET /api/workflow-states/:workflowId/execution?taskQueue=...&workflowName=...
+```
+
+Returns a `WorkflowExecution` object with chronologically ordered events (`workflow_execution_started`, `activity_task_scheduled`, `activity_task_completed`, etc.), a summary with counts, and overall duration. Each completed activity references its scheduled event via `scheduled_event_id`.
+
+Options:
+- `excludeSystem=true` — omit interceptor activities (lt*)
+- `omitResults=true` — strip result payloads
+- `mode=verbose` — include nested child workflow executions
+- `maxDepth=N` — recursion limit for verbose mode (default: 5)
+
+Programmatic access:
 
 ```typescript
 const client = new Durable.Client({ connection });
 const handle = await client.workflow.getHandle(taskQueue, workflowName, workflowId);
-const history = await handle.export();
+
+// Raw export
+const raw = await handle.export();
+
+// Temporal-compatible execution
+const execution = await handle.exportExecution({ exclude_system: true });
 ```
+
+### Database Maintenance (DBA)
+
+HotMesh uses soft-delete patterns — expired jobs and stream messages retain their rows. The DBA service prunes this history while preserving the data that matters.
+
+```
+POST /api/dba/prune
+```
+
+Three independent targets:
+- **jobs** — hard-delete expired job rows older than the retention window
+- **streams** — hard-delete expired stream messages
+- **attributes** — strip execution artifacts from completed jobs (preserves return data and timeline markers needed for Temporal-compatible export)
+
+Entity-scoped pruning lets you target specific workflow types:
+
+```typescript
+import { DBA } from '@hotmeshio/hotmesh';
+
+// Strip artifacts from reviewContent workflows only
+await DBA.prune({
+  appId: 'durable',
+  connection,
+  attributes: true,
+  entities: ['reviewContent'],
+});
+
+// Prune expired jobs older than 30 days
+await DBA.prune({
+  appId: 'durable',
+  connection,
+  expire: '30 days',
+  jobs: true,
+  streams: true,
+});
+```
+
+Pruning is idempotent — jobs are marked with `pruned_at` and skipped on subsequent runs. After pruning, the Temporal-compatible execution export still works because `jmark` data is preserved.
 
 ## Composing Workflows
 
@@ -299,6 +353,22 @@ The LT interceptor adds the human-in-the-loop layer on top: task tracking, escal
 | `GET` | `/api/workflows/:id/status` | Get workflow execution status |
 | `GET` | `/api/workflows/:id/result` | Await workflow result |
 | `GET` | `/api/workflows/:id/export` | Export full execution history (data, timeline, transitions) |
+
+### Workflow States (Export)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/workflow-states/:id` | Raw workflow state export (allow/block facet filters) |
+| `GET` | `/api/workflow-states/:id/execution` | Temporal-compatible execution history |
+| `GET` | `/api/workflow-states/:id/status` | Workflow status semaphore |
+| `GET` | `/api/workflow-states/:id/state` | Current workflow state |
+
+### DBA (Database Maintenance)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/dba/prune` | Prune expired jobs, streams, and execution artifacts |
+| `POST` | `/api/dba/deploy` | Deploy prune function and run schema migrations |
 
 ### Tasks
 
