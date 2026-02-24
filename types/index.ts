@@ -55,3 +55,23 @@ export type {
 export type {
   LTTelemetryAdapter,
 } from './telemetry';
+
+export type {
+  LTExportField,
+  LTExportOptions,
+  LTTimelineEntry,
+  LTTransitionEntry,
+  LTWorkflowExport,
+} from './export';
+
+export type {
+  WorkflowExecution,
+  WorkflowExecutionEvent,
+  WorkflowExecutionStatus,
+  WorkflowExecutionSummary,
+  WorkflowEventType,
+  WorkflowEventCategory,
+  WorkflowEventAttributes,
+  ExecutionExportOptions,
+  ExportMode,
+} from './export';

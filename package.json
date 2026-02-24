@@ -19,7 +19,8 @@
     "lint:fix": "eslint . --fix --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:workflows": "vitest run tests/workflows"
+    "test:workflows": "vitest run tests/workflows",
+    "test:export": "vitest run tests/workflows/export.test.ts"
   },
   "keywords": [
     "Long Tail Workflows",
@@ -35,7 +36,7 @@
   "author": "luke.birdeau@gmail.com",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.10.1",
+    "@hotmeshio/hotmesh": "^0.10.2",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.212.0",
     "@opentelemetry/resources": "^2.5.1",
     "@opentelemetry/sdk-node": "^0.212.0",

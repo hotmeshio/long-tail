@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from './setup';
+import { connectTelemetry, disconnectTelemetry } from './setup/telemetry';
 import { migrate } from '../services/db/migrate';
 import * as userService from '../services/user';
 
@@ -12,6 +13,7 @@ describe('User service', () => {
   let userId: string;
 
   beforeAll(async () => {
+    await connectTelemetry();
     await Connection.connect({
       class: Postgres,
       options: postgres_options,
@@ -21,6 +23,7 @@ describe('User service', () => {
 
   afterAll(async () => {
     await Durable.shutdown();
+    await disconnectTelemetry();
   }, 10_000);
 
   // ── Create ──────────────────────────────────────────────────────────────

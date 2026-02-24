@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
+import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
@@ -91,6 +92,7 @@ describe('consumer/provider data injection', () => {
   let client: InstanceType<typeof Client>;
 
   beforeAll(async () => {
+    await connectTelemetry();
     await Connection.connect({
       class: Postgres,
       options: postgres_options,
@@ -198,6 +200,7 @@ describe('consumer/provider data injection', () => {
     Durable.clearActivityInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
+    await disconnectTelemetry();
   }, 10_000);
 
   // ── Core test: downstream consumer receives upstream provider data ───────

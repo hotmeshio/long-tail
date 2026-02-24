@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../setup';
+import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
@@ -23,6 +24,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
   let client: InstanceType<typeof Client>;
 
   beforeAll(async () => {
+    await connectTelemetry();
     if (!hasOpenAIKey) {
       console.warn(
         '\n⚠  OPENAI_API_KEY not set — vision tests will be skipped.\n' +
@@ -81,6 +83,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     Durable.clearActivityInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
+    await disconnectTelemetry();
   }, 10_000);
 
   // ── Vision: extract → validate → escalate (address mismatch) ─────────────

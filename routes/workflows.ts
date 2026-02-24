@@ -6,6 +6,7 @@ import {
   LT_REVIEW_ORCH_QUEUE,
   LT_VERIFY_ORCH_QUEUE,
 } from '../workers';
+import * as exportService from '../services/export';
 import type { LTEnvelope } from '../types';
 
 const router = Router();
@@ -134,10 +135,9 @@ router.get('/:workflowId/result', async (req, res) => {
 
 /**
  * GET /api/workflows/:workflowId/export
- * Export the full execution history for a workflow — input/output data,
- * state, activity timeline, and state transitions. Uses HotMesh's
- * Durable export which reads directly from the Postgres-backed
- * execution store.
+ * Convenience alias — delegates to the export service.
+ * Prefer the dedicated `/api/workflow-states/:workflowId` endpoint
+ * which supports allow/block facet filtering.
  *
  * Query: ?taskQueue=<queue>&workflowName=<name>
  */
@@ -146,14 +146,12 @@ router.get('/:workflowId/export', async (req, res) => {
     const taskQueue = (req.query.taskQueue as string) || LT_REVIEW_ORCH_QUEUE;
     const workflowName = (req.query.workflowName as string) || 'reviewContentOrchestrator';
 
-    const client = createClient();
-    const handle = await client.workflow.getHandle(
+    const exported = await exportService.exportWorkflow(
+      req.params.workflowId,
       taskQueue,
       workflowName,
-      req.params.workflowId,
     );
-    const exported = await handle.export();
-    res.json({ workflowId: req.params.workflowId, ...exported });
+    res.json(exported);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from './setup';
+import { connectTelemetry, disconnectTelemetry } from './setup/telemetry';
 import { migrate } from '../services/db/migrate';
 import { createLTInterceptor } from '../interceptor';
 import { createLTActivityInterceptor } from '../interceptor/activity-interceptor';
@@ -75,6 +76,8 @@ describe('events service', () => {
   let eventAdapter: InMemoryEventAdapter;
 
   beforeAll(async () => {
+    await connectTelemetry();
+
     // Set up in-memory event adapter
     eventAdapter = new InMemoryEventAdapter();
     eventRegistry.register(eventAdapter);
@@ -170,6 +173,7 @@ describe('events service', () => {
     Durable.clearActivityInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
+    await disconnectTelemetry();
   }, 10_000);
 
   // ── Standalone: interceptor publishes milestone events ─────────────────────

@@ -3,6 +3,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from './setup';
+import { connectTelemetry, disconnectTelemetry } from './setup/telemetry';
 import { migrate } from '../services/db/migrate';
 import * as configService from '../services/config';
 import { ltConfig } from '../modules/ltconfig';
@@ -13,6 +14,7 @@ const { Connection } = Durable;
 
 describe('LTConfig service and cache', () => {
   beforeAll(async () => {
+    await connectTelemetry();
     await Connection.connect({
       class: Postgres,
       options: postgres_options,
@@ -29,6 +31,7 @@ describe('LTConfig service and cache', () => {
 
   afterAll(async () => {
     await Durable.shutdown();
+    await disconnectTelemetry();
   }, 10_000);
 
   // ── CRUD: create ──────────────────────────────────────────────────────────
