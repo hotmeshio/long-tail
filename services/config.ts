@@ -2,7 +2,6 @@ import { getPool } from './db';
 import type {
   LTWorkflowConfig,
   LTLifecycleHook,
-  LTConsumerConfig,
   LTResolvedConfig,
   LTProviderData,
 } from '../types';
@@ -22,17 +21,13 @@ export async function getWorkflowConfig(
 
   const wf = wfRows[0];
 
-  const [rolesResult, lifecycleResult, consumersResult] = await Promise.all([
+  const [rolesResult, lifecycleResult] = await Promise.all([
     pool.query(
       'SELECT role FROM lt_config_roles WHERE workflow_type = $1 ORDER BY role',
       [workflowType],
     ),
     pool.query(
       'SELECT hook, target_workflow_type, target_task_queue, ordinal FROM lt_config_lifecycle WHERE workflow_type = $1 ORDER BY hook, ordinal',
-      [workflowType],
-    ),
-    pool.query(
-      'SELECT provider_name, provider_workflow_type, ordinal FROM lt_config_consumers WHERE workflow_type = $1 ORDER BY ordinal',
       [workflowType],
     ),
   ]);
@@ -59,26 +54,19 @@ export async function getWorkflowConfig(
     description: wf.description,
     roles: rolesResult.rows.map((r: any) => r.role),
     lifecycle: { onBefore, onAfter },
-    consumers: consumersResult.rows.map((r: any) => ({
-      provider_name: r.provider_name,
-      provider_workflow_type: r.provider_workflow_type,
-      ordinal: r.ordinal,
-    })),
+    consumes: wf.consumes || [],
   };
 }
 
 export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
   const pool = getPool();
 
-  const [wfResult, rolesResult, lifecycleResult, consumersResult] =
+  const [wfResult, rolesResult, lifecycleResult] =
     await Promise.all([
       pool.query('SELECT * FROM lt_config_workflows ORDER BY workflow_type'),
       pool.query('SELECT * FROM lt_config_roles ORDER BY workflow_type, role'),
       pool.query(
         'SELECT * FROM lt_config_lifecycle ORDER BY workflow_type, hook, ordinal',
-      ),
-      pool.query(
-        'SELECT * FROM lt_config_consumers ORDER BY workflow_type, ordinal',
       ),
     ]);
 
@@ -109,17 +97,6 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     }
   }
 
-  const consumersMap = new Map<string, LTConsumerConfig[]>();
-  for (const r of consumersResult.rows) {
-    if (!consumersMap.has(r.workflow_type))
-      consumersMap.set(r.workflow_type, []);
-    consumersMap.get(r.workflow_type)!.push({
-      provider_name: r.provider_name,
-      provider_workflow_type: r.provider_workflow_type,
-      ordinal: r.ordinal,
-    });
-  }
-
   return wfResult.rows.map((wf: any) => ({
     workflow_type: wf.workflow_type,
     is_lt: wf.is_lt,
@@ -133,7 +110,7 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
       onBefore: [],
       onAfter: [],
     },
-    consumers: consumersMap.get(wf.workflow_type) || [],
+    consumes: wf.consumes || [],
   }));
 }
 
@@ -151,15 +128,16 @@ export async function upsertWorkflowConfig(
     // Upsert the workflow row
     await client.query(
       `INSERT INTO lt_config_workflows
-         (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, description, consumes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (workflow_type) DO UPDATE SET
          is_lt = EXCLUDED.is_lt,
          is_container = EXCLUDED.is_container,
          task_queue = EXCLUDED.task_queue,
          default_role = EXCLUDED.default_role,
          default_modality = EXCLUDED.default_modality,
-         description = EXCLUDED.description`,
+         description = EXCLUDED.description,
+         consumes = EXCLUDED.consumes`,
       [
         config.workflow_type,
         config.is_lt,
@@ -168,6 +146,7 @@ export async function upsertWorkflowConfig(
         config.default_role,
         config.default_modality,
         config.description,
+        config.consumes,
       ],
     );
 
@@ -213,24 +192,6 @@ export async function upsertWorkflowConfig(
       );
     }
 
-    // Replace consumers
-    await client.query(
-      'DELETE FROM lt_config_consumers WHERE workflow_type = $1',
-      [config.workflow_type],
-    );
-    for (const consumer of config.consumers) {
-      await client.query(
-        `INSERT INTO lt_config_consumers (workflow_type, provider_name, provider_workflow_type, ordinal)
-         VALUES ($1, $2, $3, $4)`,
-        [
-          config.workflow_type,
-          consumer.provider_name,
-          consumer.provider_workflow_type,
-          consumer.ordinal,
-        ],
-      );
-    }
-
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -269,7 +230,7 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       roles: c.roles,
       onBefore: c.lifecycle.onBefore,
       onAfter: c.lifecycle.onAfter,
-      consumers: c.consumers,
+      consumes: c.consumes,
     });
   }
 
@@ -279,13 +240,12 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
 // ─── Provider data ───────────────────────────────────────────────────────────
 
 export async function getProviderData(
-  consumers: LTConsumerConfig[],
+  consumes: string[],
   originId: string,
 ): Promise<LTProviderData> {
-  if (!consumers.length || !originId) return {};
+  if (!consumes.length || !originId) return {};
 
   const pool = getPool();
-  const workflowTypes = consumers.map((c) => c.provider_workflow_type);
 
   const { rows } = await pool.query(
     `SELECT workflow_type, data, completed_at
@@ -294,33 +254,24 @@ export async function getProviderData(
        AND workflow_type = ANY($2)
        AND status = 'completed'
      ORDER BY completed_at DESC`,
-    [originId, workflowTypes],
+    [originId, consumes],
   );
 
-  // Build lookup: workflow_type → most recent completed task data
-  const byType = new Map<string, any>();
-  for (const row of rows) {
-    if (!byType.has(row.workflow_type)) {
-      byType.set(row.workflow_type, row);
-    }
-  }
-
   const result: LTProviderData = {};
-  for (const consumer of consumers) {
-    const row = byType.get(consumer.provider_workflow_type);
-    if (row) {
-      let parsed: Record<string, any> = {};
-      try {
-        parsed = row.data ? JSON.parse(row.data) : {};
-      } catch {
-        parsed = {};
-      }
-      result[consumer.provider_name] = {
-        data: parsed,
-        completedAt: row.completed_at?.toISOString() || '',
-        workflowType: consumer.provider_workflow_type,
-      };
+  for (const row of rows) {
+    // Keep first (most recent) per workflow type
+    if (result[row.workflow_type]) continue;
+    let parsed: Record<string, any> = {};
+    try {
+      parsed = row.data ? JSON.parse(row.data) : {};
+    } catch {
+      parsed = {};
     }
+    result[row.workflow_type] = {
+      data: parsed,
+      completedAt: row.completed_at?.toISOString() || '',
+      workflowType: row.workflow_type,
+    };
   }
 
   return result;

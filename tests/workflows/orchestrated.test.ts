@@ -45,7 +45,7 @@ describe('orchestrated workflows (executeLT)', () => {
       description: null,
       roles: ['reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContentOrchestrator',
@@ -57,7 +57,7 @@ describe('orchestrated workflows (executeLT)', () => {
       description: null,
       roles: [],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     const connection = { class: Postgres, options: postgres_options };

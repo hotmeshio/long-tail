@@ -47,7 +47,7 @@ async function enrichOrder(envelope: LTEnvelope): Promise<LTReturn> {
  */
 async function processOrder(envelope: LTEnvelope): Promise<LTReturn> {
   const providers = envelope.lt?.providers;
-  const pricing = providers?.orderPricing;
+  const pricing = providers?.enrichOrder;
 
   return {
     type: 'return',
@@ -110,7 +110,7 @@ describe('consumer/provider data injection', () => {
       description: 'Enriches order with pricing data',
       roles: ['reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     // ── Config: processOrder declares enrichOrder as a provider ────────
@@ -124,13 +124,7 @@ describe('consumer/provider data injection', () => {
       description: 'Processes order using provider data from enrichOrder',
       roles: ['reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [
-        {
-          provider_name: 'orderPricing',
-          provider_workflow_type: 'enrichOrder',
-          ordinal: 0,
-        },
-      ],
+      consumes: ['enrichOrder'],
     });
 
     // ── Config: orchestrator (container) ──────────────────────────────
@@ -144,7 +138,7 @@ describe('consumer/provider data injection', () => {
       description: null,
       roles: [],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     ltConfig.invalidate();

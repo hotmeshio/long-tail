@@ -42,7 +42,7 @@ describe('reviewContent workflow', () => {
       description: null,
       roles: ['reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     const connection = { class: Postgres, options: postgres_options };

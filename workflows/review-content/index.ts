@@ -40,7 +40,7 @@ export async function reviewContent(
       data: {
         contentId,
         ...envelope.resolver,
-      },
+      } as ReviewContentReturnData,
     };
   }
 

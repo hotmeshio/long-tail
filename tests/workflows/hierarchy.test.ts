@@ -143,7 +143,7 @@ const defaultConfig = {
   description: null,
   roles: ['reviewer'],
   lifecycle: { onBefore: [], onAfter: [] },
-  consumers: [],
+  consumes: [],
 };
 
 // ── Test suite ───────────────────────────────────────────────────────────────

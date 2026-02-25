@@ -5,15 +5,17 @@ import { migrate } from './services/db/migrate';
 import { startWorkers } from './workers';
 import { telemetryRegistry } from './services/telemetry';
 import { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
+import { maintenanceRegistry } from './services/maintenance';
+import { defaultMaintenanceConfig } from './modules/maintenance';
 import routes from './routes';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
-export { createLTInterceptor } from './interceptor';
+export { registerLT, createLTInterceptor } from './interceptor';
 export { createLTActivityInterceptor } from './interceptor/activity-interceptor';
 export { executeLT } from './orchestrator';
 export type { ExecuteLTOptions } from './orchestrator';
-export { JwtAuthAdapter, createAuthMiddleware, requireAuth, signToken } from './modules/auth';
+export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken } from './modules/auth';
 export * from './types';
 export * as TaskService from './services/task';
 export * as EscalationService from './services/escalation';
@@ -26,6 +28,8 @@ export { InMemoryEventAdapter } from './services/events/memory';
 export { publishMilestoneEvent } from './services/events/publish';
 export { telemetryRegistry } from './services/telemetry';
 export { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
+export { maintenanceRegistry } from './services/maintenance';
+export { defaultMaintenanceConfig } from './modules/maintenance';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,9 @@ async function main() {
       apiKey: honeycombKey,
     }));
   }
+
+  // 0b. Register default maintenance config
+  maintenanceRegistry.register(defaultMaintenanceConfig);
 
   // 1. Run database migrations
   console.log('[long-tail] running migrations...');

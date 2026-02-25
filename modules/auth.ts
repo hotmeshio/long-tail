@@ -2,6 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 
 import { config } from './config';
+import { isSuperAdmin } from '../services/user';
 import type { AuthPayload, LTAuthAdapter } from '../types';
 
 // Re-export types for convenience
@@ -87,8 +88,38 @@ export function createAuthMiddleware(adapter: LTAuthAdapter): RequestHandler {
 export const requireAuth = createAuthMiddleware(new JwtAuthAdapter());
 
 /**
+ * Middleware that requires admin access. Must be placed AFTER requireAuth.
+ *
+ * Checks isSuperAdmin() via the database first, then falls back to the
+ * JWT `role` claim for stateless admin checks. Returns 403 otherwise.
+ */
+export const requireAdmin: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (!req.auth?.userId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    if (await isSuperAdmin(req.auth.userId)) {
+      next();
+      return;
+    }
+    if (req.auth.role === 'admin') {
+      next();
+      return;
+    }
+    res.status(403).json({ error: 'Forbidden: admin access required' });
+  } catch {
+    res.status(403).json({ error: 'Forbidden' });
+  }
+};
+
+/**
  * Generate a JWT token. Utility for tests and token provisioning.
  */
 export function signToken(payload: AuthPayload, expiresIn: string = '24h'): string {
-  return jwt.sign(payload, config.JWT_SECRET, { expiresIn });
+  return jwt.sign(payload, config.JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
