@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
@@ -108,11 +108,8 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       expire: 120,
     });
 
-    // Vision calls take a few seconds
-    await sleepFor(15_000);
-
-    // Verify escalation was created with mismatch details (found via workflow_id)
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until the escalation appears (vision API timing varies)
+    const escalations = await waitForEscalation(workflowId);
     expect(escalations.length).toBe(1);
 
     const esc = escalations[0];
@@ -138,7 +135,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // Verify escalation was resolved
     const resolvedEsc = await escalationService.getEscalation(esc.id);
     expect(resolvedEsc!.status).toBe('resolved');
-  }, 60_000);
+  }, 90_000);
 
   // ── Vision: escalation payload contains full context for human review ─────
 
@@ -158,9 +155,8 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       expire: 120,
     });
 
-    await sleepFor(15_000);
-
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until the escalation appears (vision API timing varies)
+    const escalations = await waitForEscalation(workflowId);
     const payload = JSON.parse(escalations[0].escalation_payload!);
 
     // Human reviewer should see:
@@ -182,7 +178,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       verified: true,
     });
     await sleepFor(10_000);
-  }, 60_000);
+  }, 90_000);
 
   // ── Vision: multi-page extraction merges data ─────────────────────────────
 
@@ -202,11 +198,8 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       expire: 120,
     });
 
-    await sleepFor(15_000);
-
-    // The workflow will escalate (address mismatch), but the extracted data
-    // should include info from BOTH pages (page 1: member info, page 2: emergency contact)
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until the escalation appears (vision API timing varies)
+    const escalations = await waitForEscalation(workflowId);
     const payload = JSON.parse(escalations[0].escalation_payload!);
 
     // Page 1 should provide: memberId, name, address
@@ -222,7 +215,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       verified: true,
     });
     await sleepFor(10_000);
-  }, 60_000);
+  }, 90_000);
 
   // ── Skipped without key ───────────────────────────────────────────────────
 

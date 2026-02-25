@@ -1,6 +1,7 @@
 import { connect, NatsConnection, StringCodec } from 'nats';
 
 import { config } from '../../modules/config';
+import { loggerRegistry } from '../logger';
 import type { LTEvent, LTEventAdapter } from '../../types';
 
 const sc = StringCodec();
@@ -31,7 +32,7 @@ export class NatsEventAdapter implements LTEventAdapter {
 
   async connect(): Promise<void> {
     this.nc = await connect({ servers: this.url });
-    console.log(`[lt-events:nats] connected to ${this.url}`);
+    loggerRegistry.info(`[lt-events:nats] connected to ${this.url}`);
   }
 
   async publish(event: LTEvent): Promise<void> {
@@ -44,7 +45,7 @@ export class NatsEventAdapter implements LTEventAdapter {
     if (this.nc) {
       await this.nc.drain();
       this.nc = null;
-      console.log('[lt-events:nats] disconnected');
+      loggerRegistry.info('[lt-events:nats] disconnected');
     }
   }
 }

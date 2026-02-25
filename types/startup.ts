@@ -1,0 +1,78 @@
+import type { LoggerOptions } from 'pino';
+
+import type { LTAuthAdapter } from './auth';
+import type { LTTelemetryAdapter } from './telemetry';
+import type { LTEventAdapter } from './events';
+import type { LTLoggerAdapter } from './logger';
+import type { LTMaintenanceConfig } from './maintenance';
+
+export interface LTStartConfig {
+  /** PostgreSQL connection. Provide individual fields or a connectionString. */
+  database: {
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    database?: string;
+    connectionString?: string;
+  };
+
+  /** Embedded API server. Default: enabled on port 3000. */
+  server?: {
+    enabled?: boolean;
+    port?: number;
+  };
+
+  /** Workflow workers to start. Each entry registers a worker on the given queue. */
+  workers?: Array<{
+    taskQueue: string;
+    workflow: (...args: any[]) => any;
+  }>;
+
+  /** Interceptor defaults applied when a workflow escalates. */
+  interceptor?: {
+    defaultRole?: string;
+    defaultModality?: string;
+  };
+
+  /** Authentication. Defaults to the built-in JWT adapter using JWT_SECRET. */
+  auth?: {
+    /** JWT secret for the built-in adapter. */
+    secret?: string;
+    /** Replace the built-in JWT adapter entirely. */
+    adapter?: LTAuthAdapter;
+  };
+
+  /** OpenTelemetry. Register before workers start. */
+  telemetry?: {
+    honeycomb?: { apiKey: string; serviceName?: string; endpoint?: string };
+    adapter?: LTTelemetryAdapter;
+  };
+
+  /** Milestone event publishing. */
+  events?: {
+    nats?: { url?: string; subjectPrefix?: string };
+    adapters?: LTEventAdapter[];
+  };
+
+  /** Structured logging. Defaults to console.* when omitted. */
+  logging?: {
+    pino?: LoggerOptions;
+    adapter?: LTLoggerAdapter;
+  };
+
+  /**
+   * Database maintenance schedule.
+   * - `true` or `undefined` → default nightly 2 AM cleanup
+   * - `false` → disabled
+   * - `LTMaintenanceConfig` → custom schedule and rules
+   */
+  maintenance?: LTMaintenanceConfig | boolean;
+}
+
+export interface LTInstance {
+  /** Durable client for starting workflows and querying state. */
+  client: any;
+  /** Graceful shutdown — stops workers, server, and adapters. */
+  shutdown: () => Promise<void>;
+}

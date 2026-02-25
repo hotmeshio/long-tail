@@ -1,32 +1,103 @@
 # Long Tail
 
-**AI and humans, working the same queue.**
+*AI and humans, working the same queue.*
 
-Long Tail is a workflow engine where AI handles the routine work and everything it can't handle flows to the right person automatically. The only infrastructure you need is PostgreSQL.
+Your team already has processes. Policies. People. AI doesn't replace that — it joins the team. Long Tail is the workflow engine that makes this real: durable, transactional workflows where AI handles the routine work, and everything it can't handle flows to the right person (or the right AI) automatically.
 
-## Quick Start
+No work is dropped. No state is lost. Every task is tracked from start to finish. And the only infrastructure you need is PostgreSQL.
 
-### Prerequisites
+- **Postgres-only** — state, queues, escalations, and audit trails in one database
+- **Durable execution** — workflows survive crashes, deploys, and restarts via transactional checkpointing
+- **Pluggable everything** — auth, events, telemetry, logging, and maintenance are adapter-based; ship defaults or wire your own
 
-- [Docker](https://docs.docker.com/get-docker/)
+## Why This Matters
 
-### Run
+The hard part of adopting AI isn't the model. It's the process around the model.
+
+Every enterprise has business processes — approval chains, compliance checks, document reviews, data validation. These processes exist for good reasons: regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best.
+
+The realistic path is BPM-first: start AI on the granular, well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let the existing workforce handle the judgment calls — the ambiguous, high-stakes, long-tail work that requires human context. Then evolve the boundary over time as trust is earned and models improve.
+
+Long Tail gives you the machinery to do this. Write a workflow. If AI is confident, the work completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
+
+### Who Resolves Escalations?
+
+Anyone. That's the point.
+
+The escalation queue is an API. Who consumes it is a deployment decision, not an architectural one:
+
+- **A human team** using a purpose-built SPA — your HITL reviewers triaging a queue of AI-flagged items
+- **Another AI agent** consuming from the same API with its own RBAC role — a more capable model, a specialized system, a domain-specific pipeline
+- **A hybrid** — AI does a first pass on the escalation, then routes to a human for final sign-off
+
+And it works in the other direction too. A workflow can call out to a human team, then use AI to validate what comes back. The system doesn't care who's on either end. It cares that the work gets done, the state is consistent, and the audit trail is complete.
+
+This is the sociotechnical shape of AI in the enterprise: not AI *or* humans, but AI *alongside* humans, as team members with different roles and capabilities. In regulated industries where policy is immutable, this isn't optional — it's the only way forward.
+
+## Contents
+
+- [Install](#install)
+- [Connect and Start Workers](#connect-and-start-workers)
+- [Write a Workflow](#write-a-workflow)
+- [What Happens When It Runs](#what-happens-when-it-runs)
+- [The Human Side](#the-human-side)
+- [Composing Workflows](#composing-workflows)
+- [Milestones](#milestones)
+- [Roles](#roles)
+- [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [Maintenance](docs/maintenance.md)
+- [Execution History Export](#execution-history-export)
+- [How It Works](#how-it-works)
+- [Try It](#try-it)
+- [API Reference](#api-reference) — [Workflows](docs/api/workflows.md) · [Tasks](docs/api/tasks.md) · [Escalations](docs/api/escalations.md) · [Users](docs/api/users.md) · [Roles](docs/api/roles.md) · [Maintenance](docs/api/maintenance.md) · [DBA](docs/api/dba.md) · [Exports](docs/api/exports.md)
+- [Cloud Deployment](docs/cloud.md)
+- [Data Model](docs/data.md)
+- [Testing](#testing)
+
+## Install
 
 ```bash
-git clone https://github.com/hotmeshio/long-tail.git
-cd long-tail
-docker compose up
+npm install @hotmeshio/long-tail @hotmeshio/hotmesh
 ```
 
-Postgres, NATS, and the API server start together. Migrations run automatically.
+## Connect and Start Workers
 
-Default ports are `3000` (API), `5432` (Postgres), `4222`/`8222` (NATS). Override any of them:
+Long Tail embeds its own server, runs migrations, starts workers, and manages all cross-cutting concerns. Pass a config object to `start()` and everything is handled:
 
-```bash
-LT_PORT=3001 LT_PG_PORT=5433 LT_NATS_PORT=4223 docker compose up
+```typescript
+import { start } from '@hotmeshio/long-tail';
+import * as myWorkflow from './workflows/my-workflow';
+
+const lt = await start({
+  database: { host: 'localhost', port: 5432, user: 'postgres', password: 'password', database: 'mydb' },
+  workers: [
+    { taskQueue: 'my-queue', workflow: myWorkflow.myWorkflow },
+  ],
+});
 ```
 
-## Writing a Workflow
+That's it. Migrations run, the interceptor registers, workers start, the API server listens on port 3000, and maintenance is scheduled. The only infrastructure is PostgreSQL.
+
+### Start a workflow
+
+```typescript
+const handle = await lt.client.workflow.start({
+  args: [{ data: { contentId: '123', content: 'Review this' }, metadata: {} }],
+  taskQueue: 'my-queue',
+  workflowName: 'myWorkflow',
+  workflowId: `review-${Date.now()}`,
+  expire: 86_400,
+});
+
+const result = await handle.result();
+```
+
+### Shutdown
+
+```typescript
+await lt.shutdown();
+```
+
+## Write a Workflow
 
 A workflow is a function. It receives input (an envelope), does work, and returns a result or an escalation.
 
@@ -73,7 +144,7 @@ export async function reviewContent(
 }
 ```
 
-That's the whole workflow. Activities are where side effects live — API calls, LLMs, database reads. They run outside the deterministic sandbox so they can do I/O:
+Activities are where side effects live — API calls, LLMs, database reads. They run outside the deterministic sandbox so they can do I/O:
 
 ```typescript
 // activities.ts
@@ -167,22 +238,6 @@ POST /api/escalations/esc-abc123/resolve
 
 The workflow re-runs. This time `envelope.resolver` is populated, so the `if (envelope.resolver)` branch from the workflow code above executes — the resolver's decision becomes the final result, and the task completes.
 
-## Milestones
-
-Milestones are structured markers that workflows emit at key decision points. They're included in the return value:
-
-```typescript
-return {
-  type: 'return',
-  data: { approved: true },
-  milestones: [{ name: 'ai_review', value: 'approved' }],
-};
-```
-
-Milestones are persisted on the task record and published to any registered event adapters (NATS, SNS, Kafka, webhooks). This means external systems can react to workflow progress in real time — trigger notifications, update dashboards, or feed analytics — without polling.
-
-When a human resolves an escalation, the interceptor automatically appends `escalated` and `resolved_by_human` milestones, so you always know which tasks went through human review.
-
 ## Composing Workflows
 
 Workflows can call other workflows. An orchestrator coordinates child workflows, each of which can independently succeed or escalate:
@@ -223,6 +278,22 @@ PUT /api/workflows/validateExtraction/config
 ```
 
 When `validateExtraction` runs, Long Tail looks up the completed `extractDocument` task for the same `originId` and injects its result into `envelope.lt.providers.extractDocument`. The child workflow gets the data it needs without the orchestrator having to thread it through.
+
+## Milestones
+
+Milestones are structured markers that workflows emit at key decision points. They're included in the return value:
+
+```typescript
+return {
+  type: 'return',
+  data: { approved: true },
+  milestones: [{ name: 'ai_review', value: 'approved' }],
+};
+```
+
+Milestones are persisted on the task record and published to any registered event adapters (NATS, SNS, Kafka, webhooks). This means external systems can react to workflow progress in real time — trigger notifications, update dashboards, or feed analytics — without polling.
+
+When a human resolves an escalation, the interceptor automatically appends `escalated` and `resolved_by_human` milestones, so you always know which tasks went through human review.
 
 ## Roles
 
@@ -281,141 +352,43 @@ Every role assignment has a `type` that controls what the user can manage — no
 
 A user can hold multiple roles with different types. For example, Jane might be a `member` of `reviewer` and an `admin` of `senior-reviewer` — she can claim escalations for both, but only manage the senior reviewer team.
 
-## Pluggable Services
+## Pluggable Architecture
 
-Postgres is the only hard dependency. Everything else — telemetry, events, auth, maintenance — is pluggable. Each follows the same pattern: register an adapter or config, and Long Tail handles the rest. Ship with the defaults or wire in your own.
+Long Tail separates concerns through adapter registries. Each cross-cutting capability — authentication, event publishing, telemetry, logging, database maintenance — follows the same contract: implement a typed interface, register at startup, done.
 
-### Telemetry
+No capability requires configuration unless you want it. Auth ships with a working JWT adapter. Maintenance ships with a default nightly schedule. Telemetry, events, and logging are opt-in: register nothing and they do nothing.
 
-Register a telemetry adapter before starting workers. The adapter configures an OpenTelemetry `TracerProvider`; workflow spans are then exported to whatever backend you choose.
-
-```typescript
-import { telemetryRegistry, HoneycombTelemetryAdapter } from '@hotmeshio/long-tail';
-
-telemetryRegistry.register(new HoneycombTelemetryAdapter({
-  apiKey: process.env.HONEYCOMB_API_KEY,
-  serviceName: 'my-app',
-}));
-```
-
-Write your own by implementing `LTTelemetryAdapter` (`connect` / `disconnect`):
+The fastest way to configure adapters is through the `start()` config:
 
 ```typescript
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import type { LTTelemetryAdapter } from '@hotmeshio/long-tail';
-
-class DatadogAdapter implements LTTelemetryAdapter {
-  private sdk: NodeSDK | null = null;
-
-  async connect() {
-    this.sdk = new NodeSDK({ /* Datadog exporter config */ });
-    this.sdk.start();
-  }
-  async disconnect() {
-    await this.sdk?.shutdown();
-  }
-}
-
-telemetryRegistry.register(new DatadogAdapter());
-```
-
-Set `HMSH_TELEMETRY` to control span verbosity (`info` for triggers/workers/errors, `debug` for every activity).
-
-### Events
-
-Milestone events follow the same pattern. Register one or more event adapters and workflow milestones are published as they occur:
-
-```typescript
-import { eventRegistry, NatsEventAdapter } from '@hotmeshio/long-tail';
-
-eventRegistry.register(new NatsEventAdapter({ servers: 'nats://localhost:4222' }));
-await eventRegistry.connect();
-```
-
-Implement `LTEventAdapter` (`connect` / `disconnect` / `publish`) to target SNS, Kafka, a webhook, or anything else. See `services/events/` for the interface and the in-memory reference adapter used in tests.
-
-### Auth
-
-Every API request goes through an auth adapter. The adapter reads the incoming request, verifies identity, and returns an `AuthPayload` with at least a `userId`. Long Tail ships a built-in `JwtAuthAdapter` that verifies Bearer tokens using `JWT_SECRET` — this is the default with no setup required.
-
-To swap in your own provider, implement `LTAuthAdapter` and pass it to `createAuthMiddleware`:
-
-```typescript
-import { createAuthMiddleware } from '@hotmeshio/long-tail';
-import type { LTAuthAdapter, AuthPayload } from '@hotmeshio/long-tail';
-import { OAuth2Client } from 'google-auth-library';
-
-const google = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-class GoogleOAuthAdapter implements LTAuthAdapter {
-  async authenticate(req): Promise<AuthPayload | null> {
-    const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) return null;
-    try {
-      const ticket = await google.verifyIdToken({
-        idToken: header.slice(7),
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      const { sub, email } = ticket.getPayload()!;
-      return { userId: sub, email, role: 'member' };
-    } catch {
-      return null;
-    }
-  }
-}
-
-// Replace the default middleware when mounting routes
-app.use('/api', createAuthMiddleware(new GoogleOAuthAdapter()));
-```
-
-The only contract is `{ userId: string }`. Everything else on the payload (`role`, `email`, custom claims) is passed through to `req.auth` and available in your route handlers. For development, you can skip auth entirely by returning a hardcoded payload.
-
-### Maintenance
-
-Workflow execution generates supporting data — activity records, stream messages, intermediate state. Long Tail ships a default maintenance schedule that cleans this up automatically using HotMesh's built-in cron. It runs nightly at 2 AM with no setup required.
-
-The default rules:
-
-- **Delete streams** older than 7 days — internal message data that's no longer needed.
-- **Delete jobs without an entity** older than 7 days — transient records (activity executions, internal bookkeeping) not tied to a workflow you care about.
-- **Prune jobs with an entity** older than 7 days — your actual workflows (`reviewContent`, `extractDocument`, etc.). Pruning strips the scaffolding but preserves core data, so Temporal-compatible exports always work.
-- **Delete pruned jobs** older than 90 days — fully remove even the compact records after three months.
-
-The net effect: your database holds about a week of full-detail data. Important workflows stick around much longer in compact form, and everything is eventually cleaned up.
-
-To customize, register your own config before startup:
-
-```typescript
-import { maintenanceRegistry } from '@hotmeshio/long-tail';
-
-maintenanceRegistry.register({
-  schedule: '0 3 * * *', // 3 AM instead of 2 AM
-  rules: [
-    { target: 'streams', olderThan: '24 hours', action: 'delete' },
-    { target: 'jobs',    olderThan: '14 days',  action: 'delete', hasEntity: false },
-    { target: 'jobs',    olderThan: '14 days',  action: 'prune',  hasEntity: true },
-    { target: 'jobs',    olderThan: '180 days', action: 'delete', pruned: true },
-  ],
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  workers: [ ... ],
+  auth: { secret: process.env.JWT_SECRET },
+  telemetry: { honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY } },
+  events: { nats: { url: 'nats://localhost:4222' } },
+  logging: { pino: { level: 'info' } },
+  maintenance: {
+    schedule: '0 3 * * *',
+    rules: [
+      { target: 'streams', olderThan: '24 hours', action: 'delete' },
+      { target: 'jobs',    olderThan: '14 days',  action: 'delete', hasEntity: false },
+      { target: 'jobs',    olderThan: '14 days',  action: 'prune',  hasEntity: true },
+      { target: 'jobs',    olderThan: '180 days', action: 'delete', pruned: true },
+    ],
+  },
 });
 ```
 
-Or update at runtime via the REST API (admin-only):
+Every adapter can also be registered programmatically for advanced use cases (custom adapters, conditional logic). See the detailed docs for each:
 
-```
-PUT /api/config/maintenance
+- **[Auth](docs/auth.md)** — JWT (built-in), OAuth, API keys, or any custom `LTAuthAdapter`
+- **[Events](docs/events.md)** — NATS (built-in), SNS, Kafka, webhooks, or any custom `LTEventAdapter`
+- **[Telemetry](docs/telemetry.md)** — Honeycomb (built-in), Datadog, or any OTLP backend via `LTTelemetryAdapter`
+- **[Logging](docs/logging.md)** — Pino (built-in), Winston, or any custom `LTLoggerAdapter`
+- **[Maintenance](docs/maintenance.md)** — Scheduled cleanup with prune/delete rules, runtime API
 
-{
-  "schedule": "0 3 * * *",
-  "rules": [
-    { "target": "streams", "olderThan": "24 hours", "action": "delete" },
-    { "target": "jobs",    "olderThan": "14 days",  "action": "delete", "hasEntity": false },
-    { "target": "jobs",    "olderThan": "14 days",  "action": "prune",  "hasEntity": true },
-    { "target": "jobs",    "olderThan": "180 days", "action": "delete", "pruned": true }
-  ]
-}
-```
-
-## Exporting Execution History
+## Execution History Export
 
 Every workflow's full execution history can be exported in a Temporal-compatible format — typed events (`workflow_execution_started`, `activity_task_scheduled`, `activity_task_completed`, etc.) with ISO timestamps, durations, and event cross-references.
 
@@ -475,56 +448,28 @@ The LT interceptor adds the human-in-the-loop layer on top: task tracking, escal
                         └──────────┘
 ```
 
-## Using Long Tail in Your Project
+## Try It
 
-### Install
+The repository includes a working server with two example workflows (`reviewContent` and `verifyDocument`), Postgres, and NATS.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+
+### Run
 
 ```bash
-npm install @hotmeshio/long-tail @hotmeshio/hotmesh
+git clone https://github.com/hotmeshio/long-tail.git
+cd long-tail
+docker compose up
 ```
 
-### Connect and start workers
+Postgres, NATS, and the API server start together. Migrations run automatically.
 
-Long Tail uses Postgres for both workflow state and application data. Connect, run migrations, register the interceptor, and start your workflow workers:
+Default ports are `3000` (API), `5432` (Postgres), `4222`/`8222` (NATS). Override any of them:
 
-```typescript
-import { Client as Postgres } from 'pg';
-import { Durable } from '@hotmeshio/hotmesh';
-import { registerLT } from '@hotmeshio/long-tail';
-
-import * as myWorkflow from './workflows/my-workflow';
-
-const connection = {
-  class: Postgres,
-  options: { connectionString: process.env.DATABASE_URL },
-};
-
-// Register Long Tail interceptors
-await registerLT(connection);
-
-// Start your workflow worker
-const worker = await Durable.Worker.create({
-  connection,
-  taskQueue: 'my-queue',
-  workflow: myWorkflow.myWorkflow,
-});
-await worker.run();
-```
-
-### Start a workflow
-
-```typescript
-const client = new Durable.Client({ connection });
-
-const handle = await client.workflow.start({
-  args: [{ data: { contentId: '123', content: 'Review this' }, metadata: {} }],
-  taskQueue: 'my-queue',
-  workflowName: 'myWorkflow',
-  workflowId: `review-${Date.now()}`,
-  expire: 86_400,
-});
-
-const result = await handle.result();
+```bash
+LT_PORT=3001 LT_PG_PORT=5433 LT_NATS_PORT=4223 docker compose up
 ```
 
 ## API Reference

@@ -1,16 +1,16 @@
-import express from 'express';
-
 import { config } from './modules/config';
-import { migrate } from './services/db/migrate';
-import { startWorkers } from './workers';
-import { telemetryRegistry } from './services/telemetry';
-import { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
-import { maintenanceRegistry } from './services/maintenance';
-import { defaultMaintenanceConfig } from './modules/maintenance';
-import routes from './routes';
+import { loggerRegistry } from './services/logger';
+
+import { start } from './start';
+
+import * as reviewContentWorkflow from './workflows/review-content';
+import * as verifyDocumentWorkflow from './workflows/verify-document';
+import * as reviewContentOrchWorkflow from './workflows/review-content/orchestrator';
+import * as verifyDocumentOrchWorkflow from './workflows/verify-document/orchestrator';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
+export { start } from './start';
 export { registerLT, createLTInterceptor } from './interceptor';
 export { createLTActivityInterceptor } from './interceptor/activity-interceptor';
 export { executeLT } from './orchestrator';
@@ -28,50 +28,35 @@ export { InMemoryEventAdapter } from './services/events/memory';
 export { publishMilestoneEvent } from './services/events/publish';
 export { telemetryRegistry } from './services/telemetry';
 export { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
+export { loggerRegistry } from './services/logger';
+export { PinoLoggerAdapter } from './services/logger/pino';
 export { maintenanceRegistry } from './services/maintenance';
 export { defaultMaintenanceConfig } from './modules/maintenance';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('[long-tail] starting...');
-
-  // 0. Register telemetry adapter (if HONEYCOMB_API_KEY is set)
-  //    Read from process.env directly since dotenv loads after module init.
   const honeycombKey = process.env.HONEYCOMB_API_KEY;
-  if (honeycombKey) {
-    telemetryRegistry.register(new HoneycombTelemetryAdapter({
-      apiKey: honeycombKey,
-    }));
-  }
 
-  // 0b. Register default maintenance config
-  maintenanceRegistry.register(defaultMaintenanceConfig);
-
-  // 1. Run database migrations
-  console.log('[long-tail] running migrations...');
-  await migrate();
-
-  // 2. Start HotMesh workers + interceptor (telemetry connects first)
-  console.log('[long-tail] starting workers...');
-  await startWorkers();
-
-  // 3. Start Express server
-  const app = express();
-  app.use(express.json());
-
-  // Health check
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
-
-  // API routes
-  app.use('/api', routes);
-
-  app.listen(config.PORT, () => {
-    console.log(`[long-tail] server running on port ${config.PORT}`);
-    console.log(`[long-tail] API: http://localhost:${config.PORT}/api`);
-    console.log(`[long-tail] Health: http://localhost:${config.PORT}/health`);
+  await start({
+    database: {
+      host: config.POSTGRES_HOST,
+      port: config.POSTGRES_PORT,
+      user: config.POSTGRES_USER,
+      password: config.POSTGRES_PASSWORD,
+      database: config.POSTGRES_DB,
+    },
+    server: {
+      port: config.PORT,
+    },
+    workers: [
+      { taskQueue: 'long-tail', workflow: reviewContentWorkflow.reviewContent },
+      { taskQueue: 'long-tail-verify', workflow: verifyDocumentWorkflow.verifyDocument },
+      { taskQueue: 'lt-review-orch', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
+      { taskQueue: 'lt-verify-orch', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
+    ],
+    telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
+    events: config.NATS_URL ? { nats: { url: config.NATS_URL } } : undefined,
   });
 }
 
@@ -79,7 +64,7 @@ async function main() {
 if (require.main === module) {
   require('dotenv').config();
   main().catch((err) => {
-    console.error('[long-tail] fatal:', err);
+    loggerRegistry.error(`[long-tail] fatal: ${err}`);
     process.exit(1);
   });
 }

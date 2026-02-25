@@ -2,6 +2,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../modules/config';
+import { loggerRegistry } from '../services/logger';
 import { telemetryRegistry } from '../services/telemetry';
 import { eventRegistry } from '../services/events';
 import { maintenanceRegistry } from '../services/maintenance';
@@ -74,16 +75,16 @@ export async function startWorkers(): Promise<void> {
   // Connect event adapters (no-op if none registered)
   if (eventRegistry.hasAdapters) {
     await eventRegistry.connect();
-    console.log('[workers] event adapters connected');
+    loggerRegistry.info('[workers] event adapters connected');
   }
 
   // Start maintenance cron (no-op if no config registered)
   if (maintenanceRegistry.hasConfig) {
     await maintenanceRegistry.connect();
-    console.log('[workers] maintenance cron started');
+    loggerRegistry.info('[workers] maintenance cron started');
   }
 
-  console.log(
+  loggerRegistry.info(
     `[workers] started on queues: ${LT_TASK_QUEUE}, ${LT_VERIFY_QUEUE}, ` +
     `${LT_REVIEW_ORCH_QUEUE}, ${LT_VERIFY_ORCH_QUEUE}`,
   );
