@@ -50,9 +50,7 @@ describe('LTConfig service and cache', () => {
         onBefore: [{ target_workflow_type: 'fetchData', target_task_queue: 'fetch-queue', ordinal: 0 }],
         onAfter: [{ target_workflow_type: 'notify', target_task_queue: null, ordinal: 0 }],
       },
-      consumers: [
-        { provider_name: 'userProfile', provider_workflow_type: 'fetchUserProfile', ordinal: 0 },
-      ],
+      consumes: ['fetchUserProfile'],
     };
 
     const result = await configService.upsertWorkflowConfig(input);
@@ -66,8 +64,7 @@ describe('LTConfig service and cache', () => {
     expect(result.lifecycle.onBefore).toHaveLength(1);
     expect(result.lifecycle.onBefore[0].target_workflow_type).toBe('fetchData');
     expect(result.lifecycle.onAfter).toHaveLength(1);
-    expect(result.consumers).toHaveLength(1);
-    expect(result.consumers[0].provider_name).toBe('userProfile');
+    expect(result.consumes).toEqual(['fetchUserProfile']);
   });
 
   // ── CRUD: read ────────────────────────────────────────────────────────────
@@ -99,7 +96,7 @@ describe('LTConfig service and cache', () => {
       description: null,
       roles: [],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     const configs = await configService.listWorkflowConfigs();
@@ -122,7 +119,7 @@ describe('LTConfig service and cache', () => {
       description: 'Updated description',
       roles: ['senior-reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     expect(updated.task_queue).toBe('updated-queue');
@@ -130,7 +127,7 @@ describe('LTConfig service and cache', () => {
     expect(updated.default_modality).toBe('fax');
     expect(updated.roles).toEqual(['senior-reviewer']);
     expect(updated.lifecycle.onBefore).toHaveLength(0);
-    expect(updated.consumers).toHaveLength(0);
+    expect(updated.consumes).toHaveLength(0);
   });
 
   // ── CRUD: delete ──────────────────────────────────────────────────────────
@@ -226,7 +223,7 @@ describe('LTConfig service and cache', () => {
       description: null,
       roles: ['moderator'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     // Before invalidation, cache still has old value
@@ -274,7 +271,7 @@ describe('LTConfig service and cache', () => {
       description: null,
       roles: ['supervisor'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     // Still returns old value (cached)
@@ -297,7 +294,7 @@ describe('LTConfig service and cache', () => {
       description: null,
       roles: ['moderator'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
     ltConfig.invalidate();
   });
@@ -324,7 +321,7 @@ describe('LTConfig service and cache', () => {
       description: null,
       roles: [],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
     ltConfig.invalidate();
 

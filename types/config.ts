@@ -15,18 +15,12 @@ export interface LTWorkflowConfig {
     onBefore: LTLifecycleHook[];
     onAfter: LTLifecycleHook[];
   };
-  consumers: LTConsumerConfig[];
+  consumes: string[];
 }
 
 export interface LTLifecycleHook {
   target_workflow_type: string;
   target_task_queue: string | null;
-  ordinal: number;
-}
-
-export interface LTConsumerConfig {
-  provider_name: string;
-  provider_workflow_type: string;
   ordinal: number;
 }
 
@@ -43,12 +37,12 @@ export interface LTResolvedConfig {
   roles: string[];
   onBefore: LTLifecycleHook[];
   onAfter: LTLifecycleHook[];
-  consumers: LTConsumerConfig[];
+  consumes: string[];
 }
 
 /**
  * Provider data returned by ltGetProviderData.
- * Keyed by provider_name from LTConsumerConfig.
+ * Keyed by workflow type name from the `consumes` array.
  */
 export interface LTProviderData {
   [providerName: string]: {

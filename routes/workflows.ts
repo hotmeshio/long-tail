@@ -7,9 +7,88 @@ import {
   LT_VERIFY_ORCH_QUEUE,
 } from '../workers';
 import * as exportService from '../services/export';
+import * as configService from '../services/config';
+import { ltConfig } from '../modules/ltconfig';
 import type { LTEnvelope } from '../types';
 
 const router = Router();
+
+// ── Workflow configuration ────────────────────────────────────────────────────
+
+/**
+ * GET /api/workflows/config
+ * List all workflow configurations.
+ */
+router.get('/config', async (_req, res) => {
+  try {
+    const configs = await configService.listWorkflowConfigs();
+    res.json({ workflows: configs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/workflows/:type/config
+ * Get a single workflow configuration.
+ */
+router.get('/:type/config', async (req, res) => {
+  try {
+    const config = await configService.getWorkflowConfig(req.params.type);
+    if (!config) {
+      res.status(404).json({ error: 'Workflow config not found' });
+      return;
+    }
+    res.json(config);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/workflows/:type/config
+ * Create or replace a workflow configuration.
+ */
+router.put('/:type/config', async (req, res) => {
+  try {
+    const config = await configService.upsertWorkflowConfig({
+      workflow_type: req.params.type,
+      is_lt: req.body.is_lt ?? true,
+      is_container: req.body.is_container ?? false,
+      task_queue: req.body.task_queue ?? null,
+      default_role: req.body.default_role ?? 'reviewer',
+      default_modality: req.body.default_modality ?? 'portal',
+      description: req.body.description ?? null,
+      roles: req.body.roles ?? [],
+      lifecycle: req.body.lifecycle ?? { onBefore: [], onAfter: [] },
+      consumes: req.body.consumes ?? [],
+    });
+    ltConfig.invalidate();
+    res.json(config);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/workflows/:type/config
+ * Delete a workflow configuration and all sub-entities (cascade).
+ */
+router.delete('/:type/config', async (req, res) => {
+  try {
+    const deleted = await configService.deleteWorkflowConfig(req.params.type);
+    if (!deleted) {
+      res.status(404).json({ error: 'Workflow config not found' });
+      return;
+    }
+    ltConfig.invalidate();
+    res.json({ deleted: true, workflow_type: req.params.type });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Workflow execution ────────────────────────────────────────────────────────
 
 /**
  * POST /api/workflows/review-content

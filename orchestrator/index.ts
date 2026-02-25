@@ -109,8 +109,8 @@ export async function executeLT<T = any>(
   // 2. Load workflow config for lifecycle hooks and provider injection
   const wfConfig = await ltGetWorkflowConfig(workflowName);
 
-  // 3. Inject provider data into envelope if consumers are configured
-  if (wfConfig?.consumers?.length && originId) {
+  // 3. Inject provider data into envelope if consumes are configured
+  if (wfConfig?.consumes?.length && originId) {
     const providerData = await ltGetProviderData({
       workflowName,
       originId,

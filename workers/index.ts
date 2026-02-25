@@ -4,9 +4,8 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options } from '../modules/config';
 import { telemetryRegistry } from '../services/telemetry';
 import { eventRegistry } from '../services/events';
-import { createLTInterceptor } from '../interceptor';
-import { createLTActivityInterceptor } from '../interceptor/activity-interceptor';
-import * as interceptorActivities from '../interceptor/activities';
+import { maintenanceRegistry } from '../services/maintenance';
+import { registerLT } from '../interceptor';
 import * as reviewContentWorkflow from '../workflows/review-content';
 import * as verifyDocumentWorkflow from '../workflows/verify-document';
 import * as reviewContentOrchWorkflow from '../workflows/review-content/orchestrator';
@@ -19,9 +18,6 @@ const LT_VERIFY_QUEUE = 'long-tail-verify';
 // Orchestrator queues
 const LT_REVIEW_ORCH_QUEUE = 'lt-review-orch';
 const LT_VERIFY_ORCH_QUEUE = 'lt-verify-orch';
-
-// Shared interceptor activity queue
-const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 
 /**
  * Register the shared interceptor activity worker, register the LT
@@ -39,24 +35,11 @@ export async function startWorkers(): Promise<void> {
     options: postgres_options,
   };
 
-  // 1. Register shared activity worker for interceptor DB operations
-  await Durable.registerActivityWorker(
-    { connection, taskQueue: LT_ACTIVITY_QUEUE },
-    interceptorActivities,
-    LT_ACTIVITY_QUEUE,
-  );
-
-  // 2. Register the LT interceptor
-  const ltInterceptor = createLTInterceptor({
-    activityTaskQueue: LT_ACTIVITY_QUEUE,
+  // 1. Register the LT interceptors (activity worker + workflow + activity)
+  await registerLT(connection, {
     defaultRole: 'reviewer',
     defaultModality: 'default',
   });
-  Durable.registerInterceptor(ltInterceptor);
-
-  // 2b. Register the LT activity interceptor (pass-through for now)
-  const ltActivityInterceptor = createLTActivityInterceptor();
-  Durable.registerActivityInterceptor(ltActivityInterceptor);
 
   // 3. Start leaf workflow workers
   const reviewWorker = await Durable.Worker.create({
@@ -94,6 +77,12 @@ export async function startWorkers(): Promise<void> {
     console.log('[workers] event adapters connected');
   }
 
+  // Start maintenance cron (no-op if no config registered)
+  if (maintenanceRegistry.hasConfig) {
+    await maintenanceRegistry.connect();
+    console.log('[workers] maintenance cron started');
+  }
+
   console.log(
     `[workers] started on queues: ${LT_TASK_QUEUE}, ${LT_VERIFY_QUEUE}, ` +
     `${LT_REVIEW_ORCH_QUEUE}, ${LT_VERIFY_ORCH_QUEUE}`,
@@ -117,5 +106,4 @@ export {
   LT_VERIFY_QUEUE,
   LT_REVIEW_ORCH_QUEUE,
   LT_VERIFY_ORCH_QUEUE,
-  LT_ACTIVITY_QUEUE,
 };

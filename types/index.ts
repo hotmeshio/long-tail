@@ -30,7 +30,6 @@ export type {
 export type {
   LTWorkflowConfig,
   LTLifecycleHook,
-  LTConsumerConfig,
   LTResolvedConfig,
   LTProviderData,
 } from './config';
@@ -55,6 +54,11 @@ export type {
 export type {
   LTTelemetryAdapter,
 } from './telemetry';
+
+export type {
+  LTMaintenanceRule,
+  LTMaintenanceConfig,
+} from './maintenance';
 
 export type {
   LTExportField,

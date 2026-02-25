@@ -50,7 +50,7 @@ export async function verifyDocument(
       data: {
         documentId,
         ...envelope.resolver,
-      },
+      } as VerifyDocumentReturnData,
     };
   }
 

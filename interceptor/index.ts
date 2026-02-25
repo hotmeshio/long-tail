@@ -1,6 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from './activities';
+import { createLTActivityInterceptor } from './activity-interceptor';
 import { runWithOrchestratorContext } from './context';
 import { extractEnvelope } from './state';
 import { handleEscalation, handleErrorEscalation } from './escalation';
@@ -10,6 +11,41 @@ import type { LTReturn, LTEscalation, LTEnvelope } from '../types';
 import type { InterceptorState } from './state';
 
 type ActivitiesType = typeof interceptorActivities;
+
+const DEFAULT_ACTIVITY_QUEUE = 'lt-interceptor';
+
+/**
+ * Register the Long Tail interceptors in a single call.
+ *
+ * This registers:
+ * 1. The shared activity worker for interceptor DB operations
+ * 2. The workflow interceptor (escalation, routing, re-runs)
+ * 3. The activity interceptor (milestone event publishing)
+ */
+export async function registerLT(
+  connection: { class: any; options: any },
+  options?: {
+    taskQueue?: string;
+    defaultRole?: string;
+    defaultModality?: string;
+  },
+): Promise<void> {
+  const taskQueue = options?.taskQueue ?? DEFAULT_ACTIVITY_QUEUE;
+
+  await Durable.registerActivityWorker(
+    { connection, taskQueue },
+    interceptorActivities,
+    taskQueue,
+  );
+
+  Durable.registerInterceptor(createLTInterceptor({
+    activityTaskQueue: taskQueue,
+    defaultRole: options?.defaultRole,
+    defaultModality: options?.defaultModality,
+  }));
+
+  Durable.registerActivityInterceptor(createLTActivityInterceptor());
+}
 
 /**
  * The Long Tail interceptor wraps every registered workflow.

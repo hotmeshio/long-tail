@@ -2,7 +2,6 @@ import * as configService from '../services/config';
 import type {
   LTResolvedConfig,
   LTLifecycleHook,
-  LTConsumerConfig,
   LTProviderData,
 } from '../types';
 
@@ -82,18 +81,18 @@ class LTConfigCache {
     return hooks.length > 0;
   }
 
-  async getProviders(name: string): Promise<LTConsumerConfig[]> {
+  async getProviders(name: string): Promise<string[]> {
     const config = await this.get(name);
-    return config?.consumers ?? [];
+    return config?.consumes ?? [];
   }
 
   async getProviderData(
     name: string,
     originId: string,
   ): Promise<LTProviderData> {
-    const consumers = await this.getProviders(name);
-    if (!consumers.length || !originId) return {};
-    return configService.getProviderData(consumers, originId);
+    const consumes = await this.getProviders(name);
+    if (!consumes.length || !originId) return {};
+    return configService.getProviderData(consumes, originId);
   }
 
   /** Force cache reload on next access. Call after config mutations. */

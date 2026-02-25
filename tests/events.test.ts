@@ -100,7 +100,7 @@ describe('events service', () => {
       description: null,
       roles: ['reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContentOrchestrator',
@@ -112,7 +112,7 @@ describe('events service', () => {
       description: null,
       roles: [],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     const connection = { class: Postgres, options: postgres_options };

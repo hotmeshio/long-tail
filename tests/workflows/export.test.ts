@@ -44,7 +44,7 @@ describe('workflow state export', () => {
       description: null,
       roles: ['reviewer'],
       lifecycle: { onBefore: [], onAfter: [] },
-      consumers: [],
+      consumes: [],
     });
 
     const connection = { class: Postgres, options: postgres_options };
@@ -381,10 +381,8 @@ describe('workflow state export', () => {
 
     await handle.result();
 
-    const [first, second] = await Promise.all([
-      exportService.exportWorkflow(workflowId, TASK_QUEUE, 'reviewContent'),
-      exportService.exportWorkflow(workflowId, TASK_QUEUE, 'reviewContent'),
-    ]);
+    const first = await exportService.exportWorkflow(workflowId, TASK_QUEUE, 'reviewContent');
+    const second = await exportService.exportWorkflow(workflowId, TASK_QUEUE, 'reviewContent');
 
     expect(first.workflow_id).toBe(second.workflow_id);
     expect(first.status).toBe(second.status);
