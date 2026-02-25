@@ -56,6 +56,10 @@ export type {
 } from './telemetry';
 
 export type {
+  LTLoggerAdapter,
+} from './logger';
+
+export type {
   LTMaintenanceRule,
   LTMaintenanceConfig,
 } from './maintenance';
@@ -79,3 +83,8 @@ export type {
   ExecutionExportOptions,
   ExportMode,
 } from './export';
+
+export type {
+  LTStartConfig,
+  LTInstance,
+} from './startup';

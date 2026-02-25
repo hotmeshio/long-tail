@@ -4,6 +4,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 import type { LTTelemetryAdapter } from '../../types/telemetry';
+import { loggerRegistry } from '../logger';
 
 export interface HoneycombOptions {
   /** Honeycomb API key (defaults to HONEYCOMB_API_KEY env var) */
@@ -51,7 +52,7 @@ export class HoneycombTelemetryAdapter implements LTTelemetryAdapter {
 
   async connect(): Promise<void> {
     if (!this.apiKey) {
-      console.warn('[telemetry] HONEYCOMB_API_KEY not set — skipping Honeycomb telemetry');
+      loggerRegistry.warn('[telemetry] HONEYCOMB_API_KEY not set — skipping Honeycomb telemetry');
       return;
     }
 
@@ -70,13 +71,13 @@ export class HoneycombTelemetryAdapter implements LTTelemetryAdapter {
     });
 
     this.sdk.start();
-    console.log(`[telemetry] Honeycomb connected (service: ${this.serviceName})`);
+    loggerRegistry.info(`[telemetry] Honeycomb connected (service: ${this.serviceName})`);
   }
 
   async disconnect(): Promise<void> {
     if (!this.sdk) return;
     await this.sdk.shutdown();
     this.sdk = null;
-    console.log('[telemetry] Honeycomb disconnected');
+    loggerRegistry.info('[telemetry] Honeycomb disconnected');
   }
 }

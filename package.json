@@ -45,7 +45,8 @@
     "jsonwebtoken": "^9.0.3",
     "nats": "^2.28.0",
     "openai": "^5.9.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "pino": "^9.6.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

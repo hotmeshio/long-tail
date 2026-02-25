@@ -32,3 +32,22 @@ export async function truncateTables(client: any): Promise<void> {
 export function sleepFor(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * Poll for escalations by workflowId until at least one appears or timeout.
+ * Used for tests that depend on async workflow completion (e.g., OpenAI Vision).
+ */
+export async function waitForEscalation(
+  workflowId: string,
+  timeoutMs = 45_000,
+  intervalMs = 2_000,
+): Promise<import('../../types').LTEscalationRecord[]> {
+  const { getEscalationsByWorkflowId } = await import('../../services/escalation');
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const escalations = await getEscalationsByWorkflowId(workflowId);
+    if (escalations.length > 0) return escalations;
+    await sleepFor(intervalMs);
+  }
+  throw new Error(`No escalation found for workflow ${workflowId} within ${timeoutMs}ms`);
+}

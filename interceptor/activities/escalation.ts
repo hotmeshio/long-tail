@@ -1,4 +1,5 @@
 import * as escalationService from '../../services/escalation';
+import { loggerRegistry } from '../../services/logger';
 
 /**
  * Resolve an escalation record. Called by the interceptor after
@@ -16,7 +17,7 @@ export async function ltResolveEscalation(input: {
     input.resolverPayload,
   );
   if (!result) {
-    console.warn(`[ltResolveEscalation] Escalation ${input.escalationId} already resolved or not found`);
+    loggerRegistry.warn(`[ltResolveEscalation] Escalation ${input.escalationId} already resolved or not found`);
   }
 }
 

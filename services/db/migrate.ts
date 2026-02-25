@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { getPool, closePool } from './index';
+import { loggerRegistry } from '../logger';
 
 const SCHEMAS_DIR = path.join(__dirname, 'schemas');
 
@@ -35,7 +36,7 @@ export async function migrate(): Promise<void> {
         'INSERT INTO lt_migrations (name) VALUES ($1)',
         [file],
       );
-      console.log(`[migrate] applied: ${file}`);
+      loggerRegistry.info(`[migrate] applied: ${file}`);
     }
   }
 }
@@ -45,11 +46,11 @@ if (require.main === module) {
   require('dotenv').config();
   migrate()
     .then(() => {
-      console.log('[migrate] done');
+      loggerRegistry.info('[migrate] done');
       return closePool();
     })
     .catch((err) => {
-      console.error('[migrate] failed:', err);
+      loggerRegistry.error(`[migrate] failed: ${err}`);
       process.exit(1);
     });
 }

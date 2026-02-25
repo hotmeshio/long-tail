@@ -2,6 +2,7 @@ import { Virtual } from '@hotmeshio/hotmesh';
 import { Client as Postgres } from 'pg';
 
 import { postgres_options } from '../../modules/config';
+import { loggerRegistry } from '../logger';
 import * as dbaService from '../dba';
 import type { LTMaintenanceConfig, LTMaintenanceRule } from '../../types/maintenance';
 
@@ -53,7 +54,7 @@ async function executeRule(rule: LTMaintenanceRule): Promise<void> {
       break;
 
     default:
-      console.warn('[lt-maintenance] unknown rule, skipping:', rule);
+      loggerRegistry.warn(`[lt-maintenance] unknown rule, skipping: ${JSON.stringify(rule)}`);
   }
 }
 
@@ -93,15 +94,15 @@ class LTMaintenanceRegistry {
       topic: CRON_TOPIC,
       connection,
       callback: async () => {
-        console.log('[lt-maintenance] starting maintenance cycle...');
+        loggerRegistry.info('[lt-maintenance] starting maintenance cycle...');
         for (const rule of rules) {
           try {
             await executeRule(rule);
           } catch (err: any) {
-            console.error('[lt-maintenance] rule failed:', rule, err?.message);
+            loggerRegistry.error(`[lt-maintenance] rule failed: ${JSON.stringify(rule)} ${err?.message}`);
           }
         }
-        console.log('[lt-maintenance] maintenance cycle complete.');
+        loggerRegistry.info('[lt-maintenance] maintenance cycle complete.');
       },
       args: [],
       options: {
@@ -111,7 +112,7 @@ class LTMaintenanceRegistry {
     });
 
     this.connected = true;
-    console.log(`[lt-maintenance] cron started (schedule: ${schedule})`);
+    loggerRegistry.info(`[lt-maintenance] cron started (schedule: ${schedule})`);
   }
 
   /**
@@ -128,7 +129,7 @@ class LTMaintenanceRegistry {
         options: { id: CRON_ID },
       });
     } catch (err: any) {
-      console.warn('[lt-maintenance] interrupt failed (may not be running):', err?.message);
+      loggerRegistry.warn(`[lt-maintenance] interrupt failed (may not be running): ${err?.message}`);
     }
 
     this.connected = false;

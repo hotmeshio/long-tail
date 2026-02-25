@@ -84,8 +84,24 @@ export function createAuthMiddleware(adapter: LTAuthAdapter): RequestHandler {
 /**
  * Default auth middleware using JWT with `config.JWT_SECRET`.
  * Drop-in replacement for custom middleware — just import and use.
+ *
+ * When `setAuthAdapter()` is called (e.g., from `start()`), this
+ * middleware delegates to the custom adapter instead.
  */
-export const requireAuth = createAuthMiddleware(new JwtAuthAdapter());
+let _authMiddleware: RequestHandler | null = null;
+
+export const requireAuth: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+  const mw = _authMiddleware || createAuthMiddleware(new JwtAuthAdapter());
+  mw(req, res, next);
+};
+
+/**
+ * Replace the auth adapter used by `requireAuth`.
+ * Call before starting the server.
+ */
+export function setAuthAdapter(adapter: LTAuthAdapter): void {
+  _authMiddleware = createAuthMiddleware(adapter);
+}
 
 /**
  * Middleware that requires admin access. Must be placed AFTER requireAuth.

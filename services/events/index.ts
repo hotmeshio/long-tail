@@ -1,4 +1,5 @@
 import type { LTEvent, LTEventAdapter } from '../../types';
+import { loggerRegistry } from '../logger';
 
 class LTEventRegistry {
   private adapters: LTEventAdapter[] = [];
@@ -31,7 +32,7 @@ class LTEventRegistry {
     await Promise.allSettled(
       this.adapters.map((a) =>
         a.publish(event).catch((err) => {
-          console.error('[lt-events] adapter publish failed:', err?.message);
+          loggerRegistry.error(`[lt-events] adapter publish failed: ${err?.message}`);
         }),
       ),
     );
