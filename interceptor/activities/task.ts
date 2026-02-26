@@ -9,6 +9,7 @@ export async function ltCreateTask(input: {
   workflowId: string;
   workflowType: string;
   ltType: string;
+  taskQueue?: string;
   modality?: string;
   signalId: string;
   parentWorkflowId: string;
@@ -21,6 +22,7 @@ export async function ltCreateTask(input: {
     workflow_id: input.workflowId,
     workflow_type: input.workflowType,
     lt_type: input.ltType,
+    task_queue: input.taskQueue,
     modality: input.modality,
     signal_id: input.signalId,
     parent_workflow_id: input.parentWorkflowId,

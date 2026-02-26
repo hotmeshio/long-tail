@@ -46,6 +46,16 @@ class LTConfigCache {
     return config?.isContainer ?? false;
   }
 
+  async isInvocable(name: string): Promise<boolean> {
+    const config = await this.get(name);
+    return config?.invocable ?? false;
+  }
+
+  async getInvocationRoles(name: string): Promise<string[]> {
+    const config = await this.get(name);
+    return config?.invocationRoles ?? [];
+  }
+
   async getTargetEscalationRole(name: string): Promise<string> {
     const config = await this.get(name);
     return config?.role ?? 'reviewer';

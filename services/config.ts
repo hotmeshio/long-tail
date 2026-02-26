@@ -21,9 +21,13 @@ export async function getWorkflowConfig(
 
   const wf = wfRows[0];
 
-  const [rolesResult, lifecycleResult] = await Promise.all([
+  const [rolesResult, invocationRolesResult, lifecycleResult] = await Promise.all([
     pool.query(
       'SELECT role FROM lt_config_roles WHERE workflow_type = $1 ORDER BY role',
+      [workflowType],
+    ),
+    pool.query(
+      'SELECT role FROM lt_config_invocation_roles WHERE workflow_type = $1 ORDER BY role',
       [workflowType],
     ),
     pool.query(
@@ -48,11 +52,13 @@ export async function getWorkflowConfig(
     workflow_type: wf.workflow_type,
     is_lt: wf.is_lt,
     is_container: wf.is_container,
+    invocable: wf.invocable,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
     default_modality: wf.default_modality,
     description: wf.description,
     roles: rolesResult.rows.map((r: any) => r.role),
+    invocation_roles: invocationRolesResult.rows.map((r: any) => r.role),
     lifecycle: { onBefore, onAfter },
     consumes: wf.consumes || [],
   };
@@ -61,10 +67,11 @@ export async function getWorkflowConfig(
 export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
   const pool = getPool();
 
-  const [wfResult, rolesResult, lifecycleResult] =
+  const [wfResult, rolesResult, invocationRolesResult, lifecycleResult] =
     await Promise.all([
       pool.query('SELECT * FROM lt_config_workflows ORDER BY workflow_type'),
       pool.query('SELECT * FROM lt_config_roles ORDER BY workflow_type, role'),
+      pool.query('SELECT * FROM lt_config_invocation_roles ORDER BY workflow_type, role'),
       pool.query(
         'SELECT * FROM lt_config_lifecycle ORDER BY workflow_type, hook, ordinal',
       ),
@@ -75,6 +82,12 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
   for (const r of rolesResult.rows) {
     if (!rolesMap.has(r.workflow_type)) rolesMap.set(r.workflow_type, []);
     rolesMap.get(r.workflow_type)!.push(r.role);
+  }
+
+  const invocationRolesMap = new Map<string, string[]>();
+  for (const r of invocationRolesResult.rows) {
+    if (!invocationRolesMap.has(r.workflow_type)) invocationRolesMap.set(r.workflow_type, []);
+    invocationRolesMap.get(r.workflow_type)!.push(r.role);
   }
 
   const lifecycleMap = new Map<
@@ -101,11 +114,13 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     workflow_type: wf.workflow_type,
     is_lt: wf.is_lt,
     is_container: wf.is_container,
+    invocable: wf.invocable,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
     default_modality: wf.default_modality,
     description: wf.description,
     roles: rolesMap.get(wf.workflow_type) || [],
+    invocation_roles: invocationRolesMap.get(wf.workflow_type) || [],
     lifecycle: lifecycleMap.get(wf.workflow_type) || {
       onBefore: [],
       onAfter: [],
@@ -128,11 +143,12 @@ export async function upsertWorkflowConfig(
     // Upsert the workflow row
     await client.query(
       `INSERT INTO lt_config_workflows
-         (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, description, consumes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (workflow_type, is_lt, is_container, invocable, task_queue, default_role, default_modality, description, consumes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (workflow_type) DO UPDATE SET
          is_lt = EXCLUDED.is_lt,
          is_container = EXCLUDED.is_container,
+         invocable = EXCLUDED.invocable,
          task_queue = EXCLUDED.task_queue,
          default_role = EXCLUDED.default_role,
          default_modality = EXCLUDED.default_modality,
@@ -142,6 +158,7 @@ export async function upsertWorkflowConfig(
         config.workflow_type,
         config.is_lt,
         config.is_container,
+        config.invocable,
         config.task_queue,
         config.default_role,
         config.default_modality,
@@ -158,6 +175,18 @@ export async function upsertWorkflowConfig(
     for (const role of config.roles) {
       await client.query(
         'INSERT INTO lt_config_roles (workflow_type, role) VALUES ($1, $2)',
+        [config.workflow_type, role],
+      );
+    }
+
+    // Replace invocation roles
+    await client.query(
+      'DELETE FROM lt_config_invocation_roles WHERE workflow_type = $1',
+      [config.workflow_type],
+    );
+    for (const role of config.invocation_roles) {
+      await client.query(
+        'INSERT INTO lt_config_invocation_roles (workflow_type, role) VALUES ($1, $2)',
         [config.workflow_type, role],
       );
     }
@@ -224,10 +253,12 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
     map.set(c.workflow_type, {
       isLT: c.is_lt,
       isContainer: c.is_container,
+      invocable: c.invocable,
       taskQueue: c.task_queue,
       role: c.default_role,
       modality: c.default_modality,
       roles: c.roles,
+      invocationRoles: c.invocation_roles,
       onBefore: c.lifecycle.onBefore,
       onAfter: c.lifecycle.onAfter,
       consumes: c.consumes,

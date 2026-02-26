@@ -19,12 +19,24 @@ export async function connectPostgres() {
 }
 
 export async function dropTables(client: any): Promise<void> {
+  await client.query('DROP TABLE IF EXISTS lt_config_lifecycle CASCADE');
+  await client.query('DROP TABLE IF EXISTS lt_config_invocation_roles CASCADE');
+  await client.query('DROP TABLE IF EXISTS lt_config_roles CASCADE');
+  await client.query('DROP TABLE IF EXISTS lt_config_workflows CASCADE');
+  await client.query('DROP TABLE IF EXISTS lt_user_roles CASCADE');
+  await client.query('DROP TABLE IF EXISTS lt_users CASCADE');
   await client.query('DROP TABLE IF EXISTS lt_escalations CASCADE');
   await client.query('DROP TABLE IF EXISTS lt_tasks CASCADE');
   await client.query('DROP TABLE IF EXISTS lt_migrations CASCADE');
 }
 
 export async function truncateTables(client: any): Promise<void> {
+  await client.query('TRUNCATE lt_config_lifecycle CASCADE');
+  await client.query('TRUNCATE lt_config_invocation_roles CASCADE');
+  await client.query('TRUNCATE lt_config_roles CASCADE');
+  await client.query('TRUNCATE lt_config_workflows CASCADE');
+  await client.query('TRUNCATE lt_user_roles CASCADE');
+  await client.query('TRUNCATE lt_users CASCADE');
   await client.query('TRUNCATE lt_escalations CASCADE');
   await client.query('TRUNCATE lt_tasks CASCADE');
 }

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS lt_tasks (
   workflow_id     TEXT NOT NULL,
   workflow_type   TEXT NOT NULL,
   lt_type         TEXT NOT NULL,
+  task_queue      TEXT,
   modality        TEXT,
 
   -- state
@@ -59,6 +60,8 @@ CREATE INDEX IF NOT EXISTS idx_lt_tasks_signal
   ON lt_tasks (signal_id);
 CREATE INDEX IF NOT EXISTS idx_lt_tasks_origin
   ON lt_tasks (origin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lt_tasks_workflow_id
+  ON lt_tasks (workflow_id);
 
 CREATE OR REPLACE TRIGGER trg_lt_tasks_updated_at
   BEFORE UPDATE ON lt_tasks
@@ -173,6 +176,7 @@ CREATE TABLE IF NOT EXISTS lt_config_workflows (
   workflow_type    TEXT UNIQUE NOT NULL,
   is_lt            BOOLEAN NOT NULL DEFAULT true,
   is_container     BOOLEAN NOT NULL DEFAULT false,
+  invocable        BOOLEAN NOT NULL DEFAULT false,
   task_queue       TEXT,
   default_role     TEXT NOT NULL DEFAULT 'reviewer',
   default_modality TEXT NOT NULL DEFAULT 'portal',
@@ -187,6 +191,14 @@ CREATE TRIGGER lt_config_workflows_updated_at
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
 CREATE TABLE IF NOT EXISTS lt_config_roles (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_type TEXT NOT NULL REFERENCES lt_config_workflows(workflow_type) ON DELETE CASCADE,
+  role          TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(workflow_type, role)
+);
+
+CREATE TABLE IF NOT EXISTS lt_config_invocation_roles (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_type TEXT NOT NULL REFERENCES lt_config_workflows(workflow_type) ON DELETE CASCADE,
   role          TEXT NOT NULL,

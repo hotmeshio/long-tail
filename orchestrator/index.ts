@@ -89,6 +89,7 @@ export async function executeLT<T = any>(
     workflowId: childWorkflowId,
     workflowType: workflowName,
     ltType: workflowName,
+    taskQueue,
     signalId,
     parentWorkflowId: orchCtx?.workflowId || childWorkflowId,
     originId,

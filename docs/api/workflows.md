@@ -1,8 +1,12 @@
 # Workflows API
 
-All endpoints require authentication. Responses use `application/json`.
+The workflow API covers the full lifecycle: configure a workflow, invoke it, observe its progress, and export its durable execution history. All endpoints require authentication. Responses use `application/json`.
+
+---
 
 ## Configuration
+
+Workflow configuration lives in Postgres (`lt_config_workflows`) and drives everything: which workflows the interceptor manages, who can escalate, who can invoke, and what data flows between steps.
 
 ### List all workflow configurations
 
@@ -20,14 +24,14 @@ GET /api/workflows/config
       "workflow_type": "reviewContent",
       "is_lt": true,
       "is_container": false,
+      "invocable": true,
       "task_queue": "long-tail",
       "default_role": "reviewer",
       "default_modality": "default",
-      "description": null,
+      "description": "AI content review with human escalation",
       "consumes": [],
-      "roles": [
-        { "id": "...", "workflow_type": "reviewContent", "role": "reviewer" }
-      ],
+      "roles": ["reviewer"],
+      "invocation_roles": ["submitter"],
       "lifecycle": {
         "onBefore": [],
         "onAfter": []
@@ -61,6 +65,8 @@ GET /api/workflows/:type/config
 
 ### Create or replace a workflow configuration
 
+Requires `admin` or `superadmin` role.
+
 ```
 PUT /api/workflows/:type/config
 ```
@@ -77,11 +83,13 @@ PUT /api/workflows/:type/config
 |-------|------|---------|-------------|
 | `is_lt` | `boolean` | `true` | Enable the LT interceptor for this workflow |
 | `is_container` | `boolean` | `false` | `true` for orchestrators that coordinate child workflows |
-| `task_queue` | `string \| null` | `null` | Default task queue name |
+| `invocable` | `boolean` | `false` | Allow this workflow to be started via `POST /api/workflows/:type/invoke` |
+| `task_queue` | `string \| null` | `null` | Task queue name (required for invocable workflows) |
 | `default_role` | `string` | `"reviewer"` | Role assigned to escalations when the workflow doesn't specify one |
 | `default_modality` | `string` | `"portal"` | Default modality |
 | `description` | `string \| null` | `null` | Human-readable description |
 | `roles` | `string[]` | `[]` | Roles allowed to claim escalations for this workflow |
+| `invocation_roles` | `string[]` | `[]` | Roles allowed to invoke via API. Empty = any authenticated user. |
 | `lifecycle` | `object` | `{ onBefore: [], onAfter: [] }` | Hook definitions (see below) |
 | `consumes` | `string[]` | `[]` | Workflow types whose completed data this workflow receives via `envelope.lt.providers` |
 
@@ -91,10 +99,17 @@ PUT /api/workflows/:type/config
 {
   "lifecycle": {
     "onBefore": [
-      { "target_workflow_type": "precheck", "target_task_queue": "long-tail", "ordinal": 0 }
+      {
+        "target_workflow_type": "precheck",
+        "target_task_queue": "long-tail",
+        "ordinal": 0
+      }
     ],
     "onAfter": [
-      { "target_workflow_type": "notify", "ordinal": 0 }
+      {
+        "target_workflow_type": "notify",
+        "ordinal": 0
+      }
     ]
   }
 }
@@ -110,23 +125,28 @@ Each hook has:
 ```json
 {
   "is_lt": true,
+  "invocable": true,
+  "task_queue": "long-tail",
   "default_role": "reviewer",
   "roles": ["reviewer", "senior-reviewer"],
+  "invocation_roles": ["submitter", "admin"],
   "consumes": ["extractDocument"]
 }
 ```
 
 **Response 200:** The created or updated config object.
 
-This endpoint is idempotent. It replaces the entire configuration, including roles and lifecycle hooks (cascade delete + re-insert). It also invalidates the in-memory config cache.
+This endpoint is idempotent. It replaces the entire configuration, including roles, invocation roles, and lifecycle hooks (cascade delete + re-insert). It also invalidates the in-memory config cache.
 
 ### Delete a workflow configuration
+
+Requires `admin` or `superadmin` role.
 
 ```
 DELETE /api/workflows/:type/config
 ```
 
-Deletes the workflow config and all associated roles and lifecycle hooks (cascade).
+Deletes the workflow config and all associated roles, invocation roles, and lifecycle hooks (cascade).
 
 **Response 200:**
 
@@ -142,29 +162,38 @@ Deletes the workflow config and all associated roles and lifecycle hooks (cascad
 
 ---
 
-## Execution
+## Invocation
 
-### Start a content review workflow
+### Invoke a workflow
 
 ```
-POST /api/workflows/review-content
+POST /api/workflows/:type/invoke
 ```
+
+Start a workflow by its registered type. The workflow must have `invocable: true` in its configuration.
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `type` | Workflow type name (e.g., `reviewContent`) |
 
 **Request body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `contentId` | `string` | yes | Identifier for the content being reviewed |
-| `content` | `string` | yes | The content to review |
-| `contentType` | `string` | no | Content classification (e.g., `article`, `comment`) |
+| `data` | `object` | yes | Business data passed to the workflow as `envelope.data` |
+| `metadata` | `object` | no | Control flow metadata passed as `envelope.metadata` |
 
 **Example request:**
 
 ```json
 {
-  "contentId": "post-456",
-  "content": "This article discusses the impact of...",
-  "contentType": "article"
+  "data": {
+    "contentId": "post-456",
+    "content": "This article discusses the impact of...",
+    "contentType": "article"
+  }
 }
 ```
 
@@ -172,51 +201,33 @@ POST /api/workflows/review-content
 
 ```json
 {
-  "workflowId": "review-orch-post-456-a1b2c3d4",
+  "workflowId": "reviewContent-a1b2c3d4",
   "message": "Workflow started"
 }
 ```
 
-**Response 400:**
+The workflow starts on its configured `task_queue` with a generated workflow ID (`{type}-{guid}`). The response returns immediately — the workflow runs durably in the background.
 
-```json
-{ "error": "contentId and content are required" }
-```
+**Error responses:**
 
-The workflow ID is deterministic: `review-orch-{contentId}-{guid}`. The workflow runs on the `lt-review-orch` orchestrator queue.
+| Status | Body | Meaning |
+|--------|------|---------|
+| `400` | `{ "error": "Request body must include a data object" }` | Missing or invalid `data` field |
+| `400` | `{ "error": "Workflow has no task_queue configured" }` | Config exists but `task_queue` is null |
+| `403` | `{ "error": "Workflow is not invocable" }` | `invocable` is `false` |
+| `403` | `{ "error": "User not registered" }` | RBAC check failed — no matching user |
+| `403` | `{ "error": "Insufficient role for invocation" }` | User lacks a required invocation role |
+| `404` | `{ "error": "Workflow not found" }` | No config exists for this type |
 
-### Start a document verification workflow
+**Authorization:**
 
-```
-POST /api/workflows/verify-document
-```
+When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one of the listed roles (checked against `lt_user_roles` via the user's `external_id`). Superadmins bypass this check.
 
-**Request body:**
+---
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `documentId` | `string` | yes | Identifier for the document to verify |
+## Observation
 
-**Example request:**
-
-```json
-{ "documentId": "DOC-001" }
-```
-
-**Response 202:**
-
-```json
-{
-  "workflowId": "verify-orch-DOC-001-e5f6g7h8",
-  "message": "Workflow started"
-}
-```
-
-**Response 400:**
-
-```json
-{ "error": "documentId is required" }
-```
+These endpoints let you check on running or completed workflows. The `workflowId` (returned from the invoke call) is all you need.
 
 ### Get workflow status
 
@@ -224,54 +235,302 @@ POST /api/workflows/verify-document
 GET /api/workflows/:workflowId/status
 ```
 
-**Query parameters:**
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `taskQueue` | `lt-review-orch` | Task queue the workflow runs on |
-| `workflowName` | `reviewContentOrchestrator` | Registered workflow function name |
-
 **Response 200:**
 
 ```json
 {
-  "workflowId": "review-orch-post-456-a1b2c3d4",
+  "workflowId": "reviewContent-a1b2c3d4",
   "status": 0
 }
 ```
 
-Status is a numeric semaphore from HotMesh: `0` means complete, a positive value means running, a negative value means interrupted.
+| Status value | Meaning |
+|--------------|---------|
+| `0` | Complete |
+| Positive | Running |
+| Negative | Interrupted |
 
-### Await workflow result
+### Get workflow result
 
 ```
 GET /api/workflows/:workflowId/result
 ```
 
-Blocks until the workflow completes and returns the result.
+Returns the result if the workflow is complete, or `202` if it's still running. Never blocks.
 
-**Query parameters:** Same as `/status`.
-
-**Response 200:**
+**Response 200** (complete):
 
 ```json
 {
-  "workflowId": "review-orch-post-456-a1b2c3d4",
+  "workflowId": "reviewContent-a1b2c3d4",
   "result": {
-    "approved": true,
-    "analysis": { "confidence": 0.92 }
+    "type": "return",
+    "data": {
+      "approved": true,
+      "analysis": { "confidence": 0.92 }
+    },
+    "milestones": [
+      { "name": "ai_review", "value": "approved" }
+    ]
   }
 }
 ```
 
-### Export workflow state
+**Response 202** (still running):
+
+```json
+{
+  "workflowId": "reviewContent-a1b2c3d4",
+  "status": "running"
+}
+```
+
+---
+
+## Execution History Export
+
+Every workflow's full execution history is exportable in JSON. Two formats are available: a raw state export (HotMesh-native) and a Temporal-compatible execution event history with typed events, ISO timestamps, durations, and cross-references.
+
+Because workflows are durably executed — state is transactionally checkpointed to Postgres after every step — the export is a complete, faithful record of everything that happened. Every activity scheduled, every result returned, every signal received, every child workflow spawned. Nothing is reconstructed or approximated.
+
+### Convenience alias
 
 ```
 GET /api/workflows/:workflowId/export
 ```
 
-Convenience alias that delegates to the export service. For full control over facet filtering, use the dedicated [`/api/workflow-states/:workflowId`](exports.md) endpoint.
+Returns the raw workflow state from HotMesh. For full control over facet filtering and execution format, use the dedicated `/api/workflow-states` endpoints below.
 
-**Query parameters:** Same as `/status`.
+**Response 200:** Raw workflow state object (data, state, status, timeline, transitions).
 
-**Response 200:** Raw workflow state object from HotMesh.
+### Raw workflow state
+
+```
+GET /api/workflow-states/:workflowId
+```
+
+Full state export with facet filtering. The response includes five facets: `data`, `state`, `status`, `timeline`, and `transitions`. Use `allow` or `block` to control which facets are returned.
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `allow` | `string` | no | Comma-separated allowlist of facets |
+| `block` | `string` | no | Comma-separated blocklist of facets |
+| `values` | `string` | no | Set to `false` to omit timeline values |
+
+`allow` and `block` are mutually exclusive. If both are provided, `allow` takes precedence.
+
+**Example — only data and status:**
+
+```
+GET /api/workflow-states/reviewContent-a1b2c3d4?allow=data,status
+```
+
+**Response 200:**
+
+```json
+{
+  "workflow_id": "reviewContent-a1b2c3d4",
+  "data": {
+    "contentId": "post-456",
+    "approved": true,
+    "analysis": { "confidence": 0.92 }
+  },
+  "status": 0
+}
+```
+
+### Temporal-compatible execution history
+
+```
+GET /api/workflow-states/:workflowId/execution
+```
+
+Exports the workflow's execution as a sequence of typed events in a format compatible with Temporal's event history model. Each event has a `eventType`, an ISO timestamp, and typed attributes. Activity events include durations and cross-reference the scheduling event via `scheduledEventId`. The response ends with a `summary` that captures total event count, wall-clock duration, and final status.
+
+This is the primary export format for auditing, debugging, and building dashboards over durable workflow executions.
+
+**Query parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `excludeSystem` | `string` | no | `false` | `true` to omit LT interceptor activities (`lt*`) |
+| `omitResults` | `string` | no | `false` | `true` to strip activity result payloads |
+| `mode` | `string` | no | `sparse` | `sparse` = flat event list, `verbose` = nested child workflows |
+| `maxDepth` | `integer` | no | `5` | Recursion depth limit for verbose mode |
+
+**Event types:**
+
+| Event type | Description |
+|------------|-------------|
+| `workflow_execution_started` | Workflow began — includes input arguments |
+| `activity_task_scheduled` | Activity dispatched to a task queue |
+| `activity_task_completed` | Activity returned a result — includes duration and `scheduledEventId` |
+| `activity_task_failed` | Activity threw an error |
+| `child_workflow_execution_started` | Orchestrator spawned a child workflow |
+| `child_workflow_execution_completed` | Child workflow returned |
+| `child_workflow_execution_failed` | Child workflow failed |
+| `timer_started` | Timer (sleep/delay) began |
+| `timer_fired` | Timer elapsed |
+| `workflow_execution_signaled` | External signal received (e.g., escalation resolution) |
+| `workflow_execution_completed` | Workflow finished successfully |
+| `workflow_execution_failed` | Workflow failed |
+
+**Example request — clean history without interceptor internals:**
+
+```
+GET /api/workflow-states/reviewContent-a1b2c3d4/execution?excludeSystem=true
+```
+
+**Response 200:**
+
+```json
+{
+  "workflowId": "reviewContent-a1b2c3d4",
+  "workflowName": "reviewContent",
+  "taskQueue": "long-tail",
+  "events": [
+    {
+      "eventId": 1,
+      "eventType": "workflow_execution_started",
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "details": {
+        "input": {
+          "data": { "contentId": "post-456" },
+          "metadata": {}
+        }
+      }
+    },
+    {
+      "eventId": 2,
+      "eventType": "activity_task_scheduled",
+      "timestamp": "2025-01-15T10:00:00.050Z",
+      "details": {
+        "activityType": "analyzeContent",
+        "taskQueue": "long-tail"
+      }
+    },
+    {
+      "eventId": 3,
+      "eventType": "activity_task_completed",
+      "timestamp": "2025-01-15T10:00:02.300Z",
+      "details": {
+        "scheduledEventId": 2,
+        "duration": "2.250s",
+        "result": {
+          "confidence": 0.92,
+          "flags": []
+        }
+      }
+    },
+    {
+      "eventId": 4,
+      "eventType": "workflow_execution_completed",
+      "timestamp": "2025-01-15T10:00:02.350Z",
+      "details": {
+        "result": {
+          "approved": true,
+          "analysis": { "confidence": 0.92 }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "totalEvents": 4,
+    "duration": "2.350s",
+    "status": "completed"
+  }
+}
+```
+
+Every event is faithfully reconstructed from the durable execution log — activities are only executed once (their results are checkpointed), so the event history reflects exactly what happened, not a re-execution.
+
+**Verbose mode** includes nested `children` arrays for orchestrator workflows, where each child contains its own full event sequence. Use `maxDepth` to limit recursion for deeply nested orchestrations.
+
+### Workflow status semaphore
+
+```
+GET /api/workflow-states/:workflowId/status
+```
+
+Returns only the numeric status — useful for lightweight polling.
+
+**Response 200:**
+
+```json
+{ "workflow_id": "reviewContent-a1b2c3d4", "status": 0 }
+```
+
+| Value | Meaning |
+|-------|---------|
+| `0` | Complete |
+| Positive | Running |
+| Negative | Interrupted |
+
+### Workflow state snapshot
+
+```
+GET /api/workflow-states/:workflowId/state
+```
+
+Returns the current internal job state — the HotMesh representation of where the workflow is in its execution graph. For completed workflows, this is the final output.
+
+**Response 200:** HotMesh job state object. Structure depends on the workflow's current execution point.
+
+### Programmatic access
+
+The same export data is available directly through the Durable client, without going through the HTTP API:
+
+```typescript
+import { Durable } from '@hotmeshio/hotmesh';
+
+const client = new Durable.Client({ connection });
+const handle = await client.workflow.getHandle(
+  taskQueue,
+  workflowName,
+  workflowId,
+);
+
+// Temporal-compatible execution history
+const execution = await handle.exportExecution({
+  exclude_system: true,
+});
+
+// Raw state export with facet filtering
+const state = await handle.export({
+  allow: ['data', 'status'],
+});
+
+// Status semaphore
+const status = await handle.status();
+
+// Current state snapshot
+const snapshot = await handle.state(true);
+```
+
+---
+
+## Endpoint summary
+
+### `/api/workflows`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/config` | any | List all workflow configurations |
+| `GET` | `/:type/config` | any | Get a single workflow configuration |
+| `PUT` | `/:type/config` | admin | Create or replace a workflow configuration |
+| `DELETE` | `/:type/config` | admin | Delete a workflow configuration (cascade) |
+| `POST` | `/:type/invoke` | RBAC | Invoke a workflow (requires `invocable: true`) |
+| `GET` | `/:workflowId/status` | any | Workflow status |
+| `GET` | `/:workflowId/result` | any | Get workflow result (200 if complete, 202 if running) |
+| `GET` | `/:workflowId/export` | any | Raw state export (convenience alias) |
+
+### `/api/workflow-states`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/:workflowId` | any | Raw state export with facet filtering |
+| `GET` | `/:workflowId/execution` | any | Temporal-compatible execution history |
+| `GET` | `/:workflowId/status` | any | Status semaphore |
+| `GET` | `/:workflowId/state` | any | Current workflow state snapshot |

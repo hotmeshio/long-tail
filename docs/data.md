@@ -14,6 +14,7 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 | `workflow_id` | `TEXT NOT NULL` | — | HotMesh workflow ID (unique per execution) |
 | `workflow_type` | `TEXT NOT NULL` | — | Registered workflow name (e.g., `reviewContent`) |
 | `lt_type` | `TEXT NOT NULL` | — | Classification set by the interceptor |
+| `task_queue` | `TEXT` | — | Task queue the workflow ran on |
 | `modality` | `TEXT` | — | Modality from workflow config |
 | `status` | `TEXT NOT NULL` | `'pending'` | `pending` or `completed` |
 | `priority` | `INTEGER NOT NULL` | `2` | Numeric priority (lower = higher priority) |
@@ -41,6 +42,7 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 | `idx_lt_tasks_completed` | `(completed_at, status)` | Maintenance queries for old completed tasks |
 | `idx_lt_tasks_signal` | `(signal_id)` | Look up task by HotMesh signal |
 | `idx_lt_tasks_origin` | `(origin_id, created_at DESC)` | Consumer/provider data injection — find sibling tasks sharing an origin |
+| `idx_lt_tasks_workflow_id` | `(workflow_id)` | Resolve workflow handle by workflow ID |
 
 ### lt_escalations
 
@@ -137,6 +139,7 @@ Workflow registration. Every workflow that uses the LT interceptor must have a r
 | `workflow_type` | `TEXT UNIQUE NOT NULL` | — | Workflow function name |
 | `is_lt` | `BOOLEAN NOT NULL` | `true` | Enables the LT interceptor for this workflow |
 | `is_container` | `BOOLEAN NOT NULL` | `false` | `true` for orchestrators that coordinate child workflows |
+| `invocable` | `BOOLEAN NOT NULL` | `false` | Allow invocation via `POST /api/workflows/:type/invoke` |
 | `task_queue` | `TEXT` | — | Default task queue name |
 | `default_role` | `TEXT NOT NULL` | `'reviewer'` | Role assigned to escalations when the workflow doesn't specify one |
 | `default_modality` | `TEXT NOT NULL` | `'portal'` | Default modality |
@@ -157,6 +160,19 @@ Allowed roles per workflow type. A workflow can have multiple roles; any user ho
 | `workflow_type` | `TEXT NOT NULL` | — | FK to `lt_config_workflows(workflow_type)`, CASCADE on delete |
 | `role` | `TEXT NOT NULL` | — | Role name |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+
+Unique constraint: `(workflow_type, role)`.
+
+### lt_config_invocation_roles
+
+Roles allowed to invoke a workflow via the API. When a workflow has `invocable: true` and this table has entries for it, only users holding one of these roles (or superadmins) can invoke.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `workflow_type` | `TEXT NOT NULL` | — | FK to `lt_config_workflows(workflow_type)`, CASCADE on delete |
+| `role` | `TEXT NOT NULL` | — | Role name |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | When the role was assigned |
 
 Unique constraint: `(workflow_type, role)`.
 
@@ -182,8 +198,9 @@ Unique constraint: `(workflow_type, hook, target_workflow_type)`.
 
 ```
 lt_config_workflows
-  ├──< lt_config_roles        (workflow_type → workflow_type, CASCADE)
-  └──< lt_config_lifecycle    (workflow_type → workflow_type, CASCADE)
+  ├──< lt_config_roles              (workflow_type → workflow_type, CASCADE)
+  ├──< lt_config_invocation_roles   (workflow_type → workflow_type, CASCADE)
+  └──< lt_config_lifecycle          (workflow_type → workflow_type, CASCADE)
 
 lt_users
   └──< lt_user_roles          (user_id → id, CASCADE)

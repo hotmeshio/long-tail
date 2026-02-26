@@ -176,6 +176,7 @@ export function createLTInterceptor(options: {
           workflowId,
           workflowType: workflowName,
           ltType: workflowName,
+          taskQueue,
           signalId: standaloneSignalId,
           parentWorkflowId: workflowId,
           originId: envelope?.lt?.originId || workflowId,

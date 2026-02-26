@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import {
-  createClient,
-  LT_REVIEW_ORCH_QUEUE,
-  LT_VERIFY_ORCH_QUEUE,
-} from '../workers';
+import { createClient } from '../workers';
 import * as exportService from '../services/export';
 import * as configService from '../services/config';
+import * as userService from '../services/user';
+import { requireAdmin } from '../modules/auth';
 import { ltConfig } from '../modules/ltconfig';
+import { resolveHandle } from './resolve';
 import type { LTEnvelope } from '../types';
 
 const router = Router();
@@ -48,18 +47,21 @@ router.get('/:type/config', async (req, res) => {
 /**
  * PUT /api/workflows/:type/config
  * Create or replace a workflow configuration.
+ * Requires admin or superadmin role.
  */
-router.put('/:type/config', async (req, res) => {
+router.put('/:type/config', requireAdmin, async (req, res) => {
   try {
     const config = await configService.upsertWorkflowConfig({
       workflow_type: req.params.type,
       is_lt: req.body.is_lt ?? true,
       is_container: req.body.is_container ?? false,
+      invocable: req.body.invocable ?? false,
       task_queue: req.body.task_queue ?? null,
       default_role: req.body.default_role ?? 'reviewer',
       default_modality: req.body.default_modality ?? 'portal',
       description: req.body.description ?? null,
       roles: req.body.roles ?? [],
+      invocation_roles: req.body.invocation_roles ?? [],
       lifecycle: req.body.lifecycle ?? { onBefore: [], onAfter: [] },
       consumes: req.body.consumes ?? [],
     });
@@ -73,8 +75,9 @@ router.put('/:type/config', async (req, res) => {
 /**
  * DELETE /api/workflows/:type/config
  * Delete a workflow configuration and all sub-entities (cascade).
+ * Requires admin or superadmin role.
  */
-router.delete('/:type/config', async (req, res) => {
+router.delete('/:type/config', requireAdmin, async (req, res) => {
   try {
     const deleted = await configService.deleteWorkflowConfig(req.params.type);
     if (!deleted) {
@@ -88,33 +91,81 @@ router.delete('/:type/config', async (req, res) => {
   }
 });
 
-// ── Workflow execution ────────────────────────────────────────────────────────
+// ── Workflow invocation ─────────────────────────────────────────────────────
 
 /**
- * POST /api/workflows/review-content
- * Start a new content review orchestrator workflow.
- * Body: { contentId: string, content: string, contentType?: string }
+ * POST /api/workflows/:type/invoke
+ * Start a workflow by its registered type.
+ *
+ * The workflow must have `invocable: true` in its config. If the config
+ * includes `invocation_roles`, the authenticated user must hold at least
+ * one of those roles. When invocation_roles is empty, any authenticated
+ * user can invoke.
+ *
+ * Body: { data: Record<string, any>, metadata?: Record<string, any> }
  */
-router.post('/review-content', async (req, res) => {
+router.post('/:type/invoke', async (req, res) => {
   try {
-    const { contentId, content, contentType } = req.body || {};
-    if (!contentId || !content) {
-      res.status(400).json({ error: 'contentId and content are required' });
+    const workflowType = req.params.type;
+
+    // 1. Look up workflow config
+    const wfConfig = await configService.getWorkflowConfig(workflowType);
+    if (!wfConfig) {
+      res.status(404).json({ error: 'Workflow not found' });
+      return;
+    }
+
+    // 2. Check invocable flag
+    if (!wfConfig.invocable) {
+      res.status(403).json({ error: 'Workflow is not invocable' });
+      return;
+    }
+
+    // 3. Check invocation roles (if configured)
+    if (wfConfig.invocation_roles.length > 0) {
+      const userId = req.auth!.userId;
+      const user = await userService.getUserByExternalId(userId);
+      if (!user) {
+        res.status(403).json({ error: 'User not registered' });
+        return;
+      }
+      const userRoles = user.roles.map((r) => r.role);
+      const hasInvocationRole = wfConfig.invocation_roles.some((r) =>
+        userRoles.includes(r),
+      );
+      if (!hasInvocationRole) {
+        const isSuperAdmin = user.roles.some((r) => r.type === 'superadmin');
+        if (!isSuperAdmin) {
+          res.status(403).json({ error: 'Insufficient role for invocation' });
+          return;
+        }
+      }
+    }
+
+    // 4. Build envelope and start workflow
+    const { data, metadata } = req.body || {};
+    if (!data || typeof data !== 'object') {
+      res.status(400).json({ error: 'Request body must include a data object' });
       return;
     }
 
     const envelope: LTEnvelope = {
-      data: { contentId, content, contentType },
-      metadata: {},
+      data,
+      metadata: metadata || {},
     };
 
+    if (!wfConfig.task_queue) {
+      res.status(400).json({ error: 'Workflow has no task_queue configured' });
+      return;
+    }
+
     const client = createClient();
-    const workflowId = `review-orch-${contentId}-${Durable.guid()}`;
+    const workflowId = `${workflowType}-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [envelope],
-      taskQueue: LT_REVIEW_ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
+      taskQueue: wfConfig.task_queue,
+      workflowName: workflowType,
       workflowId,
       expire: 86_400,
     });
@@ -128,58 +179,21 @@ router.post('/review-content', async (req, res) => {
   }
 });
 
-/**
- * POST /api/workflows/verify-document
- * Start a new document verification orchestrator workflow.
- * Body: { documentId: string }
- */
-router.post('/verify-document', async (req, res) => {
-  try {
-    const { documentId } = req.body || {};
-    if (!documentId) {
-      res.status(400).json({ error: 'documentId is required' });
-      return;
-    }
-
-    const envelope: LTEnvelope = {
-      data: { documentId },
-      metadata: {},
-    };
-
-    const client = createClient();
-    const workflowId = `verify-orch-${documentId}-${Durable.guid()}`;
-
-    const handle = await client.workflow.start({
-      args: [envelope],
-      taskQueue: LT_VERIFY_ORCH_QUEUE,
-      workflowName: 'verifyDocumentOrchestrator',
-      workflowId,
-      expire: 86_400,
-    });
-
-    res.status(202).json({
-      workflowId: handle.workflowId,
-      message: 'Workflow started',
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// ── Workflow observation ────────────────────────────────────────────────────
 
 /**
  * GET /api/workflows/:workflowId/status
- * Get the status of a running workflow.
- * Query: ?taskQueue=<queue>&workflowName=<name>
+ * Get the status of a workflow. Only the workflowId is needed.
  */
 router.get('/:workflowId/status', async (req, res) => {
   try {
-    const taskQueue = (req.query.taskQueue as string) || LT_REVIEW_ORCH_QUEUE;
-    const workflowName = (req.query.workflowName as string) || 'reviewContentOrchestrator';
+    const resolved = await resolveHandle(req, res);
+    if (!resolved) return;
 
     const client = createClient();
     const handle = await client.workflow.getHandle(
-      taskQueue,
-      workflowName,
+      resolved.taskQueue,
+      resolved.workflowName,
       req.params.workflowId,
     );
     const status = await handle.status();
@@ -191,20 +205,30 @@ router.get('/:workflowId/status', async (req, res) => {
 
 /**
  * GET /api/workflows/:workflowId/result
- * Await and return the workflow result (blocks until complete).
- * Query: ?taskQueue=<queue>&workflowName=<name>
+ * Return the workflow result if complete, or 202 if still running.
+ * Never blocks — always returns immediately.
  */
 router.get('/:workflowId/result', async (req, res) => {
   try {
-    const taskQueue = (req.query.taskQueue as string) || LT_REVIEW_ORCH_QUEUE;
-    const workflowName = (req.query.workflowName as string) || 'reviewContentOrchestrator';
+    const resolved = await resolveHandle(req, res);
+    if (!resolved) return;
 
     const client = createClient();
     const handle = await client.workflow.getHandle(
-      taskQueue,
-      workflowName,
+      resolved.taskQueue,
+      resolved.workflowName,
       req.params.workflowId,
     );
+    const status = await handle.status();
+
+    if (status !== 0) {
+      res.status(202).json({
+        workflowId: req.params.workflowId,
+        status: 'running',
+      });
+      return;
+    }
+
     const result = await handle.result();
     res.json({ workflowId: req.params.workflowId, result });
   } catch (err: any) {
@@ -214,21 +238,17 @@ router.get('/:workflowId/result', async (req, res) => {
 
 /**
  * GET /api/workflows/:workflowId/export
- * Convenience alias — delegates to the export service.
- * Prefer the dedicated `/api/workflow-states/:workflowId` endpoint
- * which supports allow/block facet filtering.
- *
- * Query: ?taskQueue=<queue>&workflowName=<name>
+ * Export workflow state. Convenience alias for /api/workflow-states/:workflowId.
  */
 router.get('/:workflowId/export', async (req, res) => {
   try {
-    const taskQueue = (req.query.taskQueue as string) || LT_REVIEW_ORCH_QUEUE;
-    const workflowName = (req.query.workflowName as string) || 'reviewContentOrchestrator';
+    const resolved = await resolveHandle(req, res);
+    if (!resolved) return;
 
     const exported = await exportService.exportWorkflow(
       req.params.workflowId,
-      taskQueue,
-      workflowName,
+      resolved.taskQueue,
+      resolved.workflowName,
     );
     res.json(exported);
   } catch (err: any) {
