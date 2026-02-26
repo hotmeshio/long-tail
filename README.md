@@ -44,14 +44,14 @@ This is the sociotechnical shape of AI in the enterprise: not AI *or* humans, bu
 - [Composing Workflows](#composing-workflows)
 - [Milestones](#milestones)
 - [Roles](#roles)
+- [Invoking Workflows](#invoking-workflows)
 - [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [Maintenance](docs/maintenance.md)
 - [Execution History Export](#execution-history-export)
 - [How It Works](#how-it-works)
-- [Try It](#try-it)
 - [API Reference](#api-reference) — [Workflows](docs/api/workflows.md) · [Tasks](docs/api/tasks.md) · [Escalations](docs/api/escalations.md) · [Users](docs/api/users.md) · [Roles](docs/api/roles.md) · [Maintenance](docs/api/maintenance.md) · [DBA](docs/api/dba.md) · [Exports](docs/api/exports.md)
-- [Cloud Deployment](docs/cloud.md)
+- [Deployment](#deployment) — [Cloud Deployment](docs/cloud.md)
 - [Data Model](docs/data.md)
-- [Testing](#testing)
+- [Contributing](docs/contributing.md)
 
 ## Install
 
@@ -68,9 +68,18 @@ import { start } from '@hotmeshio/long-tail';
 import * as myWorkflow from './workflows/my-workflow';
 
 const lt = await start({
-  database: { host: 'localhost', port: 5432, user: 'postgres', password: 'password', database: 'mydb' },
+  database: {
+    host: 'localhost',
+    port: 5432,
+    user: 'postgres',
+    password: 'password',
+    database: 'mydb',
+  },
   workers: [
-    { taskQueue: 'my-queue', workflow: myWorkflow.myWorkflow },
+    {
+      taskQueue: 'my-queue',
+      workflow: myWorkflow.myWorkflow,
+    },
   ],
 });
 ```
@@ -169,11 +178,12 @@ PUT /api/workflows/reviewContent/config
 {
   "is_lt": true,
   "default_role": "reviewer",
-  "roles": ["reviewer"]
+  "roles": ["reviewer"],
+  "invocable": true
 }
 ```
 
-`is_lt: true` turns on the interceptor for this workflow. `default_role` and `roles` control who gets the escalation when the AI isn't confident enough to decide on its own.
+`is_lt: true` turns on the interceptor for this workflow. `default_role` and `roles` control who gets the escalation when the AI isn't confident enough to decide on its own. `invocable: true` exposes the workflow for invocation via the public API (see [Invoking Workflows](#invoking-workflows)).
 
 From there, two things can happen when `reviewContent` runs:
 
@@ -264,20 +274,7 @@ export async function processDocument(envelope: LTEnvelope) {
 
 If `extractDocument` escalates to a human, the orchestrator waits. When the escalation is resolved, it resumes exactly where it left off and runs `validateExtraction`. No polling, no callbacks — just sequential code.
 
-Children that share an `originId` can read each other's completed data automatically. Instead of manually passing results through the envelope, you declare what a workflow consumes in its config:
-
-```
-PUT /api/workflows/validateExtraction/config
-
-{
-  "is_lt": true,
-  "default_role": "reviewer",
-  "roles": ["reviewer"],
-  "consumes": ["extractDocument"]
-}
-```
-
-When `validateExtraction` runs, Long Tail looks up the completed `extractDocument` task for the same `originId` and injects its result into `envelope.lt.providers.extractDocument`. The child workflow gets the data it needs without the orchestrator having to thread it through.
+Children that share an `originId` can read each other's completed data automatically. Declare what a workflow [`consumes`](docs/api/workflows.md#create-or-replace-a-workflow-configuration) in its config, and Long Tail injects sibling results into `envelope.lt.providers` at runtime — no manual threading required.
 
 ## Milestones
 
@@ -299,46 +296,7 @@ When a human resolves an escalation, the interceptor automatically appends `esca
 
 Roles connect workflows to people. When a workflow escalates to the `reviewer` role, every user assigned that role sees it in their queue. Roles are implicit — they exist the moment you reference them. There's no separate "create role" step.
 
-A role appears in two places: the workflow config (who should handle escalations) and the user record (who is available to handle them).
-
-### Assigning roles to workflows
-
-When you register a workflow, `default_role` sets the primary escalation target and `roles` lists every role allowed to claim escalations for this workflow:
-
-```
-PUT /api/workflows/reviewContent/config
-
-{
-  "is_lt": true,
-  "default_role": "reviewer",
-  "roles": ["reviewer", "senior-reviewer"]
-}
-```
-
-When `reviewContent` escalates, the escalation targets `reviewer` by default. Users with either `reviewer` or `senior-reviewer` can claim it.
-
-### Assigning roles to users
-
-Create a user with roles up front, or add roles later:
-
-```
-POST /api/users
-
-{
-  "external_id": "jane",
-  "email": "jane@acme.com",
-  "roles": [
-    { "role": "reviewer", "type": "member" },
-    { "role": "senior-reviewer", "type": "admin" }
-  ]
-}
-```
-
-```
-POST /api/users/:id/roles
-
-{ "role": "reviewer", "type": "member" }
-```
+A role appears in two places: the [workflow config](docs/api/workflows.md#create-or-replace-a-workflow-configuration) (`default_role` and `roles`) and the [user record](docs/api/roles.md) (assigned via the roles API).
 
 ### Role types
 
@@ -350,7 +308,47 @@ Every role assignment has a `type` that controls what the user can manage — no
 | `admin` | Everything a member can do, plus manage users within this role |
 | `superadmin` | Full access — manage all roles, all users, system configuration |
 
-A user can hold multiple roles with different types. For example, Jane might be a `member` of `reviewer` and an `admin` of `senior-reviewer` — she can claim escalations for both, but only manage the senior reviewer team.
+A user can hold multiple roles with different types. See the [Users](docs/api/users.md) and [Roles](docs/api/roles.md) API docs for assignment examples.
+
+## Invoking Workflows
+
+Any registered workflow can be invoked via the public API. Set `invocable: true` in the [workflow config](docs/api/workflows.md#create-or-replace-a-workflow-configuration) and optionally restrict access with `invocation_roles`:
+
+```
+PUT /api/workflows/reviewContent/config
+
+{
+  "is_lt": true,
+  "default_role": "reviewer",
+  "roles": ["reviewer"],
+  "invocable": true,
+  "invocation_roles": ["submitter", "admin"]
+}
+```
+
+Then invoke it:
+
+```
+POST /api/workflows/reviewContent/invoke
+
+{
+  "data": {
+    "contentId": "doc-42",
+    "content": "Review this document"
+  }
+}
+```
+
+```json
+{
+  "workflowId": "reviewContent-a1b2c3",
+  "message": "Workflow started"
+}
+```
+
+The workflow runs durably from here. Track progress with the [status and result endpoints](docs/api/workflows.md#observation), or let milestones and events handle downstream notifications.
+
+When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one matching role. Superadmins always bypass. Authorization lives in the database config — change who can invoke without redeploying. See the full [invocation API](docs/api/workflows.md#invocation) for details.
 
 ## Pluggable Architecture
 
@@ -362,19 +360,29 @@ The fastest way to configure adapters is through the `start()` config:
 
 ```typescript
 await start({
-  database: { connectionString: process.env.DATABASE_URL },
+  database: {
+    connectionString: process.env.DATABASE_URL,
+  },
   workers: [ ... ],
-  auth: { secret: process.env.JWT_SECRET },
-  telemetry: { honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY } },
-  events: { nats: { url: 'nats://localhost:4222' } },
-  logging: { pino: { level: 'info' } },
+  auth: {
+    secret: process.env.JWT_SECRET,
+  },
+  telemetry: {
+    honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY },
+  },
+  events: {
+    nats: { url: 'nats://localhost:4222' },
+  },
+  logging: {
+    pino: { level: 'info' },
+  },
   maintenance: {
     schedule: '0 3 * * *',
     rules: [
       { target: 'streams', olderThan: '24 hours', action: 'delete' },
-      { target: 'jobs',    olderThan: '14 days',  action: 'delete', hasEntity: false },
-      { target: 'jobs',    olderThan: '14 days',  action: 'prune',  hasEntity: true },
-      { target: 'jobs',    olderThan: '180 days', action: 'delete', pruned: true },
+      { target: 'jobs', olderThan: '14 days', action: 'delete', hasEntity: false },
+      { target: 'jobs', olderThan: '14 days', action: 'prune', hasEntity: true },
+      { target: 'jobs', olderThan: '180 days', action: 'delete', pruned: true },
     ],
   },
 });
@@ -393,7 +401,7 @@ Every adapter can also be registered programmatically for advanced use cases (cu
 Every workflow's full execution history can be exported in a Temporal-compatible format — typed events (`workflow_execution_started`, `activity_task_scheduled`, `activity_task_completed`, etc.) with ISO timestamps, durations, and event cross-references.
 
 ```
-GET /api/workflow-states/:workflowId/execution?taskQueue=...&workflowName=...
+GET /api/workflow-states/:workflowId/execution
 ```
 
 Options:
@@ -412,13 +420,9 @@ const execution = await handle.exportExecution({ exclude_system: true });
 
 ## How It Works
 
-Long Tail is built on [HotMesh](https://github.com/hotmeshio/sdk-typescript), a workflow engine that delivers Temporal-style durable execution using PostgreSQL.
+Long Tail is built on [HotMesh](https://github.com/hotmeshio/sdk-typescript), a workflow engine that delivers Temporal-style durable execution using PostgreSQL. Workflow state is transactionally checkpointed — crashes, deploys, restarts, the workflow resumes from its last checkpoint. Activities execute exactly once; their results are cached and replayed on recovery. Workflows can pause and wait for external signals (like a human resolving an escalation), then resume with the signal payload.
 
-- **Durable execution** — workflow state is transactionally persisted to Postgres. Crashes, deploys, restarts — the workflow resumes from its last checkpoint.
-- **Deterministic replay** — workflows replay from persisted state on recovery. Activities are only executed once; their results are cached.
-- **Signals** — workflows can pause and wait for external events (like a human resolving an escalation), then resume with the signal payload.
-
-The LT interceptor adds the human-in-the-loop layer on top: task tracking, escalation management, claim/release with expiration, milestone recording, and audit trails. All stored in Postgres alongside the workflow state.
+The LT interceptor adds the human-in-the-loop layer: task tracking, escalation management, claim/release with expiration, milestone recording, and audit trails. All stored in Postgres alongside the workflow state.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -448,40 +452,15 @@ The LT interceptor adds the human-in-the-loop layer on top: task tracking, escal
                         └──────────┘
 ```
 
-## Try It
-
-The repository includes a working server with two example workflows (`reviewContent` and `verifyDocument`), Postgres, and NATS.
-
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/)
-
-### Run
-
-```bash
-git clone https://github.com/hotmeshio/long-tail.git
-cd long-tail
-docker compose up
-```
-
-Postgres, NATS, and the API server start together. Migrations run automatically.
-
-Default ports are `3000` (API), `5432` (Postgres), `4222`/`8222` (NATS). Override any of them:
-
-```bash
-LT_PORT=3001 LT_PG_PORT=5433 LT_NATS_PORT=4223 docker compose up
-```
-
 ## API Reference
 
 ### Workflows
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/workflows/review-content` | Start a content review workflow |
-| `POST` | `/api/workflows/verify-document` | Start a document verification workflow |
+| `POST` | `/api/workflows/:type/invoke` | Invoke a workflow (requires `invocable: true`) |
 | `GET` | `/api/workflows/:id/status` | Get workflow execution status |
-| `GET` | `/api/workflows/:id/result` | Await workflow result |
+| `GET` | `/api/workflows/:id/result` | Get workflow result (200 if complete, 202 if running) |
 | `GET` | `/api/workflows/:id/export` | Export full execution history |
 | `GET` | `/api/workflows/config` | List all workflow configurations |
 | `GET` | `/api/workflows/:type/config` | Get a workflow's configuration |
@@ -542,18 +521,30 @@ LT_PORT=3001 LT_PG_PORT=5433 LT_NATS_PORT=4223 docker compose up
 | `POST` | `/api/dba/prune` | Run maintenance rules on demand |
 | `POST` | `/api/dba/deploy` | Deploy server-side prune function and run migrations |
 
-## Testing
+## Deployment
 
-```bash
-# Start Postgres and NATS
-docker compose up -d postgres nats
+In production, run two container types from the same codebase — one serves the API, the other executes workflows:
 
-# Run all tests
-npm test
-
-# Run workflow tests
-npm run test:workflows
+```typescript
+// api.ts — serves REST endpoints, no workflow execution
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  auth: { secret: process.env.JWT_SECRET },
+});
 ```
+
+```typescript
+// worker.ts — executes workflows, no HTTP server
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  server: { enabled: false },
+  workers: [
+    { taskQueue: 'long-tail', workflow: reviewContent.reviewContent },
+  ],
+});
+```
+
+Both tiers share the same PostgreSQL database and scale independently. See [Cloud Deployment](docs/cloud.md) for AWS ECS, GCP Cloud Run, and Docker configurations.
 
 ## License
 

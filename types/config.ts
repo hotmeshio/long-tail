@@ -6,11 +6,13 @@ export interface LTWorkflowConfig {
   workflow_type: string;
   is_lt: boolean;
   is_container: boolean;
+  invocable: boolean;
   task_queue: string | null;
   default_role: string;
   default_modality: string;
   description: string | null;
   roles: string[];
+  invocation_roles: string[];
   lifecycle: {
     onBefore: LTLifecycleHook[];
     onAfter: LTLifecycleHook[];
@@ -31,10 +33,12 @@ export interface LTLifecycleHook {
 export interface LTResolvedConfig {
   isLT: boolean;
   isContainer: boolean;
+  invocable: boolean;
   taskQueue: string | null;
   role: string;
   modality: string;
   roles: string[];
+  invocationRoles: string[];
   onBefore: LTLifecycleHook[];
   onAfter: LTLifecycleHook[];
   consumes: string[];

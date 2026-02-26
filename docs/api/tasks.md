@@ -35,6 +35,7 @@ GET /api/tasks?status=completed&workflow_type=reviewContent&limit=10
       "workflow_id": "review-orch-post-456-a1b2c3d4",
       "workflow_type": "reviewContent",
       "lt_type": "workflow",
+      "task_queue": "long-tail",
       "modality": "default",
       "status": "completed",
       "priority": 2,
@@ -87,6 +88,7 @@ GET /api/tasks/:id
 | `workflow_id` | `string` | HotMesh workflow ID |
 | `workflow_type` | `string` | Registered workflow name |
 | `lt_type` | `string` | Interceptor classification |
+| `task_queue` | `string` | Task queue the workflow ran on |
 | `modality` | `string` | Modality from workflow config |
 | `status` | `string` | `pending` or `completed` |
 | `priority` | `integer` | Numeric priority (lower = higher) |

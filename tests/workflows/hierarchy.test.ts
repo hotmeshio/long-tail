@@ -138,12 +138,14 @@ const SUB_ORCH_TYPES = ['subOrchA', 'subOrchB'];
 const ALL_TYPES = [...SUB_ORCH_TYPES, ...LEAF_TYPES];
 
 const defaultConfig = {
+  invocable: false as const,
   default_role: 'reviewer',
   default_modality: 'default',
   description: null,
   roles: ['reviewer'],
+  invocation_roles: [] as string[],
   lifecycle: { onBefore: [], onAfter: [] },
-  consumes: [],
+  consumes: [] as string[],
 };
 
 // ── Test suite ───────────────────────────────────────────────────────────────

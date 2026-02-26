@@ -1,10 +1,16 @@
 import { getPool } from './db';
 import type { LTTaskRecord, LTTaskStatus, LTMilestone } from '../types';
 
+export interface ResolvedHandle {
+  taskQueue: string;
+  workflowName: string;
+}
+
 export interface CreateTaskInput {
   workflow_id: string;
   workflow_type: string;
   lt_type: string;
+  task_queue?: string;
   modality?: string;
   signal_id: string;
   parent_workflow_id: string;
@@ -27,14 +33,15 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
   const pool = getPool();
   const { rows } = await pool.query(
     `INSERT INTO lt_tasks
-       (workflow_id, workflow_type, lt_type, modality, signal_id,
+       (workflow_id, workflow_type, lt_type, task_queue, modality, signal_id,
         parent_workflow_id, origin_id, parent_id, envelope, metadata, priority)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
       input.workflow_id,
       input.workflow_type,
       input.lt_type,
+      input.task_queue || null,
       input.modality || null,
       input.signal_id,
       input.parent_workflow_id,
@@ -171,4 +178,47 @@ export async function listTasks(filters: {
     tasks: dataResult.rows,
     total: parseInt(countResult.rows[0].count, 10),
   };
+}
+
+/**
+ * Resolve a workflowId to the (taskQueue, workflowName) pair that
+ * HotMesh needs to get a workflow handle.
+ *
+ * 1. Look up lt_tasks by workflow_id — returns workflow_type and task_queue.
+ * 2. If task_queue is null (pre-migration record), fall back to lt_config_workflows.
+ * 3. Throws if the workflow cannot be resolved.
+ */
+export async function resolveWorkflowHandle(
+  workflowId: string,
+): Promise<ResolvedHandle> {
+  const pool = getPool();
+
+  const { rows } = await pool.query(
+    'SELECT workflow_type, task_queue FROM lt_tasks WHERE workflow_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [workflowId],
+  );
+
+  if (rows.length === 0) {
+    throw new Error(`No task found for workflow "${workflowId}"`);
+  }
+
+  const { workflow_type, task_queue } = rows[0];
+
+  if (task_queue) {
+    return { taskQueue: task_queue, workflowName: workflow_type };
+  }
+
+  // Fallback: resolve task_queue from config (pre-migration records)
+  const { rows: configRows } = await pool.query(
+    'SELECT task_queue FROM lt_config_workflows WHERE workflow_type = $1',
+    [workflow_type],
+  );
+
+  if (configRows.length > 0 && configRows[0].task_queue) {
+    return { taskQueue: configRows[0].task_queue, workflowName: workflow_type };
+  }
+
+  throw new Error(
+    `Cannot resolve task queue for workflow "${workflowId}" (type="${workflow_type}")`,
+  );
 }
