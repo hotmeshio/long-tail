@@ -14,6 +14,8 @@ import { eventRegistry } from './services/events';
 import { NatsEventAdapter } from './services/events/nats';
 import { maintenanceRegistry } from './services/maintenance';
 import { defaultMaintenanceConfig } from './modules/maintenance';
+import { mcpRegistry } from './services/mcp';
+import { BuiltInMcpAdapter } from './services/mcp/adapter';
 import routes from './routes';
 
 import type { LTStartConfig, LTInstance } from './types/startup';
@@ -107,6 +109,16 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     maintenanceRegistry.register(startConfig.maintenance);
   }
 
+  // MCP
+  if (startConfig.mcp?.adapter) {
+    mcpRegistry.register(startConfig.mcp.adapter);
+  } else if (startConfig.mcp) {
+    mcpRegistry.register(new BuiltInMcpAdapter({
+      server: startConfig.mcp.server,
+      autoConnect: startConfig.mcp.autoConnect,
+    }));
+  }
+
   // ── 4. Run migrations ──────────────────────────────────────────────────
   loggerRegistry.info('[long-tail] running migrations...');
   await migrate();
@@ -152,6 +164,12 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       await maintenanceRegistry.connect();
       loggerRegistry.info('[long-tail] maintenance cron started');
     }
+
+    // Connect MCP adapter
+    if (mcpRegistry.hasAdapter) {
+      await mcpRegistry.connect();
+      loggerRegistry.info('[long-tail] MCP adapter connected');
+    }
   }
 
   // ── 6. Start embedded server (if enabled) ──────────────────────────────
@@ -179,6 +197,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     loggerRegistry.info('[long-tail] shutting down...');
     if (httpServer) {
       await new Promise<void>((resolve) => httpServer!.close(() => resolve()));
+    }
+    if (mcpRegistry.hasAdapter) {
+      await mcpRegistry.disconnect();
     }
     if (maintenanceRegistry.hasConfig) {
       await maintenanceRegistry.disconnect();

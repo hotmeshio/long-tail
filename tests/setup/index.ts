@@ -19,6 +19,7 @@ export async function connectPostgres() {
 }
 
 export async function dropTables(client: any): Promise<void> {
+  await client.query('DROP TABLE IF EXISTS lt_mcp_servers CASCADE');
   await client.query('DROP TABLE IF EXISTS lt_config_lifecycle CASCADE');
   await client.query('DROP TABLE IF EXISTS lt_config_invocation_roles CASCADE');
   await client.query('DROP TABLE IF EXISTS lt_config_roles CASCADE');
@@ -31,6 +32,7 @@ export async function dropTables(client: any): Promise<void> {
 }
 
 export async function truncateTables(client: any): Promise<void> {
+  await client.query('TRUNCATE lt_mcp_servers CASCADE');
   await client.query('TRUNCATE lt_config_lifecycle CASCADE');
   await client.query('TRUNCATE lt_config_invocation_roles CASCADE');
   await client.query('TRUNCATE lt_config_roles CASCADE');

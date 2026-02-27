@@ -1,5 +1,6 @@
 -- Long Tail Workflows: Schema
 -- Tasks track workflow executions; escalations track human interventions.
+-- MCP servers track external tool server registrations.
 
 -- ─── updated_at trigger ─────────────────────────────────────────────────────
 
@@ -217,12 +218,57 @@ CREATE TABLE IF NOT EXISTS lt_config_lifecycle (
   UNIQUE(workflow_type, hook, target_workflow_type)
 );
 
+-- ─── MCP server registrations ───────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_mcp_servers (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- identification
+  name              TEXT UNIQUE NOT NULL,
+  description       TEXT,
+
+  -- transport
+  transport_type    TEXT NOT NULL CHECK (transport_type IN ('stdio', 'sse')),
+  transport_config  JSONB NOT NULL DEFAULT '{}'::JSONB,
+
+  -- behavior
+  auto_connect      BOOLEAN NOT NULL DEFAULT false,
+
+  -- cached tool manifest (refreshed on connect)
+  tool_manifest     JSONB,
+
+  -- operational
+  status            TEXT NOT NULL DEFAULT 'registered'
+                      CHECK (status IN ('registered', 'connected', 'error', 'disconnected')),
+  last_connected_at TIMESTAMPTZ,
+  metadata          JSONB,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_name
+  ON lt_mcp_servers (name);
+
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_status
+  ON lt_mcp_servers (status);
+
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_auto_connect
+  ON lt_mcp_servers (auto_connect)
+  WHERE auto_connect = true;
+
+CREATE OR REPLACE TRIGGER trg_lt_mcp_servers_updated_at
+  BEFORE UPDATE ON lt_mcp_servers
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
+
 -- ─── Seed built-in workflows ────────────────────────────────────────────────
 
 INSERT INTO lt_config_workflows (workflow_type, is_lt, is_container, task_queue, default_role, default_modality)
 VALUES
-  ('reviewContent',              true,  false, 'long-tail',        'reviewer', 'default'),
-  ('reviewContentOrchestrator',  false, true,  'lt-review-orch',   'reviewer', 'default'),
-  ('verifyDocument',             true,  false, 'long-tail-verify', 'reviewer', 'default'),
-  ('verifyDocumentOrchestrator', false, true,  'lt-verify-orch',   'reviewer', 'default')
+  ('reviewContent',                  true,  false, 'long-tail',            'reviewer', 'default'),
+  ('reviewContentOrchestrator',      false, true,  'lt-review-orch',       'reviewer', 'default'),
+  ('verifyDocument',                 true,  false, 'long-tail-verify',     'reviewer', 'default'),
+  ('verifyDocumentOrchestrator',     false, true,  'lt-verify-orch',       'reviewer', 'default'),
+  ('verifyDocumentMcp',              true,  false, 'long-tail-verify-mcp', 'reviewer', 'default'),
+  ('verifyDocumentMcpOrchestrator',  false, true,  'lt-verify-mcp-orch',   'reviewer', 'default')
 ON CONFLICT (workflow_type) DO NOTHING;
