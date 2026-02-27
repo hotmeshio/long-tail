@@ -88,3 +88,11 @@ export type {
   LTStartConfig,
   LTInstance,
 } from './startup';
+
+export type {
+  LTMcpTransportType,
+  LTMcpServerRecord,
+  LTMcpServerStatus,
+  LTMcpToolManifest,
+  LTMcpAdapter,
+} from './mcp';

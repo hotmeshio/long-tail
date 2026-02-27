@@ -5,6 +5,7 @@ import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
 import type { LTMaintenanceConfig } from './maintenance';
+import type { LTMcpAdapter } from './mcp';
 
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
@@ -68,6 +69,21 @@ export interface LTStartConfig {
    * - `LTMaintenanceConfig` → custom schedule and rules
    */
   maintenance?: LTMaintenanceConfig | boolean;
+
+  /** MCP (Model Context Protocol) integration. */
+  mcp?: {
+    /** Built-in MCP server (human queue) configuration. */
+    server?: {
+      /** Enable the built-in human-queue MCP server. Default: true. */
+      enabled?: boolean;
+      /** Server name reported to MCP clients. Default: 'long-tail-human-queue'. */
+      name?: string;
+    };
+    /** MCP server IDs to auto-connect on startup. */
+    autoConnect?: string[];
+    /** Replace the built-in MCP adapter entirely. */
+    adapter?: LTMcpAdapter;
+  };
 }
 
 export interface LTInstance {

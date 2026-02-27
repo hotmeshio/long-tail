@@ -5,12 +5,12 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options, sleepFor, waitForEscalation } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
+import { createMcpTestClient, parseMcpResult, type McpTestContext } from '../setup/mcp';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
 import * as verifyDocumentWorkflow from '../../workflows/verify-document';
-import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
 
 const { Connection, Client, Worker } = Durable;
@@ -22,6 +22,7 @@ const hasOpenAIKey = !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY 
 
 describe('verifyDocument workflow (OpenAI Vision)', () => {
   let client: InstanceType<typeof Client>;
+  let mcpCtx: McpTestContext;
 
   beforeAll(async () => {
     await connectTelemetry();
@@ -78,9 +79,13 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     await worker.run();
 
     client = new Client({ connection });
+
+    // Connect MCP client for escalation queue interaction via protocol
+    mcpCtx = await createMcpTestClient();
   }, 60_000);
 
   afterAll(async () => {
+    await mcpCtx.cleanup();
     Durable.clearInterceptors();
     Durable.clearActivityInterceptors();
     await sleepFor(1500);
@@ -124,7 +129,24 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     expect(payload.extractedInfo.memberId).toBe('MBR-2024-001');
     expect(payload.validationResult).toMatch(/mismatch|not_found/);
 
-    // Resolve via new workflow
+    // ── MCP: verify escalation is visible via the protocol ──
+    const checkPending = await mcpCtx.client.callTool({
+      name: 'check_resolution',
+      arguments: { escalation_id: esc.id },
+    });
+    expect(parseMcpResult(checkPending).status).toBe('pending');
+
+    const availableWork = await mcpCtx.client.callTool({
+      name: 'get_available_work',
+      arguments: { role: 'reviewer', limit: 100 },
+    });
+    expect(
+      parseMcpResult(availableWork).escalations.some(
+        (e: any) => e.escalation_id === esc.id,
+      ),
+    ).toBe(true);
+
+    // Resolve via new workflow (re-run pattern)
     await resolveEscalation(esc.id, {
       documentId: 'DOC-001',
       memberId: 'MBR-2024-001',
@@ -134,9 +156,14 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     await sleepFor(10_000);
 
-    // Verify escalation was resolved
-    const resolvedEsc = await escalationService.getEscalation(esc.id);
-    expect(resolvedEsc!.status).toBe('resolved');
+    // ── MCP: verify resolution via protocol ──
+    const checkResolved = await mcpCtx.client.callTool({
+      name: 'check_resolution',
+      arguments: { escalation_id: esc.id },
+    });
+    const resolved = parseMcpResult(checkResolved);
+    expect(resolved.status).toBe('resolved');
+    expect(resolved.resolver_payload).toBeTruthy();
   }, 90_000);
 
   // ── Vision: escalation payload contains full context for human review ─────
@@ -174,12 +201,26 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // 3. Why it was escalated
     expect(payload.reason).toBeTruthy();
 
+    // ── MCP: verify pending status via protocol ──
+    const checkPending = await mcpCtx.client.callTool({
+      name: 'check_resolution',
+      arguments: { escalation_id: escalations[0].id },
+    });
+    expect(parseMcpResult(checkPending).status).toBe('pending');
+
     // Clean up — resolve via new workflow
     await resolveEscalation(escalations[0].id, {
       documentId: 'DOC-002',
       verified: true,
     });
     await sleepFor(10_000);
+
+    // ── MCP: verify resolution via protocol ──
+    const checkResolved = await mcpCtx.client.callTool({
+      name: 'check_resolution',
+      arguments: { escalation_id: escalations[0].id },
+    });
+    expect(parseMcpResult(checkResolved).status).toBe('resolved');
   }, 90_000);
 
   // ── Vision: multi-page extraction merges data ─────────────────────────────
@@ -211,12 +252,30 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // Page 2 should provide: emergency contact (merged into the record)
     expect(payload.extractedInfo.emergencyContact).toBeTruthy();
 
+    // ── MCP: verify escalation appears in reviewer queue ──
+    const availableWork = await mcpCtx.client.callTool({
+      name: 'get_available_work',
+      arguments: { role: 'reviewer', limit: 100 },
+    });
+    expect(
+      parseMcpResult(availableWork).escalations.some(
+        (e: any) => e.escalation_id === escalations[0].id,
+      ),
+    ).toBe(true);
+
     // Clean up — resolve via new workflow
     await resolveEscalation(escalations[0].id, {
       documentId: 'DOC-003',
       verified: true,
     });
     await sleepFor(10_000);
+
+    // ── MCP: verify resolution via protocol ──
+    const checkResolved = await mcpCtx.client.callTool({
+      name: 'check_resolution',
+      arguments: { escalation_id: escalations[0].id },
+    });
+    expect(parseMcpResult(checkResolved).status).toBe('resolved');
   }, 90_000);
 
   // ── Skipped without key ───────────────────────────────────────────────────

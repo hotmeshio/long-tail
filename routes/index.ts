@@ -8,6 +8,7 @@ import workflowStatesRouter from './exports';
 import usersRouter from './users';
 import dbaRouter from './dba';
 import maintenanceRouter from './maintenance';
+import mcpRouter from './mcp';
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use('/workflow-states', workflowStatesRouter);
 router.use('/config/maintenance', maintenanceRouter);
 router.use('/users', usersRouter);
 router.use('/dba', dbaRouter);
+router.use('/mcp', mcpRouter);
 
 export default router;

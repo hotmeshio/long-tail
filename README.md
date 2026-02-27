@@ -1,24 +1,23 @@
 # Long Tail
 
-*AI and humans, working the same queue.*
+*Durable workflows where AI and humans are peers — same protocol, same queue, same audit trail.*
 
-Your team already has processes. Policies. People. AI doesn't replace that — it joins the team. Long Tail is the workflow engine that makes this real: durable, transactional workflows where AI handles the routine work, and everything it can't handle flows to the right person (or the right AI) automatically.
+Long Tail runs durable workflows where AI tools and human judgment speak the same protocol. Both sides are MCP. Both sides are checkpointed. Write a workflow — if AI is confident, the task completes; if not, it escalates with full context to whoever should handle it next. The only infrastructure is PostgreSQL.
 
-No work is dropped. No state is lost. Every task is tracked from start to finish. And the only infrastructure you need is PostgreSQL.
-
-- **Postgres-only** — state, queues, escalations, and audit trails in one database
-- **Durable execution** — workflows survive crashes, deploys, and restarts via transactional checkpointing
-- **Pluggable everything** — auth, events, telemetry, logging, and maintenance are adapter-based; ship defaults or wire your own
+- **MCP-native** — AI tools and human escalation on the same protocol, both durable
+- **Postgres-only** — state, queues, escalations, audit trails
+- **Durable execution** — survives crashes, deploys, restarts
+- **Pluggable** — auth, events, telemetry, logging, maintenance; ship defaults or wire your own
 
 ## Why This Matters
 
 The hard part of adopting AI isn't the model. It's the process around the model.
 
-Every enterprise has business processes — approval chains, compliance checks, document reviews, data validation. These processes exist for good reasons: regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best.
+Every enterprise has approval chains, compliance checks, document reviews. These exist for good reasons — regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best.
 
-The realistic path is BPM-first: start AI on the granular, well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let the existing workforce handle the judgment calls — the ambiguous, high-stakes, long-tail work that requires human context. Then evolve the boundary over time as trust is earned and models improve.
+The realistic path: start AI on well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let humans handle the judgment calls — the ambiguous, high-stakes work that requires context. Evolve the boundary as trust is earned and models improve.
 
-Long Tail gives you the machinery to do this. Write a workflow. If AI is confident, the work completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
+Long Tail gives you the machinery. Write a workflow. If AI is confident, it completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
 
 ### Who Resolves Escalations?
 
@@ -27,7 +26,8 @@ Anyone. That's the point.
 The escalation queue is an API. Who consumes it is a deployment decision, not an architectural one:
 
 - **A human team** using a purpose-built SPA — your HITL reviewers triaging a queue of AI-flagged items
-- **Another AI agent** consuming from the same API with its own RBAC role — a more capable model, a specialized system, a domain-specific pipeline
+- **An MCP-aware AI agent** connecting to Long Tail's Human Queue MCP server — the same protocol it uses to call any other tool, now pointed at your escalation queue
+- **Another AI agent** consuming from the same REST API with its own RBAC role — a more capable model, a specialized system, a domain-specific pipeline
 - **A hybrid** — AI does a first pass on the escalation, then routes to a human for final sign-off
 
 And it works in the other direction too. A workflow can call out to a human team, then use AI to validate what comes back. The system doesn't care who's on either end. It cares that the work gets done, the state is consistent, and the audit trail is complete.
@@ -45,7 +45,8 @@ This is the sociotechnical shape of AI in the enterprise: not AI *or* humans, bu
 - [Milestones](#milestones)
 - [Roles](#roles)
 - [Invoking Workflows](#invoking-workflows)
-- [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [Maintenance](docs/maintenance.md)
+- [MCP Integration](#mcp-integration)
+- [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [MCP](docs/mcp.md) · [Maintenance](docs/maintenance.md)
 - [Execution History Export](#execution-history-export)
 - [How It Works](#how-it-works)
 - [API Reference](#api-reference) — [Workflows](docs/api/workflows.md) · [Tasks](docs/api/tasks.md) · [Escalations](docs/api/escalations.md) · [Users](docs/api/users.md) · [Roles](docs/api/roles.md) · [Maintenance](docs/api/maintenance.md) · [DBA](docs/api/dba.md) · [Exports](docs/api/exports.md)
@@ -350,6 +351,102 @@ The workflow runs durably from here. Track progress with the [status and result 
 
 When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one matching role. Superadmins always bypass. Authorization lives in the database config — change who can invoke without redeploying. See the full [invocation API](docs/api/workflows.md#invocation) for details.
 
+## MCP Integration
+
+MCP is the shared language. AI tools — vision, classification, search — run as MCP servers whose calls are checkpointed as durable activities. Human escalation runs as an MCP server too. A workflow can call an AI tool and escalate to a human reviewer through the same protocol, with the same durability guarantees. See [docs/mcp.md](docs/mcp.md) for the full guide.
+
+### MCP Tool Calls as Durable Activities
+
+Register external MCP servers and invoke their tools as checkpointed activities. If the process crashes between the call and the checkpoint, it replays from cache — the MCP server isn't called twice. You get exactly-once semantics over a protocol that doesn't natively guarantee them.
+
+```typescript
+import { Durable } from '@hotmeshio/hotmesh';
+import { McpClient } from '@hotmeshio/long-tail';
+
+// Get tool functions from a registered MCP server
+const tools = await McpClient.toolActivities(serverId);
+const { mcp_analyzer_classify } = Durable.workflow.proxyActivities<typeof tools>({
+  activities: tools,
+});
+
+export async function classifyDocument(envelope: LTEnvelope) {
+  // This MCP tool call is now durable — checkpointed, retried, audited
+  const result = await mcp_analyzer_classify({ content: envelope.data.content });
+
+  if (result.confidence >= 0.85) {
+    return { type: 'return', data: result };
+  }
+  return { type: 'escalation', data: result, message: 'Low confidence', role: 'reviewer' };
+}
+```
+
+### Humans as an MCP Server
+
+Long Tail exposes its escalation queue as an MCP server. Any MCP-aware agent — LangGraph, CrewAI, raw API calls — can route work to humans through the same protocol it uses to call any other tool.
+
+```
+MCP Server: "long-tail-human-queue"
+
+Tools:
+  - escalate_to_human(role, message, data)   → escalation_id
+  - check_resolution(escalation_id)          → resolved | pending
+  - get_available_work(role)                 → escalation[]
+  - claim_and_resolve(escalation_id, payload) → result
+```
+
+An AI agent working the queue looks like this:
+
+```typescript
+import { Client } from '@modelcontextprotocol/sdk/client';
+
+const client = new Client({ name: 'my-agent', version: '1.0.0' });
+await client.connect(transport); // stdio, SSE, or in-memory
+
+// Check the queue
+const work = await client.callTool({
+  name: 'get_available_work',
+  arguments: { role: 'reviewer' },
+});
+
+// Claim and resolve
+await client.callTool({
+  name: 'claim_and_resolve',
+  arguments: {
+    escalation_id: 'esc-abc123',
+    resolver_id: 'my-agent',
+    payload: { approved: true, note: 'Verified by automated review' },
+  },
+});
+```
+
+Human labor — and AI labor — becomes composable across the entire MCP ecosystem. Long Tail handles the durable wait, the routing, the claim/release lifecycle, and the audit trail. The protocol is the same whether the resolver is a human clicking a button or an agent calling a tool.
+
+### Managing MCP Servers
+
+Register, connect, and manage MCP servers via the REST API:
+
+```
+POST /api/mcp/servers
+{
+  "name": "doc-analyzer",
+  "transport_type": "stdio",
+  "transport_config": { "command": "npx", "args": ["-y", "doc-analyzer-mcp"] },
+  "auto_connect": true
+}
+```
+
+Or configure at startup:
+
+```typescript
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  workers: [ ... ],
+  mcp: {
+    server: { enabled: true },
+  },
+});
+```
+
 ## Pluggable Architecture
 
 Long Tail separates concerns through adapter registries. Each cross-cutting capability — authentication, event publishing, telemetry, logging, database maintenance — follows the same contract: implement a typed interface, register at startup, done.
@@ -376,6 +473,9 @@ await start({
   logging: {
     pino: { level: 'info' },
   },
+  mcp: {
+    server: { enabled: true },
+  },
   maintenance: {
     schedule: '0 3 * * *',
     rules: [
@@ -394,6 +494,7 @@ Every adapter can also be registered programmatically for advanced use cases (cu
 - **[Events](docs/events.md)** — NATS (built-in), SNS, Kafka, webhooks, or any custom `LTEventAdapter`
 - **[Telemetry](docs/telemetry.md)** — Honeycomb (built-in), Datadog, or any OTLP backend via `LTTelemetryAdapter`
 - **[Logging](docs/logging.md)** — Pino (built-in), Winston, or any custom `LTLoggerAdapter`
+- **[MCP](docs/mcp.md)** — Register MCP servers as durable tool providers, expose Long Tail's escalation queue as an MCP server
 - **[Maintenance](docs/maintenance.md)** — Scheduled cleanup with prune/delete rules, runtime API
 
 ## Execution History Export
@@ -511,6 +612,20 @@ The LT interceptor adds the human-in-the-loop layer: task tracking, escalation m
 | `GET` | `/api/users/:id/roles` | List roles for a user |
 | `POST` | `/api/users/:id/roles` | Add role to user |
 | `DELETE` | `/api/users/:id/roles/:role` | Remove role from user |
+
+### MCP
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/mcp/servers` | List registered MCP servers |
+| `POST` | `/api/mcp/servers` | Register a new MCP server |
+| `GET` | `/api/mcp/servers/:id` | Get MCP server details |
+| `PUT` | `/api/mcp/servers/:id` | Update MCP server registration |
+| `DELETE` | `/api/mcp/servers/:id` | Delete MCP server registration |
+| `POST` | `/api/mcp/servers/:id/connect` | Connect to an MCP server |
+| `POST` | `/api/mcp/servers/:id/disconnect` | Disconnect from an MCP server |
+| `GET` | `/api/mcp/servers/:id/tools` | List tools on a connected server |
+| `POST` | `/api/mcp/servers/:id/tools/:tool/call` | Call a tool on a connected server |
 
 ### Maintenance
 
