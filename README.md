@@ -1,29 +1,20 @@
 # Long Tail
 
-*Durable workflows where AI and humans are peers — same protocol, same queue, same audit trail.*
+Every enterprise has approval chains, compliance checks, document reviews. These exist for good reasons — regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best. AI must participate, not replace.
 
-Long Tail runs durable workflows where AI tools and human judgment speak the same protocol. Both sides are MCP. Both sides are checkpointed. Write a workflow — if AI is confident, the task completes; if not, it escalates with full context to whoever should handle it next. The only infrastructure is PostgreSQL.
+### De-risk through determinism
 
+Long Tail is a durable workflow engine. Every activity is checkpointed. Every result is cached. If the process crashes between an AI extraction and a database validation, it replays from the last checkpoint — the model isn't called twice. The deterministic pipeline is the safety net: retries, exactly-once execution, transactional state, all in Postgres.
 - **MCP-native** — AI tools and human escalation on the same protocol, both durable
 - **Postgres-only** — state, queues, escalations, audit trails
 - **Durable execution** — survives crashes, deploys, restarts
 - **Pluggable** — auth, events, telemetry, logging, maintenance; ship defaults or wire your own
 
-## Why This Matters
-
-The hard part of adopting AI isn't the model. It's the process around the model.
-
-Every enterprise has approval chains, compliance checks, document reviews. These exist for good reasons — regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best. You need a process engine first. AI participates in the process — it doesn't replace it.
-
-### De-risk through determinism
-
-Long Tail is a durable workflow engine. Every activity is checkpointed. Every result is cached. If the process crashes between an AI extraction and a database validation, it replays from the last checkpoint — the model isn't called twice. The deterministic pipeline is the safety net: retries, exactly-once execution, transactional state, all in Postgres.
-
 Write a workflow. If AI is confident, the task completes. The deterministic path handles it.
 
 ### When AI isn't confident — escalate
 
-When the model can't decide, the workflow returns an escalation. The interceptor creates a record with full context — what the AI tried, what it saw, why it wasn't confident — and the workflow ends. No long-running poll. No open connection. A human (or another agent) claims the escalation, resolves it, and the workflow re-runs with the resolver's payload. The deterministic path resumes.
+When the model can't decide, the workflow returns an escalation. A background interceptor creates a record with full context — what the AI tried, what it saw, why it wasn't confident — and the workflow ends. No long-running poll. No open connection. A human (or another agent) claims the escalation, resolves it, and the workflow re-runs with the resolver's payload. The deterministic path resumes.
 
 ### When the resolver can't fix it — remediate
 
@@ -61,7 +52,7 @@ The escalation queue is an API. Who — or what — consumes it is a deployment 
 
 Humans and AI are interchangeable at every resolution point. Both speak MCP. Both are checkpointed. Both feed their results back into the same deterministic flow. The system doesn't care who's on either end — it cares that the work gets done, the state is consistent, and the audit trail is complete.
 
-This is the shape of AI in the enterprise: not AI *replacing* process, but AI *participating* in process — with deterministic execution as the foundation, escalation as the safety net, and tool-aware remediation as the escape hatch when neither AI nor humans can produce the answer directly. In regulated industries where policy is immutable, this isn't optional — it's the only architecture that works.
+This is the shape of AI in the enterprise: not AI *replacing* process, but AI *participating* in process — with deterministic execution as the foundation, escalation as the safety net, and tool-aware remediation as the escape hatch when neither AI nor humans can produce the answer directly.
 
 ## Contents
 
@@ -91,7 +82,7 @@ npm install @hotmeshio/long-tail @hotmeshio/hotmesh
 
 ## Connect and Start Workers
 
-Long Tail embeds its own server, runs migrations, starts workers, and manages all cross-cutting concerns. Pass a config object to `start()` and everything is handled:
+Long Tail embeds its own server, starts workers, and manages all cross-cutting concerns. Pass a config object to `start()` and everything is handled:
 
 ```typescript
 import { start } from '@hotmeshio/long-tail';
@@ -667,7 +658,7 @@ The LT interceptor adds the human-in-the-loop layer: task tracking, escalation m
 | `PUT` | `/api/config/maintenance` | Set the maintenance schedule and rules |
 | `GET` | `/api/config/maintenance` | Get the current maintenance configuration |
 | `POST` | `/api/dba/prune` | Run maintenance rules on demand |
-| `POST` | `/api/dba/deploy` | Deploy server-side prune function and run migrations |
+| `POST` | `/api/dba/deploy` | Deploy server-side prune function |
 
 ## Deployment
 
