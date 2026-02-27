@@ -96,3 +96,9 @@ export type {
   LTMcpToolManifest,
   LTMcpAdapter,
 } from './mcp';
+
+export type {
+  ResolutionContext,
+  ResolutionDirective,
+  LTEscalationStrategy,
+} from './escalation-strategy';

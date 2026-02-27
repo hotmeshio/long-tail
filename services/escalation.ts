@@ -177,6 +177,17 @@ export async function getEscalationsByWorkflowId(
   return rows;
 }
 
+export async function getEscalationsByOriginId(
+  originId: string,
+): Promise<LTEscalationRecord[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    'SELECT * FROM lt_escalations WHERE origin_id = $1 ORDER BY created_at DESC',
+    [originId],
+  );
+  return rows;
+}
+
 export async function listEscalations(filters: {
   status?: LTEscalationStatus;
   role?: string;

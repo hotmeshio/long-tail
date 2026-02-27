@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import * as escalationService from '../services/escalation';
 import * as taskService from '../services/task';
+import { escalationStrategyRegistry } from '../services/escalation-strategy';
 import { createClient, LT_TASK_QUEUE } from '../workers';
 
 const router = Router();
@@ -146,14 +147,69 @@ router.post('/:id/resolve', async (req, res) => {
       }
     }
 
-    // 3. Inject resolver data and escalation ID into the envelope
+    // 3. Check escalation strategy for triage routing
+    const strategy = escalationStrategyRegistry.current;
+    if (strategy) {
+      const directive = await strategy.onResolution({
+        escalation,
+        resolverPayload,
+        envelope,
+      });
+
+      if (directive.action === 'triage') {
+        // Route to MCP triage orchestrator instead of standard re-run
+        const originalTask = escalation.task_id
+          ? await taskService.getTask(escalation.task_id)
+          : null;
+        const routing = originalTask?.metadata as Record<string, any> | null;
+
+        const triageWorkflowId = `triage-${escalation.id}-${Date.now()}`;
+        const client = createClient();
+
+        await taskService.createTask({
+          workflow_id: triageWorkflowId,
+          workflow_type: 'mcpTriageOrchestrator',
+          lt_type: 'mcpTriageOrchestrator',
+          task_queue: 'lt-mcp-triage-orch',
+          signal_id: `lt-triage-${triageWorkflowId}`,
+          parent_workflow_id: routing?.parentWorkflowId || triageWorkflowId,
+          origin_id: escalation.origin_id || triageWorkflowId,
+          parent_id: escalation.parent_id,
+          envelope: JSON.stringify(directive.triageEnvelope),
+          metadata: routing || undefined,
+        });
+
+        await client.workflow.start({
+          workflowName: 'mcpTriageOrchestrator',
+          args: [directive.triageEnvelope],
+          taskQueue: 'lt-mcp-triage-orch',
+          workflowId: triageWorkflowId,
+          expire: 300,
+        });
+
+        // Mark escalation as resolved (triage is handling it)
+        await escalationService.resolveEscalation(escalation.id, {
+          ...resolverPayload,
+          _lt: { ...resolverPayload._lt, triaged: true, triageWorkflowId },
+        });
+
+        res.json({
+          started: true,
+          escalationId: escalation.id,
+          workflowId: triageWorkflowId,
+          triage: true,
+        });
+        return;
+      }
+    }
+
+    // 4. Standard re-run: inject resolver data and start original workflow
     envelope.resolver = resolverPayload;
     envelope.lt = {
       ...envelope.lt,
       escalationId: escalation.id,
     };
 
-    // 4. Start a new workflow to re-run with resolver data
     const newWorkflowId = `rerun-${escalation.id}-${Date.now()}`;
     const client = createClient();
 

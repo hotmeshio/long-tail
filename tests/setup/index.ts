@@ -65,3 +65,22 @@ export async function waitForEscalation(
   }
   throw new Error(`No escalation found for workflow ${workflowId} within ${timeoutMs}ms`);
 }
+
+/**
+ * Poll for escalations by originId until at least one appears or timeout.
+ * Used for orchestrator tests where the escalation is created by a child workflow.
+ */
+export async function waitForEscalationByOriginId(
+  originId: string,
+  timeoutMs = 45_000,
+  intervalMs = 2_000,
+): Promise<import('../../types').LTEscalationRecord[]> {
+  const { getEscalationsByOriginId } = await import('../../services/escalation');
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const escalations = await getEscalationsByOriginId(originId);
+    if (escalations.length > 0) return escalations;
+    await sleepFor(intervalMs);
+  }
+  throw new Error(`No escalation found for origin ${originId} within ${timeoutMs}ms`);
+}

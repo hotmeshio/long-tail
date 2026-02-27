@@ -16,6 +16,9 @@ import { maintenanceRegistry } from './services/maintenance';
 import { defaultMaintenanceConfig } from './modules/maintenance';
 import { mcpRegistry } from './services/mcp';
 import { BuiltInMcpAdapter } from './services/mcp/adapter';
+import { escalationStrategyRegistry } from './services/escalation-strategy';
+import { DefaultEscalationStrategy } from './services/escalation-strategy/default';
+import { McpEscalationStrategy } from './services/escalation-strategy/mcp';
 import routes from './routes';
 
 import type { LTStartConfig, LTInstance } from './types/startup';
@@ -107,6 +110,15 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     maintenanceRegistry.register(defaultMaintenanceConfig);
   } else {
     maintenanceRegistry.register(startConfig.maintenance);
+  }
+
+  // Escalation strategy
+  if (startConfig.escalation?.adapter) {
+    escalationStrategyRegistry.register(startConfig.escalation.adapter);
+  } else if (startConfig.escalation?.strategy === 'mcp') {
+    escalationStrategyRegistry.register(new McpEscalationStrategy());
+  } else {
+    escalationStrategyRegistry.register(new DefaultEscalationStrategy());
   }
 
   // MCP
@@ -210,6 +222,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     if (telemetryRegistry.hasAdapter) {
       await telemetryRegistry.disconnect();
     }
+    escalationStrategyRegistry.clear();
     await Durable.shutdown();
     loggerRegistry.info('[long-tail] shutdown complete');
   };

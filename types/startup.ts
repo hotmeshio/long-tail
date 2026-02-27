@@ -6,6 +6,7 @@ import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
 import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
+import type { LTEscalationStrategy } from './escalation-strategy';
 
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
@@ -69,6 +70,17 @@ export interface LTStartConfig {
    * - `LTMaintenanceConfig` → custom schedule and rules
    */
   maintenance?: LTMaintenanceConfig | boolean;
+
+  /**
+   * Escalation strategy. Controls what happens when a resolver submits.
+   * - `'default'` or omitted → standard re-run (today's behavior)
+   * - `'mcp'` → enables MCP triage orchestrator for `needsTriage` resolutions
+   * - `adapter` → replace with a custom `LTEscalationStrategy`
+   */
+  escalation?: {
+    strategy?: 'default' | 'mcp';
+    adapter?: LTEscalationStrategy;
+  };
 
   /** MCP (Model Context Protocol) integration. */
   mcp?: {

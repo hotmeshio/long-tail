@@ -9,6 +9,8 @@ import * as verifyDocumentMcpWorkflow from './workflows/verify-document-mcp';
 import * as reviewContentOrchWorkflow from './workflows/review-content/orchestrator';
 import * as verifyDocumentOrchWorkflow from './workflows/verify-document/orchestrator';
 import * as verifyDocumentMcpOrchWorkflow from './workflows/verify-document-mcp/orchestrator';
+import * as mcpTriageWorkflow from './workflows/mcp-triage';
+import * as mcpTriageOrchWorkflow from './workflows/mcp-triage/orchestrator';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
@@ -40,6 +42,9 @@ export * as McpService from './services/mcp/db';
 export * as McpClient from './services/mcp/client';
 export * as McpServer from './services/mcp/server';
 export * as McpVisionServer from './services/mcp/vision-server';
+export { escalationStrategyRegistry } from './services/escalation-strategy';
+export { DefaultEscalationStrategy } from './services/escalation-strategy/default';
+export { McpEscalationStrategy } from './services/escalation-strategy/mcp';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +69,8 @@ async function main() {
       { taskQueue: 'lt-review-orch', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
       { taskQueue: 'lt-verify-orch', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
       { taskQueue: 'lt-verify-mcp-orch', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
+      { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
+      { taskQueue: 'lt-mcp-triage-orch', workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator },
     ],
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
     events: config.NATS_URL ? { nats: { url: config.NATS_URL } } : undefined,

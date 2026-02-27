@@ -13,26 +13,55 @@ Long Tail runs durable workflows where AI tools and human judgment speak the sam
 
 The hard part of adopting AI isn't the model. It's the process around the model.
 
-Every enterprise has approval chains, compliance checks, document reviews. These exist for good reasons — regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best.
+Every enterprise has approval chains, compliance checks, document reviews. These exist for good reasons — regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best. You need a process engine first. AI participates in the process — it doesn't replace it.
 
-The realistic path: start AI on well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let humans handle the judgment calls — the ambiguous, high-stakes work that requires context. Evolve the boundary as trust is earned and models improve.
+### De-risk through determinism
 
-Long Tail gives you the machinery. Write a workflow. If AI is confident, it completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
+Long Tail is a durable workflow engine. Every activity is checkpointed. Every result is cached. If the process crashes between an AI extraction and a database validation, it replays from the last checkpoint — the model isn't called twice. The deterministic pipeline is the safety net: retries, exactly-once execution, transactional state, all in Postgres.
 
-### Who Resolves Escalations?
+Write a workflow. If AI is confident, the task completes. The deterministic path handles it.
 
-Anyone. That's the point.
+### When AI isn't confident — escalate
 
-The escalation queue is an API. Who consumes it is a deployment decision, not an architectural one:
+When the model can't decide, the workflow returns an escalation. The interceptor creates a record with full context — what the AI tried, what it saw, why it wasn't confident — and the workflow ends. No long-running poll. No open connection. A human (or another agent) claims the escalation, resolves it, and the workflow re-runs with the resolver's payload. The deterministic path resumes.
 
-- **A human team** using a purpose-built SPA — your HITL reviewers triaging a queue of AI-flagged items
-- **An MCP-aware AI agent** connecting to Long Tail's Human Queue MCP server — the same protocol it uses to call any other tool, now pointed at your escalation queue
-- **Another AI agent** consuming from the same REST API with its own RBAC role — a more capable model, a specialized system, a domain-specific pipeline
-- **A hybrid** — AI does a first pass on the escalation, then routes to a human for final sign-off
+### When the resolver can't fix it — remediate
 
-And it works in the other direction too. A workflow can call out to a human team, then use AI to validate what comes back. The system doesn't care who's on either end. It cares that the work gets done, the state is consistent, and the audit trail is complete.
+Sometimes the human *can't* produce the correct data. An upside-down page. A corrupted image. A document in the wrong language. The resolver knows what's wrong but can't fix it themselves. They need the system to fix it and retry.
 
-This is the sociotechnical shape of AI in the enterprise: not AI *or* humans, but AI *alongside* humans, as team members with different roles and capabilities. In regulated industries where policy is immutable, this isn't optional — it's the only way forward.
+This is where MCP triage takes over. The resolver flags `needsTriage` with a hint — say, `image_orientation`. Long Tail starts a triage orchestrator that:
+
+1. Queries all upstream tasks to understand what happened
+2. Reads the hint to determine what remediation is needed
+3. Calls MCP tools to apply the fix (rotate the page, re-encode the image, translate the document)
+4. Re-invokes the original workflow with corrected data
+
+The original workflow runs again — this time with a rotated page instead of an upside-down one. Extraction succeeds. Validation passes. The triage orchestrator signals back to the parent. The deterministic path completes as if nothing went wrong.
+
+```
+Deterministic pipeline ──► AI fails ──► Escalation
+                                             │
+                              Resolver says "page is upside down"
+                                             │
+                              Triage orchestrator ──► MCP tools fix it
+                                             │
+                              Re-invokes original workflow
+                                             │
+                              Deterministic pipeline completes ◄──
+```
+
+### Who resolves? Anyone. What resolves? Anything.
+
+The escalation queue is an API. Who — or what — consumes it is a deployment decision, not an architectural one:
+
+- **A human team** triaging a queue of AI-flagged items in a purpose-built SPA
+- **An MCP-aware AI agent** connecting to Long Tail's Human Queue server — the same protocol it uses to call any other tool
+- **A triage orchestrator** calling MCP tools to remediate the problem autonomously
+- **A hybrid** — AI diagnoses the issue, tools fix it, a human signs off
+
+Humans and AI are interchangeable at every resolution point. Both speak MCP. Both are checkpointed. Both feed their results back into the same deterministic flow. The system doesn't care who's on either end — it cares that the work gets done, the state is consistent, and the audit trail is complete.
+
+This is the shape of AI in the enterprise: not AI *replacing* process, but AI *participating* in process — with deterministic execution as the foundation, escalation as the safety net, and tool-aware remediation as the escape hatch when neither AI nor humans can produce the answer directly. In regulated industries where policy is immutable, this isn't optional — it's the only architecture that works.
 
 ## Contents
 
@@ -46,7 +75,7 @@ This is the sociotechnical shape of AI in the enterprise: not AI *or* humans, bu
 - [Roles](#roles)
 - [Invoking Workflows](#invoking-workflows)
 - [MCP Integration](#mcp-integration)
-- [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [MCP](docs/mcp.md) · [Maintenance](docs/maintenance.md)
+- [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [MCP](docs/mcp.md) · [Maintenance](docs/maintenance.md) · [Escalation Strategies](docs/escalation-strategies.md)
 - [Execution History Export](#execution-history-export)
 - [How It Works](#how-it-works)
 - [API Reference](#api-reference) — [Workflows](docs/api/workflows.md) · [Tasks](docs/api/tasks.md) · [Escalations](docs/api/escalations.md) · [Users](docs/api/users.md) · [Roles](docs/api/roles.md) · [Maintenance](docs/api/maintenance.md) · [DBA](docs/api/dba.md) · [Exports](docs/api/exports.md)
@@ -476,6 +505,9 @@ await start({
   mcp: {
     server: { enabled: true },
   },
+  escalation: {
+    strategy: 'mcp',  // 'default' | 'mcp' | custom adapter
+  },
   maintenance: {
     schedule: '0 3 * * *',
     rules: [
@@ -496,6 +528,7 @@ Every adapter can also be registered programmatically for advanced use cases (cu
 - **[Logging](docs/logging.md)** — Pino (built-in), Winston, or any custom `LTLoggerAdapter`
 - **[MCP](docs/mcp.md)** — Register MCP servers as durable tool providers, expose Long Tail's escalation queue as an MCP server
 - **[Maintenance](docs/maintenance.md)** — Scheduled cleanup with prune/delete rules, runtime API
+- **[Escalation Strategies](docs/escalation-strategies.md)** — Default (deterministic re-run), MCP (dynamic triage with tool-based remediation), or custom `LTEscalationStrategy`
 
 ## Execution History Export
 
