@@ -56,12 +56,13 @@ describe('Vision MCP Server (InMemoryTransport)', () => {
     await disconnectTelemetry();
   }, 10_000);
 
-  it('should discover all 3 registered tools via listTools()', async () => {
+  it('should discover all 4 registered tools via listTools()', async () => {
     const { tools } = await visionClient.listTools();
     const names = tools.map((t: any) => t.name).sort();
     expect(names).toEqual([
       'extract_member_info',
       'list_document_pages',
+      'rotate_page',
       'validate_member',
     ]);
   });

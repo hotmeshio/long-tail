@@ -15,6 +15,11 @@ const extractMemberInfoSchema = z.object({
   page_number: z.number().int().min(1).describe('1-based page number'),
 });
 
+const rotatePageSchema = z.object({
+  image_ref: z.string().describe('Storage reference to the image to rotate'),
+  degrees: z.number().int().describe('Rotation degrees (90, 180, 270)'),
+});
+
 const validateMemberSchema = z.object({
   member_info: z.object({
     memberId: z.string().optional(),
@@ -38,10 +43,11 @@ const validateMemberSchema = z.object({
 /**
  * Create the Document Vision MCP server.
  *
- * Registers three tools wrapping the verify-document activities:
+ * Registers four tools wrapping the verify-document activities:
  * - list_document_pages — list available page images from storage
  * - extract_member_info — extract member data from a page via OpenAI Vision
  * - validate_member — validate extracted data against the member database
+ * - rotate_page — rotate a document page image by the given degrees
  */
 export async function createVisionServer(options?: {
   name?: string;
@@ -102,7 +108,33 @@ export async function createVisionServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (3 tools registered)`);
+  // ── rotate_page ───────────────────────────────────────────────
+  (server as any).registerTool(
+    'rotate_page',
+    {
+      title: 'Rotate Page',
+      description: 'Rotate a document page image by the given degrees. Returns a new image reference for the rotated version.',
+      inputSchema: rotatePageSchema,
+    },
+    async (args: z.infer<typeof rotatePageSchema>) => {
+      // Derive rotated reference by inserting _rotated before the extension.
+      // In production, this would call an image processing service.
+      const ref = args.image_ref;
+      const dotIdx = ref.lastIndexOf('.');
+      const rotatedRef = dotIdx >= 0
+        ? `${ref.slice(0, dotIdx)}_rotated${ref.slice(dotIdx)}`
+        : `${ref}_rotated`;
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({ rotated_ref: rotatedRef, degrees: args.degrees }),
+        }],
+      };
+    },
+  );
+
+  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (4 tools registered)`);
   return server;
 }
 

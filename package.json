@@ -23,6 +23,7 @@
     "test:export": "vitest run tests/workflows/export.test.ts",
     "test:vision": "vitest run tests/workflows/verify-document.test.ts",
     "test:mcp": "vitest run tests/mcp.test.ts",
+    "test:mcp:triage": "vitest run tests/workflows/mcp-triage.test.ts",
     "test:mcp:vision": "vitest run tests/workflows/verify-document-mcp.test.ts"
   },
   "keywords": [
