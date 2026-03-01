@@ -3,12 +3,24 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 const { Connection } = Durable;
 
+// ── Safety guard ─────────────────────────────────────────────────────────────
+// Fail fast if the test process somehow targets the dev database.
+// vitest.config.ts hardcodes POSTGRES_DB=longtail_test, but this guard
+// catches misconfigurations (e.g., shell env overrides, .env changes).
+const _testDb = process.env.POSTGRES_DB || 'longtail_test';
+if (_testDb !== 'longtail_test') {
+  throw new Error(
+    `[test-setup] POSTGRES_DB is "${_testDb}" — tests MUST run against "longtail_test". ` +
+    `Check your .env file and shell environment.`,
+  );
+}
+
 export const postgres_options = {
   host: process.env.POSTGRES_HOST || 'localhost',
   port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
   user: process.env.POSTGRES_USER || 'postgres',
   password: process.env.POSTGRES_PASSWORD || 'password',
-  database: process.env.POSTGRES_DB || 'longtail',
+  database: 'longtail_test',
 };
 
 export async function connectPostgres() {

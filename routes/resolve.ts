@@ -14,7 +14,7 @@ export async function resolveHandle(
   res: Response,
 ): Promise<ResolvedHandle | null> {
   try {
-    return await resolveWorkflowHandle(req.params.workflowId);
+    return await resolveWorkflowHandle(req.params.workflowId as string);
   } catch (err: any) {
     res.status(404).json({ error: err.message });
     return null;

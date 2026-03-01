@@ -45,7 +45,7 @@ const TEST_DB = {
   port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
   user: process.env.POSTGRES_USER || 'postgres',
   password: process.env.POSTGRES_PASSWORD || 'password',
-  database: process.env.POSTGRES_DB || 'longtail',
+  database: 'longtail_test',
 };
 
 const SERVER_PORT = 4567;

@@ -82,6 +82,13 @@ export interface LTStartConfig {
     adapter?: LTEscalationStrategy;
   };
 
+  /**
+   * Load example workflows and seed sample data on startup.
+   * When `true`, appends the built-in example workers and starts
+   * a few sample workflows so the dashboard has data immediately.
+   */
+  examples?: boolean;
+
   /** MCP (Model Context Protocol) integration. */
   mcp?: {
     /** Built-in MCP server (human queue) configuration. */

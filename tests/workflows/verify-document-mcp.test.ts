@@ -12,7 +12,7 @@ import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
-import * as verifyDocumentMcpWorkflow from '../../workflows/verify-document-mcp';
+import * as verifyDocumentMcpWorkflow from '../../examples/workflows/verify-document-mcp';
 import * as configService from '../../services/config';
 import { createVisionServer, stopVisionServer } from '../../services/mcp/vision-server';
 

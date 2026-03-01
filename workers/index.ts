@@ -7,10 +7,10 @@ import { telemetryRegistry } from '../services/telemetry';
 import { eventRegistry } from '../services/events';
 import { maintenanceRegistry } from '../services/maintenance';
 import { registerLT } from '../interceptor';
-import * as reviewContentWorkflow from '../workflows/review-content';
-import * as verifyDocumentWorkflow from '../workflows/verify-document';
-import * as reviewContentOrchWorkflow from '../workflows/review-content/orchestrator';
-import * as verifyDocumentOrchWorkflow from '../workflows/verify-document/orchestrator';
+import * as reviewContentWorkflow from '../examples/workflows/review-content';
+import * as verifyDocumentWorkflow from '../examples/workflows/verify-document';
+import * as reviewContentOrchWorkflow from '../examples/workflows/review-content/orchestrator';
+import * as verifyDocumentOrchWorkflow from '../examples/workflows/verify-document/orchestrator';
 
 // Leaf workflow queues
 const LT_TASK_QUEUE = 'long-tail';

@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
       lt_type: req.query.lt_type as string,
       workflow_type: req.query.workflow_type as string,
       workflow_id: req.query.workflow_id as string,
+      parent_workflow_id: req.query.parent_workflow_id as string,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });

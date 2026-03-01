@@ -60,16 +60,19 @@ export async function executeLT<T = any>(
     ltGetWorkflowConfig,
     ltGetProviderData,
     ltStartWorkflow,
-    ltGenerateWorkflowId,
   } = Durable.workflow.proxyActivities<ActivitiesType>({
     activities: interceptorActivities,
     taskQueue: LT_ACTIVITY_QUEUE,
     retryPolicy: { maximumAttempts: 3 },
   });
 
-  // Generate child workflow ID via activity (cached across replays)
+  // Derive child workflow ID deterministically from the parent context.
+  // Combines parent workflowId (globally unique) with the execution
+  // counter (unique per step within this workflow) — zero-cost, fully
+  // replay-safe, and self-documents its lineage.
+  const ctx = Durable.workflow.getContext();
   const childWorkflowId =
-    options.workflowId || await ltGenerateWorkflowId(workflowName);
+    options.workflowId || `${workflowName}-${ctx.workflowId}-${ctx.counter}`;
   const signalId = `lt-result-${childWorkflowId}`;
 
   // Read orchestrator context (set by interceptor wrapping the container)
@@ -147,7 +150,7 @@ export async function executeLT<T = any>(
     args,
     taskQueue,
     workflowId: childWorkflowId,
-    expire: expire || 180,
+    expire: expire || 86_400,
   });
 
   // 7. Wait for the child's interceptor to signal back with the result

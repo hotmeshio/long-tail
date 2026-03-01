@@ -52,7 +52,7 @@ router.get('/:type/config', async (req, res) => {
 router.put('/:type/config', requireAdmin, async (req, res) => {
   try {
     const config = await configService.upsertWorkflowConfig({
-      workflow_type: req.params.type,
+      workflow_type: req.params.type as string,
       is_lt: req.body.is_lt ?? true,
       is_container: req.body.is_container ?? false,
       invocable: req.body.invocable ?? false,
@@ -79,7 +79,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
  */
 router.delete('/:type/config', requireAdmin, async (req, res) => {
   try {
-    const deleted = await configService.deleteWorkflowConfig(req.params.type);
+    const deleted = await configService.deleteWorkflowConfig(req.params.type as string);
     if (!deleted) {
       res.status(404).json({ error: 'Workflow config not found' });
       return;
@@ -168,7 +168,8 @@ router.post('/:type/invoke', async (req, res) => {
       workflowName: workflowType,
       workflowId,
       expire: 86_400,
-    });
+      entity: workflowType,
+    } as any);
 
     res.status(202).json({
       workflowId: handle.workflowId,
@@ -231,6 +232,30 @@ router.get('/:workflowId/result', async (req, res) => {
 
     const result = await handle.result();
     res.json({ workflowId: req.params.workflowId, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/workflows/:workflowId/terminate
+ * Interrupt/terminate a running workflow.
+ */
+router.post('/:workflowId/terminate', async (req, res) => {
+  try {
+    const resolved = await resolveHandle(req, res);
+    if (!resolved) return;
+
+    const client = createClient();
+    const handle = await client.workflow.getHandle(
+      resolved.taskQueue,
+      resolved.workflowName,
+      req.params.workflowId,
+    );
+
+    await handle.interrupt();
+
+    res.json({ terminated: true, workflowId: req.params.workflowId });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -20,12 +20,12 @@ import { McpEscalationStrategy } from '../../services/escalation-strategy/mcp';
 import { stopVisionServer } from '../../services/mcp/vision-server';
 
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../types';
-import type { MemberInfo } from '../../workflows/verify-document/types';
+import type { MemberInfo } from '../../examples/workflows/verify-document/types';
 
 // ── MCP triage workflow + activities (real) ──────────────────────────────────
 
-import * as mcpTriageWorkflow from '../../workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '../../workflows/mcp-triage/orchestrator';
+import * as mcpTriageWorkflow from '../../examples/workflows/mcp-triage';
+import * as mcpTriageOrchWorkflow from '../../examples/workflows/mcp-triage/orchestrator';
 
 const { Connection, Client, Worker } = Durable;
 

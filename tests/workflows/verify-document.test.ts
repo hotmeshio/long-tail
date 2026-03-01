@@ -10,7 +10,7 @@ import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
-import * as verifyDocumentWorkflow from '../../workflows/verify-document';
+import * as verifyDocumentWorkflow from '../../examples/workflows/verify-document';
 import * as configService from '../../services/config';
 
 const { Connection, Client, Worker } = Durable;

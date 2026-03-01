@@ -132,6 +132,40 @@ export async function resolveEscalation(
  * Not strictly required — expired claims are implicitly available
  * since queries check assigned_until <= NOW().
  */
+/**
+ * Bulk update priority for a set of escalations.
+ * Only updates pending escalations.
+ */
+export async function updateEscalationsPriority(
+  ids: string[],
+  priority: 1 | 2 | 3 | 4,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `UPDATE lt_escalations
+     SET priority = $1, updated_at = NOW()
+     WHERE id = ANY($2::uuid[])
+       AND status = 'pending'`,
+    [priority, ids],
+  );
+  return rowCount ?? 0;
+}
+
+/**
+ * Get the distinct roles for a set of escalation IDs.
+ * Used for permission validation before bulk operations.
+ */
+export async function getEscalationRoles(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT DISTINCT role FROM lt_escalations WHERE id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return rows.map((r: any) => r.role);
+}
+
 export async function releaseExpiredClaims(): Promise<number> {
   const pool = getPool();
   const { rowCount } = await pool.query(
@@ -144,6 +178,138 @@ export async function releaseExpiredClaims(): Promise<number> {
        AND assigned_until < NOW()`,
   );
   return rowCount || 0;
+}
+
+/**
+ * Bulk claim escalations for a user.
+ * Items already claimed by another active user are skipped.
+ */
+export async function bulkClaimEscalations(
+  ids: string[],
+  userId: string,
+  durationMinutes: number = 30,
+): Promise<{ claimed: number; skipped: number }> {
+  if (ids.length === 0) return { claimed: 0, skipped: 0 };
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `UPDATE lt_escalations
+     SET assigned_to = $1,
+         claimed_at = NOW(),
+         assigned_until = NOW() + INTERVAL '1 minute' * $2
+     WHERE id = ANY($3::uuid[])
+       AND status = 'pending'
+       AND (
+         assigned_to IS NULL
+         OR assigned_until <= NOW()
+         OR assigned_to = $1
+       )`,
+    [userId, durationMinutes, ids],
+  );
+  const claimed = rowCount ?? 0;
+  return { claimed, skipped: ids.length - claimed };
+}
+
+/**
+ * Bulk assign escalations to a specific user (admin action).
+ * Items already claimed by another active user are skipped.
+ */
+export async function bulkAssignEscalations(
+  ids: string[],
+  targetUserId: string,
+  durationMinutes: number = 30,
+): Promise<{ assigned: number; skipped: number }> {
+  if (ids.length === 0) return { assigned: 0, skipped: 0 };
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `UPDATE lt_escalations
+     SET assigned_to = $1,
+         claimed_at = NOW(),
+         assigned_until = NOW() + INTERVAL '1 minute' * $2
+     WHERE id = ANY($3::uuid[])
+       AND status = 'pending'
+       AND (
+         assigned_to IS NULL
+         OR assigned_until <= NOW()
+         OR assigned_to = $1
+       )`,
+    [targetUserId, durationMinutes, ids],
+  );
+  const assigned = rowCount ?? 0;
+  return { assigned, skipped: ids.length - assigned };
+}
+
+/**
+ * Bulk reassign escalations to a different role.
+ * Clears assignment on all affected rows.
+ */
+export async function bulkEscalateToRole(
+  ids: string[],
+  targetRole: string,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `UPDATE lt_escalations
+     SET role = $1,
+         assigned_to = NULL,
+         assigned_until = NULL,
+         claimed_at = NULL,
+         updated_at = NOW()
+     WHERE id = ANY($2::uuid[])
+       AND status = 'pending'`,
+    [targetRole, ids],
+  );
+  return rowCount ?? 0;
+}
+
+/**
+ * Bulk resolve escalations for AI triage.
+ * Returns full records so the caller can start triage workflows.
+ */
+export async function bulkResolveForTriage(
+  ids: string[],
+  hint?: string,
+): Promise<LTEscalationRecord[]> {
+  if (ids.length === 0) return [];
+  const pool = getPool();
+  const resolverPayload = JSON.stringify({
+    _lt: { needsTriage: true, ...(hint ? { hint } : {}) },
+  });
+  const { rows } = await pool.query(
+    `UPDATE lt_escalations
+     SET status = 'resolved',
+         resolved_at = NOW(),
+         resolver_payload = $1
+     WHERE id = ANY($2::uuid[])
+       AND status = 'pending'
+     RETURNING *`,
+    [resolverPayload, ids],
+  );
+  return rows;
+}
+
+/**
+ * Reassign an escalation to a different role.
+ * Clears the current assignment so it becomes available to the new role.
+ */
+export async function escalateToRole(
+  id: string,
+  targetRole: string,
+): Promise<LTEscalationRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `UPDATE lt_escalations
+     SET role = $2,
+         assigned_to = NULL,
+         assigned_until = NULL,
+         claimed_at = NULL,
+         updated_at = NOW()
+     WHERE id = $1
+       AND status = 'pending'
+     RETURNING *`,
+    [id, targetRole],
+  );
+  return rows[0] || null;
 }
 
 export async function getEscalation(id: string): Promise<LTEscalationRecord | null> {
@@ -188,19 +354,95 @@ export async function getEscalationsByOriginId(
   return rows;
 }
 
+export interface EscalationStats {
+  pending: number;
+  claimed: number;
+  created_1h: number;
+  created_24h: number;
+  resolved_1h: number;
+  resolved_24h: number;
+  by_role: { role: string; pending: number; claimed: number }[];
+}
+
+export async function getEscalationStats(
+  visibleRoles?: string[],
+): Promise<EscalationStats> {
+  const pool = getPool();
+
+  // Build optional RBAC filter
+  const roleFilter = visibleRoles ? `WHERE role = ANY($1::text[])` : '';
+  const roleFilterAnd = visibleRoles ? `AND role = ANY($1::text[])` : '';
+  const params = visibleRoles ? [visibleRoles] : [];
+
+  // Global counts
+  const { rows: [totals] } = await pool.query(
+    `SELECT
+       COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+       COUNT(*) FILTER (WHERE status = 'pending' AND assigned_to IS NOT NULL AND assigned_until > NOW()) AS claimed,
+       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 hour') AS created_1h,
+       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS created_24h,
+       COUNT(*) FILTER (WHERE resolved_at > NOW() - INTERVAL '1 hour') AS resolved_1h,
+       COUNT(*) FILTER (WHERE resolved_at > NOW() - INTERVAL '24 hours') AS resolved_24h
+     FROM lt_escalations ${roleFilter}`,
+    params,
+  );
+
+  // By-role breakdown (pending only)
+  const { rows: byRole } = await pool.query(
+    `SELECT role,
+       COUNT(*) AS pending,
+       COUNT(*) FILTER (WHERE assigned_to IS NOT NULL AND assigned_until > NOW()) AS claimed
+     FROM lt_escalations
+     WHERE status = 'pending' ${roleFilterAnd}
+     GROUP BY role
+     ORDER BY COUNT(*) DESC`,
+    params,
+  );
+
+  return {
+    pending: parseInt(totals.pending),
+    claimed: parseInt(totals.claimed),
+    created_1h: parseInt(totals.created_1h),
+    created_24h: parseInt(totals.created_24h),
+    resolved_1h: parseInt(totals.resolved_1h),
+    resolved_24h: parseInt(totals.resolved_24h),
+    by_role: byRole.map((r: any) => ({
+      role: r.role,
+      pending: parseInt(r.pending),
+      claimed: parseInt(r.claimed),
+    })),
+  };
+}
+
+export async function listDistinctTypes(): Promise<string[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT DISTINCT type FROM lt_escalations ORDER BY type`,
+  );
+  return rows.map((r: any) => r.type);
+}
+
 export async function listEscalations(filters: {
   status?: LTEscalationStatus;
   role?: string;
   type?: string;
   subtype?: string;
   assigned_to?: string;
+  priority?: number;
   limit?: number;
   offset?: number;
+  visibleRoles?: string[];
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   const pool = getPool();
   const conditions: string[] = [];
   const values: any[] = [];
   let idx = 1;
+
+  // RBAC: scope to roles the user is a member of
+  if (filters.visibleRoles) {
+    conditions.push(`role = ANY($${idx++}::text[])`);
+    values.push(filters.visibleRoles);
+  }
 
   if (filters.status) {
     conditions.push(`status = $${idx++}`);
@@ -222,6 +464,10 @@ export async function listEscalations(filters: {
     conditions.push(`assigned_to = $${idx++}`);
     values.push(filters.assigned_to);
   }
+  if (filters.priority) {
+    conditions.push(`priority = $${idx++}`);
+    values.push(filters.priority);
+  }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const limit = filters.limit || 50;
@@ -230,7 +476,7 @@ export async function listEscalations(filters: {
   const [countResult, dataResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) FROM lt_escalations ${where}`, values),
     pool.query(
-      `SELECT * FROM lt_escalations ${where} ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+      `SELECT * FROM lt_escalations ${where} ORDER BY priority ASC, created_at ASC LIMIT $${idx++} OFFSET $${idx++}`,
       [...values, limit, offset],
     ),
   ]);
@@ -248,8 +494,10 @@ export async function listAvailableEscalations(filters: {
   role?: string;
   type?: string;
   subtype?: string;
+  priority?: number;
   limit?: number;
   offset?: number;
+  visibleRoles?: string[];
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   const pool = getPool();
   const conditions: string[] = [
@@ -258,6 +506,12 @@ export async function listAvailableEscalations(filters: {
   ];
   const values: any[] = [];
   let idx = 1;
+
+  // RBAC: scope to roles the user is a member of
+  if (filters.visibleRoles) {
+    conditions.push(`role = ANY($${idx++}::text[])`);
+    values.push(filters.visibleRoles);
+  }
 
   if (filters.role) {
     conditions.push(`role = $${idx++}`);
@@ -270,6 +524,10 @@ export async function listAvailableEscalations(filters: {
   if (filters.subtype) {
     conditions.push(`subtype = $${idx++}`);
     values.push(filters.subtype);
+  }
+  if (filters.priority) {
+    conditions.push(`priority = $${idx++}`);
+    values.push(filters.priority);
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`;

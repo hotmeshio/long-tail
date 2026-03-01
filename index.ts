@@ -3,15 +3,6 @@ import { loggerRegistry } from './services/logger';
 
 import { start } from './start';
 
-import * as reviewContentWorkflow from './workflows/review-content';
-import * as verifyDocumentWorkflow from './workflows/verify-document';
-import * as verifyDocumentMcpWorkflow from './workflows/verify-document-mcp';
-import * as reviewContentOrchWorkflow from './workflows/review-content/orchestrator';
-import * as verifyDocumentOrchWorkflow from './workflows/verify-document/orchestrator';
-import * as verifyDocumentMcpOrchWorkflow from './workflows/verify-document-mcp/orchestrator';
-import * as mcpTriageWorkflow from './workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from './workflows/mcp-triage/orchestrator';
-
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
 export { start } from './start';
@@ -45,6 +36,7 @@ export * as McpVisionServer from './services/mcp/vision-server';
 export { escalationStrategyRegistry } from './services/escalation-strategy';
 export { DefaultEscalationStrategy } from './services/escalation-strategy/default';
 export { McpEscalationStrategy } from './services/escalation-strategy/mcp';
+export { exampleWorkers, seedExamples } from './examples';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
@@ -62,16 +54,7 @@ async function main() {
     server: {
       port: config.PORT,
     },
-    workers: [
-      { taskQueue: 'long-tail', workflow: reviewContentWorkflow.reviewContent },
-      { taskQueue: 'long-tail-verify', workflow: verifyDocumentWorkflow.verifyDocument },
-      { taskQueue: 'long-tail-verify-mcp', workflow: verifyDocumentMcpWorkflow.verifyDocumentMcp },
-      { taskQueue: 'lt-review-orch', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
-      { taskQueue: 'lt-verify-orch', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
-      { taskQueue: 'lt-verify-mcp-orch', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
-      { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
-      { taskQueue: 'lt-mcp-triage-orch', workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator },
-    ],
+    examples: true,
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
     events: config.NATS_URL ? { nats: { url: config.NATS_URL } } : undefined,
   });

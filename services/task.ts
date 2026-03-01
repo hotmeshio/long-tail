@@ -137,6 +137,7 @@ export async function listTasks(filters: {
   lt_type?: string;
   workflow_type?: string;
   workflow_id?: string;
+  parent_workflow_id?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ tasks: LTTaskRecord[]; total: number }> {
@@ -160,6 +161,10 @@ export async function listTasks(filters: {
   if (filters.workflow_id) {
     conditions.push(`workflow_id = $${idx++}`);
     values.push(filters.workflow_id);
+  }
+  if (filters.parent_workflow_id) {
+    conditions.push(`parent_workflow_id = $${idx++}`);
+    values.push(filters.parent_workflow_id);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -185,40 +190,60 @@ export async function listTasks(filters: {
  * HotMesh needs to get a workflow handle.
  *
  * 1. Look up lt_tasks by workflow_id — returns workflow_type and task_queue.
- * 2. If task_queue is null (pre-migration record), fall back to lt_config_workflows.
- * 3. Throws if the workflow cannot be resolved.
+ * 2. If no task record (e.g., orchestrators/containers), fall back to
+ *    durable.jobs (entity) + lt_config_workflows (task_queue).
+ * 3. If task_queue is null (pre-migration record), fall back to lt_config_workflows.
+ * 4. Throws if the workflow cannot be resolved.
  */
 export async function resolveWorkflowHandle(
   workflowId: string,
 ): Promise<ResolvedHandle> {
   const pool = getPool();
 
+  // 1. Try lt_tasks first (leaf workflows)
   const { rows } = await pool.query(
     'SELECT workflow_type, task_queue FROM lt_tasks WHERE workflow_id = $1 ORDER BY created_at DESC LIMIT 1',
     [workflowId],
   );
 
-  if (rows.length === 0) {
-    throw new Error(`No task found for workflow "${workflowId}"`);
+  if (rows.length > 0) {
+    const { workflow_type, task_queue } = rows[0];
+
+    if (task_queue) {
+      return { taskQueue: task_queue, workflowName: workflow_type };
+    }
+
+    // Fallback: resolve task_queue from config (pre-migration records)
+    const { rows: configRows } = await pool.query(
+      'SELECT task_queue FROM lt_config_workflows WHERE workflow_type = $1',
+      [workflow_type],
+    );
+
+    if (configRows.length > 0 && configRows[0].task_queue) {
+      return { taskQueue: configRows[0].task_queue, workflowName: workflow_type };
+    }
   }
 
-  const { workflow_type, task_queue } = rows[0];
-
-  if (task_queue) {
-    return { taskQueue: task_queue, workflowName: workflow_type };
-  }
-
-  // Fallback: resolve task_queue from config (pre-migration records)
-  const { rows: configRows } = await pool.query(
-    'SELECT task_queue FROM lt_config_workflows WHERE workflow_type = $1',
-    [workflow_type],
+  // 2. Fall back to durable.jobs — handles orchestrators/containers that
+  //    have no lt_tasks record but do have a job with an entity tag.
+  const { rows: jobRows } = await pool.query(
+    `SELECT entity FROM durable.jobs WHERE key = $1 LIMIT 1`,
+    [`hmsh:durable:j:${workflowId}`],
   );
 
-  if (configRows.length > 0 && configRows[0].task_queue) {
-    return { taskQueue: configRows[0].task_queue, workflowName: workflow_type };
+  if (jobRows.length > 0 && jobRows[0].entity) {
+    const entity = jobRows[0].entity;
+    const { rows: configRows } = await pool.query(
+      'SELECT task_queue FROM lt_config_workflows WHERE workflow_type = $1',
+      [entity],
+    );
+
+    if (configRows.length > 0 && configRows[0].task_queue) {
+      return { taskQueue: configRows[0].task_queue, workflowName: entity };
+    }
   }
 
   throw new Error(
-    `Cannot resolve task queue for workflow "${workflowId}" (type="${workflow_type}")`,
+    `Cannot resolve workflow "${workflowId}" — no task record or job entity found`,
   );
 }

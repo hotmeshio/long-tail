@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../logger';
-import * as verifyActivities from '../../workflows/verify-document/activities';
+import * as verifyActivities from '../../examples/workflows/verify-document/activities';
 
 let server: McpServer | null = null;
 

@@ -1,0 +1,1 @@
+export { EscalationDetailPage } from './EscalationDetailPage';

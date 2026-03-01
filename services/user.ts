@@ -1,3 +1,5 @@
+import bcrypt from 'bcryptjs';
+
 import { getPool } from './db';
 import type { LTUserRecord, LTUserRole, LTRoleType, LTUserStatus } from '../types';
 
@@ -9,6 +11,7 @@ export interface CreateUserInput {
   external_id: string;
   email?: string;
   display_name?: string;
+  password?: string;
   status?: LTUserStatus;
   metadata?: Record<string, any>;
   roles?: { role: string; type: LTRoleType }[];
@@ -53,9 +56,12 @@ async function attachRolesToMany(users: any[]): Promise<LTUserRecord[]> {
 
 export async function createUser(input: CreateUserInput): Promise<LTUserRecord> {
   const pool = getPool();
+  const passwordHash = input.password
+    ? await bcrypt.hash(input.password, 10)
+    : null;
   const { rows } = await pool.query(
-    `INSERT INTO lt_users (external_id, email, display_name, status, metadata)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO lt_users (external_id, email, display_name, status, metadata, password_hash)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
     [
       input.external_id,
@@ -63,6 +69,7 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
       input.display_name || null,
       input.status || 'active',
       input.metadata ? JSON.stringify(input.metadata) : null,
+      passwordHash,
     ],
   );
   const user = rows[0];
@@ -284,4 +291,26 @@ export async function isGroupAdmin(userId: string, role: string): Promise<boolea
  */
 export async function canManageRole(actorId: string, role: string): Promise<boolean> {
   return isGroupAdmin(actorId, role);
+}
+
+// ─── Password authentication ────────────────────────────────────────────────
+
+/**
+ * Verify a user's password. Returns the full user record (with roles)
+ * on success, or null if the external_id doesn't exist, the user has
+ * no password set, or the password doesn't match.
+ */
+export async function verifyPassword(
+  externalId: string,
+  password: string,
+): Promise<LTUserRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    'SELECT * FROM lt_users WHERE external_id = $1',
+    [externalId],
+  );
+  if (!rows[0] || !rows[0].password_hash) return null;
+  const valid = await bcrypt.compare(password, rows[0].password_hash);
+  if (!valid) return null;
+  return attachRoles(rows[0]);
 }

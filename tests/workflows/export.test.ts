@@ -9,7 +9,7 @@ import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
-import * as reviewContentWorkflow from '../../workflows/review-content';
+import * as reviewContentWorkflow from '../../examples/workflows/review-content';
 import * as exportService from '../../services/export';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';

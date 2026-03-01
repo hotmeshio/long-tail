@@ -3,7 +3,11 @@ export const config = {
   POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
   POSTGRES_USER: process.env.POSTGRES_USER || 'postgres',
   POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || 'password',
-  POSTGRES_DB: process.env.POSTGRES_DB || 'longtail',
+  // In test environments, always use the test database to prevent accidental
+  // pollution of the dev/prod database from test runs.
+  POSTGRES_DB: process.env.NODE_ENV === 'test'
+    ? 'longtail_test'
+    : (process.env.POSTGRES_DB || 'longtail'),
 
   NATS_URL: process.env.NATS_URL || 'nats://localhost:4222',
 

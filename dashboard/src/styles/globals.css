@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface text-text-primary antialiased;
+  }
+
+  * {
+    @apply border-surface-border;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-5 py-2.5 bg-accent text-text-inverse rounded-md text-sm font-medium
+           hover:bg-accent-hover transition-colors duration-150;
+  }
+
+  .btn-secondary {
+    @apply px-5 py-2.5 bg-surface-raised border border-surface-border rounded-md text-sm font-medium
+           text-text-primary hover:bg-surface-sunken transition-colors duration-150;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2.5 rounded-md text-sm font-medium text-text-secondary
+           hover:bg-surface-sunken transition-colors duration-150;
+  }
+
+  .input {
+    @apply w-full px-3.5 py-2.5 bg-surface-raised border border-surface-border rounded-md text-sm
+           text-text-primary placeholder:text-text-tertiary
+           focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent
+           transition-colors duration-150;
+  }
+
+  .select {
+    @apply px-3.5 py-2.5 bg-surface-raised border border-surface-border rounded-md text-sm
+           text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30
+           transition-colors duration-150 appearance-none cursor-pointer;
+  }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(1rem); }
+  to   { opacity: 1; transform: translateX(0); }
+}
