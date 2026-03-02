@@ -1,0 +1,42 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        surface: {
+          DEFAULT: '#F8F7FC',
+          raised: '#FFFFFF',
+          sunken: '#F0EDF8',
+          border: '#E2DDF0',
+        },
+        text: {
+          primary: '#1E1535',
+          secondary: '#5B5173',
+          tertiary: '#918AAB',
+          inverse: '#FFFFFF',
+        },
+        accent: {
+          DEFAULT: '#6C47FF',
+          hover: '#5835DB',
+          muted: '#C8BEF0',
+        },
+        status: {
+          active: '#2563EB',
+          pending: '#F59E0B',
+          success: '#16A34A',
+          warning: '#F59E0B',
+          error: '#DC2626',
+        },
+      },
+      fontFamily: {
+        sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'monospace'],
+      },
+      maxWidth: {
+        dashboard: '1440px',
+      },
+    },
+  },
+  plugins: [],
+};

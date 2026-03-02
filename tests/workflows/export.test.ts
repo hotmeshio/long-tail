@@ -3,13 +3,13 @@ import { Client as Postgres } from 'pg';
 import { Durable, DBA } from '@hotmeshio/hotmesh';
 import type { WorkflowExecution } from '@hotmeshio/hotmesh/build/types/exporter';
 
-import { postgres_options, sleepFor } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation } from '../setup';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
-import * as reviewContentWorkflow from '../../workflows/review-content';
+import * as reviewContentWorkflow from '../../examples/workflows/review-content';
 import * as exportService from '../../services/export';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
@@ -339,8 +339,9 @@ describe('workflow state export', () => {
       expire: 120,
     });
 
-    // Wait for escalation to be created
-    await sleepFor(5000);
+    // Poll until the escalation record is created (replaces fragile sleepFor)
+    const escalations = await waitForEscalation(workflowId, 30_000, 1_000);
+    expect(escalations.length).toBe(1);
 
     const exported = await exportService.exportWorkflow(
       workflowId,
@@ -355,8 +356,6 @@ describe('workflow state export', () => {
     expect(exported.transitions).toBeDefined();
 
     // Clean up: resolve the escalation
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
-    expect(escalations.length).toBe(1);
     await resolveEscalation(escalations[0].id, {
       contentId: 'export-esc-1',
       approved: true,

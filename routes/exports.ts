@@ -1,11 +1,76 @@
 import { Router } from 'express';
 
 import * as exportService from '../services/export';
+import { getPool } from '../services/db';
 import { resolveHandle } from './resolve';
 import type { LTExportField } from '../types';
 import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
 
 const router = Router();
+
+/**
+ * GET /api/workflow-states/jobs
+ * List workflow jobs from durable.jobs where entity IS NOT NULL.
+ * Returns paginated results sorted by active first, then created_at DESC.
+ *
+ * Query:
+ *   limit  — page size (default 20, max 100)
+ *   offset — pagination offset (default 0)
+ *   entity — filter by workflow type
+ */
+router.get('/jobs', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const entity = (req.query.entity as string) || undefined;
+    const search = (req.query.search as string) || undefined;
+
+    const pool = getPool();
+    const conditions = ['j.entity IS NOT NULL'];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (entity) {
+      conditions.push(`j.entity = $${idx++}`);
+      values.push(entity);
+    }
+
+    if (search) {
+      conditions.push(`j.key ILIKE $${idx++}`);
+      values.push(`%${search}%`);
+    }
+
+    const where = conditions.join(' AND ');
+
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) FROM durable.jobs j WHERE ${where}`,
+        values,
+      ),
+      pool.query(
+        `SELECT j.key, j.entity, j.status, j.is_live, j.created_at, j.updated_at
+         FROM durable.jobs j
+         WHERE ${where}
+         ORDER BY (CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC
+         LIMIT $${idx++} OFFSET $${idx++}`,
+        [...values, limit, offset],
+      ),
+    ]);
+
+    const jobs = dataResult.rows.map((row: any) => ({
+      workflow_id: row.key.replace('hmsh:durable:j:', ''),
+      entity: row.entity,
+      status: row.status > 0 ? 'running' : row.status === 0 ? 'completed' : 'failed',
+      is_live: row.is_live,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+
+    res.json({ jobs, total: parseInt(countResult.rows[0].count, 10) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * GET /api/workflow-states/:workflowId
@@ -30,7 +95,7 @@ router.get('/:workflowId', async (req, res) => {
     const values = req.query.values === 'false' ? false : undefined;
 
     const exported = await exportService.exportWorkflow(
-      req.params.workflowId,
+      req.params.workflowId as string,
       resolved.taskQueue,
       resolved.workflowName,
       { allow, block, values },
@@ -38,7 +103,14 @@ router.get('/:workflowId', async (req, res) => {
 
     res.json(exported);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const msg: string = err.message ?? '';
+    if (msg.includes('not found') || msg.includes('undefined')) {
+      res.status(404).json({
+        error: 'Workflow data is no longer available (job may have expired)',
+      });
+      return;
+    }
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -66,7 +138,7 @@ router.get('/:workflowId/execution', async (req, res) => {
       : undefined;
 
     const execution = await exportService.exportWorkflowExecution(
-      req.params.workflowId,
+      req.params.workflowId as string,
       resolved.taskQueue,
       resolved.workflowName,
       { exclude_system, omit_results, mode, max_depth },

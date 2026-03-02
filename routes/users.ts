@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { requireAdmin } from '../modules/auth';
 import * as userService from '../services/user';
 import type { LTRoleType } from '../types';
 
@@ -49,7 +50,7 @@ router.get('/:id', async (req, res) => {
  * Create a new user.
  * Body: { external_id, email?, display_name?, roles?: [{ role, type }], metadata? }
  */
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const { external_id, email, display_name, roles, metadata } = req.body || {};
     if (!external_id) {
@@ -88,9 +89,9 @@ router.post('/', async (req, res) => {
  * Update a user.
  * Body: { email?, display_name?, status?, metadata? }
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
-    const user = await userService.updateUser(req.params.id, req.body || {});
+    const user = await userService.updateUser(req.params.id as string, req.body || {});
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -105,9 +106,9 @@ router.put('/:id', async (req, res) => {
  * DELETE /api/users/:id
  * Delete a user.
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const deleted = await userService.deleteUser(req.params.id);
+    const deleted = await userService.deleteUser(req.params.id as string);
     if (!deleted) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -138,7 +139,7 @@ router.get('/:id/roles', async (req, res) => {
  * Add a role to a user.
  * Body: { role, type } — type must be superadmin, admin, or member
  */
-router.post('/:id/roles', async (req, res) => {
+router.post('/:id/roles', requireAdmin, async (req, res) => {
   try {
     const { role, type } = req.body || {};
     if (!role || !type) {
@@ -149,7 +150,7 @@ router.post('/:id/roles', async (req, res) => {
       res.status(400).json({ error: 'type must be superadmin, admin, or member' });
       return;
     }
-    const result = await userService.addUserRole(req.params.id, role, type);
+    const result = await userService.addUserRole(req.params.id as string, role, type);
     res.status(201).json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -160,9 +161,9 @@ router.post('/:id/roles', async (req, res) => {
  * DELETE /api/users/:id/roles/:role
  * Remove a role from a user.
  */
-router.delete('/:id/roles/:role', async (req, res) => {
+router.delete('/:id/roles/:role', requireAdmin, async (req, res) => {
   try {
-    const removed = await userService.removeUserRole(req.params.id, req.params.role);
+    const removed = await userService.removeUserRole(req.params.id as string, req.params.role as string);
     if (!removed) {
       res.status(404).json({ error: 'Role not found' });
       return;

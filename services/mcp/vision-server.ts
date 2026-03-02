@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../logger';
-import * as verifyActivities from '../../workflows/verify-document/activities';
+import * as verifyActivities from '../../examples/workflows/verify-document/activities';
 
 let server: McpServer | null = null;
 
@@ -18,6 +18,11 @@ const extractMemberInfoSchema = z.object({
 const rotatePageSchema = z.object({
   image_ref: z.string().describe('Storage reference to the image to rotate'),
   degrees: z.number().int().describe('Rotation degrees (90, 180, 270)'),
+});
+
+const translateContentSchema = z.object({
+  content: z.string().describe('The content text to translate'),
+  target_language: z.string().describe('Target language code (e.g. "en", "es")'),
 });
 
 const validateMemberSchema = z.object({
@@ -43,11 +48,12 @@ const validateMemberSchema = z.object({
 /**
  * Create the Document Vision MCP server.
  *
- * Registers four tools wrapping the verify-document activities:
+ * Registers five tools wrapping the verify-document activities:
  * - list_document_pages — list available page images from storage
  * - extract_member_info — extract member data from a page via OpenAI Vision
  * - validate_member — validate extracted data against the member database
  * - rotate_page — rotate a document page image by the given degrees
+ * - translate_content — translate text content to a target language
  */
 export async function createVisionServer(options?: {
   name?: string;
@@ -134,7 +140,36 @@ export async function createVisionServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (4 tools registered)`);
+  // ── translate_content ──────────────────────────────────────────
+  (server as any).registerTool(
+    'translate_content',
+    {
+      title: 'Translate Content',
+      description: 'Translate content text to the target language. Returns the translated content and detected source language.',
+      inputSchema: translateContentSchema,
+    },
+    async (args: z.infer<typeof translateContentSchema>) => {
+      // For the demo, strip the WRONG_LANGUAGE marker and return the English text.
+      // In production this would call a translation API.
+      const cleaned = args.content
+        .replace(/WRONG_LANGUAGE\s*/g, '')
+        .trim();
+
+      // Simulate: the cleaned text IS the English translation
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            translated_content: cleaned,
+            source_language: 'es',
+            target_language: args.target_language,
+          }),
+        }],
+      };
+    },
+  );
+
+  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (5 tools registered)`);
   return server;
 }
 

@@ -1,17 +1,7 @@
-import { randomUUID } from 'crypto';
-
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../../modules/config';
-
-/**
- * Generate a deterministic workflow ID for a child workflow.
- * Called as an activity so the ID is cached across replays.
- */
-export async function ltGenerateWorkflowId(prefix: string): Promise<string> {
-  return `${prefix}-${randomUUID()}`;
-}
 
 /**
  * Start a workflow via the Durable client. Used by executeLT to start
@@ -24,6 +14,7 @@ export async function ltStartWorkflow(input: {
   taskQueue: string;
   workflowId: string;
   expire?: number;
+  entity?: string;
 }): Promise<void> {
   const client = new Durable.Client({
     connection: { class: Postgres, options: postgres_options },
@@ -33,8 +24,9 @@ export async function ltStartWorkflow(input: {
     args: input.args,
     taskQueue: input.taskQueue,
     workflowId: input.workflowId,
-    expire: input.expire || 180,
-  });
+    expire: input.expire || 86_400,
+    entity: input.entity || input.workflowName,
+  } as any);
 }
 
 /**

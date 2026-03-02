@@ -54,8 +54,48 @@ Humans and AI are interchangeable at every resolution point. Both speak MCP. Bot
 
 This is the shape of AI in the enterprise: not AI *replacing* process, but AI *participating* in process — with deterministic execution as the foundation, escalation as the safety net, and tool-aware remediation as the escape hatch when neither AI nor humans can produce the answer directly.
 
+## Quick Start
+
+Run the full stack locally with Docker. This starts Postgres, NATS, the API server, the dashboard, and seeds example workflows and users — everything needed to explore Long Tail immediately.
+
+```bash
+git clone https://github.com/hotmeshio/long-tail.git
+cd long-tail
+npm install
+docker compose up -d --build
+```
+
+Once the container is healthy (~10 seconds), open the dashboard at [http://localhost:3000](http://localhost:3000).
+
+### Demo accounts
+
+| User | Password | Role |
+|------|----------|------|
+| `superadmin` | `superadmin123` | superadmin |
+| `admin` | `admin123` | admin |
+| `engineer` | `engineer123` | engineer |
+| `reviewer` | `reviewer123` | reviewer |
+
+### Seeded segments
+
+Three workflows run automatically on startup to populate the dashboard:
+
+1. **Clean Review** — AI auto-approves high-quality content. Happy path.
+2. **Flagged for Review** — AI flags content for human review. Log in as `reviewer` and approve or reject.
+3. **Wrong Language** — Content arrives in Spanish. Walk the escalation chain: `reviewer` escalates to `admin`, `admin` escalates to `engineer`, `engineer` triggers MCP triage with hint `wrong_language`. The triage orchestrator translates the content, re-runs the workflow, and recommends adding language detection.
+
+### Reset
+
+To wipe the database and start fresh:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
 ## Contents
 
+- [Quick Start](#quick-start)
 - [Install](#install)
 - [Connect and Start Workers](#connect-and-start-workers)
 - [Write a Workflow](#write-a-workflow)

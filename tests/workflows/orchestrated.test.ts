@@ -2,15 +2,15 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
-import * as reviewContentWorkflow from '../../workflows/review-content';
-import * as reviewContentOrchestrator from '../../workflows/review-content/orchestrator';
+import * as reviewContentWorkflow from '../../examples/workflows/review-content';
+import * as reviewContentOrchestrator from '../../examples/workflows/review-content/orchestrator';
 import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
@@ -159,30 +159,29 @@ describe('orchestrated workflows (executeLT)', () => {
       expire: 180,
     });
 
-    // Wait for the child workflow to escalate and end
-    await sleepFor(8000);
+    // Poll for the child task to reach needs_intervention (created by executeLT)
+    let childTask: Awaited<ReturnType<typeof taskService.getTask>> = null;
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const { tasks } = await taskService.listTasks({
+        parent_workflow_id: orchWorkflowId,
+        status: 'needs_intervention',
+      });
+      if (tasks.length > 0) { childTask = tasks[0]; break; }
+      await sleepFor(1_000);
+    }
+    expect(childTask).toBeTruthy();
+    expect(childTask!.workflow_id).toBeTruthy();
 
-    // Find the escalation — it should have routing fields
-    const { escalations } = await escalationService.listEscalations({
-      status: 'pending',
-      type: 'reviewContent',
-    });
-    const esc = escalations.find(e =>
-      e.description?.includes('confidence') && e.workflow_id,
-    );
-    expect(esc).toBeTruthy();
-    expect(esc!.workflow_id).toBeTruthy();
-    expect(esc!.task_queue).toBeTruthy();
-    expect(esc!.workflow_type).toBe('reviewContent');
-
-    // Verify task was created and marked as needs_intervention
-    // (the interceptor escalation handler sets this status)
-    const task = await taskService.getTaskByWorkflowId(esc!.workflow_id!);
-    expect(task).toBeTruthy();
-    expect(task!.status).toBe('needs_intervention');
+    // Find escalation by the child's specific workflow ID (precise, no stale matches)
+    const escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+    expect(escalations.length).toBeGreaterThan(0);
+    const esc = escalations[0];
+    expect(esc.task_queue).toBeTruthy();
+    expect(esc.workflow_type).toBe('reviewContent');
 
     // Resolve by starting a new workflow (interceptor resolves escalation + signals orchestrator)
-    await resolveEscalation(esc!.id, {
+    await resolveEscalation(esc.id, {
       contentId: 'orch-esc-1',
       approved: true,
       humanNote: 'Reviewed via orchestrator path',
@@ -196,7 +195,7 @@ describe('orchestrated workflows (executeLT)', () => {
 
     // Verify the interceptor resolved the escalation record
     await sleepFor(500);
-    const resolvedEsc = await escalationService.getEscalation(esc!.id);
+    const resolvedEsc = await escalationService.getEscalation(esc.id);
     expect(resolvedEsc!.status).toBe('resolved');
     expect(resolvedEsc!.resolver_payload).toBeTruthy();
   }, 60_000);
@@ -220,19 +219,24 @@ describe('orchestrated workflows (executeLT)', () => {
       expire: 180,
     });
 
-    await sleepFor(8000);
+    // Poll for child task to reach needs_intervention
+    let childTask: Awaited<ReturnType<typeof taskService.getTask>> = null;
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const { tasks } = await taskService.listTasks({
+        parent_workflow_id: orchWorkflowId,
+        status: 'needs_intervention',
+      });
+      if (tasks.length > 0) { childTask = tasks[0]; break; }
+      await sleepFor(1_000);
+    }
+    expect(childTask).toBeTruthy();
 
-    // Find and resolve the escalation
-    const { escalations } = await escalationService.listEscalations({
-      status: 'pending',
-      type: 'reviewContent',
-    });
-    const esc = escalations.find(e =>
-      e.workflow_id && e.description?.includes('confidence'),
-    );
-    expect(esc).toBeTruthy();
+    // Find escalation by child's specific workflow ID
+    const escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+    expect(escalations.length).toBeGreaterThan(0);
 
-    await resolveEscalation(esc!.id, {
+    await resolveEscalation(escalations[0].id, {
       contentId: 'orch-complete-1',
       approved: true,
     });
@@ -241,7 +245,7 @@ describe('orchestrated workflows (executeLT)', () => {
     await sleepFor(500);
 
     // Verify the task is now completed (orchestrator completes it when signal returns)
-    const task = await taskService.getTaskByWorkflowId(esc!.workflow_id!);
+    const task = await taskService.getTaskByWorkflowId(childTask!.workflow_id);
     expect(task).toBeTruthy();
     expect(task!.status).toBe('completed');
     expect(task!.data).toBeTruthy();

@@ -12,7 +12,7 @@ import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
 import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
 import * as interceptorActivities from '../../interceptor/activities';
-import * as verifyDocumentMcpWorkflow from '../../workflows/verify-document-mcp';
+import * as verifyDocumentMcpWorkflow from '../../examples/workflows/verify-document-mcp';
 import * as configService from '../../services/config';
 import { createVisionServer, stopVisionServer } from '../../services/mcp/vision-server';
 
@@ -56,13 +56,14 @@ describe('Vision MCP Server (InMemoryTransport)', () => {
     await disconnectTelemetry();
   }, 10_000);
 
-  it('should discover all 4 registered tools via listTools()', async () => {
+  it('should discover all 5 registered tools via listTools()', async () => {
     const { tools } = await visionClient.listTools();
     const names = tools.map((t: any) => t.name).sort();
     expect(names).toEqual([
       'extract_member_info',
       'list_document_pages',
       'rotate_page',
+      'translate_content',
       'validate_member',
     ]);
   });

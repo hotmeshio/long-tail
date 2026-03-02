@@ -61,6 +61,9 @@ export async function getWorkflowConfig(
     invocation_roles: invocationRolesResult.rows.map((r: any) => r.role),
     lifecycle: { onBefore, onAfter },
     consumes: wf.consumes || [],
+    envelope_schema: wf.envelope_schema ?? null,
+    resolver_schema: wf.resolver_schema ?? null,
+    cron_schedule: wf.cron_schedule ?? null,
   };
 }
 
@@ -126,6 +129,9 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
       onAfter: [],
     },
     consumes: wf.consumes || [],
+    envelope_schema: wf.envelope_schema ?? null,
+    resolver_schema: wf.resolver_schema ?? null,
+    cron_schedule: wf.cron_schedule ?? null,
   }));
 }
 
@@ -143,8 +149,8 @@ export async function upsertWorkflowConfig(
     // Upsert the workflow row
     await client.query(
       `INSERT INTO lt_config_workflows
-         (workflow_type, is_lt, is_container, invocable, task_queue, default_role, default_modality, description, consumes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (workflow_type, is_lt, is_container, invocable, task_queue, default_role, default_modality, description, consumes, envelope_schema, resolver_schema, cron_schedule)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (workflow_type) DO UPDATE SET
          is_lt = EXCLUDED.is_lt,
          is_container = EXCLUDED.is_container,
@@ -153,7 +159,10 @@ export async function upsertWorkflowConfig(
          default_role = EXCLUDED.default_role,
          default_modality = EXCLUDED.default_modality,
          description = EXCLUDED.description,
-         consumes = EXCLUDED.consumes`,
+         consumes = EXCLUDED.consumes,
+         envelope_schema = EXCLUDED.envelope_schema,
+         resolver_schema = EXCLUDED.resolver_schema,
+         cron_schedule = EXCLUDED.cron_schedule`,
       [
         config.workflow_type,
         config.is_lt,
@@ -164,6 +173,9 @@ export async function upsertWorkflowConfig(
         config.default_modality,
         config.description,
         config.consumes,
+        config.envelope_schema ?? null,
+        config.resolver_schema ?? null,
+        config.cron_schedule ?? null,
       ],
     );
 
@@ -262,6 +274,9 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       onBefore: c.lifecycle.onBefore,
       onAfter: c.lifecycle.onAfter,
       consumes: c.consumes,
+      envelopeSchema: c.envelope_schema,
+      resolverSchema: c.resolver_schema,
+      cronSchedule: c.cron_schedule,
     });
   }
 

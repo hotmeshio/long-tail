@@ -1,3 +1,5 @@
+import { existsSync } from 'fs';
+import path from 'path';
 import express from 'express';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
@@ -14,6 +16,7 @@ import { eventRegistry } from './services/events';
 import { NatsEventAdapter } from './services/events/nats';
 import { maintenanceRegistry } from './services/maintenance';
 import { defaultMaintenanceConfig } from './modules/maintenance';
+import { cronRegistry } from './services/cron';
 import { mcpRegistry } from './services/mcp';
 import { BuiltInMcpAdapter } from './services/mcp/adapter';
 import { escalationStrategyRegistry } from './services/escalation-strategy';
@@ -139,7 +142,15 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   const connection = { class: Postgres, options: postgres_options };
   let httpServer: ReturnType<typeof express.application.listen> | null = null;
 
-  if (startConfig.workers?.length) {
+  // Merge example workers when examples flag is set
+  const allWorkers = [...(startConfig.workers ?? [])];
+  if (startConfig.examples) {
+    const { exampleWorkers } = await import('./examples');
+    allWorkers.push(...exampleWorkers);
+    loggerRegistry.info('[long-tail] example workflows loaded');
+  }
+
+  if (allWorkers.length) {
     // Connect telemetry BEFORE HotMesh starts
     if (telemetryRegistry.hasAdapter) {
       await telemetryRegistry.connect();
@@ -152,7 +163,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     });
 
     // Start each worker
-    for (const w of startConfig.workers) {
+    for (const w of allWorkers) {
       const worker = await Durable.Worker.create({
         connection,
         taskQueue: w.taskQueue,
@@ -162,7 +173,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     }
 
     loggerRegistry.info(
-      `[long-tail] workers started on queues: ${startConfig.workers.map((w) => w.taskQueue).join(', ')}`,
+      `[long-tail] workers started on queues: ${allWorkers.map((w) => w.taskQueue).join(', ')}`,
     );
 
     // Connect event adapters
@@ -177,11 +188,26 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       loggerRegistry.info('[long-tail] maintenance cron started');
     }
 
+    // Start workflow cron schedules
+    await cronRegistry.connect();
+
     // Connect MCP adapter
     if (mcpRegistry.hasAdapter) {
       await mcpRegistry.connect();
       loggerRegistry.info('[long-tail] MCP adapter connected');
     }
+  }
+
+  // ── 5b. Seed example workflows (fire-and-forget after workers are up) ─
+  if (startConfig.examples) {
+    const { seedExamples } = await import('./examples');
+    const seedClient = new Durable.Client({ connection });
+    // Delay slightly to let workers fully register
+    setTimeout(() => {
+      seedExamples(seedClient).catch((err: any) =>
+        loggerRegistry.warn(`[long-tail] seed error: ${err.message}`),
+      );
+    }, 2000);
   }
 
   // ── 6. Start embedded server (if enabled) ──────────────────────────────
@@ -194,6 +220,23 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     });
 
     app.use('/api', routes);
+
+    // Serve dashboard static assets
+    // Resolves correctly in both dev (ts-node from root) and prod (node build/)
+    const devDist = path.join(__dirname, 'dashboard', 'dist');
+    const prodDist = path.join(__dirname, '..', 'dashboard', 'dist');
+    const dashboardDist = existsSync(devDist) ? devDist : prodDist;
+
+    if (existsSync(dashboardDist)) {
+      app.use(express.static(dashboardDist));
+
+      // SPA fallback — all non-API routes serve index.html
+      app.get('/{*splat}', (_req, res) => {
+        res.sendFile(path.join(dashboardDist, 'index.html'));
+      });
+
+      loggerRegistry.info(`[long-tail] Dashboard: http://localhost:${serverPort}/`);
+    }
 
     httpServer = app.listen(serverPort, () => {
       loggerRegistry.info(`[long-tail] server running on port ${serverPort}`);
@@ -212,6 +255,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     }
     if (mcpRegistry.hasAdapter) {
       await mcpRegistry.disconnect();
+    }
+    if (cronRegistry.hasActiveCrons) {
+      await cronRegistry.disconnect();
     }
     if (maintenanceRegistry.hasConfig) {
       await maintenanceRegistry.disconnect();

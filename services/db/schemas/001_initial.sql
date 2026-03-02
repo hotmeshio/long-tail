@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS lt_users (
   external_id   TEXT UNIQUE NOT NULL,
   email         TEXT,
   display_name  TEXT,
+  password_hash TEXT,
   status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
   metadata      JSONB,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -261,14 +262,45 @@ CREATE OR REPLACE TRIGGER trg_lt_mcp_servers_updated_at
   BEFORE UPDATE ON lt_mcp_servers
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
--- ─── Seed built-in workflows ────────────────────────────────────────────────
+-- ─── Role escalation chains ────────────────────────────────────────────────
 
-INSERT INTO lt_config_workflows (workflow_type, is_lt, is_container, task_queue, default_role, default_modality)
+CREATE TABLE IF NOT EXISTS lt_config_role_escalations (
+  source_role TEXT NOT NULL,
+  target_role TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (source_role, target_role)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_config_role_escalations_source
+  ON lt_config_role_escalations (source_role);
+
+-- ─── Seed data ──────────────────────────────────────────────────────────────
+
+-- Example workflows: orchestrators are invocable entry points; leaf workflows
+-- are started by orchestrators only (invocable = false).
+INSERT INTO lt_config_workflows (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable)
 VALUES
-  ('reviewContent',                  true,  false, 'long-tail',            'reviewer', 'default'),
-  ('reviewContentOrchestrator',      false, true,  'lt-review-orch',       'reviewer', 'default'),
-  ('verifyDocument',                 true,  false, 'long-tail-verify',     'reviewer', 'default'),
-  ('verifyDocumentOrchestrator',     false, true,  'lt-verify-orch',       'reviewer', 'default'),
-  ('verifyDocumentMcp',              true,  false, 'long-tail-verify-mcp', 'reviewer', 'default'),
-  ('verifyDocumentMcpOrchestrator',  false, true,  'lt-verify-mcp-orch',   'reviewer', 'default')
+  ('reviewContent',                  true,  false, 'long-tail',            'reviewer', 'default', false),
+  ('reviewContentOrchestrator',      true,  true,  'lt-review-orch',       'reviewer', 'default', true),
+  ('verifyDocument',                 true,  false, 'long-tail-verify',     'reviewer', 'default', false),
+  ('verifyDocumentOrchestrator',     true,  true,  'lt-verify-orch',       'reviewer', 'default', true),
+  ('verifyDocumentMcp',              true,  false, 'long-tail-verify-mcp', 'reviewer', 'default', false),
+  ('verifyDocumentMcpOrchestrator',  true,  true,  'lt-verify-mcp-orch',   'reviewer', 'default', true)
 ON CONFLICT (workflow_type) DO NOTHING;
+
+-- Assign roles to all LT workflows
+INSERT INTO lt_config_roles (workflow_type, role)
+SELECT workflow_type, unnest(ARRAY['reviewer', 'engineer', 'admin'])
+FROM lt_config_workflows
+WHERE is_lt = true
+ON CONFLICT (workflow_type, role) DO NOTHING;
+
+-- Baseline escalation chains (superadmin → any is implicit in code)
+INSERT INTO lt_config_role_escalations (source_role, target_role) VALUES
+  ('reviewer',  'engineer'),
+  ('reviewer',  'admin'),
+  ('engineer',  'admin'),
+  ('engineer',  'superadmin'),
+  ('admin',     'engineer'),
+  ('admin',     'superadmin')
+ON CONFLICT DO NOTHING;

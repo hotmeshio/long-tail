@@ -1,0 +1,30 @@
+# Dashboard (source, config, node_modules)
+dashboard/
+
+# Tests
+tests/
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+
+# Examples (not needed at runtime)
+examples/
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker/
+
+# Dev tooling
+.github/
+.vscode/
+.eslintrc*
+.prettierrc*
+.editorconfig
+.claude/
+scripts/
+
+# Docs
+docs/
+*.md
+!LICENSE

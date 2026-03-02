@@ -7,10 +7,39 @@ import * as configService from '../services/config';
 import * as userService from '../services/user';
 import { requireAdmin } from '../modules/auth';
 import { ltConfig } from '../modules/ltconfig';
+import { cronRegistry } from '../services/cron';
 import { resolveHandle } from './resolve';
 import type { LTEnvelope } from '../types';
 
 const router = Router();
+
+// ── Cron status ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/workflows/cron/status
+ * List all cron-configured workflows and whether each is actively running.
+ */
+router.get('/cron/status', async (_req, res) => {
+  try {
+    const configs = await configService.listWorkflowConfigs();
+    const cronConfigs = configs.filter((c) => c.cron_schedule);
+    const activeTypes = cronRegistry.activeWorkflowTypes;
+
+    const schedules = cronConfigs.map((c) => ({
+      workflow_type: c.workflow_type,
+      cron_schedule: c.cron_schedule,
+      description: c.description,
+      task_queue: c.task_queue,
+      invocable: c.invocable,
+      active: activeTypes.includes(c.workflow_type),
+      envelope_schema: c.envelope_schema,
+    }));
+
+    res.json({ schedules });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── Workflow configuration ────────────────────────────────────────────────────
 
@@ -52,7 +81,7 @@ router.get('/:type/config', async (req, res) => {
 router.put('/:type/config', requireAdmin, async (req, res) => {
   try {
     const config = await configService.upsertWorkflowConfig({
-      workflow_type: req.params.type,
+      workflow_type: req.params.type as string,
       is_lt: req.body.is_lt ?? true,
       is_container: req.body.is_container ?? false,
       invocable: req.body.invocable ?? false,
@@ -64,8 +93,13 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
       invocation_roles: req.body.invocation_roles ?? [],
       lifecycle: req.body.lifecycle ?? { onBefore: [], onAfter: [] },
       consumes: req.body.consumes ?? [],
+      envelope_schema: req.body.envelope_schema ?? null,
+      resolver_schema: req.body.resolver_schema ?? null,
+      cron_schedule: req.body.cron_schedule ?? null,
     });
     ltConfig.invalidate();
+    // Restart cron if schedule changed
+    await cronRegistry.restartCron(config);
     res.json(config);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -79,7 +113,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
  */
 router.delete('/:type/config', requireAdmin, async (req, res) => {
   try {
-    const deleted = await configService.deleteWorkflowConfig(req.params.type);
+    const deleted = await configService.deleteWorkflowConfig(req.params.type as string);
     if (!deleted) {
       res.status(404).json({ error: 'Workflow config not found' });
       return;
@@ -168,7 +202,8 @@ router.post('/:type/invoke', async (req, res) => {
       workflowName: workflowType,
       workflowId,
       expire: 86_400,
-    });
+      entity: workflowType,
+    } as any);
 
     res.status(202).json({
       workflowId: handle.workflowId,
@@ -231,6 +266,30 @@ router.get('/:workflowId/result', async (req, res) => {
 
     const result = await handle.result();
     res.json({ workflowId: req.params.workflowId, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/workflows/:workflowId/terminate
+ * Interrupt/terminate a running workflow.
+ */
+router.post('/:workflowId/terminate', async (req, res) => {
+  try {
+    const resolved = await resolveHandle(req, res);
+    if (!resolved) return;
+
+    const client = createClient();
+    const handle = await client.workflow.getHandle(
+      resolved.taskQueue,
+      resolved.workflowName,
+      req.params.workflowId,
+    );
+
+    await handle.interrupt();
+
+    res.json({ terminated: true, workflowId: req.params.workflowId });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

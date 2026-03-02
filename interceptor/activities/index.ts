@@ -20,7 +20,6 @@ export {
 } from './config';
 
 export {
-  ltGenerateWorkflowId,
   ltStartWorkflow,
   ltSignalParent,
 } from './workflow';
