@@ -29,12 +29,12 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GET /api/tasks/journeys
+ * GET /api/tasks/processes
  * List distinct origin_id values with summary stats.
  */
-router.get('/journeys', async (req, res) => {
+router.get('/processes', async (req, res) => {
   try {
-    const result = await taskService.listJourneys({
+    const result = await taskService.listProcesses({
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
       workflow_type: (req.query.workflow_type as string) || undefined,
@@ -46,13 +46,13 @@ router.get('/journeys', async (req, res) => {
 });
 
 /**
- * GET /api/tasks/journeys/:originId
- * Get all tasks and escalations for a journey (origin_id).
+ * GET /api/tasks/processes/:originId
+ * Get all tasks and escalations for a process (origin_id).
  */
-router.get('/journeys/:originId', async (req, res) => {
+router.get('/processes/:originId', async (req, res) => {
   try {
     const [tasks, escalations] = await Promise.all([
-      taskService.getJourneyTasks(req.params.originId),
+      taskService.getProcessTasks(req.params.originId),
       escalationService.getEscalationsByOriginId(req.params.originId),
     ]);
     res.json({

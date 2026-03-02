@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useJourneys, type JourneySummary } from '../../api/tasks';
+import { useProcesses, type ProcessSummary } from '../../api/tasks';
 import { useWorkflowConfigs } from '../../api/workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
@@ -8,7 +8,7 @@ import { StickyPagination } from '../../components/common/StickyPagination';
 import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { PageHeader } from '../../components/common/PageHeader';
 
-const columns: Column<JourneySummary>[] = [
+const columns: Column<ProcessSummary>[] = [
   {
     key: 'origin_id',
     label: 'Origin',
@@ -72,7 +72,7 @@ const columns: Column<JourneySummary>[] = [
   },
 ];
 
-export function JourneysListPage() {
+export function ProcessesListPage() {
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { workflow_type: '' },
@@ -81,7 +81,7 @@ export function JourneysListPage() {
   const { data: configs } = useWorkflowConfigs();
   const workflowTypes = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
 
-  const { data, isLoading } = useJourneys({
+  const { data, isLoading } = useProcesses({
     workflow_type: filters.workflow_type || undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
@@ -91,7 +91,7 @@ export function JourneysListPage() {
 
   return (
     <div>
-      <PageHeader title="Segments" backTo="/" backLabel="Overview" />
+      <PageHeader title="Business Processes" backTo="/" backLabel="Overview" />
 
       <div className="mb-6">
         <FilterBar>
@@ -106,11 +106,11 @@ export function JourneysListPage() {
 
       <DataTable
         columns={columns}
-        data={data?.journeys ?? []}
+        data={data?.processes ?? []}
         keyFn={(row) => row.origin_id}
-        onRowClick={(row) => navigate(`/segments/${encodeURIComponent(row.origin_id)}`)}
+        onRowClick={(row) => navigate(`/processes/${encodeURIComponent(row.origin_id)}`)}
         isLoading={isLoading}
-        emptyMessage="No segments found"
+        emptyMessage="No business processes found"
       />
 
       <StickyPagination

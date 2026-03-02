@@ -56,6 +56,42 @@ function extractActivityName(jobId: string): string {
   return match ? match[1] : jobId;
 }
 
+/**
+ * Extract a child workflow ID from a job_id.
+ * Format: -parentId-$childName-N → strip to get the child workflow identifier
+ */
+function extractChildWorkflowId(jobId: string): string {
+  // Remove the leading dash and trailing index
+  const match = jobId.match(/^-(.+)-\d+$/);
+  return match ? match[1] : jobId;
+}
+
+/**
+ * Sort + filter attribute keys matching a prefix (e.g., '-wait-')
+ * and parse each JSON value.
+ */
+function getOperationKeys(
+  attrs: Record<string, string>,
+  prefix: string,
+): Array<{ key: string; index: number; val: Record<string, unknown> }> {
+  return Object.keys(attrs)
+    .filter((k) => k.startsWith(prefix))
+    .sort((a, b) => {
+      const numA = parseInt(a.replace(new RegExp(`${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|-`, 'g'), ''));
+      const numB = parseInt(b.replace(new RegExp(`${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|-`, 'g'), ''));
+      return numA - numB;
+    })
+    .map((key) => {
+      const raw = attrs[key].startsWith('/s') ? attrs[key].slice(2) : attrs[key];
+      try {
+        return { key, index: parseInt(key.replace(/[^0-9]/g, '')), val: JSON.parse(raw) };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean) as Array<{ key: string; index: number; val: Record<string, unknown> }>;
+}
+
 // ── Direct-query fallback for expired jobs ───────────────────────────────────
 
 /**
@@ -105,59 +141,281 @@ async function exportExecutionDirect(
     try { workflowResult = JSON.parse(raw); } catch { /* ignore */ }
   }
 
-  // Build events from proxy fields
+  // Build events from all operation types
   const events: WorkflowExecution['events'] = [];
   const excludeSystem = options?.exclude_system ?? false;
-
-  const proxyKeys = Object.keys(attrs)
-    .filter(k => k.startsWith('-proxy-'))
-    .sort((a, b) => {
-      const numA = parseInt(a.replace(/-proxy-|-/g, ''));
-      const numB = parseInt(b.replace(/-proxy-|-/g, ''));
-      return numA - numB;
-    });
+  let nextId = 1;
 
   let systemCount = 0;
   let userCount = 0;
+  let activityCompleted = 0;
+  let activityFailed = 0;
+  let childTotal = 0;
+  let childCompleted = 0;
+  let childFailed = 0;
+  let timerCount = 0;
+  let signalCount = 0;
 
-  for (const key of proxyKeys) {
-    const raw = attrs[key].startsWith('/s') ? attrs[key].slice(2) : attrs[key];
-    let proxy: Record<string, unknown>;
-    try { proxy = JSON.parse(raw); } catch { continue; }
+  function computeDuration(ac?: string, au?: string): number | null {
+    if (!ac || !au) return null;
+    const s = new Date(hmshTimestampToISO(ac)).getTime();
+    const e = new Date(hmshTimestampToISO(au)).getTime();
+    return e >= s ? e - s : null;
+  }
 
-    const activityName = extractActivityName((proxy.job_id as string) || key);
+  // ── Proxy (activities) ──────────────────────────────────────
+  for (const { key, index, val } of getOperationKeys(attrs, '-proxy-')) {
+    const activityName = extractActivityName((val.job_id as string) || key);
     const isSystem = activityName.startsWith('lt');
+    const ac = val.ac as string | undefined;
+    const au = val.au as string | undefined;
+    const dur = computeDuration(ac, au);
+    const hasError = '$error' in val;
 
     if (isSystem) systemCount++; else userCount++;
     if (excludeSystem && isSystem) continue;
 
-    const ac = proxy.ac as string | undefined;
-    const au = proxy.au as string | undefined;
-
-    let durationMs: number | null = null;
-    if (ac && au) {
-      const s = new Date(hmshTimestampToISO(ac)).getTime();
-      const e = new Date(hmshTimestampToISO(au)).getTime();
-      if (e >= s) durationMs = e - s;
+    if (ac) {
+      events.push({
+        event_id: nextId++,
+        event_type: 'activity_task_scheduled',
+        category: 'activity',
+        event_time: hmshTimestampToISO(ac),
+        duration_ms: null,
+        is_system: isSystem,
+        attributes: {
+          kind: 'activity_task_scheduled',
+          activity_type: activityName,
+          timeline_key: (val.job_id as string) || key,
+          execution_index: index,
+        },
+      } as WorkflowExecution['events'][number]);
     }
 
-    const eventId = parseInt(key.replace(/-proxy-|-/g, ''));
+    if (au) {
+      if (hasError) {
+        activityFailed++;
+        events.push({
+          event_id: nextId++,
+          event_type: 'activity_task_failed',
+          category: 'activity',
+          event_time: hmshTimestampToISO(au),
+          duration_ms: dur,
+          is_system: isSystem,
+          attributes: {
+            kind: 'activity_task_failed',
+            activity_type: activityName,
+            failure: val.$error,
+            timeline_key: (val.job_id as string) || key,
+            execution_index: index,
+          },
+        } as WorkflowExecution['events'][number]);
+      } else {
+        activityCompleted++;
+        events.push({
+          event_id: nextId++,
+          event_type: 'activity_task_completed',
+          category: 'activity',
+          event_time: hmshTimestampToISO(au),
+          duration_ms: dur,
+          is_system: isSystem,
+          attributes: {
+            kind: 'activity_task_completed',
+            activity_type: activityName,
+            result: val.data,
+            timeline_key: (val.job_id as string) || key,
+            execution_index: index,
+          },
+        } as WorkflowExecution['events'][number]);
+      }
+    }
+  }
 
+  // ── Wait (signals) ──────────────────────────────────────────
+  for (const { key, index, val } of getOperationKeys(attrs, '-wait-')) {
+    const signalName = (val.id as string)
+      || (val.data as any)?.id
+      || (val.data as any)?.data?.id
+      || `signal-${index}`;
+    const ac = val.ac as string | undefined;
+    const au = val.au as string | undefined;
+    const dur = computeDuration(ac, au);
+    signalCount++;
+
+    const ts = au ? hmshTimestampToISO(au) : ac ? hmshTimestampToISO(ac) : startTime;
     events.push({
-      event_id: eventId,
-      event_type: 'activity_task_completed',
-      category: 'activity',
-      event_time: ac ? hmshTimestampToISO(ac) : startTime,
-      duration_ms: durationMs,
-      is_system: isSystem,
+      event_id: nextId++,
+      event_type: 'workflow_execution_signaled',
+      category: 'signal',
+      event_time: ts,
+      duration_ms: dur,
+      is_system: false,
       attributes: {
-        kind: 'activity_task_completed',
-        activity_type: activityName,
-        result: proxy.data,
-        timeline_key: (proxy.job_id as string) || key,
-        execution_index: eventId,
+        kind: 'workflow_execution_signaled',
+        signal_name: signalName,
+        input: (val.data as any)?.data,
+        timeline_key: (val.job_id as string) || key,
+        execution_index: index,
       },
     } as WorkflowExecution['events'][number]);
+  }
+
+  // ── Sleep (timers) ──────────────────────────────────────────
+  for (const { key, index, val } of getOperationKeys(attrs, '-sleep-')) {
+    const ac = val.ac as string | undefined;
+    const au = val.au as string | undefined;
+    const dur = computeDuration(ac, au);
+    timerCount++;
+
+    if (ac) {
+      events.push({
+        event_id: nextId++,
+        event_type: 'timer_started',
+        category: 'timer',
+        event_time: hmshTimestampToISO(ac),
+        duration_ms: null,
+        is_system: false,
+        attributes: {
+          kind: 'timer_started',
+          duration_ms: dur ?? undefined,
+          timeline_key: (val.job_id as string) || key,
+          execution_index: index,
+        },
+      } as WorkflowExecution['events'][number]);
+    }
+    if (au) {
+      events.push({
+        event_id: nextId++,
+        event_type: 'timer_fired',
+        category: 'timer',
+        event_time: hmshTimestampToISO(au),
+        duration_ms: dur,
+        is_system: false,
+        attributes: {
+          kind: 'timer_fired',
+          timeline_key: (val.job_id as string) || key,
+          execution_index: index,
+        },
+      } as WorkflowExecution['events'][number]);
+    }
+  }
+
+  // ── Child (awaited child workflows) ─────────────────────────
+  for (const { key, index, val } of getOperationKeys(attrs, '-child-')) {
+    const childId = extractChildWorkflowId((val.job_id as string) || key);
+    const ac = val.ac as string | undefined;
+    const au = val.au as string | undefined;
+    const dur = computeDuration(ac, au);
+    const hasError = '$error' in val;
+    childTotal++;
+
+    if (ac) {
+      events.push({
+        event_id: nextId++,
+        event_type: 'child_workflow_execution_started',
+        category: 'child_workflow',
+        event_time: hmshTimestampToISO(ac),
+        duration_ms: null,
+        is_system: false,
+        attributes: {
+          kind: 'child_workflow_execution_started',
+          child_workflow_id: childId,
+          awaited: true,
+          timeline_key: (val.job_id as string) || key,
+          execution_index: index,
+        },
+      } as WorkflowExecution['events'][number]);
+    }
+    if (au) {
+      if (hasError) {
+        childFailed++;
+        events.push({
+          event_id: nextId++,
+          event_type: 'child_workflow_execution_failed',
+          category: 'child_workflow',
+          event_time: hmshTimestampToISO(au),
+          duration_ms: dur,
+          is_system: false,
+          attributes: {
+            kind: 'child_workflow_execution_failed',
+            child_workflow_id: childId,
+            failure: val.$error,
+            timeline_key: (val.job_id as string) || key,
+            execution_index: index,
+          },
+        } as WorkflowExecution['events'][number]);
+      } else {
+        childCompleted++;
+        events.push({
+          event_id: nextId++,
+          event_type: 'child_workflow_execution_completed',
+          category: 'child_workflow',
+          event_time: hmshTimestampToISO(au),
+          duration_ms: dur,
+          is_system: false,
+          attributes: {
+            kind: 'child_workflow_execution_completed',
+            child_workflow_id: childId,
+            result: val.data,
+            timeline_key: (val.job_id as string) || key,
+            execution_index: index,
+          },
+        } as WorkflowExecution['events'][number]);
+      }
+    }
+  }
+
+  // ── Start (fire-and-forget child workflows) ─────────────────
+  for (const { key, index, val } of getOperationKeys(attrs, '-start-')) {
+    const childId = extractChildWorkflowId((val.job_id as string) || key);
+    const ac = val.ac as string | undefined;
+    const au = val.au as string | undefined;
+    const ts = ac ? hmshTimestampToISO(ac) : au ? hmshTimestampToISO(au) : startTime;
+    childTotal++;
+
+    events.push({
+      event_id: nextId++,
+      event_type: 'child_workflow_execution_started',
+      category: 'child_workflow',
+      event_time: ts,
+      duration_ms: null,
+      is_system: false,
+      attributes: {
+        kind: 'child_workflow_execution_started',
+        child_workflow_id: childId,
+        awaited: false,
+        timeline_key: (val.job_id as string) || key,
+        execution_index: index,
+      },
+    } as WorkflowExecution['events'][number]);
+  }
+
+  // Sort chronologically and re-number
+  events.sort((a, b) => {
+    const cmp = a.event_time.localeCompare(b.event_time);
+    return cmp !== 0 ? cmp : a.event_id - b.event_id;
+  });
+  for (let i = 0; i < events.length; i++) {
+    events[i].event_id = i + 1;
+  }
+
+  // Back-references
+  const scheduledMap = new Map<string, number>();
+  const initiatedMap = new Map<string, number>();
+  for (const e of events) {
+    const a = e.attributes as any;
+    if (e.event_type === 'activity_task_scheduled' && a.timeline_key) {
+      scheduledMap.set(a.timeline_key, e.event_id);
+    }
+    if (e.event_type === 'child_workflow_execution_started' && a.timeline_key) {
+      initiatedMap.set(a.timeline_key, e.event_id);
+    }
+    if ((e.event_type === 'activity_task_completed' || e.event_type === 'activity_task_failed') && a.timeline_key) {
+      a.scheduled_event_id = scheduledMap.get(a.timeline_key) ?? null;
+    }
+    if ((e.event_type === 'child_workflow_execution_completed' || e.event_type === 'child_workflow_execution_failed') && a.timeline_key) {
+      a.initiated_event_id = initiatedMap.get(a.timeline_key) ?? null;
+    }
   }
 
   // Compute total duration
@@ -167,11 +425,13 @@ async function exportExecutionDirect(
     if (diffMs >= 0) totalDurationMs = diffMs;
   }
 
+  const proxyTotal = systemCount + userCount;
+
   return {
     workflow_id: workflowId,
     workflow_type: workflowName,
     task_queue: taskQueue,
-    status: job.is_live ? 'completed' : 'completed',
+    status: 'completed',
     start_time: startTime || null,
     close_time: closeTime || null,
     duration_ms: totalDurationMs,
@@ -180,15 +440,15 @@ async function exportExecutionDirect(
     summary: {
       total_events: events.length,
       activities: {
-        total: proxyKeys.length,
-        completed: proxyKeys.length,
-        failed: 0,
+        total: proxyTotal,
+        completed: activityCompleted,
+        failed: activityFailed,
         system: systemCount,
         user: userCount,
       },
-      child_workflows: { total: 0, completed: 0, failed: 0 },
-      timers: 0,
-      signals: 0,
+      child_workflows: { total: childTotal, completed: childCompleted, failed: childFailed },
+      timers: timerCount,
+      signals: signalCount,
     },
   };
 }

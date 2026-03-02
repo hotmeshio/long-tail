@@ -11,15 +11,15 @@ import { RequireRole } from './components/layout/RequireRole';
 // Lazy-loaded route sections
 // ---------------------------------------------------------------------------
 
-// Journey pages (all authenticated users)
-const JourneysOverview = lazy(() =>
-  import('./pages/journeys/JourneysOverview').then((m) => ({ default: m.JourneysOverview })),
+// Process pages (all authenticated users)
+const ProcessesOverview = lazy(() =>
+  import('./pages/processes/ProcessesOverview').then((m) => ({ default: m.ProcessesOverview })),
 );
-const JourneysListPage = lazy(() =>
-  import('./pages/journeys/JourneysListPage').then((m) => ({ default: m.JourneysListPage })),
+const ProcessesListPage = lazy(() =>
+  import('./pages/processes/ProcessesListPage').then((m) => ({ default: m.ProcessesListPage })),
 );
-const JourneyDetailPage = lazy(() =>
-  import('./pages/journeys/JourneyDetailPage').then((m) => ({ default: m.JourneyDetailPage })),
+const ProcessDetailPage = lazy(() =>
+  import('./pages/processes/ProcessDetailPage').then((m) => ({ default: m.ProcessDetailPage })),
 );
 // MCP pages (engineer, admin, or superadmin)
 const McpOverview = lazy(() =>
@@ -129,12 +129,12 @@ const router = createBrowserRouter([
     path: '/',
     element: <Shell />,
     children: [
-      // Default -> segments overview (home page)
-      { index: true, element: <Lazy><JourneysOverview /></Lazy> },
+      // Default -> processes overview (home page)
+      { index: true, element: <Lazy><ProcessesOverview /></Lazy> },
 
-      // Segments section (all authenticated users)
-      { path: 'segments', element: <Lazy><JourneysListPage /></Lazy> },
-      { path: 'segments/:originId', element: <Lazy><JourneyDetailPage /></Lazy> },
+      // Processes section (all authenticated users)
+      { path: 'processes', element: <Lazy><ProcessesListPage /></Lazy> },
+      { path: 'processes/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
 
       // Escalation section (all authenticated users)
       { path: 'escalations', element: <Lazy><EscalationsOverview /></Lazy> },

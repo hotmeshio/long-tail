@@ -3,7 +3,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
-import { JourneysSidebar } from './JourneysSidebar';
+import { ProcessesSidebar } from './ProcessesSidebar';
 import { AdminSidebar } from './AdminSidebar';
 import { EngineerSidebar } from './EngineerSidebar';
 import { McpSidebar } from './McpSidebar';
@@ -28,7 +28,7 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <JourneysSidebar />
+            <ProcessesSidebar />
             <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}

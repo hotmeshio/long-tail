@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ── Long Tail Demo ──────────────────────────────────────────────────────────
 #
-# One command. Fresh database, server, full Durable MCP journey.
+# One command. Fresh database, server, full Durable MCP process.
 #
 #   npm run demo
 #
@@ -65,11 +65,11 @@ echo "  [2/4] Server running (pid $SERVER_PID)"
 sleep 3
 echo "  [3/4] Workflows seeded"
 
-# ── 3. Run journey ──────────────────────────────────────────────────────────
+# ── 3. Run process ──────────────────────────────────────────────────────────
 
-echo "  [4/4] Running journey ..."
+echo "  [4/4] Running process ..."
 echo ""
-npx tsx scripts/journey.ts
+npx tsx scripts/process.ts
 EXIT_CODE=$?
 
 # ── 4. Done ─────────────────────────────────────────────────────────────────
@@ -82,6 +82,6 @@ if [ $EXIT_CODE -eq 0 ]; then
   echo ""
   wait "$SERVER_PID" 2>/dev/null || true
 else
-  echo "  ✗ Journey failed (exit code $EXIT_CODE)"
+  echo "  ✗ Process failed (exit code $EXIT_CODE)"
   exit $EXIT_CODE
 fi

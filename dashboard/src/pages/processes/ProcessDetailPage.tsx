@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useJourneyDetail } from '../../api/tasks';
+import { useProcessDetail } from '../../api/tasks';
 import { PageHeader } from '../../components/common/PageHeader';
 import { SectionLabel } from '../../components/common/SectionLabel';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -12,9 +12,9 @@ type TimelineEntry =
   | { kind: 'task'; item: LTTaskRecord; time: string }
   | { kind: 'escalation'; item: LTEscalationRecord; time: string };
 
-export function JourneyDetailPage() {
+export function ProcessDetailPage() {
   const { originId } = useParams<{ originId: string }>();
-  const { data, isLoading } = useJourneyDetail(originId ?? '');
+  const { data, isLoading } = useProcessDetail(originId ?? '');
 
   const tasks = data?.tasks ?? [];
   const escalations = data?.escalations ?? [];
@@ -46,9 +46,9 @@ export function JourneyDetailPage() {
   return (
     <div>
       <PageHeader
-        title="Segment Detail"
-        backTo="/segments"
-        backLabel="All Segments"
+        title="Process Detail"
+        backTo="/processes"
+        backLabel="All Processes"
       />
 
       <div className="mb-6">
@@ -66,7 +66,7 @@ export function JourneyDetailPage() {
       <SectionLabel className="mb-4">Timeline</SectionLabel>
 
       {timeline.length === 0 && (
-        <p className="text-sm text-text-tertiary py-8 text-center">No events in this segment.</p>
+        <p className="text-sm text-text-tertiary py-8 text-center">No events in this process.</p>
       )}
 
       <div className="relative">

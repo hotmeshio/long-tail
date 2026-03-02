@@ -46,3 +46,15 @@
   from { opacity: 0; transform: translateX(1rem); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+/* Striped pattern for pending timeline bars */
+.bg-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(255, 255, 255, 0.15) 3px,
+    rgba(255, 255, 255, 0.15) 6px
+  );
+  background-color: var(--color-status-warning, #f59e0b);
+}
