@@ -10,6 +10,8 @@ const {
   getUpstreamTasks,
   listDocumentPages,
   rotatePage,
+  translateContent,
+  notifyEngineering,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
   retryPolicy: {
@@ -53,7 +55,7 @@ export async function mcpTriage(
   let correctedData: Record<string, any> = { ...escalationPayload };
 
   if (hint === 'image_orientation') {
-    // 3. Get page list and rotate each page via MCP tool
+    // 3a. Get page list and rotate each page via MCP tool
     const pages = await listDocumentPages();
     const rotatedPages: string[] = [];
     for (const page of pages) {
@@ -61,16 +63,39 @@ export async function mcpTriage(
       rotatedPages.push(rotated);
     }
     correctedData.pages = rotatedPages;
+  } else if (hint === 'wrong_language') {
+    // 3b. Translate content via MCP tool, then notify engineering
+    const originalContent = escalationPayload?.content || correctedData.content || '';
+    const translation = await translateContent(originalContent, 'en');
+    correctedData.content = translation.translated_content;
+    correctedData.contentId = correctedData.contentId || escalationPayload?.contentId;
+
+    // Recommend adding language detection to the deterministic pipeline
+    await notifyEngineering(
+      originId,
+      `Content arrived in ${translation.source_language} — translated and re-processed successfully. ` +
+      `Recommend adding a language detection step to the pipeline to handle this automatically.`,
+      { hint, source_language: translation.source_language },
+    );
   }
 
   // 4. Re-invoke the original workflow with corrected data
+  const reInvokeData: Record<string, any> = {};
+  if (hint === 'image_orientation') {
+    reInvokeData.documentId = correctedData.documentId;
+    reInvokeData.pages = correctedData.pages;
+  } else if (hint === 'wrong_language') {
+    reInvokeData.contentId = correctedData.contentId;
+    reInvokeData.content = correctedData.content;
+    reInvokeData.contentType = correctedData.contentType || escalationPayload?.contentType;
+  } else {
+    Object.assign(reInvokeData, correctedData);
+  }
+
   const result = await executeLT({
     workflowName: originalWorkflowType,
     args: [{
-      data: {
-        documentId: correctedData.documentId,
-        pages: correctedData.pages,
-      },
+      data: reInvokeData,
       metadata: envelope.metadata || {},
     }],
     taskQueue: originalTaskQueue,

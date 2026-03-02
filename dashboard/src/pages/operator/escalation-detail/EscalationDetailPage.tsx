@@ -19,7 +19,7 @@ import { SectionLabel } from '../../../components/common/SectionLabel';
 import { Pill } from '../../../components/common/Pill';
 import { Collapsible } from '../../../components/common/Collapsible';
 import { isEffectivelyClaimed, isAvailable } from '../../../lib/escalation';
-import { getResolverTemplate } from '../../../lib/templates';
+import { useWorkflowConfigs } from '../../../api/workflows';
 import { safeParseJson } from '../../../lib/parse';
 import { CLAIM_DURATION_OPTIONS } from '../../../lib/constants';
 import { TimeAgo } from '../../../components/common/TimeAgo';
@@ -68,12 +68,14 @@ function ClaimPanel({
 
 function ResolvePanel({
   workflowType,
+  resolverSchema,
   onResolve,
   onCancel,
   isPending,
   error,
 }: {
   workflowType: string | null;
+  resolverSchema: Record<string, unknown> | null;
   onResolve: (payload: Record<string, unknown>) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -85,8 +87,8 @@ function ResolvePanel({
   const [triageHint, setTriageHint] = useState('');
 
   useEffect(() => {
-    if (workflowType) setJson(getResolverTemplate(workflowType));
-  }, [workflowType]);
+    setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
+  }, [resolverSchema]);
 
   const handleSubmit = () => {
     setParseError('');
@@ -289,7 +291,9 @@ export function EscalationDetailPage() {
   const resolve = useResolveEscalation();
   const escalate = useEscalateToRole();
   const { data: escalationTargets } = useEscalationTargets(esc?.role ?? '');
+  const { data: workflowConfigs } = useWorkflowConfigs();
 
+  const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
   const returnPath = (location.state as { from?: string } | null)?.from ?? '/escalations';
   const [activePanel, setActivePanel] = useState<ActivePanel>('none');
 
@@ -355,7 +359,7 @@ export function EscalationDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Escalation" backTo={returnPath} backLabel={returnPath === '/escalations/queue' ? 'My Queue' : 'Escalations'} />
+      <PageHeader title="Escalation" backTo={returnPath} backLabel={returnPath === '/escalations/queue' ? 'My Escalations' : 'Escalations'} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* ---- Left: Context ---- */}
@@ -477,7 +481,7 @@ export function EscalationDetailPage() {
                     onClick={() => setActivePanel('resolve')}
                     className="btn-primary text-sm w-full"
                   >
-                    Resolve
+                    {esc.workflow_type ? 'Resolve' : 'Acknowledge'}
                   </button>
                   {hasTargets && (
                     <button
@@ -498,13 +502,42 @@ export function EscalationDetailPage() {
 
               {/* Expanded panels */}
               {activePanel === 'resolve' && (
-                <ResolvePanel
-                  workflowType={esc.workflow_type}
-                  onResolve={handleResolve}
-                  onCancel={() => setActivePanel('none')}
-                  isPending={resolve.isPending}
-                  error={resolve.error as Error | null}
-                />
+                esc.workflow_type ? (
+                  <ResolvePanel
+                    workflowType={esc.workflow_type}
+                    resolverSchema={wfConfig?.resolver_schema ?? null}
+                    onResolve={handleResolve}
+                    onCancel={() => setActivePanel('none')}
+                    isPending={resolve.isPending}
+                    error={resolve.error as Error | null}
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    <SectionLabel>Acknowledge</SectionLabel>
+                    <p className="text-xs text-text-secondary leading-relaxed">
+                      This is a notification escalation — no workflow to re-run.
+                      Acknowledging marks it as resolved.
+                    </p>
+                    {resolve.error && (
+                      <p className="text-xs text-status-error">{(resolve.error as Error).message}</p>
+                    )}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleResolve({ acknowledged: true })}
+                        disabled={resolve.isPending}
+                        className="btn-primary text-xs flex-1"
+                      >
+                        {resolve.isPending ? 'Acknowledging...' : 'Acknowledge & Close'}
+                      </button>
+                      <button
+                        onClick={() => setActivePanel('none')}
+                        className="btn-secondary text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )
               )}
 
               {activePanel === 'escalate' && (

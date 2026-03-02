@@ -32,7 +32,7 @@ export function useEscalationStats() {
   return useQuery<EscalationStats>({
     queryKey: ['escalationStats'],
     queryFn: () => apiFetch('/escalations/stats'),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -94,7 +94,8 @@ export function useClaimEscalation() {
         body: JSON.stringify({ durationMinutes }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }
@@ -114,7 +115,10 @@ export function useResolveEscalation() {
         body: JSON.stringify({ resolverPayload }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['tasks'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'all' });
     },
   });
 }
@@ -128,7 +132,8 @@ export function useEscalateToRole() {
         body: JSON.stringify({ targetRole }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }
@@ -142,7 +147,8 @@ export function useSetEscalationPriority() {
         body: JSON.stringify({ ids, priority }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }
@@ -156,7 +162,8 @@ export function useBulkClaimEscalations() {
         body: JSON.stringify({ ids, durationMinutes }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }
@@ -178,7 +185,8 @@ export function useBulkAssignEscalations() {
         body: JSON.stringify({ ids, targetUserId, durationMinutes }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }
@@ -192,7 +200,8 @@ export function useBulkEscalateToRole() {
         body: JSON.stringify({ ids, targetRole }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }
@@ -206,7 +215,8 @@ export function useBulkTriageEscalations() {
         body: JSON.stringify({ ids, ...(hint ? { hint } : {}) }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
     },
   });
 }

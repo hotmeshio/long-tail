@@ -172,6 +172,23 @@ describe('start() declarative API', () => {
       const res = await fetch(`http://localhost:${SERVER_PORT}/api/tasks`);
       expect(res.status).toBe(401);
     });
+
+    it('should mount cron status route (401 without auth)', async () => {
+      const res = await fetch(`http://localhost:${SERVER_PORT}/api/workflows/cron/status`);
+      expect(res.status).toBe(401);
+    });
+
+    it('should return cron schedules with valid auth', async () => {
+      const { signToken } = await import('../modules/auth');
+      const token = signToken({ userId: 'test-admin', role: 'admin' });
+      const res = await fetch(`http://localhost:${SERVER_PORT}/api/workflows/cron/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body).toHaveProperty('schedules');
+      expect(Array.isArray(body.schedules)).toBe(true);
+    });
   });
 
   // ── Maintenance disabled ───────────────────────────────────────────────

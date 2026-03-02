@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
 import { Shell } from './components/layout/Shell';
@@ -10,6 +10,24 @@ import { RequireRole } from './components/layout/RequireRole';
 // ---------------------------------------------------------------------------
 // Lazy-loaded route sections
 // ---------------------------------------------------------------------------
+
+// Journey pages (all authenticated users)
+const JourneysOverview = lazy(() =>
+  import('./pages/journeys/JourneysOverview').then((m) => ({ default: m.JourneysOverview })),
+);
+const JourneysListPage = lazy(() =>
+  import('./pages/journeys/JourneysListPage').then((m) => ({ default: m.JourneysListPage })),
+);
+const JourneyDetailPage = lazy(() =>
+  import('./pages/journeys/JourneyDetailPage').then((m) => ({ default: m.JourneyDetailPage })),
+);
+// MCP pages (engineer, admin, or superadmin)
+const McpOverview = lazy(() =>
+  import('./pages/mcp/McpOverview').then((m) => ({ default: m.McpOverview })),
+);
+const McpToolsPage = lazy(() =>
+  import('./pages/mcp/McpToolsPage').then((m) => ({ default: m.McpToolsPage })),
+);
 
 // Escalation pages (all authenticated users)
 const EscalationsOverview = lazy(() =>
@@ -34,6 +52,9 @@ const WorkflowsDashboard = lazy(() =>
 );
 const StartWorkflowPage = lazy(() =>
   import('./pages/workflows/StartWorkflowPage').then((m) => ({ default: m.StartWorkflowPage })),
+);
+const CronWorkflowsPage = lazy(() =>
+  import('./pages/workflows/CronWorkflowsPage').then((m) => ({ default: m.CronWorkflowsPage })),
 );
 const TasksListPage = lazy(() =>
   import('./pages/admin/TasksListPage').then((m) => ({ default: m.TasksListPage })),
@@ -93,7 +114,11 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 10_000,
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry auth errors — apiFetch handles refresh internally
+        if (error instanceof Error && error.message === 'Session expired') return false;
+        return failureCount < 1;
+      },
     },
   },
 });
@@ -104,8 +129,12 @@ const router = createBrowserRouter([
     path: '/',
     element: <Shell />,
     children: [
-      // Default -> escalations front page
-      { index: true, element: <Navigate to="/escalations" replace /> },
+      // Default -> segments overview (home page)
+      { index: true, element: <Lazy><JourneysOverview /></Lazy> },
+
+      // Segments section (all authenticated users)
+      { path: 'segments', element: <Lazy><JourneysListPage /></Lazy> },
+      { path: 'segments/:originId', element: <Lazy><JourneyDetailPage /></Lazy> },
 
       // Escalation section (all authenticated users)
       { path: 'escalations', element: <Lazy><EscalationsOverview /></Lazy> },
@@ -123,6 +152,17 @@ const router = createBrowserRouter([
           { path: 'workflows/tasks/:id', element: <Lazy><TaskDetailPage /></Lazy> },
           { path: 'workflows/execution/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
+          { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
+        ],
+      },
+
+      // MCP section (engineer, admin, or superadmin)
+      {
+        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
+        children: [
+          { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
+          { path: 'mcp/tools', element: <Lazy><McpToolsPage /></Lazy> },
+          { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
         ],
       },
 
@@ -132,7 +172,6 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/config', element: <Lazy><WorkflowConfigsPage /></Lazy> },
-          { path: 'admin/mcp', element: <Lazy><McpServersPage /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
           { path: 'admin/escalation-chains', element: <Lazy><EscalationChainsPage /></Lazy> },
           { path: 'admin/user-roles', element: <Lazy><UserRolesPage /></Lazy> },

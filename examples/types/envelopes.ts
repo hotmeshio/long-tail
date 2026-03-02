@@ -24,6 +24,16 @@ export interface VerifyDocumentEnvelopeData {
   memberId?: string;
 }
 
+// ── kitchenSinkOrchestrator ──────────────────────────────────────
+
+/** Kitchen sink — showcases every Durable primitive. */
+export interface KitchenSinkEnvelopeData {
+  /** Name used in the greeting activity. */
+  name?: string;
+  /** 'full' pauses for human review; 'quick' auto-completes. */
+  mode?: 'full' | 'quick';
+}
+
 // ── Workflow envelope map ───────────────────────────────────────
 
 /** Map of invocable workflow type → its typed envelope data shape. */
@@ -31,6 +41,7 @@ export type WorkflowEnvelopeMap = {
   reviewContentOrchestrator: ReviewContentEnvelopeData;
   verifyDocumentOrchestrator: VerifyDocumentEnvelopeData;
   verifyDocumentMcpOrchestrator: VerifyDocumentEnvelopeData;
+  kitchenSinkOrchestrator: KitchenSinkEnvelopeData;
 };
 
 /** All invocable workflow type names. */
@@ -72,6 +83,13 @@ export const ENVELOPE_TEMPLATES: {
       documentUrl: 'https://example.com/doc.jpg',
       documentType: 'drivers_license',
       memberId: 'member-12345',
+    },
+    metadata: { source: 'dashboard' },
+  },
+  kitchenSinkOrchestrator: {
+    data: {
+      name: 'World',
+      mode: 'full',
     },
     metadata: { source: 'dashboard' },
   },

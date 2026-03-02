@@ -5,13 +5,12 @@ import {
   UserCog,
   Link,
   Settings,
-  Server,
   Wrench,
 } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 const entries: NavEntry[] = [
-  { to: '/admin', label: 'Overview', end: true, icon: LayoutDashboard },
+  { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
   {
     kind: 'group',
     label: 'RBAC',
@@ -24,7 +23,6 @@ const entries: NavEntry[] = [
     ],
   },
   { to: '/admin/config', label: 'Workflow Configs', icon: Settings },
-  { to: '/admin/mcp', label: 'MCP Servers', icon: Server },
   { to: '/admin/maintenance', label: 'Maintenance', icon: Wrench },
 ];
 

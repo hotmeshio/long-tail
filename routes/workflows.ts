@@ -7,10 +7,39 @@ import * as configService from '../services/config';
 import * as userService from '../services/user';
 import { requireAdmin } from '../modules/auth';
 import { ltConfig } from '../modules/ltconfig';
+import { cronRegistry } from '../services/cron';
 import { resolveHandle } from './resolve';
 import type { LTEnvelope } from '../types';
 
 const router = Router();
+
+// ── Cron status ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/workflows/cron/status
+ * List all cron-configured workflows and whether each is actively running.
+ */
+router.get('/cron/status', async (_req, res) => {
+  try {
+    const configs = await configService.listWorkflowConfigs();
+    const cronConfigs = configs.filter((c) => c.cron_schedule);
+    const activeTypes = cronRegistry.activeWorkflowTypes;
+
+    const schedules = cronConfigs.map((c) => ({
+      workflow_type: c.workflow_type,
+      cron_schedule: c.cron_schedule,
+      description: c.description,
+      task_queue: c.task_queue,
+      invocable: c.invocable,
+      active: activeTypes.includes(c.workflow_type),
+      envelope_schema: c.envelope_schema,
+    }));
+
+    res.json({ schedules });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── Workflow configuration ────────────────────────────────────────────────────
 
@@ -64,8 +93,13 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
       invocation_roles: req.body.invocation_roles ?? [],
       lifecycle: req.body.lifecycle ?? { onBefore: [], onAfter: [] },
       consumes: req.body.consumes ?? [],
+      envelope_schema: req.body.envelope_schema ?? null,
+      resolver_schema: req.body.resolver_schema ?? null,
+      cron_schedule: req.body.cron_schedule ?? null,
     });
     ltConfig.invalidate();
+    // Restart cron if schedule changed
+    await cronRegistry.restartCron(config);
     res.json(config);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

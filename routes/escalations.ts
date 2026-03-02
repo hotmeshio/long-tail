@@ -614,7 +614,14 @@ router.post('/:id/resolve', async (req, res) => {
       }
     }
 
-    // 4. Standard re-run: inject resolver data and start original workflow
+    // 4. If no workflow_type, this is a notification-only escalation — acknowledge and close
+    if (!escalation.workflow_type || !escalation.task_queue) {
+      await escalationService.resolveEscalation(escalation.id, resolverPayload);
+      res.json({ acknowledged: true, escalationId: escalation.id });
+      return;
+    }
+
+    // 5. Standard re-run: inject resolver data and start original workflow
     envelope.resolver = resolverPayload;
     envelope.lt = {
       ...envelope.lt,
@@ -625,9 +632,9 @@ router.post('/:id/resolve', async (req, res) => {
     const client = createClient();
 
     await client.workflow.start({
-      workflowName: escalation.workflow_type!,
+      workflowName: escalation.workflow_type,
       args: [envelope],
-      taskQueue: escalation.task_queue!,
+      taskQueue: escalation.task_queue,
       workflowId: newWorkflowId,
       expire: 180,
     });

@@ -14,7 +14,7 @@ export function AdminDashboard() {
 
   return (
     <div>
-      <PageHeader title="Admin Overview" />
+      <PageHeader title="Admin Dashboard" />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard

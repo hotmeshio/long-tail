@@ -15,8 +15,6 @@ import {
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
-import { PriorityBadge } from '../../components/common/PriorityBadge';
-import { TimeAgo } from '../../components/common/TimeAgo';
 import { StickyPagination } from '../../components/common/StickyPagination';
 import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { Modal } from '../../components/common/Modal';
@@ -25,6 +23,7 @@ import { BulkActionBar } from '../../components/common/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/BulkTriageModal';
 import { CLAIM_DURATION_OPTIONS } from '../../lib/constants';
+import { ESCALATION_COLUMNS, PRIORITY_OPTIONS } from './escalation-columns';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
@@ -209,47 +208,7 @@ export function AvailableEscalationsPage() {
   }
 
   columns.push(
-    {
-      key: 'type',
-      label: 'Type',
-      render: (row) => (
-        <div>
-          <p className="text-sm text-text-primary">{row.type}</p>
-          {row.subtype && (
-            <p className="text-xs text-text-tertiary">{row.subtype}</p>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'role',
-      label: 'Role',
-      render: (row) => (
-        <span className="px-2 py-0.5 text-[10px] bg-surface-sunken rounded-full text-text-secondary">
-          {row.role}
-        </span>
-      ),
-      className: 'w-32',
-    },
-    {
-      key: 'priority',
-      label: 'Priority',
-      render: (row) => <PriorityBadge priority={row.priority} />,
-      className: 'w-20',
-    },
-    {
-      key: 'workflow_type',
-      label: 'Workflow',
-      render: (row) => (
-        <span className="text-xs font-mono text-text-secondary">{row.workflow_type}</span>
-      ),
-    },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (row) => <TimeAgo date={row.created_at} />,
-      className: 'w-28',
-    },
+    ...ESCALATION_COLUMNS,
     {
       key: 'actions',
       label: '',
@@ -270,7 +229,7 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="Available Escalations" />
+      <PageHeader title="All Escalations" />
 
       <div className="mb-6">
         <FilterBar>
@@ -290,12 +249,7 @@ export function AvailableEscalationsPage() {
             label="Priority"
             value={filters.priority}
             onChange={(v) => setFilter('priority', v)}
-            options={[
-              { value: '1', label: 'P1' },
-              { value: '2', label: 'P2' },
-              { value: '3', label: 'P3' },
-              { value: '4', label: 'P4' },
-            ]}
+            options={PRIORITY_OPTIONS}
           />
         </FilterBar>
       </div>

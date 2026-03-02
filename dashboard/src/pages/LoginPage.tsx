@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
@@ -9,9 +9,13 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // After re-login, return to the page the user was on
+  const returnTo = (location.state as { from?: string })?.from ?? '/';
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -34,8 +38,8 @@ export function LoginPage() {
         setError(data.error || 'Login failed');
         return;
       }
-      login(data.token);
-      navigate('/');
+      login(data.token, { username: username.trim(), password });
+      navigate(returnTo, { replace: true });
     } catch {
       setError('Unable to connect to server');
     } finally {
@@ -55,6 +59,12 @@ export function LoginPage() {
             <p className="text-xs text-text-tertiary">Dashboard</p>
           </div>
         </div>
+
+        {returnTo !== '/' && (
+          <p className="text-xs text-status-warning mb-4">
+            Session expired — sign in to continue
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>

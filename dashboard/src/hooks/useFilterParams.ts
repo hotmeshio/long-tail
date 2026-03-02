@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 interface PaginationState {
@@ -40,6 +40,10 @@ export function useFilterParams<F extends Record<string, string> = Record<string
 
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Keep a stable ref to setSearchParams so downstream callbacks never change identity
+  const setSearchParamsRef = useRef(setSearchParams);
+  useEffect(() => { setSearchParamsRef.current = setSearchParams; });
+
   // ── Read current values from URL ──────────────────────────────────────────
 
   const filters = useMemo(() => {
@@ -58,7 +62,7 @@ export function useFilterParams<F extends Record<string, string> = Record<string
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
-      setSearchParams(
+      setSearchParamsRef.current(
         (prev) => {
           const next = new URLSearchParams(prev);
           for (const [k, v] of Object.entries(updates)) {
@@ -73,7 +77,7 @@ export function useFilterParams<F extends Record<string, string> = Record<string
         { replace: true },
       );
     },
-    [setSearchParams],
+    [],
   );
 
   // ── Filter setters (auto-reset page) ──────────────────────────────────────

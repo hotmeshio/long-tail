@@ -55,6 +55,12 @@ async function main() {
       port: config.PORT,
     },
     examples: true,
+    mcp: {
+      server: { enabled: true },
+    },
+    escalation: {
+      strategy: 'mcp',
+    },
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
     events: config.NATS_URL ? { nats: { url: config.NATS_URL } } : undefined,
   });

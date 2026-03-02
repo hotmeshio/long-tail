@@ -70,6 +70,24 @@ export function WorkflowConfigsPage() {
       className: 'w-24',
     },
     {
+      key: 'schemas',
+      label: 'Schemas',
+      render: (row) => (
+        <div className="flex gap-1 flex-wrap">
+          {row.envelope_schema && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-accent/10 text-accent rounded">env</span>
+          )}
+          {row.resolver_schema && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-accent/10 text-accent rounded">res</span>
+          )}
+          {row.cron_schedule && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-status-warning/10 text-status-warning rounded font-mono">{row.cron_schedule}</span>
+          )}
+        </div>
+      ),
+      className: 'w-32',
+    },
+    {
       key: 'default_role',
       label: 'Default Role',
       render: (row) => <span className="text-xs text-text-secondary">{row.default_role}</span>,

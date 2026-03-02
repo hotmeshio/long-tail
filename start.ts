@@ -16,6 +16,7 @@ import { eventRegistry } from './services/events';
 import { NatsEventAdapter } from './services/events/nats';
 import { maintenanceRegistry } from './services/maintenance';
 import { defaultMaintenanceConfig } from './modules/maintenance';
+import { cronRegistry } from './services/cron';
 import { mcpRegistry } from './services/mcp';
 import { BuiltInMcpAdapter } from './services/mcp/adapter';
 import { escalationStrategyRegistry } from './services/escalation-strategy';
@@ -187,6 +188,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       loggerRegistry.info('[long-tail] maintenance cron started');
     }
 
+    // Start workflow cron schedules
+    await cronRegistry.connect();
+
     // Connect MCP adapter
     if (mcpRegistry.hasAdapter) {
       await mcpRegistry.connect();
@@ -251,6 +255,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     }
     if (mcpRegistry.hasAdapter) {
       await mcpRegistry.disconnect();
+    }
+    if (cronRegistry.hasActiveCrons) {
+      await cronRegistry.disconnect();
     }
     if (maintenanceRegistry.hasConfig) {
       await maintenanceRegistry.disconnect();

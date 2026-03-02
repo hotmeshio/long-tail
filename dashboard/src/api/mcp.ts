@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { McpServerRecord } from './types';
+import type { McpServerRecord, McpToolManifest } from './types';
 
 interface McpServerListResponse {
   servers: McpServerRecord[];
@@ -99,5 +99,31 @@ export function useDisconnectMcpServer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mcpServers'] });
     },
+  });
+}
+
+export function useMcpTools(serverId: string) {
+  return useQuery<{ tools: McpToolManifest[] }>({
+    queryKey: ['mcpTools', serverId],
+    queryFn: () => apiFetch(`/mcp/servers/${serverId}/tools`),
+    enabled: !!serverId,
+  });
+}
+
+export function useCallMcpTool() {
+  return useMutation({
+    mutationFn: ({
+      serverId,
+      toolName,
+      arguments: args,
+    }: {
+      serverId: string;
+      toolName: string;
+      arguments: Record<string, unknown>;
+    }) =>
+      apiFetch(`/mcp/servers/${serverId}/tools/${toolName}/call`, {
+        method: 'POST',
+        body: JSON.stringify({ arguments: args }),
+      }),
   });
 }

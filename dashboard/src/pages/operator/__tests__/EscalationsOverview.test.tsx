@@ -34,7 +34,7 @@ describe('EscalationsOverview', () => {
     render(<EscalationsOverview />);
 
     // PageHeader
-    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(screen.getByText('Escalations Dashboard')).toBeInTheDocument();
 
     // Stat card labels (Claimed also appears as a table header)
     expect(screen.getByText('Open')).toBeInTheDocument();

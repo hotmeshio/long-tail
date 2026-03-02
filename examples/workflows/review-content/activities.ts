@@ -17,19 +17,24 @@ export async function analyzeContent(
 
   const flags: string[] = [];
   let confidence = 0.95;
+  const text = content ?? '';
 
   // Simple heuristic simulation
-  if (content.length < 10) {
+  if (text.length < 10) {
     flags.push('too_short');
     confidence -= 0.3;
   }
-  if (content.includes('REVIEW_ME')) {
+  if (text.includes('REVIEW_ME')) {
     flags.push('manual_review_requested');
     confidence = 0.1;
   }
-  if (content.includes('ERROR')) {
+  if (text.includes('ERROR')) {
     flags.push('error_detected');
     confidence -= 0.4;
+  }
+  if (text.includes('WRONG_LANGUAGE')) {
+    flags.push('wrong_language');
+    confidence = 0.15;
   }
 
   const approved = confidence > 0.85 && flags.length === 0;

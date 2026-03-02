@@ -18,6 +18,9 @@ export interface LTWorkflowConfig {
     onAfter: LTLifecycleHook[];
   };
   consumes: string[];
+  envelope_schema: Record<string, any> | null;
+  resolver_schema: Record<string, any> | null;
+  cron_schedule: string | null;
 }
 
 export interface LTLifecycleHook {
@@ -42,6 +45,9 @@ export interface LTResolvedConfig {
   onBefore: LTLifecycleHook[];
   onAfter: LTLifecycleHook[];
   consumes: string[];
+  envelopeSchema: Record<string, any> | null;
+  resolverSchema: Record<string, any> | null;
+  cronSchedule: string | null;
 }
 
 /**

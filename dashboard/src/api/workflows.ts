@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
+import type { CronScheduleEntry, LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
 
 export function useWorkflowConfigs() {
   return useQuery<LTWorkflowConfig[]>({
@@ -9,6 +9,17 @@ export function useWorkflowConfigs() {
       const res = await apiFetch<{ workflows: LTWorkflowConfig[] }>('/workflows/config');
       return res.workflows;
     },
+  });
+}
+
+export function useCronStatus() {
+  return useQuery<CronScheduleEntry[]>({
+    queryKey: ['cronStatus'],
+    queryFn: async () => {
+      const res = await apiFetch<{ schedules: CronScheduleEntry[] }>('/workflows/cron/status');
+      return res.schedules;
+    },
+    refetchInterval: 30_000,
   });
 }
 
@@ -54,8 +65,8 @@ export function useTerminateWorkflow() {
     mutationFn: (workflowId: string) =>
       apiFetch(`/workflows/${workflowId}/terminate`, { method: 'POST' }),
     onSuccess: (_data, workflowId) => {
-      queryClient.invalidateQueries({ queryKey: ['workflowExecution', workflowId] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['workflowExecution', workflowId], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'all' });
     },
   });
 }
@@ -78,6 +89,9 @@ export function useUpsertWorkflowConfig() {
       invocation_roles?: string[];
       lifecycle?: Record<string, unknown>;
       consumes?: string[];
+      envelope_schema?: Record<string, unknown> | null;
+      resolver_schema?: Record<string, unknown> | null;
+      cron_schedule?: string | null;
     }
   >({
     mutationFn: ({ workflow_type, ...body }) =>
@@ -86,7 +100,7 @@ export function useUpsertWorkflowConfig() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workflowConfigs'] });
+      queryClient.invalidateQueries({ queryKey: ['workflowConfigs'], refetchType: 'all' });
     },
   });
 }
@@ -99,7 +113,26 @@ export function useDeleteWorkflowConfig() {
         method: 'DELETE',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workflowConfigs'] });
+      queryClient.invalidateQueries({ queryKey: ['workflowConfigs'], refetchType: 'all' });
+    },
+  });
+}
+
+export function useSetCronSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    LTWorkflowConfig,
+    Error,
+    { config: LTWorkflowConfig; cron_schedule: string | null }
+  >({
+    mutationFn: ({ config, cron_schedule }) =>
+      apiFetch(`/workflows/${encodeURIComponent(config.workflow_type)}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...config, cron_schedule }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflowConfigs'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['cronStatus'], refetchType: 'all' });
     },
   });
 }
@@ -117,8 +150,8 @@ export function useInvokeWorkflow() {
         body: JSON.stringify({ data, metadata }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'all' });
     },
   });
 }

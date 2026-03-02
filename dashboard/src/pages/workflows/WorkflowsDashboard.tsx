@@ -53,9 +53,10 @@ export function WorkflowsDashboard() {
   const [searchInput, setSearchInput] = useState(filters.search);
 
   useEffect(() => {
+    if (searchInput === filters.search) return;
     const timer = setTimeout(() => setFilter('search', searchInput), 300);
     return () => clearTimeout(timer);
-  }, [searchInput, setFilter]);
+  }, [searchInput, setFilter, filters.search]);
 
   const { data: jobsData, isLoading } = useJobs({
     limit: pagination.pageSize,

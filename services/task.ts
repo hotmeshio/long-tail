@@ -138,6 +138,7 @@ export async function listTasks(filters: {
   workflow_type?: string;
   workflow_id?: string;
   parent_workflow_id?: string;
+  origin_id?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ tasks: LTTaskRecord[]; total: number }> {
@@ -165,6 +166,10 @@ export async function listTasks(filters: {
   if (filters.parent_workflow_id) {
     conditions.push(`parent_workflow_id = $${idx++}`);
     values.push(filters.parent_workflow_id);
+  }
+  if (filters.origin_id) {
+    conditions.push(`origin_id = $${idx++}`);
+    values.push(filters.origin_id);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -246,4 +251,84 @@ export async function resolveWorkflowHandle(
   throw new Error(
     `Cannot resolve workflow "${workflowId}" — no task record or job entity found`,
   );
+}
+
+// ── Journey queries ──────────────────────────────────────────────────────────
+
+export interface JourneySummary {
+  origin_id: string;
+  task_count: number;
+  completed: number;
+  escalated: number;
+  workflow_types: string[];
+  started_at: string;
+  last_activity: string;
+}
+
+export async function listJourneys(filters: {
+  limit?: number;
+  offset?: number;
+  workflow_type?: string;
+}): Promise<{ journeys: JourneySummary[]; total: number }> {
+  const pool = getPool();
+  const limit = filters.limit || 50;
+  const offset = filters.offset || 0;
+
+  const hasWf = !!filters.workflow_type;
+  const wfSubquery = `origin_id IN (
+    SELECT origin_id FROM lt_tasks WHERE origin_id IS NOT NULL AND workflow_type = $${hasWf ? 1 : 0}
+  )`;
+
+  const countParams: any[] = hasWf ? [filters.workflow_type] : [];
+  const countWhere = hasWf
+    ? `WHERE origin_id IS NOT NULL AND ${wfSubquery.replace('$1', '$1')}`
+    : `WHERE origin_id IS NOT NULL`;
+
+  const dataWhere = hasWf
+    ? `WHERE origin_id IS NOT NULL AND origin_id IN (
+         SELECT origin_id FROM lt_tasks WHERE origin_id IS NOT NULL AND workflow_type = $3
+       )`
+    : `WHERE origin_id IS NOT NULL`;
+  const dataParams: any[] = hasWf
+    ? [limit, offset, filters.workflow_type]
+    : [limit, offset];
+
+  const [countResult, dataResult] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(DISTINCT origin_id) FROM lt_tasks ${countWhere}`,
+      countParams,
+    ),
+    pool.query(
+      `SELECT
+         origin_id,
+         COUNT(*)::int AS task_count,
+         COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+         COUNT(*) FILTER (WHERE status = 'needs_intervention')::int AS escalated,
+         array_agg(DISTINCT workflow_type) AS workflow_types,
+         MIN(created_at) AS started_at,
+         MAX(COALESCE(completed_at, created_at)) AS last_activity
+       FROM lt_tasks
+       ${dataWhere}
+       GROUP BY origin_id
+       ORDER BY MAX(created_at) DESC
+       LIMIT $1 OFFSET $2`,
+      dataParams,
+    ),
+  ]);
+
+  return {
+    journeys: dataResult.rows,
+    total: parseInt(countResult.rows[0].count, 10),
+  };
+}
+
+export async function getJourneyTasks(
+  originId: string,
+): Promise<LTTaskRecord[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    'SELECT * FROM lt_tasks WHERE origin_id = $1 ORDER BY created_at ASC',
+    [originId],
+  );
+  return rows;
 }

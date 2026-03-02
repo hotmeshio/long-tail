@@ -1,10 +1,12 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
+import { JourneysSidebar } from './JourneysSidebar';
 import { AdminSidebar } from './AdminSidebar';
 import { EngineerSidebar } from './EngineerSidebar';
+import { McpSidebar } from './McpSidebar';
 import { OperatorSidebar } from './OperatorSidebar';
 
 function ShellLayout() {
@@ -26,8 +28,10 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto overflow-x-hidden">
+            <JourneysSidebar />
             <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
 
@@ -60,9 +64,10 @@ function ShellLayout() {
 
 export function Shell() {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
   return (

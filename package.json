@@ -26,6 +26,8 @@
     "test:mcp:triage": "vitest run tests/workflows/mcp-triage.test.ts",
     "test:mcp:vision": "vitest run tests/workflows/verify-document-mcp.test.ts",
     "token": "ts-node scripts/token.ts",
+    "journey": "tsx scripts/journey.ts",
+    "demo": "bash scripts/demo.sh",
     "dashboard:install": "cd dashboard && npm install",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",

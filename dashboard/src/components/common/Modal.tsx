@@ -5,9 +5,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  maxWidth?: string;
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, maxWidth }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -27,8 +28,8 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         onClick={onClose}
       />
       {/* Dialog */}
-      <div className="relative bg-surface-raised border border-surface-border rounded-lg shadow-xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+      <div className={`relative bg-surface-raised border border-surface-border rounded-lg shadow-xl w-full ${maxWidth ?? 'max-w-md'} mx-4 max-h-[85vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <h2 className="text-sm font-medium text-text-primary">{title}</h2>
           <button
             onClick={onClose}
@@ -37,7 +38,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             &times;
           </button>
         </div>
-        <div className="px-6 py-4">{children}</div>
+        <div className="px-6 py-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

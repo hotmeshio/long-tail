@@ -1,28 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { getResolverTemplate } from '../../../lib/templates';
 
 interface ResolveModalProps {
   open: boolean;
   onClose: () => void;
   workflowType: string | null;
+  resolverSchema: Record<string, unknown> | null;
   onResolve: (payload: Record<string, unknown>) => void;
   isPending: boolean;
   error?: Error | null;
 }
 
-export function ResolveModal({ open, onClose, workflowType, onResolve, isPending, error }: ResolveModalProps) {
+export function ResolveModal({ open, onClose, workflowType, resolverSchema, onResolve, isPending, error }: ResolveModalProps) {
   const [resolverJson, setResolverJson] = useState('{}');
   const [resolveError, setResolveError] = useState('');
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageHint, setTriageHint] = useState('');
 
-  // Pre-fill resolver JSON when workflow type is available
+  // Pre-fill resolver JSON from workflow config's resolver_schema
   useEffect(() => {
-    if (workflowType) {
-      setResolverJson(getResolverTemplate(workflowType));
-    }
-  }, [workflowType]);
+    setResolverJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
+  }, [resolverSchema]);
 
   const handleResolve = () => {
     setResolveError('');

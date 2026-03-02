@@ -11,6 +11,25 @@ export interface LTWorkflowConfig {
   invocation_roles: string[];
   lifecycle: Record<string, unknown>;
   consumes: string[];
+  envelope_schema: Record<string, unknown> | null;
+  resolver_schema: Record<string, unknown> | null;
+  cron_schedule: string | null;
+}
+
+export interface CronScheduleEntry {
+  workflow_type: string;
+  cron_schedule: string;
+  description: string | null;
+  task_queue: string;
+  invocable: boolean;
+  active: boolean;
+  envelope_schema: Record<string, unknown> | null;
+}
+
+export interface McpToolManifest {
+  name: string;
+  description: string;
+  inputSchema: Record<string, any>;
 }
 
 export interface McpServerRecord {
@@ -21,7 +40,7 @@ export interface McpServerRecord {
   transport_config: Record<string, unknown>;
   auto_connect: boolean;
   status: 'registered' | 'connected' | 'error' | 'disconnected';
-  tool_manifest: Record<string, unknown> | null;
+  tool_manifest: McpToolManifest[] | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;

@@ -1,13 +1,14 @@
 import { Router } from 'express';
 
 import * as taskService from '../services/task';
+import * as escalationService from '../services/escalation';
 
 const router = Router();
 
 /**
  * GET /api/tasks
  * List tasks with optional filters.
- * Query: ?status=completed&workflow_type=reviewContent&workflow_id=abc&lt_type=...&limit=50&offset=0
+ * Query: ?status=completed&workflow_type=reviewContent&workflow_id=abc&lt_type=...&origin_id=...&limit=50&offset=0
  */
 router.get('/', async (req, res) => {
   try {
@@ -17,10 +18,48 @@ router.get('/', async (req, res) => {
       workflow_type: req.query.workflow_type as string,
       workflow_id: req.query.workflow_id as string,
       parent_workflow_id: req.query.parent_workflow_id as string,
+      origin_id: req.query.origin_id as string,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });
     res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/tasks/journeys
+ * List distinct origin_id values with summary stats.
+ */
+router.get('/journeys', async (req, res) => {
+  try {
+    const result = await taskService.listJourneys({
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+      offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+      workflow_type: (req.query.workflow_type as string) || undefined,
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/tasks/journeys/:originId
+ * Get all tasks and escalations for a journey (origin_id).
+ */
+router.get('/journeys/:originId', async (req, res) => {
+  try {
+    const [tasks, escalations] = await Promise.all([
+      taskService.getJourneyTasks(req.params.originId),
+      escalationService.getEscalationsByOriginId(req.params.originId),
+    ]);
+    res.json({
+      origin_id: req.params.originId,
+      tasks,
+      escalations,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
