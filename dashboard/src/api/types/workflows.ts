@@ -59,6 +59,14 @@ export interface WorkflowExecutionEvent {
     result?: unknown;
     timeline_key?: string;
     execution_index?: number;
+    signal_name?: string;
+    input?: unknown;
+    child_workflow_id?: string;
+    awaited?: boolean;
+    wait_event_id?: number;
+    scheduled_event_id?: number;
+    initiated_event_id?: number;
+    failure?: unknown;
     [key: string]: unknown;
   };
 }

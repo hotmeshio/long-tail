@@ -86,18 +86,18 @@ async function seedUsers(): Promise<void> {
   }
 }
 
-// ── Seed journeys ────────────────────────────────────────────────────────────
+// ── Seed processes ───────────────────────────────────────────────────────────
 //
-// Three deterministic journeys that tell the LongTail story:
+// Three deterministic processes that tell the LongTail story:
 //
-// Journey 1 — "Clean Review"
+// Process 1 — "Clean Review"
 //   Content passes AI analysis. Auto-approved. The happy path.
 //
-// Journey 2 — "Flagged for Review"
+// Process 2 — "Flagged for Review"
 //   Content triggers REVIEW_ME flag. AI escalates to reviewer role.
 //   Instruction: Log in as `reviewer` and approve the content.
 //
-// Journey 3 — "Wrong Language → Durable MCP"
+// Process 3 — "Wrong Language → Durable MCP"
 //   Content arrives in Spanish with WRONG_LANGUAGE marker.
 //   AI flags it with low confidence (0.15) → escalates to reviewer.
 //   Instruction chain:
@@ -114,65 +114,65 @@ const SEED_ENVELOPES: Array<{
   envelope: LTEnvelope;
   label: string;
 }> = [
-  // ── Journey 1: Clean Review ──────────────────────────────────────
+  // ── Process 1: Clean Review ─────────────────────────────────────
   {
-    label: 'Journey 1 — Clean Review',
+    label: 'Process 1 — Clean Review',
     workflowName: 'reviewContentOrchestrator',
     taskQueue: 'lt-review-orch',
     envelope: {
       data: {
-        contentId: 'journey-clean-001',
+        contentId: 'process-clean-001',
         content: 'This is a well-researched article about renewable energy solutions for urban environments. It covers solar panels, wind turbines, and energy storage with thorough citations and balanced analysis.',
         contentType: 'article',
       } satisfies ReviewContentEnvelopeData,
       metadata: {
         source: 'seed',
-        journey: 'clean-review',
+        process: 'clean-review',
         description: 'Happy path — AI auto-approves high-quality content',
       },
     },
   },
 
-  // ── Journey 2: Flagged for Review ────────────────────────────────
+  // ── Process 2: Flagged for Review ───────────────────────────────
   {
-    label: 'Journey 2 — Flagged for Review',
+    label: 'Process 2 — Flagged for Review',
     workflowName: 'reviewContentOrchestrator',
     taskQueue: 'lt-review-orch',
     envelope: {
       data: {
-        contentId: 'journey-flagged-001',
+        contentId: 'process-flagged-001',
         content: 'REVIEW_ME This user-submitted blog post discusses alternative medicine claims without citing peer-reviewed sources. The AI flagged it for human review.',
         contentType: 'blog_post',
       } satisfies ReviewContentEnvelopeData,
       metadata: {
         source: 'seed',
-        journey: 'flagged-review',
+        process: 'flagged-review',
         description: 'AI flags content for human review. Log in as reviewer (reviewer/reviewer123) and approve or reject.',
       },
     },
   },
 
-  // ── Journey 3: Wrong Language → Durable MCP ────────────────────
+  // ── Process 3: Wrong Language → Durable MCP ────────────────────
   {
-    label: 'Journey 3 — Wrong Language',
+    label: 'Process 3 — Wrong Language',
     workflowName: 'reviewContentOrchestrator',
     taskQueue: 'lt-review-orch',
     envelope: {
       data: {
-        contentId: 'journey-language-001',
+        contentId: 'process-language-001',
         content: 'WRONG_LANGUAGE La energía renovable es el futuro de las ciudades sostenibles. Los paneles solares y las turbinas eólicas pueden reducir significativamente la huella de carbono urbana cuando se combinan con sistemas modernos de almacenamiento de energía.',
         contentType: 'article',
       } satisfies ReviewContentEnvelopeData,
       metadata: {
         source: 'seed',
-        journey: 'wrong-language',
+        process: 'wrong-language',
         description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" with hint "wrong_language". The MCP orchestrator translates the content, re-runs the workflow, and recommends adding language detection to the pipeline.',
       },
     },
   },
 ];
 
-// Escalation chains required for the Journey 3 story:
+// Escalation chains required for the Process 3 story:
 //   reviewer → admin → engineer (and cross-links for flexibility)
 const SEED_CHAINS = [
   ['reviewer', 'admin'],

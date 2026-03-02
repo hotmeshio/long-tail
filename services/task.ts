@@ -253,9 +253,9 @@ export async function resolveWorkflowHandle(
   );
 }
 
-// ── Journey queries ──────────────────────────────────────────────────────────
+// ── Process queries ──────────────────────────────────────────────────────────
 
-export interface JourneySummary {
+export interface ProcessSummary {
   origin_id: string;
   task_count: number;
   completed: number;
@@ -265,11 +265,11 @@ export interface JourneySummary {
   last_activity: string;
 }
 
-export async function listJourneys(filters: {
+export async function listProcesses(filters: {
   limit?: number;
   offset?: number;
   workflow_type?: string;
-}): Promise<{ journeys: JourneySummary[]; total: number }> {
+}): Promise<{ processes: ProcessSummary[]; total: number }> {
   const pool = getPool();
   const limit = filters.limit || 50;
   const offset = filters.offset || 0;
@@ -317,12 +317,12 @@ export async function listJourneys(filters: {
   ]);
 
   return {
-    journeys: dataResult.rows,
+    processes: dataResult.rows,
     total: parseInt(countResult.rows[0].count, 10),
   };
 }
 
-export async function getJourneyTasks(
+export async function getProcessTasks(
   originId: string,
 ): Promise<LTTaskRecord[]> {
   const pool = getPool();

@@ -16,9 +16,9 @@ interface TaskFilters {
   offset?: number;
 }
 
-// ── Journey types ──────────────────────────────────────────────────
+// ── Process types ─────────────────────────────────────────────────
 
-export interface JourneySummary {
+export interface ProcessSummary {
   origin_id: string;
   task_count: number;
   completed: number;
@@ -28,12 +28,12 @@ export interface JourneySummary {
   last_activity: string;
 }
 
-interface JourneyListResponse {
-  journeys: JourneySummary[];
+interface ProcessListResponse {
+  processes: ProcessSummary[];
   total: number;
 }
 
-export interface JourneyDetail {
+export interface ProcessDetail {
   origin_id: string;
   tasks: LTTaskRecord[];
   escalations: LTEscalationRecord[];
@@ -99,25 +99,25 @@ export function useTaskByWorkflowId(workflowId: string) {
   });
 }
 
-// ── Journey hooks ──────────────────────────────────────────────────
+// ── Process hooks ─────────────────────────────────────────────────
 
-export function useJourneys(filters?: { limit?: number; offset?: number; workflow_type?: string }) {
+export function useProcesses(filters?: { limit?: number; offset?: number; workflow_type?: string }) {
   const params = new URLSearchParams();
   if (filters?.limit) params.set('limit', String(filters.limit));
   if (filters?.offset !== undefined) params.set('offset', String(filters.offset));
   if (filters?.workflow_type) params.set('workflow_type', filters.workflow_type);
 
-  return useQuery<JourneyListResponse>({
-    queryKey: ['journeys', filters],
-    queryFn: () => apiFetch(`/tasks/journeys?${params}`),
+  return useQuery<ProcessListResponse>({
+    queryKey: ['processes', filters],
+    queryFn: () => apiFetch(`/tasks/processes?${params}`),
     refetchInterval: 30_000,
   });
 }
 
-export function useJourneyDetail(originId: string) {
-  return useQuery<JourneyDetail>({
-    queryKey: ['journeys', originId],
-    queryFn: () => apiFetch(`/tasks/journeys/${encodeURIComponent(originId)}`),
+export function useProcessDetail(originId: string) {
+  return useQuery<ProcessDetail>({
+    queryKey: ['processes', originId],
+    queryFn: () => apiFetch(`/tasks/processes/${encodeURIComponent(originId)}`),
     enabled: !!originId,
   });
 }

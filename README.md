@@ -76,7 +76,7 @@ Once the container is healthy (~10 seconds), open the dashboard at [http://local
 | `engineer` | `engineer123` | engineer |
 | `reviewer` | `reviewer123` | reviewer |
 
-### Seeded segments
+### Seeded processes
 
 Three workflows run automatically on startup to populate the dashboard:
 

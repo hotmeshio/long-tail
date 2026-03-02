@@ -7,6 +7,8 @@ import { formatDuration, formatDateTime } from './utils';
 interface EventDetailPanelProps {
   event: WorkflowExecutionEvent;
   childTask?: LTTaskRecord;
+  /** When true, show a "Pending" badge. Caller determines this from the full event list. */
+  pending?: boolean;
   onClose?: () => void;
 }
 
@@ -24,21 +26,34 @@ function safeParseJson(raw: string | null | undefined): unknown {
  * Renders inline wherever placed — used by both SwimlaneTimeline
  * (below the lane row) and EventTable (below the event row).
  *
- * When a child task is matched, shows the input envelope and
- * output data from the task record (since HotMesh's event export
- * only stores activity results, not inputs).
+ * Shows rich detail for all event categories:
+ * - Activities: activity_type, result, scheduled_event_id
+ * - Signals: signal_name, payload, wait_event_id
+ * - Timers: duration
+ * - Child workflows: child_workflow_id link, awaited badge, result
  */
-export function EventDetailPanel({ event, childTask, onClose }: EventDetailPanelProps) {
+export function EventDetailPanel({ event, childTask, pending = false, onClose }: EventDetailPanelProps) {
   const childInput = childTask ? safeParseJson(childTask.envelope) : null;
   const childOutput = childTask ? safeParseJson(childTask.data) : null;
 
   return (
     <div className="p-4 bg-surface-sunken rounded-md space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="font-mono font-medium text-sm text-text-primary">
-          {event.attributes.activity_type ?? event.event_type}
-        </p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <p className="font-mono font-medium text-sm text-text-primary">
+            {event.attributes.activity_type
+              ?? event.attributes.signal_name
+              ?? event.attributes.child_workflow_id
+              ?? event.event_type}
+          </p>
+          {pending && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-status-warning/15 text-status-warning">
+              <span className="w-1.5 h-1.5 rounded-full bg-status-warning animate-pulse" />
+              Pending
+            </span>
+          )}
+        </div>
         {onClose && (
           <button
             onClick={onClose}
@@ -87,9 +102,107 @@ export function EventDetailPanel({ event, childTask, onClose }: EventDetailPanel
             {new Date(event.event_time).toLocaleString()}
           </p>
         </div>
+
+        {/* Signal-specific: signal name */}
+        {event.attributes.signal_name && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Signal
+            </p>
+            <p className="text-xs font-mono text-text-primary">
+              {event.attributes.signal_name}
+            </p>
+          </div>
+        )}
+
+        {/* Child workflow: awaited badge */}
+        {event.attributes.awaited !== undefined && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Awaited
+            </p>
+            <p className="text-xs font-mono text-text-primary">
+              {event.attributes.awaited ? 'Yes' : 'No (fire-and-forget)'}
+            </p>
+          </div>
+        )}
+
+        {/* Timeline key */}
+        {event.attributes.timeline_key && (
+          <div className="col-span-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Timeline Key
+            </p>
+            <p className="text-xs font-mono text-text-primary truncate" title={event.attributes.timeline_key}>
+              {event.attributes.timeline_key}
+            </p>
+          </div>
+        )}
+
+        {/* Execution index */}
+        {event.attributes.execution_index !== undefined && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Exec Index
+            </p>
+            <p className="text-xs font-mono text-text-primary">
+              {event.attributes.execution_index}
+            </p>
+          </div>
+        )}
+
+        {/* Back-references */}
+        {event.attributes.scheduled_event_id != null && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Scheduled Event
+            </p>
+            <p className="text-xs font-mono text-text-primary">
+              #{event.attributes.scheduled_event_id}
+            </p>
+          </div>
+        )}
+        {event.attributes.wait_event_id != null && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Wait Started
+            </p>
+            <p className="text-xs font-mono text-text-primary">
+              Event #{event.attributes.wait_event_id}
+            </p>
+          </div>
+        )}
+        {event.attributes.initiated_event_id != null && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Initiated Event
+            </p>
+            <p className="text-xs font-mono text-text-primary">
+              #{event.attributes.initiated_event_id}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Child workflow section */}
+      {/* Child workflow link — from event attributes (no matching task record) */}
+      {!childTask && event.attributes.child_workflow_id && (
+        <div className="border-t border-surface-border pt-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              Child Workflow
+            </span>
+            <Link
+              to={`/workflows/execution/${event.attributes.child_workflow_id}`}
+              className="text-xs font-mono text-accent hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {event.attributes.child_workflow_id}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Child workflow section — from matched task record */}
       {childTask && (
         <div className="space-y-3 border-t border-surface-border pt-3">
           {/* Child link + status */}
@@ -124,12 +237,22 @@ export function EventDetailPanel({ event, childTask, onClose }: EventDetailPanel
         </div>
       )}
 
+      {/* Signal payload */}
+      {event.attributes.input !== undefined && (
+        <JsonViewer data={event.attributes.input} label="Signal Payload" />
+      )}
+
+      {/* Failure detail */}
+      {event.attributes.failure !== undefined && (
+        <JsonViewer data={event.attributes.failure} label="Failure" />
+      )}
+
       {/* Activity result (from HotMesh event — for non-child activities) */}
       {!childTask && event.attributes.result !== undefined && (
         <JsonViewer data={event.attributes.result} label="Result" />
       )}
 
-      {/* Remaining attributes (exclude the fields shown in the grid) */}
+      {/* Remaining attributes (exclude the fields shown above) */}
       {(() => {
         const {
           kind,
@@ -137,6 +260,14 @@ export function EventDetailPanel({ event, childTask, onClose }: EventDetailPanel
           result,
           timeline_key,
           execution_index,
+          signal_name,
+          input,
+          child_workflow_id,
+          awaited,
+          wait_event_id,
+          scheduled_event_id,
+          initiated_event_id,
+          failure,
           ...rest
         } = event.attributes;
         return Object.keys(rest).length > 0 ? (

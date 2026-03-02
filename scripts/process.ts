@@ -1,7 +1,7 @@
 /**
- * End-to-end journey runner for Long Tail examples.
+ * End-to-end process runner for Long Tail examples.
  *
- * Walks Journey 3 ("Wrong Language → Durable MCP") through the full
+ * Walks Process 3 ("Wrong Language → Durable MCP") through the full
  * escalation chain and MCP triage cycle:
  *
  *   1. Wait for server + seeded escalation
@@ -12,8 +12,8 @@
  *   6. Verify: original workflow completed, engineering escalation created
  *
  * Usage:
- *   npx tsx scripts/journey.ts
- *   npx tsx scripts/journey.ts --base http://localhost:3000
+ *   npx tsx scripts/process.ts
+ *   npx tsx scripts/process.ts --base http://localhost:3000
  */
 
 const BASE = process.argv.includes('--base')
@@ -79,7 +79,7 @@ async function poll<T>(
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log('\n  Long Tail — Journey Runner');
+  console.log('\n  Long Tail — Process Runner');
   console.log('  ═════════════════════════════════════════════════════════════\n');
   console.log(`  Server: ${BASE}`);
 
@@ -106,12 +106,12 @@ async function run() {
   const engineerToken = await login('engineer', 'engineer123');
   log('engineer', 'Logged in');
 
-  // ── 2. Wait for Journey 3 escalation to appear ──────────────────────────
+  // ── 2. Wait for Process 3 escalation to appear ──────────────────────────
 
-  header('Journey 3 — Wrong Language');
+  header('Process 3 — Wrong Language');
   log('system', 'Waiting for escalation (wrong_language content) ...');
 
-  const escalation: any = await poll('journey-3 escalation', async () => {
+  const escalation: any = await poll('process-3 escalation', async () => {
     const { escalations } = await api(
       'GET',
       '/escalations/available?role=reviewer&limit=50',
@@ -212,9 +212,9 @@ async function run() {
   header('MCP Triage — Remediation');
   log('system', 'Waiting for triage workflow to translate and re-run ...');
 
-  // Poll the journey to see new tasks appear (triage + re-run)
-  const journeyResult: any = await poll('triage completion', async () => {
-    const detail = await api('GET', `/tasks/journeys/${encodeURIComponent(originId)}`, engineerToken);
+  // Poll the process to see new tasks appear (triage + re-run)
+  const processResult: any = await poll('triage completion', async () => {
+    const detail = await api('GET', `/tasks/processes/${encodeURIComponent(originId)}`, engineerToken);
     const tasks = detail.tasks || [];
     // Look for a completed reviewContent re-run (from triage)
     const triageTask = tasks.find((t: any) =>
@@ -229,7 +229,7 @@ async function run() {
     return null;
   }, 45_000, 2_000);
 
-  const tasks = journeyResult.tasks || [];
+  const tasks = processResult.tasks || [];
   const triageTask = tasks.find((t: any) => t.workflow_type?.includes('mcpTriage'));
   const rerunTask = tasks.find((t: any) =>
     t.workflow_type === 'reviewContent' &&
@@ -275,12 +275,12 @@ async function run() {
 
   // Summary
   const allTasks = tasks;
-  const escalations = journeyResult.escalations || [];
+  const escalations = processResult.escalations || [];
 
-  log('verify', `Journey tasks: ${allTasks.length}`);
-  log('verify', `Journey escalations: ${escalations.length}`);
+  log('verify', `Process tasks: ${allTasks.length}`);
+  log('verify', `Process escalations: ${escalations.length}`);
 
-  header('Journey Complete');
+  header('Process Complete');
   console.log('  The full Durable MCP cycle:');
   console.log('');
   console.log('    Content arrived in Spanish');

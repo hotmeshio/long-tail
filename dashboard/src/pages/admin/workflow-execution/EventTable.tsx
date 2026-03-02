@@ -10,6 +10,38 @@ interface EventTableProps {
   childTasks?: LTTaskRecord[];
 }
 
+/** Event types that represent the "start" phase of a paired operation */
+const STARTED_TYPES = new Set([
+  'activity_task_scheduled',
+  'timer_started',
+  'child_workflow_execution_started',
+  'signal_wait_started',
+]);
+
+/** Completion event types that close a paired operation */
+const COMPLETED_TYPES = new Set([
+  'activity_task_completed',
+  'activity_task_failed',
+  'timer_fired',
+  'child_workflow_execution_completed',
+  'child_workflow_execution_failed',
+  'workflow_execution_signaled',
+]);
+
+/**
+ * Build a set of timeline_keys that have a matching completion event.
+ * A "scheduled" event is only truly pending if no completion exists.
+ */
+function buildCompletedKeys(events: WorkflowExecutionEvent[]): Set<string> {
+  const keys = new Set<string>();
+  for (const e of events) {
+    if (COMPLETED_TYPES.has(e.event_type) && e.attributes.timeline_key) {
+      keys.add(e.attributes.timeline_key);
+    }
+  }
+  return keys;
+}
+
 export function EventTable({ events, childTasks }: EventTableProps) {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -18,6 +50,16 @@ export function EventTable({ events, childTasks }: EventTableProps) {
 
   const categories = [...new Set(events.map((e) => e.category))].sort();
   const eventTypes = [...new Set(events.map((e) => e.event_type))].sort();
+  const completedKeys = buildCompletedKeys(events);
+
+  /** True only when a "started/scheduled" event has no matching completion */
+  const isPending = (evt: WorkflowExecutionEvent): boolean => {
+    if (evt.duration_ms !== null) return false;
+    if (!STARTED_TYPES.has(evt.event_type)) return false;
+    const tlk = evt.attributes.timeline_key;
+    if (tlk && completedKeys.has(tlk)) return false;
+    return true;
+  };
 
   let filtered = events;
   if (categoryFilter) filtered = filtered.filter((e) => e.category === categoryFilter);
@@ -35,9 +77,28 @@ export function EventTable({ events, childTasks }: EventTableProps) {
         return 'bg-status-active';
       case 'timer':
         return 'bg-status-warning';
+      case 'child_workflow':
+        return 'bg-purple-500';
       default:
         return 'bg-text-tertiary';
     }
+  };
+
+  /** Build a descriptive label for an event row */
+  const eventLabel = (evt: WorkflowExecutionEvent): string => {
+    const base = evt.event_type;
+    if (evt.attributes.activity_type) {
+      return `${base} — ${evt.attributes.activity_type}`;
+    }
+    if (evt.attributes.signal_name) {
+      return `${base} — ${evt.attributes.signal_name}`;
+    }
+    if (evt.attributes.child_workflow_id) {
+      const id = evt.attributes.child_workflow_id;
+      const truncated = id.length > 24 ? `${id.slice(0, 24)}...` : id;
+      return `${base} — ${truncated}`;
+    }
+    return base;
   };
 
   /** Find a matching child task for an event's activity_type */
@@ -110,6 +171,7 @@ export function EventTable({ events, childTasks }: EventTableProps) {
         ) : (
           filtered.map((evt) => {
             const isExpanded = expandedEvents.has(evt.event_id);
+            const pending = isPending(evt);
 
             return (
               <div
@@ -135,12 +197,19 @@ export function EventTable({ events, childTasks }: EventTableProps) {
                     className={`w-2 h-2 rounded-full shrink-0 ${categoryDot(evt.category)}`}
                   />
                   <span className="text-sm text-text-primary flex-1 truncate">
-                    {evt.attributes.activity_type
-                      ? `${evt.event_type} — ${evt.attributes.activity_type}`
-                      : evt.event_type}
+                    {eventLabel(evt)}
                   </span>
                   <span className="text-xs font-mono text-text-tertiary shrink-0">
-                    {evt.duration_ms !== null ? formatDuration(evt.duration_ms) : '--'}
+                    {pending ? (
+                      <span className="inline-flex items-center gap-1 text-status-warning">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-warning animate-pulse" />
+                        Pending
+                      </span>
+                    ) : evt.duration_ms !== null ? (
+                      formatDuration(evt.duration_ms)
+                    ) : (
+                      '--'
+                    )}
                   </span>
                   <time className="text-[10px] font-mono text-text-tertiary shrink-0">
                     {new Date(evt.event_time).toLocaleTimeString()}
@@ -153,6 +222,7 @@ export function EventTable({ events, childTasks }: EventTableProps) {
                     <EventDetailPanel
                       event={evt}
                       childTask={findChildTask(evt)}
+                      pending={pending}
                       onClose={() => toggleEvent(evt.event_id)}
                     />
                   </div>

@@ -3,16 +3,16 @@ import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 vi.mock('../../../api/tasks', () => ({
-  useJourneys: vi.fn(),
+  useProcesses: vi.fn(),
 }));
 
-import { JourneysOverview } from '../JourneysOverview';
-import { useJourneys } from '../../../api/tasks';
+import { ProcessesOverview } from '../ProcessesOverview';
+import { useProcesses } from '../../../api/tasks';
 
-const mockJourneys = {
-  journeys: [
+const mockProcesses = {
+  processes: [
     {
-      origin_id: 'journey-001',
+      origin_id: 'process-001',
       task_count: 3,
       completed: 2,
       escalated: 1,
@@ -21,7 +21,7 @@ const mockJourneys = {
       last_activity: '2026-01-15T11:30:00Z',
     },
     {
-      origin_id: 'journey-002',
+      origin_id: 'process-002',
       task_count: 1,
       completed: 1,
       escalated: 0,
@@ -37,21 +37,21 @@ function renderWithRouter(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
 }
 
-describe('JourneysOverview', () => {
+describe('ProcessesOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders stat cards with data', () => {
-    vi.mocked(useJourneys).mockReturnValue({
-      data: mockJourneys,
+    vi.mocked(useProcesses).mockReturnValue({
+      data: mockProcesses,
       isLoading: false,
     } as any);
 
-    renderWithRouter(<JourneysOverview />);
+    renderWithRouter(<ProcessesOverview />);
 
-    expect(screen.getByText('Segments Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Total Segments')).toBeInTheDocument();
+    expect(screen.getByText('Business Processes')).toBeInTheDocument();
+    expect(screen.getByText('Total Processes')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('Escalated')).toBeInTheDocument();
@@ -59,26 +59,26 @@ describe('JourneysOverview', () => {
   });
 
   it('renders dash placeholders when loading', () => {
-    vi.mocked(useJourneys).mockReturnValue({
+    vi.mocked(useProcesses).mockReturnValue({
       data: undefined,
       isLoading: true,
     } as any);
 
-    renderWithRouter(<JourneysOverview />);
+    renderWithRouter(<ProcessesOverview />);
 
     const dashes = screen.getAllByText('—');
     expect(dashes).toHaveLength(4);
   });
 
   it('renders all four stat cards', () => {
-    vi.mocked(useJourneys).mockReturnValue({
-      data: mockJourneys,
+    vi.mocked(useProcesses).mockReturnValue({
+      data: mockProcesses,
       isLoading: false,
     } as any);
 
-    renderWithRouter(<JourneysOverview />);
+    renderWithRouter(<ProcessesOverview />);
 
-    expect(screen.getByText('Total Segments')).toBeInTheDocument();
+    expect(screen.getByText('Total Processes')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('Escalated')).toBeInTheDocument();
