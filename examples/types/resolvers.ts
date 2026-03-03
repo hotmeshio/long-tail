@@ -33,6 +33,19 @@ export interface ReviewContentResolverPayload extends BaseResolverPayload {
   };
 }
 
+// ── processClaim ────────────────────────────────────────────────
+
+/** Resolver payload when a reviewer resolves a claim escalation. */
+export interface ProcessClaimResolverPayload extends BaseResolverPayload {
+  approved?: boolean;
+  status?: string;
+  analysis?: {
+    confidence: number;
+    flags: string[];
+    summary: string;
+  };
+}
+
 // ── verifyDocument / verifyDocumentMcp ──────────────────────────
 
 /** Resolver payload when a reviewer resolves a document escalation. */

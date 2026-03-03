@@ -4,7 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createVisionServer } from '../../../services/mcp/vision-server';
 import * as taskService from '../../../services/task';
 import * as escalationService from '../../../services/escalation';
-import type { LTTaskRecord } from '../../../types';
+import type { LTTaskRecord, LTEscalationRecord } from '../../../types';
 
 // ── In-process Vision MCP client (lazy singleton) ─────────────
 
@@ -32,17 +32,29 @@ function parseResult(result: any): any {
 // ── MCP tool activities ───────────────────────────────────────
 
 /**
- * Query all completed tasks sharing an originId.
- * Gives the triage orchestrator full context of upstream work.
+ * Query all tasks sharing an originId.
+ * Gives the triage workflow full context of upstream work —
+ * what ran, what succeeded, what escalated.
  */
 export async function getUpstreamTasks(
   originId: string,
 ): Promise<LTTaskRecord[]> {
   const { tasks } = await taskService.listTasks({
+    origin_id: originId,
     limit: 100,
   });
-  // Filter to matching originId (listTasks doesn't support origin_id filter directly)
-  return tasks.filter(t => t.origin_id === originId);
+  return tasks;
+}
+
+/**
+ * Query all escalations sharing an originId.
+ * Gives the triage workflow the full conversation history —
+ * who escalated to whom, what comments were left, what was tried.
+ */
+export async function getEscalationHistory(
+  originId: string,
+): Promise<LTEscalationRecord[]> {
+  return escalationService.getEscalationsByOriginId(originId);
 }
 
 /**
@@ -91,7 +103,7 @@ export async function translateContent(
 
 /**
  * Create an escalation to the engineering team with a recommendation.
- * Used by the triage workflow to surface long-term fixes.
+ * Used by the triage workflow to surface long-term fixes (non-blocking).
  */
 export async function notifyEngineering(
   originId: string,

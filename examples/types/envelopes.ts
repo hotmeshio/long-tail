@@ -24,6 +24,17 @@ export interface VerifyDocumentEnvelopeData {
   memberId?: string;
 }
 
+// ── processClaimOrchestrator ─────────────────────────────────────
+
+/** Insurance claim with document images to process. */
+export interface ProcessClaimEnvelopeData {
+  claimId: string;
+  claimantId: string;
+  claimType: string;
+  amount: number;
+  documents: string[];
+}
+
 // ── kitchenSinkOrchestrator ──────────────────────────────────────
 
 /** Kitchen sink — showcases every Durable primitive. */
@@ -41,6 +52,7 @@ export type WorkflowEnvelopeMap = {
   reviewContentOrchestrator: ReviewContentEnvelopeData;
   verifyDocumentOrchestrator: VerifyDocumentEnvelopeData;
   verifyDocumentMcpOrchestrator: VerifyDocumentEnvelopeData;
+  processClaimOrchestrator: ProcessClaimEnvelopeData;
   kitchenSinkOrchestrator: KitchenSinkEnvelopeData;
 };
 
@@ -83,6 +95,20 @@ export const ENVELOPE_TEMPLATES: {
       documentUrl: 'https://example.com/doc.jpg',
       documentType: 'drivers_license',
       memberId: 'member-12345',
+    },
+    metadata: { source: 'dashboard' },
+  },
+  processClaimOrchestrator: {
+    data: {
+      claimId: 'CLM-2024-001',
+      claimantId: 'POL-5551234',
+      claimType: 'auto_collision',
+      amount: 12500,
+      documents: [
+        'incident_report.pdf',
+        'photo_evidence.jpg',
+        'police_report.pdf',
+      ],
     },
     metadata: { source: 'dashboard' },
   },

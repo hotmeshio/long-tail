@@ -274,9 +274,9 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       onBefore: c.lifecycle.onBefore,
       onAfter: c.lifecycle.onAfter,
       consumes: c.consumes,
-      envelopeSchema: c.envelope_schema,
-      resolverSchema: c.resolver_schema,
-      cronSchedule: c.cron_schedule,
+      envelopeSchema: c.envelope_schema ?? null,
+      resolverSchema: c.resolver_schema ?? null,
+      cronSchedule: c.cron_schedule ?? null,
     });
   }
 

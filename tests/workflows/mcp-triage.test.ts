@@ -283,13 +283,13 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
     await configService.upsertWorkflowConfig({
       workflow_type: 'mcpTriage',
       is_lt: true,
-      is_container: true, // Uses executeLT internally
+      is_container: false, // Leaf — can escalate to engineer for guidance
       invocable: false,
       task_queue: TRIAGE_QUEUE,
-      default_role: 'reviewer',
+      default_role: 'engineer',
       default_modality: 'default',
-      description: 'MCP triage workflow',
-      roles: ['reviewer'],
+      description: 'MCP triage leaf — remediates via MCP tools or engineer guidance',
+      roles: ['reviewer', 'engineer'],
       invocation_roles: [],
       lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
