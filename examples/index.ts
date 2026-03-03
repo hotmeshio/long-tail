@@ -6,6 +6,8 @@ import * as verifyDocumentMcpWorkflow from './workflows/verify-document-mcp';
 import * as reviewContentOrchWorkflow from './workflows/review-content/orchestrator';
 import * as verifyDocumentOrchWorkflow from './workflows/verify-document/orchestrator';
 import * as verifyDocumentMcpOrchWorkflow from './workflows/verify-document-mcp/orchestrator';
+import * as processClaimWorkflow from './workflows/process-claim';
+import * as processClaimOrchWorkflow from './workflows/process-claim/orchestrator';
 import * as mcpTriageWorkflow from './workflows/mcp-triage';
 import * as mcpTriageOrchWorkflow from './workflows/mcp-triage/orchestrator';
 import * as kitchenSinkWorkflow from './workflows/kitchen-sink';
@@ -14,6 +16,7 @@ import * as kitchenSinkOrchWorkflow from './workflows/kitchen-sink/orchestrator'
 import type { LTEnvelope } from '../types';
 import type {
   ReviewContentEnvelopeData,
+  ProcessClaimEnvelopeData,
   InvocableWorkflowType,
 } from './types';
 import { loggerRegistry } from '../services/logger';
@@ -33,6 +36,8 @@ export const exampleWorkers = [
   { taskQueue: 'lt-review-orch', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
   { taskQueue: 'lt-verify-orch', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
   { taskQueue: 'lt-verify-mcp-orch', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
+  { taskQueue: 'lt-process-claim', workflow: processClaimWorkflow.processClaim },
+  { taskQueue: 'lt-process-claim-orch', workflow: processClaimOrchWorkflow.processClaimOrchestrator },
   { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
   { taskQueue: 'lt-mcp-triage-orch', workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator },
   { taskQueue: 'lt-kitchen-sink', workflow: kitchenSinkWorkflow.kitchenSink },
@@ -88,7 +93,7 @@ async function seedUsers(): Promise<void> {
 
 // ── Seed processes ───────────────────────────────────────────────────────────
 //
-// Three deterministic processes that tell the LongTail story:
+// Four deterministic processes that tell the LongTail story:
 //
 // Process 1 — "Clean Review"
 //   Content passes AI analysis. Auto-approved. The happy path.
@@ -107,6 +112,14 @@ async function seedUsers(): Promise<void> {
 //   The MCP triage orchestrator translates the content, re-runs the
 //   workflow (auto-approves), and creates an engineering escalation
 //   recommending a language detection step in the pipeline.
+//
+// Process 4 — "Damaged Claim → MCP Triage (Image Orientation)"
+//   Insurance claim arrives with upside-down document images.
+//   AI analysis returns low confidence (0.35) → escalates to reviewer.
+//   Instruction:
+//     reviewer → check "Request AI Triage", hint: image_orientation, submit
+//   The MCP triage orchestrator rotates the images via MCP tools,
+//   re-runs the claim workflow, and it auto-approves with corrected docs.
 
 const SEED_ENVELOPES: Array<{
   workflowName: InvocableWorkflowType;
@@ -167,6 +180,35 @@ const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'wrong-language',
         description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" with hint "wrong_language". The MCP orchestrator translates the content, re-runs the workflow, and recommends adding language detection to the pipeline.',
+      },
+    },
+  },
+
+  // ── Process 4: Damaged Claim → MCP Triage ────────────────────
+  {
+    label: 'Process 4 — Damaged Claim',
+    workflowName: 'processClaimOrchestrator',
+    taskQueue: 'lt-process-claim-orch',
+    envelope: {
+      data: {
+        claimId: 'CLM-2024-042',
+        claimantId: 'POL-5551234',
+        claimType: 'auto_collision',
+        amount: 12500,
+        documents: [
+          'incident_report.pdf',
+          'photo_evidence.jpg',
+          'police_report.pdf',
+        ],
+      } satisfies ProcessClaimEnvelopeData,
+      metadata: {
+        source: 'seed',
+        process: 'damaged-claim',
+        description:
+          'Insurance claim with damaged document images. AI flags low confidence. ' +
+          'As reviewer, check "Request AI Triage" with hint "image_orientation". ' +
+          'The MCP triage orchestrator rotates the images, re-runs the claim workflow, ' +
+          'and it completes successfully.',
       },
     },
   },

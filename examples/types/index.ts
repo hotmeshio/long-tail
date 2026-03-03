@@ -10,6 +10,7 @@
 export type {
   ReviewContentEnvelopeData,
   VerifyDocumentEnvelopeData,
+  ProcessClaimEnvelopeData,
   WorkflowEnvelopeMap,
   InvocableWorkflowType,
 } from './envelopes';
@@ -21,6 +22,7 @@ export type {
   ResolverLTBlock,
   BaseResolverPayload,
   ReviewContentResolverPayload,
+  ProcessClaimResolverPayload,
   VerifyDocumentResolverPayload,
 } from './resolvers';
 
@@ -33,6 +35,14 @@ export type {
   ReviewContentEscalationData,
   ReviewContentEscalation,
 } from '../workflows/review-content/types';
+
+export type {
+  ClaimAnalysis,
+  ProcessClaimReturnData,
+  ProcessClaimReturn,
+  ProcessClaimEscalationData,
+  ProcessClaimEscalation,
+} from '../workflows/process-claim/types';
 
 export type {
   MemberInfo,

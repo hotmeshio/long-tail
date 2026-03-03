@@ -146,18 +146,8 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
     (e) => e.category !== 'workflow',
   );
 
-  // For activities: prefer user activities, fall back to system activities.
-  // Signals, timers, and child workflows are always shown (is_system doesn't apply).
-  const userActivities = timelineEvents.filter(
-    (e) => e.category === 'activity' && !e.is_system,
-  );
-  const nonActivityEvents = timelineEvents.filter(
-    (e) => e.category !== 'activity',
-  );
-  const activityEvents = userActivities.length > 0
-    ? userActivities
-    : timelineEvents.filter((e) => e.category === 'activity');
-  const displayEvents = [...activityEvents, ...nonActivityEvents];
+  // Show all activities (user + system), signals, timers, and child workflows.
+  const displayEvents = timelineEvents;
 
   if (displayEvents.length === 0) return null;
 
