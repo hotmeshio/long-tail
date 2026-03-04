@@ -138,16 +138,14 @@ export function UsersPage() {
         }
       />
 
-      <div className="mb-6">
-        <FilterBar>
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            onChange={(v) => setFilter('status', v)}
-            options={statusOptions}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          onChange={(v) => setFilter('status', v)}
+          options={statusOptions}
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}
@@ -166,24 +164,20 @@ export function UsersPage() {
         onPageSizeChange={pagination.setPageSize}
       />
 
-      {/* Create user modal */}
       <CreateUserModal open={showCreate} onClose={() => setShowCreate(false)} />
 
-      {/* Edit user modal */}
       <EditUserModal
         open={!!editingUser}
         onClose={() => setEditingUser(null)}
         user={editingUser}
       />
 
-      {/* Role management modal */}
       <RoleManagementModal
         open={!!rolesUser}
         onClose={() => setRolesUser(null)}
         user={rolesUser}
       />
 
-      {/* Delete confirmation modal */}
       <ConfirmDeleteModal
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}

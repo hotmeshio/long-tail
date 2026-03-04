@@ -48,28 +48,26 @@ export function OperatorDashboard() {
         Roles: {userRoleNames.length > 0 ? userRoleNames.join(', ') : 'none'}
       </p>
 
-      <div className="mb-6">
-        <FilterBar>
-          <FilterSelect
-            label="Role"
-            value={filters.role}
-            onChange={(v) => setFilter('role', v)}
-            options={(rolesData?.roles ?? []).map((r) => ({ value: r, label: r }))}
-          />
-          <FilterSelect
-            label="Type"
-            value={filters.type}
-            onChange={(v) => setFilter('type', v)}
-            options={(typesData?.types ?? []).map((t) => ({ value: t, label: t }))}
-          />
-          <FilterSelect
-            label="Priority"
-            value={filters.priority}
-            onChange={(v) => setFilter('priority', v)}
-            options={PRIORITY_OPTIONS}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <FilterSelect
+          label="Role"
+          value={filters.role}
+          onChange={(v) => setFilter('role', v)}
+          options={(rolesData?.roles ?? []).map((r) => ({ value: r, label: r }))}
+        />
+        <FilterSelect
+          label="Type"
+          value={filters.type}
+          onChange={(v) => setFilter('type', v)}
+          options={(typesData?.types ?? []).map((t) => ({ value: t, label: t }))}
+        />
+        <FilterSelect
+          label="Priority"
+          value={filters.priority}
+          onChange={(v) => setFilter('priority', v)}
+          options={PRIORITY_OPTIONS}
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

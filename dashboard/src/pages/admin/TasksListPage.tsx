@@ -82,22 +82,20 @@ export function TasksListPage() {
     <div>
       <PageHeader title="Tasks" />
 
-      <div className="mb-6">
-        <FilterBar>
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            onChange={(v) => setFilter('status', v)}
-            options={statusOptions}
-          />
-          <FilterSelect
-            label="Workflow Type"
-            value={filters.workflow_type}
-            onChange={(v) => setFilter('workflow_type', v)}
-            options={workflowTypes.map((t) => ({ value: t, label: t }))}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          onChange={(v) => setFilter('status', v)}
+          options={statusOptions}
+        />
+        <FilterSelect
+          label="Workflow Type"
+          value={filters.workflow_type}
+          onChange={(v) => setFilter('workflow_type', v)}
+          options={workflowTypes.map((t) => ({ value: t, label: t }))}
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

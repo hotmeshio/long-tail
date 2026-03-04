@@ -75,23 +75,21 @@ export function WorkflowsDashboard() {
     <div>
       <PageHeader title="Workflows" />
 
-      <div className="flex items-center justify-between mb-4">
-        <FilterBar>
-          <input
-            type="text"
-            placeholder="Search workflow ID..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="input text-xs w-64"
-          />
-          <FilterSelect
-            label="Type"
-            value={filters.entity}
-            onChange={(v) => setFilter('entity', v)}
-            options={entities.map((e) => ({ value: e, label: e }))}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <input
+          type="text"
+          placeholder="Search workflow ID..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="input text-[11px] py-1 px-2 w-56"
+        />
+        <FilterSelect
+          label="Type"
+          value={filters.entity}
+          onChange={(v) => setFilter('entity', v)}
+          options={entities.map((e) => ({ value: e, label: e }))}
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

@@ -1,23 +1,45 @@
-import { Fragment, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Eye, RefreshCw, UserPlus } from 'lucide-react';
 import { useMcpServers } from '../../api/mcp';
-import { StatCard } from '../../components/common/StatCard';
-import { PageHeader } from '../../components/common/PageHeader';
-import { SectionLabel } from '../../components/common/SectionLabel';
+import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
+import { TryToolModal } from './TryToolModal';
+import type { McpToolManifest, McpServerRecord } from '../../api/types';
 
-const FLOW_STEPS = [
-  'Workflow starts',
-  'Activities run',
-  'Escalation created',
-  'Human resolves',
-  'Triage requested',
-  'MCP tools called',
-  'Workflow re-runs',
-  'Result signaled',
-];
+// ── Capability cards ─────────────────────────────────────────────────────────
+
+const CAPABILITIES = [
+  {
+    icon: Eye,
+    label: 'Observe',
+    detail: 'Query tasks, escalations, and processes in real time',
+    toolHint: 'long-tail-db-query',
+  },
+  {
+    icon: RefreshCw,
+    label: 'Adapt',
+    detail: 'Triage stalled workflows — translate, rotate, retry',
+    toolHint: 'long-tail-document-vision',
+  },
+  {
+    icon: UserPlus,
+    label: 'Escalate',
+    detail: 'Route work to engineers when deterministic flows need updating',
+    toolHint: 'long-tail-human-queue',
+  },
+] as const;
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function McpOverview() {
   const { data, isLoading } = useMcpServers();
   const servers = data?.servers ?? [];
+
+  const [tryTool, setTryTool] = useState<{
+    serverId: string;
+    serverName: string;
+    tool: McpToolManifest;
+  } | null>(null);
 
   const stats = useMemo(() => {
     const connected = servers.filter((s) => s.status === 'connected').length;
@@ -28,84 +50,137 @@ export function McpOverview() {
     return { total: servers.length, connected, totalTools };
   }, [servers]);
 
+  const v = (n: number) => (isLoading ? '—' : n);
+
   return (
     <div>
-      <PageHeader title="MCP Dashboard" />
+      <PageHeaderWithStats
+        title="MCP"
+        subtitle="Discover and Adapt"
+        stats={[
+          { label: 'Connected', value: v(stats.connected), dotClass: 'bg-status-success' },
+          { label: 'Tools', value: v(stats.totalTools), dotClass: 'bg-status-active' },
+          { label: 'Servers', value: v(stats.total) },
+        ]}
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-        <StatCard
-          label="Connected Servers"
-          value={isLoading ? '—' : stats.connected}
-          dotClass="bg-status-success"
-        />
-        <StatCard
-          label="Available Tools"
-          value={isLoading ? '—' : stats.totalTools}
-          dotClass="bg-status-active"
-        />
-        <StatCard
-          label="Registered Servers"
-          value={isLoading ? '—' : stats.total}
-        />
+      {/* Capabilities */}
+      <div className="grid grid-cols-3 gap-4 mb-10">
+        {CAPABILITIES.map((cap) => {
+          const server = servers.find((s) => s.name === cap.toolHint);
+          return (
+            <div
+              key={cap.label}
+              className="p-5 rounded-lg border border-surface-border/50 hover:border-surface-border transition-colors"
+            >
+              <div className="flex items-center gap-2.5 mb-2">
+                <cap.icon size={15} className="text-text-tertiary" />
+                <span className="text-sm font-medium text-text-primary">{cap.label}</span>
+              </div>
+              <p className="text-xs text-text-secondary leading-relaxed mb-3">
+                {cap.detail}
+              </p>
+              {server && server.status === 'connected' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-status-success" />
+                  <span className="text-[10px] text-text-tertiary font-mono">{server.name}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="space-y-8 max-w-3xl">
-        <div>
-          <SectionLabel className="mb-3">How It Works</SectionLabel>
-          <p className="text-sm text-text-secondary leading-relaxed">
-            Every workflow is durable. Activities are checkpointed, retried on failure,
-            and fully auditable. MCP servers register tools that become proxy
-            activities — callable from any workflow with the same guarantees. Connect
-            a server, and its tools are immediately available as durable activity calls.
-          </p>
-        </div>
+      {/* Connected servers with their tools */}
+      <div className="space-y-6">
+        {servers.filter((s) => s.status === 'connected').map((server) => (
+          <ServerToolsCard
+            key={server.id}
+            server={server}
+            onTryTool={(tool) =>
+              setTryTool({ serverId: server.id, serverName: server.name, tool })
+            }
+          />
+        ))}
 
-        <div>
-          <SectionLabel className="mb-3">Data Flow</SectionLabel>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-            {FLOW_STEPS.map((step, i) => (
-              <Fragment key={step}>
-                <span className="px-3 py-1.5 bg-surface-sunken rounded text-text-primary">
-                  {step}
-                </span>
-                {i < FLOW_STEPS.length - 1 && (
-                  <span className="text-text-tertiary">&rarr;</span>
-                )}
-              </Fragment>
-            ))}
+        {!isLoading && servers.filter((s) => s.status === 'connected').length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-sm text-text-tertiary mb-2">No servers connected</p>
+            <Link to="/mcp/servers" className="text-xs text-accent hover:underline">
+              Manage servers
+            </Link>
           </div>
-        </div>
+        )}
+      </div>
 
-        <div>
-          <SectionLabel className="mb-3">Authoring Workflows</SectionLabel>
-          <p className="text-sm text-text-secondary leading-relaxed mb-3">
-            A workflow is a function. Activities are its side effects — database calls,
-            API requests, file processing. Wrap any function as a proxy activity and it
-            gets automatic checkpointing and retry. MCP tools work the same way: each
-            tool on a connected server is a proxy activity you can call from your
-            workflow code.
-          </p>
-          <div className="bg-surface-sunken rounded-lg p-4 font-mono text-xs text-text-secondary leading-relaxed">
-            <div className="text-text-tertiary">// 1. Define activities (or use MCP tools)</div>
-            <div>const {'{ analyze, translate }'} = proxyActivities(serverTools);</div>
-            <div className="mt-2 text-text-tertiary">// 2. Call them in your workflow</div>
-            <div>const result = await analyze({'{ doc: input.ref }'});</div>
-            <div>if (result.language !== 'en')</div>
-            <div>{'  '}await translate({'{ content: result.text, target: "en" }'});</div>
-          </div>
-        </div>
+      {tryTool && (
+        <TryToolModal
+          open={!!tryTool}
+          onClose={() => setTryTool(null)}
+          serverId={tryTool.serverId}
+          serverName={tryTool.serverName}
+          tool={tryTool.tool}
+        />
+      )}
+    </div>
+  );
+}
 
-        <div>
-          <SectionLabel className="mb-3">Adding Tools</SectionLabel>
-          <p className="text-sm text-text-secondary leading-relaxed">
-            Register an MCP server under{' '}
-            <span className="font-mono text-text-primary">Servers</span>, connect it,
-            and its tools appear under{' '}
-            <span className="font-mono text-text-primary">Tools</span>. Each tool
-            lists its parameters and can be tested directly from the dashboard. In your
-            workflow code, call them the same way you call any other activity.
-          </p>
-        </div>
+// ── Server tools card ────────────────────────────────────────────────────────
+
+function ServerToolsCard({
+  server,
+  onTryTool,
+}: {
+  server: McpServerRecord;
+  onTryTool: (tool: McpToolManifest) => void;
+}) {
+  const tools = (server.tool_manifest ?? []) as McpToolManifest[];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-1.5 h-1.5 rounded-full bg-status-success" />
+        <span className="text-xs font-mono text-text-secondary">{server.name}</span>
+        {server.description && (
+          <span className="text-[10px] text-text-tertiary">— {server.description}</span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {tools.map((tool) => {
+          const params = Object.keys(tool.inputSchema?.properties ?? {});
+          const required = (tool.inputSchema?.required ?? []) as string[];
+          return (
+            <button
+              key={tool.name}
+              onClick={() => onTryTool(tool)}
+              className="text-left p-3 rounded-md border border-surface-border/40 hover:border-accent/40 hover:bg-surface-sunken/50 transition-colors group"
+            >
+              <code className="text-xs font-mono text-accent">{tool.name}</code>
+              {tool.description && (
+                <p className="text-[10px] text-text-tertiary mt-1 line-clamp-1">
+                  {tool.description}
+                </p>
+              )}
+              {params.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {params.map((p) => (
+                    <span
+                      key={p}
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                        required.includes(p)
+                          ? 'bg-accent/10 text-accent'
+                          : 'bg-surface-sunken text-text-tertiary'
+                      }`}
+                    >
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -91,18 +91,16 @@ export function ProcessesListPage() {
 
   return (
     <div>
-      <PageHeader title="Business Processes" backTo="/" backLabel="Overview" />
+      <PageHeader title="Business Processes" />
 
-      <div className="mb-6">
-        <FilterBar>
-          <FilterSelect
-            label="Workflow Type"
-            value={filters.workflow_type}
-            onChange={(v) => setFilter('workflow_type', v)}
-            options={workflowTypes.map((t) => ({ value: t, label: t }))}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <FilterSelect
+          label="Workflow Type"
+          value={filters.workflow_type}
+          onChange={(v) => setFilter('workflow_type', v)}
+          options={workflowTypes.map((t) => ({ value: t, label: t }))}
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

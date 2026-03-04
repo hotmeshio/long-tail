@@ -150,6 +150,13 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     loggerRegistry.info('[long-tail] example workflows loaded');
   }
 
+  // Register insight worker when OpenAI is available
+  if (process.env.OPENAI_API_KEY) {
+    const { insightQuery } = await import('./services/insight');
+    allWorkers.push({ taskQueue: 'lt-insight', workflow: insightQuery });
+    loggerRegistry.info('[long-tail] insight workflow loaded');
+  }
+
   if (allWorkers.length) {
     // Connect telemetry BEFORE HotMesh starts
     if (telemetryRegistry.hasAdapter) {

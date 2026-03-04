@@ -6,6 +6,15 @@ vi.mock('../../../api/tasks', () => ({
   useProcesses: vi.fn(),
 }));
 
+vi.mock('../../../api/insight', () => ({
+  useInsightQuery: () => ({
+    data: null,
+    isFetching: false,
+    error: null,
+  }),
+  useLastInsightQuestion: () => null,
+}));
+
 import { ProcessesOverview } from '../ProcessesOverview';
 import { useProcesses } from '../../../api/tasks';
 
@@ -42,7 +51,7 @@ describe('ProcessesOverview', () => {
     vi.clearAllMocks();
   });
 
-  it('renders stat cards with data', () => {
+  it('renders header and inline stats with data', () => {
     vi.mocked(useProcesses).mockReturnValue({
       data: mockProcesses,
       isLoading: false,
@@ -51,7 +60,7 @@ describe('ProcessesOverview', () => {
     renderWithRouter(<ProcessesOverview />);
 
     expect(screen.getByText('Business Processes')).toBeInTheDocument();
-    expect(screen.getByText('Total Processes')).toBeInTheDocument();
+    expect(screen.getByText('Total')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('Escalated')).toBeInTheDocument();
@@ -70,7 +79,7 @@ describe('ProcessesOverview', () => {
     expect(dashes).toHaveLength(4);
   });
 
-  it('renders all four stat cards', () => {
+  it('renders all four inline stats', () => {
     vi.mocked(useProcesses).mockReturnValue({
       data: mockProcesses,
       isLoading: false,
@@ -78,7 +87,7 @@ describe('ProcessesOverview', () => {
 
     renderWithRouter(<ProcessesOverview />);
 
-    expect(screen.getByText('Total Processes')).toBeInTheDocument();
+    expect(screen.getByText('Total')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('Escalated')).toBeInTheDocument();

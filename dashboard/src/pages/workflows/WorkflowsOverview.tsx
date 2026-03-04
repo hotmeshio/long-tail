@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
-import { StatCard } from '../../components/common/StatCard';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
 import { SectionLabel } from '../../components/common/SectionLabel';
 
 function formatDuration(ms: number): string {
@@ -54,30 +53,20 @@ export function WorkflowsOverview() {
     return result.sort((a, b) => b.total - a.total);
   }, [jobs]);
 
+  const running = jobs.filter((j) => j.status === 'running').length;
+  const completed = jobs.filter((j) => j.status === 'completed').length;
+
   return (
     <div>
-      <PageHeader title="Workflows Dashboard" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <StatCard
-          label="Total Jobs"
-          value={allJobs?.total ?? '—'}
-        />
-        <StatCard
-          label="Running"
-          value={jobs.filter((j) => j.status === 'running').length}
-          dotClass="bg-status-active animate-pulse"
-        />
-        <StatCard
-          label="Completed"
-          value={jobs.filter((j) => j.status === 'completed').length}
-          dotClass="bg-status-success"
-        />
-        <StatCard
-          label="Registered Workflows"
-          value={configs?.length ?? '—'}
-        />
-      </div>
+      <PageHeaderWithStats
+        title="Workflows"
+        stats={[
+          { label: 'Jobs', value: allJobs?.total ?? '—' },
+          { label: 'Running', value: running, dotClass: 'bg-status-active' },
+          { label: 'Completed', value: completed, dotClass: 'bg-status-success' },
+          { label: 'Registered', value: configs?.length ?? '—' },
+        ]}
+      />
 
       {byType.length > 0 && (
         <div>

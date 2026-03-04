@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 vi.mock('../../../api/escalations', () => ({
@@ -21,36 +22,33 @@ const mockStats = {
   ],
 };
 
+function renderWithRouter(ui: React.ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe('EscalationsOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders stat cards with data', () => {
+  it('renders header with inline stats', () => {
     vi.mocked(useEscalationStats).mockReturnValue({
       data: mockStats,
     } as any);
 
-    render(<EscalationsOverview />);
+    renderWithRouter(<EscalationsOverview />);
 
-    // PageHeader
-    expect(screen.getByText('Escalations Dashboard')).toBeInTheDocument();
-
-    // Stat card labels (Claimed also appears as a table header)
+    expect(screen.getByText('Escalations')).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
     expect(screen.getAllByText('Claimed').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Created (24h)')).toBeInTheDocument();
-    expect(screen.getByText('Resolved (24h)')).toBeInTheDocument();
+    expect(screen.getByText('Created 24h')).toBeInTheDocument();
+    expect(screen.getByText('Resolved 24h')).toBeInTheDocument();
 
-    // Stat card values
+    // Stat values
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('18')).toBeInTheDocument();
-
-    // Sub text
-    expect(screen.getByText('5 in last hour')).toBeInTheDocument();
-    expect(screen.getByText('2 in last hour')).toBeInTheDocument();
   });
 
   it('renders dash placeholders when data is loading', () => {
@@ -58,7 +56,7 @@ describe('EscalationsOverview', () => {
       data: undefined,
     } as any);
 
-    render(<EscalationsOverview />);
+    renderWithRouter(<EscalationsOverview />);
 
     const dashes = screen.getAllByText('—');
     expect(dashes).toHaveLength(4);
@@ -69,16 +67,11 @@ describe('EscalationsOverview', () => {
       data: mockStats,
     } as any);
 
-    render(<EscalationsOverview />);
+    renderWithRouter(<EscalationsOverview />);
 
-    // Section label
     expect(screen.getByText('By Role')).toBeInTheDocument();
-
-    // Table headers
     expect(screen.getByText('Role')).toBeInTheDocument();
     expect(screen.getByText('Pending')).toBeInTheDocument();
-
-    // Role rows
     expect(screen.getByText('reviewer')).toBeInTheDocument();
     expect(screen.getByText('engineer')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument();
@@ -90,7 +83,7 @@ describe('EscalationsOverview', () => {
       data: { ...mockStats, by_role: [] },
     } as any);
 
-    render(<EscalationsOverview />);
+    renderWithRouter(<EscalationsOverview />);
 
     expect(screen.queryByText('By Role')).not.toBeInTheDocument();
     expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
@@ -104,26 +97,22 @@ describe('EscalationsOverview', () => {
       },
     } as any);
 
-    const { container } = render(<EscalationsOverview />);
+    const { container } = renderWithRouter(<EscalationsOverview />);
 
-    // The claimed "0" should use tertiary text color
     const zeroCells = container.querySelectorAll('.text-text-tertiary');
     const zeroTexts = Array.from(zeroCells).map(el => el.textContent);
     expect(zeroTexts).toContain('0');
   });
 
-  it('renders dot indicators on stat cards', () => {
+  it('renders dot indicators on inline stats', () => {
     vi.mocked(useEscalationStats).mockReturnValue({
       data: mockStats,
     } as any);
 
-    const { container } = render(<EscalationsOverview />);
+    const { container } = renderWithRouter(<EscalationsOverview />);
 
-    // Pending dot
     expect(container.querySelector('.bg-status-pending')).toBeInTheDocument();
-    // Active dot (claimed)
     expect(container.querySelector('.bg-status-active')).toBeInTheDocument();
-    // Success dot (resolved)
     expect(container.querySelector('.bg-status-success')).toBeInTheDocument();
   });
 });

@@ -1,8 +1,18 @@
 import type { ReactNode } from 'react';
 
-export function FilterBar({ children }: { children: ReactNode }) {
+interface FilterBarProps {
+  children: ReactNode;
+  actions?: ReactNode;
+}
+
+export function FilterBar({ children, actions }: FilterBarProps) {
   return (
-    <div className="flex items-center gap-3 flex-wrap">{children}</div>
+    <div className="sticky top-0 z-20 bg-surface -mx-10 px-10 py-1.5 pb-4 border-b border-surface-border/50">
+      <div className="flex items-center gap-2 flex-wrap">
+        {children}
+        {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+      </div>
+    </div>
   );
 }
 
@@ -15,12 +25,12 @@ interface FilterSelectProps {
 
 export function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-xs text-text-tertiary">{label}</label>
+    <div className="flex items-center gap-1.5">
+      <label className="text-[10px] text-text-tertiary">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="select text-xs"
+        className="select text-[11px] py-1 px-2"
       >
         <option value="">All</option>
         {options.map((opt) => (
