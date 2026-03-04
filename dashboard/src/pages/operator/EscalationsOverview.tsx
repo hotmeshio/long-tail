@@ -1,6 +1,5 @@
 import { useEscalationStats } from '../../api/escalations';
-import { StatCard } from '../../components/common/StatCard';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
 import { SectionLabel } from '../../components/common/SectionLabel';
 
 export function EscalationsOverview() {
@@ -8,31 +7,15 @@ export function EscalationsOverview() {
 
   return (
     <div>
-      <PageHeader title="Escalations Dashboard" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <StatCard
-          label="Open"
-          value={stats?.pending ?? '—'}
-          dotClass="bg-status-pending"
-        />
-        <StatCard
-          label="Claimed"
-          value={stats?.claimed ?? '—'}
-          dotClass="bg-status-active animate-pulse"
-        />
-        <StatCard
-          label="Created (24h)"
-          value={stats?.created_24h ?? '—'}
-          sub={stats ? `${stats.created_1h} in last hour` : undefined}
-        />
-        <StatCard
-          label="Resolved (24h)"
-          value={stats?.resolved_24h ?? '—'}
-          sub={stats ? `${stats.resolved_1h} in last hour` : undefined}
-          dotClass="bg-status-success"
-        />
-      </div>
+      <PageHeaderWithStats
+        title="Escalations"
+        stats={[
+          { label: 'Open', value: stats?.pending ?? '—', dotClass: 'bg-status-pending' },
+          { label: 'Claimed', value: stats?.claimed ?? '—', dotClass: 'bg-status-active' },
+          { label: 'Created 24h', value: stats?.created_24h ?? '—' },
+          { label: 'Resolved 24h', value: stats?.resolved_24h ?? '—', dotClass: 'bg-status-success' },
+        ]}
+      />
 
       {(stats?.by_role?.length ?? 0) > 0 && (
         <div>

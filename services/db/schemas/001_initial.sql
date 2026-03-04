@@ -1,6 +1,7 @@
 -- Long Tail Workflows: Schema
 -- Tasks track workflow executions; escalations track human interventions.
 -- MCP servers track external tool server registrations.
+-- lt_roles is the canonical registry of all role names.
 
 -- ─── updated_at trigger ─────────────────────────────────────────────────────
 
@@ -11,6 +12,21 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ─── lt_roles (canonical role registry) ────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_roles (
+  role       TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Seed the standard roles before any table references them
+INSERT INTO lt_roles (role) VALUES
+  ('reviewer'),
+  ('engineer'),
+  ('admin'),
+  ('superadmin')
+ON CONFLICT DO NOTHING;
 
 -- ─── lt_tasks ────────────────────────────────────────────────────────────────
 
@@ -94,7 +110,7 @@ CREATE TABLE IF NOT EXISTS lt_escalations (
   workflow_type     TEXT,
 
   -- ownership
-  role              TEXT NOT NULL,
+  role              TEXT NOT NULL REFERENCES lt_roles(role),
   assigned_to       TEXT,
   assigned_until    TIMESTAMPTZ,
 
@@ -162,7 +178,7 @@ CREATE INDEX IF NOT EXISTS idx_lt_users_status ON lt_users (status);
 
 CREATE TABLE IF NOT EXISTS lt_user_roles (
   user_id    UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
-  role       TEXT NOT NULL,
+  role       TEXT NOT NULL REFERENCES lt_roles(role),
   type       TEXT NOT NULL DEFAULT 'member' CHECK (type IN ('superadmin', 'admin', 'member')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, role)
@@ -180,7 +196,7 @@ CREATE TABLE IF NOT EXISTS lt_config_workflows (
   is_container     BOOLEAN NOT NULL DEFAULT false,
   invocable        BOOLEAN NOT NULL DEFAULT false,
   task_queue       TEXT,
-  default_role     TEXT NOT NULL DEFAULT 'reviewer',
+  default_role     TEXT NOT NULL DEFAULT 'reviewer' REFERENCES lt_roles(role),
   default_modality TEXT NOT NULL DEFAULT 'portal',
   description      TEXT,
   consumes         TEXT[] NOT NULL DEFAULT '{}',
@@ -195,7 +211,7 @@ CREATE TRIGGER lt_config_workflows_updated_at
 CREATE TABLE IF NOT EXISTS lt_config_roles (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_type TEXT NOT NULL REFERENCES lt_config_workflows(workflow_type) ON DELETE CASCADE,
-  role          TEXT NOT NULL,
+  role          TEXT NOT NULL REFERENCES lt_roles(role),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(workflow_type, role)
 );
@@ -203,7 +219,7 @@ CREATE TABLE IF NOT EXISTS lt_config_roles (
 CREATE TABLE IF NOT EXISTS lt_config_invocation_roles (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_type TEXT NOT NULL REFERENCES lt_config_workflows(workflow_type) ON DELETE CASCADE,
-  role          TEXT NOT NULL,
+  role          TEXT NOT NULL REFERENCES lt_roles(role),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(workflow_type, role)
 );
@@ -265,8 +281,8 @@ CREATE OR REPLACE TRIGGER trg_lt_mcp_servers_updated_at
 -- ─── Role escalation chains ────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lt_config_role_escalations (
-  source_role TEXT NOT NULL,
-  target_role TEXT NOT NULL,
+  source_role TEXT NOT NULL REFERENCES lt_roles(role),
+  target_role TEXT NOT NULL REFERENCES lt_roles(role),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (source_role, target_role)
 );

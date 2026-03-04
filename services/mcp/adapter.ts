@@ -2,6 +2,7 @@ import type { LTMcpAdapter, LTMcpToolManifest } from '../../types/mcp';
 import { loggerRegistry } from '../logger';
 import * as mcpClient from './client';
 import * as mcpServer from './server';
+import * as mcpDbServer from './db-server';
 import * as mcpDbService from './db';
 
 export interface BuiltInMcpAdapterOptions {
@@ -35,6 +36,10 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
       loggerRegistry.info('[lt-mcp] human queue server started');
     }
 
+    // Start DB query MCP server (always available)
+    await mcpDbServer.createDbServer();
+    loggerRegistry.info('[lt-mcp] db query server started');
+
     // Connect to auto-connect servers from DB
     await mcpClient.connectAutoServers();
 
@@ -57,6 +62,7 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
 
   async disconnect(): Promise<void> {
     await mcpClient.disconnectAll();
+    await mcpDbServer.stopDbServer();
     await mcpServer.stopServer();
     loggerRegistry.info('[lt-mcp] disconnected');
   }

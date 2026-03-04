@@ -61,7 +61,6 @@ export function McpToolsPage() {
 
   const [tryTool, setTryTool] = useState<ToolRow | null>(null);
 
-  // Flatten all tools from all connected servers into a single list
   const allTools = useMemo<ToolRow[]>(() => {
     const rows: ToolRow[] = [];
     for (const srv of servers) {
@@ -79,17 +78,14 @@ export function McpToolsPage() {
     return rows;
   }, [servers]);
 
-  // Filter by server
   const filtered = useMemo(() => {
     if (!filters.server) return allTools;
     return allTools.filter((r) => r.serverId === filters.server);
   }, [allTools, filters.server]);
 
-  // Client-side pagination
   const total = filtered.length;
   const page = filtered.slice(pagination.offset, pagination.offset + pagination.pageSize);
 
-  // Server options for filter dropdown
   const serverOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const r of allTools) {
@@ -104,21 +100,17 @@ export function McpToolsPage() {
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         Tools from connected MCP servers. Each tool becomes a proxy activity you
-        can call from any workflow. Click a row to test it, or use it in your
-        workflow code
-        via <code className="text-xs bg-surface-sunken px-1.5 py-0.5 rounded font-mono text-accent-primary">proxyActivities()</code>.
+        can call from any workflow. Click a row to test it.
       </p>
 
-      <div className="mb-6">
-        <FilterBar>
-          <FilterSelect
-            label="Server"
-            value={filters.server}
-            onChange={(v) => setFilter('server', v)}
-            options={serverOptions}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <FilterSelect
+          label="Server"
+          value={filters.server}
+          onChange={(v) => setFilter('server', v)}
+          options={serverOptions}
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

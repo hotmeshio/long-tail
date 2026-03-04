@@ -85,6 +85,9 @@ const EscalationChainsPage = lazy(() =>
 const UserRolesPage = lazy(() =>
   import('./pages/admin/user-roles').then((m) => ({ default: m.UserRolesPage })),
 );
+const RolesPage = lazy(() =>
+  import('./pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
+);
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
 );
@@ -103,7 +106,11 @@ function PageLoader() {
 }
 
 function Lazy({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <div className="animate-page-enter">{children}</div>
+    </Suspense>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +182,7 @@ const router = createBrowserRouter([
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
           { path: 'admin/escalation-chains', element: <Lazy><EscalationChainsPage /></Lazy> },
           { path: 'admin/user-roles', element: <Lazy><UserRolesPage /></Lazy> },
+          { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
         ],
       },

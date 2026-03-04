@@ -110,10 +110,26 @@ export function createLTInterceptor(options: {
           ? workflowTopic.replace(new RegExp(`-${workflowName}$`), '')
           : 'long-tail';
 
+        // Mark the container task as in_progress
+        if (existingContainerTask?.id && existingContainerTask.status === 'pending') {
+          await activities.ltStartTask(existingContainerTask.id);
+        }
+
         const result = await runWithOrchestratorContext(
           { workflowId, taskQueue: containerTaskQueue, workflowType: workflowName },
           next,
         );
+
+        // Complete the container's own task
+        if (existingContainerTask?.id) {
+          await activities.ltCompleteTask({
+            taskId: existingContainerTask.id,
+            data: JSON.stringify(result),
+            workflowId,
+            workflowName,
+            taskQueue: containerTaskQueue,
+          });
+        }
 
         // Nested container: signal parent when started via executeLT
         if (containerMeta?.parentWorkflowId && containerMeta?.signalId) {

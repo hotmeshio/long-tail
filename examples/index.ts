@@ -21,7 +21,7 @@ import type {
 } from './types';
 import { loggerRegistry } from '../services/logger';
 import { getUserByExternalId, createUser } from '../services/user';
-import { addEscalationChain } from '../services/role';
+import { addEscalationChain, createRole } from '../services/role';
 import { getPool } from '../services/db';
 
 /**
@@ -74,6 +74,17 @@ const SEED_USERS = [
     roles: [{ role: 'reviewer', type: 'member' as const }],
   },
 ];
+
+const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
+
+async function seedRoles(): Promise<void> {
+  for (const role of SEED_ROLES) {
+    try {
+      await createRole(role);
+    } catch { /* ON CONFLICT DO NOTHING handles duplicates */ }
+  }
+  loggerRegistry.info(`[examples] roles verified (${SEED_ROLES.join(', ')})`);
+}
 
 async function seedUsers(): Promise<void> {
   for (const userDef of SEED_USERS) {
@@ -402,6 +413,7 @@ async function seedMcpServers(): Promise<void> {
  * Called automatically when `examples: true` is set in the start config.
  */
 export async function seedExamples(client: any): Promise<void> {
+  await seedRoles();
   await seedUsers();
   await seedEscalationChains();
   await seedMcpServers();

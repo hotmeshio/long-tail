@@ -6,6 +6,13 @@ export interface EscalationChain {
   target_role: string;
 }
 
+export interface RoleDetail {
+  role: string;
+  user_count: number;
+  chain_count: number;
+  workflow_count: number;
+}
+
 export function useRoles() {
   return useQuery<{ roles: string[] }>({
     queryKey: ['roles'],
@@ -63,6 +70,40 @@ export function useRemoveEscalationChain() {
       apiFetch('/roles/escalation-chains', {
         method: 'DELETE',
         body: JSON.stringify(chain),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+    },
+  });
+}
+
+export function useRoleDetails() {
+  return useQuery<{ roles: RoleDetail[] }>({
+    queryKey: ['roles', 'details'],
+    queryFn: () => apiFetch('/roles/details'),
+  });
+}
+
+export function useCreateRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (role: string) =>
+      apiFetch('/roles', {
+        method: 'POST',
+        body: JSON.stringify({ role }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+    },
+  });
+}
+
+export function useDeleteRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (role: string) =>
+      apiFetch(`/roles/${encodeURIComponent(role)}`, {
+        method: 'DELETE',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });

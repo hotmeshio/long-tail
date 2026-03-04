@@ -1,8 +1,7 @@
 import { useTasks } from '../../api/tasks';
 import { useEscalations } from '../../api/escalations';
 import { useMcpServers } from '../../api/mcp';
-import { PageHeader } from '../../components/common/PageHeader';
-import { StatCard } from '../../components/common/StatCard';
+import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
 
 export function AdminDashboard() {
   const { data: taskData } = useTasks({ limit: 1 });
@@ -11,30 +10,19 @@ export function AdminDashboard() {
 
   const connectedServers =
     mcpData?.servers?.filter((s) => s.status === 'connected').length ?? 0;
+  const mcpLabel = mcpData ? `${connectedServers}/${mcpData.total}` : '—';
 
   return (
     <div>
-      <PageHeader title="Admin Dashboard" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Tasks"
-          value={taskData?.total ?? '—'}
-        />
-        <StatCard
-          label="Pending Escalations"
-          value={pendingEsc?.total ?? '—'}
-        />
-        <StatCard
-          label="MCP Servers"
-          value={mcpData?.total ?? '—'}
-          sub={`${connectedServers} connected`}
-        />
-        <StatCard
-          label="System"
-          value="Healthy"
-        />
-      </div>
+      <PageHeaderWithStats
+        title="Admin"
+        stats={[
+          { label: 'Tasks', value: taskData?.total ?? '—' },
+          { label: 'Pending Escalations', value: pendingEsc?.total ?? '—', dotClass: 'bg-status-pending' },
+          { label: 'MCP Servers', value: mcpLabel },
+          { label: 'System', value: 'Healthy', dotClass: 'bg-status-success' },
+        ]}
+      />
     </div>
   );
 }

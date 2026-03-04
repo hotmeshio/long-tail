@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useProcesses } from '../../api/tasks';
-import { StatCard } from '../../components/common/StatCard';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
+import { InsightSearch } from '../../components/insight/InsightSearch';
 
 export function ProcessesOverview() {
   const { data, isLoading } = useProcesses({ limit: 50 });
@@ -20,31 +20,20 @@ export function ProcessesOverview() {
     return { total: data?.total ?? 0, active, completed, escalated };
   }, [processes, data?.total]);
 
+  const v = (n: number) => (isLoading ? '—' : n);
+
   return (
     <div>
-      <PageHeader title="Business Processes" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Processes"
-          value={isLoading ? '—' : stats.total}
-        />
-        <StatCard
-          label="Active"
-          value={isLoading ? '—' : stats.active}
-          dotClass="bg-status-active animate-pulse"
-        />
-        <StatCard
-          label="Completed"
-          value={isLoading ? '—' : stats.completed}
-          dotClass="bg-status-success"
-        />
-        <StatCard
-          label="Escalated"
-          value={isLoading ? '—' : stats.escalated}
-          dotClass="bg-status-error"
-        />
-      </div>
+      <PageHeaderWithStats
+        title="Business Processes"
+        stats={[
+          { label: 'Total', value: v(stats.total) },
+          { label: 'Active', value: v(stats.active), dotClass: 'bg-status-active' },
+          { label: 'Completed', value: v(stats.completed), dotClass: 'bg-status-success' },
+          { label: 'Escalated', value: v(stats.escalated), dotClass: 'bg-status-error' },
+        ]}
+      />
+      <InsightSearch />
     </div>
   );
 }

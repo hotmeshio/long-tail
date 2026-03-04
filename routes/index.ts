@@ -11,6 +11,7 @@ import rolesRouter from './roles';
 import dbaRouter from './dba';
 import maintenanceRouter from './maintenance';
 import mcpRouter from './mcp';
+import insightRouter from './insight';
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use('/users', usersRouter);
 router.use('/roles', rolesRouter);
 router.use('/dba', dbaRouter);
 router.use('/mcp', mcpRouter);
+router.use('/insight', insightRouter);
 
 export default router;

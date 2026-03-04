@@ -6,6 +6,7 @@ import {
   Link,
   Settings,
   Wrench,
+  Tag,
 } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
@@ -15,10 +16,11 @@ const entries: NavEntry[] = [
     kind: 'group',
     label: 'RBAC',
     icon: Shield,
-    matchPaths: ['/admin/users', '/admin/user-roles', '/admin/escalation-chains'],
+    matchPaths: ['/admin/users', '/admin/user-roles', '/admin/roles', '/admin/escalation-chains'],
     items: [
       { to: '/admin/users', label: 'Users', icon: Users },
       { to: '/admin/user-roles', label: 'User Roles', icon: UserCog },
+      { to: '/admin/roles', label: 'Roles', icon: Tag },
       { to: '/admin/escalation-chains', label: 'Escalation Chains', icon: Link },
     ],
   },

@@ -73,7 +73,6 @@ export function AvailableEscalationsPage() {
     return [...roles];
   }, [escalations, selectedIds]);
 
-  // ── Single-item claim ──────────────────────────────────────────────────────
   const handleClaim = () => {
     if (!claimTarget) return;
     claim.mutate(
@@ -87,7 +86,6 @@ export function AvailableEscalationsPage() {
     );
   };
 
-  // ── Bulk action handlers ───────────────────────────────────────────────────
   const handleSetPriority = (priority: 1 | 2 | 3 | 4) => {
     setPriority.mutate(
       { ids: [...selectedIds], priority },
@@ -161,7 +159,6 @@ export function AvailableEscalationsPage() {
     );
   };
 
-  // ── Selection helpers ──────────────────────────────────────────────────────
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
@@ -177,7 +174,6 @@ export function AvailableEscalationsPage() {
     }
   };
 
-  // ── Table columns ──────────────────────────────────────────────────────────
   const columns: Column<LTEscalationRecord>[] = [];
 
   if (canBulkManage) {
@@ -231,28 +227,26 @@ export function AvailableEscalationsPage() {
     <div>
       <PageHeader title="All Escalations" />
 
-      <div className="mb-6">
-        <FilterBar>
-          <FilterSelect
-            label="Role"
-            value={filters.role}
-            onChange={(v) => setFilter('role', v)}
-            options={(rolesData?.roles ?? []).map((r) => ({ value: r, label: r }))}
-          />
-          <FilterSelect
-            label="Type"
-            value={filters.type}
-            onChange={(v) => setFilter('type', v)}
-            options={(typesData?.types ?? []).map((t) => ({ value: t, label: t }))}
-          />
-          <FilterSelect
-            label="Priority"
-            value={filters.priority}
-            onChange={(v) => setFilter('priority', v)}
-            options={PRIORITY_OPTIONS}
-          />
-        </FilterBar>
-      </div>
+      <FilterBar>
+        <FilterSelect
+          label="Role"
+          value={filters.role}
+          onChange={(v) => setFilter('role', v)}
+          options={(rolesData?.roles ?? []).map((r) => ({ value: r, label: r }))}
+        />
+        <FilterSelect
+          label="Type"
+          value={filters.type}
+          onChange={(v) => setFilter('type', v)}
+          options={(typesData?.types ?? []).map((t) => ({ value: t, label: t }))}
+        />
+        <FilterSelect
+          label="Priority"
+          value={filters.priority}
+          onChange={(v) => setFilter('priority', v)}
+          options={PRIORITY_OPTIONS}
+        />
+      </FilterBar>
 
       {selectedIds.size > 0 && (
         <BulkActionBar
@@ -290,7 +284,6 @@ export function AvailableEscalationsPage() {
         onPageSizeChange={pagination.setPageSize}
       />
 
-      {/* Single-item claim dialog */}
       <Modal
         open={!!claimTarget}
         onClose={() => setClaimTarget(null)}
@@ -324,7 +317,6 @@ export function AvailableEscalationsPage() {
         </div>
       </Modal>
 
-      {/* Bulk triage dialog */}
       <BulkTriageModal
         open={triageModalOpen}
         onClose={() => setTriageModalOpen(false)}
@@ -333,7 +325,6 @@ export function AvailableEscalationsPage() {
         isPending={bulkTriage.isPending}
       />
 
-      {/* Bulk assign dialog */}
       <BulkAssignModal
         open={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
