@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useWorkflowExecution, useWorkflowState, useTerminateWorkflow } from '../../api/workflows';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
+import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
 import { PageHeader } from '../../components/common/PageHeader';
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
@@ -12,21 +13,39 @@ import { RestartPanel } from './workflow-execution/RestartPanel';
 
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
+  const navigate = useNavigate();
   const { data: execution, isLoading, error } = useWorkflowExecution(workflowId!);
   const { data: stateData } = useWorkflowState(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
   const { data: childTasksData } = useChildTasks(workflowId!);
   const { data: escalationsData } = useEscalationsByWorkflowId(workflowId);
   const terminateMutation = useTerminateWorkflow();
+  const createYamlMutation = useCreateYamlWorkflow();
   const [restartOpen, setRestartOpen] = useState(false);
 
-  const handleAction = (action: 'restart' | 'terminate') => {
+  const handleAction = (action: 'restart' | 'terminate' | 'convert_yaml') => {
     if (action === 'terminate') {
       if (confirm('Are you sure you want to terminate this workflow?')) {
         terminateMutation.mutate(workflowId!);
       }
     } else if (action === 'restart') {
       setRestartOpen(true);
+    } else if (action === 'convert_yaml' && execution && task) {
+      const name = prompt('Name for the YAML workflow:');
+      if (!name) return;
+      createYamlMutation.mutate(
+        {
+          workflow_id: execution.workflow_id,
+          task_queue: task.task_queue!,
+          workflow_name: task.workflow_type,
+          name,
+        },
+        {
+          onSuccess: (record) => {
+            navigate(`/workflows/yaml/${record.id}`);
+          },
+        },
+      );
     }
   };
 
@@ -82,6 +101,14 @@ export function WorkflowExecutionPage() {
         <div className="py-3 mb-6">
           <p className="text-xs text-status-error">
             Terminate failed: {terminateMutation.error.message}
+          </p>
+        </div>
+      )}
+
+      {createYamlMutation.error && (
+        <div className="py-3 mb-6">
+          <p className="text-xs text-status-error">
+            YAML conversion failed: {createYamlMutation.error.message}
           </p>
         </div>
       )}

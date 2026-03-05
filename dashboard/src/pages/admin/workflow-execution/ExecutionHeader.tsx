@@ -48,7 +48,7 @@ interface ExecutionHeaderProps {
   task?: LTTaskRecord | null;
   childTasks?: LTTaskRecord[];
   escalations?: LTEscalationRecord[];
-  onAction?: (action: 'restart' | 'terminate') => void;
+  onAction?: (action: 'restart' | 'terminate' | 'convert_yaml') => void;
 }
 
 export function ExecutionHeader({ execution, task, escalations, onAction }: ExecutionHeaderProps) {
@@ -72,6 +72,15 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
   const parentWorkflowId = isLeaf ? task.parent_workflow_id : null;
 
   const isRunning = execution.status !== 'completed' && execution.status !== 'failed';
+
+  // Check for convertible tool patterns: callLLM→callDbTool pairs or mcp_* activities
+  const hasToolCalls = execution.status === 'completed' && execution.events.some(
+    (e) => {
+      if (e.event_type !== 'activity_task_completed') return false;
+      const actType = (e.attributes as any).activity_type;
+      return actType === 'callDbTool' || actType?.startsWith('mcp_');
+    },
+  );
 
   // Split compound HotMesh keys into separate task queue / workflow type
   const { taskQueue, workflowType } = splitEntityKey(execution.workflow_type);
@@ -111,6 +120,17 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                     className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-sunken"
                   >
                     Terminate
+                  </button>
+                )}
+                {hasToolCalls && (
+                  <button
+                    onClick={() => {
+                      onAction('convert_yaml');
+                      setActionsOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-sunken"
+                  >
+                    Convert to YAML
                   </button>
                 )}
               </div>

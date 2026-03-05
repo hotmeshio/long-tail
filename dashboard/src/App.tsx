@@ -56,6 +56,12 @@ const StartWorkflowPage = lazy(() =>
 const CronWorkflowsPage = lazy(() =>
   import('./pages/workflows/CronWorkflowsPage').then((m) => ({ default: m.CronWorkflowsPage })),
 );
+const YamlWorkflowsPage = lazy(() =>
+  import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
+);
+const YamlWorkflowDetailPage = lazy(() =>
+  import('./pages/workflows/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
+);
 const TasksListPage = lazy(() =>
   import('./pages/admin/TasksListPage').then((m) => ({ default: m.TasksListPage })),
 );
@@ -157,6 +163,8 @@ const router = createBrowserRouter([
           { path: 'workflows/detail/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
           { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
+          { path: 'workflows/yaml', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+          { path: 'workflows/yaml/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
         ],
       },
 
