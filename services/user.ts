@@ -76,6 +76,11 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
 
   if (input.roles && input.roles.length > 0) {
     for (const r of input.roles) {
+      // Ensure the role exists in lt_roles (FK constraint)
+      await pool.query(
+        'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+        [r.role],
+      );
       await pool.query(
         `INSERT INTO lt_user_roles (user_id, role, type) VALUES ($1, $2, $3)
          ON CONFLICT DO NOTHING`,
@@ -211,6 +216,11 @@ export async function addUserRole(
   type: LTRoleType,
 ): Promise<LTUserRole> {
   const pool = getPool();
+  // Ensure the role exists in lt_roles (FK constraint)
+  await pool.query(
+    'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+    [role],
+  );
   const { rows } = await pool.query(
     `INSERT INTO lt_user_roles (user_id, role, type) VALUES ($1, $2, $3)
      ON CONFLICT (user_id, role) DO UPDATE SET type = EXCLUDED.type

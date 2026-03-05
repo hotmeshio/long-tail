@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWorkflowExecution, useWorkflowState, useTerminateWorkflow } from '../../api/workflows';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
+import { useEscalationsByWorkflowId } from '../../api/escalations';
 import { PageHeader } from '../../components/common/PageHeader';
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
@@ -15,6 +16,7 @@ export function WorkflowExecutionPage() {
   const { data: stateData } = useWorkflowState(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
   const { data: childTasksData } = useChildTasks(workflowId!);
+  const { data: escalationsData } = useEscalationsByWorkflowId(workflowId);
   const terminateMutation = useTerminateWorkflow();
   const [restartOpen, setRestartOpen] = useState(false);
 
@@ -72,6 +74,7 @@ export function WorkflowExecutionPage() {
         execution={execution}
         task={task}
         childTasks={childTasksData?.tasks}
+        escalations={escalationsData?.escalations}
         onAction={handleAction}
       />
 

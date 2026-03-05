@@ -101,7 +101,7 @@ export function TasksListPage() {
         columns={columns}
         data={data?.tasks ?? []}
         keyFn={(row) => row.id}
-        onRowClick={(row) => navigate(`/workflows/tasks/${row.id}`)}
+        onRowClick={(row) => navigate(`/workflows/tasks/detail/${row.id}`)}
         isLoading={isLoading}
         emptyMessage="No tasks found"
       />

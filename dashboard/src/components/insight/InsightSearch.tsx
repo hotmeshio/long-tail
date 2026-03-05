@@ -8,6 +8,7 @@ const SUGGESTIONS = [
   'Summarize today\'s activity',
   'How many tasks completed in the last 24 hours?',
   'Which workflow types have the most escalations?',
+  'Trace the most recent failed task — what happened in the workflow execution?',
 ];
 
 export function InsightSearch() {

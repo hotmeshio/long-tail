@@ -38,6 +38,8 @@ router.get('/processes', async (req, res) => {
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
       workflow_type: (req.query.workflow_type as string) || undefined,
+      status: (req.query.status as string) || undefined,
+      search: (req.query.search as string) || undefined,
     });
     res.json(result);
   } catch (err: any) {

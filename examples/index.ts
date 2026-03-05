@@ -361,6 +361,46 @@ const VISION_TOOLS = [
   },
 ];
 
+const TELEMETRY_TOOLS = [
+  {
+    name: 'query_trace',
+    description: 'Look up all spans for a specific OpenTelemetry trace ID in Honeycomb. Returns span details including name, service, duration, status, and parent-child relationships.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        trace_id: { type: 'string', description: 'The OpenTelemetry trace ID to look up' },
+        dataset: { type: 'string', description: 'Honeycomb dataset (defaults to "long-tail")' },
+      },
+      required: ['trace_id'],
+    },
+  },
+  {
+    name: 'find_recent_traces',
+    description: 'Search for recent traces in Honeycomb. Returns trace IDs with summary info including root span name, total duration, and span count.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_name: { type: 'string', description: 'Filter by service name' },
+        duration_ms_gt: { type: 'number', description: 'Only traces longer than this duration (ms)' },
+        time_range_minutes: { type: 'integer', description: 'How far back to search (minutes, max 1440)', default: 60 },
+        limit: { type: 'integer', description: 'Maximum number of traces to return', default: 20 },
+      },
+    },
+  },
+  {
+    name: 'get_trace_timeline',
+    description: 'Get an ordered timeline view of a trace, showing the workflow execution DAG with parent-child relationships and durations.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        trace_id: { type: 'string', description: 'The OpenTelemetry trace ID' },
+        dataset: { type: 'string', description: 'Honeycomb dataset (defaults to "long-tail")' },
+      },
+      required: ['trace_id'],
+    },
+  },
+];
+
 const SEED_MCP_SERVERS = [
   {
     name: 'long-tail-human-queue',
@@ -377,6 +417,14 @@ const SEED_MCP_SERVERS = [
     transport_config: { builtin: true, process: 'in-memory' },
     tool_manifest: VISION_TOOLS,
     metadata: { builtin: true, category: 'document-processing' },
+  },
+  {
+    name: 'long-tail-telemetry',
+    description: 'Honeycomb telemetry query tools. Traces workflow executions, identifies bottlenecks, and correlates errors across the distributed DAG.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: TELEMETRY_TOOLS,
+    metadata: { builtin: true, category: 'telemetry' },
   },
 ];
 
@@ -405,7 +453,7 @@ async function seedMcpServers(): Promise<void> {
       loggerRegistry.warn(`[examples] failed to seed MCP server ${srv.name}: ${err.message}`);
     }
   }
-  loggerRegistry.info(`[examples] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${HUMAN_QUEUE_TOOLS.length + VISION_TOOLS.length} tools)`);
+  loggerRegistry.info(`[examples] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${HUMAN_QUEUE_TOOLS.length + VISION_TOOLS.length + TELEMETRY_TOOLS.length} tools)`);
 }
 
 /**

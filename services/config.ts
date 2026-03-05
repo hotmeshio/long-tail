@@ -146,6 +146,19 @@ export async function upsertWorkflowConfig(
   try {
     await client.query('BEGIN');
 
+    // Ensure all referenced roles exist in lt_roles (FK constraints)
+    const allRoles = new Set([
+      config.default_role,
+      ...config.roles,
+      ...config.invocation_roles,
+    ]);
+    for (const role of allRoles) {
+      await client.query(
+        'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+        [role],
+      );
+    }
+
     // Upsert the workflow row
     await client.query(
       `INSERT INTO lt_config_workflows

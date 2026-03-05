@@ -3,6 +3,7 @@ import { loggerRegistry } from '../logger';
 import * as mcpClient from './client';
 import * as mcpServer from './server';
 import * as mcpDbServer from './db-server';
+import * as mcpTelemetryServer from './telemetry-server';
 import * as mcpDbService from './db';
 
 export interface BuiltInMcpAdapterOptions {
@@ -40,6 +41,12 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
     await mcpDbServer.createDbServer();
     loggerRegistry.info('[lt-mcp] db query server started');
 
+    // Start Telemetry MCP server (when Honeycomb is configured)
+    if (process.env.HONEYCOMB_API_KEY) {
+      await mcpTelemetryServer.createTelemetryServer();
+      loggerRegistry.info('[lt-mcp] telemetry server started');
+    }
+
     // Connect to auto-connect servers from DB
     await mcpClient.connectAutoServers();
 
@@ -62,6 +69,7 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
 
   async disconnect(): Promise<void> {
     await mcpClient.disconnectAll();
+    await mcpTelemetryServer.stopTelemetryServer();
     await mcpDbServer.stopDbServer();
     await mcpServer.stopServer();
     loggerRegistry.info('[lt-mcp] disconnected');

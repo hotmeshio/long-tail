@@ -95,7 +95,7 @@ export function WorkflowsDashboard() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/workflows/execution/${row.workflow_id}`)}
+        onRowClick={(row) => navigate(`/workflows/detail/${row.workflow_id}`)}
         isLoading={isLoading}
         emptyMessage="No workflow jobs found"
       />

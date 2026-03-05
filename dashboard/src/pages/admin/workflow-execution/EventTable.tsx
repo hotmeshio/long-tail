@@ -72,13 +72,13 @@ export function EventTable({ events, childTasks }: EventTableProps) {
   const categoryDot = (category: string) => {
     switch (category) {
       case 'activity':
-        return 'bg-accent';
+        return 'bg-blue-500';
       case 'signal':
-        return 'bg-status-active';
+        return 'bg-emerald-500';
       case 'timer':
         return 'bg-status-warning';
       case 'child_workflow':
-        return 'bg-purple-500';
+        return 'bg-violet-500';
       default:
         return 'bg-text-tertiary';
     }
@@ -180,12 +180,12 @@ export function EventTable({ events, childTasks }: EventTableProps) {
               >
                 {/* Row header */}
                 <div
-                  className="px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-surface-sunken transition-colors duration-100"
+                  className="px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-surface-sunken transition-colors duration-200"
                   onClick={() => toggleEvent(evt.event_id)}
                 >
                   {/* Expand chevron */}
                   <span
-                    className={`text-[10px] text-text-tertiary transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
+                    className={`text-[10px] text-text-tertiary transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`}
                   >
                     &#9654;
                   </span>

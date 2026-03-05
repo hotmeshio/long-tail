@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/StatusBadge';
-import type { WorkflowExecution, LTTaskRecord } from '../../../api/types';
+import type { WorkflowExecution, LTTaskRecord, LTEscalationRecord } from '../../../api/types';
 import { formatDuration, formatDateTime } from './utils';
 
 function MetadataField({
@@ -47,10 +47,11 @@ interface ExecutionHeaderProps {
   execution: WorkflowExecution;
   task?: LTTaskRecord | null;
   childTasks?: LTTaskRecord[];
+  escalations?: LTEscalationRecord[];
   onAction?: (action: 'restart' | 'terminate') => void;
 }
 
-export function ExecutionHeader({ execution, task, onAction }: ExecutionHeaderProps) {
+export function ExecutionHeader({ execution, task, escalations, onAction }: ExecutionHeaderProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -144,21 +145,60 @@ export function ExecutionHeader({ execution, task, onAction }: ExecutionHeaderPr
         />
       </div>
 
-      {/* Parent navigation */}
-      {parentWorkflowId && (
-        <div className="mt-5 pt-4 border-t border-surface-border">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">
-              Parent
-            </span>
-            <Link
-              to={`/workflows/execution/${parentWorkflowId}`}
-              className="text-xs font-mono text-accent hover:underline truncate"
-              title={parentWorkflowId}
-            >
-              {parentWorkflowId}
-            </Link>
-          </div>
+      {/* Related links */}
+      {(parentWorkflowId || task || (escalations && escalations.length > 0)) && (
+        <div className="mt-5 pt-4 border-t border-surface-border space-y-3">
+          {/* Parent navigation */}
+          {parentWorkflowId && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">
+                Parent
+              </span>
+              <Link
+                to={`/workflows/detail/${parentWorkflowId}`}
+                className="text-xs font-mono text-accent hover:underline truncate"
+                title={parentWorkflowId}
+              >
+                {parentWorkflowId}
+              </Link>
+            </div>
+          )}
+
+          {/* Process link — deep-links to process list filtered by this workflow */}
+          {task && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">
+                Process
+              </span>
+              <Link
+                to={`/processes/list?search=${encodeURIComponent(execution.workflow_id)}`}
+                className="text-xs font-mono text-accent hover:underline truncate"
+              >
+                Find in Processes
+              </Link>
+            </div>
+          )}
+
+          {/* Escalation links */}
+          {escalations && escalations.length > 0 && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0 mt-0.5">
+                {escalations.length === 1 ? 'Escalation' : 'Escalations'}
+              </span>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {escalations.map((esc) => (
+                  <Link
+                    key={esc.id}
+                    to={`/escalations/detail/${esc.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline"
+                  >
+                    <span>{esc.type}</span>
+                    <StatusBadge status={esc.status} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -49,9 +49,24 @@ When answering, call the appropriate tools to gather data, then respond with a J
 
 Tool selection:
 - Always call at least one tool — never guess at data
+
+CRITICAL — Telemetry / trace questions (HIGHEST PRIORITY):
+- If the user provides a trace_id (a hex string like "88143b9fef47873989540fdce20ec108"), call get_trace_link DIRECTLY with that trace_id. Do NOT use DB tools first — go straight to generating the link.
+- If the user asks about a trace, telemetry, spans, execution timeline, performance, latency, or bottlenecks — use get_trace_link to generate a Honeycomb UI link.
+- If the user mentions a workflow_id and asks for its trace/telemetry, use find_tasks with the workflow_id filter to get the trace_id, then call get_trace_link with that trace_id.
+- get_trace_link: generates a direct URL to the Honeycomb trace visualization — the Honeycomb UI shows the full span DAG with durations, errors, and parent-child relationships.
+- Strategy when the user asks about a specific workflow's telemetry:
+  1. Use find_tasks with workflow_id to locate the task and get its trace_id
+  2. Call get_trace_link with that trace_id (and optionally span_id)
+  3. The get_trace_link tool returns a JSON object with a "honeycomb_url" field — you MUST copy that exact URL into your response as a markdown link
+  4. Also include DB context (status, role, workflow type) from the task data
+- If get_trace_link returns an error (env vars not configured), explain that HONEYCOMB_TEAM and HONEYCOMB_ENVIRONMENT need to be set
+- MANDATORY: When get_trace_link returns a honeycomb_url, you MUST embed the full URL in the "summary" field as a markdown link: [View trace in Honeycomb](https://ui.honeycomb.io/...). Never say "via the provided link" or "follow the trace link" without including the actual URL. The user cannot see tool results — only what you put in your JSON response.
+
+Database tools:
 - Use get_system_health for broad status questions
 - Use find_escalations to query escalation records (the source of truth for escalations)
-- Use find_tasks to query task records by status or workflow type
+- Use find_tasks to query task records by status, workflow type, or workflow_id
 - Use get_process_summary for process-level aggregation (do NOT pass status values as workflow_type)
 - Use get_escalation_stats for workload and throughput questions
 - Use get_workflow_types to discover valid workflow type names
@@ -72,11 +87,13 @@ Information design — optimize for a human scanning quickly:
 - Return ONLY the JSON object, no markdown fences or extra text
 
 Link formatting — when referencing specific records, include markdown links so users can navigate directly.
-CRITICAL: Links MUST use relative paths starting with / — never use absolute URLs or https://. Examples:
-- Escalation: [processClaim — pending](/escalations/8afc8abf-d54e-4c7c-98c9-882b08dce7f9)
-- Task: [reviewContent task](/workflows/tasks/7af727a7-3a70-4859-94b0-b5ee55b9d4bb)
-- Process: [Process HeMk6JfQ](/processes/processClaimOrchestrator-seed-HeMk6JfQ)
-- Workflow: [View execution](/workflows/execution/insight-1772577600468-5u4ami)
+For internal app links: use relative paths starting with /. Examples:
+- Escalation: [processClaim — pending](/escalations/detail/8afc8abf-d54e-4c7c-98c9-882b08dce7f9)
+- Task: [reviewContent task](/workflows/tasks/detail/7af727a7-3a70-4859-94b0-b5ee55b9d4bb)
+- Process: [Process HeMk6JfQ](/processes/detail/processClaimOrchestrator-seed-HeMk6JfQ)
+- Workflow: [View execution](/workflows/detail/insight-1772577600468-5u4ami)
+For Honeycomb trace links: use the full https:// URL returned by get_trace_link. Example:
+- Trace: [View trace in Honeycomb](https://ui.honeycomb.io/team/environments/env/datasets/long-tail/trace?trace_id=abc123)
 ALWAYS include links when results reference specific items. Place links inline in summary and section content fields.`;
 
 const MAX_TOOL_ROUNDS = 5;
@@ -188,7 +205,7 @@ export async function insightQuery(
 /**
  * Parse JSON from the LLM response, handling markdown fences and malformed output.
  */
-function parseJsonResponse(content: string): Record<string, any> {
+export function parseJsonResponse(content: string): Record<string, any> {
   // Strip markdown code fences if present
   const cleaned = content
     .replace(/^```(?:json)?\s*/m, '')

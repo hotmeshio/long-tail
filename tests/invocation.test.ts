@@ -21,6 +21,12 @@ describe('Workflow invocation config and RBAC', () => {
     });
     await migrate();
 
+    // Clean up stale data from previous interrupted runs
+    for (const extId of ['invoke-test-user', 'invoke-denied-user', 'invoke-superadmin']) {
+      const stale = await userService.getUserByExternalId(extId);
+      if (stale) await userService.deleteUser(stale.id);
+    }
+
     // Clear seeded configs so tests start clean
     await configService.deleteWorkflowConfig('reviewContent');
     await configService.deleteWorkflowConfig('reviewContentOrchestrator');

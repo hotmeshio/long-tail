@@ -3,21 +3,39 @@ import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { createDbServer } from '../mcp/db-server';
+import { createTelemetryServer } from '../mcp/telemetry-server';
 
-// ── In-process DB MCP client (lazy singleton) ────────────────
+// ── In-process MCP clients (lazy singletons) ─────────────────
 
-let client: InstanceType<typeof McpClient> | null = null;
+let dbClient: InstanceType<typeof McpClient> | null = null;
+let telemetryClient: InstanceType<typeof McpClient> | null = null;
 
-async function getClient(): Promise<InstanceType<typeof McpClient>> {
-  if (client) return client;
+// Maps tool names to the client that owns them
+const toolClientMap = new Map<string, InstanceType<typeof McpClient>>();
+
+async function getDbClient(): Promise<InstanceType<typeof McpClient>> {
+  if (dbClient) return dbClient;
 
   const server = await createDbServer();
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 
-  client = new McpClient({ name: 'insight-query-client', version: '1.0.0' });
-  await client.connect(clientTransport);
-  return client;
+  dbClient = new McpClient({ name: 'insight-db-client', version: '1.0.0' });
+  await dbClient.connect(clientTransport);
+  return dbClient;
+}
+
+async function getTelemetryClient(): Promise<InstanceType<typeof McpClient> | null> {
+  if (telemetryClient) return telemetryClient;
+  if (!process.env.HONEYCOMB_TEAM || !process.env.HONEYCOMB_ENVIRONMENT) return null;
+
+  const server = await createTelemetryServer();
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+
+  telemetryClient = new McpClient({ name: 'insight-telemetry-client', version: '1.0.0' });
+  await telemetryClient.connect(clientTransport);
+  return telemetryClient;
 }
 
 function parseResult(result: any): any {
@@ -30,13 +48,26 @@ function parseResult(result: any): any {
 // ── Proxy activities ──────────────────────────────────────────
 
 /**
- * List all available DB tools and return them in OpenAI function-calling format.
+ * List all available tools (DB + telemetry) in OpenAI function-calling format.
  */
 export async function getDbTools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
-  const c = await getClient();
-  const { tools } = await c.listTools();
+  const db = await getDbClient();
+  const { tools: dbTools } = await db.listTools();
 
-  return tools.map((t) => ({
+  // Register DB tools in the routing map
+  for (const t of dbTools) toolClientMap.set(t.name, db);
+
+  const allTools = [...dbTools];
+
+  // Add telemetry tools if Honeycomb is configured
+  const tel = await getTelemetryClient();
+  if (tel) {
+    const { tools: telTools } = await tel.listTools();
+    for (const t of telTools) toolClientMap.set(t.name, tel);
+    allTools.push(...telTools);
+  }
+
+  return allTools.map((t) => ({
     type: 'function' as const,
     function: {
       name: t.name,
@@ -47,14 +78,14 @@ export async function getDbTools(): Promise<OpenAI.Chat.Completions.ChatCompleti
 }
 
 /**
- * Call a specific DB MCP tool and return the parsed result.
+ * Call a specific MCP tool (DB or telemetry) and return the parsed result.
  */
 export async function callDbTool(
   name: string,
   args: Record<string, any>,
 ): Promise<any> {
-  const c = await getClient();
-  const result = await c.callTool({ name, arguments: args });
+  const client = toolClientMap.get(name) || (await getDbClient());
+  const result = await client.callTool({ name, arguments: args });
   return parseResult(result);
 }
 

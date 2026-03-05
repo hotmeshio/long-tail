@@ -5,11 +5,12 @@ interface InsightResultCardProps {
   result: InsightResult;
 }
 
-const LINK_RE = /\[([^\]]+)\]\((\/[^)]+)\)/g;
+const LINK_RE = /\[([^\]]+)\]\(((?:\/|https?:\/\/)[^)]+)\)/g;
 
 /**
- * Render text with inline markdown links as React Router <Link> components.
- * Only matches relative URLs (starting with /) to prevent external injection.
+ * Render text with inline markdown links.
+ * - Relative URLs (starting with /) → React Router <Link>
+ * - External URLs (https://) → <a> with target="_blank"
  */
 function LinkedText({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
@@ -22,15 +23,30 @@ function LinkedText({ text }: { text: string }) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    parts.push(
-      <Link
-        key={key++}
-        to={match[2]}
-        className="text-accent hover:underline"
-      >
-        {match[1]}
-      </Link>,
-    );
+    const url = match[2];
+    if (url.startsWith('http')) {
+      parts.push(
+        <a
+          key={key++}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:underline"
+        >
+          {match[1]}
+        </a>,
+      );
+    } else {
+      parts.push(
+        <Link
+          key={key++}
+          to={url}
+          className="text-accent hover:underline"
+        >
+          {match[1]}
+        </Link>,
+      );
+    }
     lastIndex = match.index + match[0].length;
   }
 

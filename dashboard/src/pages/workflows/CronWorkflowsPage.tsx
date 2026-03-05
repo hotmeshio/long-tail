@@ -306,7 +306,7 @@ export function CronWorkflowsPage() {
                     columns={jobColumns}
                     data={jobsData?.jobs ?? []}
                     keyFn={(row) => row.workflow_id}
-                    onRowClick={(row) => navigate(`/workflows/execution/${row.workflow_id}`)}
+                    onRowClick={(row) => navigate(`/workflows/detail/${row.workflow_id}`)}
                     isLoading={jobsLoading}
                     emptyMessage="No executions yet"
                   />

@@ -30,10 +30,10 @@ interface SwimlaneTimelineProps {
 // ── Category styling ─────────────────────────────────────────────────────────
 
 const CATEGORY_COLORS: Record<string, { bar: string; label: string }> = {
-  activity:       { bar: 'bg-accent',        label: 'Activities' },
-  signal:         { bar: 'bg-status-active',  label: 'Signals' },
+  activity:       { bar: 'bg-blue-500',      label: 'Activities' },
+  signal:         { bar: 'bg-emerald-500',   label: 'Signals' },
   timer:          { bar: 'bg-status-warning', label: 'Timers' },
-  child_workflow: { bar: 'bg-purple-500',     label: 'Child Workflows' },
+  child_workflow: { bar: 'bg-violet-500',    label: 'Child Workflows' },
 };
 
 const PENDING_CLASS = 'bg-stripes animate-pulse opacity-70';
@@ -320,7 +320,7 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
                 {lane.segments.map((seg) => (
                   <div
                     key={seg.eventId}
-                    className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-100 ${
+                    className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 ${
                       selectedEvents.has(seg.eventId)
                         ? `${barColor(lane.category, seg.pending)} ring-2 ring-accent ring-offset-1`
                         : `${barColor(lane.category, seg.pending)} hover:opacity-80`

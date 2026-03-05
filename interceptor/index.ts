@@ -87,6 +87,8 @@ export function createLTInterceptor(options: {
       const workflowId = ctx.get('workflowId') as string;
       const workflowName = ctx.get('workflowName') as string;
       const workflowTopic = ctx.get('workflowTopic') as string;
+      const workflowTrace = ctx.get('workflowTrace') as string | undefined;
+      const workflowSpan = ctx.get('workflowSpan') as string | undefined;
 
       // Proxy the interceptor activities through the shared queue
       const activities = Durable.workflow.proxyActivities<ActivitiesType>({
@@ -198,6 +200,8 @@ export function createLTInterceptor(options: {
           originId: envelope?.lt?.originId || workflowId,
           parentId: envelope?.lt?.parentId,
           envelope: JSON.stringify(envelope || {}),
+          traceId: workflowTrace,
+          spanId: workflowSpan,
         });
         await activities.ltStartTask(taskId);
       }
@@ -215,6 +219,8 @@ export function createLTInterceptor(options: {
         envelope,
         isReRun,
         activities,
+        traceId: workflowTrace,
+        spanId: workflowSpan,
       };
 
       try {

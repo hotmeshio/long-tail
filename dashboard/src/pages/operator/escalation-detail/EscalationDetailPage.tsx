@@ -265,7 +265,7 @@ function ParentTaskContext({ taskId }: { taskId: string }) {
       )}
 
       <Link
-        to={`/workflows/tasks/${taskId}`}
+        to={`/workflows/tasks/detail/${taskId}`}
         className="text-xs text-accent hover:underline inline-block"
       >
         View full task &rarr;
@@ -294,7 +294,7 @@ export function EscalationDetailPage() {
   const { data: workflowConfigs } = useWorkflowConfigs();
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
-  const returnPath = (location.state as { from?: string } | null)?.from ?? '/escalations';
+  const returnPath = (location.state as { from?: string } | null)?.from ?? '/escalations/available';
   const [activePanel, setActivePanel] = useState<ActivePanel>('none');
 
   if (isLoading) {

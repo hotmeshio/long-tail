@@ -35,12 +35,13 @@ describe('Modal', () => {
 
   it('calls onClose when backdrop is clicked', () => {
     const onClose = vi.fn();
-    const { container } = render(
+    render(
       <Modal open={true} onClose={onClose} title="Title">
         <p>Body</p>
       </Modal>,
     );
-    const backdrop = container.querySelector('.absolute.inset-0')!;
+    // Modal portals to document.body, so query from there
+    const backdrop = document.body.querySelector('.absolute.inset-0')!;
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledOnce();
   });

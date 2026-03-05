@@ -22,7 +22,7 @@ executeLT(options)
       |
   7. Execute onBefore lifecycle hooks (execChild, not LT)
       |
-  8. Start child workflow via activity (SEVERED connection)
+  8. Start child workflow (fire-and-forget via startChild)
       |
   9. waitFor signal from child's interceptor
       |       ^
@@ -44,7 +44,7 @@ When using `executeLT` from within an orchestrator workflow:
 - **Task tracking** — Every child workflow gets a task record in `lt_tasks` with status progression: `pending` -> `in_progress` -> `completed` (or `needs_intervention`).
 - **Provider data injection** — If the workflow config declares `consumers`, completed sibling task data is automatically injected into the envelope under `envelope.lt.providers`.
 - **Lifecycle hooks** — `onBefore` and `onAfter` hooks run as child workflows (via `execChild`) at the configured points. Use them for validation, notification, cleanup, etc.
-- **Severed connection resilience** — The child workflow is started via an activity (not `execChild`), which means the orchestrator is completely decoupled. The child can crash, escalate, and restart without the parent noticing.
+- **Fire-and-forget resilience** — The child workflow is started via `startChild` (not `execChild`), which means the orchestrator is completely decoupled. The child can crash, escalate, and restart without the parent noticing. The orchestrator simply waits for the signal.
 - **Milestone events** — When the task completes, milestones are published to all registered event adapters with `source: 'orchestrator'`.
 - **Origin ID correlation** — Pass `originId` to `executeLT` and all tasks in the pipeline share a correlation key for provider data lookups.
 

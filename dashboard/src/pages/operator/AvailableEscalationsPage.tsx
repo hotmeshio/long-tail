@@ -80,7 +80,7 @@ export function AvailableEscalationsPage() {
       {
         onSuccess: () => {
           setClaimTarget(null);
-          navigate(`/escalations/${claimTarget.id}`);
+          navigate(`/escalations/detail/${claimTarget.id}`);
         },
       },
     );
@@ -270,7 +270,7 @@ export function AvailableEscalationsPage() {
         columns={columns}
         data={escalations}
         keyFn={(row) => row.id}
-        onRowClick={(row) => navigate(`/escalations/${row.id}`, { state: { from: '/escalations' } })}
+        onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
         isLoading={isLoading}
         emptyMessage="No available escalations"
       />

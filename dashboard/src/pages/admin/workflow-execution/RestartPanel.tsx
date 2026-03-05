@@ -77,7 +77,7 @@ export function RestartPanel({ execution, envelope, workflowType, forceOpen, onC
         data: (envelope.data ?? envelope) as Record<string, unknown>,
         metadata: (envelope.metadata ?? {}) as Record<string, unknown>,
       });
-      navigate(`/workflows/execution/${result.workflowId}`);
+      navigate(`/workflows/detail/${result.workflowId}`);
     } catch {
       // error available via invokeMutation.error
     }

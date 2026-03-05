@@ -101,11 +101,19 @@ export function useTaskByWorkflowId(workflowId: string) {
 
 // ── Process hooks ─────────────────────────────────────────────────
 
-export function useProcesses(filters?: { limit?: number; offset?: number; workflow_type?: string }) {
+export function useProcesses(filters?: {
+  limit?: number;
+  offset?: number;
+  workflow_type?: string;
+  status?: string;
+  search?: string;
+}) {
   const params = new URLSearchParams();
   if (filters?.limit) params.set('limit', String(filters.limit));
   if (filters?.offset !== undefined) params.set('offset', String(filters.offset));
   if (filters?.workflow_type) params.set('workflow_type', filters.workflow_type);
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.search) params.set('search', filters.search);
 
   return useQuery<ProcessListResponse>({
     queryKey: ['processes', filters],

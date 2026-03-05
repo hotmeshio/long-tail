@@ -25,6 +25,10 @@ services:
       - NATS_URL=nats://nats:4222
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET:-lt-dev-secret}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY:-}
+      - HONEYCOMB_TEAM=${HONEYCOMB_TEAM:-}
+      - HONEYCOMB_ENVIRONMENT=${HONEYCOMB_ENVIRONMENT:-}
     depends_on:
       postgres:
         condition: service_healthy

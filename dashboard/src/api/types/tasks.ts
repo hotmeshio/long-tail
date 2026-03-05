@@ -35,6 +35,8 @@ export interface LTTaskRecord {
   error: string | null;
   milestones: LTMilestone[];
   data: string | null;
+  trace_id: string | null;
+  span_id: string | null;
   created_at: string;
   updated_at: string;
 }
