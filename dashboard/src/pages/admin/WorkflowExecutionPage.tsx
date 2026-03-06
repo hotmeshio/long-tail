@@ -5,6 +5,7 @@ import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
 import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
 import { PageHeader } from '../../components/common/PageHeader';
+import { ConvertToYamlModal } from '../../components/common/ConvertToYamlModal';
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
@@ -22,6 +23,7 @@ export function WorkflowExecutionPage() {
   const terminateMutation = useTerminateWorkflow();
   const createYamlMutation = useCreateYamlWorkflow();
   const [restartOpen, setRestartOpen] = useState(false);
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
 
   const handleAction = (action: 'restart' | 'terminate' | 'convert_yaml') => {
     if (action === 'terminate') {
@@ -30,23 +32,29 @@ export function WorkflowExecutionPage() {
       }
     } else if (action === 'restart') {
       setRestartOpen(true);
-    } else if (action === 'convert_yaml' && execution && task) {
-      const name = prompt('Name for the YAML workflow:');
-      if (!name) return;
-      createYamlMutation.mutate(
-        {
-          workflow_id: execution.workflow_id,
-          task_queue: task.task_queue!,
-          workflow_name: task.workflow_type,
-          name,
-        },
-        {
-          onSuccess: (record) => {
-            navigate(`/workflows/yaml/${record.id}`);
-          },
-        },
-      );
+    } else if (action === 'convert_yaml') {
+      setConvertModalOpen(true);
     }
+  };
+
+  const handleConvertSubmit = (values: { name: string; app_id: string; subscribes: string }) => {
+    if (!execution || !task) return;
+    createYamlMutation.mutate(
+      {
+        workflow_id: execution.workflow_id,
+        task_queue: task.task_queue!,
+        workflow_name: task.workflow_type,
+        name: values.name,
+        app_id: values.app_id,
+        subscribes: values.subscribes,
+      },
+      {
+        onSuccess: (record) => {
+          setConvertModalOpen(false);
+          navigate(`/mcp/pipelines/${record.id}`);
+        },
+      },
+    );
   };
 
   if (isLoading) {
@@ -108,10 +116,17 @@ export function WorkflowExecutionPage() {
       {createYamlMutation.error && (
         <div className="py-3 mb-6">
           <p className="text-xs text-status-error">
-            YAML conversion failed: {createYamlMutation.error.message}
+            Conversion failed: {createYamlMutation.error.message}
           </p>
         </div>
       )}
+
+      <ConvertToYamlModal
+        open={convertModalOpen}
+        onClose={() => setConvertModalOpen(false)}
+        onSubmit={handleConvertSubmit}
+        isPending={createYamlMutation.isPending}
+      />
 
       <RestartPanel
         execution={execution}

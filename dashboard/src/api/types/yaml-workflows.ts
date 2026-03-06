@@ -5,12 +5,14 @@ export interface ActivityManifestEntry {
   title: string;
   type: 'trigger' | 'worker';
   topic: string;
-  tool_source: 'db' | 'mcp' | 'trigger';
+  tool_source: 'db' | 'mcp' | 'llm' | 'trigger';
   mcp_server_id?: string;
   mcp_tool_name?: string;
   tool_arguments?: Record<string, unknown>;
   input_mappings: Record<string, string>;
   output_fields: string[];
+  prompt_template?: string;
+  model?: string;
 }
 
 export interface LTYamlWorkflowRecord {

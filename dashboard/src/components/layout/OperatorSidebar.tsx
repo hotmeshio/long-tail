@@ -8,5 +8,5 @@ const entries: NavEntry[] = [
 ];
 
 export function OperatorSidebar() {
-  return <SidebarNav heading="Escalations" entries={entries} />;
+  return <SidebarNav heading="HITL Escalations" entries={entries} />;
 }

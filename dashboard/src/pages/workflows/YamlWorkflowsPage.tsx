@@ -81,7 +81,7 @@ export function YamlWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="YAML Workflows" />
+      <PageHeader title="MCP Pipelines" />
 
       <FilterBar>
         <FilterSelect
@@ -101,9 +101,9 @@ export function YamlWorkflowsPage() {
         columns={columns}
         data={workflows}
         keyFn={(row) => row.id}
-        onRowClick={(row) => navigate(`/workflows/yaml/${row.id}`)}
+        onRowClick={(row) => navigate(`/mcp/pipelines/${row.id}`)}
         isLoading={isLoading}
-        emptyMessage="No YAML workflows found"
+        emptyMessage="No MCP pipelines found"
       />
 
       <StickyPagination

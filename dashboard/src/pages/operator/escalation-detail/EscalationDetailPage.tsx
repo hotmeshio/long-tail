@@ -320,41 +320,23 @@ export function EscalationDetailPage() {
     claim.mutate({ id: esc.id, durationMinutes });
   };
 
-  const handleResolve = (payload: Record<string, unknown>) => {
-    resolve.mutate(
-      { id: esc.id, resolverPayload: payload },
-      {
-        onSuccess: () => {
-          addToast('Escalation resolved', 'success');
-          navigate(returnPath);
-        },
-      },
-    );
+  const handleResolve = async (payload: Record<string, unknown>) => {
+    await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
+    addToast('Escalation resolved', 'success');
+    navigate(returnPath);
   };
 
-  const handleEscalate = (targetRole: string) => {
+  const handleEscalate = async (targetRole: string) => {
     if (!targetRole) return;
-    escalate.mutate(
-      { id: esc.id, targetRole },
-      {
-        onSuccess: () => {
-          addToast(`Escalated to ${targetRole}`, 'success');
-          navigate(returnPath);
-        },
-      },
-    );
+    await escalate.mutateAsync({ id: esc.id, targetRole });
+    addToast(`Escalated to ${targetRole}`, 'success');
+    navigate(returnPath);
   };
 
-  const handleRelease = () => {
-    claim.mutate(
-      { id: esc.id, durationMinutes: 0 },
-      {
-        onSuccess: () => {
-          addToast('Escalation released', 'success');
-          navigate(returnPath);
-        },
-      },
-    );
+  const handleRelease = async () => {
+    await claim.mutateAsync({ id: esc.id, durationMinutes: 0 });
+    addToast('Escalation released', 'success');
+    navigate(returnPath);
   };
 
   return (

@@ -34,11 +34,11 @@ export interface ActivityManifestEntry {
   type: 'trigger' | 'worker';
   /** Worker topic for routing */
   topic: string;
-  /** How this tool should be called at runtime */
-  tool_source: 'db' | 'mcp' | 'trigger';
-  /** Original MCP server ID that provided this tool (MCP tools only) */
+  /** How this activity executes at runtime */
+  tool_source: 'db' | 'mcp' | 'llm' | 'trigger';
+  /** Original MCP server ID that provided this tool (tool steps only) */
   mcp_server_id?: string;
-  /** Tool name — MCP tool name or DB tool name */
+  /** Tool name — MCP tool name or DB tool name (tool steps only) */
   mcp_tool_name?: string;
   /** Original arguments the LLM chose (stored for reference / defaults) */
   tool_arguments?: Record<string, unknown>;
@@ -46,4 +46,8 @@ export interface ActivityManifestEntry {
   input_mappings: Record<string, string>;
   /** Known output field names */
   output_fields: string[];
+  /** LLM prompt template — use {field} for interpolation from input maps (llm steps only) */
+  prompt_template?: string;
+  /** LLM model identifier (llm steps only). Defaults to 'gpt-4o-mini'. */
+  model?: string;
 }

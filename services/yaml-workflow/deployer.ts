@@ -2,15 +2,19 @@ import { HotMesh } from '@hotmeshio/hotmesh';
 import { Client as Postgres } from 'pg';
 import type { HotMeshManifest } from '@hotmeshio/hotmesh/build/types/hotmesh';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const yaml = require('js-yaml');
+
 import { postgres_options } from '../../modules/config';
 import { loggerRegistry } from '../logger';
+import * as yamlDb from './db';
 
 /** Cache of HotMesh engine instances keyed by appId */
 const engines = new Map<string, HotMesh>();
 
 /**
  * Get or create a HotMesh engine instance for a given app ID.
- * Each YAML workflow gets its own isolated engine.
+ * Flows sharing the same appId share the same engine (and DB connection pool).
  */
 export async function getEngine(appId: string): Promise<HotMesh> {
   const cached = engines.get(appId);
@@ -27,7 +31,51 @@ export async function getEngine(appId: string): Promise<HotMesh> {
 }
 
 /**
- * Deploy a YAML workflow to HotMesh (inactive until activated).
+ * Merge all YAML graphs for an app_id into a single YAML document.
+ * HotMesh supports multiple graphs in one app definition under `app.graphs[]`.
+ */
+export async function buildMergedYaml(appId: string, version: string): Promise<string> {
+  const workflows = await yamlDb.listYamlWorkflowsByAppId(appId);
+  if (workflows.length === 0) {
+    throw new Error(`No YAML workflows found for app_id: ${appId}`);
+  }
+
+  const allGraphs: unknown[] = [];
+  for (const wf of workflows) {
+    const parsed = yaml.load(wf.yaml_content) as { app?: { graphs?: unknown[] } };
+    if (parsed?.app?.graphs) {
+      allGraphs.push(...parsed.app.graphs);
+    }
+  }
+
+  const merged = {
+    app: {
+      id: appId,
+      version,
+      graphs: allGraphs,
+    },
+  };
+
+  return yaml.dump(merged, { lineWidth: 120, noRefs: true, sortKeys: false });
+}
+
+/**
+ * Deploy all YAML workflows for an app_id as a single merged version.
+ */
+export async function deployAppId(
+  appId: string,
+  version: string,
+): Promise<HotMeshManifest> {
+  const mergedYaml = await buildMergedYaml(appId, version);
+  const engine = await getEngine(appId);
+  const manifest = await engine.deploy(mergedYaml);
+  loggerRegistry.info(`[yaml-workflow] deployed ${appId} v${version} (merged)`);
+  return manifest;
+}
+
+/**
+ * Deploy a single YAML workflow to HotMesh (inactive until activated).
+ * @deprecated Use deployAppId for merged deployment.
  */
 export async function deployYamlWorkflow(
   appId: string,
@@ -74,7 +122,7 @@ export async function invokeYamlWorkflowSync(
   timeout?: number,
 ): Promise<Record<string, unknown>> {
   const engine = await getEngine(appId);
-  const result = await engine.pubsub(topic, data, null, timeout);
+  const result = await engine.pubsub(topic, data, null, timeout ?? 120000);
   return result as unknown as Record<string, unknown>;
 }
 

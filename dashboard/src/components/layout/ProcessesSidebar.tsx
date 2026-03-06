@@ -7,5 +7,5 @@ const entries: NavEntry[] = [
 ];
 
 export function ProcessesSidebar() {
-  return <SidebarNav heading="Processes" entries={entries} />;
+  return <SidebarNav heading="Business Processes" entries={entries} />;
 }

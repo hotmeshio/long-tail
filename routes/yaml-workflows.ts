@@ -4,6 +4,7 @@ import * as yamlDb from '../services/yaml-workflow/db';
 import * as yamlGenerator from '../services/yaml-workflow/generator';
 import * as yamlDeployer from '../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../services/yaml-workflow/workers';
+import { getTaskByWorkflowId } from '../services/task';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { workflow_id, task_queue, workflow_name, name, description } = req.body;
+    const { workflow_id, task_queue, workflow_name, name, description, app_id, subscribes } = req.body;
     if (!workflow_id || !task_queue || !workflow_name || !name) {
       res.status(400).json({
         error: 'workflow_id, task_queue, workflow_name, and name are required',
@@ -46,6 +47,8 @@ router.post('/', async (req, res) => {
       workflowName: workflow_name,
       name,
       description,
+      appId: app_id,
+      subscribes,
     });
 
     // Store in DB
@@ -109,6 +112,58 @@ router.put('/:id', async (req, res) => {
 });
 
 /**
+ * POST /api/yaml-workflows/:id/regenerate
+ * Re-generate the YAML from the original source execution (e.g., after generator improvements).
+ * Only allowed for draft workflows.
+ */
+router.post('/:id/regenerate', async (req, res) => {
+  try {
+    const wf = await yamlDb.getYamlWorkflow(req.params.id);
+    if (!wf) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
+    if (wf.status !== 'draft') {
+      res.status(400).json({ error: 'Only draft workflows can be regenerated' });
+      return;
+    }
+    if (!wf.source_workflow_id || !wf.source_workflow_type) {
+      res.status(400).json({ error: 'Missing source workflow reference — cannot regenerate' });
+      return;
+    }
+
+    // Look up task queue from the source task record, or use body override
+    let taskQueue = req.body.task_queue;
+    if (!taskQueue) {
+      const sourceTask = await getTaskByWorkflowId(wf.source_workflow_id);
+      taskQueue = sourceTask?.task_queue || 'v1';
+    }
+
+    const result = await yamlGenerator.generateYamlFromExecution({
+      workflowId: wf.source_workflow_id,
+      taskQueue,
+      workflowName: wf.source_workflow_type,
+      name: wf.name,
+      description: wf.description || undefined,
+      appId: wf.app_id,
+    });
+
+    const updated = await yamlDb.updateYamlWorkflow(wf.id, {
+      app_id: result.appId,
+      graph_topic: result.graphTopic,
+      yaml_content: result.yaml,
+      input_schema: result.inputSchema,
+      output_schema: result.outputSchema,
+      activity_manifest: result.activityManifest,
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * DELETE /api/yaml-workflows/:id
  * Delete a YAML workflow (must be draft or archived).
  */
@@ -132,7 +187,8 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * POST /api/yaml-workflows/:id/deploy
- * Deploy a YAML workflow via HotMesh CompilerService.
+ * Deploy all YAML workflows sharing this workflow's app_id as a merged version.
+ * Bumps the version and deploys all graphs together.
  */
 router.post('/:id/deploy', async (req, res) => {
   try {
@@ -141,8 +197,24 @@ router.post('/:id/deploy', async (req, res) => {
       res.status(404).json({ error: 'YAML workflow not found' });
       return;
     }
-    await yamlDeployer.deployYamlWorkflow(wf.app_id, wf.yaml_content);
-    const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'deployed');
+
+    // Determine next version across all workflows in this app_id
+    const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
+    const maxVersion = Math.max(...siblings.map((s) => parseInt(s.app_version, 10) || 0), 0);
+    const nextVersion = String(maxVersion + 1);
+
+    // Deploy merged YAML for the full app_id
+    await yamlDeployer.deployAppId(wf.app_id, nextVersion);
+
+    // Mark all non-archived siblings as deployed with the new version
+    for (const sibling of siblings) {
+      await yamlDb.updateYamlWorkflowVersion(sibling.id, nextVersion);
+      if (sibling.status === 'draft' || sibling.status === 'deployed') {
+        await yamlDb.updateYamlWorkflowStatus(sibling.id, 'deployed');
+      }
+    }
+
+    const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -151,7 +223,7 @@ router.post('/:id/deploy', async (req, res) => {
 
 /**
  * POST /api/yaml-workflows/:id/activate
- * Activate a deployed YAML workflow and register workers.
+ * Activate the deployed version for this workflow's app_id and register all workers.
  */
 router.post('/:id/activate', async (req, res) => {
   try {
@@ -164,9 +236,19 @@ router.post('/:id/activate', async (req, res) => {
       res.status(400).json({ error: 'Workflow must be deployed before activation' });
       return;
     }
+
     await yamlDeployer.activateYamlWorkflow(wf.app_id, wf.app_version);
-    await yamlWorkers.registerWorkersForWorkflow(wf);
-    const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'active');
+
+    // Register workers for ALL workflows sharing this app_id
+    const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
+    for (const sibling of siblings) {
+      await yamlWorkers.registerWorkersForWorkflow(sibling);
+      if (sibling.status === 'deployed') {
+        await yamlDb.updateYamlWorkflowStatus(sibling.id, 'active');
+      }
+    }
+
+    const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

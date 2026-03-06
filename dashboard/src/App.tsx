@@ -163,8 +163,6 @@ const router = createBrowserRouter([
           { path: 'workflows/detail/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
           { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
-          { path: 'workflows/yaml', element: <Lazy><YamlWorkflowsPage /></Lazy> },
-          { path: 'workflows/yaml/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
         ],
       },
 
@@ -175,6 +173,8 @@ const router = createBrowserRouter([
           { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
           { path: 'mcp/tools', element: <Lazy><McpToolsPage /></Lazy> },
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
+          { path: 'mcp/pipelines', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+          { path: 'mcp/pipelines/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
         ],
       },
 

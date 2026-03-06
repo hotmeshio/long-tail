@@ -130,7 +130,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                     }}
                     className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-sunken"
                   >
-                    Convert to YAML
+                    Convert to Pipeline
                   </button>
                 )}
               </div>

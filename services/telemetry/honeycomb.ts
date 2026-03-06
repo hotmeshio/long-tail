@@ -13,6 +13,12 @@ export interface HoneycombOptions {
   serviceName?: string;
   /** Honeycomb OTLP endpoint (defaults to https://api.honeycomb.io) */
   endpoint?: string;
+  /**
+   * URL template for deep-linking to traces in Honeycomb UI.
+   * Use `{traceId}` as a placeholder, e.g.:
+   * `https://ui.honeycomb.io/my-team/environments/prod/trace?trace_id={traceId}`
+   */
+  traceUrl?: string;
 }
 
 /**
@@ -43,11 +49,24 @@ export class HoneycombTelemetryAdapter implements LTTelemetryAdapter {
   private readonly apiKey: string;
   private readonly serviceName: string;
   private readonly endpoint: string;
+  readonly traceUrl?: string;
 
   constructor(options?: HoneycombOptions) {
     this.apiKey = options?.apiKey || process.env.HONEYCOMB_API_KEY || '';
     this.serviceName = options?.serviceName || 'long-tail';
     this.endpoint = options?.endpoint || 'https://api.honeycomb.io';
+    this.traceUrl = options?.traceUrl || HoneycombTelemetryAdapter.deriveTraceUrl(this.serviceName);
+  }
+
+  /**
+   * Auto-derive the Honeycomb trace URL from standard env vars.
+   * Returns undefined if HONEYCOMB_TEAM or HONEYCOMB_ENVIRONMENT are not set.
+   */
+  private static deriveTraceUrl(dataset: string): string | undefined {
+    const team = process.env.HONEYCOMB_TEAM;
+    const env = process.env.HONEYCOMB_ENVIRONMENT;
+    if (!team || !env) return undefined;
+    return `https://ui.honeycomb.io/${team}/environments/${env}/datasets/${dataset}/trace?trace_id={traceId}`;
   }
 
   async connect(): Promise<void> {

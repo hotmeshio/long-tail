@@ -79,9 +79,20 @@ export async function updateYamlWorkflowStatus(
   return rows[0] || null;
 }
 
+export async function updateYamlWorkflowVersion(
+  id: string,
+  version: string,
+): Promise<void> {
+  const pool = getPool();
+  await pool.query(
+    'UPDATE lt_yaml_workflows SET app_version = $2 WHERE id = $1',
+    [id, version],
+  );
+}
+
 export async function updateYamlWorkflow(
   id: string,
-  updates: Partial<Pick<CreateYamlWorkflowInput, 'name' | 'description' | 'yaml_content' | 'input_schema' | 'output_schema' | 'activity_manifest' | 'metadata'>>,
+  updates: Partial<Pick<CreateYamlWorkflowInput, 'name' | 'description' | 'app_id' | 'yaml_content' | 'graph_topic' | 'input_schema' | 'output_schema' | 'activity_manifest' | 'metadata'>>,
 ): Promise<LTYamlWorkflowRecord | null> {
   const pool = getPool();
   const sets: string[] = [];
@@ -90,7 +101,9 @@ export async function updateYamlWorkflow(
 
   if (updates.name !== undefined) { sets.push(`name = $${idx++}`); values.push(updates.name); }
   if (updates.description !== undefined) { sets.push(`description = $${idx++}`); values.push(updates.description); }
+  if (updates.app_id !== undefined) { sets.push(`app_id = $${idx++}`); values.push(updates.app_id); }
   if (updates.yaml_content !== undefined) { sets.push(`yaml_content = $${idx++}`); values.push(updates.yaml_content); }
+  if (updates.graph_topic !== undefined) { sets.push(`graph_topic = $${idx++}`); values.push(updates.graph_topic); }
   if (updates.input_schema !== undefined) { sets.push(`input_schema = $${idx++}`); values.push(JSON.stringify(updates.input_schema)); }
   if (updates.output_schema !== undefined) { sets.push(`output_schema = $${idx++}`); values.push(JSON.stringify(updates.output_schema)); }
   if (updates.activity_manifest !== undefined) { sets.push(`activity_manifest = $${idx++}`); values.push(JSON.stringify(updates.activity_manifest)); }
@@ -154,4 +167,21 @@ export async function getActiveYamlWorkflows(): Promise<LTYamlWorkflowRecord[]> 
     "SELECT * FROM lt_yaml_workflows WHERE status = 'active' ORDER BY name",
   );
   return rows;
+}
+
+export async function listYamlWorkflowsByAppId(appId: string): Promise<LTYamlWorkflowRecord[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    "SELECT * FROM lt_yaml_workflows WHERE app_id = $1 AND status != 'archived' ORDER BY name",
+    [appId],
+  );
+  return rows;
+}
+
+export async function getDistinctAppIds(): Promise<string[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    "SELECT DISTINCT app_id FROM lt_yaml_workflows WHERE status != 'archived' ORDER BY app_id",
+  );
+  return rows.map((r: { app_id: string }) => r.app_id);
 }

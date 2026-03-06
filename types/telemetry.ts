@@ -23,4 +23,10 @@ export interface LTTelemetryAdapter {
   connect(): Promise<void>;
   /** Graceful shutdown — flush pending spans and close the exporter */
   disconnect(): Promise<void>;
+  /**
+   * Optional URL template for deep-linking to a trace in your observability UI.
+   * Use `{traceId}` as a placeholder, e.g.:
+   * `https://ui.honeycomb.io/my-team/environments/prod/trace?trace_id={traceId}`
+   */
+  traceUrl?: string;
 }

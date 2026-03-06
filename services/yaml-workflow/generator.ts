@@ -15,9 +15,13 @@ export interface GenerateYamlOptions {
   workflowId: string;
   taskQueue: string;
   workflowName: string;
-  /** User-chosen name for the YAML workflow (used in app_id and topics) */
+  /** User-chosen name for the YAML workflow */
   name: string;
   description?: string;
+  /** HotMesh app namespace (shared across flows). Defaults to 'mcpyaml'. */
+  appId?: string;
+  /** Graph subscribes topic. Defaults to sanitized name. */
+  subscribes?: string;
 }
 
 export interface GenerateYamlResult {
@@ -29,13 +33,17 @@ export interface GenerateYamlResult {
   appId: string;
 }
 
-/** A tool call extracted from an execution's event timeline. */
-interface ExtractedToolCall {
+/** A step extracted from an execution's event timeline. */
+interface ExtractedStep {
+  /** Step kind: 'tool' for DB/MCP tool calls, 'llm' for LLM interpretation */
+  kind: 'tool' | 'llm';
   toolName: string;
   arguments: Record<string, unknown>;
   result: unknown;
-  source: 'db' | 'mcp';
+  source: 'db' | 'mcp' | 'llm';
   mcpServerId?: string;
+  /** For LLM steps: the system/user messages that produced this response */
+  promptMessages?: Array<{ role: string; content: string }>;
 }
 
 /**
@@ -68,9 +76,9 @@ function sanitizeName(name: string): string {
 }
 
 /**
- * Extract the ordered tool call sequence from an execution's events.
+ * Extract the ordered step sequence from an execution's events.
  *
- * Supports two patterns:
+ * Supports three patterns:
  *
  * 1. **callLLM → callDbTool** — Insight/agentic workflows where the LLM
  *    decides which DB tool to call. The `callLLM` result contains
@@ -79,9 +87,13 @@ function sanitizeName(name: string): string {
  *
  * 2. **mcp_* activities** — Workflows that call external MCP server tools
  *    directly via proxyActivities (e.g., vision, document tools).
+ *
+ * 3. **callLLM (interpretation)** — A final callLLM that produces text
+ *    content (no tool_calls). This is the LLM synthesizing/interpreting
+ *    tool results into a structured response.
  */
-function extractToolCallSequence(events: WorkflowExecutionEvent[]): ExtractedToolCall[] {
-  const calls: ExtractedToolCall[] = [];
+function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] {
+  const steps: ExtractedStep[] = [];
   let pendingLlmCall: { toolName: string; arguments: Record<string, unknown> } | null = null;
 
   for (const evt of events) {
@@ -107,13 +119,41 @@ function extractToolCallSequence(events: WorkflowExecutionEvent[]): ExtractedToo
           toolName: tc.function.name,
           arguments: parsedArgs,
         };
+        continue;
+      }
+
+      // Pattern 3: callLLM with text content (no tool_calls) — interpretation step
+      const content = result?.content as string | undefined;
+      if (content) {
+        // Try to parse JSON from LLM response to get output schema
+        let parsed: unknown = content;
+        try {
+          const cleaned = content
+            .replace(/^```(?:json)?\s*/m, '')
+            .replace(/\s*```$/m, '')
+            .trim();
+          parsed = JSON.parse(cleaned);
+        } catch {
+          // Keep as raw string — wrap in object for schema consistency
+          parsed = { response: content };
+        }
+
+        steps.push({
+          kind: 'llm',
+          toolName: 'interpret',
+          arguments: {},
+          result: parsed,
+          source: 'llm',
+          promptMessages: buildDefaultPrompt(steps),
+        });
       }
       continue;
     }
 
     // Pattern 1b: callDbTool — paired with the preceding callLLM
     if (attrs.activity_type === 'callDbTool' && pendingLlmCall) {
-      calls.push({
+      steps.push({
+        kind: 'tool',
         toolName: pendingLlmCall.toolName,
         arguments: pendingLlmCall.arguments,
         result: attrs.result,
@@ -126,7 +166,8 @@ function extractToolCallSequence(events: WorkflowExecutionEvent[]): ExtractedToo
     // Pattern 2: mcp_* activities (external MCP tools)
     if (attrs.activity_type?.startsWith('mcp_')) {
       const { serverName, toolName } = parseMcpActivityType(attrs.activity_type);
-      calls.push({
+      steps.push({
+        kind: 'tool',
         toolName,
         arguments: {},
         result: attrs.result,
@@ -137,7 +178,27 @@ function extractToolCallSequence(events: WorkflowExecutionEvent[]): ExtractedToo
     }
   }
 
-  return calls;
+  return steps;
+}
+
+/**
+ * Build a default prompt template referencing the data available from prior tool steps.
+ * The prompt uses {field} placeholders that map to input_maps at runtime.
+ */
+function buildDefaultPrompt(priorSteps: ExtractedStep[]): Array<{ role: string; content: string }> {
+  const lastToolStep = [...priorSteps].reverse().find((s) => s.kind === 'tool');
+  const fields = lastToolStep?.result && typeof lastToolStep.result === 'object' && !Array.isArray(lastToolStep.result)
+    ? Object.keys(lastToolStep.result as Record<string, unknown>)
+    : [];
+
+  const dataRef = fields.length > 0
+    ? `The data includes the following fields: ${fields.join(', ')}.`
+    : 'Analyze the provided data.';
+
+  return [
+    { role: 'system', content: `You are a data analysis assistant. Interpret the provided data and return a structured JSON response with: title, summary, sections (array of {heading, content}), and metrics (array of {label, value}).` },
+    { role: 'user', content: `${dataRef}\n\nData:\n{input_data}\n\nProvide a concise analysis.` },
+  ];
 }
 
 /**
@@ -200,48 +261,47 @@ export async function generateYamlFromExecution(
     workflowName,
   );
 
-  // 2. Extract ordered tool calls (both callLLM→callDbTool and mcp_* patterns)
-  const toolCalls = extractToolCallSequence(execution.events);
-  if (toolCalls.length === 0) {
+  // 2. Extract ordered steps (tool calls + LLM interpretation steps)
+  const steps = extractStepSequence(execution.events);
+  if (steps.length === 0) {
     throw new Error(
-      'No tool calls found in this execution. Expected callLLM→callDbTool pairs or mcp_* activities.',
+      'No steps found in this execution. Expected callLLM→callDbTool pairs, mcp_* activities, or LLM interpretation steps.',
     );
   }
 
-  const safeName = sanitizeName(name);
-  const appId = `lt-yaml-${safeName}`;
-  const graphTopic = `${appId}.execute`;
+  const appId = options.appId || 'mcpyaml';
+  const graphTopic = options.subscribes || sanitizeName(name);
 
-  // 3. Infer input schema from the workflow's initial input
-  const startEvent = execution.events.find(
-    (e) => e.event_type === 'workflow_execution_started',
-  );
-  const workflowInput = startEvent
-    ? (startEvent.attributes as { input?: unknown }).input
-    : null;
-  const inputSchema = workflowInput ? inferSchema(workflowInput) : {
-    type: 'object' as const,
-    properties: { id: { type: 'string' } },
-  };
+  // 3. Infer input schema from the first tool step's arguments.
+  const firstToolStep = steps.find((s) => s.kind === 'tool');
+  const firstCallArgs = firstToolStep?.arguments ?? {};
+  const inputSchema = Object.keys(firstCallArgs).length > 0
+    ? inferSchema(firstCallArgs)
+    : { type: 'object' as const };
 
-  // 4. Infer output schema from execution result
-  const outputSchema = execution.result
-    ? inferSchema(execution.result)
+  // 4. Infer output schema from the last step's result.
+  const lastStep = steps[steps.length - 1];
+  const outputSchema = lastStep.result
+    ? inferSchema(lastStep.result)
     : { type: 'object' as const };
 
   // 5. Build activities and transitions
+  // Prefix activity IDs with graph topic to ensure uniqueness across
+  // merged graphs sharing the same app_id.
+  const prefix = graphTopic.replace(/[^a-z0-9]/g, '_');
   const activities: Record<string, unknown> = {};
   const transitions: Record<string, Array<{ to: string }>> = {};
   const activityManifest: ActivityManifestEntry[] = [];
 
   // Trigger activity
-  activities['t1'] = {
+  const triggerId = `${prefix}_t1`;
+  activities[triggerId] = {
     title: 'Trigger',
     type: 'trigger',
     output: { schema: { type: 'object' } },
   };
   activityManifest.push({
-    activity_id: 't1',
+    activity_id: triggerId,
     title: 'Trigger',
     type: 'trigger',
     tool_source: 'trigger',
@@ -252,23 +312,35 @@ export async function generateYamlFromExecution(
     ),
   });
 
-  let prevActivityId = 't1';
-  let prevResult: unknown = workflowInput;
+  let prevActivityId = triggerId;
+  let prevResult: unknown = firstCallArgs;
 
-  toolCalls.forEach((call, idx) => {
-    const actId = `a${idx + 1}`;
-    const topic = `${appId}.${call.toolName}`;
-    const title = call.toolName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  steps.forEach((step, idx) => {
+    const actId = `${prefix}_a${idx + 1}`;
+    const topicSuffix = step.kind === 'llm' ? 'interpret' : step.toolName;
+    const topic = `${graphTopic}.${topicSuffix}`;
+    const title = step.kind === 'llm'
+      ? 'LLM Interpret'
+      : step.toolName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-    // Build input maps from previous activity output
+    // Build input maps from previous activity output.
     const inputMappings = idx === 0
-      ? buildInputMappings('t1', workflowInput)
+      ? buildInputMappings(triggerId, firstCallArgs)
       : buildInputMappings(prevActivityId, prevResult);
 
-    const resultSchema = call.result ? inferSchema(call.result) : { type: 'object' };
-    const outputFields = call.result && typeof call.result === 'object' && !Array.isArray(call.result)
-      ? Object.keys(call.result as Record<string, unknown>)
+    const resultSchema = step.result ? inferSchema(step.result) : { type: 'object' };
+    const outputFields = step.result && typeof step.result === 'object' && !Array.isArray(step.result)
+      ? Object.keys(step.result as Record<string, unknown>)
       : [];
+
+    // Build job maps for the last activity — this sets the job result data
+    const isLastActivity = idx === steps.length - 1;
+    const jobMaps: Record<string, string> | undefined = isLastActivity && outputFields.length > 0
+      ? outputFields.reduce((acc, field) => {
+          acc[field] = `{$self.output.data.${field}}`;
+          return acc;
+        }, {} as Record<string, string>)
+      : undefined;
 
     activities[actId] = {
       title,
@@ -279,26 +351,36 @@ export async function generateYamlFromExecution(
         ...(Object.keys(inputMappings).length > 0 ? { maps: inputMappings } : {}),
       },
       output: { schema: resultSchema },
+      ...(jobMaps ? { job: { maps: jobMaps } } : {}),
     };
+
+    // Build prompt template for LLM steps
+    const promptTemplate = step.kind === 'llm' && step.promptMessages
+      ? step.promptMessages.map((m) => `[${m.role}]\n${m.content}`).join('\n\n')
+      : undefined;
 
     activityManifest.push({
       activity_id: actId,
       title,
       type: 'worker',
-      tool_source: call.source,
+      tool_source: step.source,
       topic,
-      mcp_server_id: call.source === 'mcp' ? call.mcpServerId : 'db',
-      mcp_tool_name: call.toolName,
-      tool_arguments: Object.keys(call.arguments).length > 0 ? call.arguments : undefined,
+      ...(step.kind === 'tool' ? {
+        mcp_server_id: step.source === 'mcp' ? step.mcpServerId : 'db',
+        mcp_tool_name: step.toolName,
+        tool_arguments: Object.keys(step.arguments).length > 0 ? step.arguments : undefined,
+      } : {}),
       input_mappings: inputMappings,
       output_fields: outputFields,
+      ...(promptTemplate ? { prompt_template: promptTemplate } : {}),
+      ...(step.kind === 'llm' ? { model: 'gpt-4o-mini' } : {}),
     });
 
     // Transition from previous
     transitions[prevActivityId] = [{ to: actId }];
 
     prevActivityId = actId;
-    prevResult = call.result;
+    prevResult = step.result;
   });
 
   // 6. Build the full YAML graph structure
