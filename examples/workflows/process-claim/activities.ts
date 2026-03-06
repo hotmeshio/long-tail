@@ -1,18 +1,123 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import OpenAI from 'openai';
+
 import type { ClaimAnalysis } from './types';
 
+// ── Resolve fixtures directory ──────────────────────────────────────────────
+function fixturesDir(): string {
+  const candidates = [
+    path.join(__dirname, '..', '..', '..', 'tests', 'fixtures'),
+    path.join(__dirname, '..', '..', '..', '..', 'tests', 'fixtures'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
+  return candidates[0];
+}
+
 /**
- * Analyze claim documents. Behavior is driven by filenames:
- * - Filenames containing '_rotated' → high confidence (corrected docs)
- * - Original filenames → low confidence (simulates blurry/corrupt images)
+ * Analyze claim documents using OpenAI Vision.
  *
- * In production, this would call an AI vision service to analyze
- * the document images and extract structured data.
+ * Reads each document image, sends it to gpt-4o-mini for quality assessment.
+ * Returns a confidence score based on whether the images are readable.
+ *
+ * Falls back to filename-based heuristics when OPENAI_API_KEY is not set.
  */
 export async function analyzeDocuments(
   documents: string[],
 ): Promise<ClaimAnalysis> {
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  if (documents.length === 0) {
+    return {
+      confidence: 0,
+      flags: ['no_documents'],
+      summary: 'No documents provided for analysis.',
+    };
+  }
 
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || apiKey === 'xxx') {
+    // Fallback: filename-based heuristic (for testing without API key)
+    return analyzeByFilename(documents);
+  }
+
+  const openai = new OpenAI({ apiKey });
+  const dir = fixturesDir();
+  const flags: string[] = [];
+  let readableCount = 0;
+
+  for (const doc of documents) {
+    const filePath = path.join(dir, doc);
+    if (!fs.existsSync(filePath)) {
+      flags.push(`missing_file:${doc}`);
+      continue;
+    }
+
+    const imageContent = fs.readFileSync(filePath, 'base64');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Assess this document image quality. Is the text readable and right-side up?
+Return ONLY a JSON object: {"readable": true/false, "orientation": "normal"|"upside_down"|"rotated"|"unknown", "issues": ["list of issues"]}`,
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${imageContent}`,
+                detail: 'low',
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 200,
+    });
+
+    const raw = response.choices?.[0]?.message?.content || '';
+    try {
+      const cleaned = raw.replace(/^```json\n?|\n?```$/g, '').trim();
+      const assessment = JSON.parse(cleaned);
+
+      if (assessment.readable) {
+        readableCount++;
+      } else {
+        if (assessment.orientation === 'upside_down') flags.push(`upside_down:${doc}`);
+        else if (assessment.orientation === 'rotated') flags.push(`rotated:${doc}`);
+        else flags.push(`unreadable:${doc}`);
+      }
+    } catch {
+      flags.push(`assessment_failed:${doc}`);
+    }
+  }
+
+  const confidence = documents.length > 0 ? readableCount / documents.length : 0;
+
+  if (confidence >= 0.85) {
+    return {
+      confidence,
+      flags: flags.length > 0 ? flags : [],
+      summary: 'All document images processed successfully. Data extraction complete.',
+    };
+  }
+
+  return {
+    confidence,
+    flags: flags.length > 0 ? flags : ['unreadable_images'],
+    summary:
+      `${documents.length - readableCount} of ${documents.length} document images have quality issues. ` +
+      'Unable to extract data reliably.',
+  };
+}
+
+/**
+ * Filename-based fallback when no API key is available.
+ */
+function analyzeByFilename(documents: string[]): ClaimAnalysis {
   const correctedCount = documents.filter(d => d.includes('_rotated')).length;
   const allCorrected = correctedCount === documents.length && documents.length > 0;
 
@@ -24,11 +129,12 @@ export async function analyzeDocuments(
     };
   }
 
-  // Some or no corrected documents — low confidence
-  const flags: string[] = ['blurry_images', 'unreadable_text'];
-  if (correctedCount > 0) {
-    flags.push('partial_correction');
+  const flags: string[] = [];
+  for (const doc of documents) {
+    if (doc.includes('upside_down')) flags.push(`upside_down:${doc}`);
+    else if (!doc.includes('_rotated')) flags.push(`unreadable:${doc}`);
   }
+  if (flags.length === 0) flags.push('unreadable_images');
 
   return {
     confidence: 0.35,
@@ -42,16 +148,11 @@ export async function analyzeDocuments(
 /**
  * Validate a claim against the claimant record.
  * Only succeeds when analysis confidence is above threshold.
- *
- * In production, this would query a policy database and cross-reference
- * the extracted claim data with the claimant's active coverage.
  */
 export async function validateClaim(
   claimantId: string,
   confidence: number,
 ): Promise<{ valid: boolean; reason: string }> {
-  await new Promise((resolve) => setTimeout(resolve, 50));
-
   if (confidence >= 0.85) {
     return {
       valid: true,
@@ -62,7 +163,7 @@ export async function validateClaim(
   return {
     valid: false,
     reason:
-      `Insufficient confidence (${confidence}) to validate claim. ` +
+      `Insufficient confidence (${confidence.toFixed(2)}) to validate claim. ` +
       `Document quality too low for automated processing.`,
   };
 }

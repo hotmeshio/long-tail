@@ -7,8 +7,8 @@
  *   1. Wait for server + seeded escalation
  *   2. Reviewer claims → escalates to admin
  *   3. Admin claims → escalates to engineer
- *   4. Engineer claims → resolves with needsTriage + hint "wrong_language"
- *   5. MCP triage translates content, re-runs workflow, notifies engineering
+ *   4. Engineer claims → resolves with needsTriage, describes: "Content is in Spanish"
+ *   5. LLM-driven MCP triage diagnoses, translates, re-runs workflow, notifies engineering
  *   6. Verify: original workflow completed, engineering escalation created
  *
  * Usage:
@@ -192,7 +192,7 @@ async function run() {
 
   await api('POST', `/escalations/${engEsc.id}/claim`, engineerToken);
   log('engineer', 'Claimed escalation');
-  log('engineer', 'Content is wrong language. Requesting AI triage with hint: wrong_language');
+  log('engineer', 'Content is in the wrong language. Requesting AI triage.');
 
   const resolveResult = await api('POST', `/escalations/${engEsc.id}/resolve`, engineerToken, {
     resolverPayload: {
@@ -200,8 +200,8 @@ async function run() {
       reason: 'Content is in Spanish — needs translation before review',
       _lt: {
         needsTriage: true,
-        hint: 'wrong_language',
       },
+      notes: 'Content arrived in Spanish. Needs translation to English before it can be reviewed.',
     },
   });
 
@@ -288,7 +288,7 @@ async function run() {
   console.log('    → Escalated to reviewer');
   console.log('    → Reviewer escalated to admin (language issue)');
   console.log('    → Admin escalated to engineer (needs technical fix)');
-  console.log('    → Engineer requested AI triage (hint: wrong_language)');
+  console.log('    → Engineer requested AI triage (LLM will diagnose and fix)');
   console.log('    → MCP orchestrator: translate_content() → re-invoke workflow');
   console.log('    → Translated content auto-approved');
   console.log('    → Engineering notified: add language detection to pipeline');

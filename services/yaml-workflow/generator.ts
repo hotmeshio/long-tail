@@ -100,8 +100,8 @@ function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] 
     if (evt.event_type !== 'activity_task_completed') continue;
     const attrs = evt.attributes as ActivityTaskCompletedAttributes;
 
-    // Pattern 1a: callLLM with tool_calls → record pending tool call
-    if (attrs.activity_type === 'callLLM') {
+    // Pattern 1a: callLLM/callTriageLLM with tool_calls → record pending tool call
+    if (attrs.activity_type === 'callLLM' || attrs.activity_type === 'callTriageLLM') {
       const result = attrs.result as Record<string, unknown> | null;
       const toolCalls = result?.tool_calls as Array<{
         function: { name: string; arguments: string };
@@ -150,14 +150,15 @@ function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] 
       continue;
     }
 
-    // Pattern 1b: callDbTool — paired with the preceding callLLM
-    if (attrs.activity_type === 'callDbTool' && pendingLlmCall) {
+    // Pattern 1b: callDbTool/callVisionTool — paired with the preceding callLLM
+    if ((attrs.activity_type === 'callDbTool' || attrs.activity_type === 'callVisionTool') && pendingLlmCall) {
       steps.push({
         kind: 'tool',
         toolName: pendingLlmCall.toolName,
         arguments: pendingLlmCall.arguments,
         result: attrs.result,
-        source: 'db',
+        source: attrs.activity_type === 'callVisionTool' ? 'mcp' : 'db',
+        ...(attrs.activity_type === 'callVisionTool' ? { mcpServerId: 'vision' } : {}),
       });
       pendingLlmCall = null;
       continue;

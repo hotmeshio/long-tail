@@ -84,7 +84,7 @@ function ResolvePanel({
   const [json, setJson] = useState('{}');
   const [parseError, setParseError] = useState('');
   const [requestTriage, setRequestTriage] = useState(false);
-  const [triageHint, setTriageHint] = useState('');
+  const [triageNotes, setTriageNotes] = useState('');
 
   useEffect(() => {
     setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
@@ -100,7 +100,8 @@ function ResolvePanel({
       return;
     }
     if (requestTriage) {
-      payload._lt = { needsTriage: true, ...(triageHint ? { hint: triageHint } : {}) };
+      payload._lt = { needsTriage: true };
+      if (triageNotes.trim()) payload.notes = triageNotes.trim();
     }
     onResolve(payload);
   };
@@ -136,15 +137,15 @@ function ResolvePanel({
 
       <Collapsible open={requestTriage}>
         <div className="pl-7">
-          <input
-            type="text"
-            value={triageHint}
-            onChange={(e) => setTriageHint(e.target.value)}
-            placeholder="e.g., image_orientation"
-            className="input text-xs font-mono w-full"
+          <textarea
+            value={triageNotes}
+            onChange={(e) => setTriageNotes(e.target.value)}
+            placeholder="Describe the issue, e.g.: Document images appear upside down, unable to read member information"
+            className="input text-xs w-full"
+            rows={3}
           />
           <p className="text-[10px] text-text-tertiary mt-1">
-            Guides the triage workflow on what remediation to apply
+            Describe the problem — AI will diagnose and apply the fix using MCP tools
           </p>
         </div>
       </Collapsible>

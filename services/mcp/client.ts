@@ -1,13 +1,32 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../logger';
 import * as mcpDbService from './db';
 import type { LTMcpServerRecord, LTMcpToolManifest } from '../../types';
 
-/** In-memory map of server ID to active MCP client */
+/** In-memory map of server ID/name to active MCP client */
 const clients = new Map<string, Client>();
+
+/**
+ * Built-in server factories — keyed by server name.
+ * These are in-process MCP servers that connect via InMemoryTransport
+ * rather than external stdio/SSE connections.
+ */
+const builtinFactories = new Map<string, () => Promise<any>>();
+
+/**
+ * Register a built-in server factory so it can be auto-connected
+ * when callServerTool is invoked with its name.
+ */
+export function registerBuiltinServer(
+  name: string,
+  factory: () => Promise<any>,
+): void {
+  builtinFactories.set(name, factory);
+}
 
 /**
  * Connect to a registered MCP server.
@@ -79,14 +98,65 @@ export async function listServerTools(serverId: string): Promise<LTMcpToolManife
 }
 
 /**
+ * Resolve a server by ID or name, auto-connecting built-in servers if needed.
+ * Returns the client or null if not found.
+ *
+ * Built-in servers are connected once under their canonical factory name.
+ * Alias lookups (e.g. 'vision' matching 'long-tail-document-vision') reuse
+ * the same client instance to avoid double-connecting the singleton server.
+ */
+async function resolveClient(serverId: string): Promise<Client | null> {
+  // 1. Direct lookup (by UUID or name)
+  if (clients.has(serverId)) return clients.get(serverId)!;
+
+  // 2. Check built-in server factories by name
+  for (const [name, factory] of builtinFactories) {
+    if (serverId === name || name.includes(serverId) || serverId.includes(name)) {
+      // Check if we already connected this factory under its canonical name
+      if (clients.has(name)) {
+        // Alias the serverId to the existing client so future lookups are instant
+        clients.set(serverId, clients.get(name)!);
+        return clients.get(name)!;
+      }
+
+      const server = await factory();
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+
+      const client = new Client({ name: `builtin-${name}`, version: '1.0.0' });
+      await client.connect(clientTransport);
+      // Cache under both the canonical name and the requested serverId
+      clients.set(name, client);
+      if (serverId !== name) clients.set(serverId, client);
+      loggerRegistry.info(`[lt-mcp:client] auto-connected built-in server: ${name} (as '${serverId}')`);
+      return client;
+    }
+  }
+
+  // 3. Look up by name in DB — maybe the serverId is actually a name
+  try {
+    const dbServer = await mcpDbService.getMcpServerByName(serverId);
+    if (dbServer && clients.has(dbServer.id)) {
+      clients.set(serverId, clients.get(dbServer.id)!);
+      return clients.get(dbServer.id)!;
+    }
+  } catch {
+    // DB lookup failed — not critical
+  }
+
+  return null;
+}
+
+/**
  * Call a tool on a connected server.
+ * Resolves the server by ID or name, auto-connecting built-in servers.
  */
 export async function callServerTool(
   serverId: string,
   toolName: string,
   args: Record<string, any>,
 ): Promise<any> {
-  const client = clients.get(serverId);
+  const client = await resolveClient(serverId);
   if (!client) {
     throw new Error(`MCP server ${serverId} is not connected`);
   }

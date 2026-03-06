@@ -101,13 +101,12 @@ export const ENVELOPE_TEMPLATES: {
   processClaimOrchestrator: {
     data: {
       claimId: 'CLM-2024-001',
-      claimantId: 'POL-5551234',
+      claimantId: 'MBR-2024-001',
       claimType: 'auto_collision',
       amount: 12500,
       documents: [
-        'incident_report.pdf',
-        'photo_evidence.jpg',
-        'police_report.pdf',
+        'page1_upside_down.png',
+        'page2.png',
       ],
     },
     metadata: { source: 'dashboard' },

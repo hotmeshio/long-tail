@@ -15,7 +15,7 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
   const [resolverJson, setResolverJson] = useState('{}');
   const [resolveError, setResolveError] = useState('');
   const [requestTriage, setRequestTriage] = useState(false);
-  const [triageHint, setTriageHint] = useState('');
+  const [triageNotes, setTriageNotes] = useState('');
 
   // Pre-fill resolver JSON from workflow config's resolver_schema
   useEffect(() => {
@@ -34,10 +34,8 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
 
     // Inject _lt triage routing when requested
     if (requestTriage) {
-      payload._lt = {
-        needsTriage: true,
-        ...(triageHint ? { hint: triageHint } : {}),
-      };
+      payload._lt = { needsTriage: true };
+      if (triageNotes.trim()) payload.notes = triageNotes.trim();
     }
 
     onResolve(payload);
@@ -85,17 +83,17 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
           {requestTriage && (
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
-                Triage Hint (optional)
+                Describe the Problem
               </label>
-              <input
-                type="text"
-                value={triageHint}
-                onChange={(e) => setTriageHint(e.target.value)}
-                placeholder="e.g., image_orientation"
-                className="input text-xs font-mono w-full"
+              <textarea
+                value={triageNotes}
+                onChange={(e) => setTriageNotes(e.target.value)}
+                placeholder="e.g.: Document images appear upside down, unable to read member information"
+                className="input text-xs w-full"
+                rows={3}
               />
               <p className="text-[10px] text-text-tertiary mt-1">
-                Guides the triage workflow on what remediation to apply
+                AI will diagnose and apply the fix using MCP tools
               </p>
             </div>
           )}

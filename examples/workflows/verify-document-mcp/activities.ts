@@ -29,10 +29,13 @@ async function getClient(): Promise<InstanceType<typeof McpClient>> {
 }
 
 function parseResult(result: any): any {
-  if (result.content?.[0]?.text) {
-    return JSON.parse(result.content[0].text);
+  const text = result.content?.[0]?.text;
+  if (!text) return result;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
   }
-  return result;
 }
 
 // ── MCP-wrapped activities ────────────────────────────────────
