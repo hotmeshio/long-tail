@@ -73,12 +73,12 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
 
   const isRunning = execution.status !== 'completed' && execution.status !== 'failed';
 
-  // Check for convertible tool patterns: callLLM→callDbTool pairs or mcp_* activities
+  // Check for convertible tool patterns: callLLM→callDbTool/callVisionTool pairs or mcp_* activities
   const hasToolCalls = execution.status === 'completed' && execution.events.some(
     (e) => {
       if (e.event_type !== 'activity_task_completed') return false;
       const actType = (e.attributes as any).activity_type;
-      return actType === 'callDbTool' || actType?.startsWith('mcp_');
+      return actType === 'callDbTool' || actType === 'callVisionTool' || actType?.startsWith('mcp_');
     },
   );
 

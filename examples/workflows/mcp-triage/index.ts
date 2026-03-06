@@ -8,9 +8,9 @@ type ActivitiesType = typeof activities;
 const {
   getUpstreamTasks,
   getEscalationHistory,
-  listDocumentPages,
-  rotatePage,
-  translateContent,
+  getVisionTools,
+  callVisionTool,
+  callTriageLLM,
   notifyEngineering,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
@@ -21,35 +21,75 @@ const {
   },
 });
 
+const MAX_TOOL_ROUNDS = 8;
+
+const SYSTEM_PROMPT = `You are an automated triage specialist for a document processing system. A workflow failed and a human reviewer has flagged the issue for AI-assisted remediation.
+
+Your job:
+1. Diagnose why the original workflow failed using the failure context provided
+2. Use the available document processing tools to investigate and fix the issue
+3. Return corrected data so the original workflow can be re-run successfully
+
+Diagnostic strategy:
+1. Start by listing document pages (list_document_pages) to see what's available
+2. Common issues and their fixes:
+   - **Unreadable/damaged/upside-down images**: Rotate pages with rotate_page (try 180 degrees first). After rotating, use extract_member_info on the rotated reference to verify the fix worked.
+   - **Wrong language content**: Use translate_content to convert to the target language (usually English)
+   - **Extraction failures**: Try extracting from different pages, or rotate and retry
+   - **Validation mismatches**: Use validate_member to check extracted data against the database
+3. After applying fixes, verify the result by extracting/validating the corrected data
+4. Build the corrected data object for re-invocation of the original workflow
+
+IMPORTANT rules:
+- Always call at least one tool — never guess at what's wrong
+- When rotating pages, use the RETURNED rotated_ref from rotate_page as the new image reference
+- After rotating, call extract_member_info with the rotated reference to confirm the fix worked
+- The corrected data must include all fields the original workflow needs
+
+When done, return ONLY a JSON object (no markdown fences):
+{
+  "diagnosis": "Clear description of what went wrong",
+  "actions_taken": ["Step 1: ...", "Step 2: ...", ...],
+  "correctedData": {
+    ...all fields the original workflow needs, with problematic fields corrected...
+    "documents": ["page1_upside_down_rotated.png", "page2.png"] // corrected document list for re-invocation
+  },
+  "confidence": 0.0-1.0,
+  "recommendation": "Suggested pipeline improvement to prevent this in future"
+}
+
+If you cannot fix the issue after investigation, return:
+{
+  "diagnosis": "What you found",
+  "actions_taken": ["What you tried"],
+  "correctedData": null,
+  "confidence": 0,
+  "recommendation": "What a human engineer should investigate"
+}`;
+
 /**
  * MCP Triage workflow (leaf).
  *
- * Activated when a human resolver gives up and flags `needsTriage` in their
- * resolution payload. This is the MCP remediation escape hatch — it uses
- * MCP tools to figure out what went wrong and produce corrected data.
+ * Activated when a human resolver flags \`needsTriage\` in their resolution
+ * payload. Uses an LLM-driven agentic loop with Vision MCP tools to
+ * diagnose and fix document processing failures.
  *
- * The triage leaf does NOT re-invoke the original workflow. It returns
- * `correctedData` to the orchestrator, which handles the re-invocation.
- * This keeps the leaf pure — it can escalate to an engineer for guidance
- * using the standard LT escalation mechanism.
+ * The LLM dynamically decides which tools to call — rotate pages, extract
+ * member info, translate content, validate against the database — creating
+ * a rich event history of tool calls. This event history can later be
+ * converted to a deterministic MCP pipeline (same as insight workflows).
  *
- * **First entry** (no `envelope.resolver`):
+ * **First entry** (no \`envelope.resolver\`):
+ *   1. Queries upstream tasks and escalation history for full context
+ *   2. Gives the LLM all available Vision MCP tools
+ *   3. LLM diagnoses the issue and applies fixes via tool calls
+ *   4. Returns \`{ correctedData }\` to the orchestrator
+ *   5. If LLM can't fix it, escalates to engineer with full diagnosis
  *
- * 1. Queries upstream tasks and escalation history for full context
- * 2. For known hints (wrong_language, image_orientation): applies the fix
- *    via MCP tools and returns `{ correctedData }` to the orchestrator
- * 3. For unknown/complex issues: escalates to `engineer` with full context.
- *    The workflow ENDS — the interceptor creates an escalation record.
- *
- * **Re-entry** (has `envelope.resolver` — engineer responded):
- *
- * 1. Reads the engineer's guidance from `envelope.resolver`
- * 2. Applies the guided fix via MCP tools
- * 3. Returns `{ correctedData }` to the orchestrator
- *
- * The orchestrator receives the corrected data and re-invokes the original
- * workflow. When it succeeds, the container interceptor signals back to
- * the original parent, completing the vortex.
+ * **Re-entry** (has \`envelope.resolver\` — engineer responded):
+ *   1. Adds engineer's guidance to the LLM context
+ *   2. LLM uses the guidance + tools to apply the fix
+ *   3. Returns \`{ correctedData }\` to the orchestrator
  */
 export async function mcpTriage(
   envelope: LTEnvelope,
@@ -62,32 +102,195 @@ export async function mcpTriage(
     resolverPayload,
   } = envelope.data;
 
-  // ── Re-entry: engineer (or another role) responded to our escalation ──
+  // ── Re-entry: engineer responded to our escalation ──
   if (envelope.resolver) {
-    return handleEngineerResponse(envelope);
+    const resolver = envelope.resolver as Record<string, any>;
+    return runTriageLLM(envelope, {
+      additionalContext:
+        `An engineer has reviewed this issue and provided guidance:\n` +
+        JSON.stringify(resolver, null, 2),
+    });
   }
 
-  // ── First entry: analyze the situation and decide what to do ───────────
-
-  // 1. Query all upstream tasks and escalation history for full context
+  // ── First entry: gather context and let LLM diagnose + fix ──
   const upstreamTasks = await getUpstreamTasks(originId);
   const escalationHistory = await getEscalationHistory(originId);
 
-  // 2. Determine remediation from resolver hints
-  const hint = (resolverPayload?._lt?.hint ?? '').toString().toLowerCase();
+  const contextParts = [
+    `**Original Workflow**: ${originalWorkflowType} (queue: ${originalTaskQueue})`,
+    `**Origin ID**: ${originId}`,
+    `**Failure Data**:\n${JSON.stringify(escalationPayload, null, 2)}`,
+    `**Reviewer Notes**:\n${JSON.stringify(resolverPayload, null, 2)}`,
+  ];
 
-  // 3. Known hints — apply automatic fix via MCP tools
-  if (hint.includes('image_orientation') || hint.includes('orientation') || hint.includes('rotate')) {
-    return handleImageOrientation(envelope, upstreamTasks.length);
+  if (upstreamTasks.length > 0) {
+    contextParts.push(
+      `**Upstream Tasks** (${upstreamTasks.length}):\n${JSON.stringify(
+        upstreamTasks.map((t) => ({
+          id: t.id,
+          type: t.workflow_type,
+          status: t.status,
+        })),
+        null,
+        2,
+      )}`,
+    );
   }
 
-  if (hint.includes('wrong_language') || hint.includes('language') || hint.includes('translate')) {
-    return handleWrongLanguage(envelope, upstreamTasks.length);
+  if (escalationHistory.length > 0) {
+    contextParts.push(
+      `**Escalation History** (${escalationHistory.length}):\n${JSON.stringify(
+        escalationHistory.map((e) => ({
+          id: e.id,
+          type: e.type,
+          role: e.role,
+          status: e.status,
+          description: e.description,
+        })),
+        null,
+        2,
+      )}`,
+    );
   }
 
-  // 4. Unknown/complex issue — escalate to engineer with full context
-  //    The workflow ENDS here. When the engineer resolves, the interceptor
-  //    re-runs this workflow with envelope.resolver populated.
+  return runTriageLLM(envelope, {
+    additionalContext: contextParts.join('\n\n'),
+  });
+}
+
+// ── LLM Agentic Loop ────────────────────────────────────────────
+
+async function runTriageLLM(
+  envelope: LTEnvelope,
+  opts: { additionalContext: string },
+): Promise<LTReturn | LTEscalation> {
+  const {
+    originId,
+    originalWorkflowType,
+    originalTaskQueue,
+    escalationPayload,
+  } = envelope.data;
+
+  const tools = await getVisionTools();
+  const messages: any[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `Please diagnose and fix this issue:\n\n${opts.additionalContext}`,
+    },
+  ];
+
+  let toolCallCount = 0;
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const response = await callTriageLLM(messages, tools);
+
+    // No tool calls — LLM has produced its final answer
+    if (!response.tool_calls?.length) {
+      return handleFinalResponse(
+        response.content || '',
+        envelope,
+        toolCallCount,
+      );
+    }
+
+    // Execute each tool call
+    const fnCalls = response.tool_calls.filter(
+      (tc): tc is typeof tc & {
+        type: 'function';
+        function: { name: string; arguments: string };
+      } => tc.type === 'function',
+    );
+
+    messages.push({
+      role: 'assistant',
+      content: response.content,
+      tool_calls: fnCalls,
+    });
+
+    for (const toolCall of fnCalls) {
+      toolCallCount++;
+      let args: Record<string, any> = {};
+      try {
+        args = JSON.parse(toolCall.function.arguments || '{}');
+      } catch {
+        args = {};
+      }
+
+      const result = await callVisionTool(toolCall.function.name, args);
+
+      messages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(result),
+      });
+    }
+  }
+
+  // Exhausted rounds — ask for final synthesis without tools
+  const finalResponse = await callTriageLLM(messages, undefined);
+  return handleFinalResponse(
+    finalResponse.content || '',
+    envelope,
+    toolCallCount,
+  );
+}
+
+// ── Response handling ───────────────────────────────────────────
+
+async function handleFinalResponse(
+  content: string,
+  envelope: LTEnvelope,
+  toolCallCount: number,
+): Promise<LTReturn | LTEscalation> {
+  const {
+    originId,
+    originalWorkflowType,
+    originalTaskQueue,
+    escalationPayload,
+  } = envelope.data;
+
+  const parsed = parseTriageResponse(content);
+
+  if (parsed.correctedData) {
+    // Success — LLM fixed the issue
+    if (parsed.recommendation) {
+      await notifyEngineering(
+        originId,
+        `Triage auto-remediation for ${originalWorkflowType}: ${parsed.diagnosis || 'issue resolved'}. ` +
+          `Recommendation: ${parsed.recommendation}`,
+        {
+          actions_taken: parsed.actions_taken,
+          tool_calls: toolCallCount,
+          confidence: parsed.confidence,
+        },
+      );
+    }
+
+    return {
+      type: 'return',
+      data: {
+        correctedData: {
+          ...escalationPayload,
+          ...parsed.correctedData,
+        },
+        originalWorkflowType,
+        originalTaskQueue,
+        originId,
+        diagnosis: parsed.diagnosis,
+        actions_taken: parsed.actions_taken,
+        tool_calls_made: toolCallCount,
+        confidence: parsed.confidence,
+      },
+      milestones: [
+        { name: 'triage', value: 'completed' },
+        { name: 'triage_method', value: 'llm_assisted' },
+        { name: 'tool_calls', value: String(toolCallCount) },
+      ],
+    };
+  }
+
+  // LLM couldn't fix — escalate to engineer with full diagnosis
   return {
     type: 'escalation',
     data: {
@@ -95,200 +298,33 @@ export async function mcpTriage(
       originalWorkflowType,
       originalTaskQueue,
       escalationPayload,
-      resolverPayload,
-      context: {
-        upstreamTaskCount: upstreamTasks.length,
-        upstreamTasks: upstreamTasks.map(t => ({
-          id: t.id,
-          workflow_type: t.workflow_type,
-          status: t.status,
-          created_at: t.created_at,
-        })),
-        escalationHistory: escalationHistory.map(e => ({
-          id: e.id,
-          type: e.type,
-          role: e.role,
-          status: e.status,
-          description: e.description,
-          created_at: e.created_at,
-        })),
-        humanComments: resolverPayload,
-      },
+      diagnosis: parsed.diagnosis || 'AI triage could not determine a fix',
+      actions_taken: parsed.actions_taken || [],
+      tool_calls_made: toolCallCount,
     },
     message:
-      `Triage needed for ${originalWorkflowType} (origin: ${originId}). ` +
-      `${upstreamTasks.length} upstream task(s), ${escalationHistory.length} prior escalation(s). ` +
-      `Human comment: ${resolverPayload?.reason || resolverPayload?.notes || 'no details provided'}. ` +
-      `Please review the context and provide guidance: what fix should be applied?`,
+      `AI triage could not resolve the issue for ${originalWorkflowType} ` +
+      `(origin: ${originId}). Diagnosis: ${parsed.diagnosis || 'unknown'}. ` +
+      `${toolCallCount} tool call(s) made. Please review and provide guidance.`,
     role: 'engineer',
     priority: 2,
   };
 }
 
-// ── Handlers ──────────────────────────────────────────────────────────────
+function parseTriageResponse(content: string): Record<string, any> {
+  const cleaned = content
+    .replace(/^```(?:json)?\s*/m, '')
+    .replace(/\s*```$/m, '')
+    .trim();
 
-/**
- * Handle re-entry after an engineer responds to the triage escalation.
- *
- * The engineer's response is in `envelope.resolver`. It may contain:
- * - `action`: what to do ('translate', 'rotate', 'correct_data', 'retry')
- * - `hint`: a hint for the automatic handler
- * - `correctedData`: direct data to use for re-invocation
- * - `notes`: context for the audit trail
- *
- * Returns `{ correctedData }` so the orchestrator can re-invoke.
- */
-async function handleEngineerResponse(
-  envelope: LTEnvelope,
-): Promise<LTReturn> {
-  const {
-    originId,
-    originalWorkflowType,
-    originalTaskQueue,
-    escalationPayload,
-  } = envelope.data;
-
-  const resolver = envelope.resolver as Record<string, any>;
-  const rawAction = (resolver.action || resolver._lt?.hint || resolver.hint || '').toString().toLowerCase();
-  let correctedData: Record<string, any>;
-
-  if (rawAction.includes('wrong_language') || rawAction.includes('language') || rawAction.includes('translate')) {
-    const content = escalationPayload?.content || '';
-    const targetLang = resolver.targetLanguage || 'en';
-    const translation = await translateContent(content, targetLang);
-    correctedData = {
-      ...escalationPayload,
-      content: translation.translated_content,
-    };
-
-    await notifyEngineering(
-      originId,
-      `Content arrived in ${translation.source_language} — translated per engineer guidance. ` +
-      `Recommend adding language detection to the pipeline.`,
-      { action: rawAction, source_language: translation.source_language },
-    );
-  } else if (rawAction.includes('image_orientation') || rawAction.includes('orientation') || rawAction.includes('rotate')) {
-    const pages = escalationPayload?.documents || await listDocumentPages();
-    const degrees = resolver.degrees || 180;
-    const rotatedPages: string[] = [];
-    for (const page of pages) {
-      rotatedPages.push(await rotatePage(page, degrees));
-    }
-    correctedData = {
-      ...escalationPayload,
-      documents: rotatedPages,
-    };
-  } else if (resolver.correctedData) {
-    correctedData = resolver.correctedData;
-  } else {
-    // General guidance — pass through with engineer's response augmented
-    correctedData = {
-      ...escalationPayload,
-      _engineerGuidance: resolver,
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    return {
+      diagnosis: cleaned || 'No response generated',
+      actions_taken: [],
+      correctedData: null,
+      confidence: 0,
     };
   }
-
-  return {
-    type: 'return',
-    data: {
-      correctedData,
-      originalWorkflowType,
-      originalTaskQueue,
-      originId,
-      resolvedVia: 'engineer_guidance',
-      engineerAction: rawAction || 'custom',
-    },
-    milestones: [
-      { name: 'triage', value: 'completed' },
-      { name: 'triage_resolved_via', value: 'engineer_guidance' },
-    ],
-  };
-}
-
-/**
- * Automatic fix: rotate upside-down document pages.
- * Returns corrected data for the orchestrator to re-invoke with.
- */
-async function handleImageOrientation(
-  envelope: LTEnvelope,
-  upstreamTaskCount: number,
-): Promise<LTReturn> {
-  const {
-    originId,
-    originalWorkflowType,
-    originalTaskQueue,
-    escalationPayload,
-  } = envelope.data;
-
-  // Use documents from escalation payload if available, else query MCP
-  const pages = escalationPayload?.documents || await listDocumentPages();
-  const rotatedPages: string[] = [];
-  for (const page of pages) {
-    rotatedPages.push(await rotatePage(page, 180));
-  }
-
-  return {
-    type: 'return',
-    data: {
-      correctedData: {
-        ...escalationPayload,
-        documents: rotatedPages,
-      },
-      originalWorkflowType,
-      originalTaskQueue,
-      originId,
-      hint: 'image_orientation',
-      upstreamTaskCount,
-    },
-    milestones: [
-      { name: 'triage', value: 'completed' },
-      { name: 'triage_hint', value: 'image_orientation' },
-    ],
-  };
-}
-
-/**
- * Automatic fix: translate wrong-language content.
- * Returns corrected data for the orchestrator to re-invoke with.
- */
-async function handleWrongLanguage(
-  envelope: LTEnvelope,
-  upstreamTaskCount: number,
-): Promise<LTReturn> {
-  const {
-    originId,
-    originalWorkflowType,
-    originalTaskQueue,
-    escalationPayload,
-  } = envelope.data;
-
-  const originalContent = escalationPayload?.content || '';
-  const translation = await translateContent(originalContent, 'en');
-
-  // Non-blocking recommendation to engineering
-  await notifyEngineering(
-    originId,
-    `Content arrived in ${translation.source_language} — translated and re-processed successfully. ` +
-    `Recommend adding a language detection step to the pipeline to handle this automatically.`,
-    { hint: 'wrong_language', source_language: translation.source_language },
-  );
-
-  return {
-    type: 'return',
-    data: {
-      correctedData: {
-        ...escalationPayload,
-        content: translation.translated_content,
-      },
-      originalWorkflowType,
-      originalTaskQueue,
-      originId,
-      hint: 'wrong_language',
-      upstreamTaskCount,
-    },
-    milestones: [
-      { name: 'triage', value: 'completed' },
-      { name: 'triage_hint', value: 'wrong_language' },
-    ],
-  };
 }

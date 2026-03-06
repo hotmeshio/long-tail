@@ -37,14 +37,19 @@ const ACTIVITY_QUEUE = 'lt-interceptor';
 
 // ── Mock activities for testVerifyDocument ──────────────────────────────────
 // These replace the real OpenAI Vision calls with deterministic behavior:
-// - page1.png → returns null (simulates upside-down/unreadable page)
-// - page1_rotated.png → returns valid MemberInfo matching database
+// - page1_upside_down.png → returns null (simulates upside-down/unreadable page)
+// - page1_upside_down_rotated.png → returns valid MemberInfo matching database
+// - page1.png → returns valid MemberInfo (normal orientation)
 // - page2.png → returns partial info (emergency contact)
 
 async function mockListDocumentPages(): Promise<string[]> {
+  // Simulate a document set with an upside-down page (like the real claim scenario).
+  // Only return the upside-down page + page2 — not the right-side-up page1.png.
   const dir = path.join(__dirname, '..', 'fixtures');
   return fs.readdirSync(dir)
-    .filter(f => (f.endsWith('.png') || f.endsWith('.jpg')) && !f.includes('_rotated'))
+    .filter(f => (f.endsWith('.png') || f.endsWith('.jpg'))
+      && !f.includes('_rotated')
+      && f !== 'page1.png')
     .map(f => f);
 }
 
@@ -53,10 +58,10 @@ async function mockExtractMemberInfo(
   _pageNumber: number,
 ): Promise<MemberInfo | null> {
   // Simulates upside-down page — extraction returns nothing
-  if (imageRef === 'page1.png') return null;
+  if (imageRef === 'page1_upside_down.png') return null;
 
   // Rotated page extracts correctly — matches MBR-2024-001 in database
-  if (imageRef === 'page1_rotated.png') {
+  if (imageRef.includes('_rotated') || imageRef === 'page1.png') {
     return {
       memberId: 'MBR-2024-001',
       name: 'John Smith',
@@ -363,9 +368,10 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
   //
   // 1. Start orchestrator → testVerifyDocument extracts from page1.png → null
   // 2. Workflow escalates (extraction_failed)
-  // 3. Human resolves with needsTriage + hint: image_orientation
+  // 3. Human resolves with needsTriage (no hint — just describes the problem)
   // 4. MCP strategy → starts mcpTriageOrchestrator
-  // 5. Triage calls rotate_page → gets page1_rotated.png
+  // 5. LLM-driven triage: diagnoses issue using Vision tools, rotates pages,
+  //    verifies extraction, returns corrected data
   // 6. Triage re-invokes testVerifyDocument with corrected pages
   // 7. Extraction succeeds → validation passes → signals back
   // 8. Original orchestrator completes
@@ -404,9 +410,10 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
     expect(parseMcpResult(checkPending).status).toBe('pending');
 
     // 4. Resolve with needsTriage — triggers MCP triage orchestrator
+    //    No hint needed — the LLM diagnoses the issue using MCP tools
     await resolveEscalation(esc.id, {
-      _lt: { needsTriage: true, hint: 'image_orientation' },
-      notes: 'Page is upside down, cannot extract data',
+      _lt: { needsTriage: true },
+      notes: 'Document images appear to be upside down or damaged. Cannot read member information from the scanned pages.',
     });
 
     // 5. Wait for the full triage chain to complete

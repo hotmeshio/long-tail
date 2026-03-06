@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
@@ -8,33 +9,38 @@ import type { LTTaskRecord, LTEscalationRecord } from '../../../types';
 
 // ── In-process Vision MCP client (lazy singleton) ─────────────
 
-let client: InstanceType<typeof McpClient> | null = null;
+let visionClient: InstanceType<typeof McpClient> | null = null;
+const toolClientMap = new Map<string, InstanceType<typeof McpClient>>();
 
-async function getClient(): Promise<InstanceType<typeof McpClient>> {
-  if (client) return client;
+async function getVisionClient(): Promise<InstanceType<typeof McpClient>> {
+  if (visionClient) return visionClient;
 
   const server = await createVisionServer();
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 
-  client = new McpClient({ name: 'mcp-triage-client', version: '1.0.0' });
-  await client.connect(clientTransport);
-  return client;
+  visionClient = new McpClient({ name: 'mcp-triage-client', version: '1.0.0' });
+  await visionClient.connect(clientTransport);
+  return visionClient;
 }
 
 function parseResult(result: any): any {
-  if (result.content?.[0]?.text) {
-    return JSON.parse(result.content[0].text);
+  const text = result.content?.[0]?.text;
+  if (!text) return result;
+
+  // MCP error responses or non-JSON text — return as-is for the LLM to interpret
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
   }
-  return result;
 }
 
-// ── MCP tool activities ───────────────────────────────────────
+// ── Context activities ────────────────────────────────────────
 
 /**
  * Query all tasks sharing an originId.
- * Gives the triage workflow full context of upstream work —
- * what ran, what succeeded, what escalated.
+ * Gives the triage workflow full context of upstream work.
  */
 export async function getUpstreamTasks(
   originId: string,
@@ -48,57 +54,12 @@ export async function getUpstreamTasks(
 
 /**
  * Query all escalations sharing an originId.
- * Gives the triage workflow the full conversation history —
- * who escalated to whom, what comments were left, what was tried.
+ * Gives the triage workflow the full conversation history.
  */
 export async function getEscalationHistory(
   originId: string,
 ): Promise<LTEscalationRecord[]> {
   return escalationService.getEscalationsByOriginId(originId);
-}
-
-/**
- * List available document pages via Vision MCP server.
- */
-export async function listDocumentPages(): Promise<string[]> {
-  const c = await getClient();
-  const result = await c.callTool({
-    name: 'list_document_pages',
-    arguments: {},
-  });
-  return parseResult(result).pages;
-}
-
-/**
- * Rotate a document page image via Vision MCP server.
- * Returns the storage reference for the rotated image.
- */
-export async function rotatePage(
-  imageRef: string,
-  degrees: number,
-): Promise<string> {
-  const c = await getClient();
-  const result = await c.callTool({
-    name: 'rotate_page',
-    arguments: { image_ref: imageRef, degrees },
-  });
-  return parseResult(result).rotated_ref;
-}
-
-/**
- * Translate content via Vision MCP server.
- * Returns the translated text and detected source language.
- */
-export async function translateContent(
-  content: string,
-  targetLanguage: string,
-): Promise<{ translated_content: string; source_language: string }> {
-  const c = await getClient();
-  const result = await c.callTool({
-    name: 'translate_content',
-    arguments: { content, target_language: targetLanguage },
-  });
-  return parseResult(result);
 }
 
 /**
@@ -125,4 +86,56 @@ export async function notifyEngineering(
       auto_generated: true,
     },
   });
+}
+
+// ── LLM + MCP tool activities ────────────────────────────────
+
+/**
+ * List all available Vision MCP tools in OpenAI function-calling format.
+ * These are the document processing tools the LLM can choose from.
+ */
+export async function getVisionTools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+  const client = await getVisionClient();
+  const { tools } = await client.listTools();
+
+  for (const t of tools) toolClientMap.set(t.name, client);
+
+  return tools.map((t) => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description || '',
+      parameters: t.inputSchema as Record<string, unknown>,
+    },
+  }));
+}
+
+/**
+ * Call a specific Vision MCP tool and return the parsed result.
+ * The LLM decides which tool to call — this executes it.
+ */
+export async function callVisionTool(
+  name: string,
+  args: Record<string, any>,
+): Promise<any> {
+  const client = toolClientMap.get(name) || (await getVisionClient());
+  const result = await client.callTool({ name, arguments: args });
+  return parseResult(result);
+}
+
+/**
+ * Call the LLM (OpenAI) with messages and optional tool definitions.
+ * Returns the assistant message (content + tool_calls).
+ */
+export async function callTriageLLM(
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  tools?: OpenAI.Chat.Completions.ChatCompletionTool[],
+): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages,
+    ...(tools?.length ? { tools } : {}),
+  });
+  return response.choices[0].message;
 }

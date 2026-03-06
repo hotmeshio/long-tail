@@ -12,13 +12,13 @@
 export interface ResolverLTBlock {
   /** Flag for AI triage — routes to the mcpTriage orchestrator. */
   needsTriage?: boolean;
-  /** Hint for the triage workflow (e.g., 'image_orientation'). */
-  hint?: string;
 }
 
-/** Base resolver payload — all resolvers may include _lt. */
+/** Base resolver payload — all resolvers may include _lt and notes. */
 export interface BaseResolverPayload {
   _lt?: ResolverLTBlock;
+  /** Human description of the problem — the LLM uses this for diagnosis. */
+  notes?: string;
 }
 
 // ── reviewContent ───────────────────────────────────────────────

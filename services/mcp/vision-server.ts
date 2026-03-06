@@ -1,10 +1,25 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import sharp from 'sharp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import OpenAI from 'openai';
 
 import { loggerRegistry } from '../logger';
 import * as verifyActivities from '../../examples/workflows/verify-document/activities';
 
-let server: McpServer | null = null;
+// ── Resolve fixtures directory ──────────────────────────────────────────────
+function fixturesDir(): string {
+  // Works from both ts-node (root) and compiled (build/) contexts
+  const candidates = [
+    path.join(__dirname, '..', '..', 'tests', 'fixtures'),
+    path.join(__dirname, '..', '..', '..', 'tests', 'fixtures'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
+  return candidates[0];
+}
 
 // ── Schemas (extracted to break TS2589 deep-instantiation in registerTool generics) ──
 
@@ -46,25 +61,11 @@ const validateMemberSchema = z.object({
 });
 
 /**
- * Create the Document Vision MCP server.
- *
- * Registers five tools wrapping the verify-document activities:
- * - list_document_pages — list available page images from storage
- * - extract_member_info — extract member data from a page via OpenAI Vision
- * - validate_member — validate extracted data against the member database
- * - rotate_page — rotate a document page image by the given degrees
- * - translate_content — translate text content to a target language
+ * Register all five vision tools on an McpServer instance.
  */
-export async function createVisionServer(options?: {
-  name?: string;
-}): Promise<McpServer> {
-  if (server) return server;
-
-  const name = options?.name || 'long-tail-document-vision';
-  server = new McpServer({ name, version: '1.0.0' });
-
+function registerTools(srv: McpServer): void {
   // ── list_document_pages ─────────────────────────────────────────
-  (server as any).registerTool(
+  (srv as any).registerTool(
     'list_document_pages',
     {
       title: 'List Document Pages',
@@ -80,11 +81,11 @@ export async function createVisionServer(options?: {
   );
 
   // ── extract_member_info ─────────────────────────────────────────
-  (server as any).registerTool(
+  (srv as any).registerTool(
     'extract_member_info',
     {
       title: 'Extract Member Info',
-      description: 'Extract member information from a document page image using OpenAI Vision (gpt-4o-mini). Returns structured MemberInfo or null.',
+      description: 'Extract member information from a document page image using OpenAI Vision (gpt-4o-mini). Returns structured MemberInfo or null if the image is unreadable (e.g. upside down or blurry).',
       inputSchema: extractMemberInfoSchema,
     },
     async (args: z.infer<typeof extractMemberInfoSchema>) => {
@@ -99,7 +100,7 @@ export async function createVisionServer(options?: {
   );
 
   // ── validate_member ─────────────────────────────────────────────
-  (server as any).registerTool(
+  (srv as any).registerTool(
     'validate_member',
     {
       title: 'Validate Member',
@@ -115,78 +116,141 @@ export async function createVisionServer(options?: {
   );
 
   // ── rotate_page ───────────────────────────────────────────────
-  (server as any).registerTool(
+  (srv as any).registerTool(
     'rotate_page',
     {
       title: 'Rotate Page',
-      description: 'Rotate a document page image by the given degrees. Returns a new image reference for the rotated version.',
+      description: 'Rotate a document page image by the given degrees using sharp. Writes the corrected image to storage and returns the new image reference.',
       inputSchema: rotatePageSchema,
     },
     async (args: z.infer<typeof rotatePageSchema>) => {
-      // Derive rotated reference by inserting _rotated before the extension.
-      // In production, this would call an image processing service.
-      const ref = args.image_ref;
-      const dotIdx = ref.lastIndexOf('.');
-      const rotatedRef = dotIdx >= 0
-        ? `${ref.slice(0, dotIdx)}_rotated${ref.slice(dotIdx)}`
-        : `${ref}_rotated`;
+      const dir = fixturesDir();
+      const srcPath = path.join(dir, args.image_ref);
 
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({ rotated_ref: rotatedRef, degrees: args.degrees }),
-        }],
-      };
-    },
-  );
+      if (!fs.existsSync(srcPath)) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: `Image not found: ${args.image_ref}` }),
+          }],
+        };
+      }
 
-  // ── translate_content ──────────────────────────────────────────
-  (server as any).registerTool(
-    'translate_content',
-    {
-      title: 'Translate Content',
-      description: 'Translate content text to the target language. Returns the translated content and detected source language.',
-      inputSchema: translateContentSchema,
-    },
-    async (args: z.infer<typeof translateContentSchema>) => {
-      // For the demo, strip the WRONG_LANGUAGE marker and return the English text.
-      // In production this would call a translation API.
-      const cleaned = args.content
-        .replace(/WRONG_LANGUAGE\s*/g, '')
-        .trim();
+      // Build output filename: page1_upside_down.png → page1_upside_down_rotated.png
+      const ext = path.extname(args.image_ref);
+      const base = path.basename(args.image_ref, ext);
+      const rotatedName = `${base}_rotated${ext}`;
+      const destPath = path.join(dir, rotatedName);
 
-      // Simulate: the cleaned text IS the English translation
+      await sharp(srcPath)
+        .rotate(args.degrees)
+        .toFile(destPath);
+
+      loggerRegistry.info(
+        `[lt-mcp:vision-server] rotated ${args.image_ref} by ${args.degrees}° → ${rotatedName}`,
+      );
+
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
-            translated_content: cleaned,
-            source_language: 'es',
-            target_language: args.target_language,
+            rotated_ref: rotatedName,
+            degrees: args.degrees,
+            source_ref: args.image_ref,
           }),
         }],
       };
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (5 tools registered)`);
-  return server;
+  // ── translate_content ──────────────────────────────────────────
+  (srv as any).registerTool(
+    'translate_content',
+    {
+      title: 'Translate Content',
+      description: 'Translate content text to the target language using OpenAI. Returns the translated content and detected source language.',
+      inputSchema: translateContentSchema,
+    },
+    async (args: z.infer<typeof translateContentSchema>) => {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey || apiKey === 'xxx') {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              translated_content: args.content,
+              source_language: 'unknown',
+              target_language: args.target_language,
+              note: 'OPENAI_API_KEY not configured — returned content unchanged',
+            }),
+          }],
+        };
+      }
+
+      const openai = new OpenAI({ apiKey });
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a translation assistant. Translate the user's text to ${args.target_language}. Return ONLY a JSON object: {"translated_content": "...", "source_language": "detected ISO code"}. No markdown, no explanation.`,
+          },
+          { role: 'user', content: args.content },
+        ],
+        max_tokens: 2000,
+      });
+
+      const raw = response.choices?.[0]?.message?.content || '';
+      try {
+        const cleaned = raw.replace(/^```json\n?|\n?```$/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              translated_content: parsed.translated_content || args.content,
+              source_language: parsed.source_language || 'unknown',
+              target_language: args.target_language,
+            }),
+          }],
+        };
+      } catch {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              translated_content: raw,
+              source_language: 'unknown',
+              target_language: args.target_language,
+            }),
+          }],
+        };
+      }
+    },
+  );
 }
 
 /**
- * Get the current Vision MCP server instance.
+ * Create the Document Vision MCP server.
+ *
+ * Returns a fresh McpServer instance each time. The MCP SDK only allows
+ * one transport per server, so each consumer (triage activities, pipeline
+ * workers, tests) needs its own instance to avoid "already connected" errors.
  */
-export function getVisionServer(): McpServer | null {
-  return server;
+export async function createVisionServer(options?: {
+  name?: string;
+}): Promise<McpServer> {
+  const name = options?.name || 'long-tail-document-vision';
+  const instance = new McpServer({ name, version: '1.0.0' });
+  registerTools(instance);
+  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (5 tools registered)`);
+  return instance;
 }
 
 /**
- * Stop the Vision MCP server and release resources.
+ * Stop a Vision MCP server instance and release resources.
  */
 export async function stopVisionServer(): Promise<void> {
-  if (server) {
-    await server.close();
-    server = null;
-    loggerRegistry.info('[lt-mcp:vision-server] stopped');
-  }
+  // No-op — instances are now independent and cleaned up by their callers
+  loggerRegistry.info('[lt-mcp:vision-server] stopped');
 }

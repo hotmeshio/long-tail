@@ -119,18 +119,21 @@ async function seedUsers(): Promise<void> {
 //   Instruction chain:
 //     reviewer  → escalate to admin (language issue, outside your role)
 //     admin     → escalate to engineer (needs technical fix)
-//     engineer  → check "Request AI Triage", hint: wrong_language, submit
-//   The MCP triage orchestrator translates the content, re-runs the
-//   workflow (auto-approves), and creates an engineering escalation
-//   recommending a language detection step in the pipeline.
+//     engineer  → check "Request AI Triage", describe: "Content is in Spanish, needs translation"
+//   The MCP triage orchestrator uses LLM + Vision tools to diagnose the
+//   issue, translate the content, re-run the workflow (auto-approves),
+//   and creates an engineering escalation recommending a language
+//   detection step in the pipeline.
 //
 // Process 4 — "Damaged Claim → MCP Triage (Image Orientation)"
 //   Insurance claim arrives with upside-down document images.
 //   AI analysis returns low confidence (0.35) → escalates to reviewer.
 //   Instruction:
-//     reviewer → check "Request AI Triage", hint: image_orientation, submit
-//   The MCP triage orchestrator rotates the images via MCP tools,
-//   re-runs the claim workflow, and it auto-approves with corrected docs.
+//     reviewer → check "Request AI Triage", describe: "Document images
+//       appear damaged or upside down, unable to read claim data"
+//   The MCP triage orchestrator uses LLM + Vision tools to diagnose,
+//   rotate images, verify extraction, re-run the claim workflow, and
+//   it auto-approves with corrected docs.
 
 const SEED_ENVELOPES: Array<{
   workflowName: InvocableWorkflowType;
@@ -190,7 +193,7 @@ const SEED_ENVELOPES: Array<{
       metadata: {
         source: 'seed',
         process: 'wrong-language',
-        description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" with hint "wrong_language". The MCP orchestrator translates the content, re-runs the workflow, and recommends adding language detection to the pipeline.',
+        description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" and describe: "Content is in Spanish, needs translation to English." The MCP triage orchestrator uses AI + Vision tools to diagnose, translate the content, re-run the workflow, and recommend adding language detection to the pipeline.',
       },
     },
   },
@@ -203,23 +206,25 @@ const SEED_ENVELOPES: Array<{
     envelope: {
       data: {
         claimId: 'CLM-2024-042',
-        claimantId: 'POL-5551234',
+        claimantId: 'MBR-2024-001',
         claimType: 'auto_collision',
         amount: 12500,
         documents: [
-          'incident_report.pdf',
-          'photo_evidence.jpg',
-          'police_report.pdf',
+          'page1_upside_down.png',
+          'page2.png',
         ],
       } satisfies ProcessClaimEnvelopeData,
       metadata: {
         source: 'seed',
         process: 'damaged-claim',
         description:
-          'Insurance claim with damaged document images. AI flags low confidence. ' +
-          'As reviewer, check "Request AI Triage" with hint "image_orientation". ' +
-          'The MCP triage orchestrator rotates the images, re-runs the claim workflow, ' +
-          'and it completes successfully.',
+          'Insurance claim with an upside-down member application scan. ' +
+          'AI Vision detects the orientation issue and flags low confidence. ' +
+          'As reviewer, check "Request AI Triage" and describe the problem: ' +
+          '"Page 1 appears to be scanned upside down. Cannot read member ID or address." ' +
+          'The MCP triage orchestrator uses AI + Vision tools to diagnose the issue, ' +
+          'rotate the page with sharp, re-extract member info, validate against the DB, ' +
+          're-run the claim workflow with corrected documents, and it auto-approves.',
       },
     },
   },
