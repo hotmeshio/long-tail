@@ -42,6 +42,8 @@ export async function handleEscalation(
     workflowId: state.workflowId,
     taskQueue: state.taskQueue,
     workflowType: state.workflowName,
+    traceId: state.traceId,
+    spanId: state.spanId,
   });
 
   return result;
@@ -81,6 +83,8 @@ export async function handleErrorEscalation(
     workflowId: state.workflowId,
     taskQueue: state.taskQueue,
     workflowType: state.workflowName,
+    traceId: state.traceId,
+    spanId: state.spanId,
   });
 
   return {

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
@@ -20,7 +21,7 @@ export function Modal({ open, onClose, title, children, maxWidth }: ModalProps) 
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
@@ -40,6 +41,7 @@ export function Modal({ open, onClose, title, children, maxWidth }: ModalProps) 
         </div>
         <div className="px-6 py-5 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

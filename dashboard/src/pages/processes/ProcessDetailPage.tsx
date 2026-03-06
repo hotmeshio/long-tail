@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useProcessDetail } from '../../api/tasks';
+import { useInsightQuery } from '../../api/insight';
+import { InsightResultCard } from '../../components/insight/InsightResultCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { SectionLabel } from '../../components/common/SectionLabel';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -15,6 +17,9 @@ type TimelineEntry =
 export function ProcessDetailPage() {
   const { originId } = useParams<{ originId: string }>();
   const { data, isLoading } = useProcessDetail(originId ?? '');
+
+  const [telemetryQuestion, setTelemetryQuestion] = useState<string | null>(null);
+  const { data: insightData, isFetching: insightFetching, error: insightError } = useInsightQuery(telemetryQuestion);
 
   const tasks = data?.tasks ?? [];
   const escalations = data?.escalations ?? [];
@@ -34,6 +39,11 @@ export function ProcessDetailPage() {
     return { tasks: tasks.length, completed, escalated, escalations: escalations.length, resolved };
   }, [tasks, escalations]);
 
+  const handleGetTelemetry = (task: LTTaskRecord) => {
+    const q = `Get telemetry for workflow ${task.workflow_id} — find the task using find_tasks with workflow_id filter, retrieve its trace_id, then use get_trace_link to generate a direct Honeycomb UI link for the trace.`;
+    setTelemetryQuestion(q);
+  };
+
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -47,7 +57,7 @@ export function ProcessDetailPage() {
     <div>
       <PageHeader
         title="Process Detail"
-        backTo="/processes"
+        backTo="/processes/list"
         backLabel="All Processes"
       />
 
@@ -62,6 +72,36 @@ export function ProcessDetailPage() {
         <StatCard label="Escalations" value={stats.escalations} dotClass="bg-status-pending" />
         <StatCard label="Resolved" value={stats.resolved} dotClass="bg-status-success" />
       </div>
+
+      {/* Insight telemetry result */}
+      {insightFetching && (
+        <div className="mb-10 space-y-4 animate-pulse">
+          <div className="h-4 w-1/4 bg-surface-border/60 rounded" />
+          <div className="h-3.5 w-2/3 bg-surface-border/60 rounded" />
+          <div className="flex gap-10 mt-2">
+            <div className="space-y-2">
+              <div className="h-2.5 w-16 bg-surface-border/60 rounded" />
+              <div className="h-6 w-12 bg-surface-border/60 rounded" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-2.5 w-16 bg-surface-border/60 rounded" />
+              <div className="h-6 w-12 bg-surface-border/60 rounded" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {insightError && !insightFetching && (
+        <div className="mb-10 p-4 rounded-lg bg-status-error/10">
+          <p className="text-sm text-status-error">{insightError.message}</p>
+        </div>
+      )}
+
+      {insightData && !insightFetching && (
+        <div className="mb-10">
+          <InsightResultCard result={insightData} />
+        </div>
+      )}
 
       <SectionLabel className="mb-4">Timeline</SectionLabel>
 
@@ -90,7 +130,11 @@ export function ProcessDetailPage() {
               {/* Content */}
               <div className="flex-1 min-w-0">
                 {entry.kind === 'task' ? (
-                  <TaskEntry task={entry.item} />
+                  <TaskEntry
+                    task={entry.item}
+                    onGetTelemetry={() => handleGetTelemetry(entry.item)}
+                    isFetching={insightFetching}
+                  />
                 ) : (
                   <EscalationEntry escalation={entry.item} />
                 )}
@@ -103,7 +147,11 @@ export function ProcessDetailPage() {
   );
 }
 
-function TaskEntry({ task }: { task: LTTaskRecord }) {
+function TaskEntry({ task, onGetTelemetry, isFetching }: {
+  task: LTTaskRecord;
+  onGetTelemetry?: () => void;
+  isFetching?: boolean;
+}) {
   return (
     <div className="bg-surface-raised border border-surface-border rounded-lg px-4 py-3">
       <div className="flex items-center justify-between gap-3 mb-1">
@@ -134,19 +182,32 @@ function TaskEntry({ task }: { task: LTTaskRecord }) {
         </div>
       )}
 
-      <div className="flex gap-3 mt-2">
+      <div className="flex items-center gap-3 mt-2">
         <Link
-          to={`/workflows/execution/${encodeURIComponent(task.workflow_id)}`}
+          to={`/workflows/detail/${encodeURIComponent(task.workflow_id)}`}
           className="text-[10px] text-accent-primary hover:underline"
         >
           View Execution
         </Link>
         <Link
-          to={`/workflows/tasks/${task.id}`}
+          to={`/workflows/tasks/detail/${task.id}`}
           className="text-[10px] text-accent-primary hover:underline"
         >
           Task Detail
         </Link>
+        {task.trace_id && onGetTelemetry && (
+          <button
+            onClick={onGetTelemetry}
+            disabled={isFetching}
+            className="px-3 py-1 rounded-full text-[10px] text-text-tertiary
+                       bg-surface-sunken border border-surface-border
+                       hover:text-text-secondary hover:border-accent/30
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       transition-colors"
+          >
+            Get Telemetry
+          </button>
+        )}
       </div>
     </div>
   );
@@ -178,7 +239,7 @@ function EscalationEntry({ escalation }: { escalation: LTEscalationRecord }) {
 
       <div className="mt-2">
         <Link
-          to={`/escalations/${escalation.id}`}
+          to={`/escalations/detail/${escalation.id}`}
           className="text-[10px] text-accent-primary hover:underline"
         >
           View Escalation

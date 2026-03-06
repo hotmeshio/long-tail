@@ -1,10 +1,11 @@
 # Long Tail
 
-Every enterprise has approval chains, compliance checks, document reviews. These exist for good reasons — regulatory requirements, quality standards, institutional knowledge. You can't hand them to an LLM and hope for the best. AI must participate, not replace.
+Every enterprise has business processes — approval chains, compliance checks, document reviews, data validation. These processes exist for good reasons: regulatory requirements, quality standards, institutional knowledge. You can't just hand them to an LLM and hope for the best.
 
-### De-risk through determinism
+The realistic path is process-first: start AI on the granular, well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let the existing workforce handle the judgment calls — the ambiguous, high-stakes, long-tail work that requires human context. Then evolve the boundary over time as trust is earned and models improve.
 
-Long Tail is a durable workflow engine. Every activity is checkpointed. Every result is cached. If the process crashes between an AI extraction and a database validation, it replays from the last checkpoint — the model isn't called twice. The deterministic pipeline is the safety net: retries, exactly-once execution, transactional state, all in Postgres.
+Long Tail gives you the machinery to do this. Write a workflow. If AI is confident, the work completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
+
 - **MCP-native** — AI tools and human escalation on the same protocol, both durable
 - **Postgres-only** — state, queues, escalations, audit trails
 - **Durable execution** — survives crashes, deploys, restarts
@@ -14,7 +15,7 @@ Write a workflow. If AI is confident, the task completes. The deterministic path
 
 ### When AI isn't confident — escalate
 
-When the model can't decide, the workflow returns an escalation. A background interceptor creates a record with full context — what the AI tried, what it saw, why it wasn't confident — and the workflow ends. No long-running poll. No open connection. A human (or another agent) claims the escalation, resolves it, and the workflow re-runs with the resolver's payload. The deterministic path resumes.
+When the model can't decide, the workflow returns an **escalation**. A background interceptor creates a record with full context — what the AI tried, what it saw, why it wasn't confident — and the workflow ends. No long-running poll. No open connection. A human (or another agent) claims the escalation, resolves it, and the workflow re-runs with the resolver's payload. The deterministic path resumes.
 
 ### When the resolver can't fix it — remediate
 

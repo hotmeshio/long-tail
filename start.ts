@@ -18,6 +18,7 @@ import { maintenanceRegistry } from './services/maintenance';
 import { defaultMaintenanceConfig } from './modules/maintenance';
 import { cronRegistry } from './services/cron';
 import { mcpRegistry } from './services/mcp';
+import * as yamlWorkflowWorkers from './services/yaml-workflow/workers';
 import { BuiltInMcpAdapter } from './services/mcp/adapter';
 import { escalationStrategyRegistry } from './services/escalation-strategy';
 import { DefaultEscalationStrategy } from './services/escalation-strategy/default';
@@ -203,6 +204,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       await mcpRegistry.connect();
       loggerRegistry.info('[long-tail] MCP adapter connected');
     }
+
+    // Register workers for active YAML (deterministic) workflows
+    await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
   // ── 5b. Seed example workflows (fire-and-forget after workers are up) ─

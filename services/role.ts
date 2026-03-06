@@ -37,6 +37,15 @@ export async function addEscalationChain(
   targetRole: string,
 ): Promise<void> {
   const pool = getPool();
+  // Ensure both roles exist in lt_roles (FK constraints)
+  await pool.query(
+    'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+    [sourceRole],
+  );
+  await pool.query(
+    'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+    [targetRole],
+  );
   await pool.query(
     `INSERT INTO lt_config_role_escalations (source_role, target_role)
      VALUES ($1, $2)
@@ -71,6 +80,17 @@ export async function replaceEscalationTargets(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Ensure all roles exist in lt_roles (FK constraints)
+    await client.query(
+      'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+      [sourceRole],
+    );
+    for (const target of targets) {
+      await client.query(
+        'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+        [target],
+      );
+    }
     await client.query(
       'DELETE FROM lt_config_role_escalations WHERE source_role = $1',
       [sourceRole],

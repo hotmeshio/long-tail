@@ -7,6 +7,7 @@ import { telemetryRegistry } from '../services/telemetry';
 import { eventRegistry } from '../services/events';
 import { maintenanceRegistry } from '../services/maintenance';
 import { registerLT } from '../interceptor';
+import * as yamlWorkflowWorkers from '../services/yaml-workflow/workers';
 import * as reviewContentWorkflow from '../examples/workflows/review-content';
 import * as verifyDocumentWorkflow from '../examples/workflows/verify-document';
 import * as reviewContentOrchWorkflow from '../examples/workflows/review-content/orchestrator';
@@ -71,6 +72,9 @@ export async function startWorkers(): Promise<void> {
     workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator,
   });
   await verifyOrchWorker.run();
+
+  // 5. Register workers for active YAML workflows
+  await yamlWorkflowWorkers.registerAllActiveWorkers();
 
   // Connect event adapters (no-op if none registered)
   if (eventRegistry.hasAdapters) {

@@ -2,11 +2,18 @@ import { useNavigate } from 'react-router-dom';
 import { useProcesses, type ProcessSummary } from '../../api/tasks';
 import { useWorkflowConfigs } from '../../api/workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { TimeAgo } from '../../components/common/TimeAgo';
 import { StickyPagination } from '../../components/common/StickyPagination';
-import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
+import { FilterBar, FilterSelect, FilterInput } from '../../components/common/FilterBar';
 import { PageHeader } from '../../components/common/PageHeader';
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'escalated', label: 'Escalated' },
+];
 
 const columns: Column<ProcessSummary>[] = [
   {
@@ -75,14 +82,18 @@ const columns: Column<ProcessSummary>[] = [
 export function ProcessesListPage() {
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
-    filters: { workflow_type: '' },
+    filters: { workflow_type: '', status: '', search: '' },
   });
+
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
 
   const { data: configs } = useWorkflowConfigs();
   const workflowTypes = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
 
   const { data, isLoading } = useProcesses({
     workflow_type: filters.workflow_type || undefined,
+    status: filters.status || undefined,
+    search: debouncedSearch || undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
   });
@@ -94,6 +105,18 @@ export function ProcessesListPage() {
       <PageHeader title="Business Processes" />
 
       <FilterBar>
+        <FilterInput
+          label="Search"
+          value={filters.search}
+          onChange={(v) => setFilter('search', v)}
+          placeholder="origin, workflow, or trace ID"
+        />
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          onChange={(v) => setFilter('status', v)}
+          options={STATUS_OPTIONS}
+        />
         <FilterSelect
           label="Workflow Type"
           value={filters.workflow_type}
@@ -106,7 +129,7 @@ export function ProcessesListPage() {
         columns={columns}
         data={data?.processes ?? []}
         keyFn={(row) => row.origin_id}
-        onRowClick={(row) => navigate(`/processes/${encodeURIComponent(row.origin_id)}`)}
+        onRowClick={(row) => navigate(`/processes/detail/${encodeURIComponent(row.origin_id)}`)}
         isLoading={isLoading}
         emptyMessage="No business processes found"
       />

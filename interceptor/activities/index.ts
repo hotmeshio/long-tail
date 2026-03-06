@@ -20,6 +20,5 @@ export {
 } from './config';
 
 export {
-  ltStartWorkflow,
   ltSignalParent,
 } from './workflow';

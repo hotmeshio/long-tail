@@ -71,7 +71,7 @@ export function TaskDetailPage() {
           )}
 
           <Link
-            to={`/workflows/execution/${task.workflow_id}`}
+            to={`/workflows/detail/${task.workflow_id}`}
             className="btn-secondary inline-block text-xs"
           >
             View Workflow Execution

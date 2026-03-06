@@ -40,6 +40,8 @@ export async function ltCreateEscalation(input: {
   workflowId?: string;
   taskQueue?: string;
   workflowType?: string;
+  traceId?: string;
+  spanId?: string;
 }): Promise<string> {
   const escalation = await escalationService.createEscalation({
     type: input.type,
@@ -57,6 +59,8 @@ export async function ltCreateEscalation(input: {
     workflow_id: input.workflowId,
     task_queue: input.taskQueue,
     workflow_type: input.workflowType,
+    trace_id: input.traceId,
+    span_id: input.spanId,
   });
   return escalation.id;
 }

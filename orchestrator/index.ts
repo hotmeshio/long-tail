@@ -30,11 +30,11 @@ export interface ExecuteLTOptions {
 /**
  * Execute a Long Tail workflow with automatic task tracking.
  *
- * Uses `ltStartWorkflow` (activity) to start the child with a severed
- * connection, then `waitFor` to receive the result signal from the
- * child's interceptor. This protects the orchestrator from child
- * failures — the child can escalate, fail, and be re-run multiple
- * times without affecting the parent.
+ * Uses `startChild` to spawn the child workflow (fire-and-forget),
+ * then `waitFor` to receive the result signal from the child's
+ * interceptor. The child can escalate, fail, and be re-run multiple
+ * times without affecting the parent — the orchestrator simply waits
+ * for the signal.
  *
  * Usage (from within an orchestrator workflow):
  * ```typescript
@@ -59,7 +59,6 @@ export async function executeLT<T = any>(
     ltCompleteTask,
     ltGetWorkflowConfig,
     ltGetProviderData,
-    ltStartWorkflow,
   } = Durable.workflow.proxyActivities<ActivitiesType>({
     activities: interceptorActivities,
     taskQueue: LT_ACTIVITY_QUEUE,
@@ -106,6 +105,8 @@ export async function executeLT<T = any>(
           parentWorkflowType: orchCtx.workflowType,
         }
       : { signalId },
+    traceId: ctx.workflowTrace || undefined,
+    spanId: ctx.workflowSpan || undefined,
   });
 
   await ltStartTask(taskId);
@@ -144,13 +145,14 @@ export async function executeLT<T = any>(
     }
   }
 
-  // 6. Start child workflow via activity (SEVERED connection)
-  await ltStartWorkflow({
+  // 6. Start child workflow (fire-and-forget — only the start is awaited)
+  await Durable.workflow.startChild({
     workflowName,
     args,
     taskQueue,
     workflowId: childWorkflowId,
     expire: expire || 86_400,
+    entity: workflowName,
   });
 
   // 7. Wait for the child's interceptor to signal back with the result

@@ -19,6 +19,8 @@ export interface CreateTaskInput {
   envelope: string;
   metadata?: Record<string, any>;
   priority?: number;
+  trace_id?: string;
+  span_id?: string;
 }
 
 export interface UpdateTaskInput {
@@ -34,8 +36,9 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
   const { rows } = await pool.query(
     `INSERT INTO lt_tasks
        (workflow_id, workflow_type, lt_type, task_queue, modality, signal_id,
-        parent_workflow_id, origin_id, parent_id, envelope, metadata, priority)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        parent_workflow_id, origin_id, parent_id, envelope, metadata, priority,
+        trace_id, span_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING *`,
     [
       input.workflow_id,
@@ -50,6 +53,8 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
       input.envelope,
       input.metadata ? JSON.stringify(input.metadata) : null,
       input.priority || 2,
+      input.trace_id || null,
+      input.span_id || null,
     ],
   );
   return rows[0];
@@ -269,51 +274,78 @@ export async function listProcesses(filters: {
   limit?: number;
   offset?: number;
   workflow_type?: string;
+  status?: string;
+  search?: string;
 }): Promise<{ processes: ProcessSummary[]; total: number }> {
   const pool = getPool();
   const limit = filters.limit || 50;
   const offset = filters.offset || 0;
 
-  const hasWf = !!filters.workflow_type;
-  const wfSubquery = `origin_id IN (
-    SELECT origin_id FROM lt_tasks WHERE origin_id IS NOT NULL AND workflow_type = $${hasWf ? 1 : 0}
-  )`;
+  // Build WHERE conditions that restrict which origin_ids are included
+  const conditions: string[] = ['origin_id IS NOT NULL'];
+  const filterParams: any[] = [];
+  let idx = 1;
 
-  const countParams: any[] = hasWf ? [filters.workflow_type] : [];
-  const countWhere = hasWf
-    ? `WHERE origin_id IS NOT NULL AND ${wfSubquery.replace('$1', '$1')}`
-    : `WHERE origin_id IS NOT NULL`;
+  if (filters.workflow_type) {
+    conditions.push(`origin_id IN (
+      SELECT origin_id FROM lt_tasks
+      WHERE origin_id IS NOT NULL AND workflow_type = $${idx++}
+    )`);
+    filterParams.push(filters.workflow_type);
+  }
 
-  const dataWhere = hasWf
-    ? `WHERE origin_id IS NOT NULL AND origin_id IN (
-         SELECT origin_id FROM lt_tasks WHERE origin_id IS NOT NULL AND workflow_type = $3
-       )`
-    : `WHERE origin_id IS NOT NULL`;
-  const dataParams: any[] = hasWf
-    ? [limit, offset, filters.workflow_type]
-    : [limit, offset];
+  if (filters.search) {
+    const pattern = `%${filters.search}%`;
+    conditions.push(`origin_id IN (
+      SELECT DISTINCT origin_id FROM lt_tasks
+      WHERE origin_id IS NOT NULL
+        AND (origin_id ILIKE $${idx} OR workflow_id ILIKE $${idx} OR trace_id ILIKE $${idx})
+    )`);
+    filterParams.push(pattern);
+    idx++;
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+
+  // Status filter uses HAVING on aggregated counts
+  let having = '';
+  if (filters.status === 'completed') {
+    having = 'HAVING COUNT(*) = COUNT(*) FILTER (WHERE status = \'completed\')';
+  } else if (filters.status === 'escalated') {
+    having = 'HAVING COUNT(*) FILTER (WHERE status = \'needs_intervention\') > 0';
+  } else if (filters.status === 'active') {
+    having = `HAVING COUNT(*) > COUNT(*) FILTER (WHERE status = 'completed')
+              AND COUNT(*) FILTER (WHERE status = 'needs_intervention') = 0`;
+  }
+
+  // Count query — wrap in subquery because of HAVING
+  const countSql = having
+    ? `SELECT COUNT(*) FROM (
+         SELECT origin_id FROM lt_tasks ${where}
+         GROUP BY origin_id ${having}
+       ) sub`
+    : `SELECT COUNT(DISTINCT origin_id) FROM lt_tasks ${where}`;
+
+  const dataSql = `SELECT
+       origin_id,
+       COUNT(*)::int AS task_count,
+       COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+       COUNT(*) FILTER (WHERE status = 'needs_intervention')::int AS escalated,
+       array_agg(DISTINCT workflow_type) AS workflow_types,
+       MIN(created_at) AS started_at,
+       MAX(COALESCE(completed_at, created_at)) AS last_activity
+     FROM lt_tasks
+     ${where}
+     GROUP BY origin_id
+     ${having}
+     ORDER BY MAX(created_at) DESC
+     LIMIT $${idx++} OFFSET $${idx++}`;
+
+  const dataParams = [...filterParams, limit, offset];
 
   const [countResult, dataResult] = await Promise.all([
-    pool.query(
-      `SELECT COUNT(DISTINCT origin_id) FROM lt_tasks ${countWhere}`,
-      countParams,
-    ),
-    pool.query(
-      `SELECT
-         origin_id,
-         COUNT(*)::int AS task_count,
-         COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
-         COUNT(*) FILTER (WHERE status = 'needs_intervention')::int AS escalated,
-         array_agg(DISTINCT workflow_type) AS workflow_types,
-         MIN(created_at) AS started_at,
-         MAX(COALESCE(completed_at, created_at)) AS last_activity
-       FROM lt_tasks
-       ${dataWhere}
-       GROUP BY origin_id
-       ORDER BY MAX(created_at) DESC
-       LIMIT $1 OFFSET $2`,
-      dataParams,
-    ),
+    pool.query(countSql, filterParams),
+    pool.query(dataSql, dataParams),
   ]);
 
   return {

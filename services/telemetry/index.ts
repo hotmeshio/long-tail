@@ -56,6 +56,14 @@ class LTTelemetryRegistry {
   get hasAdapter(): boolean {
     return this.adapter !== null;
   }
+
+  /**
+   * Trace URL template from the registered adapter (if any).
+   * Contains `{traceId}` placeholder for substitution.
+   */
+  get traceUrl(): string | undefined {
+    return this.adapter?.traceUrl;
+  }
 }
 
 /** Singleton telemetry registry */

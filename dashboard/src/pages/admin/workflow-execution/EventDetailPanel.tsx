@@ -192,7 +192,7 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
               Child Workflow
             </span>
             <Link
-              to={`/workflows/execution/${event.attributes.child_workflow_id}`}
+              to={`/workflows/detail/${event.attributes.child_workflow_id}`}
               className="text-xs font-mono text-accent hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -211,7 +211,7 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
               Child Workflow
             </span>
             <Link
-              to={`/workflows/execution/${childTask.workflow_id}`}
+              to={`/workflows/detail/${childTask.workflow_id}`}
               className="text-xs font-mono text-accent hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -249,7 +249,10 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
 
       {/* Activity result (from HotMesh event — for non-child activities) */}
       {!childTask && event.attributes.result !== undefined && (
-        <JsonViewer data={event.attributes.result} label="Result" />
+        <JsonViewer
+          data={event.attributes.result}
+          label={event.attributes.activity_type === 'ltSignalParent' ? 'Signal Payload' : 'Result'}
+        />
       )}
 
       {/* Remaining attributes (exclude the fields shown above) */}

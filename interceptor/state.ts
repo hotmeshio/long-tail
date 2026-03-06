@@ -25,6 +25,8 @@ export interface InterceptorState {
   envelope: LTEnvelope | undefined;
   isReRun: boolean;
   activities: ProxiedActivities;
+  traceId?: string;
+  spanId?: string;
 }
 
 /**

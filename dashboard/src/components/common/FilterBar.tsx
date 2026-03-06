@@ -42,3 +42,25 @@ export function FilterSelect({ label, value, onChange, options }: FilterSelectPr
     </div>
   );
 }
+
+interface FilterInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+export function FilterInput({ label, value, onChange, placeholder }: FilterInputProps) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <label className="text-[10px] text-text-tertiary whitespace-nowrap">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="input text-[11px] py-1 px-2 w-48 font-mono"
+      />
+    </div>
+  );
+}

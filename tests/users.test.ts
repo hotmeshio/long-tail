@@ -19,6 +19,12 @@ describe('User service', () => {
       options: postgres_options,
     });
     await migrate();
+
+    // Clean up stale data from previous interrupted runs
+    for (const extId of ['ext-rbac-1', 'ext-rbac-2', 'sa-rbac', 'ga-rbac', 'm-rbac']) {
+      const stale = await userService.getUserByExternalId(extId);
+      if (stale) await userService.deleteUser(stale.id);
+    }
   }, 30_000);
 
   afterAll(async () => {

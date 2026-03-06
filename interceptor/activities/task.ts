@@ -17,6 +17,8 @@ export async function ltCreateTask(input: {
   parentId?: string;
   envelope: string;
   metadata?: Record<string, any>;
+  traceId?: string;
+  spanId?: string;
 }): Promise<string> {
   const task = await taskService.createTask({
     workflow_id: input.workflowId,
@@ -30,6 +32,8 @@ export async function ltCreateTask(input: {
     parent_id: input.parentId,
     envelope: input.envelope,
     metadata: input.metadata,
+    trace_id: input.traceId,
+    span_id: input.spanId,
   });
   return task.id;
 }

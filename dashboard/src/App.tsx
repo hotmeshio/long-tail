@@ -56,6 +56,12 @@ const StartWorkflowPage = lazy(() =>
 const CronWorkflowsPage = lazy(() =>
   import('./pages/workflows/CronWorkflowsPage').then((m) => ({ default: m.CronWorkflowsPage })),
 );
+const YamlWorkflowsPage = lazy(() =>
+  import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
+);
+const YamlWorkflowDetailPage = lazy(() =>
+  import('./pages/workflows/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
+);
 const TasksListPage = lazy(() =>
   import('./pages/admin/TasksListPage').then((m) => ({ default: m.TasksListPage })),
 );
@@ -81,9 +87,6 @@ const UsersPage = lazy(() =>
 );
 const EscalationChainsPage = lazy(() =>
   import('./pages/admin/escalation-chains').then((m) => ({ default: m.EscalationChainsPage })),
-);
-const UserRolesPage = lazy(() =>
-  import('./pages/admin/user-roles').then((m) => ({ default: m.UserRolesPage })),
 );
 const RolesPage = lazy(() =>
   import('./pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
@@ -140,14 +143,14 @@ const router = createBrowserRouter([
       { index: true, element: <Lazy><ProcessesOverview /></Lazy> },
 
       // Processes section (all authenticated users)
-      { path: 'processes', element: <Lazy><ProcessesListPage /></Lazy> },
-      { path: 'processes/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
+      { path: 'processes/list', element: <Lazy><ProcessesListPage /></Lazy> },
+      { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
 
       // Escalation section (all authenticated users)
       { path: 'escalations', element: <Lazy><EscalationsOverview /></Lazy> },
       { path: 'escalations/available', element: <Lazy><AvailableEscalationsPage /></Lazy> },
       { path: 'escalations/queue', element: <Lazy><OperatorDashboard /></Lazy> },
-      { path: 'escalations/:id', element: <Lazy><EscalationDetailPage /></Lazy> },
+      { path: 'escalations/detail/:id', element: <Lazy><EscalationDetailPage /></Lazy> },
 
       // Workflows section (engineer, admin, or superadmin)
       {
@@ -156,8 +159,8 @@ const router = createBrowserRouter([
           { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
           { path: 'workflows/list', element: <Lazy><WorkflowsDashboard /></Lazy> },
           { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
-          { path: 'workflows/tasks/:id', element: <Lazy><TaskDetailPage /></Lazy> },
-          { path: 'workflows/execution/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
+          { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
+          { path: 'workflows/detail/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
           { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
         ],
@@ -170,6 +173,8 @@ const router = createBrowserRouter([
           { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
           { path: 'mcp/tools', element: <Lazy><McpToolsPage /></Lazy> },
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
+          { path: 'mcp/pipelines', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+          { path: 'mcp/pipelines/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
         ],
       },
 
@@ -181,7 +186,6 @@ const router = createBrowserRouter([
           { path: 'admin/config', element: <Lazy><WorkflowConfigsPage /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
           { path: 'admin/escalation-chains', element: <Lazy><EscalationChainsPage /></Lazy> },
-          { path: 'admin/user-roles', element: <Lazy><UserRolesPage /></Lazy> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
         ],

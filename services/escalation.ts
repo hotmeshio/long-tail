@@ -17,6 +17,8 @@ export interface CreateEscalationInput {
   workflow_id?: string;
   task_queue?: string;
   workflow_type?: string;
+  trace_id?: string;
+  span_id?: string;
 }
 
 export interface ClaimResult {
@@ -28,12 +30,17 @@ export async function createEscalation(
   input: CreateEscalationInput,
 ): Promise<LTEscalationRecord> {
   const pool = getPool();
+  // Ensure the role exists in lt_roles (FK constraint)
+  await pool.query(
+    'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
+    [input.role],
+  );
   const { rows } = await pool.query(
     `INSERT INTO lt_escalations
        (type, subtype, modality, description, priority, task_id,
         origin_id, parent_id, role, envelope, metadata, escalation_payload,
-        workflow_id, task_queue, workflow_type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        workflow_id, task_queue, workflow_type, trace_id, span_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
      RETURNING *`,
     [
       input.type,
@@ -51,6 +58,8 @@ export async function createEscalation(
       input.workflow_id || null,
       input.task_queue || null,
       input.workflow_type || null,
+      input.trace_id || null,
+      input.span_id || null,
     ],
   );
   return rows[0];

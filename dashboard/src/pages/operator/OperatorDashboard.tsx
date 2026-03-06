@@ -73,7 +73,7 @@ export function OperatorDashboard() {
         columns={columns}
         data={activeClaims}
         keyFn={(row) => row.id}
-        onRowClick={(row) => navigate(`/escalations/${row.id}`, { state: { from: '/escalations/queue' } })}
+        onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/queue' } })}
         isLoading={isLoading}
         emptyMessage="No active escalations"
       />

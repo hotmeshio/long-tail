@@ -77,6 +77,14 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
   });
 }
 
+export function useEscalationsByWorkflowId(workflowId: string | undefined) {
+  return useQuery<{ escalations: LTEscalationRecord[] }>({
+    queryKey: ['escalations', 'by-workflow', workflowId],
+    queryFn: () => apiFetch(`/escalations/by-workflow/${workflowId}`),
+    enabled: !!workflowId,
+  });
+}
+
 export function useEscalation(id: string) {
   return useQuery<LTEscalationRecord>({
     queryKey: ['escalations', id],

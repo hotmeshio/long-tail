@@ -47,7 +47,7 @@ export interface LTStartConfig {
 
   /** OpenTelemetry. Register before workers start. */
   telemetry?: {
-    honeycomb?: { apiKey: string; serviceName?: string; endpoint?: string };
+    honeycomb?: { apiKey: string; serviceName?: string; endpoint?: string; traceUrl?: string };
     adapter?: LTTelemetryAdapter;
   };
 

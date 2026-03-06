@@ -38,6 +38,10 @@ export interface LTTaskRecord {
   milestones: LTMilestone[];
   data: string | null;
 
+  // telemetry
+  trace_id: string | null;
+  span_id: string | null;
+
   created_at: Date;
   updated_at: Date;
 }

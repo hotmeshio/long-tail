@@ -12,6 +12,8 @@ import dbaRouter from './dba';
 import maintenanceRouter from './maintenance';
 import mcpRouter from './mcp';
 import insightRouter from './insight';
+import yamlWorkflowsRouter from './yaml-workflows';
+import settingsRouter from './settings';
 
 const router = Router();
 
@@ -31,5 +33,7 @@ router.use('/roles', rolesRouter);
 router.use('/dba', dbaRouter);
 router.use('/mcp', mcpRouter);
 router.use('/insight', insightRouter);
+router.use('/yaml-workflows', yamlWorkflowsRouter);
+router.use('/settings', settingsRouter);
 
 export default router;

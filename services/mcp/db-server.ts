@@ -15,6 +15,7 @@ const findTasksSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'needs_intervention', 'completed', 'failed'])
     .optional().describe('Filter by task status'),
   workflow_type: z.string().optional().describe('Filter by workflow type (e.g. "processClaim")'),
+  workflow_id: z.string().optional().describe('Filter by workflow execution ID'),
   origin_id: z.string().optional().describe('Filter by origin/process ID to see all tasks in a process'),
   limit: z.number().int().min(1).max(100).optional().default(25)
     .describe('Maximum number of results'),
@@ -77,6 +78,7 @@ export async function createDbServer(options?: {
       const { tasks, total } = await taskService.listTasks({
         status: args.status as any,
         workflow_type: args.workflow_type,
+        workflow_id: args.workflow_id,
         origin_id: args.origin_id,
         limit: args.limit,
       });
@@ -96,6 +98,8 @@ export async function createDbServer(options?: {
               created_at: t.created_at,
               completed_at: t.completed_at,
               error: t.error,
+              trace_id: t.trace_id,
+              span_id: t.span_id,
             })),
           }),
         }],
@@ -139,6 +143,8 @@ export async function createDbServer(options?: {
               assigned_to: e.assigned_to,
               created_at: e.created_at,
               resolved_at: e.resolved_at,
+              trace_id: e.trace_id,
+              span_id: e.span_id,
             })),
           }),
         }],

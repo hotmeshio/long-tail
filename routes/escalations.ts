@@ -444,6 +444,21 @@ router.patch('/:id/escalate', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/escalations/by-workflow/:workflowId
+ * List escalations linked to a specific workflow.
+ */
+router.get('/by-workflow/:workflowId', async (req, res) => {
+  try {
+    const escalations = await escalationService.getEscalationsByWorkflowId(
+      req.params.workflowId,
+    );
+    res.json({ escalations });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Parameterized routes (must come after literal paths) ─────────────────────
 
 /**
