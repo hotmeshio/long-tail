@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
+import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -46,6 +47,7 @@ const columns: Column<LTJob>[] = [
 ];
 
 export function WorkflowsDashboard() {
+  useWorkflowListEvents();
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { search: '', entity: '' },
@@ -66,8 +68,19 @@ export function WorkflowsDashboard() {
   });
   const { data: configs } = useWorkflowConfigs();
 
-  const jobs = jobsData?.jobs ?? [];
   const total = jobsData?.total ?? 0;
+
+  // Sort: running (in_progress) first, then by created_at descending (newest first)
+  const STATUS_ORDER: Record<string, number> = { running: 0, failed: 1, completed: 2 };
+  const jobs = useMemo(() => {
+    const raw = jobsData?.jobs ?? [];
+    return [...raw].sort((a, b) => {
+      const sa = STATUS_ORDER[a.status] ?? 9;
+      const sb = STATUS_ORDER[b.status] ?? 9;
+      if (sa !== sb) return sa - sb;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [jobsData?.jobs]);
 
   const entities = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
 

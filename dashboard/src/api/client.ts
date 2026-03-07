@@ -27,6 +27,12 @@ async function tryRefresh(): Promise<string | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
+    if (data.token && data.user) {
+      sessionStorage.setItem('lt_user_info', JSON.stringify({
+        displayName: data.user.display_name,
+        username: data.user.external_id,
+      }));
+    }
     return data.token ?? null;
   } catch {
     return null;

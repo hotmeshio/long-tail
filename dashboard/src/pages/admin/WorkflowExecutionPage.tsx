@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useWorkflowExecution, useWorkflowState, useTerminateWorkflow } from '../../api/workflows';
+import { useWorkflowDetailEvents } from '../../hooks/useNatsEvents';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
 import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
@@ -14,6 +15,7 @@ import { RestartPanel } from './workflow-execution/RestartPanel';
 
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
+  useWorkflowDetailEvents(workflowId);
   const navigate = useNavigate();
   const { data: execution, isLoading, error } = useWorkflowExecution(workflowId!);
   const { data: stateData } = useWorkflowState(workflowId!);

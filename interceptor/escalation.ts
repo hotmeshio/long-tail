@@ -1,6 +1,7 @@
 import type { LTEscalation } from '../types';
 import type { InterceptorState } from './state';
 import { buildStoredEnvelope } from './state';
+import { publishEscalationEvent, publishTaskEvent, publishWorkflowEvent } from '../services/events/publish';
 
 /**
  * Handle a workflow that returned { type: 'escalation' }.
@@ -27,7 +28,7 @@ export async function handleEscalation(
     await activities.ltEscalateTask(state.taskId);
   }
 
-  await activities.ltCreateEscalation({
+  const escalationId = await activities.ltCreateEscalation({
     type: state.workflowName,
     subtype: state.workflowName,
     modality: result.modality || wfConfig?.modality || defaultModality,
@@ -44,6 +45,30 @@ export async function handleEscalation(
     workflowType: state.workflowName,
     traceId: state.traceId,
     spanId: state.spanId,
+  });
+
+  publishEscalationEvent({
+    type: 'escalation.created',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId,
+    escalationId,
+    originId: state.envelope?.lt?.originId,
+    status: 'pending',
+    data: result.data,
+  });
+
+  publishTaskEvent({
+    type: 'task.escalated',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId!,
+    originId: state.envelope?.lt?.originId,
+    status: 'needs_intervention',
   });
 
   return result;
@@ -69,7 +94,7 @@ export async function handleErrorEscalation(
     await activities.ltEscalateTask(state.taskId);
   }
 
-  await activities.ltCreateEscalation({
+  const errorEscalationId = await activities.ltCreateEscalation({
     type: state.workflowName,
     subtype: state.workflowName,
     modality: wfConfig?.modality || defaultModality,
@@ -85,6 +110,42 @@ export async function handleErrorEscalation(
     workflowType: state.workflowName,
     traceId: state.traceId,
     spanId: state.spanId,
+  });
+
+  publishEscalationEvent({
+    type: 'escalation.created',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId,
+    escalationId: errorEscalationId,
+    originId: state.envelope?.lt?.originId,
+    status: 'pending',
+    data: { error: err.message },
+  });
+
+  publishTaskEvent({
+    type: 'task.escalated',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId!,
+    originId: state.envelope?.lt?.originId,
+    status: 'needs_intervention',
+  });
+
+  publishWorkflowEvent({
+    type: 'workflow.failed',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId,
+    originId: state.envelope?.lt?.originId,
+    status: 'failed',
+    data: { error: err.message },
   });
 
   return {

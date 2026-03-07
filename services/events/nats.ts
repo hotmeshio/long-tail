@@ -24,14 +24,19 @@ export class NatsEventAdapter implements LTEventAdapter {
   private nc: NatsConnection | null = null;
   private url: string;
   private subjectPrefix: string;
+  private token?: string;
 
-  constructor(options?: { url?: string; subjectPrefix?: string }) {
+  constructor(options?: { url?: string; subjectPrefix?: string; token?: string }) {
     this.url = options?.url || config.NATS_URL;
     this.subjectPrefix = options?.subjectPrefix || 'lt.events';
+    this.token = options?.token || process.env.NATS_TOKEN || 'dev_api_secret';
   }
 
   async connect(): Promise<void> {
-    this.nc = await connect({ servers: this.url });
+    this.nc = await connect({
+      servers: this.url,
+      token: this.token,
+    });
     loggerRegistry.info(`[lt-events:nats] connected to ${this.url}`);
   }
 

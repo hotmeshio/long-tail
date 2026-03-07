@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useEscalationListEvents } from '../../hooks/useNatsEvents';
 import { useToast } from '../../hooks/useToast';
 import {
   useAvailableEscalations,
@@ -27,6 +28,7 @@ import { ESCALATION_COLUMNS, PRIORITY_OPTIONS } from './escalation-columns';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
+  useEscalationListEvents();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const { addToast } = useToast();

@@ -53,7 +53,7 @@ export interface LTStartConfig {
 
   /** Milestone event publishing. */
   events?: {
-    nats?: { url?: string; subjectPrefix?: string };
+    nats?: { url?: string; subjectPrefix?: string; token?: string };
     adapters?: LTEventAdapter[];
   };
 

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useProcesses, type ProcessSummary } from '../../api/tasks';
 import { useWorkflowConfigs } from '../../api/workflows';
+import { useProcessListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DataTable, type Column } from '../../components/common/DataTable';
@@ -80,6 +81,7 @@ const columns: Column<ProcessSummary>[] = [
 ];
 
 export function ProcessesListPage() {
+  useProcessListEvents();
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { workflow_type: '', status: '', search: '' },
