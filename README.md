@@ -62,11 +62,12 @@ Run the full stack locally with Docker. This starts Postgres, NATS, the API serv
 ```bash
 git clone https://github.com/hotmeshio/long-tail.git
 cd long-tail
-npm install
 docker compose up -d --build
 ```
 
 Once the container is healthy (~10 seconds), open the dashboard at [http://localhost:3000](http://localhost:3000).
+
+> **Local development** — If you want to run tests or start the server outside Docker, install dependencies first: `npm install`
 
 ### Demo accounts
 
@@ -79,11 +80,12 @@ Once the container is healthy (~10 seconds), open the dashboard at [http://local
 
 ### Seeded processes
 
-Three workflows run automatically on startup to populate the dashboard:
+Four workflows run automatically on startup to populate the dashboard:
 
 1. **Clean Review** — AI auto-approves high-quality content. Happy path.
 2. **Flagged for Review** — AI flags content for human review. Log in as `reviewer` and approve or reject.
 3. **Wrong Language** — Content arrives in Spanish. Walk the escalation chain: `reviewer` escalates to `admin`, `admin` escalates to `engineer`, `engineer` triggers MCP triage with hint `wrong_language`. The triage orchestrator translates the content, re-runs the workflow, and recommends adding language detection.
+4. **Damaged Claim** — Insurance claim arrives with an upside-down document scan. AI Vision detects the orientation issue and flags low confidence. As `reviewer`, check "Request AI Triage" and describe the problem. The MCP triage orchestrator uses AI + Vision tools to diagnose, rotate the page, re-extract member info, and re-run the claim workflow.
 
 ### Reset
 
