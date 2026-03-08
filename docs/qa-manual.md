@@ -267,7 +267,7 @@ Human resolves with needsTriage: true         │
 mcpTriageOrchestrator (container)             │
   │                                           │
   ├─ Phase 1: executeLT(mcpTriage)            │
-  │    ├─ LLM + MCP tools                    │
+  │    ├─ LLM + MCP tools                     │
   │    ├─ rotate_page, extract_member_info    │
   │    └─ return { correctedData }            │
   │                                           │
