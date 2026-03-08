@@ -1,6 +1,6 @@
 import type { LTReturn, LTMilestone } from '../types';
 import type { InterceptorState } from './state';
-import { publishMilestoneEvent } from '../services/events/publish';
+import { publishMilestoneEvent, publishWorkflowEvent } from '../services/events/publish';
 
 /**
  * Handle a workflow that returned { type: 'return' }.
@@ -29,6 +29,19 @@ export async function handleCompletion(
         ],
       }
     : result;
+
+  // Publish workflow.completed event
+  publishWorkflowEvent({
+    type: 'workflow.completed',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId,
+    originId: state.envelope?.lt?.originId,
+    status: 'completed',
+    data: augmentedResult.data,
+  });
 
   // Publish milestone event (non-durable side effect, fire-and-forget)
   if (augmentedResult.milestones?.length) {

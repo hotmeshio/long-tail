@@ -48,6 +48,7 @@ export type {
 
 export type {
   LTEvent,
+  LTEventType,
   LTEventAdapter,
 } from './events';
 

@@ -13,14 +13,21 @@ import type { LTUserRole, LTRoleType } from '../api/types';
 
 interface AuthUser {
   userId: string;
+  displayName: string | null;
+  username: string | null;
   roles: LTUserRole[];
+}
+
+interface LoginUserInfo {
+  displayName?: string | null;
+  username?: string | null;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
-  login: (token: string, credentials?: { username: string; password: string }) => void;
+  login: (token: string, credentials?: { username: string; password: string }, userInfo?: LoginUserInfo) => void;
   logout: () => void;
   hasRole: (role: string) => boolean;
   hasRoleType: (type: LTRoleType) => boolean;
@@ -32,12 +39,23 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 /** Refresh the token 5 minutes before it expires. */
 const REFRESH_BUFFER_SECONDS = 5 * 60;
 
-function userFromToken(token: string): AuthUser | null {
+function userFromToken(token: string, userInfo?: LoginUserInfo | null): AuthUser | null {
   if (isTokenExpired(token)) return null;
   const payload = decodeJwtPayload(token);
   if (!payload) return null;
+
+  // Restore saved user info from sessionStorage if not provided
+  const saved = userInfo ?? (() => {
+    try {
+      const raw = sessionStorage.getItem('lt_user_info');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
   return {
     userId: payload.userId as string,
+    displayName: saved?.displayName ?? null,
+    username: saved?.username ?? null,
     roles: (payload.roles as LTUserRole[]) ?? [],
   };
 }
@@ -86,11 +104,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    (token: string, credentials?: { username: string; password: string }) => {
-      const parsed = userFromToken(token);
+    (token: string, credentials?: { username: string; password: string }, userInfo?: LoginUserInfo) => {
+      const info: LoginUserInfo = {
+        displayName: userInfo?.displayName ?? null,
+        username: userInfo?.username ?? credentials?.username ?? null,
+      };
+      const parsed = userFromToken(token, info);
       if (!parsed) return;
       setToken(token);
       sessionStorage.setItem('lt_token', token);
+      sessionStorage.setItem('lt_user_info', JSON.stringify(info));
       if (credentials) {
         sessionStorage.setItem('lt_credentials', JSON.stringify(credentials));
       }
@@ -105,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     sessionStorage.removeItem('lt_token');
     sessionStorage.removeItem('lt_credentials');
+    sessionStorage.removeItem('lt_user_info');
     setUser(null);
   }, []);
 

@@ -5,10 +5,10 @@ export default {
     extend: {
       colors: {
         surface: {
-          DEFAULT: '#F8F7FC',
+          DEFAULT: '#FFFFFF',
           raised: '#FFFFFF',
-          sunken: '#F0EDF8',
-          border: '#E2DDF0',
+          sunken: '#F5F5F7',
+          border: '#E5E5EA',
         },
         text: {
           primary: '#1E1535',

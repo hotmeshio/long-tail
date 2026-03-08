@@ -1,9 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 
 vi.mock('../../../api/escalations', () => ({
   useEscalationStats: vi.fn(),
+}));
+
+vi.mock('../../../hooks/useNatsEvents', () => ({
+  useEscalationStatsEvents: vi.fn(),
 }));
 
 import { EscalationsOverview } from '../EscalationsOverview';
@@ -23,7 +28,12 @@ const mockStats = {
 };
 
 function renderWithRouter(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  );
 }
 
 describe('EscalationsOverview', () => {

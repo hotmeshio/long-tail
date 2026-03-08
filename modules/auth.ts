@@ -37,7 +37,11 @@ export class JwtAuthAdapter implements LTAuthAdapter {
     if (!secret) return null;
     try {
       return jwt.verify(header.slice(7), secret) as AuthPayload;
-    } catch {
+    } catch (err) {
+      if (err instanceof jwt.TokenExpiredError) {
+        // Tag the request so the middleware can return a specific message
+        (req as any)._authError = 'expired';
+      }
       return null;
     }
   }
@@ -66,7 +70,8 @@ export function createAuthMiddleware(adapter: LTAuthAdapter): RequestHandler {
     try {
       const payload = await adapter.authenticate(req);
       if (!payload) {
-        res.status(401).json({ error: 'Unauthorized' });
+        const isExpired = (req as any)._authError === 'expired';
+        res.status(401).json({ error: isExpired ? 'Token expired' : 'Unauthorized' });
         return;
       }
       if (!payload.userId) {

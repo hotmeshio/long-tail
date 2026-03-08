@@ -9,6 +9,7 @@ import { handleCompletion } from './completion';
 
 import type { LTReturn, LTEscalation, LTEnvelope } from '../types';
 import type { InterceptorState } from './state';
+import { publishWorkflowEvent, publishTaskEvent, publishEscalationEvent } from '../services/events/publish';
 
 type ActivitiesType = typeof interceptorActivities;
 
@@ -179,6 +180,18 @@ export function createLTInterceptor(options: {
           escalationId: envelope!.lt!.escalationId!,
           resolverPayload: envelope!.resolver!,
         });
+
+        publishEscalationEvent({
+          type: 'escalation.resolved',
+          source: 'interceptor',
+          workflowId,
+          workflowName,
+          taskQueue,
+          taskId: reRunTask?.id || existingTask?.id,
+          escalationId: envelope!.lt!.escalationId!,
+          originId: envelope?.lt?.originId,
+          status: 'resolved',
+        });
       }
 
       // ── Standalone mode: guarantee a task always exists ──────────
@@ -205,6 +218,29 @@ export function createLTInterceptor(options: {
         });
         await activities.ltStartTask(taskId);
       }
+
+      // ── Publish workflow.started + task.started events ──────────────
+      publishWorkflowEvent({
+        type: 'workflow.started',
+        source: 'interceptor',
+        workflowId,
+        workflowName,
+        taskQueue,
+        taskId,
+        originId: envelope?.lt?.originId || workflowId,
+        status: 'running',
+      });
+
+      publishTaskEvent({
+        type: 'task.started',
+        source: 'interceptor',
+        workflowId,
+        workflowName,
+        taskQueue,
+        taskId: taskId!,
+        originId: envelope?.lt?.originId || workflowId,
+        status: 'in_progress',
+      });
 
       // ── Build interceptor state ────────────────────────────────────
       const state: InterceptorState = {

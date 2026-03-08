@@ -14,6 +14,7 @@ import mcpRouter from './mcp';
 import insightRouter from './insight';
 import yamlWorkflowsRouter from './yaml-workflows';
 import settingsRouter from './settings';
+import mcpRunsRouter from './mcp-runs';
 
 const router = Router();
 
@@ -35,5 +36,6 @@ router.use('/mcp', mcpRouter);
 router.use('/insight', insightRouter);
 router.use('/yaml-workflows', yamlWorkflowsRouter);
 router.use('/settings', settingsRouter);
+router.use('/mcp-runs', mcpRunsRouter);
 
 export default router;

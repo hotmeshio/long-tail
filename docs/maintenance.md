@@ -147,7 +147,7 @@ maintenanceRegistry.register({
 });
 ```
 
-The registry accepts exactly one config at a time. Calling `register()` again overwrites the previous config. The cron does not start until `connect()` is called -- which happens inside `startWorkers()` when `hasConfig` is `true`.
+The registry accepts exactly one config at a time. Calling `register()` again overwrites the previous config. The cron does not start until `connect()` is called — which happens inside `start()` when `hasConfig` is `true`.
 
 ## Runtime API
 

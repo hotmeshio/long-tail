@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
+import { NatsProvider } from './hooks/useNats';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { RequireRole } from './components/layout/RequireRole';
@@ -27,6 +28,12 @@ const McpOverview = lazy(() =>
 );
 const McpToolsPage = lazy(() =>
   import('./pages/mcp/McpToolsPage').then((m) => ({ default: m.McpToolsPage })),
+);
+const McpRunsPage = lazy(() =>
+  import('./pages/mcp/McpRunsPage').then((m) => ({ default: m.McpRunsPage })),
+);
+const McpRunDetailPage = lazy(() =>
+  import('./pages/mcp/McpRunDetailPage').then((m) => ({ default: m.McpRunDetailPage })),
 );
 
 // Escalation pages (all authenticated users)
@@ -78,6 +85,9 @@ const AdminDashboard = lazy(() =>
 );
 const WorkflowConfigsPage = lazy(() =>
   import('./pages/admin/workflow-configs').then((m) => ({ default: m.WorkflowConfigsPage })),
+);
+const WorkflowConfigDetailPage = lazy(() =>
+  import('./pages/admin/workflow-configs').then((m) => ({ default: m.WorkflowConfigDetailPage })),
 );
 const McpServersPage = lazy(() =>
   import('./pages/admin/mcp-servers').then((m) => ({ default: m.McpServersPage })),
@@ -175,6 +185,8 @@ const router = createBrowserRouter([
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
           { path: 'mcp/pipelines', element: <Lazy><YamlWorkflowsPage /></Lazy> },
           { path: 'mcp/pipelines/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
+          { path: 'mcp/runs', element: <Lazy><McpRunsPage /></Lazy> },
+          { path: 'mcp/runs/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
         ],
       },
 
@@ -184,6 +196,8 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/config', element: <Lazy><WorkflowConfigsPage /></Lazy> },
+          { path: 'admin/config/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+          { path: 'admin/config/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
           { path: 'admin/escalation-chains', element: <Lazy><EscalationChainsPage /></Lazy> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
@@ -197,11 +211,13 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ToastProvider>
-          <RouterProvider router={router} />
-        </ToastProvider>
-      </AuthProvider>
+      <NatsProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
+        </AuthProvider>
+      </NatsProvider>
     </QueryClientProvider>
   );
 }

@@ -23,9 +23,11 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=longtail
       - NATS_URL=nats://nats:4222
+      - NATS_TOKEN=dev_api_secret
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET:-lt-dev-secret}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HMSH_TELEMETRY=${HMSH_TELEMETRY:-info}
       - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY:-}
       - HONEYCOMB_TEAM=${HONEYCOMB_TEAM:-}
       - HONEYCOMB_ENVIRONMENT=${HONEYCOMB_ENVIRONMENT:-}
@@ -59,7 +61,10 @@ services:
     ports:
       - "${LT_NATS_PORT:-4222}:4222"
       - "${LT_NATS_MONITOR_PORT:-8222}:8222"
-    command: ["-js", "-m", "8222"]
+      - "${LT_NATS_WS_PORT:-9222}:9222"
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf
+    command: ["-c", "/etc/nats/nats.conf", "-js"]
 
 volumes:
   pgdata:

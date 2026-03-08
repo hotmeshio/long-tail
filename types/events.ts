@@ -1,11 +1,31 @@
 import type { LTMilestone } from './task';
 
 /**
+ * All event types published through the NATS event system.
+ *
+ * Topic space: `lt.events.{type}` — e.g. `lt.events.task.created`
+ *
+ * Dashboard subscribes to `lt.events.>` to receive all events.
+ */
+export type LTEventType =
+  | 'task.created'
+  | 'task.started'
+  | 'task.completed'
+  | 'task.escalated'
+  | 'task.failed'
+  | 'escalation.created'
+  | 'escalation.resolved'
+  | 'workflow.started'
+  | 'workflow.completed'
+  | 'workflow.failed'
+  | 'milestone';
+
+/**
  * Payload published through the events system.
  */
 export interface LTEvent {
-  /** Event classification: 'milestone', 'escalation', 'task.completed', etc. */
-  type: string;
+  /** Event classification */
+  type: LTEventType | string;
   /** Where the event originated: 'interceptor' | 'orchestrator' | 'activity' */
   source: string;
   /** The workflow instance that produced this event */
@@ -16,10 +36,16 @@ export interface LTEvent {
   taskQueue: string;
   /** The task ID (present when orchestrated) */
   taskId?: string;
+  /** The escalation ID (present for escalation events) */
+  escalationId?: string;
+  /** The origin ID — root process lineage */
+  originId?: string;
+  /** Task or workflow status after this event */
+  status?: string;
   /** The activity name (present when source is 'activity') */
   activityName?: string;
   /** Milestones reported by the workflow */
-  milestones: LTMilestone[];
+  milestones?: LTMilestone[];
   /** Optional result data */
   data?: Record<string, any>;
   /** ISO 8601 timestamp */

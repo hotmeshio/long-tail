@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { AppLogo } from '../components/common/AppLogo';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
@@ -38,7 +39,11 @@ export function LoginPage() {
         setError(data.error || 'Login failed');
         return;
       }
-      login(data.token, { username: username.trim(), password });
+      login(
+        data.token,
+        { username: username.trim(), password },
+        { displayName: data.user?.display_name, username: data.user?.external_id },
+      );
       navigate(returnTo, { replace: true });
     } catch {
       setError('Unable to connect to server');
@@ -50,14 +55,8 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center">
       <div className="w-full max-w-md p-10">
-        <div className="flex items-center gap-3 mb-10">
-          <img src="/logo512.png" alt="HotMesh" className="w-10 h-10" />
-          <div>
-            <h1 className="text-2xl font-light text-text-primary tracking-tight">
-              HotMesh Long Tail
-            </h1>
-            <p className="text-xs text-text-tertiary">Dashboard</p>
-          </div>
+        <div className="mb-10">
+          <AppLogo size="lg" />
         </div>
 
         {returnTo !== '/' && (

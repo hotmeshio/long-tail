@@ -1,5 +1,5 @@
 import * as taskService from '../../services/task';
-import { publishMilestoneEvent } from '../../services/events/publish';
+import { publishMilestoneEvent, publishTaskEvent } from '../../services/events/publish';
 import type { LTMilestone, LTTaskRecord } from '../../types';
 
 /**
@@ -35,6 +35,18 @@ export async function ltCreateTask(input: {
     trace_id: input.traceId,
     span_id: input.spanId,
   });
+
+  publishTaskEvent({
+    type: 'task.created',
+    source: 'interceptor',
+    workflowId: input.workflowId,
+    workflowName: input.workflowType,
+    taskQueue: input.taskQueue || 'unknown',
+    taskId: task.id,
+    originId: input.originId,
+    status: 'pending',
+  });
+
   return task.id;
 }
 
@@ -62,6 +74,20 @@ export async function ltCompleteTask(input: {
     data: input.data,
     milestones: input.milestones,
   });
+
+  // Publish task.completed event
+  if (input.workflowId) {
+    publishTaskEvent({
+      type: 'task.completed',
+      source: 'orchestrator',
+      workflowId: input.workflowId,
+      workflowName: input.workflowName || 'unknown',
+      taskQueue: input.taskQueue || 'unknown',
+      taskId: input.taskId,
+      status: 'completed',
+      milestones: input.milestones,
+    });
+  }
 
   // Publish milestone event from orchestrator context
   if (input.milestones?.length && input.workflowId) {

@@ -45,12 +45,14 @@ export function useJobs(filters: {
   offset?: number;
   entity?: string;
   search?: string;
+  status?: string;
 }) {
   const params = new URLSearchParams();
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
   if (filters.entity) params.set('entity', filters.entity);
   if (filters.search) params.set('search', filters.search);
+  if (filters.status) params.set('status', filters.status);
 
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['jobs', filters],

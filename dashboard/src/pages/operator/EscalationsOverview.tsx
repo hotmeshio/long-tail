@@ -1,8 +1,10 @@
 import { useEscalationStats } from '../../api/escalations';
+import { useEscalationStatsEvents } from '../../hooks/useNatsEvents';
 import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
 import { SectionLabel } from '../../components/common/SectionLabel';
 
 export function EscalationsOverview() {
+  useEscalationStatsEvents();
   const { data: stats } = useEscalationStats();
 
   return (

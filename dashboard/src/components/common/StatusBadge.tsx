@@ -8,6 +8,7 @@ const statusStyles: Record<string, string> = {
   completed: 'bg-status-success',
   resolved: 'bg-status-success',
   needs_intervention: 'bg-status-error',
+  failed: 'bg-status-error',
   cancelled: 'bg-accent-muted',
 };
 
@@ -17,6 +18,7 @@ const statusLabels: Record<string, string> = {
   completed: 'Completed',
   resolved: 'Resolved',
   needs_intervention: 'Needs Intervention',
+  failed: 'Failed',
   cancelled: 'Cancelled',
 };
 

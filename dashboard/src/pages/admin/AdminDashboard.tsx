@@ -1,9 +1,11 @@
 import { useTasks } from '../../api/tasks';
 import { useEscalations } from '../../api/escalations';
+import { useEscalationListEvents } from '../../hooks/useNatsEvents';
 import { useMcpServers } from '../../api/mcp';
 import { PageHeaderWithStats } from '../../components/common/PageHeaderWithStats';
 
 export function AdminDashboard() {
+  useEscalationListEvents();
   const { data: taskData } = useTasks({ limit: 1 });
   const { data: pendingEsc } = useEscalations({ status: 'pending', limit: 1 });
   const { data: mcpData } = useMcpServers();
