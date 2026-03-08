@@ -26,4 +26,6 @@ export interface LTEscalationRecord {
   resolver_payload: string | null;
   created_at: string;
   updated_at: string;
+  trace_id: string | null;
+  span_id: string | null;
 }

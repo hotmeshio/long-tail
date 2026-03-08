@@ -5,7 +5,6 @@ import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
-import { TimeAgo } from '../../components/common/TimeAgo';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { StickyPagination } from '../../components/common/StickyPagination';
@@ -41,8 +40,22 @@ const columns: Column<LTJob>[] = [
   {
     key: 'created_at',
     label: 'Created',
-    render: (row) => <TimeAgo date={row.created_at} />,
-    className: 'w-32',
+    render: (row) => (
+      <span className="text-xs text-text-secondary font-mono">
+        {new Date(row.created_at).toISOString().replace('T', ' ').slice(0, 19)}
+      </span>
+    ),
+    className: 'w-44',
+  },
+  {
+    key: 'updated_at',
+    label: 'Updated',
+    render: (row) => (
+      <span className="text-xs text-text-secondary font-mono">
+        {new Date(row.updated_at).toISOString().replace('T', ' ').slice(0, 19)}
+      </span>
+    ),
+    className: 'w-44',
   },
 ];
 

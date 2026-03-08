@@ -28,6 +28,8 @@ function makeEsc(overrides: Partial<LTEscalationRecord> = {}): LTEscalationRecor
     resolver_payload: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    trace_id: null,
+    span_id: null,
     ...overrides,
   };
 }

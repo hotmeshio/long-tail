@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalations, useEscalationTypes } from '../../api/escalations';
+import { useEscalationListEvents } from '../../hooks/useNatsEvents';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable } from '../../components/common/DataTable';
@@ -10,6 +11,7 @@ import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, PRIORITY_OPTIONS } from './escalation-columns';
 
 export function OperatorDashboard() {
+  useEscalationListEvents();
   const navigate = useNavigate();
   const { user, userRoleNames } = useAuth();
   const { filters, setFilter, pagination } = useFilterParams({

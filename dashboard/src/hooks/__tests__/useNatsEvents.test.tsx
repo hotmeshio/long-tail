@@ -8,6 +8,7 @@ import {
   useWorkflowDetailEvents,
   useEscalationStatsEvents,
   useEscalationListEvents,
+  useEscalationDetailEvents,
   useProcessListEvents,
 } from '../useNatsEvents';
 
@@ -208,6 +209,55 @@ describe('useEscalationListEvents', () => {
     act(() => { vi.advanceTimersByTime(350); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+  });
+});
+
+// ── useEscalationDetailEvents ─────────────────────────────────────────────────
+
+describe('useEscalationDetailEvents', () => {
+  it('subscribes to escalation.> pattern', () => {
+    const { Wrapper } = createWrapper();
+    renderHook(() => useEscalationDetailEvents('esc-1'), { wrapper: Wrapper });
+
+    expect(subscriptions[0].pattern).toBe('lt.events.escalation.>');
+  });
+
+  it('invalidates detail + list + stats for matching escalationId', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useEscalationDetailEvents('esc-1'), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'escalation.resolved', escalationId: 'esc-1' }));
+
+    act(() => { vi.advanceTimersByTime(350); });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'esc-1'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalationStats'] });
+  });
+
+  it('ignores events for a different escalationId', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useEscalationDetailEvents('esc-1'), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'escalation.created', escalationId: 'esc-other' }));
+
+    act(() => { vi.advanceTimersByTime(350); });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when escalationId is undefined', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useEscalationDetailEvents(undefined), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'escalation.created', escalationId: 'esc-1' }));
+
+    act(() => { vi.advanceTimersByTime(350); });
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 

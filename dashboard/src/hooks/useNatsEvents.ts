@@ -94,13 +94,27 @@ export function useEscalationStatsEvents(): void {
 }
 
 /**
- * Invalidate escalation list (AvailableEscalationsPage) on escalation events.
+ * Invalidate escalation list queries on escalation events.
  */
 export function useEscalationListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
   useNatsSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
     invalidate([['escalations']]);
+  });
+}
+
+/**
+ * Invalidate a single escalation detail on escalation events for that ID.
+ */
+export function useEscalationDetailEvents(escalationId: string | undefined): void {
+  const invalidate = useDebouncedInvalidation(300);
+
+  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, (event) => {
+    if (!escalationId) return;
+    if (event.escalationId === escalationId) {
+      invalidate([['escalations', escalationId], ['escalations'], ['escalationStats']]);
+    }
   });
 }
 

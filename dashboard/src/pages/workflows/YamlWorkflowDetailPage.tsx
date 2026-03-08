@@ -86,7 +86,6 @@ function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl }: 
           </button>
         )}
       </div>
-      <JsonViewer data={displayData} label="Data" />
       {showMetadata && hasEnvelope && (
         <div className="bg-surface-raised border border-surface-border rounded-md p-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Metadata</p>
@@ -109,6 +108,7 @@ function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl }: 
           </div>
         </div>
       )}
+      <JsonViewer data={displayData} label="Data" />
     </div>
   );
 }
