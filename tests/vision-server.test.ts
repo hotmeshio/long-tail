@@ -25,9 +25,11 @@ async function connectClient(): Promise<McpClient> {
 
 afterEach(async () => {
   // Clean up any rotated files created during tests
-  const rotated = path.join(FIXTURES_DIR, 'page1_upside_down_rotated.png');
-  if (fs.existsSync(rotated)) {
-    fs.unlinkSync(rotated);
+  const files = fs.readdirSync(FIXTURES_DIR);
+  for (const f of files) {
+    if (f.includes('_rotated') && f.endsWith('.png')) {
+      fs.unlinkSync(path.join(FIXTURES_DIR, f));
+    }
   }
   await stopVisionServer();
 });
