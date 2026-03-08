@@ -144,13 +144,13 @@ function ActivityNode({
                 </div>
               </div>
             )}
-            {event.attributes.failure && (
+            {event.attributes.failure != null && (
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-status-error mb-1">Error</p>
                 <pre className="text-[11px] font-mono text-status-error bg-status-error/5 rounded p-2 whitespace-pre-wrap">
-                  {typeof event.attributes.failure === 'string'
+                  {String(typeof event.attributes.failure === 'string'
                     ? event.attributes.failure
-                    : JSON.stringify(event.attributes.failure, null, 2)}
+                    : JSON.stringify(event.attributes.failure, null, 2))}
                 </pre>
               </div>
             )}

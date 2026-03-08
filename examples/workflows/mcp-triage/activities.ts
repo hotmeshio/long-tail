@@ -1,40 +1,15 @@
 import OpenAI from 'openai';
-import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
-import { createVisionServer } from '../../../services/mcp/vision-server';
+import * as mcpClient from '../../../services/mcp/client';
+import * as mcpDbService from '../../../services/mcp/db';
 import * as taskService from '../../../services/task';
 import * as escalationService from '../../../services/escalation';
 import type { LTTaskRecord, LTEscalationRecord } from '../../../types';
 
-// ── In-process Vision MCP client (lazy singleton) ─────────────
+// ── Tool → server routing ────────────────────────────────────
 
-let visionClient: InstanceType<typeof McpClient> | null = null;
-const toolClientMap = new Map<string, InstanceType<typeof McpClient>>();
-
-async function getVisionClient(): Promise<InstanceType<typeof McpClient>> {
-  if (visionClient) return visionClient;
-
-  const server = await createVisionServer();
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-
-  visionClient = new McpClient({ name: 'mcp-triage-client', version: '1.0.0' });
-  await visionClient.connect(clientTransport);
-  return visionClient;
-}
-
-function parseResult(result: any): any {
-  const text = result.content?.[0]?.text;
-  if (!text) return result;
-
-  // MCP error responses or non-JSON text — return as-is for the LLM to interpret
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { error: text };
-  }
-}
+/** Maps qualified tool name → MCP server name for routing calls */
+const toolServerMap = new Map<string, string>();
 
 // ── Context activities ────────────────────────────────────────
 
@@ -91,36 +66,101 @@ export async function notifyEngineering(
 // ── LLM + MCP tool activities ────────────────────────────────
 
 /**
- * List all available Vision MCP tools in OpenAI function-calling format.
- * These are the document processing tools the LLM can choose from.
+ * Build a compact inventory of all MCP servers and their tools.
+ * Injected into the system prompt so the LLM understands what's available
+ * before making any tool calls.
  */
-export async function getVisionTools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
-  const client = await getVisionClient();
-  const { tools } = await client.listTools();
+export async function getToolInventory(): Promise<string> {
+  const { servers } = await mcpDbService.listMcpServers({ limit: 100 });
+  const lines: string[] = [];
 
-  for (const t of tools) toolClientMap.set(t.name, client);
+  for (const server of servers) {
+    const manifest = server.tool_manifest || [];
+    const category = (server.metadata as any)?.category || 'general';
+    const toolNames = manifest.map((t: any) => t.name).join(', ');
+    lines.push(`• ${server.name} [${category}] (${manifest.length} tools): ${toolNames}`);
+  }
 
-  return tools.map((t) => ({
-    type: 'function' as const,
-    function: {
-      name: t.name,
-      description: t.description || '',
-      parameters: t.inputSchema as Record<string, unknown>,
-    },
-  }));
+  return lines.join('\n');
 }
 
 /**
- * Call a specific Vision MCP tool and return the parsed result.
- * The LLM decides which tool to call — this executes it.
+ * Discover tools from ALL available MCP servers.
+ *
+ * Queries the DB for connected/built-in servers, aggregates their tool
+ * manifests, and returns them in OpenAI function-calling format. Each tool
+ * name is prefixed with the server slug so we can route calls back.
+ *
+ * Example: `long_tail_document_vision__rotate_page`
  */
-export async function callVisionTool(
-  name: string,
+export async function getAvailableTools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+  const { servers } = await mcpDbService.listMcpServers({ limit: 100 });
+  const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
+
+  for (const server of servers) {
+    const manifest = server.tool_manifest || [];
+    const slug = server.name.replace(/[^a-zA-Z0-9]/g, '_');
+
+    for (const t of manifest) {
+      const qualifiedName = `${slug}__${t.name}`;
+      toolServerMap.set(qualifiedName, server.name);
+
+      tools.push({
+        type: 'function' as const,
+        function: {
+          name: qualifiedName,
+          description: `[${server.name}] ${t.description || ''}`,
+          parameters: (t.inputSchema || { type: 'object', properties: {} }) as Record<string, unknown>,
+        },
+      });
+    }
+  }
+
+  return tools;
+}
+
+/**
+ * Call any MCP tool by its qualified name (e.g. `long_tail_document_vision__rotate_page`).
+ *
+ * Resolves the server from the tool name prefix and delegates to the
+ * central MCP client which handles built-in auto-connection and routing.
+ */
+export async function callTool(
+  qualifiedName: string,
   args: Record<string, any>,
 ): Promise<any> {
-  const client = toolClientMap.get(name) || (await getVisionClient());
-  const result = await client.callTool({ name, arguments: args });
-  return parseResult(result);
+  const serverName = toolServerMap.get(qualifiedName);
+
+  // Parse: slug__toolName → extract the actual tool name
+  const separatorIdx = qualifiedName.indexOf('__');
+  const toolName = separatorIdx >= 0
+    ? qualifiedName.slice(separatorIdx + 2)
+    : qualifiedName;
+
+  if (serverName) {
+    try {
+      return await mcpClient.callServerTool(serverName, toolName, args);
+    } catch (err: any) {
+      // Return error as data so the LLM can adapt rather than crashing the workflow
+      return { error: err.message, tool: qualifiedName, args };
+    }
+  }
+
+  // Fallback: try the tool name directly (unqualified) against all connected servers
+  // This handles cases where the LLM drops the prefix
+  const { servers } = await mcpDbService.listMcpServers({ limit: 100 });
+  for (const server of servers) {
+    const manifest = server.tool_manifest || [];
+    if (manifest.some((t: any) => t.name === toolName)) {
+      try {
+        return await mcpClient.callServerTool(server.name, toolName, args);
+      } catch (err: any) {
+        return { error: err.message, tool: qualifiedName, args };
+      }
+    }
+  }
+
+  return { error: `Unknown tool: ${qualifiedName} (no server found)`, tool: qualifiedName };
 }
 
 /**

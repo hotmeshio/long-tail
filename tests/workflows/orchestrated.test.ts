@@ -173,8 +173,14 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(childTask).toBeTruthy();
     expect(childTask!.workflow_id).toBeTruthy();
 
-    // Find escalation by the child's specific workflow ID (precise, no stale matches)
-    const escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+    // Poll for escalation — ltCreateEscalation runs asynchronously after ltEscalateTask
+    let escalations: Awaited<ReturnType<typeof escalationService.getEscalationsByWorkflowId>> = [];
+    const escDeadline = Date.now() + 10_000;
+    while (Date.now() < escDeadline) {
+      escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+      if (escalations.length > 0) break;
+      await sleepFor(500);
+    }
     expect(escalations.length).toBeGreaterThan(0);
     const esc = escalations[0];
     expect(esc.task_queue).toBeTruthy();
@@ -232,8 +238,14 @@ describe('orchestrated workflows (executeLT)', () => {
     }
     expect(childTask).toBeTruthy();
 
-    // Find escalation by child's specific workflow ID
-    const escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+    // Poll for escalation — ltCreateEscalation runs asynchronously after ltEscalateTask
+    let escalations: Awaited<ReturnType<typeof escalationService.getEscalationsByWorkflowId>> = [];
+    const escDeadline2 = Date.now() + 10_000;
+    while (Date.now() < escDeadline2) {
+      escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+      if (escalations.length > 0) break;
+      await sleepFor(500);
+    }
     expect(escalations.length).toBeGreaterThan(0);
 
     await resolveEscalation(escalations[0].id, {

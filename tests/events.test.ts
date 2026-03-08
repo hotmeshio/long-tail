@@ -242,18 +242,15 @@ describe('events service', () => {
     expect(result.type).toBe('return');
     expect(result.data.approved).toBe(true);
 
-    await sleepFor(500);
-
-    const milestoneEvents = eventAdapter.events.filter(
-      (e) => e.type === 'milestone',
+    // Poll for orchestrator event (fire-and-forget from ltCompleteTask activity)
+    const orchestratorEvt = await waitForEvent(
+      eventAdapter,
+      (e) => e.type === 'milestone' && e.source === 'orchestrator',
+      10_000,
     );
 
-    // Should have events from both sources
-    const interceptorEvt = milestoneEvents.find(
-      (e) => e.source === 'interceptor',
-    );
-    const orchestratorEvt = milestoneEvents.find(
-      (e) => e.source === 'orchestrator',
+    const interceptorEvt = eventAdapter.events.find(
+      (e) => e.type === 'milestone' && e.source === 'interceptor',
     );
 
     expect(interceptorEvt).toBeTruthy();
@@ -332,7 +329,8 @@ describe('events service', () => {
       eventAdapter,
       (e) => e.type === 'milestone'
         && e.source === 'activity'
-        && e.activityName === 'processWithMilestones',
+        && e.activityName === 'processWithMilestones'
+        && e.workflowId === workflowId,
     );
 
     expect(evt).toBeTruthy();

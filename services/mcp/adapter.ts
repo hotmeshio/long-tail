@@ -5,6 +5,7 @@ import * as mcpServer from './server';
 import * as mcpDbServer from './db-server';
 import * as mcpTelemetryServer from './telemetry-server';
 import * as mcpWorkflowCompilerServer from './workflow-compiler-server';
+import * as mcpWorkflowServer from './workflow-server';
 import * as mcpDbService from './db';
 
 export interface BuiltInMcpAdapterOptions {
@@ -52,6 +53,10 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
     await mcpWorkflowCompilerServer.createWorkflowCompilerServer();
     loggerRegistry.info('[lt-mcp] workflow compiler server started');
 
+    // Start MCP Workflows server (exposes compiled YAML workflows as tools)
+    await mcpWorkflowServer.createWorkflowServer();
+    loggerRegistry.info('[lt-mcp] workflow server started');
+
     // Connect to auto-connect servers from DB
     await mcpClient.connectAutoServers();
 
@@ -74,6 +79,7 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
 
   async disconnect(): Promise<void> {
     await mcpClient.disconnectAll();
+    await mcpWorkflowServer.stopWorkflowServer();
     await mcpWorkflowCompilerServer.stopWorkflowCompilerServer();
     await mcpTelemetryServer.stopTelemetryServer();
     await mcpDbServer.stopDbServer();

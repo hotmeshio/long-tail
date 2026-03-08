@@ -11,6 +11,7 @@ export type {
   ReviewContentEnvelopeData,
   VerifyDocumentEnvelopeData,
   ProcessClaimEnvelopeData,
+  KitchenSinkEnvelopeData,
   WorkflowEnvelopeMap,
   InvocableWorkflowType,
 } from './envelopes';

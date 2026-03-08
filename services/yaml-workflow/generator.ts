@@ -18,7 +18,7 @@ export interface GenerateYamlOptions {
   /** User-chosen name for the YAML workflow */
   name: string;
   description?: string;
-  /** HotMesh app namespace (shared across flows). Defaults to 'mcpyaml'. */
+  /** HotMesh app namespace (shared across flows). Defaults to 'longtail'. */
   appId?: string;
   /** Graph subscribes topic. Defaults to sanitized name. */
   subscribes?: string;
@@ -270,7 +270,7 @@ export async function generateYamlFromExecution(
     );
   }
 
-  const appId = options.appId || 'mcpyaml';
+  const appId = options.appId || 'longtail';
   const graphTopic = options.subscribes || sanitizeName(name);
 
   // 3. Infer input schema from the first tool step's arguments.

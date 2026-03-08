@@ -13,9 +13,11 @@ import * as interceptorActivities from '../../interceptor/activities';
 import { executeLT } from '../../orchestrator';
 import * as configService from '../../services/config';
 import * as taskService from '../../services/task';
+import * as mcpDbService from '../../services/mcp/db';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
 import { McpEscalationStrategy } from '../../services/escalation-strategy/mcp';
-import { stopVisionServer } from '../../services/mcp/vision-server';
+import { createVisionServer, stopVisionServer } from '../../services/mcp/vision-server';
+import { registerBuiltinServer } from '../../services/mcp/client';
 
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../types';
 
@@ -57,6 +59,23 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       options: postgres_options,
     });
     await migrate();
+
+    // Seed MCP server record so getAvailableTools() finds vision tools
+    const visionServer = await mcpDbService.createMcpServer({
+      name: 'long-tail-document-vision',
+      description: 'Document vision tools for page analysis and manipulation',
+      transport_type: 'stdio',
+      transport_config: { command: 'builtin' },
+      auto_connect: false,
+      metadata: { category: 'document_processing', builtin: true },
+    });
+    await mcpDbService.updateMcpServerStatus(visionServer.id, 'connected', [
+      { name: 'list_document_pages', description: 'List available document page images from storage.', inputSchema: { type: 'object', properties: {} } },
+      { name: 'extract_member_info', description: 'Extract member information from a document page image using OpenAI Vision.', inputSchema: { type: 'object', properties: { image_ref: { type: 'string' }, page_number: { type: 'integer' } }, required: ['image_ref', 'page_number'] } },
+      { name: 'validate_member', description: 'Validate extracted member information against the member database.', inputSchema: { type: 'object', properties: { member_info: { type: 'object' } }, required: ['member_info'] } },
+      { name: 'rotate_page', description: 'Rotate a document page image by the given degrees.', inputSchema: { type: 'object', properties: { image_ref: { type: 'string' }, degrees: { type: 'integer' } }, required: ['image_ref', 'degrees'] } },
+      { name: 'translate_content', description: 'Translate content text to the target language using OpenAI.', inputSchema: { type: 'object', properties: { content: { type: 'string' }, target_language: { type: 'string' } }, required: ['content', 'target_language'] } },
+    ]);
 
     // Seed workflow configs
     await configService.upsertWorkflowConfig({
@@ -167,6 +186,9 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     // Register MCP escalation strategy
     escalationStrategyRegistry.register(new McpEscalationStrategy());
+
+    // Register builtin server factory so resolveClient can auto-connect
+    registerBuiltinServer('long-tail-document-vision', createVisionServer);
 
     // Connect MCP test client
     mcpCtx = await createMcpTestClient();
@@ -289,8 +311,8 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       expire: 300,
     });
 
-    // Wait for escalation
-    const escalations = await waitForEscalationByOriginId(workflowId, 45_000, 2_000);
+    // Wait for escalation (Vision API can be slow)
+    const escalations = await waitForEscalationByOriginId(workflowId, 60_000, 2_000);
     expect(escalations.length).toBeGreaterThanOrEqual(1);
 
     const esc = escalations[0];

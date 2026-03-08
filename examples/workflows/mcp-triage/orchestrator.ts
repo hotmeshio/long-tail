@@ -44,11 +44,17 @@ export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
   const correctedData = (triageResult as any)?.data?.correctedData;
 
   if (correctedData && originalWorkflowType && originalTaskQueue) {
+    // Re-invoke the original workflow with correctedData as the resolver.
+    // Leaf workflows check `envelope.resolver` to detect re-entry after
+    // escalation — without it they'd escalate again (infinite loop).
+    // The original escalation payload becomes the envelope data so the
+    // workflow sees the same input shape it was originally called with.
     const result = await executeLT({
       workflowName: originalWorkflowType,
       args: [{
-        data: correctedData,
+        data: envelope.data.escalationPayload || correctedData,
         metadata: envelope.metadata || {},
+        resolver: correctedData,
       }],
       taskQueue: originalTaskQueue,
       originId,

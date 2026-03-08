@@ -26,7 +26,7 @@ export function ConvertToYamlModal({
   isPending,
 }: ConvertToYamlModalProps) {
   const [name, setName] = useState('');
-  const [appId, setAppId] = useState('mcpyaml');
+  const [appId, setAppId] = useState('longtail');
   const [subscribes, setSubscribes] = useState('');
   const [autoSubscribes, setAutoSubscribes] = useState(true);
 
@@ -37,7 +37,7 @@ export function ConvertToYamlModal({
     if (!name.trim()) return;
     onSubmit({
       name: name.trim(),
-      app_id: appId.trim() || 'mcpyaml',
+      app_id: appId.trim() || 'longtail',
       subscribes: derivedSubscribes,
     });
   };
@@ -68,7 +68,7 @@ export function ConvertToYamlModal({
             value={appId}
             onChange={(e) => setAppId(e.target.value)}
             className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-            placeholder="mcpyaml"
+            placeholder="longtail"
           />
           <p className="text-[10px] text-text-tertiary mt-1">
             Flows sharing the same App ID share a connection pool and are deployed together.

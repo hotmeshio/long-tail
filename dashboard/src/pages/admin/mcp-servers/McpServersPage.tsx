@@ -13,7 +13,11 @@ import type { McpServerRecord } from '../../../api/types';
 import { PageHeader } from '../../../components/common/PageHeader';
 import { ServerFormModal } from './ServerFormModal';
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function isBuiltIn(row: McpServerRecord): boolean {
+  return !!(row.metadata as Record<string, unknown> | null)?.builtin;
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export function McpServersPage() {
   const { data, isLoading } = useMcpServers();
@@ -42,7 +46,9 @@ export function McpServersPage() {
       key: 'transport_type',
       label: 'Transport',
       render: (row) => (
-        <span className="text-xs font-mono text-text-secondary">{row.transport_type}</span>
+        <span className="text-xs font-mono text-text-secondary">
+          {isBuiltIn(row) ? 'built-in' : row.transport_type}
+        </span>
       ),
       className: 'w-24',
     },
@@ -71,52 +77,62 @@ export function McpServersPage() {
     {
       key: 'actions',
       label: '',
-      render: (row) => (
-        <div className="flex gap-2">
-          {row.status === 'connected' ? (
+      render: (row) => {
+        if (isBuiltIn(row)) {
+          const toolCount = row.tool_manifest?.length ?? 0;
+          return (
+            <span className="text-xs text-text-tertiary">
+              {toolCount} tool{toolCount !== 1 ? 's' : ''}
+            </span>
+          );
+        }
+        return (
+          <div className="flex gap-2">
+            {row.status === 'connected' ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  disconnect.mutate(row.id);
+                }}
+                className="btn-ghost text-xs"
+                disabled={disconnect.isPending}
+              >
+                Disconnect
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  connect.mutate(row.id);
+                }}
+                className="btn-ghost text-xs"
+                disabled={connect.isPending}
+              >
+                Connect
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                disconnect.mutate(row.id);
+                setEditing(row);
+                setShowForm(true);
               }}
-              className="btn-ghost text-xs"
-              disabled={disconnect.isPending}
+              className="text-xs text-accent hover:underline"
             >
-              Disconnect
+              Edit
             </button>
-          ) : (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                connect.mutate(row.id);
+                setConfirmDelete(row);
               }}
-              className="btn-ghost text-xs"
-              disabled={connect.isPending}
+              className="text-xs text-status-error hover:underline"
             >
-              Connect
+              Delete
             </button>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditing(row);
-              setShowForm(true);
-            }}
-            className="text-xs text-accent hover:underline"
-          >
-            Edit
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmDelete(row);
-            }}
-            className="text-xs text-status-error hover:underline"
-          >
-            Delete
-          </button>
-        </div>
-      ),
+          </div>
+        );
+      },
       className: 'w-48',
     },
   ];

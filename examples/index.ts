@@ -17,6 +17,7 @@ import type { LTEnvelope } from '../types';
 import type {
   ReviewContentEnvelopeData,
   ProcessClaimEnvelopeData,
+  KitchenSinkEnvelopeData,
   InvocableWorkflowType,
 } from './types';
 import { loggerRegistry } from '../services/logger';
@@ -134,6 +135,17 @@ async function seedUsers(): Promise<void> {
 //   The MCP triage orchestrator uses LLM + Vision tools to diagnose,
 //   rotate images, verify extraction, re-run the claim workflow, and
 //   it auto-approves with corrected docs.
+//
+// Process 5 — "Dynamic Triage (Kitchen Sink)"
+//   Kitchen-sink workflow creates a standard escalation (reviewer approval).
+//   Demonstrates the GENERIC triage controller with a non-domain-specific
+//   workflow:
+//     reviewer → check "Request AI Triage", write: "This looks fine, approve"
+//   The triage controller detects simple approval intent via pre-flight
+//   pattern matching and passes through without LLM calls (fastest path).
+//   Or, with a complex message: "Check system health before approving",
+//   the LLM uses DB query tools (find_tasks, get_system_health) to
+//   investigate, then decides whether to approve.
 
 const SEED_ENVELOPES: Array<{
   workflowName: InvocableWorkflowType;
@@ -225,6 +237,32 @@ const SEED_ENVELOPES: Array<{
           'The MCP triage orchestrator uses AI + Vision tools to diagnose the issue, ' +
           'rotate the page with sharp, re-extract member info, validate against the DB, ' +
           're-run the claim workflow with corrected documents, and it auto-approves.',
+      },
+    },
+  },
+
+  // ── Process 5: Kitchen Sink → Dynamic Triage ────────────────
+  {
+    label: 'Process 5 — Dynamic Triage',
+    workflowName: 'kitchenSinkOrchestrator',
+    taskQueue: 'lt-kitchen-sink-orch',
+    envelope: {
+      data: {
+        name: 'Triage Demo',
+        mode: 'full',
+      } satisfies KitchenSinkEnvelopeData,
+      metadata: {
+        source: 'seed',
+        process: 'dynamic-triage',
+        description:
+          'Demonstrates the dynamic triage controller with a generic workflow. ' +
+          'The kitchen-sink workflow creates an escalation waiting for approval. ' +
+          'As reviewer, check "Request AI Triage" and write a natural language ' +
+          'message like: "This looks fine, just approve it." The triage controller ' +
+          'detects simple approval intent and passes through without LLM calls. ' +
+          'Try again with a complex message like: "Something seems wrong — check ' +
+          'the system health and recent escalation stats before approving." The ' +
+          'triage agent will use database query tools to investigate, then decide.',
       },
     },
   },
@@ -406,6 +444,86 @@ const TELEMETRY_TOOLS = [
   },
 ];
 
+const MCP_WORKFLOW_TOOLS = [
+  {
+    name: 'list_workflows',
+    description: 'Discover available compiled YAML workflows. These are deterministic pipelines converted from successful MCP triage executions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by lifecycle status (default: "active")' },
+      },
+    },
+  },
+  {
+    name: 'get_workflow',
+    description: 'Inspect a compiled workflow by name. Returns the activity manifest, input/output schemas, and provenance.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workflow_name: { type: 'string', description: 'Name of the workflow to inspect' },
+      },
+      required: ['workflow_name'],
+    },
+  },
+  {
+    name: 'invoke_workflow',
+    description: 'Run a compiled YAML workflow by name. No LLM reasoning — direct tool-to-tool data piping.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workflow_name: { type: 'string', description: 'Name of the compiled workflow to invoke' },
+        input: { type: 'object', description: 'Input data matching the workflow input schema' },
+        async: { type: 'boolean', description: 'If true, fire-and-forget (returns job ID)' },
+        timeout: { type: 'number', description: 'Max ms to wait for result (sync mode only)' },
+      },
+      required: ['workflow_name'],
+    },
+  },
+];
+
+const WORKFLOW_COMPILER_TOOLS = [
+  {
+    name: 'convert_execution_to_yaml',
+    description: 'Analyze a completed workflow execution and convert its tool call sequence into a deterministic HotMesh YAML workflow.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workflow_id: { type: 'string', description: 'The workflow execution ID to analyze' },
+        task_queue: { type: 'string', description: 'HotMesh task queue' },
+        workflow_name: { type: 'string', description: 'Workflow name' },
+        yaml_name: { type: 'string', description: 'Name for the generated YAML workflow' },
+        description: { type: 'string', description: 'Optional description' },
+      },
+      required: ['workflow_id', 'task_queue', 'workflow_name', 'yaml_name'],
+    },
+  },
+  {
+    name: 'deploy_yaml_workflow',
+    description: 'Deploy a stored YAML workflow to HotMesh. Optionally activate immediately.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        yaml_workflow_id: { type: 'string', description: 'UUID of the stored YAML workflow' },
+        activate: { type: 'boolean', description: 'Whether to activate immediately after deployment' },
+      },
+      required: ['yaml_workflow_id'],
+    },
+  },
+  {
+    name: 'list_yaml_workflows',
+    description: 'List stored YAML workflows with optional status filter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by status (draft, deployed, active, archived)' },
+        limit: { type: 'integer', description: 'Maximum results (default: 25)' },
+        offset: { type: 'integer', description: 'Pagination offset' },
+      },
+    },
+  },
+];
+
 const SEED_MCP_SERVERS = [
   {
     name: 'long-tail-human-queue',
@@ -414,6 +532,22 @@ const SEED_MCP_SERVERS = [
     transport_config: { builtin: true, process: 'in-memory' },
     tool_manifest: HUMAN_QUEUE_TOOLS,
     metadata: { builtin: true, category: 'escalation' },
+  },
+  {
+    name: 'long-tail-mcp-workflows',
+    description: 'Compiled YAML workflows — hardened deterministic pipelines from successful MCP triage executions. Invoke proven solutions to edge cases without LLM reasoning.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: MCP_WORKFLOW_TOOLS,
+    metadata: { builtin: true, category: 'workflows' },
+  },
+  {
+    name: 'long-tail-workflow-compiler',
+    description: 'Convert dynamic MCP tool call sequences into deterministic YAML workflows. Analyze executions, generate pipelines, deploy and activate.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: WORKFLOW_COMPILER_TOOLS,
+    metadata: { builtin: true, category: 'compilation' },
   },
   {
     name: 'long-tail-document-vision',
@@ -458,7 +592,8 @@ async function seedMcpServers(): Promise<void> {
       loggerRegistry.warn(`[examples] failed to seed MCP server ${srv.name}: ${err.message}`);
     }
   }
-  loggerRegistry.info(`[examples] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${HUMAN_QUEUE_TOOLS.length + VISION_TOOLS.length + TELEMETRY_TOOLS.length} tools)`);
+  const totalTools = SEED_MCP_SERVERS.reduce((sum, s) => sum + s.tool_manifest.length, 0);
+  loggerRegistry.info(`[examples] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${totalTools} tools)`);
 }
 
 /**

@@ -205,10 +205,18 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       loggerRegistry.info('[long-tail] MCP adapter connected');
     }
 
-    // Register built-in MCP server factories for YAML pipeline workers
-    const { createVisionServer } = await import('./services/mcp/vision-server');
+    // Register built-in MCP server factories so resolveClient can auto-connect
     const { registerBuiltinServer } = await import('./services/mcp/client');
+    const { createVisionServer } = await import('./services/mcp/vision-server');
+    const { createHumanQueueServer } = await import('./services/mcp/server');
+    const { createWorkflowServer } = await import('./services/mcp/workflow-server');
+    const { createWorkflowCompilerServer } = await import('./services/mcp/workflow-compiler-server');
+    const { createDbServer } = await import('./services/mcp/db-server');
     registerBuiltinServer('long-tail-document-vision', createVisionServer);
+    registerBuiltinServer('long-tail-human-queue', createHumanQueueServer);
+    registerBuiltinServer('long-tail-mcp-workflows', createWorkflowServer);
+    registerBuiltinServer('long-tail-workflow-compiler', createWorkflowCompilerServer);
+    registerBuiltinServer('long-tail-db', createDbServer);
 
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();
