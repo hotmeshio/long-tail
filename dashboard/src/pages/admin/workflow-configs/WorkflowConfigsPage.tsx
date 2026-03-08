@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useWorkflowConfigs,
   useDeleteWorkflowConfig,
@@ -7,16 +8,14 @@ import { DataTable, type Column } from '../../../components/common/DataTable';
 import { ConfirmDeleteModal } from '../../../components/common/ConfirmDeleteModal';
 import type { LTWorkflowConfig } from '../../../api/types';
 import { PageHeader } from '../../../components/common/PageHeader';
-import { ConfigFormModal } from './ConfigFormModal';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function WorkflowConfigsPage() {
+  const navigate = useNavigate();
   const { data, isLoading } = useWorkflowConfigs();
   const deleteConfig = useDeleteWorkflowConfig();
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<LTWorkflowConfig | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const configs = data ?? [];
@@ -113,25 +112,15 @@ export function WorkflowConfigsPage() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setEditing(row);
-              setShowForm(true);
-            }}
-            className="text-xs text-accent hover:underline"
-          >
-            Edit
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
               setConfirmDelete(row.workflow_type);
             }}
-            className="text-xs text-status-error hover:underline"
+            className="text-xs text-status-error hover:underline opacity-0 group-hover/row:opacity-100 transition-opacity"
           >
             Delete
           </button>
         </div>
       ),
-      className: 'w-28 text-right',
+      className: 'w-20 text-right',
     },
   ];
 
@@ -148,10 +137,7 @@ export function WorkflowConfigsPage() {
         title="Workflow Configurations"
         actions={
           <button
-            onClick={() => {
-              setEditing(null);
-              setShowForm(true);
-            }}
+            onClick={() => navigate('/admin/config/new')}
             className="btn-primary text-xs"
           >
             Add Config
@@ -163,18 +149,9 @@ export function WorkflowConfigsPage() {
         columns={columns}
         data={configs}
         keyFn={(row) => row.workflow_type}
+        onRowClick={(row) => navigate(`/admin/config/${encodeURIComponent(row.workflow_type)}`)}
         isLoading={isLoading}
         emptyMessage="No workflow configurations found"
-      />
-
-      {/* Create / Edit modal */}
-      <ConfigFormModal
-        open={showForm}
-        onClose={() => {
-          setShowForm(false);
-          setEditing(null);
-        }}
-        editing={editing}
       />
 
       {/* Delete confirmation modal */}

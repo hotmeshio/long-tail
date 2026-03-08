@@ -24,6 +24,7 @@ router.get('/jobs', async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const entity = (req.query.entity as string) || undefined;
     const search = (req.query.search as string) || undefined;
+    const status = (req.query.status as string) || undefined;
 
     const pool = getPool();
     const conditions = ['j.entity IS NOT NULL'];
@@ -38,6 +39,15 @@ router.get('/jobs', async (req, res) => {
     if (search) {
       conditions.push(`j.key ILIKE $${idx++}`);
       values.push(`%${search}%`);
+    }
+
+    // HotMesh stores status as integer: >0 = running, 0 = completed, <0 = failed
+    if (status === 'running') {
+      conditions.push('j.status > 0');
+    } else if (status === 'completed') {
+      conditions.push('j.status = 0');
+    } else if (status === 'failed') {
+      conditions.push('j.status < 0');
     }
 
     const where = conditions.join(' AND ');

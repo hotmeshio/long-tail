@@ -246,7 +246,7 @@ export function EscalationDetailPage() {
 
       {/* Details — copyable IDs */}
       <Collapsible open={showDetails}>
-        <div className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
+        <div className="mt-4 bg-surface-raised border border-surface-border rounded-md p-4 flex flex-wrap gap-x-8 gap-y-4">
           <CopyableId label="Escalation ID" value={esc.id} />
           {esc.task_id && (
             <CopyableId label="Task" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />

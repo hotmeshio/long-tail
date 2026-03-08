@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { useUpsertWorkflowConfig } from '../../../api/workflows';
-import { Modal } from '../../../components/common/Modal';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useWorkflowConfigs, useUpsertWorkflowConfig, useInvokeWorkflow } from '../../../api/workflows';
+import { useToast } from '../../../hooks/useToast';
 import { StepIndicator } from '../../../components/common/StepIndicator';
+import { PageHeader } from '../../../components/common/PageHeader';
+import { SectionLabel } from '../../../components/common/SectionLabel';
 import { splitCsv } from '../../../lib/parse';
 import type { LTWorkflowConfig } from '../../../api/types';
 
@@ -85,32 +88,31 @@ const labelCls = 'block text-[10px] font-semibold uppercase tracking-widest text
 const hintCls = 'text-[10px] text-text-tertiary mt-2 leading-relaxed';
 const jsonCls = 'input font-mono text-[11px] w-full leading-relaxed tabular-nums';
 
-// ── Component ───────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
-export function ConfigFormModal({
-  open,
-  onClose,
-  editing,
-}: {
-  open: boolean;
-  onClose: () => void;
-  editing: LTWorkflowConfig | null;
-}) {
-  const [form, setForm] = useState<ConfigFormState>(
-    editing ? configToForm(editing) : EMPTY_FORM,
-  );
-  const [step, setStep] = useState(0);
-  const [schemaError, setSchemaError] = useState('');
+export function WorkflowConfigDetailPage() {
+  const { workflowType } = useParams<{ workflowType: string }>();
+  const isNew = !workflowType;
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const { data: configs, isLoading } = useWorkflowConfigs();
   const upsert = useUpsertWorkflowConfig();
 
-  // Reset form when modal opens with new data
-  const [prevEditing, setPrevEditing] = useState(editing);
-  if (editing !== prevEditing) {
-    setPrevEditing(editing);
-    setForm(editing ? configToForm(editing) : EMPTY_FORM);
-    setStep(0);
-    setSchemaError('');
-  }
+  const editing = configs?.find((c) => c.workflow_type === workflowType) ?? null;
+
+  const [form, setForm] = useState<ConfigFormState>(EMPTY_FORM);
+  const [step, setStep] = useState(0);
+  const [schemaError, setSchemaError] = useState('');
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (initialized) return;
+    if (isNew) { setInitialized(true); return; }
+    if (editing) {
+      setForm(configToForm(editing));
+      setInitialized(true);
+    }
+  }, [editing, isNew, initialized]);
 
   const set = (field: keyof ConfigFormState, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -162,11 +164,31 @@ export function ConfigFormModal({
         resolver_schema,
         cron_schedule: form.cron_schedule.trim() || null,
       },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          addToast(isNew ? 'Config created' : 'Config saved', 'success');
+          navigate('/admin/config');
+        },
+      },
     );
   };
 
-  // ── Step 0 — Basics ───────────────────────────────────────────────────
+  // ── Loading / Not found ──────────────────────────────────────────────────
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-surface-sunken rounded w-48" />
+        <div className="h-60 bg-surface-sunken rounded" />
+      </div>
+    );
+  }
+
+  if (!isNew && !editing) {
+    return <p className="text-sm text-text-secondary">Config not found.</p>;
+  }
+
+  // ── Step renderers ───────────────────────────────────────────────────────
 
   function renderBasics() {
     return (
@@ -240,6 +262,20 @@ export function ConfigFormModal({
           </p>
         </div>
 
+        <div>
+          <label className={labelCls}>Cron Schedule</label>
+          <input
+            type="text"
+            value={form.cron_schedule}
+            onChange={(e) => set('cron_schedule', e.target.value)}
+            placeholder="0 */6 * * *"
+            className="input font-mono text-xs w-full"
+          />
+          <p className={hintCls}>
+            Optional cron expression for scheduled execution
+          </p>
+        </div>
+
         <div className="flex gap-6 pt-1">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -276,8 +312,6 @@ export function ConfigFormModal({
       </div>
     );
   }
-
-  // ── Step 1 — Access ───────────────────────────────────────────────────
 
   function renderAccess() {
     return (
@@ -332,8 +366,6 @@ export function ConfigFormModal({
       </div>
     );
   }
-
-  // ── Step 2 — Schemas ──────────────────────────────────────────────────
 
   function renderSchemas() {
     return (
@@ -394,8 +426,6 @@ export function ConfigFormModal({
     );
   }
 
-  // ── Step 3 — Hooks ────────────────────────────────────────────────────
-
   function renderHooks() {
     return (
       <div className="space-y-5">
@@ -426,67 +456,172 @@ export function ConfigFormModal({
     );
   }
 
+  // ── Invoke sidebar ──────────────────────────────────────────────────────
+
+  const invokeMutation = useInvokeWorkflow();
+  const [invokeJson, setInvokeJson] = useState(DEFAULT_ENVELOPE);
+  const [invokeParseError, setInvokeParseError] = useState('');
+
+  // Sync invoke editor when config loads
+  useEffect(() => {
+    if (!editing) return;
+    setInvokeJson(
+      editing.envelope_schema
+        ? JSON.stringify(editing.envelope_schema, null, 2)
+        : DEFAULT_ENVELOPE,
+    );
+  }, [editing]);
+
+  const handleInvoke = async () => {
+    const wfType = form.workflow_type.trim();
+    if (!wfType) return;
+
+    setInvokeParseError('');
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = JSON.parse(invokeJson);
+    } catch {
+      setInvokeParseError('Invalid JSON');
+      return;
+    }
+
+    const { data, metadata } = envelope;
+    if (!data || typeof data !== 'object') {
+      setInvokeParseError('Envelope must include a "data" object');
+      return;
+    }
+
+    try {
+      await invokeMutation.mutateAsync({
+        workflowType: wfType,
+        data: data as Record<string, unknown>,
+        metadata: (metadata as Record<string, unknown>) ?? undefined,
+      });
+      navigate('/workflows/list');
+    } catch {
+      // Error available via invokeMutation.error
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isLast = step === STEP_LABELS.length - 1;
+  const showInvokeSidebar = !isNew && form.invocable;
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={editing ? `Edit — ${editing.workflow_type}` : 'Add Workflow Config'}
-      maxWidth="max-w-3xl"
-    >
-      <StepIndicator steps={STEP_LABELS} currentStep={step} />
+    <div>
+      <PageHeader title={isNew ? 'New Workflow Config' : editing?.workflow_type ?? ''} />
 
-      <div className="min-h-[360px]">
-        {step === 0 && renderBasics()}
-        {step === 1 && renderAccess()}
-        {step === 2 && renderSchemas()}
-        {step === 3 && renderHooks()}
-      </div>
+      <div className={`grid gap-12 ${showInvokeSidebar ? 'grid-cols-1 lg:grid-cols-3' : ''}`}>
+        {/* Wizard (left / full width) */}
+        <div className={showInvokeSidebar ? 'lg:col-span-2' : 'max-w-3xl'}>
+          <StepIndicator steps={STEP_LABELS} currentStep={step} onStepClick={setStep} />
 
-      {(schemaError || upsert.error) && (
-        <p className="text-xs text-status-error mt-4">
-          {schemaError || (upsert.error as Error).message}
-        </p>
-      )}
+          <div className="min-h-[360px] py-2">
+            {step === 0 && renderBasics()}
+            {step === 1 && renderAccess()}
+            {step === 2 && renderSchemas()}
+            {step === 3 && renderHooks()}
+          </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between items-center pt-4 border-t border-surface-border mt-4">
-        <div>
-          {step > 0 && (
-            <button
-              onClick={() => setStep((s) => s - 1)}
-              className="btn-secondary text-xs"
-            >
-              Back
-            </button>
+          {(schemaError || upsert.error) && (
+            <p className="text-xs text-status-error mt-4">
+              {schemaError || (upsert.error as Error).message}
+            </p>
           )}
+
+          {/* Navigation */}
+          <div className="flex justify-between items-center pt-4 border-t border-surface-border mt-4">
+            <div>
+              {step > 0 && (
+                <button
+                  onClick={() => setStep((s) => s - 1)}
+                  className="btn-secondary text-xs"
+                >
+                  Back
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => navigate('/admin/config')} className="btn-ghost text-xs">
+                Cancel
+              </button>
+              {isLast ? (
+                <button
+                  onClick={handleSave}
+                  disabled={!isStepValid(step, form) || upsert.isPending}
+                  className="btn-primary text-xs"
+                >
+                  {upsert.isPending ? 'Saving...' : editing ? 'Save' : 'Create'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setStep((s) => s + 1)}
+                  disabled={!isStepValid(step, form)}
+                  className="btn-primary text-xs"
+                >
+                  Next
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="btn-ghost text-xs">
-            Cancel
-          </button>
-          {isLast ? (
-            <button
-              onClick={handleSave}
-              disabled={!isStepValid(step, form) || upsert.isPending}
-              className="btn-primary text-xs"
-            >
-              {upsert.isPending ? 'Saving...' : editing ? 'Save' : 'Create'}
-            </button>
-          ) : (
-            <button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={!isStepValid(step, form)}
-              className="btn-primary text-xs"
-            >
-              Next
-            </button>
-          )}
-        </div>
+
+        {/* Invoke sidebar (right) */}
+        {showInvokeSidebar && (
+          <div className="lg:border-l lg:border-surface-border lg:pl-12">
+            <SectionLabel className="mb-6">Invoke</SectionLabel>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <label className="block text-xs text-text-secondary">Envelope</label>
+                  {editing?.envelope_schema ? (
+                    <span className="text-[10px] text-accent">Pre-filled from config</span>
+                  ) : (
+                    <span className="text-[10px] text-status-warning">No template</span>
+                  )}
+                </div>
+                <textarea
+                  value={invokeJson}
+                  onChange={(e) => {
+                    setInvokeJson(e.target.value);
+                    setInvokeParseError('');
+                  }}
+                  className="input font-mono text-[11px] w-full leading-relaxed"
+                  rows={10}
+                  spellCheck={false}
+                />
+                <p className="text-[10px] text-text-tertiary mt-1.5">
+                  <code className="text-accent/80">data</code> holds workflow input; <code className="text-accent/80">metadata</code> is optional context.
+                </p>
+              </div>
+
+              {invokeParseError && (
+                <p className="text-xs text-status-error">{invokeParseError}</p>
+              )}
+              {invokeMutation.error && (
+                <p className="text-xs text-status-error">
+                  {(invokeMutation.error as Error).message}
+                </p>
+              )}
+              {invokeMutation.isSuccess && (
+                <p className="text-xs text-status-success">Workflow started</p>
+              )}
+
+              <button
+                onClick={handleInvoke}
+                disabled={invokeMutation.isPending}
+                className="btn-primary text-xs w-full"
+              >
+                {invokeMutation.isPending ? 'Starting...' : 'Start Workflow'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </Modal>
+    </div>
   );
 }
+
+const DEFAULT_ENVELOPE = '{\n  "data": {},\n  "metadata": {}\n}';

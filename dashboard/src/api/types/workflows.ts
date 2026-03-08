@@ -88,11 +88,13 @@ export interface WorkflowExecutionSummary {
 export interface WorkflowExecution {
   workflow_id: string;
   workflow_type: string;
+  workflow_name?: string;
   task_queue: string;
   status: string;
   start_time: string | null;
   close_time: string | null;
   duration_ms: number | null;
+  trace_id?: string | null;
   result?: unknown;
   events: WorkflowExecutionEvent[];
   summary: WorkflowExecutionSummary;

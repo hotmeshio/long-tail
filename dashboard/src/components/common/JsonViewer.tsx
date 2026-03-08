@@ -1,12 +1,20 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
 import { SectionLabel } from './SectionLabel';
 
 // ---------------------------------------------------------------------------
 // JSON view — raw, collapsible syntax tree (existing)
 // ---------------------------------------------------------------------------
 
-function JsonNode({ data, depth = 0 }: { data: unknown; depth?: number }) {
+function JsonNode({ data, depth = 0, generation }: { data: unknown; depth?: number; generation?: number }) {
   const [collapsed, setCollapsed] = useState(depth > 1);
+  const [lastGen, setLastGen] = useState(generation);
+
+  // Reset local collapse state when global generation changes
+  if (generation !== undefined && generation !== lastGen) {
+    setLastGen(generation);
+    // generation is even = expanded, odd = collapsed (beyond depth 0)
+    setCollapsed(generation % 2 === 1 && depth > 0);
+  }
 
   if (data === null || data === undefined) {
     return <span className="text-text-tertiary italic">null</span>;
@@ -45,7 +53,7 @@ function JsonNode({ data, depth = 0 }: { data: unknown; depth?: number }) {
         <div className="pl-4 border-l border-surface-border ml-1">
           {data.map((item, i) => (
             <div key={i}>
-              <JsonNode data={item} depth={depth + 1} />
+              <JsonNode data={item} depth={depth + 1} generation={generation} />
               {i < data.length - 1 && <span className="text-text-tertiary">,</span>}
             </div>
           ))}
@@ -83,7 +91,7 @@ function JsonNode({ data, depth = 0 }: { data: unknown; depth?: number }) {
             <div key={key}>
               <span className="text-text-secondary">{key}</span>
               <span className="text-text-tertiary">: </span>
-              <JsonNode data={value} depth={depth + 1} />
+              <JsonNode data={value} depth={depth + 1} generation={generation} />
               {i < entries.length - 1 && <span className="text-text-tertiary">,</span>}
             </div>
           ))}
@@ -194,6 +202,22 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+function CollapseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.5 3.5M9 15v4.5M9 15H4.5M9 15l-5.5 5.5M15 9h4.5M15 9V4.5M15 9l5.5-5.5M15 15h4.5M15 15v4.5m0-4.5l5.5 5.5" />
+    </svg>
+  );
+}
+
+function ExpandIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Public component
 // ---------------------------------------------------------------------------
@@ -209,6 +233,11 @@ export function JsonViewer({
 }) {
   const [mode, setMode] = useState<ViewMode>('json');
   const [copied, setCopied] = useState(false);
+  // Bumping generation forces all JsonNodes to re-evaluate collapse state.
+  // Even = fully expanded, odd = collapsed (first level visible).
+  const [generation, setGeneration] = useState(0);
+  const isGlobalCollapsed = generation % 2 === 1;
+  const toggleGlobalCollapse = useCallback(() => setGeneration((g) => g + 1), []);
 
   let parsed = data;
   if (typeof data === 'string') {
@@ -233,6 +262,19 @@ export function JsonViewer({
       <div className="flex items-center justify-between mb-2">
         {label ? <SectionLabel>{label}</SectionLabel> : <span />}
         <div className="flex items-center gap-1">
+          {mode === 'json' && (
+            <button
+              onClick={toggleGlobalCollapse}
+              className={iconBtn}
+              title={isGlobalCollapsed ? 'Expand all' : 'Collapse all'}
+            >
+              {isGlobalCollapsed ? (
+                <ExpandIcon className="w-3.5 h-3.5" />
+              ) : (
+                <CollapseIcon className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
           <button
             onClick={() => setMode(mode === 'json' ? 'tree' : 'json')}
             className={iconBtn}
@@ -258,7 +300,7 @@ export function JsonViewer({
         </div>
       </div>
       <div className="font-mono text-xs leading-relaxed bg-surface-sunken rounded-md p-4 overflow-x-auto">
-        {mode === 'json' ? <JsonNode data={parsed} /> : <TreeNode data={parsed} />}
+        {mode === 'json' ? <JsonNode data={parsed} generation={generation} /> : <TreeNode data={parsed} />}
       </div>
     </div>
   );

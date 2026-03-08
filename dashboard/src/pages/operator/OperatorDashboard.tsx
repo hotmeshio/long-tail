@@ -13,7 +13,7 @@ import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, PRIORITY_OPTIONS } from './escala
 export function OperatorDashboard() {
   useEscalationListEvents();
   const navigate = useNavigate();
-  const { user, userRoleNames } = useAuth();
+  const { user } = useAuth();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { role: '', type: '', priority: '' },
   });
@@ -46,9 +46,6 @@ export function OperatorDashboard() {
   return (
     <div>
       <PageHeader title="My Escalations" />
-      <p className="text-sm text-text-tertiary -mt-6 mb-6">
-        Roles: {userRoleNames.length > 0 ? userRoleNames.join(', ') : 'none'}
-      </p>
 
       <FilterBar>
         <FilterSelect
@@ -77,7 +74,7 @@ export function OperatorDashboard() {
         keyFn={(row) => row.id}
         onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/queue' } })}
         isLoading={isLoading}
-        emptyMessage="No active escalations"
+        emptyMessage="No assigned escalations"
       />
 
       <StickyPagination
