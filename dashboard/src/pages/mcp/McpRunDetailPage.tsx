@@ -5,7 +5,10 @@ import { useSettings } from '../../api/settings';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
 import { PageHeader } from '../../components/common/PageHeader';
+import { CopyableId } from '../../components/common/CopyableId';
+import { TraceLink } from '../../components/common/TraceLink';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
+import { formatDuration } from '../../lib/format';
 import type { WorkflowExecutionEvent } from '../../api/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -15,14 +18,6 @@ const statusMap: Record<string, string> = {
   completed: 'completed',
   failed: 'failed',
 };
-
-function formatDuration(ms: number | null): string {
-  if (ms === null) return '—';
-  if (ms < 1) return '<1ms';
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(2)}s`;
-  return `${(ms / 60_000).toFixed(1)}m`;
-}
 
 function formatTimestamp(iso: string | null): string {
   if (!iso) return '—';
@@ -49,95 +44,6 @@ function categoryColor(category: string): string {
     case 'workflow': return 'text-text-tertiary';
     default: return 'text-text-tertiary';
   }
-}
-
-// ── Trace link helper ────────────────────────────────────────────────────────
-
-function TraceLink({
-  traceId,
-  spanId,
-  traceUrl,
-  className = '',
-}: {
-  traceId?: string | null;
-  spanId?: string | null;
-  traceUrl?: string | null;
-  className?: string;
-}) {
-  if (!traceId) return null;
-
-  const href = traceUrl
-    ? traceUrl.replace('{traceId}', traceId) + (spanId ? `&span=${spanId}` : '')
-    : undefined;
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`text-[10px] font-mono text-accent hover:underline truncate ${className}`}
-        title={`Trace: ${traceId}`}
-      >
-        trace &rarr;
-      </a>
-    );
-  }
-
-  return (
-    <span
-      className={`text-[10px] font-mono text-text-tertiary truncate cursor-default ${className}`}
-      title={`Trace: ${traceId}${spanId ? `\nSpan: ${spanId}` : ''}`}
-    >
-      {traceId.slice(0, 12)}…
-    </span>
-  );
-}
-
-// ── CopyableId (trace/span) ─────────────────────────────────────────────────
-
-function CopyableId({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: string;
-  href?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">{label}</span>
-      {href ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs font-mono text-accent hover:underline truncate"
-          title={value}
-        >
-          {value}
-        </a>
-      ) : (
-        <span className="text-xs font-mono text-text-primary truncate" title={value}>{value}</span>
-      )}
-      <button
-        onClick={handleCopy}
-        className="text-[10px] text-text-tertiary hover:text-text-primary transition-colors shrink-0"
-        title="Copy to clipboard"
-      >
-        {copied ? '✓' : 'copy'}
-      </button>
-    </div>
-  );
 }
 
 // ── Activity node in the DAG ─────────────────────────────────────────────────

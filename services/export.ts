@@ -7,6 +7,7 @@ import type {
 
 import { postgres_options } from '../modules/config';
 import { getPool } from './db';
+import { hmshTimestampToISO } from './hotmesh-utils';
 import type {
   LTExportOptions,
   LTWorkflowExport,
@@ -29,22 +30,6 @@ async function getHandle(
 ) {
   const client = createClient();
   return client.workflow.getHandle(taskQueue, workflowName, workflowId);
-}
-
-// ── HotMesh timestamp helpers ────────────────────────────────────────────────
-
-/**
- * Convert HotMesh's compact timestamp (YYYYMMDDHHmmss.SSS) to ISO 8601.
- */
-function hmshTimestampToISO(ts: string): string {
-  if (!ts || ts.length < 14) return ts;
-  const y = ts.slice(0, 4);
-  const mo = ts.slice(4, 6);
-  const d = ts.slice(6, 8);
-  const h = ts.slice(8, 10);
-  const mi = ts.slice(10, 12);
-  const rest = ts.slice(12); // ss.SSS
-  return `${y}-${mo}-${d}T${h}:${mi}:${rest}Z`;
 }
 
 /**
