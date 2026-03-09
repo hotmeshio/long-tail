@@ -168,6 +168,12 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
   const hasOutputs = activity.output_fields.length > 0;
   const isLlm = activity.tool_source === 'llm';
 
+  const serverId = activity.mcp_server_id || (activity.tool_source === 'db' ? 'db' : '');
+  const toolDisplay = !isLlm && activity.mcp_tool_name
+    ? `${serverId}/${activity.mcp_tool_name}`
+    : null;
+  const toolIsLinkable = !isLlm && activity.mcp_tool_name && serverId;
+
   return (
     <div className="pt-2 space-y-6">
       {/* Header */}
@@ -179,17 +185,24 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
       </div>
 
       {/* Identity */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-10 gap-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Topic</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Mapped Workflow Topic</p>
           <p className="text-sm font-mono text-text-primary">{activity.topic}</p>
         </div>
-        {!isLlm && activity.mcp_tool_name && (
+        {toolDisplay && (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool</p>
-            <p className="text-sm font-mono text-text-primary">
-              {activity.tool_source === 'db' ? 'db' : activity.mcp_server_id}/{activity.mcp_tool_name}
-            </p>
+            {toolIsLinkable ? (
+              <Link
+                to={`/mcp/servers?search=${encodeURIComponent(activity.mcp_tool_name!)}`}
+                className="text-sm font-mono text-accent hover:underline"
+              >
+                {toolDisplay}
+              </Link>
+            ) : (
+              <p className="text-sm font-mono text-text-primary">{toolDisplay}</p>
+            )}
           </div>
         )}
         {isLlm && (
@@ -202,9 +215,9 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
 
       {/* Input → Output */}
       {(hasInputs || hasOutputs) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0">
           {hasInputs && (
-            <div>
+            <div className="border border-surface-border rounded-md p-4">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Inputs</p>
               <div className="space-y-1.5">
                 {Object.entries(activity.input_mappings).map(([k, v]) => (
@@ -219,11 +232,11 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
           )}
 
           {hasOutputs && (
-            <div>
+            <div className="border border-surface-border rounded-md p-4">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Outputs</p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="space-y-1.5">
                 {activity.output_fields.map((f) => (
-                  <span key={f} className="text-xs font-mono px-2 py-0.5 border border-surface-border rounded-full text-text-secondary">{f}</span>
+                  <p key={f} className="text-xs font-mono text-text-secondary leading-relaxed">{f}</p>
                 ))}
               </div>
             </div>
@@ -254,9 +267,18 @@ const LIFECYCLE_LABELS: Record<string, string> = {
   archived: 'Archived',
 };
 
+const LIFECYCLE_COLORS: Record<string, { filled: string; faded: string; line: string }> = {
+  draft:    { filled: 'bg-status-pending border-status-pending', faded: 'bg-status-pending/30 border-status-pending/50', line: 'bg-status-pending/30' },
+  deployed: { filled: 'bg-status-active border-status-active',   faded: 'bg-status-active/30 border-status-active/50',   line: 'bg-status-active/30' },
+  active:   { filled: 'bg-status-success border-status-success', faded: 'bg-status-success/30 border-status-success/50', line: 'bg-status-success/30' },
+  archived: { filled: 'bg-text-tertiary border-text-tertiary',   faded: 'bg-text-tertiary/30 border-text-tertiary/50',   line: 'bg-text-tertiary/30' },
+};
+
 function LifecycleSidebar({
   status,
   sourceWorkflowId,
+  contentVersion,
+  deployedContentVersion,
   onDeploy,
   onActivate,
   onArchive,
@@ -267,6 +289,8 @@ function LifecycleSidebar({
 }: {
   status: string;
   sourceWorkflowId?: string | null;
+  contentVersion?: number;
+  deployedContentVersion?: number | null;
   onDeploy: () => void;
   onActivate: () => void;
   onArchive: () => void;
@@ -276,10 +300,24 @@ function LifecycleSidebar({
   error?: string;
 }) {
   const currentIdx = LIFECYCLE_STEPS.indexOf(status as any);
+  const needsRedeploy = contentVersion != null && contentVersion > (deployedContentVersion ?? 0);
 
   return (
     <div>
       <SectionLabel className="mb-4">Lifecycle</SectionLabel>
+
+      {/* Out-of-sync warning */}
+      {needsRedeploy && status !== 'draft' && status !== 'archived' && (
+        <div className="mb-4 px-3 py-2 rounded-md bg-status-pending/10 border border-status-pending/30">
+          <p className="text-[10px] font-semibold text-status-pending mb-1">YAML modified</p>
+          <p className="text-[10px] text-text-secondary leading-relaxed">
+            v{contentVersion} edited since deploy (v{deployedContentVersion}). Redeploy to apply changes.
+          </p>
+          <button onClick={onDeploy} disabled={isPending} className="mt-1.5 text-[10px] font-medium text-status-pending hover:underline">
+            {isPending ? 'Deploying...' : 'Deploy now'}
+          </button>
+        </div>
+      )}
 
       {/* Step sequence */}
       <div className="space-y-0">
@@ -288,6 +326,7 @@ function LifecycleSidebar({
           const isDone = idx < currentIdx;
           const isFuture = idx > currentIdx;
           const isLast = idx === LIFECYCLE_STEPS.length - 1;
+          const colors = LIFECYCLE_COLORS[step];
 
           return (
             <div key={step} className="flex items-stretch gap-3">
@@ -296,14 +335,14 @@ function LifecycleSidebar({
                 <span
                   className={`w-3 h-3 rounded-full shrink-0 border-2 transition-colors ${
                     isCurrent
-                      ? 'bg-accent border-accent'
+                      ? colors.filled
                       : isDone
-                        ? 'bg-accent/30 border-accent/50'
+                        ? colors.faded
                         : 'bg-surface-sunken border-surface-border'
                   }`}
                 />
                 {!isLast && (
-                  <span className={`w-px flex-1 ${isDone ? 'bg-accent/30' : 'bg-surface-border'}`} />
+                  <span className={`w-px flex-1 ${isDone ? colors.line : 'bg-surface-border'}`} />
                 )}
               </div>
 
@@ -344,6 +383,19 @@ function LifecycleSidebar({
           );
         })}
       </div>
+
+      {/* Version info */}
+      {contentVersion != null && (
+        <div className="mt-4 pt-4 border-t border-surface-border">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Content Version</p>
+          <p className="text-xs font-mono text-text-primary">
+            v{contentVersion}
+            {deployedContentVersion != null && (
+              <span className="text-text-tertiary ml-1.5">(deployed: v{deployedContentVersion})</span>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Delete — only for draft/archived */}
       {(status === 'draft' || status === 'archived') && (
@@ -469,7 +521,7 @@ export function YamlWorkflowDetailPage() {
   };
 
   const isActive = wf.status === 'active';
-  const canEditYaml = wf.status === 'draft';
+  const canEditYaml = wf.status !== 'archived';
 
   const tabs: { key: Tab; label: string; show: boolean }[] = [
     { key: 'tools', label: 'Tools', show: true },
@@ -717,6 +769,8 @@ export function YamlWorkflowDetailPage() {
           <LifecycleSidebar
             status={wf.status}
             sourceWorkflowId={wf.source_workflow_id}
+            contentVersion={wf.content_version}
+            deployedContentVersion={wf.deployed_content_version}
             onDeploy={handleDeploy}
             onActivate={handleActivate}
             onArchive={handleArchive}

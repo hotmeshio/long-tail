@@ -26,7 +26,12 @@ async function getDbClient(): Promise<InstanceType<typeof McpClient>> {
 }
 
 async function initDbClient(): Promise<InstanceType<typeof McpClient>> {
-  const server = await createDbServer();
+  // IMPORTANT: Create a DEDICATED server instance for this in-process client.
+  // createDbServer() returns a module-level singleton that may already be
+  // connected to the main MCP adapter transport. An McpServer can only be
+  // connected to ONE transport at a time, so reusing it causes
+  // "Already connected to a transport" errors.
+  const server = await createDbServer({ name: 'insight-db-query', fresh: true });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 

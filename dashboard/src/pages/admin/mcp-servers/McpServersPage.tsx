@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, Pencil, Trash2, Plug, Unplug } from 'lucide-react';
 import { RowAction, RowActionGroup } from '../../../components/common/RowActions';
 import {
@@ -272,6 +272,27 @@ export function McpServersPage() {
     if (!filters.search) return servers;
     return servers.filter((s) => matchesSearch(s, filters.search));
   }, [servers, filters.search]);
+
+  // Auto-expand servers whose tools match the search (so results are visible)
+  useEffect(() => {
+    if (!filters.search) return;
+    const q = filters.search.toLowerCase();
+    const idsToExpand = filteredServers
+      .filter((s) => {
+        const tools = (s.tool_manifest ?? []) as McpToolManifest[];
+        return tools.some(
+          (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
+        );
+      })
+      .map((s) => s.id);
+    if (idsToExpand.length > 0) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of idsToExpand) next.add(id);
+        return next;
+      });
+    }
+  }, [filters.search, filteredServers]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {

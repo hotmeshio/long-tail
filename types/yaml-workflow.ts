@@ -18,11 +18,25 @@ export interface LTYamlWorkflowRecord {
   output_schema: Record<string, unknown>;
   activity_manifest: ActivityManifestEntry[];
   status: LTYamlWorkflowStatus;
+  content_version: number;
+  deployed_content_version: number | null;
   deployed_at: Date | null;
   activated_at: Date | null;
   metadata: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface LTYamlWorkflowVersionRecord {
+  id: string;
+  workflow_id: string;
+  version: number;
+  yaml_content: string;
+  activity_manifest: ActivityManifestEntry[];
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  change_summary: string | null;
+  created_at: Date;
 }
 
 export interface ActivityManifestEntry {

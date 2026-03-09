@@ -256,6 +256,9 @@ router.post('/:id/deploy', async (req, res) => {
       }
     }
 
+    // Mark content as deployed for the entire app_id
+    await yamlDb.markAppIdContentDeployed(wf.app_id);
+
     const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
@@ -328,7 +331,6 @@ router.post('/:id/invoke', async (req, res) => {
         wf.graph_topic,
         data,
         req.body.timeout,
-        wf.graph_topic,
       );
       res.json({ result });
     } else {
@@ -365,6 +367,25 @@ router.post('/:id/archive', async (req, res) => {
     }
     const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'archived');
     res.json(updated);
+  } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/yaml-workflows/:id/versions
+ * Return version history for a YAML workflow.
+ */
+router.get('/:id/versions', async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+    const result = await yamlDb.getVersionHistory(req.params.id, limit, offset);
+    res.json(result);
   } catch (err: any) {
     if (isNotFoundError(err)) {
       res.status(404).json({ error: 'YAML workflow not found' });

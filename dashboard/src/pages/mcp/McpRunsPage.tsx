@@ -118,7 +118,7 @@ export function McpRunsPage() {
 
   return (
     <div>
-      <PageHeader title="Workflow Runs" />
+      <PageHeader title="MCP Workflow Runs" />
 
       <FilterBar>
         <FilterSelect

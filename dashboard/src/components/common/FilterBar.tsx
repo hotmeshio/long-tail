@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 
 interface FilterBarProps {
   children: ReactNode;
@@ -54,13 +54,28 @@ interface FilterInputProps {
 }
 
 export function FilterInput({ label, value, onChange, placeholder }: FilterInputProps) {
+  const [local, setLocal] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sync from parent when the URL-driven value changes externally
+  useEffect(() => { setLocal(value); }, [value]);
+
+  const handleChange = (v: string) => {
+    setLocal(v);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => onChange(v), 300);
+  };
+
+  // Flush on unmount
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
   return (
     <div className="flex items-center gap-1.5">
       <label className="text-[10px] text-text-tertiary whitespace-nowrap">{label}</label>
       <input
         type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={local}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         className="input text-[11px] py-1 px-2 w-48 font-mono"
       />

@@ -259,7 +259,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Workflow Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Workflow Runs" />
+      <PageHeader title="MCP Workflow Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Workflow Runs" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">

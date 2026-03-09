@@ -13,7 +13,7 @@ const statusStyles: Record<string, string> = {
   draft: 'bg-status-pending',
   deployed: 'bg-status-active',
   active: 'bg-status-success',
-  archived: 'bg-accent-muted',
+  archived: 'bg-text-tertiary',
 };
 
 const statusLabels: Record<string, string> = {

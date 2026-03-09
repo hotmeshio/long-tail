@@ -58,14 +58,21 @@ const getSystemHealthSchema = z.object({});
  */
 export async function createDbServer(options?: {
   name?: string;
+  /** When true, skip the singleton cache and create a dedicated instance. */
+  fresh?: boolean;
 }): Promise<McpServer> {
-  if (server) return server;
+  if (server && !options?.fresh) return server;
 
   const name = options?.name || 'long-tail-db-query';
-  server = new McpServer({ name, version: '1.0.0' });
+  const instance = new McpServer({ name, version: '1.0.0' });
+
+  // Only cache as the singleton when not a fresh (dedicated) instance
+  if (!options?.fresh) {
+    server = instance;
+  }
 
   // ── find_tasks ──────────────────────────────────────────────────
-  (server as any).registerTool(
+  (instance as any).registerTool(
     'find_tasks',
     {
       title: 'Find Tasks',
@@ -108,7 +115,7 @@ export async function createDbServer(options?: {
   );
 
   // ── find_escalations ────────────────────────────────────────────
-  (server as any).registerTool(
+  (instance as any).registerTool(
     'find_escalations',
     {
       title: 'Find Escalations',
@@ -153,7 +160,7 @@ export async function createDbServer(options?: {
   );
 
   // ── get_process_summary ─────────────────────────────────────────
-  (server as any).registerTool(
+  (instance as any).registerTool(
     'get_process_summary',
     {
       title: 'Get Process Summary',
@@ -189,7 +196,7 @@ export async function createDbServer(options?: {
   );
 
   // ── get_escalation_stats ────────────────────────────────────────
-  (server as any).registerTool(
+  (instance as any).registerTool(
     'get_escalation_stats',
     {
       title: 'Get Escalation Stats',
@@ -210,7 +217,7 @@ export async function createDbServer(options?: {
   );
 
   // ── get_workflow_types ──────────────────────────────────────────
-  (server as any).registerTool(
+  (instance as any).registerTool(
     'get_workflow_types',
     {
       title: 'Get Workflow Types',
@@ -243,7 +250,7 @@ export async function createDbServer(options?: {
   );
 
   // ── get_system_health ──────────────────────────────────────────
-  (server as any).registerTool(
+  (instance as any).registerTool(
     'get_system_health',
     {
       title: 'Get System Health',
@@ -304,7 +311,7 @@ export async function createDbServer(options?: {
   );
 
   loggerRegistry.info(`[lt-mcp:db-server] ${name} ready (6 tools registered)`);
-  return server;
+  return instance;
 }
 
 /**

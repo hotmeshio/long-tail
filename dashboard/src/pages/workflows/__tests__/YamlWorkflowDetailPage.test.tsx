@@ -70,6 +70,7 @@ const draftWorkflow = {
 };
 
 const activeWorkflow = { ...draftWorkflow, id: 'wf-2', status: 'active' };
+const archivedWorkflow = { ...draftWorkflow, id: 'wf-3', status: 'archived' };
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -184,9 +185,9 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText('Edit')).toBeInTheDocument();
   });
 
-  it('does NOT show Edit button for active workflows', () => {
-    setupMocks(activeWorkflow as any);
-    renderPage('wf-2');
+  it('does NOT show Edit button for archived workflows', () => {
+    setupMocks(archivedWorkflow as any);
+    renderPage('wf-3');
     fireEvent.click(screen.getByText('Config'));
     expect(screen.queryByText('Edit')).not.toBeInTheDocument();
   });

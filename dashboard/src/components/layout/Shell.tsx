@@ -29,8 +29,8 @@ function ShellLayout() {
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
             <ProcessesSidebar />
-            <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
+            <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
