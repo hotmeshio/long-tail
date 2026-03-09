@@ -1,10 +1,10 @@
 # Create an MCP Server
 
-This is the story of how we built a browser automation tool for Long Tail — and the guide for building your own.
+We needed screenshots for our QA documentation. Taking them by hand was slow, and they went stale every time the UI changed. So we built an MCP server that wraps Playwright — now the system can navigate the dashboard, capture screenshots, and update the docs automatically.
 
-We needed screenshots for our QA documentation. Rather than capture them by hand, we wrapped Playwright in an MCP server. Now the triage agent can *see* the dashboard, click through flows, and capture evidence. And when the pattern is proven, we'll compile it into a deterministic YAML workflow that generates documentation on every deploy.
+This is the story of how we built it, and a guide for building your own.
 
-This guide covers the full journey: creating a custom MCP server, registering it with Long Tail, building workflows that use it, and deploying hardened pipelines. By the end, you'll understand how to give the triage system any capability — browser automation, S3 uploads, Slack notifications, PDF generation — by wrapping it in 50 lines of tool registration code.
+Long Tail ships with a Playwright MCP Server. The screenshots in the [QA Manual](qa-manual.md) were generated using it.
 
 ---
 
@@ -52,7 +52,9 @@ The server itself is stateless from Long Tail's perspective. It gets a fresh `Mc
 
 ## 2. Building the Playwright Server
 
-Here's `services/mcp/playwright-server.ts` — the real, working server that ships with Long Tail.
+The screenshot problem gave us a clear spec: navigate the dashboard, fill in a login form, click through pages, and save PNGs. Playwright does all of that. The question was how to expose it so the triage agent (or a curl script, or a workflow) could use it without knowing anything about Playwright's API.
+
+The answer: wrap it in an MCP server. Here's `services/mcp/playwright-server.ts` — the real, working server that ships with Long Tail.
 
 ### The Skeleton
 
@@ -142,7 +144,7 @@ export async function createPlaywrightServer(options?: {
 
 ### The Full Tool List
 
-The Playwright server provides 8 tools:
+The Playwright server provides 8 tools. These are the building blocks we used to solve the screenshot problem — and the same tools available to any workflow or triage agent:
 
 | Tool | What It Does |
 |------|-------------|
@@ -347,6 +349,10 @@ export async function screenshotWorkflow(envelope: LTEnvelope) {
 }
 ```
 
+### Path 3: Via the REST API (Scripts and CI)
+
+There's a third path that doesn't require writing any workflow code at all: call the MCP server's tools directly through the Long Tail REST API. This is how we actually generated the screenshots for the QA manual, and it's the approach Section 7 walks through in detail.
+
 ---
 
 ## 6. Creating Custom Activities
@@ -422,9 +428,134 @@ export async function myWorkflow(envelope: LTEnvelope) {
 
 ## 7. The Full Workflow: Screenshot Capture
 
-Here's a complete example: a workflow that navigates the Long Tail dashboard, logs in, captures screenshots of key pages, and saves them to `docs/img/`.
+This is where the story comes full circle. We needed 10 screenshots for `docs/qa-manual.md` — login page, dashboard home, processes list, escalation views, MCP servers, pipelines, workflows, tasks, and detail pages. Taking them by hand meant logging in, navigating to each page, resizing the window, hitting Cmd+Shift+4, naming the file, and repeating. Every time we changed the UI, every screenshot went stale.
 
-### Directory Structure
+Here's exactly how we solved it.
+
+### What We Did
+
+The Playwright MCP server runs inside the Docker container. Long Tail exposes every registered MCP tool through a REST endpoint: `POST /api/mcp/servers/:serverId/tools/:toolName/call`. So generating screenshots became a sequence of curl calls — authenticate, navigate, fill, click, screenshot, repeat.
+
+The actual session that produced the screenshots in the QA manual looked like this:
+
+#### Step 1: Get an auth token
+
+```bash
+TOKEN=$(curl -s http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"superadmin","password":"superadmin123"}' | jq -r '.token')
+```
+
+#### Step 2: Find the Playwright server ID
+
+```bash
+PW_ID=$(curl -s http://localhost:3000/api/mcp-servers \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq -r '.servers[] | select(.name=="long-tail-playwright") | .id')
+```
+
+#### Step 3: Navigate to the login page and screenshot it
+
+```bash
+# Navigate opens a new browser page
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/navigate/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"url":"http://localhost:3000/login","wait_until":"networkidle"}}'
+
+# Capture the login page
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/screenshot/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"path":"/app/docs/img/01-login.png"}}'
+```
+
+#### Step 4: Log in through the form
+
+```bash
+# Fill username
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/fill/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"selector":"#username","value":"superadmin"}}'
+
+# Fill password
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/fill/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"selector":"#password","value":"superadmin123"}}'
+
+# Click submit
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/click/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"selector":"button[type=\"submit\"]"}}'
+
+# Wait for the dashboard to load
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/wait_for/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"selector":"nav","timeout":10000}}'
+
+# Screenshot the dashboard home
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/screenshot/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"path":"/app/docs/img/02-dashboard-home.png","page_id":"page_7"}}'
+```
+
+#### Step 5: Navigate through the SPA (the key insight)
+
+Here's a gotcha we hit. The `navigate` tool opens a **new** browser page every time it's called. That new page has no cookies — so it lands on the login screen instead of the page you asked for. After logging in once, we needed to stay on the same page and navigate within the SPA.
+
+The solution: use `evaluate` to set `window.location.href`. This navigates the **existing** page, preserving the auth cookies and session state.
+
+```bash
+# SPA-navigate to Processes (preserves auth cookies)
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/evaluate/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"script":"window.location.href = \"/processes/list\"; \"ok\"","page_id":"page_7"}}'
+
+# Wait for the page to settle
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/wait_for/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"selector":"table","timeout":10000,"page_id":"page_7"}}'
+
+# Screenshot
+curl -s "http://localhost:3000/api/mcp/servers/$PW_ID/tools/screenshot/call" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"arguments":{"path":"/app/docs/img/03-processes-list.png","page_id":"page_7"}}'
+```
+
+We repeated this `evaluate` → `wait_for` → `screenshot` pattern for every page:
+
+| Screenshot | SPA Route | File |
+|-----------|-----------|------|
+| Login page | `/login` | `01-login.png` |
+| Dashboard home | (after login) | `02-dashboard-home.png` |
+| Processes list | `/processes/list` | `03-processes-list.png` |
+| Escalations list | `/escalations/available` | `04-escalations-list.png` |
+| MCP Servers | `/mcp/servers` | `05-mcp-servers.png` |
+| MCP Pipelines | `/mcp/pipelines` | `06-mcp-pipelines.png` |
+| Workflows overview | `/workflows` | `07-workflows-list.png` |
+| Tasks list | `/workflows/tasks` | `08-tasks-list.png` |
+| Process detail | `/processes/detail/:originId` | `09-process-detail.png` |
+| Escalation detail | `/escalations/detail/:id` | `10-escalation-detail.png` |
+
+### The Docker Path Gotcha
+
+Notice the screenshot paths use `/app/docs/img/` — not `docs/img/`. Playwright runs inside the Docker container where the project root is `/app`. The `docker-compose.yml` maps the host directory into the container with a volume mount (`.:/app`), so `/app/docs/img/03-processes-list.png` inside the container appears as `docs/img/03-processes-list.png` on the host.
+
+If you're running outside Docker, use relative paths from your project root instead.
+
+### The Workflow Blueprint
+
+The curl approach works well for scripts and CI. But you can also encode the same logic as a durable workflow. Here's a blueprint — it doesn't exist in the codebase yet, but it follows the same patterns used by every other workflow in `examples/workflows/`:
+
+#### Directory Structure
 
 ```
 examples/workflows/capture-screenshots/
@@ -433,44 +564,63 @@ examples/workflows/capture-screenshots/
 ├── orchestrator.ts    # executeLT wrapper
 ```
 
-### activities.ts
+#### activities.ts
 
 ```typescript
 import * as mcpClient from '../../../services/mcp/client';
 
 const BASE_URL = process.env.LT_DASHBOARD_URL || 'http://localhost:3000';
-const IMG_DIR = 'docs/img';
+const IMG_DIR = '/app/docs/img';
 
-export async function navigateTo(path: string): Promise<{ page_id: string; title: string }> {
+export async function navigateTo(url: string): Promise<{ page_id: string; title: string }> {
   const result = await mcpClient.callServerTool(
     'long-tail-playwright', 'navigate',
-    { url: `${BASE_URL}${path}`, wait_until: 'networkidle' },
+    { url, wait_until: 'networkidle' },
   );
   return result;
 }
 
+export async function spaNavigate(
+  path: string,
+  pageId: string,
+): Promise<void> {
+  // Use evaluate to navigate within the SPA, preserving auth cookies
+  await mcpClient.callServerTool('long-tail-playwright', 'evaluate', {
+    script: `window.location.href = "${path}"; "ok"`,
+    page_id: pageId,
+  });
+  // Wait for content to settle
+  await mcpClient.callServerTool('long-tail-playwright', 'wait_for', {
+    selector: 'main',
+    timeout: 10000,
+    page_id: pageId,
+  });
+}
+
 export async function login(username: string, password: string): Promise<void> {
   await mcpClient.callServerTool('long-tail-playwright', 'fill', {
-    selector: 'input[name="username"]', value: username,
+    selector: '#username', value: username,
   });
   await mcpClient.callServerTool('long-tail-playwright', 'fill', {
-    selector: 'input[name="password"]', value: password,
+    selector: '#password', value: password,
   });
   await mcpClient.callServerTool('long-tail-playwright', 'click', {
     selector: 'button[type="submit"]',
   });
   await mcpClient.callServerTool('long-tail-playwright', 'wait_for', {
-    selector: '[data-testid="dashboard"]', timeout: 10000,
+    selector: 'nav', timeout: 10000,
   });
 }
 
 export async function captureScreenshot(
   name: string,
+  pageId: string,
   fullPage?: boolean,
 ): Promise<{ path: string; size_bytes: number }> {
   return await mcpClient.callServerTool('long-tail-playwright', 'screenshot', {
     path: `${IMG_DIR}/${name}.png`,
     full_page: fullPage ?? false,
+    page_id: pageId,
   });
 }
 
@@ -480,44 +630,45 @@ export async function closeBrowser(): Promise<void> {
 }
 ```
 
-### index.ts
+#### index.ts
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
 import type { LTEnvelope } from '../../../types';
 import * as activities from './activities';
 
-const { navigateTo, login, captureScreenshot, closeBrowser } =
+const { navigateTo, spaNavigate, login, captureScreenshot, closeBrowser } =
   Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export async function captureScreenshots(envelope: LTEnvelope) {
   const screenshots: string[] = [];
 
   try {
-    // Login page
-    await navigateTo('/login');
-    await captureScreenshot('01-login-page');
-    screenshots.push('01-login-page.png');
+    // Navigate to login (opens a new page)
+    const { page_id } = await navigateTo('http://localhost:3000/login');
+    await captureScreenshot('01-login', page_id);
+    screenshots.push('01-login.png');
 
-    // Log in
+    // Log in through the form
     await login('superadmin', 'superadmin123');
-    await captureScreenshot('02-dashboard-home');
+    await captureScreenshot('02-dashboard-home', page_id);
     screenshots.push('02-dashboard-home.png');
 
-    // Processes
-    await navigateTo('/processes');
-    await captureScreenshot('03-processes-list');
-    screenshots.push('03-processes-list.png');
+    // SPA-navigate to each page (preserves session)
+    const pages = [
+      { route: '/processes/list',       name: '03-processes-list' },
+      { route: '/escalations/available', name: '04-escalations-list' },
+      { route: '/mcp/servers',           name: '05-mcp-servers' },
+      { route: '/mcp/pipelines',         name: '06-mcp-pipelines' },
+      { route: '/workflows/list',        name: '07-workflows-list' },
+      { route: '/tasks/list',            name: '08-tasks-list' },
+    ];
 
-    // Escalations
-    await navigateTo('/escalations');
-    await captureScreenshot('04-escalations-list');
-    screenshots.push('04-escalations-list.png');
-
-    // MCP Servers
-    await navigateTo('/mcp-servers');
-    await captureScreenshot('05-mcp-servers');
-    screenshots.push('05-mcp-servers.png');
+    for (const { route, name } of pages) {
+      await spaNavigate(route, page_id);
+      await captureScreenshot(name, page_id);
+      screenshots.push(`${name}.png`);
+    }
   } finally {
     await closeBrowser();
   }
@@ -532,7 +683,7 @@ export async function captureScreenshots(envelope: LTEnvelope) {
 }
 ```
 
-### orchestrator.ts
+#### orchestrator.ts
 
 ```typescript
 import { executeLT } from '../../../orchestrator';
@@ -547,7 +698,7 @@ export async function captureScreenshotsOrchestrator(envelope: LTEnvelope) {
 }
 ```
 
-This workflow doesn't exist yet in the codebase — it's a blueprint. The key insight: the triage agent can do exactly the same thing *without* a pre-built workflow, by calling the same Playwright MCP tools in its agentic loop. The workflow just makes it deterministic and repeatable.
+Both paths — the curl scripts and the durable workflow — use the same underlying Playwright MCP tools. The curl approach is immediate and good for one-off runs or CI scripts. The workflow approach adds durability, retries, and milestone tracking. Choose whichever fits your use case.
 
 ---
 
@@ -725,7 +876,28 @@ The full source lives at `services/mcp/playwright-server.ts`. Key implementation
 - **Error resilience** — Missing elements return structured errors (not thrown exceptions) so the LLM can adapt
 - **Clean shutdown** — `stopPlaywrightServer()` closes all pages and the browser
 
-Install Playwright if not already present:
+### Docker and Playwright
+
+The Long Tail Docker image uses `node:20-slim` (Debian) rather than `node:20-alpine`. This is a deliberate choice: Playwright's Chromium requires glibc and a set of system libraries that Alpine Linux doesn't provide. The Dockerfile installs these dependencies and downloads the Chromium binary during the image build:
+
+```dockerfile
+FROM node:20-slim AS base
+
+# System deps for Playwright Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxcomposite1 libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 \
+    libcairo2 libasound2 libxshmfence1 libx11-xcb1 libxcb1 \
+    libxfixes3 libxkbcommon0 \
+    fonts-liberation fonts-noto-color-emoji ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+RUN npm ci
+RUN npx playwright install chromium
+```
+
+If you're running outside Docker, install Playwright locally:
 
 ```bash
 npm install playwright
@@ -733,3 +905,7 @@ npx playwright install chromium
 ```
 
 The server requires only the `chromium` browser. Firefox and WebKit are not installed by default.
+
+### Builtin Server Connection
+
+When the dashboard's "Connect" button is clicked for a builtin server, `connectToServer()` detects `transport_config.builtin: true` and uses `InMemoryTransport` to link the factory-created server instance with a client — no external processes, no ports. The Chromium browser itself is lazy-launched on the first `navigate` call, not at connection time.

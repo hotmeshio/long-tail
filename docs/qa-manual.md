@@ -75,7 +75,7 @@ You'll see output like:
 [examples] roles verified (reviewer, engineer, admin, superadmin)
 [examples] seeded user (superadmin / superadmin123)
 [examples] seeded user (reviewer / reviewer123)
-[examples] MCP servers seeded (5 servers, 20 tools)
+[examples] MCP servers seeded (7 servers, 32 tools)
 [examples] seeded: Process 1 — Clean Review
 [examples] seeded: Process 2 — Flagged for Review
 [examples] seeded: Process 3 — Wrong Language
@@ -83,7 +83,7 @@ You'll see output like:
 [examples] seeded: Process 5 — Dynamic Triage
 ```
 
-> **Screenshot: Terminal showing seed output with all 5 processes launched**
+The Docker image uses `node:20-slim` (Debian) rather than Alpine because Playwright's Chromium requires glibc and system libraries (`libnss3`, `libgbm1`, `libxfixes3`, etc.) that Alpine doesn't provide. The Dockerfile installs these dependencies and runs `npx playwright install chromium` during the image build so the Playwright MCP server works out of the box.
 
 ---
 
@@ -102,15 +102,19 @@ Log in with one of the seeded accounts:
 
 Log in as **superadmin** first to see the full picture.
 
-> **Screenshot: Login page**
+![Login page](img/01-login.png)
 
-> **Screenshot: Dashboard home after login (superadmin view)**
+After logging in as superadmin:
+
+![Dashboard home](img/02-dashboard-home.png)
 
 The dashboard shows:
-- **Processes** — The 5 seed workflows and their current state
-- **Escalations** — Pending human review items
-- **Tasks** — All tracked workflow executions
-- **MCP Servers** — Connected tool servers (5 built-in)
+- **Processes** — The primary entry point. Each process represents a business workflow and its current state. Click into any process to see its full timeline of tasks and escalations.
+- **Escalations** — Pending human review items across all processes
+- **MCP Servers** — Connected tool servers (7 built-in)
+- **MCP Pipelines** — Compiled YAML workflows (deterministic fixes from past triage runs)
+
+> Tasks and escalations appear in context on each process detail page, so there is no need to navigate to them independently. For advanced users, a standalone Tasks list view is also available from the navigation.
 
 ---
 
@@ -126,11 +130,27 @@ Navigate to the **Processes** view. You'll see five workflows in various states:
 | 4 | Damaged Claim | **Needs Intervention** | Upside-down document. Trigger AI triage. |
 | 5 | Dynamic Triage | **Needs Intervention** | Generic workflow. Test pre-flight detection. |
 
-> **Screenshot: Processes list showing all 5 with their statuses**
+![Processes list](img/03-processes-list.png)
 
-Click into **Process 1** to see a completed workflow — task record, milestones, return data. This is what success looks like. Every other process aims to reach this state.
+### The Process Detail View
 
-> **Screenshot: Process 1 detail view showing completed task with milestones**
+Click into any process to see its detail page. This is the primary navigation hub — everything about a business process is visible here.
+
+![Process detail](img/09-process-detail.png)
+
+The process detail page shows:
+- **Timeline** — A chronological view of tasks and escalations that belong to this process
+- **Task entries** — Each workflow execution (leaf workflow) appears as a row with its status, timestamps, and result summary
+- **Escalation entries** — Any escalations raised during the process appear inline, showing their status (pending, claimed, resolved)
+
+From the timeline, you can:
+- **View Execution** — See the full workflow execution history (milestones, events, return data)
+- **Task Detail** — Drill into a specific task's input/output and metadata
+- **View Escalation** — Jump to the escalation detail for any pending or resolved escalation
+
+This is the primary way to navigate the system. Processes are the top-level concept, and tasks and escalations are always viewed in the context of the process they belong to.
+
+Click into **Process 1** to see a completed workflow — its task record, milestones, and return data. This is what success looks like. Every other process aims to reach this state.
 
 ---
 
@@ -140,28 +160,35 @@ This is the full self-healing story. An insurance claim arrives with a scanned d
 
 ### Step 1: See the Escalation
 
-Navigate to **Escalations**. Find the Process 4 escalation (type: `processClaim`). It's pending, assigned to the `reviewer` role.
+Navigate to the **Process 4** detail page. In the timeline, you'll see an escalation entry with status `pending`, assigned to the `reviewer` role.
 
-> **Screenshot: Escalations list with the Process 4 escalation highlighted**
+You can also find it from the top-level **Escalations** view (type: `processClaim`).
 
-Click into it. You'll see:
-- **Escalation payload**: The claim analysis with low confidence (< 0.85), flags about unreadable documents
-- **Documents**: `page1_upside_down.png`, `page2.png`
+![Escalations list](img/04-escalations-list.png)
+
+Click into the escalation. You'll see the escalation detail page:
+
+![Escalation detail](img/10-escalation-detail.png)
+
+The escalation detail shows:
+- **Input Envelope** (left panel) — The full input that was sent to the workflow, including document references (`page1_upside_down.png`, `page2.png`) and analysis parameters
+- **Workflow Result** (right panel) — The output from the failed workflow execution, including the low confidence score (< 0.85) and flags about unreadable documents
 - **Status**: `pending`
+- **Claim button** (bottom-right) — Assigns this escalation to you so other reviewers know it's being handled
 
-> **Screenshot: Escalation detail showing the claim payload with flags**
-
-### Step 2: Log in as Reviewer
+### Step 2: Log in as Reviewer and Claim
 
 Log out and log back in as `reviewer` / `reviewer123`.
 
-Navigate to **Escalations**. You'll see the same escalation, but now you can act on it.
+Navigate to **Escalations** or find the escalation through the Process 4 detail page. Click into the escalation to see the full detail view.
+
+Click the **Claim** button at the bottom-right of the escalation detail. This assigns the escalation to your user, preventing other reviewers from working on it simultaneously. After claiming, the resolution form appears.
 
 ### Step 3: Resolve with AI Triage
 
-Click the escalation to open the resolution form. You'll see two options:
+The resolution form gives you two options:
 
-1. **Standard resolution** — Provide corrected data directly (the human fixes it)
+1. **Standard resolution** — Provide corrected data directly using the context from the Input Envelope and Workflow Result panels (the human fixes it)
 2. **Request AI Triage** — Check the triage checkbox and describe the problem
 
 Check **"Request AI Triage"** and enter a description:
@@ -169,8 +196,6 @@ Check **"Request AI Triage"** and enter a description:
 ```
 Page 1 appears to be scanned upside down. Cannot read member ID or address.
 ```
-
-> **Screenshot: Resolution form with "Request AI Triage" checked and description filled in**
 
 Click **Resolve**.
 
@@ -183,9 +208,7 @@ Behind the scenes, a cascade of workflows just started:
 1. **mcpTriageOrchestrator** — Container workflow (Phase 1 + Phase 2)
 2. **mcpTriage** — Leaf workflow (LLM agentic loop with MCP tools)
 
-Navigate to **Tasks** and filter by workflow type. You'll see the triage workflows appear.
-
-> **Screenshot: Tasks list showing mcpTriageOrchestrator and mcpTriage tasks in progress**
+Navigate back to the **Process 4** detail page to see the triage task appear in the timeline. You'll see new entries for the triage orchestrator and its child workflows as they execute.
 
 The triage leaf is executing an LLM agentic loop:
 
@@ -200,6 +223,10 @@ The triage leaf is executing an LLM agentic loop:
 
 This takes 30-60 seconds depending on OpenAI response times.
 
+> For advanced users, a standalone Tasks list view is also available that shows all workflow executions across processes. You can filter by workflow type to find specific triage runs.
+>
+> ![Tasks list](img/08-tasks-list.png)
+
 ### Step 5: Observe the Re-invocation
 
 After triage completes (Phase 1), the orchestrator enters Phase 2:
@@ -211,15 +238,15 @@ After triage completes (Phase 1), the orchestrator enters Phase 2:
 
 ### Step 6: Verify Completion
 
-Navigate back to the original Process 4 task. It should now show:
+Navigate back to the **Process 4** detail page. The timeline should now show:
 
-- **Status**: `completed`
+- **Task status**: `completed`
 - **Milestones**: Includes `triage: completed`, `triage_method: llm_with_tools`
 - **Data**: Corrected claim with `triaged: true`
 
-> **Screenshot: Process 4 task detail showing completed status with triage milestones**
+Click **View Execution** on the completed task to see the full details.
 
-Check the original escalation — it's now `resolved` with:
+Check the escalation entry in the timeline — it's now `resolved` with:
 
 ```json
 {
@@ -229,8 +256,6 @@ Check the original escalation — it's now `resolved` with:
   }
 }
 ```
-
-> **Screenshot: Resolved escalation showing triage metadata**
 
 The parent orchestrator's `waitFor` signal resolved. The deterministic pipeline completed as if nothing went wrong.
 
@@ -260,6 +285,7 @@ Interceptor:                                  │
   ├─ Marks task needs_intervention            │
   └─ Publishes escalation.created event       │
                                               │
+Human claims escalation                      │
 Human resolves with needsTriage: true         │
                                               │
                     TRIAGE                    │
@@ -296,9 +322,7 @@ The triage worked, but it used LLM reasoning (multiple OpenAI calls, tool select
 
 ### Find the Triage Execution
 
-Navigate to **Tasks** and find the completed `mcpTriage` task from the previous run. Note its `workflow_id`.
-
-> **Screenshot: Completed mcpTriage task with workflow_id visible**
+Navigate to the **Process 4** detail page and find the completed `mcpTriage` task in the timeline. Click **View Execution** to see its details and note the `workflow_id`.
 
 ### Generate the YAML Workflow
 
@@ -360,7 +384,7 @@ The response contains the generated workflow:
 }
 ```
 
-> **Screenshot: API response showing the generated YAML workflow with activity manifest**
+<!-- API response -- run the curl command above to see the generated manifest -->
 
 ### What the Generator Does
 
@@ -430,7 +454,7 @@ curl -s -X POST http://localhost:3000/api/yaml-workflows/<YAML_ID>/deploy \
   -d '{"activate": true}' | jq .
 ```
 
-> **Screenshot: YAML workflow detail showing status = "active" with activated_at timestamp**
+![MCP Pipelines](img/06-mcp-pipelines.png)
 
 ---
 
@@ -568,7 +592,7 @@ The test configuration (`vitest.config.ts`) forces `POSTGRES_DB=longtail_test` w
       Tests  368 passed (368)
 ```
 
-> **Screenshot: Terminal showing all 27 test files passing**
+<!-- Terminal output -- run `npm test` from project root -->
 
 ### Frontend Tests
 
@@ -584,7 +608,7 @@ npm test
       Tests  292 passed (292)
 ```
 
-> **Screenshot: Terminal showing all 34 frontend test files passing**
+<!-- Terminal output -- run `npm test` from dashboard/ -->
 
 ### What the Tests Cover
 
@@ -610,24 +634,25 @@ Content arrives in Spanish with a `WRONG_LANGUAGE` marker. The AI flags it with 
 ### Walk the Chain
 
 1. **Log in as `reviewer`** (`reviewer123`)
-   - See the escalation: "Low confidence content review"
+   - Navigate to the **Process 3** detail page and find the escalation in the timeline
+   - Click into the escalation detail — review the Input Envelope and Workflow Result panels for context
+   - Click **Claim** to assign it to yourself
    - You're a content reviewer, not a translator
    - **Escalate to admin**: "This is a language issue, outside my review scope"
 
-> **Screenshot: Reviewer escalating to admin with a note**
-
 2. **Log in as `admin`** (`admin123`)
-   - See the re-escalated item
+   - Navigate to the **Process 3** detail page and find the re-escalated item in the timeline
+   - Click into the escalation detail, then **Claim** it
    - This needs engineering, not administrative action
    - **Escalate to engineer**: "Content is in the wrong language, needs technical fix"
 
 3. **Log in as `engineer`** (`engineer123`)
+   - Navigate to the **Process 3** detail page and find the escalation
+   - Click into the escalation detail, then **Claim** it
    - You have the tools and authority to trigger triage
    - Check **"Request AI Triage"**
    - Describe: "Content is in Spanish, needs translation to English"
    - **Resolve**
-
-> **Screenshot: Engineer triggering AI triage with description**
 
 ### What Triage Does
 
@@ -657,7 +682,7 @@ The `kitchenSink` workflow is intentionally generic — it runs a durable sleep,
 
 ### Pre-Flight Detection
 
-Log in as `reviewer` and find the Process 5 escalation. Resolve with triage checked and a simple message:
+Log in as `reviewer` and navigate to the **Process 5** detail page. Find the escalation in the timeline, click into the escalation detail, **Claim** it, and resolve with triage checked and a simple message:
 
 ```
 This looks fine, just approve it.
@@ -665,7 +690,7 @@ This looks fine, just approve it.
 
 The triage controller detects this as a simple approval via regex pre-flight matching. No LLM call needed. The response comes back instantly with `triage_method: pre_flight`.
 
-> **Screenshot: Completed Process 5 task with triage_method = pre_flight milestone**
+Navigate back to the **Process 5** detail page to see the updated timeline with the completed task.
 
 ### Full Agentic Path
 
@@ -720,7 +745,7 @@ If triage takes more than 2 minutes, check:
 
 1. `OPENAI_API_KEY` is set and valid
 2. Docker logs: `docker compose logs -f long-tail`
-3. The triage task in the dashboard — it shows milestones as it progresses
+3. The triage task on the process detail page — it shows milestones as it progresses
 
 If the LLM enters an infinite tool-calling loop (> 10 rounds), the triage exhaustion handler forces a final synthesis or escalates to engineering.
 
