@@ -63,7 +63,7 @@ const CONFIGS: LTWorkflowConfig[] = [
   }),
 ];
 
-function renderPage(initialPath = '/admin/config') {
+function renderPage(initialPath = '/workflows/config') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>

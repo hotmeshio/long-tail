@@ -6,18 +6,17 @@ import { SectionLabel } from './SectionLabel';
 // ---------------------------------------------------------------------------
 
 function JsonNode({ data, depth = 0, generation }: { data: unknown; depth?: number; generation?: number }) {
-  // When generation is even = fully expanded; odd = collapsed (beyond depth 0).
-  // Use generation in the initial state so newly-mounted children respect the current expand/collapse.
-  // generation 0 is the initial state (not yet toggled), so treat it as default behavior.
-  const isExpandedGen = generation !== undefined && generation > 0 && generation % 2 === 0;
-  const defaultCollapsed = isExpandedGen ? false : depth > 1;
+  // Odd generation = fully expanded; even = collapsed (beyond depth 0).
+  // generation 0 = default (collapsed). First click → gen 1 → expand all.
+  const isExpandedGen = generation !== undefined && generation > 0 && generation % 2 === 1;
+  const defaultCollapsed = isExpandedGen ? false : depth > 0;
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [lastGen, setLastGen] = useState(generation);
 
   // Reset local collapse state when global generation changes
   if (generation !== undefined && generation !== lastGen) {
     setLastGen(generation);
-    setCollapsed(generation % 2 === 1 && depth > 0);
+    setCollapsed(generation % 2 === 0 && depth > 0);
   }
 
   if (data === null || data === undefined) {
@@ -238,9 +237,9 @@ export function JsonViewer({
   const [mode, setMode] = useState<ViewMode>('json');
   const [copied, setCopied] = useState(false);
   // Bumping generation forces all JsonNodes to re-evaluate collapse state.
-  // Even = fully expanded, odd = collapsed (first level visible).
+  // Even (incl. 0) = collapsed, odd = fully expanded.
   const [generation, setGeneration] = useState(0);
-  const isGlobalCollapsed = generation % 2 === 1;
+  const isGlobalCollapsed = generation % 2 === 0;
   const toggleGlobalCollapse = useCallback(() => setGeneration((g) => g + 1), []);
 
   let parsed = data;

@@ -57,7 +57,7 @@ export function ProcessDetailPage() {
     <div>
       <PageHeader
         title="Process Detail"
-        backTo="/processes/list"
+        backTo="/processes/runs"
         backLabel="All Processes"
       />
 

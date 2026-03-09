@@ -3,39 +3,36 @@ import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { createDbServer } from '../mcp/db-server';
-import { createTelemetryServer } from '../mcp/telemetry-server';
 
 // ── In-process MCP clients (lazy singletons) ─────────────────
 
-let dbClient: InstanceType<typeof McpClient> | null = null;
-let telemetryClient: InstanceType<typeof McpClient> | null = null;
+// Promise-based singleton to prevent concurrent initialization races.
+// Without this, two concurrent activity calls both see dbClient as null,
+// both get the cached McpServer, and the second `server.connect()` throws
+// "Already connected to a transport."
+let dbClientPromise: Promise<InstanceType<typeof McpClient>> | null = null;
 
 // Maps tool names to the client that owns them
 const toolClientMap = new Map<string, InstanceType<typeof McpClient>>();
 
 async function getDbClient(): Promise<InstanceType<typeof McpClient>> {
-  if (dbClient) return dbClient;
+  if (!dbClientPromise) {
+    dbClientPromise = initDbClient().catch((err) => {
+      dbClientPromise = null; // allow retry on failure
+      throw err;
+    });
+  }
+  return dbClientPromise;
+}
 
+async function initDbClient(): Promise<InstanceType<typeof McpClient>> {
   const server = await createDbServer();
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 
-  dbClient = new McpClient({ name: 'insight-db-client', version: '1.0.0' });
-  await dbClient.connect(clientTransport);
-  return dbClient;
-}
-
-async function getTelemetryClient(): Promise<InstanceType<typeof McpClient> | null> {
-  if (telemetryClient) return telemetryClient;
-  if (!process.env.HONEYCOMB_TEAM || !process.env.HONEYCOMB_ENVIRONMENT) return null;
-
-  const server = await createTelemetryServer();
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-
-  telemetryClient = new McpClient({ name: 'insight-telemetry-client', version: '1.0.0' });
-  await telemetryClient.connect(clientTransport);
-  return telemetryClient;
+  const client = new McpClient({ name: 'insight-db-client', version: '1.0.0' });
+  await client.connect(clientTransport);
+  return client;
 }
 
 function parseResult(result: any): any {
@@ -52,7 +49,7 @@ function parseResult(result: any): any {
 // ── Proxy activities ──────────────────────────────────────────
 
 /**
- * List all available tools (DB + telemetry) in OpenAI function-calling format.
+ * List all available DB tools in OpenAI function-calling format.
  */
 export async function getDbTools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
   const db = await getDbClient();
@@ -61,17 +58,7 @@ export async function getDbTools(): Promise<OpenAI.Chat.Completions.ChatCompleti
   // Register DB tools in the routing map
   for (const t of dbTools) toolClientMap.set(t.name, db);
 
-  const allTools = [...dbTools];
-
-  // Add telemetry tools if Honeycomb is configured
-  const tel = await getTelemetryClient();
-  if (tel) {
-    const { tools: telTools } = await tel.listTools();
-    for (const t of telTools) toolClientMap.set(t.name, tel);
-    allTools.push(...telTools);
-  }
-
-  return allTools.map((t) => ({
+  return dbTools.map((t) => ({
     type: 'function' as const,
     function: {
       name: t.name,
@@ -82,7 +69,7 @@ export async function getDbTools(): Promise<OpenAI.Chat.Completions.ChatCompleti
 }
 
 /**
- * Call a specific MCP tool (DB or telemetry) and return the parsed result.
+ * Call a specific MCP tool (DB) and return the parsed result.
  */
 export async function callDbTool(
   name: string,

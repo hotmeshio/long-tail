@@ -189,7 +189,7 @@ describe('consumer/provider data injection', () => {
     await orchWorker.run();
 
     client = new Client({ connection });
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     await configService.deleteWorkflowConfig('enrichOrder');
@@ -226,7 +226,7 @@ describe('consumer/provider data injection', () => {
     expect(result.data.hasPricingFromProvider).toBe(true);
     expect(result.data.totalPrice).toBeCloseTo(89.97); // 3 * 29.99
     expect(result.data.currency).toBe('USD');
-  }, 45_000);
+  }, 30_000);
 
   // ── Verify task records store the data that providers expose ────────────
 
@@ -267,7 +267,7 @@ describe('consumer/provider data injection', () => {
     const enrichData = JSON.parse(enrichTask!.data!);
     expect(enrichData.totalPrice).toBeCloseTo(149.95); // 5 * 29.99
     expect(enrichData.currency).toBe('USD');
-  }, 45_000);
+  }, 30_000);
 
   // ── No provider data when no upstream task exists ──────────────────────
 

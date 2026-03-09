@@ -211,7 +211,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                 Process
               </span>
               <Link
-                to={`/processes/list?search=${encodeURIComponent(execution.workflow_id)}`}
+                to={`/processes/runs?search=${encodeURIComponent(execution.workflow_id)}`}
                 className="text-xs font-mono text-accent hover:underline truncate"
               >
                 Find in Processes

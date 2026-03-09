@@ -2,7 +2,7 @@
 
 When an AI workflow fails — a scanned document is upside down, content arrives in the wrong language, data doesn't match — the system escalates to a human, triages with AI + MCP tools, fixes the root cause, re-runs the original workflow, and then *hardens the fix* into a new deterministic pipeline so the same problem never requires AI reasoning again.
 
-This document walks through the entire golden path: from `git clone` through Docker setup, running tests, triggering the self-healing flow, compiling the fix into a YAML workflow, deploying it, and verifying it works. Every screenshot placeholder marks a moment worth capturing.
+This document walks through the entire golden path: from `git clone` through Docker setup, running tests, triggering the self-healing flow, compiling the fix into a YAML workflow, deploying it, and verifying it works.
 
 ---
 
@@ -112,7 +112,7 @@ The dashboard shows:
 - **Processes** — The primary entry point. Each process represents a business workflow and its current state. Click into any process to see its full timeline of tasks and escalations.
 - **Escalations** — Pending human review items across all processes
 - **MCP Servers** — Connected tool servers (7 built-in)
-- **MCP Pipelines** — Compiled YAML workflows (deterministic fixes from past triage runs)
+- **Process Servers** — Dynamic MCP servers generated from successful triage runs. Each namespace is a server; each compiled workflow is a tool. The system's evolving intelligence lives here.
 
 > Tasks and escalations appear in context on each process detail page, so there is no need to navigate to them independently. For advanced users, a standalone Tasks list view is also available from the navigation.
 
@@ -285,7 +285,7 @@ Interceptor:                                  │
   ├─ Marks task needs_intervention            │
   └─ Publishes escalation.created event       │
                                               │
-Human claims escalation                      │
+Human claims escalation                       │
 Human resolves with needsTriage: true         │
                                               │
                     TRIAGE                    │
@@ -454,7 +454,7 @@ curl -s -X POST http://localhost:3000/api/yaml-workflows/<YAML_ID>/deploy \
   -d '{"activate": true}' | jq .
 ```
 
-![MCP Pipelines](img/06-mcp-pipelines.png)
+![Process Servers](img/06-mcp-pipelines.png)
 
 ---
 

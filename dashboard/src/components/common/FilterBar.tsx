@@ -21,9 +21,12 @@ interface FilterSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
+  /** When true, omit the default "All" option — a value is always required. */
+  required?: boolean;
+  placeholder?: string;
 }
 
-export function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
+export function FilterSelect({ label, value, onChange, options, required, placeholder }: FilterSelectProps) {
   return (
     <div className="flex items-center gap-1.5">
       <label className="text-[10px] text-text-tertiary">{label}</label>
@@ -32,7 +35,7 @@ export function FilterSelect({ label, value, onChange, options }: FilterSelectPr
         onChange={(e) => onChange(e.target.value)}
         className="select text-[11px] py-1 px-2"
       >
-        <option value="">All</option>
+        {!required && <option value="">{placeholder || 'All'}</option>}
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

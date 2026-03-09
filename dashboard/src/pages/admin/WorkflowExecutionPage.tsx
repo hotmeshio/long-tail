@@ -97,7 +97,7 @@ export function WorkflowExecutionPage() {
       {
         onSuccess: (record) => {
           setConvertModalOpen(false);
-          navigate(`/mcp/pipelines/${record.id}`);
+          navigate(`/mcp/workflows/${record.id}`);
         },
       },
     );
@@ -118,7 +118,7 @@ export function WorkflowExecutionPage() {
 
     return (
       <div>
-        <Link to="/workflows/list" className="text-xs text-text-tertiary hover:text-text-primary">
+        <Link to="/workflows/runs" className="text-xs text-text-tertiary hover:text-text-primary">
           &larr; Workflows
         </Link>
         <div className="mt-4 text-center py-8">
@@ -141,7 +141,7 @@ export function WorkflowExecutionPage() {
 
   return (
     <div>
-      <PageHeader title="Workflow Execution" backTo="/workflows/list" backLabel="Workflows" />
+      <PageHeader title="Workflow Execution" backTo="/workflows/runs" backLabel="Workflows" />
 
       <ExecutionHeader
         execution={execution}

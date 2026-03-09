@@ -130,6 +130,9 @@ export async function deleteYamlWorkflow(id: string): Promise<boolean> {
 
 export async function listYamlWorkflows(filters: {
   status?: LTYamlWorkflowStatus;
+  graph_topic?: string;
+  app_id?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ workflows: LTYamlWorkflowRecord[]; total: number }> {
@@ -141,6 +144,22 @@ export async function listYamlWorkflows(filters: {
   if (filters.status) {
     conditions.push(`status = $${idx++}`);
     values.push(filters.status);
+  }
+
+  if (filters.graph_topic) {
+    conditions.push(`graph_topic = $${idx++}`);
+    values.push(filters.graph_topic);
+  }
+
+  if (filters.app_id) {
+    conditions.push(`app_id = $${idx++}`);
+    values.push(filters.app_id);
+  }
+
+  if (filters.search) {
+    conditions.push(`(name ILIKE $${idx} OR graph_topic ILIKE $${idx} OR description ILIKE $${idx} OR app_id ILIKE $${idx})`);
+    values.push(`%${filters.search}%`);
+    idx++;
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';

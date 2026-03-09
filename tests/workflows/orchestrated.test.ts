@@ -99,7 +99,7 @@ describe('orchestrated workflows (executeLT)', () => {
     await orchWorker.run();
 
     client = new Client({ connection });
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     Durable.clearInterceptors();
@@ -138,7 +138,7 @@ describe('orchestrated workflows (executeLT)', () => {
     const task = tasks.find(t => t.status === 'completed' && t.workflow_type === 'reviewContent');
     expect(task).toBeTruthy();
     expect(task!.status).toBe('completed');
-  }, 45_000);
+  }, 30_000);
 
   // ── executeLT: escalation ends child, resolve starts new child ──────────────
 
@@ -204,7 +204,7 @@ describe('orchestrated workflows (executeLT)', () => {
     const resolvedEsc = await escalationService.getEscalation(esc.id);
     expect(resolvedEsc!.status).toBe('resolved');
     expect(resolvedEsc!.resolver_payload).toBeTruthy();
-  }, 60_000);
+  }, 30_000);
 
   // ── executeLT: task record completed after escalation resolve ───────────────
 
@@ -261,7 +261,7 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(task).toBeTruthy();
     expect(task!.status).toBe('completed');
     expect(task!.data).toBeTruthy();
-  }, 60_000);
+  }, 30_000);
 
   // ── Workflow milestones: persisted to task record via orchestrator ────────────
 
@@ -302,7 +302,7 @@ describe('orchestrated workflows (executeLT)', () => {
         expect.objectContaining({ name: 'llm', value: 'content_analysis' }),
       ]),
     );
-  }, 45_000);
+  }, 30_000);
 
   // ── Orchestrator pass-through: interceptor skips orchestrator workflows ─────
 

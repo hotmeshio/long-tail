@@ -10,6 +10,10 @@ const statusStyles: Record<string, string> = {
   needs_intervention: 'bg-status-error',
   failed: 'bg-status-error',
   cancelled: 'bg-accent-muted',
+  draft: 'bg-status-pending',
+  deployed: 'bg-status-active',
+  active: 'bg-status-success',
+  archived: 'bg-accent-muted',
 };
 
 const statusLabels: Record<string, string> = {
@@ -20,6 +24,10 @@ const statusLabels: Record<string, string> = {
   needs_intervention: 'Needs Intervention',
   failed: 'Failed',
   cancelled: 'Cancelled',
+  draft: 'Draft',
+  deployed: 'Deployed',
+  active: 'Active',
+  archived: 'Archived',
 };
 
 export function StatusBadge({ status }: { status: Status }) {

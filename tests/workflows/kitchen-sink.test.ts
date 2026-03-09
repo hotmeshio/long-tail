@@ -100,7 +100,7 @@ describe('kitchenSink workflow', () => {
     expect(result.data.result).toBeTruthy();
     expect(result.data.result.merged).toHaveProperty('source-a');
     expect(result.data.result.merged).toHaveProperty('source-b');
-  }, 60_000);
+  }, 30_000);
 
   // ── Full mode: escalates then resolves ────────────────────────────────────
 
@@ -118,7 +118,7 @@ describe('kitchenSink workflow', () => {
       expire: 120,
     });
 
-    const escalations = await waitForEscalation(workflowId, 45_000);
+    const escalations = await waitForEscalation(workflowId, 15_000);
     expect(escalations.length).toBe(1);
     expect(escalations[0].status).toBe('pending');
     expect(escalations[0].role).toBe('reviewer');
@@ -126,7 +126,7 @@ describe('kitchenSink workflow', () => {
 
     await resolveEscalation(escalations[0].id, { approved: true });
 
-    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 30_000);
+    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
     expect(resolvedEsc.status).toBe('resolved');
-  }, 90_000);
+  }, 30_000);
 });

@@ -99,7 +99,7 @@ function buildColumns(
             <RowAction
               icon={Settings}
               title="View config"
-              onClick={() => navigate(`/admin/config/${encodeURIComponent(row.entity)}`)}
+              onClick={() => navigate(`/workflows/config/${encodeURIComponent(row.entity)}`)}
             />
           )}
         </RowActionGroup>
@@ -144,7 +144,7 @@ export function WorkflowsDashboard() {
 
   return (
     <div>
-      <PageHeader title="Workflows" />
+      <PageHeader title="Workflow Runs" />
 
       <FilterBar>
         <input

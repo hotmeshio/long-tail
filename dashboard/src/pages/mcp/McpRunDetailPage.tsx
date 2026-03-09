@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useMcpRunExecution } from '../../api/mcp-runs';
+import { useYamlWorkflowByTopic } from '../../api/yaml-workflows';
 import { useSettings } from '../../api/settings';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
@@ -218,6 +219,9 @@ export function McpRunDetailPage() {
   const { data: execution, isLoading, error } = useMcpRunExecution(jobId!, namespace);
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
+  const workflowTopic = execution?.workflow_name || execution?.workflow_type;
+  const { data: yamlMatch } = useYamlWorkflowByTopic(workflowTopic);
+  const sourceWorkflow = yamlMatch?.workflows?.[0];
 
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
 
@@ -233,7 +237,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Pipeline Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Pipeline Runs" />
+        <PageHeader title="Workflow Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Workflow Runs" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -255,7 +259,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Pipeline Runs" />
+      <PageHeader title="Workflow Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Workflow Runs" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
@@ -266,8 +270,14 @@ export function McpRunDetailPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-8">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Pipeline</p>
-            <p className="text-xs font-mono text-text-primary">{execution.workflow_name || execution.workflow_type || '—'}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Workflow Server</p>
+            {sourceWorkflow ? (
+              <Link to={`/mcp/workflows/${sourceWorkflow.id}`} className="text-xs font-mono text-accent hover:underline">
+                {execution.workflow_name || execution.workflow_type}
+              </Link>
+            ) : (
+              <p className="text-xs font-mono text-text-primary">{execution.workflow_name || execution.workflow_type || '—'}</p>
+            )}
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>
@@ -290,6 +300,7 @@ export function McpRunDetailPage() {
               label="Trace"
               value={execution.trace_id}
               href={traceUrl ? traceUrl.replace('{traceId}', execution.trace_id) : undefined}
+              external
             />
           </div>
         )}

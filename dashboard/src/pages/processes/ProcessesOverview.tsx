@@ -75,7 +75,7 @@ export function ProcessesOverview() {
 
   const goToList = (params?: Record<string, string>) => {
     const qs = new URLSearchParams(params).toString();
-    navigate(`/processes/list${qs ? `?${qs}` : ''}`);
+    navigate(`/processes/runs${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';

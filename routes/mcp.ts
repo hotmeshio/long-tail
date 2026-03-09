@@ -17,6 +17,7 @@ router.get('/servers', async (req, res) => {
       status: req.query.status as any,
       auto_connect: req.query.auto_connect === 'true' ? true :
                     req.query.auto_connect === 'false' ? false : undefined,
+      search: req.query.search as string | undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });

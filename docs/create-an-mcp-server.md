@@ -539,7 +539,7 @@ We repeated this `evaluate` → `wait_for` → `screenshot` pattern for every pa
 | Processes list | `/processes/list` | `03-processes-list.png` |
 | Escalations list | `/escalations/available` | `04-escalations-list.png` |
 | MCP Servers | `/mcp/servers` | `05-mcp-servers.png` |
-| MCP Pipelines | `/mcp/pipelines` | `06-mcp-pipelines.png` |
+| Process Servers | `/mcp/pipelines` | `06-mcp-pipelines.png` |
 | Workflows overview | `/workflows` | `07-workflows-list.png` |
 | Tasks list | `/workflows/tasks` | `08-tasks-list.png` |
 | Process detail | `/processes/detail/:originId` | `09-process-detail.png` |

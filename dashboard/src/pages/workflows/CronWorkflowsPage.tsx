@@ -130,7 +130,7 @@ export function CronWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="Cron Workflows" />
+      <PageHeader title="Cron" />
 
       {invocable.length === 0 ? (
         <div className="py-16 text-center">

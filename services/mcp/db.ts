@@ -126,6 +126,7 @@ export async function updateMcpServerStatus(
 export async function listMcpServers(filters: {
   status?: LTMcpServerStatus;
   auto_connect?: boolean;
+  search?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ servers: LTMcpServerRecord[]; total: number }> {
@@ -141,6 +142,11 @@ export async function listMcpServers(filters: {
   if (filters.auto_connect !== undefined) {
     conditions.push(`auto_connect = $${idx++}`);
     values.push(filters.auto_connect);
+  }
+  if (filters.search) {
+    conditions.push(`(name ILIKE $${idx} OR description ILIKE $${idx} OR tool_manifest::text ILIKE $${idx})`);
+    values.push(`%${filters.search}%`);
+    idx++;
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';

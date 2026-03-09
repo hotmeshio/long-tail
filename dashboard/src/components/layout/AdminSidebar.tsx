@@ -2,7 +2,6 @@ import {
   Shield,
   Users,
   Link,
-  Settings,
   Wrench,
   Tag,
 } from 'lucide-react';
@@ -20,7 +19,6 @@ const entries: NavEntry[] = [
       { to: '/admin/escalation-chains', label: 'Escalations', icon: Link },
     ],
   },
-  { to: '/admin/config', label: 'Workflow Configs', icon: Settings },
   { to: '/admin/maintenance', label: 'Maintenance', icon: Wrench },
 ];
 

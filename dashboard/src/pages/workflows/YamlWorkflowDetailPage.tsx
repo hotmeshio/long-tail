@@ -10,8 +10,6 @@ import {
   useRegenerateYamlWorkflow,
   useUpdateYamlWorkflow,
 } from '../../api/yaml-workflows';
-import { useInsightQuery } from '../../api/insight';
-import { InsightResultCard } from '../../components/insight/InsightResultCard';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -20,12 +18,8 @@ import { Field } from '../../components/common/Field';
 import { useSettings } from '../../api/settings';
 import type { ActivityManifestEntry } from '../../api/types/yaml-workflows';
 
-const statusMap: Record<string, string> = {
-  draft: 'pending',
-  deployed: 'in_progress',
-  active: 'completed',
-  archived: 'failed',
-};
+// Status values (draft, deployed, active, archived) are passed directly
+// to StatusBadge which handles styling and labels natively.
 
 function buildSkeleton(schema: Record<string, any>): Record<string, any> {
   if (!schema?.properties) return {};
@@ -138,21 +132,29 @@ function PipelineStrip({ activities, selectedIdx, onSelect }: {
         return (
           <div key={a.activity_id} className="flex items-center shrink-0">
             {idx > 0 && (
-              <svg className="w-4 h-4 text-text-tertiary shrink-0 mx-0.5" viewBox="0 0 16 16" fill="none">
-                <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <div className="w-4 h-px bg-surface-border mx-0.5" />
             )}
             <button
               type="button"
               onClick={() => onSelect(idx)}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${
-                isSelected
-                  ? 'bg-accent text-text-inverse border-accent'
-                  : `${sourceColor(a.tool_source)} hover:opacity-80`
-              }`}
+              className="flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="font-mono">{idx + 1}</span>
-              <span className="ml-1.5">{a.title}</span>
+              <span
+                className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0 transition-colors ${
+                  isSelected
+                    ? 'bg-accent text-text-inverse'
+                    : 'bg-surface-sunken text-text-tertiary hover:bg-accent-muted hover:text-accent'
+                }`}
+              >
+                {idx + 1}
+              </span>
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                  isSelected ? 'text-text-primary' : 'text-text-tertiary hover:text-text-primary'
+                }`}
+              >
+                {a.title}
+              </span>
             </button>
           </div>
         );
@@ -162,66 +164,80 @@ function PipelineStrip({ activities, selectedIdx, onSelect }: {
 }
 
 function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
+  const hasInputs = Object.keys(activity.input_mappings).length > 0;
+  const hasOutputs = activity.output_fields.length > 0;
+  const isLlm = activity.tool_source === 'llm';
+
   return (
-    <div className="p-4 bg-surface-sunken rounded-md space-y-3">
-      <div className="flex items-center gap-2">
-        <h4 className="text-xs font-medium text-text-primary font-mono">{activity.title}</h4>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${sourceColor(activity.tool_source)}`}>
+    <div className="pt-2 space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <h4 className="text-base font-medium text-text-primary">{activity.title}</h4>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${sourceColor(activity.tool_source)}`}>
           {sourceLabel(activity.tool_source)}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+      {/* Identity */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-10 gap-y-4">
         <div>
-          <p className="text-[10px] text-text-tertiary">Topic</p>
-          <p className="text-xs font-mono text-text-primary truncate">{activity.topic}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Topic</p>
+          <p className="text-sm font-mono text-text-primary">{activity.topic}</p>
         </div>
-        {activity.tool_source !== 'llm' && activity.mcp_tool_name && (
+        {!isLlm && activity.mcp_tool_name && (
           <div>
-            <p className="text-[10px] text-text-tertiary">Tool</p>
-            <p className="text-xs font-mono text-text-primary">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool</p>
+            <p className="text-sm font-mono text-text-primary">
               {activity.tool_source === 'db' ? 'db' : activity.mcp_server_id}/{activity.mcp_tool_name}
             </p>
           </div>
         )}
-        {activity.tool_source === 'llm' && (
+        {isLlm && (
           <div>
-            <p className="text-[10px] text-text-tertiary">Model</p>
-            <p className="text-xs font-mono text-text-primary">{activity.model || 'gpt-4o-mini'}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Model</p>
+            <p className="text-sm font-mono text-text-primary">{activity.model || 'gpt-4o-mini'}</p>
           </div>
         )}
       </div>
 
-      {Object.keys(activity.input_mappings).length > 0 && (
-        <div>
-          <p className="text-[10px] text-text-tertiary mb-1">Input Mappings</p>
-          <div className="space-y-0.5">
-            {Object.entries(activity.input_mappings).map(([k, v]) => (
-              <p key={k} className="text-[10px] font-mono text-text-secondary">
-                <span className="text-text-primary">{k}</span> ← <span className="text-accent">{v}</span>
-              </p>
-            ))}
-          </div>
+      {/* Input → Output */}
+      {(hasInputs || hasOutputs) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6">
+          {hasInputs && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Inputs</p>
+              <div className="space-y-1.5">
+                {Object.entries(activity.input_mappings).map(([k, v]) => (
+                  <p key={k} className="text-xs font-mono text-text-secondary leading-relaxed">
+                    <span className="text-text-primary">{k}</span>
+                    <span className="text-text-tertiary mx-1.5">&larr;</span>
+                    <span className="text-accent">{v}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasOutputs && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Outputs</p>
+              <div className="flex flex-wrap gap-1.5">
+                {activity.output_fields.map((f) => (
+                  <span key={f} className="text-xs font-mono px-2 py-0.5 border border-surface-border rounded-full text-text-secondary">{f}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {activity.tool_source === 'llm' && activity.prompt_template && (
+      {/* LLM Prompt — special treatment */}
+      {isLlm && activity.prompt_template && (
         <div>
-          <p className="text-[10px] text-text-tertiary mb-1">Prompt Template</p>
-          <pre className="p-2 bg-surface-raised border border-surface-border rounded text-[10px] font-mono text-text-secondary whitespace-pre-wrap max-h-48 overflow-y-auto">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Prompt Template</p>
+          <pre className="p-4 bg-surface-sunken rounded-lg text-xs font-mono text-text-secondary whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
             {activity.prompt_template}
           </pre>
-        </div>
-      )}
-
-      {activity.output_fields.length > 0 && (
-        <div>
-          <p className="text-[10px] text-text-tertiary mb-1">Output Fields</p>
-          <div className="flex flex-wrap gap-1">
-            {activity.output_fields.map((f) => (
-              <span key={f} className="text-[10px] font-mono px-1.5 py-0.5 bg-surface-raised border border-surface-border rounded text-text-secondary">{f}</span>
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -333,7 +349,7 @@ function LifecycleSidebar({
       {(status === 'draft' || status === 'archived') && (
         <div className="mt-4 pt-4 border-t border-surface-border">
           <button onClick={onDelete} disabled={isPending} className="text-[11px] text-status-error hover:underline">
-            Delete pipeline
+            Delete workflow server
           </button>
         </div>
       )}
@@ -345,7 +361,7 @@ function LifecycleSidebar({
 
 // ── Tab types ──────────────────────────────────────────────────
 
-type Tab = 'pipeline' | 'config' | 'invoke';
+type Tab = 'tools' | 'config' | 'invoke';
 
 // ── Main Page ─────────────────────────────────────────────────
 
@@ -365,18 +381,13 @@ export function YamlWorkflowDetailPage() {
   const [invokeJson, setInvokeJson] = useState('{}');
   const [invokeResult, setInvokeResult] = useState<Record<string, unknown> | null>(null);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('pipeline');
+  const [activeTab, setActiveTab] = useState<Tab>('tools');
   const [selectedStep, setSelectedStep] = useState(0);
 
   // ── YAML editing state ──────────────────────────────────────
   const [yamlDraft, setYamlDraft] = useState('');
   const [yamlEditing, setYamlEditing] = useState(false);
   const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // ── LLM assistance state ────────────────────────────────────
-  const [assistInput, setAssistInput] = useState('');
-  const [assistQuestion, setAssistQuestion] = useState<string | null>(null);
-  const { data: assistData, isFetching: assistFetching, error: assistError } = useInsightQuery(assistQuestion);
 
   useEffect(() => {
     if (wf?.yaml_content) setYamlDraft(wf.yaml_content);
@@ -400,7 +411,7 @@ export function YamlWorkflowDetailPage() {
   }
 
   if (!wf) {
-    return <p className="text-sm text-text-secondary">Pipeline not found.</p>;
+    return <p className="text-sm text-text-secondary">Workflow server not found.</p>;
   }
 
   const workerActivities = wf.activity_manifest.filter((a) => a.type === 'worker');
@@ -418,11 +429,11 @@ export function YamlWorkflowDetailPage() {
   const handleDeploy = async () => { await deployMutation.mutateAsync(wf.id); refetch(); };
   const handleActivate = async () => { await activateMutation.mutateAsync(wf.id); refetch(); };
   const handleArchive = async () => {
-    if (!confirm('Archive this pipeline? It will no longer accept invocations.')) return;
+    if (!confirm('Archive this workflow server? It will no longer accept invocations.')) return;
     await archiveMutation.mutateAsync(wf.id); refetch();
   };
   const handleDelete = async () => {
-    if (!confirm('Delete this pipeline permanently?')) return;
+    if (!confirm('Delete this workflow server permanently?')) return;
     await deleteMutation.mutateAsync(wf.id);
   };
   const handleRegenerate = async () => {
@@ -437,13 +448,6 @@ export function YamlWorkflowDetailPage() {
   const handleCancelEdit = () => {
     setYamlDraft(wf.yaml_content);
     setYamlEditing(false);
-  };
-  const handleAssistSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assistInput.trim()) return;
-    // Prefix the question with YAML context so the LLM has full picture
-    const context = `I'm editing a HotMesh YAML workflow pipeline named "${wf.name}" (app_id: ${wf.app_id}, topic: ${wf.graph_topic}). Here is the current YAML definition:\n\n\`\`\`yaml\n${yamlDraft}\n\`\`\`\n\nQuestion: ${assistInput.trim()}`;
-    setAssistQuestion(context);
   };
   const handleInvoke = async () => {
     setInvokeResult(null);
@@ -468,14 +472,14 @@ export function YamlWorkflowDetailPage() {
   const canEditYaml = wf.status === 'draft';
 
   const tabs: { key: Tab; label: string; show: boolean }[] = [
-    { key: 'pipeline', label: 'Pipeline', show: true },
+    { key: 'tools', label: 'Tools', show: true },
     { key: 'config', label: 'Config', show: true },
     { key: 'invoke', label: 'Invoke', show: isActive },
   ];
 
   return (
     <div>
-      <PageHeader title="MCP Pipelines" backTo="/mcp/pipelines" backLabel="MCP Pipelines" />
+      <PageHeader title="Workflow Server Tool" backTo="/mcp/workflows" backLabel="Workflow Servers" />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12">
         {/* ── Left: main content ─────────────────────────── */}
@@ -484,7 +488,7 @@ export function YamlWorkflowDetailPage() {
           <div className="mb-6">
             <div className="flex items-center gap-4 mb-3">
               <h2 className="text-lg font-medium text-text-primary font-mono truncate flex-1">{wf.name}</h2>
-              <StatusBadge status={statusMap[wf.status] ?? wf.status} />
+              <StatusBadge status={wf.status} />
             </div>
 
             {wf.description && <p className="text-xs text-text-secondary mb-4">{wf.description}</p>}
@@ -501,6 +505,11 @@ export function YamlWorkflowDetailPage() {
                   </Link>
                 } />
               )}
+              <Field label="Invocations" value={
+                <Link to={`/mcp/runs?entity=${encodeURIComponent(wf.graph_topic)}&namespace=${encodeURIComponent(wf.app_id)}`} className="text-xs text-accent hover:underline">
+                  View runs &rarr;
+                </Link>
+              } />
               <Field label="Created" value={<span className="text-xs">{new Date(wf.created_at).toLocaleString()}</span>} />
             </div>
           </div>
@@ -526,8 +535,8 @@ export function YamlWorkflowDetailPage() {
             ))}
           </div>
 
-          {/* ── Pipeline Tab ─────────────────────────────── */}
-          {activeTab === 'pipeline' && (
+          {/* ── Tools Tab ───────────────────────────────── */}
+          {activeTab === 'tools' && (
             <div className="space-y-4">
               <PipelineStrip
                 activities={workerActivities}
@@ -598,65 +607,18 @@ export function YamlWorkflowDetailPage() {
                     ref={yamlTextareaRef}
                     value={yamlDraft}
                     onChange={(e) => setYamlDraft(e.target.value)}
-                    className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-y"
-                    rows={Math.max(20, yamlDraft.split('\n').length + 2)}
+                    className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                    rows={yamlDraft.split('\n').length + 1}
+                    style={{ fieldSizing: 'content' } as React.CSSProperties}
                     spellCheck={false}
                   />
                 ) : (
-                  <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre max-h-[600px] overflow-y-auto">
+                  <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
                     {wf.yaml_content}
                   </pre>
                 )}
               </div>
 
-              {/* ── LLM Assistance ───────────────────────────── */}
-              <div className="border-t border-surface-border pt-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-accent/60">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </span>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-                    Pipeline Assistant
-                  </p>
-                </div>
-                <p className="text-xs text-text-tertiary mb-3">
-                  Ask how to modify this pipeline — add conditionals, parallel branches, new activities, or refine mappings.
-                </p>
-                <form onSubmit={handleAssistSubmit} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={assistInput}
-                    onChange={(e) => setAssistInput(e.target.value)}
-                    placeholder="e.g. How do I add a conditional branch after step 2?"
-                    className="input text-xs py-1.5 px-3 flex-1"
-                    disabled={assistFetching}
-                  />
-                  <button
-                    type="submit"
-                    disabled={assistFetching || !assistInput.trim()}
-                    className="btn-primary text-[11px] px-3 py-1.5 disabled:opacity-40"
-                  >
-                    {assistFetching ? (
-                      <span className="flex items-center gap-1.5">
-                        <span className="inline-block w-3 h-3 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
-                        Thinking...
-                      </span>
-                    ) : 'Ask'}
-                  </button>
-                </form>
-
-                {assistError && !assistFetching && (
-                  <div className="mt-3 p-3 rounded-lg bg-status-error/10">
-                    <p className="text-xs text-status-error">{assistError.message}</p>
-                  </div>
-                )}
-
-                {assistData && !assistFetching && (
-                  <InsightResultCard result={assistData} />
-                )}
-              </div>
             </div>
           )}
 

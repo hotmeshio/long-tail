@@ -195,7 +195,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     // Connect MCP test client
     mcpCtx = await createMcpTestClient();
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     await mcpCtx?.cleanup();
@@ -236,7 +236,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     });
 
     // 2. Wait for escalation (analysis flags the upside-down page)
-    const escalations = await waitForEscalationByOriginId(workflowId, 45_000, 2_000);
+    const escalations = await waitForEscalationByOriginId(workflowId, 15_000, 2_000);
     expect(escalations.length).toBeGreaterThanOrEqual(1);
 
     const esc = escalations[0];
@@ -264,7 +264,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     // 5. Poll until triage rotates documents + re-invokes + completes.
     // This involves multiple OpenAI calls (triage LLM loop + Vision on re-run).
-    const resolvedEsc = await waitForEscalationStatus(esc.id, 'resolved', 120_000, 3_000);
+    const resolvedEsc = await waitForEscalationStatus(esc.id, 'resolved', 60_000, 3_000);
     expect(resolvedEsc.resolver_payload).toBeTruthy();
     const resolvedPayload = typeof resolvedEsc.resolver_payload === 'string'
       ? JSON.parse(resolvedEsc.resolver_payload)
@@ -280,6 +280,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     expect(resolvedData.status).toBe('resolved');
 
     // 7. Poll until triage task and re-invoked processClaim appear
+    // Triage chains multiple workflows; give it time even without OpenAI
     const taskDeadline = Date.now() + 60_000;
     let triageTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
     let claimTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
@@ -298,7 +299,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     }
     expect(triageTasks.length).toBeGreaterThanOrEqual(1);
     expect(claimTasks.length).toBeGreaterThanOrEqual(1);
-  }, 240_000);
+  }, 90_000);
 
   // ── Test 2: Standard re-run when needsTriage is not set ────────────────
 
@@ -324,7 +325,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     });
 
     // Wait for escalation (Vision API can be slow)
-    const escalations = await waitForEscalationByOriginId(workflowId, 60_000, 2_000);
+    const escalations = await waitForEscalationByOriginId(workflowId, 15_000, 2_000);
     expect(escalations.length).toBeGreaterThanOrEqual(1);
 
     const esc = escalations[0];
@@ -338,7 +339,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     });
 
     // Poll until resolved
-    await waitForEscalationStatus(esc.id, 'resolved', 60_000, 2_000);
+    await waitForEscalationStatus(esc.id, 'resolved', 15_000, 2_000);
 
     // Verify the escalation is resolved via standard path
     const checkResolved = await mcpCtx.client.callTool({
@@ -350,7 +351,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     // No triage marker — this was a standard re-run
     expect(resolvedData.resolver_payload._lt).toBeUndefined();
-  }, 120_000);
+  }, 60_000);
 
   // ── Test 3: Happy path with readable documents (no escalation) ─────────
 
@@ -376,7 +377,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     });
 
     // Poll until the processClaim child task completes (no escalation expected)
-    const deadline = Date.now() + 60_000;
+    const deadline = Date.now() + 30_000;
     let claimTask: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'][0] | undefined;
     while (Date.now() < deadline) {
       const { tasks } = await taskService.listTasks({ origin_id: workflowId, limit: 10 });
@@ -386,5 +387,5 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     }
     expect(claimTask).toBeTruthy();
     expect(claimTask!.status).toBe('completed');
-  }, 90_000);
+  }, 30_000);
 });

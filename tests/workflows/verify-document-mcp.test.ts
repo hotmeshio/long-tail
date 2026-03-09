@@ -227,7 +227,7 @@ describe('verifyDocumentMcp workflow (MCP-native)', () => {
 
     // Connect MCP client for escalation queue interaction via protocol
     mcpCtx = await createMcpTestClient();
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     await mcpCtx.cleanup();
@@ -256,7 +256,7 @@ describe('verifyDocumentMcp workflow (MCP-native)', () => {
     });
 
     // Poll until the escalation appears (increased timeout for multiple OpenAI Vision calls)
-    const escalations = await waitForEscalation(workflowId, 90_000, 3_000);
+    const escalations = await waitForEscalation(workflowId, 45_000, 3_000);
     expect(escalations.length).toBe(1);
 
     const esc = escalations[0];
@@ -311,7 +311,7 @@ describe('verifyDocumentMcp workflow (MCP-native)', () => {
     const resolved = parseMcpResult(checkResolved);
     expect(resolved.status).toBe('resolved');
     expect(resolved.resolver_payload).toBeTruthy();
-  }, 120_000);
+  }, 60_000);
 
   it('should skip MCP workflow tests when OPENAI_API_KEY is not set', () => {
     if (hasOpenAIKey) {

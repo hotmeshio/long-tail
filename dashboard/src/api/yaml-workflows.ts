@@ -9,6 +9,9 @@ interface YamlWorkflowListResponse {
 
 interface YamlWorkflowFilters {
   status?: LTYamlWorkflowStatus;
+  graph_topic?: string;
+  app_id?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -16,6 +19,9 @@ interface YamlWorkflowFilters {
 export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
+  if (filters.graph_topic) params.set('graph_topic', filters.graph_topic);
+  if (filters.app_id) params.set('app_id', filters.app_id);
+  if (filters.search) params.set('search', filters.search);
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
 
@@ -23,6 +29,21 @@ export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
     queryKey: ['yamlWorkflows', filters],
     queryFn: () => apiFetch(`/yaml-workflows?${params}`),
     refetchInterval: 10_000,
+  });
+}
+
+export function useYamlWorkflowAppIds() {
+  return useQuery<{ app_ids: string[] }>({
+    queryKey: ['yamlWorkflowAppIds'],
+    queryFn: () => apiFetch('/yaml-workflows/app-ids'),
+  });
+}
+
+export function useYamlWorkflowByTopic(graphTopic: string | undefined) {
+  return useQuery<YamlWorkflowListResponse>({
+    queryKey: ['yamlWorkflows', 'byTopic', graphTopic],
+    queryFn: () => apiFetch(`/yaml-workflows?graph_topic=${encodeURIComponent(graphTopic!)}&limit=1`),
+    enabled: !!graphTopic,
   });
 }
 

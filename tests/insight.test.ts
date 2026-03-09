@@ -4,10 +4,6 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { start } from '../start';
 import { createDbServer, stopDbServer } from '../services/mcp/db-server';
-import {
-  createTelemetryServer,
-  stopTelemetryServer,
-} from '../services/mcp/telemetry-server';
 import { parseJsonResponse } from '../services/insight/index';
 import { loggerRegistry } from '../services/logger';
 import { telemetryRegistry } from '../services/telemetry';
@@ -86,16 +82,9 @@ describe('parseJsonResponse', () => {
 
 describe('Insight activities — tool routing', () => {
   let lt: LTInstance;
-  let originalTeam: string | undefined;
-  let originalEnv: string | undefined;
 
   beforeAll(async () => {
     clearRegistries();
-
-    originalTeam = process.env.HONEYCOMB_TEAM;
-    originalEnv = process.env.HONEYCOMB_ENVIRONMENT;
-    process.env.HONEYCOMB_TEAM = 'test-team';
-    process.env.HONEYCOMB_ENVIRONMENT = 'test-env';
 
     lt = await start({
       database: TEST_DB,
@@ -103,44 +92,30 @@ describe('Insight activities — tool routing', () => {
       maintenance: false,
     });
 
-    // Reset server singletons
+    // Reset server singleton
     await stopDbServer();
-    await stopTelemetryServer();
   }, 30_000);
 
   afterAll(async () => {
     await stopDbServer();
-    await stopTelemetryServer();
     await lt.shutdown();
     clearRegistries();
-    if (originalTeam !== undefined) {
-      process.env.HONEYCOMB_TEAM = originalTeam;
-    } else {
-      delete process.env.HONEYCOMB_TEAM;
-    }
-    if (originalEnv !== undefined) {
-      process.env.HONEYCOMB_ENVIRONMENT = originalEnv;
-    } else {
-      delete process.env.HONEYCOMB_ENVIRONMENT;
-    }
   }, 15_000);
 
-  it('should merge DB and telemetry tools in getDbTools', async () => {
+  it('should list DB tools in getDbTools', async () => {
     // Import dynamically to get fresh module state
     const { getDbTools } = await import('../services/insight/activities');
 
     const tools = await getDbTools();
 
-    // DB server has 6 tools, telemetry server has 1 (get_trace_link)
-    expect(tools.length).toBeGreaterThanOrEqual(7);
+    // DB server has 6 tools
+    expect(tools.length).toBeGreaterThanOrEqual(6);
 
     const names = tools.map((t) => t.function.name);
     // DB tools
     expect(names).toContain('find_tasks');
     expect(names).toContain('find_escalations');
     expect(names).toContain('get_system_health');
-    // Telemetry tool
-    expect(names).toContain('get_trace_link');
 
     // Each tool should have OpenAI function-calling format
     for (const tool of tools) {
@@ -158,16 +133,5 @@ describe('Insight activities — tool routing', () => {
     const result = await callDbTool('get_workflow_types', {});
     expect(result).toBeTruthy();
     expect(Array.isArray(result.workflows) || result.count !== undefined).toBe(true);
-  });
-
-  it('should route telemetry tool calls to the telemetry client', async () => {
-    const { callDbTool } = await import('../services/insight/activities');
-
-    // get_trace_link generates a URL — no API calls needed
-    const result = await callDbTool('get_trace_link', { trace_id: 'test-trace' });
-    expect(result).toBeTruthy();
-    expect(result.trace_id).toBe('test-trace');
-    expect(result.honeycomb_url).toContain('test-trace');
-    expect(result.honeycomb_url).toContain('ui.honeycomb.io');
   });
 });

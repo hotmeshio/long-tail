@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronRight, Pencil, Trash2, Plug, Unplug } from 'lucide-react';
 import { RowAction, RowActionGroup } from '../../../components/common/RowActions';
 import {
@@ -13,12 +13,35 @@ import { EmptyState } from '../../../components/common/EmptyState';
 import { ConfirmDeleteModal } from '../../../components/common/ConfirmDeleteModal';
 import type { McpServerRecord, McpToolManifest } from '../../../api/types';
 import { PageHeader } from '../../../components/common/PageHeader';
+import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/FilterBar';
+import { useFilterParams } from '../../../hooks/useFilterParams';
 import { ServerFormModal } from './ServerFormModal';
 import { TryToolModal } from '../../mcp/TryToolModal';
 
 function isBuiltIn(row: McpServerRecord): boolean {
   return !!(row.metadata as Record<string, unknown> | null)?.builtin
     || !!(row.transport_config as Record<string, unknown> | null)?.builtin;
+}
+
+/** Check if a server or any of its tools match the search term */
+function matchesSearch(server: McpServerRecord, search: string): boolean {
+  if (!search) return true;
+  const q = search.toLowerCase();
+  if (server.name.toLowerCase().includes(q)) return true;
+  if (server.description?.toLowerCase().includes(q)) return true;
+  const tools = (server.tool_manifest ?? []) as McpToolManifest[];
+  return tools.some(
+    (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
+  );
+}
+
+/** Filter tools within a server that match the search term */
+function filterTools(tools: McpToolManifest[], search: string): McpToolManifest[] {
+  if (!search) return tools;
+  const q = search.toLowerCase();
+  return tools.filter(
+    (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
+  );
 }
 
 // ── Tool row inside expanded server ──────────────────────────────────────────
@@ -76,6 +99,7 @@ function ServerRow({
   onTryTool,
   connect,
   disconnect,
+  visibleTools,
 }: {
   server: McpServerRecord;
   expanded: boolean;
@@ -85,23 +109,24 @@ function ServerRow({
   onTryTool: (tool: McpToolManifest) => void;
   connect: ReturnType<typeof useConnectMcpServer>;
   disconnect: ReturnType<typeof useDisconnectMcpServer>;
+  visibleTools: McpToolManifest[];
 }) {
-  const tools = (server.tool_manifest ?? []) as McpToolManifest[];
+  const allTools = (server.tool_manifest ?? []) as McpToolManifest[];
   const builtin = isBuiltIn(server);
 
   return (
     <>
       {/* Server header row */}
       <tr
-        onClick={tools.length > 0 ? onToggle : undefined}
+        onClick={allTools.length > 0 ? onToggle : undefined}
         className={`group/row border-b transition-colors duration-100 ${
-          tools.length > 0 ? 'cursor-pointer row-hover' : ''
+          allTools.length > 0 ? 'cursor-pointer row-hover' : ''
         }`}
       >
         {/* Expand chevron + name */}
         <td className="px-6 py-3.5">
           <div className="flex items-start gap-2">
-            <span className={`mt-0.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''} ${tools.length === 0 ? 'opacity-0' : 'text-text-tertiary'}`}>
+            <span className={`mt-0.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''} ${allTools.length === 0 ? 'opacity-0' : 'text-text-tertiary'}`}>
               <ChevronRight size={14} />
             </span>
             <div className="min-w-0">
@@ -128,7 +153,7 @@ function ServerRow({
         {/* Tool count */}
         <td className="px-6 py-3.5 w-20">
           <span className="text-xs text-text-tertiary">
-            {tools.length} tool{tools.length !== 1 ? 's' : ''}
+            {allTools.length} tool{allTools.length !== 1 ? 's' : ''}
           </span>
         </td>
 
@@ -172,7 +197,7 @@ function ServerRow({
       </tr>
 
       {/* Animated tool panel */}
-      {tools.length > 0 && (
+      {visibleTools.length > 0 && (
         <tr>
           <td colSpan={6} className="p-0 border-0">
             <div
@@ -196,7 +221,7 @@ function ServerRow({
                     </tr>
                   </thead>
                   <tbody>
-                    {tools.map((tool) => (
+                    {visibleTools.map((tool) => (
                       <ToolRow
                         key={`${server.id}:${tool.name}`}
                         tool={tool}
@@ -218,7 +243,14 @@ function ServerRow({
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export function McpServersPage() {
-  const { data, isLoading } = useMcpServers();
+  const { filters, setFilter } = useFilterParams({
+    filters: { status: '', search: '' },
+  });
+
+  const { data, isLoading } = useMcpServers({
+    status: filters.status || undefined,
+    search: filters.search || undefined,
+  });
   const connect = useConnectMcpServer();
   const disconnect = useDisconnectMcpServer();
   const deleteServer = useDeleteMcpServer();
@@ -234,6 +266,12 @@ export function McpServersPage() {
   } | null>(null);
 
   const servers = data?.servers ?? [];
+
+  // Client-side search filtering for tool-level matches within expanded rows
+  const filteredServers = useMemo(() => {
+    if (!filters.search) return servers;
+    return servers.filter((s) => matchesSearch(s, filters.search));
+  }, [servers, filters.search]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -283,8 +321,32 @@ export function McpServersPage() {
         }
       />
 
-      {servers.length === 0 ? (
-        <EmptyState title="No MCP servers registered" />
+      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
+        Prebuilt, user-registered, and external MCP servers providing tools for workflows.
+      </p>
+
+      <FilterBar>
+        <FilterInput
+          label="Search"
+          value={filters.search}
+          onChange={(v) => setFilter('search', v)}
+          placeholder="Server or tool name…"
+        />
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          onChange={(v) => setFilter('status', v)}
+          options={[
+            { value: 'registered', label: 'Registered' },
+            { value: 'connected', label: 'Connected' },
+            { value: 'error', label: 'Error' },
+            { value: 'disconnected', label: 'Disconnected' },
+          ]}
+        />
+      </FilterBar>
+
+      {filteredServers.length === 0 ? (
+        <EmptyState title="No MCP servers found" />
       ) : (
         <table className="w-full">
           <thead>
@@ -308,7 +370,7 @@ export function McpServersPage() {
             </tr>
           </thead>
           <tbody>
-            {servers.map((server) => (
+            {filteredServers.map((server) => (
               <ServerRow
                 key={server.id}
                 server={server}
@@ -328,6 +390,10 @@ export function McpServersPage() {
                 }
                 connect={connect}
                 disconnect={disconnect}
+                visibleTools={filterTools(
+                  (server.tool_manifest ?? []) as McpToolManifest[],
+                  filters.search,
+                )}
               />
             ))}
           </tbody>

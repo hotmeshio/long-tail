@@ -14,10 +14,6 @@ vi.mock('../../../api/yaml-workflows', () => ({
   useUpdateYamlWorkflow: vi.fn(),
 }));
 
-vi.mock('../../../api/insight', () => ({
-  useInsightQuery: vi.fn(),
-}));
-
 vi.mock('../../../api/settings', () => ({
   useSettings: vi.fn(() => ({ data: null })),
 }));
@@ -33,7 +29,6 @@ import {
   useRegenerateYamlWorkflow,
   useUpdateYamlWorkflow,
 } from '../../../api/yaml-workflows';
-import { useInsightQuery } from '../../../api/insight';
 
 // ── Fixtures ──────────────────────────────────────────────────────
 
@@ -82,9 +77,9 @@ function renderPage(wfId = 'wf-1') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[`/mcp/pipelines/${wfId}`]}>
+      <MemoryRouter initialEntries={[`/mcp/workflows/${wfId}`]}>
         <Routes>
-          <Route path="/mcp/pipelines/:id" element={<YamlWorkflowDetailPage />} />
+          <Route path="/mcp/workflows/:id" element={<YamlWorkflowDetailPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -102,9 +97,6 @@ function setupMocks(wf = draftWorkflow) {
   vi.mocked(useDeleteYamlWorkflow).mockReturnValue({ ...baseMutation } as any);
   vi.mocked(useRegenerateYamlWorkflow).mockReturnValue({ ...baseMutation } as any);
   vi.mocked(useUpdateYamlWorkflow).mockReturnValue({ ...baseMutation } as any);
-  vi.mocked(useInsightQuery).mockReturnValue({
-    data: null, isFetching: false, error: null,
-  } as any);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────
@@ -130,7 +122,7 @@ describe('YamlWorkflowDetailPage', () => {
       data: null, isLoading: false, refetch: vi.fn(),
     } as any);
     renderPage();
-    expect(screen.getByText('Pipeline not found.')).toBeInTheDocument();
+    expect(screen.getByText('Workflow server not found.')).toBeInTheDocument();
   });
 
   // ── Header & metadata ──
@@ -252,59 +244,6 @@ describe('YamlWorkflowDetailPage', () => {
     });
   });
 
-  // ── Pipeline Assistant ──
-
-  it('renders Pipeline Assistant on Config tab', () => {
-    renderPage();
-    fireEvent.click(screen.getByText('Config'));
-    expect(screen.getByText('Pipeline Assistant')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/How do I add a conditional/)).toBeInTheDocument();
-  });
-
-  it('calls useInsightQuery with YAML context on submit', () => {
-    renderPage();
-    fireEvent.click(screen.getByText('Config'));
-
-    const input = screen.getByPlaceholderText(/How do I add a conditional/);
-    fireEvent.change(input, { target: { value: 'Add parallel branches' } });
-    fireEvent.click(screen.getByText('Ask'));
-
-    // useInsightQuery should be called with a question that includes YAML context
-    const calls = vi.mocked(useInsightQuery).mock.calls;
-    const lastCall = calls[calls.length - 1];
-    // The component sets assistQuestion state, which triggers a re-render
-    // The actual assertion is that the form was submitted without error
-    expect(input).toBeInTheDocument();
-  });
-
-  it('shows InsightResultCard when assistant data is available', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: {
-        title: 'Conditional Branches',
-        summary: 'You can add conditionals using...',
-        sections: [],
-        metrics: [],
-        tool_calls_made: 1,
-        query: 'test',
-        workflow_id: 'wf-test',
-        duration_ms: 500,
-      },
-      isFetching: false,
-      error: null,
-    } as any);
-
-    renderPage();
-    fireEvent.click(screen.getByText('Config'));
-    expect(screen.getByText('Conditional Branches')).toBeInTheDocument();
-  });
-
-  it('disables Ask button when input is empty', () => {
-    renderPage();
-    fireEvent.click(screen.getByText('Config'));
-    const askButton = screen.getByText('Ask');
-    expect(askButton).toBeDisabled();
-  });
-
   // ── Lifecycle sidebar ──
 
   it('shows Deploy button for draft status', () => {
@@ -324,9 +263,9 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText('Archive')).toBeInTheDocument();
   });
 
-  it('shows Delete pipeline link for draft status', () => {
+  it('shows Delete workflow server link for draft status', () => {
     renderPage();
-    expect(screen.getByText('Delete pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Delete workflow server')).toBeInTheDocument();
   });
 
   it('shows Regenerate button when source workflow exists', () => {

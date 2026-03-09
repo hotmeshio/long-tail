@@ -175,6 +175,7 @@ export async function createWorkflowServer(options?: {
           wf.app_id,
           wf.graph_topic,
           args.input || {},
+          wf.graph_topic,
         );
         return {
           content: [{
@@ -193,6 +194,7 @@ export async function createWorkflowServer(options?: {
         wf.graph_topic,
         args.input || {},
         args.timeout,
+        wf.graph_topic,
       );
       return {
         content: [{

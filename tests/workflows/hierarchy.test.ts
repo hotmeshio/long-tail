@@ -244,7 +244,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     await topWorker.run();
 
     client = new Client({ connection });
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     // Clean up configs
@@ -284,7 +284,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
 
       // Fetch all tasks belonging to this hierarchy
       allTasks = await getTasksByOriginId(topOrchWorkflowId);
-    }, 120_000);
+    }, 30_000);
 
     it('should create exactly 7 task records (2 sub-orchestrators + 5 leaves)', () => {
       expect(allTasks).toHaveLength(7);
@@ -452,7 +452,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
 
       // Poll until the pipeline reaches the escalation point
       // (topLevel → subOrchA completes → subOrchB starts → leafB1,B2 complete → leafB3 escalates)
-      const escalations = await waitForEscalationByOriginId(topOrchWorkflowId, 60_000, 2_000);
+      const escalations = await waitForEscalationByOriginId(topOrchWorkflowId, 15_000, 2_000);
       const esc = escalations.find((e) =>
         e.description?.includes('Hierarchy test escalation'),
       );
@@ -481,7 +481,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
 
       await sleepFor(1000);
       allTasks = await getTasksByOriginId(topOrchWorkflowId);
-    }, 120_000);
+    }, 30_000);
 
     it('should still link all tasks via the same originId after escalation resolution', () => {
       expect(allTasks.length).toBe(7);

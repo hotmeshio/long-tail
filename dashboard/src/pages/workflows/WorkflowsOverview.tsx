@@ -120,7 +120,7 @@ export function WorkflowsOverview() {
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
-    navigate(`/workflows/list${qs ? `?${qs}` : ''}`);
+    navigate(`/workflows/runs${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';

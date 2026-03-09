@@ -8,6 +8,12 @@ import { getTaskByWorkflowId } from '../services/task';
 
 const router = Router();
 
+/** Return true if a Postgres error indicates an invalid/missing ID */
+function isNotFoundError(err: any): boolean {
+  const msg: string = err?.message ?? '';
+  return msg.includes('invalid input syntax for type uuid') || msg.includes('not found');
+}
+
 /**
  * GET /api/yaml-workflows
  * List YAML workflows with optional status filter.
@@ -16,11 +22,18 @@ router.get('/', async (req, res) => {
   try {
     const result = await yamlDb.listYamlWorkflows({
       status: req.query.status as any,
+      graph_topic: req.query.graph_topic as string | undefined,
+      app_id: req.query.app_id as string | undefined,
+      search: req.query.search as string | undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });
     res.json(result);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -75,6 +88,19 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/yaml-workflows/app-ids
+ * Return distinct app_id values from non-archived workflows.
+ */
+router.get('/app-ids', async (_req, res) => {
+  try {
+    const appIds = await yamlDb.getDistinctAppIds();
+    res.json({ app_ids: appIds });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Parameterized routes ──────────────────────────────────────────────
 
 /**
@@ -90,6 +116,10 @@ router.get('/:id', async (req, res) => {
     }
     res.json(wf);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -107,6 +137,10 @@ router.put('/:id', async (req, res) => {
     }
     res.json(wf);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -159,6 +193,10 @@ router.post('/:id/regenerate', async (req, res) => {
 
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -181,6 +219,10 @@ router.delete('/:id', async (req, res) => {
     await yamlDb.deleteYamlWorkflow(req.params.id);
     res.json({ deleted: true });
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -217,6 +259,10 @@ router.post('/:id/deploy', async (req, res) => {
     const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -251,6 +297,10 @@ router.post('/:id/activate', async (req, res) => {
     const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -278,6 +328,7 @@ router.post('/:id/invoke', async (req, res) => {
         wf.graph_topic,
         data,
         req.body.timeout,
+        wf.graph_topic,
       );
       res.json({ result });
     } else {
@@ -285,10 +336,15 @@ router.post('/:id/invoke', async (req, res) => {
         wf.app_id,
         wf.graph_topic,
         data,
+        wf.graph_topic,
       );
       res.json({ job_id: jobId });
     }
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -310,6 +366,10 @@ router.post('/:id/archive', async (req, res) => {
     const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'archived');
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -327,6 +387,10 @@ router.get('/:id/yaml', async (req, res) => {
     }
     res.type('text/yaml').send(wf.yaml_content);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });

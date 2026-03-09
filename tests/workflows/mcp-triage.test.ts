@@ -351,7 +351,7 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
 
     // Connect MCP test client
     mcpCtx = await createMcpTestClient();
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     await mcpCtx.cleanup();
@@ -389,7 +389,7 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
     });
 
     // 2. Wait for escalation (mock extraction fails on page1.png)
-    const escalations = await waitForEscalationByOriginId(workflowId, 30_000, 1_000);
+    const escalations = await waitForEscalationByOriginId(workflowId, 15_000, 1_000);
     expect(escalations.length).toBeGreaterThanOrEqual(1);
 
     const esc = escalations[0];
@@ -441,7 +441,7 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       t.workflow_type === 'mcpTriage',
     );
     expect(triageTasks.length).toBeGreaterThanOrEqual(1);
-  }, 120_000);
+  }, 60_000);
 
   // ── Test 2: Standard re-run when needsTriage is not set ───────────────────
 
@@ -458,7 +458,7 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
     });
 
     // Wait for escalation
-    const escalations = await waitForEscalationByOriginId(workflowId, 30_000, 1_000);
+    const escalations = await waitForEscalationByOriginId(workflowId, 15_000, 1_000);
     expect(escalations.length).toBeGreaterThanOrEqual(1);
 
     const esc = escalations[0];
@@ -484,5 +484,5 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
 
     // No triage marker — this was a standard re-run
     expect(resolvedData.resolver_payload._lt).toBeUndefined();
-  }, 90_000);
+  }, 30_000);
 });

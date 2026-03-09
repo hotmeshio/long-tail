@@ -195,7 +195,7 @@ export function WorkflowConfigsPage() {
         title="Workflow Configurations"
         actions={
           <button
-            onClick={() => navigate('/admin/config/new')}
+            onClick={() => navigate('/workflows/config/new')}
             className="btn-primary text-xs"
           >
             Add Config
@@ -235,7 +235,7 @@ export function WorkflowConfigsPage() {
         columns={columns}
         data={configs}
         keyFn={(row) => row.workflow_type}
-        onRowClick={(row) => navigate(`/admin/config/${encodeURIComponent(row.workflow_type)}`)}
+        onRowClick={(row) => navigate(`/workflows/config/${encodeURIComponent(row.workflow_type)}`)}
         isLoading={isLoading}
         emptyMessage="No workflow configurations found"
       />

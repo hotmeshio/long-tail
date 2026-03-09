@@ -71,7 +71,7 @@ describe('reviewContent workflow', () => {
     await worker.run();
 
     client = new Client({ connection });
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     Durable.clearInterceptors();
@@ -179,10 +179,10 @@ describe('reviewContent workflow', () => {
     });
 
     // Poll until escalation is resolved by the interceptor
-    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 30_000);
+    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
     expect(resolvedEsc.resolved_at).toBeTruthy();
     expect(resolvedEsc.resolver_payload).toBeTruthy();
-  }, 60_000);
+  }, 30_000);
 
   // ── Escalation: claim → resolve lifecycle ─────────────────────────────────
 
@@ -228,10 +228,10 @@ describe('reviewContent workflow', () => {
     });
 
     // Poll until resolved
-    const resolvedEsc = await waitForEscalationStatus(escalation.id, 'resolved', 30_000);
+    const resolvedEsc = await waitForEscalationStatus(escalation.id, 'resolved', 15_000);
     expect(resolvedEsc.resolved_at).toBeTruthy();
     expect(resolvedEsc.resolver_payload).toBeTruthy();
-  }, 60_000);
+  }, 30_000);
 
   // ── Escalation: expired claim release ─────────────────────────────────────
 
@@ -272,7 +272,7 @@ describe('reviewContent workflow', () => {
     const updated = await escalationService.getEscalation(escalation.id);
     expect(updated!.status).toBe('pending');
     expect(updated!.assigned_to).toBeNull();
-  }, 45_000);
+  }, 30_000);
 
   // ── Error flag detection ──────────────────────────────────────────────────
 
@@ -303,8 +303,8 @@ describe('reviewContent workflow', () => {
     });
 
     // Poll until resolved
-    await waitForEscalationStatus(escalations[0].id, 'resolved', 30_000);
-  }, 60_000);
+    await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
+  }, 30_000);
 
   // ── Multiple workflows: isolation ─────────────────────────────────────────
 
@@ -364,8 +364,8 @@ describe('reviewContent workflow', () => {
     });
 
     // Poll until resolved
-    await waitForEscalationStatus(escalations[0].id, 'resolved', 30_000);
-  }, 60_000);
+    await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
+  }, 30_000);
 
   // ── Activity interceptor: clean analysis data in result ──────────────────
 
@@ -433,9 +433,9 @@ describe('reviewContent workflow', () => {
     });
 
     // Poll until task completes
-    const completedTask = await waitForTaskStatus(escalations[0].task_id!, 'completed', 30_000);
+    const completedTask = await waitForTaskStatus(escalations[0].task_id!, 'completed', 15_000);
     expect(completedTask.status).toBe('completed');
-  }, 60_000);
+  }, 30_000);
 
   // ── Task lifecycle: standalone completion ──────────────────────────────────
 

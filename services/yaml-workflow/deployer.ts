@@ -111,23 +111,69 @@ export async function invokeYamlWorkflow(
   appId: string,
   topic: string,
   data: Record<string, unknown>,
+  entity?: string,
 ): Promise<string> {
   const engine = await getEngine(appId);
-  return engine.pub(topic, data);
+  return engine.pub(topic, data, undefined, entity ? { entity } : undefined);
 }
 
 /**
  * Invoke a YAML workflow and wait for the result.
+ * Uses pub (with entity) + sub to replicate pubsub behavior,
+ * since engine.pubsub() doesn't forward the entity/extended param.
  */
 export async function invokeYamlWorkflowSync(
   appId: string,
   topic: string,
   data: Record<string, unknown>,
   timeout?: number,
+  entity?: string,
 ): Promise<Record<string, unknown>> {
   const engine = await getEngine(appId);
-  const result = await engine.pubsub(topic, data, null, timeout ?? 120000);
-  return result as unknown as Record<string, unknown>;
+
+  if (!entity) {
+    const result = await engine.pubsub(topic, data, null, timeout ?? 120000);
+    return result as unknown as Record<string, unknown>;
+  }
+
+  const waitMs = timeout ?? 120000;
+
+  return new Promise<Record<string, unknown>>((resolve, reject) => {
+    let settled = false;
+    let jobId: string;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        engine.unsub(topic).catch(() => {});
+        reject(new Error(`Workflow timed out after ${waitMs}ms`));
+      }
+    }, waitMs);
+
+    engine.sub(topic, (_topic, output) => {
+      if (settled) return;
+      if (output.metadata?.jid === jobId) {
+        settled = true;
+        clearTimeout(timer);
+        engine.unsub(topic).catch(() => {});
+        if (output.metadata?.err) {
+          reject(JSON.parse(output.metadata.err as string));
+        } else {
+          resolve(output as unknown as Record<string, unknown>);
+        }
+      }
+    }).then(() => {
+      return engine.pub(topic, data, undefined, { entity });
+    }).then((id) => {
+      jobId = id;
+    }).catch((err) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  });
 }
 
 /**

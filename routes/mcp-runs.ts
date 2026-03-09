@@ -18,7 +18,8 @@ const router = Router();
 
 /**
  * GET /api/mcp-runs/entities
- * Return distinct entity (pipeline) names from {appId}.jobs.
+ * Return distinct entity (tool) names from {appId}.jobs,
+ * supplemented with graph_topics from yaml_workflows for this app_id.
  */
 router.get('/entities', async (req, res) => {
   try {
@@ -32,13 +33,23 @@ router.get('/entities', async (req, res) => {
     const schema = quoteSchema(appId);
     const pool = getPool();
 
-    const { rows } = await pool.query(
-      `SELECT DISTINCT entity FROM ${schema}.jobs ORDER BY entity`,
-    );
+    // Two sources: job entities (from runs) + yaml workflow graph_topics (known tools)
+    const [jobResult, yamlResult] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT entity FROM ${schema}.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`,
+      ).catch(() => ({ rows: [] as any[] })),
+      pool.query(
+        `SELECT DISTINCT graph_topic FROM lt_yaml_workflows WHERE app_id = $1 AND status IN ('active', 'deployed')`,
+        [rawAppId],
+      ).catch(() => ({ rows: [] as any[] })),
+    ]);
 
-    res.json({ entities: rows.map((r: any) => r.entity) });
+    const entitySet = new Set<string>();
+    for (const r of jobResult.rows) entitySet.add(r.entity);
+    for (const r of yamlResult.rows) entitySet.add(r.graph_topic);
+
+    res.json({ entities: [...entitySet].sort() });
   } catch (err: any) {
-    // Schema may not exist yet
     if (err.message?.includes('does not exist')) {
       res.json({ entities: [] });
       return;
@@ -114,6 +125,10 @@ router.get('/', async (req, res) => {
 
     res.json({ jobs, total: parseInt(countResult.rows[0].count, 10) });
   } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      res.json({ jobs: [], total: 0 });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
