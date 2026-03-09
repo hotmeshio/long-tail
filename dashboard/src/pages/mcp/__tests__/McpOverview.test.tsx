@@ -11,9 +11,14 @@ vi.mock('../../../api/mcp', () => ({
   useMcpServers: vi.fn(),
 }));
 
+vi.mock('../../../api/namespaces', () => ({
+  useNamespaces: vi.fn(),
+}));
+
 import { McpOverview } from '../McpOverview';
 import { useMcpRuns } from '../../../api/mcp-runs';
 import { useMcpServers } from '../../../api/mcp';
+import { useNamespaces } from '../../../api/namespaces';
 
 const now = Date.now();
 const recent = new Date(now - 3_600_000 / 2).toISOString(); // 30 min ago
@@ -52,6 +57,7 @@ describe('McpOverview', () => {
     vi.clearAllMocks();
     vi.mocked(useMcpRuns).mockReturnValue({ data: mockRuns } as any);
     vi.mocked(useMcpServers).mockReturnValue({ data: mockServers, isLoading: false } as any);
+    vi.mocked(useNamespaces).mockReturnValue({ data: { namespaces: [{ name: 'longtail', is_default: true }] } } as any);
   });
 
   // ── Header & Duration tabs ──
@@ -132,21 +138,18 @@ describe('McpOverview', () => {
     expect(screen.getByText(/No MCP run activity/)).toBeInTheDocument();
   });
 
-  // ── Quick links ──
+  // ── Server info in header ──
 
-  it('renders pipeline and server links', () => {
+  it('shows server and tool info', () => {
     renderPage();
-    expect(screen.getByText('Pipelines')).toBeInTheDocument();
-    expect(screen.getByText('Servers')).toBeInTheDocument();
-    expect(screen.getByText('1 of 2 connected')).toBeInTheDocument();
+    expect(screen.getByText(/1 server · 2 tools/)).toBeInTheDocument();
   });
 
   // ── Loading state ──
 
-  it('shows loading text for servers', () => {
+  it('shows dash when servers are loading', () => {
     vi.mocked(useMcpServers).mockReturnValue({ data: undefined, isLoading: true } as any);
     renderPage();
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 });

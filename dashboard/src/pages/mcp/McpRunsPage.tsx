@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMcpRuns } from '../../api/mcp-runs';
+import { useMcpRuns, useMcpEntities } from '../../api/mcp-runs';
+import { useNamespaces } from '../../api/namespaces';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -63,7 +64,7 @@ const columns: Column<LTJob>[] = [
 export function McpRunsPage() {
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
-    filters: { search: '', entity: '', status: '' },
+    filters: { search: '', entity: '', status: '', namespace: 'longtail' },
   });
 
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -74,7 +75,13 @@ export function McpRunsPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 
+  const activeNamespace = filters.namespace || 'longtail';
+
+  const { data: nsData } = useNamespaces();
+  const { data: entitiesData } = useMcpEntities(activeNamespace);
+
   const { data: runsData, isLoading } = useMcpRuns({
+    app_id: activeNamespace,
     limit: pagination.pageSize,
     offset: pagination.offset,
     entity: filters.entity || undefined,
@@ -95,17 +102,38 @@ export function McpRunsPage() {
     });
   }, [runsData?.jobs]);
 
-  // Collect unique entity values for the filter
-  const entities = useMemo(() => {
-    const set = new Set((runsData?.jobs ?? []).map((j) => j.entity));
-    return [...set].sort();
-  }, [runsData?.jobs]);
+  const namespaces = useMemo(
+    () => (nsData?.namespaces ?? []).map((ns) => ({ value: ns.name, label: ns.name })),
+    [nsData?.namespaces],
+  );
+
+  const entities = useMemo(
+    () => (entitiesData?.entities ?? []).map((e) => ({ value: e, label: e })),
+    [entitiesData?.entities],
+  );
 
   return (
     <div>
       <PageHeader title="Pipeline Runs" />
 
       <FilterBar>
+        {namespaces.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-text-tertiary">Namespace</label>
+            <select
+              value={activeNamespace}
+              onChange={(e) => {
+                setFilter('namespace', e.target.value);
+                setFilter('entity', '');
+              }}
+              className="select text-[11px] py-1 px-2"
+            >
+              {namespaces.map((ns) => (
+                <option key={ns.value} value={ns.value}>{ns.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <input
           type="text"
           placeholder="Search run ID..."
@@ -117,7 +145,7 @@ export function McpRunsPage() {
           label="Pipeline"
           value={filters.entity}
           onChange={(v) => setFilter('entity', v)}
-          options={entities.map((e) => ({ value: e, label: e }))}
+          options={entities}
         />
         <FilterSelect
           label="Status"
@@ -135,7 +163,7 @@ export function McpRunsPage() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/mcp/runs/${encodeURIComponent(row.workflow_id)}`)}
+        onRowClick={(row) => navigate(`/mcp/runs/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
         isLoading={isLoading}
         emptyMessage="No pipeline runs found"
       />

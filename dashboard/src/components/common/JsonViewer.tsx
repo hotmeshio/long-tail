@@ -6,13 +6,17 @@ import { SectionLabel } from './SectionLabel';
 // ---------------------------------------------------------------------------
 
 function JsonNode({ data, depth = 0, generation }: { data: unknown; depth?: number; generation?: number }) {
-  const [collapsed, setCollapsed] = useState(depth > 1);
+  // When generation is even = fully expanded; odd = collapsed (beyond depth 0).
+  // Use generation in the initial state so newly-mounted children respect the current expand/collapse.
+  // generation 0 is the initial state (not yet toggled), so treat it as default behavior.
+  const isExpandedGen = generation !== undefined && generation > 0 && generation % 2 === 0;
+  const defaultCollapsed = isExpandedGen ? false : depth > 1;
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [lastGen, setLastGen] = useState(generation);
 
   // Reset local collapse state when global generation changes
   if (generation !== undefined && generation !== lastGen) {
     setLastGen(generation);
-    // generation is even = expanded, odd = collapsed (beyond depth 0)
     setCollapsed(generation % 2 === 1 && depth > 0);
   }
 

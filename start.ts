@@ -215,7 +215,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     const { createPlaywrightServer } = await import('./services/mcp/playwright-server');
     registerBuiltinServer('long-tail-document-vision', createVisionServer);
     registerBuiltinServer('long-tail-human-queue', createHumanQueueServer);
-    registerBuiltinServer('long-tail-mcp-workflows', createWorkflowServer);
+    registerBuiltinServer('mcp-workflows-longtail', createWorkflowServer);
     registerBuiltinServer('long-tail-workflow-compiler', createWorkflowCompilerServer);
     registerBuiltinServer('long-tail-db', createDbServer);
     registerBuiltinServer('long-tail-playwright', createPlaywrightServer);

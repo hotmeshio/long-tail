@@ -123,6 +123,20 @@ export function useArchiveYamlWorkflow() {
   });
 }
 
+export function useUpdateYamlWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string }) =>
+      apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
+    },
+  });
+}
+
 export function useDeleteYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({

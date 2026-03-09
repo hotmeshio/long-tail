@@ -551,7 +551,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'escalation' },
   },
   {
-    name: 'long-tail-mcp-workflows',
+    name: 'mcp-workflows-longtail',
     description: 'Compiled YAML workflows — hardened deterministic pipelines from successful MCP triage executions. Invoke proven solutions to edge cases without LLM reasoning.',
     transport_type: 'stdio',
     transport_config: { builtin: true, process: 'in-memory' },

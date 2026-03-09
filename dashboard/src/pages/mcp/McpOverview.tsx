@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useMcpServers } from '../../api/mcp';
 import { useMcpRuns } from '../../api/mcp-runs';
+import { useNamespaces } from '../../api/namespaces';
 import { PageHeader } from '../../components/common/PageHeader';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
@@ -62,9 +63,15 @@ function StatCell({
 export function McpOverview() {
   const navigate = useNavigate();
   const [duration, setDuration] = useState<DurationLabel>('24h');
+  const [namespace, setNamespace] = useState('longtail');
 
-  const { data: allRuns } = useMcpRuns({ limit: 500 });
+  const { data: nsData } = useNamespaces();
+  const { data: allRuns } = useMcpRuns({ limit: 500, app_id: namespace });
   const { data: serverData, isLoading: serversLoading } = useMcpServers();
+  const namespaces = useMemo(
+    () => (nsData?.namespaces ?? []).map((ns) => ns.name),
+    [nsData?.namespaces],
+  );
 
   const servers = serverData?.servers ?? [];
   const connectedServers = servers.filter((s) => s.status === 'connected').length;
@@ -120,6 +127,7 @@ export function McpOverview() {
 
   const goToRuns = (entity?: string, status?: string) => {
     const params = new URLSearchParams();
+    if (namespace !== 'longtail') params.set('namespace', namespace);
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
@@ -139,21 +147,34 @@ export function McpOverview() {
         }
       />
 
-      {/* Duration tabs */}
-      <div className="flex items-center gap-1 mb-6">
-        {DURATIONS.map((d) => (
-          <button
-            key={d.label}
-            onClick={() => setDuration(d.label)}
-            className={`px-3 py-1 text-xs rounded-full transition-colors ${
-              duration === d.label
-                ? 'bg-accent text-text-inverse'
-                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
-            }`}
+      {/* Duration tabs + Namespace selector */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-1">
+          {DURATIONS.map((d) => (
+            <button
+              key={d.label}
+              onClick={() => setDuration(d.label)}
+              className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                duration === d.label
+                  ? 'bg-accent text-text-inverse'
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+        {namespaces.length > 1 && (
+          <select
+            value={namespace}
+            onChange={(e) => setNamespace(e.target.value)}
+            className="select text-xs py-1 px-2"
           >
-            {d.label}
-          </button>
-        ))}
+            {namespaces.map((ns) => (
+              <option key={ns} value={ns}>{ns}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Summary cards */}

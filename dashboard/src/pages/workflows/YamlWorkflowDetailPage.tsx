@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   useYamlWorkflow,
@@ -8,7 +8,10 @@ import {
   useArchiveYamlWorkflow,
   useDeleteYamlWorkflow,
   useRegenerateYamlWorkflow,
+  useUpdateYamlWorkflow,
 } from '../../api/yaml-workflows';
+import { useInsightQuery } from '../../api/insight';
+import { InsightResultCard } from '../../components/insight/InsightResultCard';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -356,6 +359,7 @@ export function YamlWorkflowDetailPage() {
   const archiveMutation = useArchiveYamlWorkflow();
   const deleteMutation = useDeleteYamlWorkflow();
   const regenerateMutation = useRegenerateYamlWorkflow();
+  const updateMutation = useUpdateYamlWorkflow();
   const [invokeFields, setInvokeFields] = useState<Record<string, any>>({});
   const [invokeJsonMode, setInvokeJsonMode] = useState(false);
   const [invokeJson, setInvokeJson] = useState('{}');
@@ -364,7 +368,19 @@ export function YamlWorkflowDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('pipeline');
   const [selectedStep, setSelectedStep] = useState(0);
 
+  // ── YAML editing state ──────────────────────────────────────
+  const [yamlDraft, setYamlDraft] = useState('');
+  const [yamlEditing, setYamlEditing] = useState(false);
+  const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ── LLM assistance state ────────────────────────────────────
+  const [assistInput, setAssistInput] = useState('');
+  const [assistQuestion, setAssistQuestion] = useState<string | null>(null);
+  const { data: assistData, isFetching: assistFetching, error: assistError } = useInsightQuery(assistQuestion);
+
+  useEffect(() => {
+    if (wf?.yaml_content) setYamlDraft(wf.yaml_content);
+  }, [wf?.id, wf?.yaml_content]);
 
   useEffect(() => {
     if (wf?.input_schema) {
@@ -413,6 +429,22 @@ export function YamlWorkflowDetailPage() {
     if (!confirm('Re-generate from the source execution? This will overwrite the current definition.')) return;
     await regenerateMutation.mutateAsync({ id: wf.id }); refetch();
   };
+  const handleSaveYaml = async () => {
+    await updateMutation.mutateAsync({ id: wf.id, yaml_content: yamlDraft });
+    setYamlEditing(false);
+    refetch();
+  };
+  const handleCancelEdit = () => {
+    setYamlDraft(wf.yaml_content);
+    setYamlEditing(false);
+  };
+  const handleAssistSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assistInput.trim()) return;
+    // Prefix the question with YAML context so the LLM has full picture
+    const context = `I'm editing a HotMesh YAML workflow pipeline named "${wf.name}" (app_id: ${wf.app_id}, topic: ${wf.graph_topic}). Here is the current YAML definition:\n\n\`\`\`yaml\n${yamlDraft}\n\`\`\`\n\nQuestion: ${assistInput.trim()}`;
+    setAssistQuestion(context);
+  };
   const handleInvoke = async () => {
     setInvokeResult(null);
     try {
@@ -433,6 +465,7 @@ export function YamlWorkflowDetailPage() {
   };
 
   const isActive = wf.status === 'active';
+  const canEditYaml = wf.status === 'draft';
 
   const tabs: { key: Tab; label: string; show: boolean }[] = [
     { key: 'pipeline', label: 'Pipeline', show: true },
@@ -517,10 +550,112 @@ export function YamlWorkflowDetailPage() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-text-primary mb-3">YAML Definition</h3>
-                <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre max-h-[600px] overflow-y-auto">
-                  {wf.yaml_content}
-                </pre>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-text-primary">YAML Definition</h3>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-accent hover:underline flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      YAML Guide
+                    </a>
+                    {canEditYaml && !yamlEditing && (
+                      <button
+                        onClick={() => { setYamlEditing(true); setTimeout(() => yamlTextareaRef.current?.focus(), 50); }}
+                        className="text-[10px] text-accent hover:underline"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {yamlEditing && (
+                      <>
+                        <button onClick={handleCancelEdit} className="text-[10px] text-text-tertiary hover:text-text-primary">
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveYaml}
+                          disabled={updateMutation.isPending || yamlDraft === wf.yaml_content}
+                          className="text-[10px] text-accent hover:underline disabled:opacity-40 disabled:no-underline"
+                        >
+                          {updateMutation.isPending ? 'Saving...' : 'Save'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {updateMutation.error && (
+                  <p className="text-xs text-status-error mb-2">{updateMutation.error.message}</p>
+                )}
+
+                {yamlEditing ? (
+                  <textarea
+                    ref={yamlTextareaRef}
+                    value={yamlDraft}
+                    onChange={(e) => setYamlDraft(e.target.value)}
+                    className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-y"
+                    rows={Math.max(20, yamlDraft.split('\n').length + 2)}
+                    spellCheck={false}
+                  />
+                ) : (
+                  <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre max-h-[600px] overflow-y-auto">
+                    {wf.yaml_content}
+                  </pre>
+                )}
+              </div>
+
+              {/* ── LLM Assistance ───────────────────────────── */}
+              <div className="border-t border-surface-border pt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-accent/60">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </span>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                    Pipeline Assistant
+                  </p>
+                </div>
+                <p className="text-xs text-text-tertiary mb-3">
+                  Ask how to modify this pipeline — add conditionals, parallel branches, new activities, or refine mappings.
+                </p>
+                <form onSubmit={handleAssistSubmit} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={assistInput}
+                    onChange={(e) => setAssistInput(e.target.value)}
+                    placeholder="e.g. How do I add a conditional branch after step 2?"
+                    className="input text-xs py-1.5 px-3 flex-1"
+                    disabled={assistFetching}
+                  />
+                  <button
+                    type="submit"
+                    disabled={assistFetching || !assistInput.trim()}
+                    className="btn-primary text-[11px] px-3 py-1.5 disabled:opacity-40"
+                  >
+                    {assistFetching ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block w-3 h-3 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
+                        Thinking...
+                      </span>
+                    ) : 'Ask'}
+                  </button>
+                </form>
+
+                {assistError && !assistFetching && (
+                  <div className="mt-3 p-3 rounded-lg bg-status-error/10">
+                    <p className="text-xs text-status-error">{assistError.message}</p>
+                  </div>
+                )}
+
+                {assistData && !assistFetching && (
+                  <InsightResultCard result={assistData} />
+                )}
               </div>
             </div>
           )}

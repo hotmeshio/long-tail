@@ -7,6 +7,7 @@ const yaml = require('js-yaml');
 
 import { postgres_options } from '../../modules/config';
 import { loggerRegistry } from '../logger';
+import * as namespaceService from '../namespace';
 import * as yamlDb from './db';
 
 /** Cache of HotMesh engine instances keyed by appId */
@@ -66,6 +67,9 @@ export async function deployAppId(
   appId: string,
   version: string,
 ): Promise<HotMeshManifest> {
+  // Auto-register the namespace so it appears in the UI
+  await namespaceService.registerNamespace(appId);
+
   const mergedYaml = await buildMergedYaml(appId, version);
   const engine = await getEngine(appId);
   const manifest = await engine.deploy(mergedYaml);

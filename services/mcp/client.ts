@@ -38,6 +38,43 @@ export async function connectToServer(server: LTMcpServerRecord): Promise<Client
     return clients.get(server.id)!;
   }
 
+  // Built-in servers use InMemoryTransport via their registered factory
+  if ((server.transport_config as any)?.builtin) {
+    // Find matching factory by server name
+    for (const [name, factory] of builtinFactories) {
+      if (server.name === name || name.includes(server.name) || server.name.includes(name)) {
+        // Reuse existing client if factory was already connected
+        if (clients.has(name)) {
+          clients.set(server.id, clients.get(name)!);
+          await mcpDbService.updateMcpServerStatus(server.id, 'connected');
+          return clients.get(name)!;
+        }
+
+        const srv = await factory();
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await srv.connect(serverTransport);
+
+        const client = new Client({ name: `builtin-${name}`, version: '1.0.0' });
+        await client.connect(clientTransport);
+        clients.set(name, client);
+        clients.set(server.id, client);
+
+        // Cache the tool manifest
+        const { tools } = await client.listTools();
+        const manifest: LTMcpToolManifest[] = tools.map((t: any) => ({
+          name: t.name,
+          description: t.description || '',
+          inputSchema: t.inputSchema || {},
+        }));
+
+        await mcpDbService.updateMcpServerStatus(server.id, 'connected', manifest);
+        loggerRegistry.info(`[lt-mcp:client] connected builtin server: ${name} (${manifest.length} tools)`);
+        return client;
+      }
+    }
+    throw new Error(`No builtin factory registered for server: ${server.name}`);
+  }
+
   const client = new Client({ name: 'long-tail', version: '1.0.0' });
 
   let transport: any;

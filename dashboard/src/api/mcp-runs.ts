@@ -27,6 +27,13 @@ export function useMcpRuns(filters: McpRunFilters = {}) {
   });
 }
 
+export function useMcpEntities(appId = 'longtail') {
+  return useQuery<{ entities: string[] }>({
+    queryKey: ['mcpEntities', appId],
+    queryFn: () => apiFetch(`/mcp-runs/entities?app_id=${appId}`),
+  });
+}
+
 export function useMcpRunExecution(jobId: string, appId = 'longtail') {
   return useQuery<WorkflowExecution>({
     queryKey: ['mcpRunExecution', jobId, appId],

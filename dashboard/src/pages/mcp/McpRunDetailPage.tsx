@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useMcpRunExecution } from '../../api/mcp-runs';
 import { useSettings } from '../../api/settings';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -53,11 +53,13 @@ function ActivityNode({
   pairEvent,
   isLast,
   traceUrl,
+  namespace = 'longtail',
 }: {
   event: WorkflowExecutionEvent;
   pairEvent?: WorkflowExecutionEvent;
   isLast: boolean;
   traceUrl?: string | null;
+  namespace?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -93,7 +95,7 @@ function ActivityNode({
 
           {isChildLink && (
             <Link
-              to={`/mcp/runs/${encodeURIComponent(childWorkflowId)}`}
+              to={`/mcp/runs/${encodeURIComponent(childWorkflowId)}?namespace=${namespace}`}
               className="text-[10px] text-accent hover:underline"
               title="View child execution"
             >
@@ -211,7 +213,9 @@ function Section({
 
 export function McpRunDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
-  const { data: execution, isLoading, error } = useMcpRunExecution(jobId!);
+  const [searchParams] = useSearchParams();
+  const namespace = searchParams.get('namespace') || 'longtail';
+  const { data: execution, isLoading, error } = useMcpRunExecution(jobId!, namespace);
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
 
@@ -229,7 +233,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Pipeline Run" backTo="/mcp/runs" backLabel="Pipeline Runs" />
+        <PageHeader title="Pipeline Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Pipeline Runs" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -251,7 +255,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Run" backTo="/mcp/runs" backLabel="Pipeline Runs" />
+      <PageHeader title="Pipeline Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Pipeline Runs" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
@@ -316,6 +320,7 @@ export function McpRunDetailPage() {
                   pairEvent={node.pair}
                   isLast={i === dagEvents.length - 1}
                   traceUrl={traceUrl}
+                  namespace={namespace}
                 />
               ))}
             </div>

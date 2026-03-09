@@ -47,7 +47,7 @@ export async function createWorkflowServer(options?: {
 }): Promise<McpServer> {
   if (server) return server;
 
-  const name = options?.name || 'long-tail-mcp-workflows';
+  const name = options?.name || 'mcp-workflows-longtail';
   server = new McpServer({ name, version: '1.0.0' });
 
   // ── list_workflows ──────────────────────────────────────────────────

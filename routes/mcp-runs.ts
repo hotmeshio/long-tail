@@ -17,6 +17,37 @@ const router = Router();
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 /**
+ * GET /api/mcp-runs/entities
+ * Return distinct entity (pipeline) names from {appId}.jobs.
+ */
+router.get('/entities', async (req, res) => {
+  try {
+    const rawAppId = req.query.app_id as string;
+    if (!rawAppId) {
+      res.status(400).json({ error: 'app_id query parameter is required' });
+      return;
+    }
+
+    const appId = sanitizeAppId(rawAppId);
+    const schema = quoteSchema(appId);
+    const pool = getPool();
+
+    const { rows } = await pool.query(
+      `SELECT DISTINCT entity FROM ${schema}.jobs ORDER BY entity`,
+    );
+
+    res.json({ entities: rows.map((r: any) => r.entity) });
+  } catch (err: any) {
+    // Schema may not exist yet
+    if (err.message?.includes('does not exist')) {
+      res.json({ entities: [] });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/mcp-runs
  * List jobs from {appId}.jobs for a given app_id.
  */
