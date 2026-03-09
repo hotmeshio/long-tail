@@ -152,7 +152,7 @@ export function RolesPage() {
   return (
     <div>
       <PageHeader
-        title="Roles"
+        title="RBAC | Roles"
         actions={
           <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
             Add Role

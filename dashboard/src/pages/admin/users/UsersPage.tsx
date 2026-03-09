@@ -121,7 +121,7 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="Users"
+        title="RBAC | Users"
         actions={
           <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
             Add User

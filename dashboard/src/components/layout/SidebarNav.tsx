@@ -57,16 +57,21 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
 
   const open = expanded || isChildActive;
 
-  // Collapsed: render group icon as a direct link to first child
+  // Collapsed: render each sub-item individually
   if (collapsed) {
     return (
-      <NavLink
-        to={group.items[0]?.to ?? '#'}
-        className={getLinkClass(true)}
-        title={group.label}
-      >
-        {group.icon && <group.icon className="w-5 h-5 shrink-0 text-accent-muted" strokeWidth={1.5} />}
-      </NavLink>
+      <>
+        {group.items.map((sub) => (
+          <NavLink
+            key={sub.to}
+            to={sub.to}
+            className={getLinkClass(true)}
+            title={sub.label}
+          >
+            {sub.icon && <sub.icon className="w-5 h-5 shrink-0 text-accent-muted" strokeWidth={1.5} />}
+          </NavLink>
+        ))}
+      </>
     );
   }
 
@@ -112,7 +117,20 @@ export function SidebarNav({ heading, headingTo, entries }: SidebarNavProps) {
   return (
     <div className="space-y-1">
       {collapsed ? (
-        <div className="h-px bg-surface-border mx-3 my-2" />
+        headingTo ? (
+          <NavLink
+            to={headingTo}
+            end
+            className={({ isActive }) =>
+              `block h-px mx-3 my-2 transition-colors duration-150 ${
+                isActive ? 'bg-accent' : 'bg-surface-border hover:bg-text-tertiary'
+              }`
+            }
+            title={heading}
+          />
+        ) : (
+          <div className="h-px bg-surface-border mx-3 my-2" />
+        )
       ) : headingTo ? (
         <NavLink
           to={headingTo}

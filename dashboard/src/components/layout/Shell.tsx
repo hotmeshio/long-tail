@@ -27,7 +27,7 @@ function ShellLayout() {
           } shrink-0 bg-surface-raised border-r border-surface-border flex flex-col transition-[width] duration-200 ease-out overflow-hidden relative z-20`}
         >
           {/* Nav */}
-          <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto overflow-x-hidden">
+          <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
             <ProcessesSidebar />
             <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}

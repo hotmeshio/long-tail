@@ -17,7 +17,7 @@ const entries: NavEntry[] = [
     items: [
       { to: '/admin/users', label: 'Users', icon: Users },
       { to: '/admin/roles', label: 'Roles', icon: Tag },
-      { to: '/admin/escalation-chains', label: 'Escalation Chains', icon: Link },
+      { to: '/admin/escalation-chains', label: 'Escalations', icon: Link },
     ],
   },
   { to: '/admin/config', label: 'Workflow Configs', icon: Settings },

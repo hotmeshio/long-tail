@@ -216,33 +216,6 @@ export function McpOverview() {
           </p>
         </div>
       )}
-
-      {/* Server quick links */}
-      <div className="grid grid-cols-2 gap-4">
-        <Link
-          to="/mcp/pipelines"
-          className="p-6 rounded-lg border border-surface-border/50 hover:border-accent/30 transition-colors group"
-        >
-          <p className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
-            Pipelines
-          </p>
-          <p className="text-xs text-text-tertiary mt-1">
-            Configure and manage MCP pipelines
-          </p>
-        </Link>
-
-        <Link
-          to="/mcp/servers"
-          className="p-6 rounded-lg border border-surface-border/50 hover:border-accent/30 transition-colors group"
-        >
-          <p className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
-            Servers
-          </p>
-          <p className="text-xs text-text-tertiary mt-1">
-            {serversLoading ? 'Loading...' : `${connectedServers} of ${servers.length} connected`}
-          </p>
-        </Link>
-      </div>
     </div>
   );
 }

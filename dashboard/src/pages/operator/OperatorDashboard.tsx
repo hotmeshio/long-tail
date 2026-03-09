@@ -10,7 +10,7 @@ import { DataTable, type Column } from '../../components/common/DataTable';
 import { PageHeader } from '../../components/common/PageHeader';
 import { StickyPagination } from '../../components/common/StickyPagination';
 import { RowAction, RowActionGroup } from '../../components/common/RowActions';
-import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar } from './escalation-columns';
+import { ESCALATION_COLUMNS, CLAIMED_STATUS_COLUMN, TIME_LEFT_COLUMN, EscalationFilterBar } from './escalation-columns';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function OperatorDashboard() {
@@ -64,8 +64,9 @@ export function OperatorDashboard() {
     className: 'w-16 text-right',
   };
 
-  // Base columns + time-left before the created_at column + actions
+  // Status icon + base columns + time-left before the created_at column + actions
   const columns: Column<LTEscalationRecord>[] = [
+    CLAIMED_STATUS_COLUMN,
     ...ESCALATION_COLUMNS.slice(0, -1),
     TIME_LEFT_COLUMN,
     ESCALATION_COLUMNS[ESCALATION_COLUMNS.length - 1],

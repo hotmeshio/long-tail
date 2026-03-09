@@ -58,7 +58,7 @@ export function EscalationChainsPage() {
 
   return (
     <div>
-      <PageHeader title="Escalation Chains" />
+      <PageHeader title="RBAC | Role Escalations" />
       <p className="text-xs text-text-secondary -mt-6 mb-8">
         Configure which roles can escalate to other roles. Superadmins can escalate to any role implicitly.
       </p>

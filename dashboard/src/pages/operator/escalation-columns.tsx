@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Circle } from 'lucide-react';
 import type { Column } from '../../components/common/DataTable';
 import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { PriorityBadge } from '../../components/common/PriorityBadge';
 import { TimeAgo } from '../../components/common/TimeAgo';
 import { CountdownTimer } from '../../components/common/CountdownTimer';
+import { isEffectivelyClaimed } from '../../lib/escalation';
 import type { LTEscalationRecord } from '../../api/types';
 
 /** Base columns shared by all escalation list pages. */
@@ -88,6 +89,31 @@ export const TIME_LEFT_COLUMN: Column<LTEscalationRecord> = {
   className: 'w-28',
 };
 
+/** Status icon column — color-coded filled circle. */
+export const STATUS_COLUMN: Column<LTEscalationRecord> = {
+  key: 'status',
+  label: '',
+  render: (row) => {
+    if (row.status === 'resolved') {
+      return <Circle className="w-2.5 h-2.5 fill-status-success text-status-success" />;
+    }
+    if (isEffectivelyClaimed(row)) {
+      return <Circle className="w-2.5 h-2.5 fill-status-warning text-status-warning" />;
+    }
+    // pending (unclaimed)
+    return <Circle className="w-2.5 h-2.5 fill-text-tertiary text-text-tertiary" />;
+  },
+  className: 'w-8',
+};
+
+/** Claimed-only status icon (always orange). */
+export const CLAIMED_STATUS_COLUMN: Column<LTEscalationRecord> = {
+  key: 'status',
+  label: '',
+  render: () => <Circle className="w-2.5 h-2.5 fill-status-warning text-status-warning" />,
+  className: 'w-8',
+};
+
 /** Priority filter options shared by both pages. */
 export const PRIORITY_OPTIONS = [
   { value: '1', label: 'P1' },
@@ -96,20 +122,36 @@ export const PRIORITY_OPTIONS = [
   { value: '4', label: 'P4' },
 ];
 
+/** Status filter options for the All Escalations page. */
+export const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'resolved', label: 'Resolved' },
+];
+
 /** Shared filter bar for escalation list pages. */
 export function EscalationFilterBar({
   filters,
   setFilter,
   roles,
   types,
+  showStatus = false,
 }: {
-  filters: { role: string; type: string; priority: string };
-  setFilter: (key: 'role' | 'type' | 'priority', value: string) => void;
+  filters: { role: string; type: string; priority: string; status?: string };
+  setFilter: (key: string, value: string) => void;
   roles: string[];
   types: string[];
+  showStatus?: boolean;
 }) {
   return (
     <FilterBar>
+      {showStatus && (
+        <FilterSelect
+          label="Status"
+          value={filters.status ?? ''}
+          onChange={(v) => setFilter('status', v)}
+          options={STATUS_OPTIONS}
+        />
+      )}
       <FilterSelect
         label="Role"
         value={filters.role}

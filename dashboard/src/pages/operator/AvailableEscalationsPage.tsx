@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useEscalationListEvents } from '../../hooks/useNatsEvents';
 import { useToast } from '../../hooks/useToast';
 import {
-  useAvailableEscalations,
+  useEscalations,
   useEscalationTypes,
   useClaimEscalation,
   useSetEscalationPriority,
@@ -24,7 +24,7 @@ import { BulkAssignModal } from '../../components/common/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/BulkTriageModal';
 import { CLAIM_DURATION_OPTIONS } from '../../lib/constants';
 import { Lock } from 'lucide-react';
-import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
+import { ESCALATION_COLUMNS, STATUS_COLUMN, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/RowActions';
 import type { LTEscalationRecord } from '../../api/types';
 
@@ -34,7 +34,7 @@ export function AvailableEscalationsPage() {
   const { user, isSuperAdmin } = useAuth();
   const { addToast } = useToast();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { role: '', type: '', priority: '' },
+    filters: { role: '', type: '', priority: '', status: 'pending' },
   });
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
   const [claimDuration, setClaimDuration] = useState('30');
@@ -54,9 +54,10 @@ export function AvailableEscalationsPage() {
   // Clear selections on filter/page changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filters.role, filters.type, filters.priority, pagination.page, pagination.pageSize]);
+  }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
-  const { data, isLoading } = useAvailableEscalations({
+  const { data, isLoading } = useEscalations({
+    status: filters.status || undefined,
     role: filters.role || undefined,
     type: filters.type || undefined,
     priority: filters.priority ? parseInt(filters.priority) : undefined,
@@ -209,6 +210,7 @@ export function AvailableEscalationsPage() {
   }
 
   columns.push(
+    STATUS_COLUMN,
     ...ESCALATION_COLUMNS,
     {
       key: 'actions',
@@ -235,6 +237,7 @@ export function AvailableEscalationsPage() {
         setFilter={setFilter}
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
+        showStatus
       />
 
       {selectedIds.size > 0 && (
