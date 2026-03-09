@@ -96,8 +96,8 @@ export function ScheduledMaintenanceSection() {
             Automated pruning runs on a cron schedule. Rules execute sequentially each cycle.
           </p>
         </div>
-        <button onClick={openEdit} className="btn-secondary text-xs shrink-0">
-          Edit
+        <button onClick={openEdit} className="btn-primary text-xs shrink-0">
+          Edit Rules
         </button>
       </div>
 

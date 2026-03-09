@@ -145,7 +145,7 @@ export function WorkflowsOverview() {
             className={`px-3 py-1 text-xs rounded-full transition-colors ${
               duration === d.label
                 ? 'bg-accent text-text-inverse'
-                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-sunken'
+                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
             }`}
           >
             {d.label}

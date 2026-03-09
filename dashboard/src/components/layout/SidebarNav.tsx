@@ -24,14 +24,15 @@ export type NavEntry = NavItem | NavGroup;
 
 interface SidebarNavProps {
   heading: string;
+  headingTo?: string;
   entries: NavEntry[];
 }
 
 function getLinkClass(collapsed: boolean) {
   return ({ isActive }: { isActive: boolean }) => {
     const base = 'flex items-center rounded-md transition-colors duration-150';
-    const active = 'bg-surface-sunken text-text-primary font-medium';
-    const inactive = 'text-text-secondary hover:text-text-primary hover:bg-surface-sunken';
+    const active = 'bg-surface-hover text-text-primary font-medium';
+    const inactive = 'text-text-secondary hover:text-text-primary hover:bg-surface-hover';
 
     if (collapsed) {
       return `${base} justify-center w-10 h-10 mx-auto ${isActive ? active : inactive}`;
@@ -64,7 +65,7 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
         className={getLinkClass(true)}
         title={group.label}
       >
-        {group.icon && <group.icon className="w-5 h-5 shrink-0" />}
+        {group.icon && <group.icon className="w-5 h-5 shrink-0 text-accent-muted" strokeWidth={1.5} />}
       </NavLink>
     );
   }
@@ -73,10 +74,10 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
     <div>
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md transition-colors duration-150 text-text-secondary hover:text-text-primary hover:bg-surface-sunken"
+        className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md transition-colors duration-150 text-text-secondary hover:text-text-primary hover:bg-surface-hover"
       >
         <span className="flex items-center gap-3">
-          {group.icon && <group.icon className="w-5 h-5 shrink-0" />}
+          {group.icon && <group.icon className="w-5 h-5 shrink-0 text-accent-muted" strokeWidth={1.5} />}
           <span>{group.label}</span>
         </span>
         <svg
@@ -92,7 +93,7 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
       <Collapsible open={open}>
         {group.items.map((sub) => (
           <NavLink key={sub.to} to={sub.to} end={sub.end} className={getSubLinkClass()}>
-            {sub.icon && <sub.icon className="w-4 h-4 shrink-0" />}
+            {sub.icon && <sub.icon className="w-4 h-4 shrink-0 text-accent-muted" strokeWidth={1.5} />}
             <span>{sub.label}</span>
           </NavLink>
         ))}
@@ -105,13 +106,25 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return entry.kind === 'group';
 }
 
-export function SidebarNav({ heading, entries }: SidebarNavProps) {
+export function SidebarNav({ heading, headingTo, entries }: SidebarNavProps) {
   const { collapsed } = useSidebar();
 
   return (
     <div className="space-y-1">
       {collapsed ? (
         <div className="h-px bg-surface-border mx-3 my-2" />
+      ) : headingTo ? (
+        <NavLink
+          to={headingTo}
+          end
+          className={({ isActive }) =>
+            `block px-4 py-2 text-[10px] font-semibold uppercase tracking-widest transition-colors duration-150 ${
+              isActive ? 'text-accent' : 'text-text-tertiary hover:text-text-secondary'
+            }`
+          }
+        >
+          {heading}
+        </NavLink>
       ) : (
         <p className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
           {heading}
@@ -128,7 +141,7 @@ export function SidebarNav({ heading, entries }: SidebarNavProps) {
             className={getLinkClass(collapsed)}
             title={collapsed ? entry.label : undefined}
           >
-            {entry.icon && <entry.icon className="w-5 h-5 shrink-0" />}
+            {entry.icon && <entry.icon className="w-5 h-5 shrink-0 text-accent-muted" strokeWidth={1.5} />}
             {!collapsed && <span>{entry.label}</span>}
           </NavLink>
         ),

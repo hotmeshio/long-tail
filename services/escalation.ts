@@ -175,6 +175,29 @@ export async function getEscalationRoles(ids: string[]): Promise<string[]> {
   return rows.map((r: any) => r.role);
 }
 
+/**
+ * Release a single escalation claim back to the available pool.
+ * Only the assigned user (or superadmin via route) may release.
+ */
+export async function releaseEscalation(
+  id: string,
+  userId: string,
+): Promise<LTEscalationRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `UPDATE lt_escalations
+     SET assigned_to = NULL,
+         assigned_until = NULL,
+         claimed_at = NULL
+     WHERE id = $1
+       AND status = 'pending'
+       AND assigned_to = $2
+     RETURNING *`,
+    [id, userId],
+  );
+  return rows[0] || null;
+}
+
 export async function releaseExpiredClaims(): Promise<number> {
   const pool = getPool();
   const { rowCount } = await pool.query(
@@ -366,17 +389,26 @@ export async function getEscalationsByOriginId(
 export interface EscalationStats {
   pending: number;
   claimed: number;
-  created_1h: number;
-  created_24h: number;
-  resolved_1h: number;
-  resolved_24h: number;
+  created: number;
+  resolved: number;
   by_role: { role: string; pending: number; claimed: number }[];
+  by_type: { type: string; pending: number; claimed: number; resolved: number }[];
 }
+
+const VALID_PERIODS: Record<string, string> = {
+  '1h': '1 hour',
+  '24h': '24 hours',
+  '7d': '7 days',
+  '30d': '30 days',
+};
 
 export async function getEscalationStats(
   visibleRoles?: string[],
+  period?: string,
 ): Promise<EscalationStats> {
   const pool = getPool();
+
+  const interval = VALID_PERIODS[period ?? '24h'] ?? '24 hours';
 
   // Build optional RBAC filter
   const roleFilter = visibleRoles ? `WHERE role = ANY($1::text[])` : '';
@@ -388,10 +420,8 @@ export async function getEscalationStats(
     `SELECT
        COUNT(*) FILTER (WHERE status = 'pending') AS pending,
        COUNT(*) FILTER (WHERE status = 'pending' AND assigned_to IS NOT NULL AND assigned_until > NOW()) AS claimed,
-       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 hour') AS created_1h,
-       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS created_24h,
-       COUNT(*) FILTER (WHERE resolved_at > NOW() - INTERVAL '1 hour') AS resolved_1h,
-       COUNT(*) FILTER (WHERE resolved_at > NOW() - INTERVAL '24 hours') AS resolved_24h
+       COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '${interval}') AS created,
+       COUNT(*) FILTER (WHERE resolved_at > NOW() - INTERVAL '${interval}') AS resolved
      FROM lt_escalations ${roleFilter}`,
     params,
   );
@@ -408,17 +438,34 @@ export async function getEscalationStats(
     params,
   );
 
+  // By-type breakdown (within the time period)
+  const { rows: byType } = await pool.query(
+    `SELECT type,
+       COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+       COUNT(*) FILTER (WHERE status = 'pending' AND assigned_to IS NOT NULL AND assigned_until > NOW()) AS claimed,
+       COUNT(*) FILTER (WHERE resolved_at IS NOT NULL) AS resolved
+     FROM lt_escalations
+     WHERE created_at > NOW() - INTERVAL '${interval}' ${roleFilterAnd}
+     GROUP BY type
+     ORDER BY COUNT(*) DESC`,
+    params,
+  );
+
   return {
     pending: parseInt(totals.pending),
     claimed: parseInt(totals.claimed),
-    created_1h: parseInt(totals.created_1h),
-    created_24h: parseInt(totals.created_24h),
-    resolved_1h: parseInt(totals.resolved_1h),
-    resolved_24h: parseInt(totals.resolved_24h),
+    created: parseInt(totals.created),
+    resolved: parseInt(totals.resolved),
     by_role: byRole.map((r: any) => ({
       role: r.role,
       pending: parseInt(r.pending),
       claimed: parseInt(r.claimed),
+    })),
+    by_type: byType.map((r: any) => ({
+      type: r.type,
+      pending: parseInt(r.pending),
+      claimed: parseInt(r.claimed),
+      resolved: parseInt(r.resolved),
     })),
   };
 }
@@ -431,6 +478,17 @@ export async function listDistinctTypes(): Promise<string[]> {
   return rows.map((r: any) => r.type);
 }
 
+/** Columns allowed for user-chosen ORDER BY. */
+const SORTABLE_COLUMNS = new Set([
+  'created_at', 'updated_at', 'priority', 'resolved_at', 'role', 'type',
+]);
+
+function buildOrderBy(sortBy?: string, order?: string, fallback = 'priority ASC, created_at ASC'): string {
+  if (!sortBy || !SORTABLE_COLUMNS.has(sortBy)) return fallback;
+  const dir = order === 'asc' ? 'ASC' : 'DESC';
+  return `${sortBy} ${dir}`;
+}
+
 export async function listEscalations(filters: {
   status?: LTEscalationStatus;
   role?: string;
@@ -441,6 +499,8 @@ export async function listEscalations(filters: {
   limit?: number;
   offset?: number;
   visibleRoles?: string[];
+  sort_by?: string;
+  order?: string;
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   const pool = getPool();
   const conditions: string[] = [];
@@ -482,10 +542,12 @@ export async function listEscalations(filters: {
   const limit = filters.limit || 50;
   const offset = filters.offset || 0;
 
+  const orderBy = buildOrderBy(filters.sort_by, filters.order);
+
   const [countResult, dataResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) FROM lt_escalations ${where}`, values),
     pool.query(
-      `SELECT * FROM lt_escalations ${where} ORDER BY priority ASC, created_at ASC LIMIT $${idx++} OFFSET $${idx++}`,
+      `SELECT * FROM lt_escalations ${where} ORDER BY ${orderBy} LIMIT $${idx++} OFFSET $${idx++}`,
       [...values, limit, offset],
     ),
   ]);
@@ -507,6 +569,8 @@ export async function listAvailableEscalations(filters: {
   limit?: number;
   offset?: number;
   visibleRoles?: string[];
+  sort_by?: string;
+  order?: string;
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   const pool = getPool();
   const conditions: string[] = [
@@ -543,11 +607,13 @@ export async function listAvailableEscalations(filters: {
   const limit = filters.limit || 50;
   const offset = filters.offset || 0;
 
+  const orderBy = buildOrderBy(filters.sort_by, filters.order);
+
   const [countResult, dataResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) FROM lt_escalations ${where}`, values),
     pool.query(
       `SELECT * FROM lt_escalations ${where}
-       ORDER BY priority ASC, created_at ASC
+       ORDER BY ${orderBy}
        LIMIT $${idx++} OFFSET $${idx++}`,
       [...values, limit, offset],
     ),

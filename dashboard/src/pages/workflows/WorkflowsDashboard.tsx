@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Filter, Settings } from 'lucide-react';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
@@ -9,6 +10,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { StickyPagination } from '../../components/common/StickyPagination';
+import { RowAction, RowActionGroup } from '../../components/common/RowActions';
 import type { LTJob } from '../../api/types';
 
 const jobStatusMap: Record<string, string> = {
@@ -61,6 +63,7 @@ function buildColumns(
         </span>
       ),
       className: 'w-52',
+      sortable: true,
     },
     {
       key: 'updated_at',
@@ -71,45 +74,37 @@ function buildColumns(
         </span>
       ),
       className: 'w-52',
+      sortable: true,
     },
     {
       key: 'actions',
       label: '',
       render: (row) => (
-        <span className="flex items-center justify-end gap-2">
+        <RowActionGroup>
+          <RowAction
+            icon={Filter}
+            title={`Filter by ${row.entity}`}
+            onClick={() => onFilterEntity(row.entity)}
+          />
           <button
             onClick={(e) => { e.stopPropagation(); onFilterStatus(row.status); }}
             className="opacity-0 group-hover/row:opacity-100 transition-opacity"
             title={`Filter by ${row.status}`}
           >
-            <svg className={`w-3 h-3 ${STATUS_COLORS[row.status] ?? 'text-text-tertiary'} hover:opacity-70`} viewBox="0 0 24 24" fill="currentColor">
+            <svg className={`w-[18px] h-[18px] ${STATUS_COLORS[row.status] ?? 'text-text-tertiary'} hover:opacity-70`} viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="12" r="6" />
             </svg>
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onFilterEntity(row.entity); }}
-            className="opacity-0 group-hover/row:opacity-100 transition-opacity"
-            title={`Filter by ${row.entity}`}
-          >
-            <svg className="w-3 h-3 text-text-tertiary hover:text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-          </button>
           {isSuperAdmin && (
-            <button
-              onClick={(e) => { e.stopPropagation(); navigate(`/admin/config/${encodeURIComponent(row.entity)}`); }}
-              className="opacity-0 group-hover/row:opacity-100 transition-opacity"
+            <RowAction
+              icon={Settings}
               title="View config"
-            >
-              <svg className="w-3 h-3 text-text-tertiary hover:text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
+              onClick={() => navigate(`/admin/config/${encodeURIComponent(row.entity)}`)}
+            />
           )}
-        </span>
+        </RowActionGroup>
       ),
-      className: 'w-20 text-right',
+      className: 'w-24 text-right',
     },
   ];
 }
@@ -118,14 +113,11 @@ export function WorkflowsDashboard() {
   useWorkflowListEvents();
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
-  const { filters, setFilter, pagination } = useFilterParams({
+  const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { search: '', entity: '', status: '' },
   });
 
-  const columns = useMemo(
-    () => buildColumns((entity) => setFilter('entity', entity), (status) => setFilter('status', status), isSuperAdmin, navigate),
-    [setFilter, isSuperAdmin, navigate],
-  );
+  const columns = buildColumns((entity) => setFilter('entity', entity), (status) => setFilter('status', status), isSuperAdmin, navigate);
   const [searchInput, setSearchInput] = useState(filters.search);
 
   useEffect(() => {
@@ -140,22 +132,13 @@ export function WorkflowsDashboard() {
     entity: filters.entity || undefined,
     search: filters.search || undefined,
     status: filters.status || undefined,
+    sort_by: sort.sort_by || undefined,
+    order: sort.sort_by ? sort.order : undefined,
   });
   const { data: configs } = useWorkflowConfigs();
 
   const total = jobsData?.total ?? 0;
-
-  // Sort: running first, then by created_at desc
-  const STATUS_ORDER: Record<string, number> = { running: 0, failed: 1, completed: 2 };
-  const jobs = useMemo(() => {
-    const raw = jobsData?.jobs ?? [];
-    return [...raw].sort((a, b) => {
-      const sa = STATUS_ORDER[a.status] ?? 9;
-      const sb = STATUS_ORDER[b.status] ?? 9;
-      if (sa !== sb) return sa - sb;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [jobsData?.jobs]);
+  const jobs = jobsData?.jobs ?? [];
 
   const entities = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
 
@@ -196,6 +179,8 @@ export function WorkflowsDashboard() {
         onRowClick={(row) => navigate(`/workflows/detail/${row.workflow_id}`)}
         isLoading={isLoading}
         emptyMessage="No workflow jobs found"
+        sort={sort}
+        onSort={setSort}
       />
 
       <StickyPagination

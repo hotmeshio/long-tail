@@ -133,12 +133,40 @@ async function resolveClient(serverId: string): Promise<Client | null> {
     }
   }
 
-  // 3. Look up by name in DB — maybe the serverId is actually a name
+  // 3. Look up in DB by ID or name, then try to match a built-in factory
   try {
-    const dbServer = await mcpDbService.getMcpServerByName(serverId);
-    if (dbServer && clients.has(dbServer.id)) {
-      clients.set(serverId, clients.get(dbServer.id)!);
-      return clients.get(dbServer.id)!;
+    const dbServer =
+      (await mcpDbService.getMcpServer(serverId)) ||
+      (await mcpDbService.getMcpServerByName(serverId));
+
+    if (dbServer) {
+      // Already connected under its DB id?
+      if (clients.has(dbServer.id)) {
+        clients.set(serverId, clients.get(dbServer.id)!);
+        return clients.get(dbServer.id)!;
+      }
+
+      // Match DB server name to a built-in factory
+      for (const [name, factory] of builtinFactories) {
+        if (dbServer.name === name || name.includes(dbServer.name) || dbServer.name.includes(name)) {
+          if (clients.has(name)) {
+            clients.set(serverId, clients.get(name)!);
+            return clients.get(name)!;
+          }
+
+          const srv = await factory();
+          const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+          await srv.connect(serverTransport);
+
+          const client = new Client({ name: `builtin-${name}`, version: '1.0.0' });
+          await client.connect(clientTransport);
+          clients.set(name, client);
+          clients.set(dbServer.id, client);
+          if (serverId !== name && serverId !== dbServer.id) clients.set(serverId, client);
+          loggerRegistry.info(`[lt-mcp:client] auto-connected built-in server: ${name} (via DB id '${serverId}')`);
+          return client;
+        }
+      }
     }
   } catch {
     // DB lookup failed — not critical
@@ -214,6 +242,11 @@ export async function toolActivities(
 export async function connectAutoServers(): Promise<void> {
   const servers = await mcpDbService.getAutoConnectServers();
   for (const server of servers) {
+    // Skip built-in servers — they auto-connect lazily via resolveClient()
+    // on first tool call using InMemoryTransport, not stdio/SSE.
+    if ((server.transport_config as any)?.builtin) {
+      continue;
+    }
     try {
       await connectToServer(server);
     } catch (err: any) {

@@ -3,7 +3,7 @@ import { Client as Postgres } from 'pg';
 import { Durable, DBA } from '@hotmeshio/hotmesh';
 import type { WorkflowExecution } from '@hotmeshio/hotmesh/build/types/exporter';
 
-import { postgres_options, sleepFor, waitForEscalation } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation, waitForEscalationStatus } from '../setup';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
 import { createLTInterceptor } from '../../interceptor';
@@ -355,12 +355,12 @@ describe('workflow state export', () => {
     expect(exported.timeline).toBeDefined();
     expect(exported.transitions).toBeDefined();
 
-    // Clean up: resolve the escalation
+    // Clean up: resolve the escalation and wait for completion
     await resolveEscalation(escalations[0].id, {
       contentId: 'export-esc-1',
       approved: true,
     });
-    await sleepFor(5000);
+    await waitForEscalationStatus(escalations[0].id, 'resolved', 30_000);
   }, 60_000);
 
   it('should return consistent exports for the same workflow', async () => {

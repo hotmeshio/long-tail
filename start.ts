@@ -212,11 +212,13 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     const { createWorkflowServer } = await import('./services/mcp/workflow-server');
     const { createWorkflowCompilerServer } = await import('./services/mcp/workflow-compiler-server');
     const { createDbServer } = await import('./services/mcp/db-server');
+    const { createPlaywrightServer } = await import('./services/mcp/playwright-server');
     registerBuiltinServer('long-tail-document-vision', createVisionServer);
     registerBuiltinServer('long-tail-human-queue', createHumanQueueServer);
     registerBuiltinServer('long-tail-mcp-workflows', createWorkflowServer);
     registerBuiltinServer('long-tail-workflow-compiler', createWorkflowCompilerServer);
     registerBuiltinServer('long-tail-db', createDbServer);
+    registerBuiltinServer('long-tail-playwright', createPlaywrightServer);
 
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();

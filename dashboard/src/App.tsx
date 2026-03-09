@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
 import { NatsProvider } from './hooks/useNats';
@@ -26,9 +26,7 @@ const ProcessDetailPage = lazy(() =>
 const McpOverview = lazy(() =>
   import('./pages/mcp/McpOverview').then((m) => ({ default: m.McpOverview })),
 );
-const McpToolsPage = lazy(() =>
-  import('./pages/mcp/McpToolsPage').then((m) => ({ default: m.McpToolsPage })),
-);
+// McpToolsPage removed — tools are now inline in the Servers page
 const McpRunsPage = lazy(() =>
   import('./pages/mcp/McpRunsPage').then((m) => ({ default: m.McpRunsPage })),
 );
@@ -181,7 +179,7 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
-          { path: 'mcp/tools', element: <Lazy><McpToolsPage /></Lazy> },
+          { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
           { path: 'mcp/pipelines', element: <Lazy><YamlWorkflowsPage /></Lazy> },
           { path: 'mcp/pipelines/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },

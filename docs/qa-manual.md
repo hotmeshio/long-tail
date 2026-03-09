@@ -519,7 +519,7 @@ This is how the system avoids entropy:
  │                          │                           │
  │                          ▼                           │
  │  8. System is stronger than before                   │
- │     (new edge case? → back to step 1)               │
+ │     (new edge case? → back to step 1)                │
  │                                                      │
  └──────────────────────────────────────────────────────┘
 ```

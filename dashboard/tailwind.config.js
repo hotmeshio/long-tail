@@ -8,6 +8,7 @@ export default {
           DEFAULT: '#FFFFFF',
           raised: '#FFFFFF',
           sunken: '#F5F5F7',
+          hover: '#F4F1FB',
           border: '#E5E5EA',
         },
         text: {
@@ -20,6 +21,7 @@ export default {
           DEFAULT: '#6C47FF',
           hover: '#5835DB',
           muted: '#C8BEF0',
+          faint: '#E8E2F8',
         },
         status: {
           active: '#2563EB',

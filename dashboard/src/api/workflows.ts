@@ -46,6 +46,8 @@ export function useJobs(filters: {
   entity?: string;
   search?: string;
   status?: string;
+  sort_by?: string;
+  order?: string;
 }) {
   const params = new URLSearchParams();
   if (filters.limit) params.set('limit', String(filters.limit));
@@ -53,6 +55,8 @@ export function useJobs(filters: {
   if (filters.entity) params.set('entity', filters.entity);
   if (filters.search) params.set('search', filters.search);
   if (filters.status) params.set('status', filters.status);
+  if (filters.sort_by) params.set('sort_by', filters.sort_by);
+  if (filters.order) params.set('order', filters.order);
 
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['jobs', filters],

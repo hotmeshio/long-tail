@@ -354,6 +354,101 @@ export async function listProcesses(filters: {
   };
 }
 
+export interface ProcessStats {
+  total: number;
+  active: number;
+  completed: number;
+  escalated: number;
+  by_workflow_type: {
+    workflow_type: string;
+    total: number;
+    active: number;
+    completed: number;
+    escalated: number;
+  }[];
+}
+
+const VALID_PERIODS: Record<string, string> = {
+  '1h': '1 hour',
+  '24h': '24 hours',
+  '7d': '7 days',
+  '30d': '30 days',
+};
+
+export async function getProcessStats(
+  period?: string,
+): Promise<ProcessStats> {
+  const pool = getPool();
+
+  const interval = VALID_PERIODS[period ?? '24h'] ?? '24 hours';
+
+  // Aggregate process summaries within the time window
+  const { rows } = await pool.query(`
+    WITH process_stats AS (
+      SELECT
+        origin_id,
+        COUNT(*)::int AS task_count,
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
+        COUNT(*) FILTER (WHERE status = 'needs_intervention')::int AS escalated_count
+      FROM lt_tasks
+      WHERE origin_id IS NOT NULL
+        AND created_at > NOW() - INTERVAL '${interval}'
+      GROUP BY origin_id
+    )
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE completed_count = task_count AND task_count > 0)::int AS completed,
+      COUNT(*) FILTER (WHERE escalated_count > 0)::int AS escalated,
+      COUNT(*) FILTER (
+        WHERE completed_count < task_count
+          AND escalated_count = 0
+      )::int AS active
+    FROM process_stats
+  `);
+
+  const totals = rows[0];
+
+  // By workflow type (most active types in the period)
+  const { rows: byType } = await pool.query(`
+    WITH task_window AS (
+      SELECT
+        origin_id,
+        workflow_type,
+        status
+      FROM lt_tasks
+      WHERE origin_id IS NOT NULL
+        AND created_at > NOW() - INTERVAL '${interval}'
+    ),
+    per_origin AS (
+      SELECT
+        origin_id,
+        COUNT(*)::int AS task_count,
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
+        COUNT(*) FILTER (WHERE status = 'needs_intervention')::int AS escalated_count,
+        (array_agg(DISTINCT workflow_type))[1] AS primary_workflow_type
+      FROM task_window
+      GROUP BY origin_id
+    )
+    SELECT
+      primary_workflow_type AS workflow_type,
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE completed_count < task_count AND escalated_count = 0)::int AS active,
+      COUNT(*) FILTER (WHERE completed_count = task_count AND task_count > 0)::int AS completed,
+      COUNT(*) FILTER (WHERE escalated_count > 0)::int AS escalated
+    FROM per_origin
+    GROUP BY primary_workflow_type
+    ORDER BY COUNT(*) DESC
+  `);
+
+  return {
+    total: totals.total,
+    active: totals.active,
+    completed: totals.completed,
+    escalated: totals.escalated,
+    by_workflow_type: byType,
+  };
+}
+
 export async function getProcessTasks(
   originId: string,
 ): Promise<LTTaskRecord[]> {

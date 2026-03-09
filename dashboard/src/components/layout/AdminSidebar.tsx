@@ -1,5 +1,4 @@
 import {
-  LayoutDashboard,
   Shield,
   Users,
   Link,
@@ -10,7 +9,6 @@ import {
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 const entries: NavEntry[] = [
-  { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
   {
     kind: 'group',
     label: 'RBAC',
@@ -27,5 +25,5 @@ const entries: NavEntry[] = [
 ];
 
 export function AdminSidebar() {
-  return <SidebarNav heading="Admin" entries={entries} />;
+  return <SidebarNav heading="Admin" headingTo="/admin" entries={entries} />;
 }

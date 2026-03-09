@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor, waitForEscalationByOriginId } from '../setup';
+import { postgres_options, sleepFor, waitForEscalationByOriginId, waitForEscalationStatus } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { createMcpTestClient, parseMcpResult, type McpTestContext } from '../setup/mcp';
@@ -61,14 +61,17 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     await migrate();
 
     // Seed MCP server record so getAvailableTools() finds vision tools
-    const visionServer = await mcpDbService.createMcpServer({
-      name: 'long-tail-document-vision',
-      description: 'Document vision tools for page analysis and manipulation',
-      transport_type: 'stdio',
-      transport_config: { command: 'builtin' },
-      auto_connect: false,
-      metadata: { category: 'document_processing', builtin: true },
-    });
+    let visionServer = await mcpDbService.getMcpServerByName('long-tail-document-vision');
+    if (!visionServer) {
+      visionServer = await mcpDbService.createMcpServer({
+        name: 'long-tail-document-vision',
+        description: 'Document vision tools for page analysis and manipulation',
+        transport_type: 'stdio',
+        transport_config: { command: 'builtin' },
+        auto_connect: false,
+        metadata: { category: 'document_processing', builtin: true },
+      });
+    }
     await mcpDbService.updateMcpServerStatus(visionServer.id, 'connected', [
       { name: 'list_document_pages', description: 'List available document page images from storage.', inputSchema: { type: 'object', properties: {} } },
       { name: 'extract_member_info', description: 'Extract member information from a document page image using OpenAI Vision.', inputSchema: { type: 'object', properties: { image_ref: { type: 'string' }, page_number: { type: 'integer' } }, required: ['image_ref', 'page_number'] } },
@@ -195,7 +198,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    await mcpCtx.cleanup();
+    await mcpCtx?.cleanup();
     escalationStrategyRegistry.clear();
     await stopVisionServer();
     Durable.clearInterceptors();
@@ -259,34 +262,43 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       notes: 'Page 1 appears to be scanned upside down. Cannot read member ID or address.',
     });
 
-    // 5. Wait for triage to rotate documents + re-invoke + complete.
+    // 5. Poll until triage rotates documents + re-invokes + completes.
     // This involves multiple OpenAI calls (triage LLM loop + Vision on re-run).
-    await sleepFor(45_000);
+    const resolvedEsc = await waitForEscalationStatus(esc.id, 'resolved', 120_000, 3_000);
+    expect(resolvedEsc.resolver_payload).toBeTruthy();
+    const resolvedPayload = typeof resolvedEsc.resolver_payload === 'string'
+      ? JSON.parse(resolvedEsc.resolver_payload)
+      : resolvedEsc.resolver_payload;
+    expect(resolvedPayload._lt.triaged).toBe(true);
 
-    // 6. Verify the original escalation was resolved
+    // 6. Verify via MCP protocol
     const checkResolved = await mcpCtx.client.callTool({
       name: 'check_resolution',
       arguments: { escalation_id: esc.id },
     });
     const resolvedData = parseMcpResult(checkResolved);
     expect(resolvedData.status).toBe('resolved');
-    expect(resolvedData.resolver_payload._lt.triaged).toBe(true);
 
-    // 7. Verify task chain shows triage workflow ran
-    const { tasks } = await taskService.listTasks({ limit: 100 });
-    const triageTasks = tasks.filter(t =>
-      t.workflow_type === 'mcpTriageOrchestrator' ||
-      t.workflow_type === 'mcpTriage',
-    );
+    // 7. Poll until triage task and re-invoked processClaim appear
+    const taskDeadline = Date.now() + 60_000;
+    let triageTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
+    let claimTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
+    while (Date.now() < taskDeadline) {
+      const { tasks } = await taskService.listTasks({ limit: 100 });
+      triageTasks = tasks.filter(t =>
+        t.workflow_type === 'mcpTriageOrchestrator' ||
+        t.workflow_type === 'mcpTriage',
+      );
+      claimTasks = tasks.filter(t =>
+        t.workflow_type === 'processClaim' &&
+        t.created_at > esc.created_at,
+      );
+      if (triageTasks.length >= 1 && claimTasks.length >= 1) break;
+      await sleepFor(3_000);
+    }
     expect(triageTasks.length).toBeGreaterThanOrEqual(1);
-
-    // 8. Verify a re-invoked processClaim exists (from triage Phase 2)
-    const claimTasks = tasks.filter(t =>
-      t.workflow_type === 'processClaim' &&
-      t.created_at > esc.created_at,
-    );
     expect(claimTasks.length).toBeGreaterThanOrEqual(1);
-  }, 180_000);
+  }, 240_000);
 
   // ── Test 2: Standard re-run when needsTriage is not set ────────────────
 
@@ -325,7 +337,8 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       analysis: { confidence: 0.95, flags: [], summary: 'Manually verified.' },
     });
 
-    await sleepFor(10_000);
+    // Poll until resolved
+    await waitForEscalationStatus(esc.id, 'resolved', 60_000, 2_000);
 
     // Verify the escalation is resolved via standard path
     const checkResolved = await mcpCtx.client.callTool({
@@ -337,7 +350,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     // No triage marker — this was a standard re-run
     expect(resolvedData.resolver_payload._lt).toBeUndefined();
-  }, 90_000);
+  }, 120_000);
 
   // ── Test 3: Happy path with readable documents (no escalation) ─────────
 
@@ -362,13 +375,16 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       expire: 300,
     });
 
-    // Wait for workflow to complete (no escalation expected)
-    await sleepFor(15_000);
-
-    // Verify the claim task completed successfully
-    const { tasks } = await taskService.listTasks({ origin_id: workflowId, limit: 10 });
-    const claimTask = tasks.find(t => t.workflow_type === 'processClaim');
+    // Poll until the processClaim child task completes (no escalation expected)
+    const deadline = Date.now() + 60_000;
+    let claimTask: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'][0] | undefined;
+    while (Date.now() < deadline) {
+      const { tasks } = await taskService.listTasks({ origin_id: workflowId, limit: 10 });
+      claimTask = tasks.find(t => t.workflow_type === 'processClaim' && t.status === 'completed');
+      if (claimTask) break;
+      await sleepFor(2_000);
+    }
     expect(claimTask).toBeTruthy();
     expect(claimTask!.status).toBe('completed');
-  }, 60_000);
+  }, 90_000);
 });

@@ -7,6 +7,7 @@ import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
 import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
 import { PageHeader } from '../../components/common/PageHeader';
+import { Collapsible } from '../../components/common/Collapsible';
 import { ConvertToYamlModal } from '../../components/common/ConvertToYamlModal';
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
@@ -35,15 +36,20 @@ function CollapsibleSection({
         onClick={() => onToggle(sectionKey)}
         className="flex items-center gap-3 w-full group/section"
       >
-        <span className="text-xl font-light text-text-tertiary/40 group-hover/section:text-text-tertiary transition-colors select-none w-6 text-center shrink-0">
-          {isCollapsed ? '+' : '\u2212'}
-        </span>
-        <span className={`text-xs font-semibold uppercase tracking-widest ${isCollapsed ? 'text-text-tertiary' : 'text-text-secondary'}`}>
+        <svg
+          className={`w-4 h-4 shrink-0 text-text-tertiary/40 group-hover/section:text-text-tertiary transition-all duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-200 ${isCollapsed ? 'text-text-tertiary' : 'text-text-secondary'}`}>
           {title}
         </span>
         <span className="flex-1 border-b border-surface-border" />
       </button>
-      {!isCollapsed && <div className="mt-4 ml-9">{children}</div>}
+      <Collapsible open={!isCollapsed}>
+        <div className="mt-4 ml-9">{children}</div>
+      </Collapsible>
     </div>
   );
 }

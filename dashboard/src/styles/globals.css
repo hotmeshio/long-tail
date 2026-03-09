@@ -20,12 +20,17 @@
 
   .btn-secondary {
     @apply px-5 py-2.5 bg-surface-raised border border-surface-border rounded-md text-sm font-medium
-           text-text-primary hover:bg-surface-sunken transition-colors duration-150;
+           text-text-primary hover:bg-surface-hover transition-colors duration-150;
   }
 
   .btn-ghost {
     @apply px-4 py-2.5 rounded-md text-sm font-medium text-text-secondary
-           hover:bg-surface-sunken transition-colors duration-150;
+           hover:bg-surface-hover transition-colors duration-150;
+  }
+
+  /* Centralized row hover — lavender tint instead of pure gray */
+  .row-hover {
+    @apply transition-colors duration-100 hover:bg-surface-hover;
   }
 
   .input {

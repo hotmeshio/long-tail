@@ -99,6 +99,31 @@ export function useTaskByWorkflowId(workflowId: string) {
   });
 }
 
+// ── Process stats ────────────────────────────────────────────────
+
+export interface ProcessStats {
+  total: number;
+  active: number;
+  completed: number;
+  escalated: number;
+  by_workflow_type: {
+    workflow_type: string;
+    total: number;
+    active: number;
+    completed: number;
+    escalated: number;
+  }[];
+}
+
+export function useProcessStats(period?: string) {
+  const params = period ? `?period=${period}` : '';
+  return useQuery<ProcessStats>({
+    queryKey: ['processStats', period],
+    queryFn: () => apiFetch(`/tasks/processes/stats${params}`),
+    refetchInterval: 10_000,
+  });
+}
+
 // ── Process hooks ─────────────────────────────────────────────────
 
 export function useProcesses(filters?: {

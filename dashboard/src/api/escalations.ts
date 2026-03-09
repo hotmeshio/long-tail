@@ -16,22 +16,24 @@ interface EscalationFilters {
   priority?: number;
   limit?: number;
   offset?: number;
+  sort_by?: string;
+  order?: string;
 }
 
-interface EscalationStats {
+export interface EscalationStats {
   pending: number;
   claimed: number;
-  created_1h: number;
-  created_24h: number;
-  resolved_1h: number;
-  resolved_24h: number;
+  created: number;
+  resolved: number;
   by_role: { role: string; pending: number; claimed: number }[];
+  by_type: { type: string; pending: number; claimed: number; resolved: number }[];
 }
 
-export function useEscalationStats() {
+export function useEscalationStats(period?: string) {
+  const params = period ? `?period=${period}` : '';
   return useQuery<EscalationStats>({
-    queryKey: ['escalationStats'],
-    queryFn: () => apiFetch('/escalations/stats'),
+    queryKey: ['escalationStats', period],
+    queryFn: () => apiFetch(`/escalations/stats${params}`),
     refetchInterval: 10_000,
   });
 }
@@ -53,6 +55,8 @@ export function useEscalations(filters: EscalationFilters) {
   if (filters.priority) params.set('priority', String(filters.priority));
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
+  if (filters.sort_by) params.set('sort_by', filters.sort_by);
+  if (filters.order) params.set('order', filters.order);
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', filters],
@@ -69,6 +73,8 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
   if (filters.priority) params.set('priority', String(filters.priority));
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
+  if (filters.sort_by) params.set('sort_by', filters.sort_by);
+  if (filters.order) params.set('order', filters.order);
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', 'available', filters],
@@ -101,6 +107,18 @@ export function useClaimEscalation() {
         method: 'POST',
         body: JSON.stringify({ durationMinutes }),
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+    },
+  });
+}
+
+export function useReleaseEscalation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/escalations/${id}/release`, { method: 'POST' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });

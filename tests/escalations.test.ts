@@ -103,10 +103,8 @@ describe('Escalation service', () => {
       // 5 pending (3 reviewer + 2 engineer), 1 resolved
       expect(stats.pending).toBeGreaterThanOrEqual(5);
       expect(stats.claimed).toBeGreaterThanOrEqual(1);
-      expect(stats.created_24h).toBeGreaterThanOrEqual(6);
-      expect(stats.created_1h).toBeGreaterThanOrEqual(6);
-      expect(stats.resolved_24h).toBeGreaterThanOrEqual(1);
-      expect(stats.resolved_1h).toBeGreaterThanOrEqual(1);
+      expect(stats.created).toBeGreaterThanOrEqual(6);
+      expect(stats.resolved).toBeGreaterThanOrEqual(1);
 
       // by_role breakdown
       expect(stats.by_role.length).toBeGreaterThanOrEqual(2);
@@ -114,6 +112,9 @@ describe('Escalation service', () => {
       expect(reviewer).toBeTruthy();
       expect(reviewer!.pending).toBeGreaterThanOrEqual(3);
       expect(reviewer!.claimed).toBeGreaterThanOrEqual(1);
+
+      // by_type breakdown
+      expect(stats.by_type.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should scope stats by visible roles', async () => {
@@ -133,11 +134,22 @@ describe('Escalation service', () => {
 
       expect(stats.pending).toBe(0);
       expect(stats.claimed).toBe(0);
-      expect(stats.created_1h).toBe(0);
-      expect(stats.created_24h).toBe(0);
-      expect(stats.resolved_1h).toBe(0);
-      expect(stats.resolved_24h).toBe(0);
+      expect(stats.created).toBe(0);
+      expect(stats.resolved).toBe(0);
       expect(stats.by_role).toHaveLength(0);
+      expect(stats.by_type).toHaveLength(0);
+    });
+
+    it('should accept period parameter', async () => {
+      const stats1h = await escalationService.getEscalationStats(undefined, '1h');
+      expect(stats1h.created).toBeGreaterThanOrEqual(0);
+      expect(stats1h.resolved).toBeGreaterThanOrEqual(0);
+
+      const stats7d = await escalationService.getEscalationStats(undefined, '7d');
+      expect(stats7d.created).toBeGreaterThanOrEqual(stats1h.created);
+
+      const stats30d = await escalationService.getEscalationStats(undefined, '30d');
+      expect(stats30d.created).toBeGreaterThanOrEqual(stats7d.created);
     });
   });
 

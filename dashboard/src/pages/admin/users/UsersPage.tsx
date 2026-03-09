@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Pencil, Shield, Trash2 } from 'lucide-react';
 import { useUsers, useDeleteUser } from '../../../api/users';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/DataTable';
@@ -7,6 +8,7 @@ import { StickyPagination } from '../../../components/common/StickyPagination';
 import { FilterBar, FilterSelect } from '../../../components/common/FilterBar';
 import { TimeAgo } from '../../../components/common/TimeAgo';
 import { ConfirmDeleteModal } from '../../../components/common/ConfirmDeleteModal';
+import { RowAction, RowActionGroup } from '../../../components/common/RowActions';
 import type { LTUserRecord } from '../../../api/types';
 import { PageHeader } from '../../../components/common/PageHeader';
 import { CreateUserModal } from './CreateUserModal';
@@ -86,37 +88,26 @@ export function UsersPage() {
       key: 'actions',
       label: '',
       render: (row) => (
-        <div className="flex gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditingUser(row);
-            }}
-            className="text-xs text-accent hover:underline"
-          >
-            Edit
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setRolesUser(row);
-            }}
-            className="text-xs text-accent hover:underline"
-          >
-            Roles
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmDelete(row);
-            }}
-            className="text-xs text-status-error hover:underline"
-          >
-            Delete
-          </button>
-        </div>
+        <RowActionGroup>
+          <RowAction
+            icon={Pencil}
+            title="Edit user"
+            onClick={() => setEditingUser(row)}
+          />
+          <RowAction
+            icon={Shield}
+            title="Manage roles"
+            onClick={() => setRolesUser(row)}
+          />
+          <RowAction
+            icon={Trash2}
+            title="Delete user"
+            onClick={() => setConfirmDelete(row)}
+            colorClass="text-text-tertiary hover:text-status-error"
+          />
+        </RowActionGroup>
       ),
-      className: 'w-40 text-right',
+      className: 'w-24 text-right',
     },
   ];
 

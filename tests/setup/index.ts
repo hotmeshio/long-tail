@@ -96,3 +96,43 @@ export async function waitForEscalationByOriginId(
   }
   throw new Error(`No escalation found for origin ${originId} within ${timeoutMs}ms`);
 }
+
+/**
+ * Poll until an escalation reaches the expected status (default: 'resolved').
+ */
+export async function waitForEscalationStatus(
+  escalationId: string,
+  status = 'resolved',
+  timeoutMs = 30_000,
+  intervalMs = 1_000,
+): Promise<import('../../types').LTEscalationRecord> {
+  const { getEscalation } = await import('../../services/escalation');
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const esc = await getEscalation(escalationId);
+    if (esc && esc.status === status) return esc;
+    await sleepFor(intervalMs);
+  }
+  throw new Error(`Escalation ${escalationId} did not reach status "${status}" within ${timeoutMs}ms`);
+}
+
+/**
+ * Poll until a task reaches the expected status (default: 'completed').
+ */
+export async function waitForTaskStatus(
+  taskIdOrWorkflowId: string,
+  status = 'completed',
+  timeoutMs = 30_000,
+  intervalMs = 1_000,
+): Promise<import('../../types').LTTaskRecord> {
+  const { getTask, getTaskByWorkflowId } = await import('../../services/task');
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    // Try by task ID first, then by workflow ID
+    let task = await getTask(taskIdOrWorkflowId);
+    if (!task) task = await getTaskByWorkflowId(taskIdOrWorkflowId);
+    if (task && task.status === status) return task;
+    await sleepFor(intervalMs);
+  }
+  throw new Error(`Task ${taskIdOrWorkflowId} did not reach status "${status}" within ${timeoutMs}ms`);
+}

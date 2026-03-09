@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor } from '../setup';
+import { postgres_options, sleepFor, waitForEscalationByOriginId } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
@@ -450,15 +450,9 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
         expire: 300,
       });
 
-      // Wait for the pipeline to reach the escalation point
+      // Poll until the pipeline reaches the escalation point
       // (topLevel → subOrchA completes → subOrchB starts → leafB1,B2 complete → leafB3 escalates)
-      await sleepFor(20_000);
-
-      // Find the pending escalation from leafB3
-      const { escalations } = await escalationService.listEscalations({
-        status: 'pending',
-        type: 'leafB3',
-      });
+      const escalations = await waitForEscalationByOriginId(topOrchWorkflowId, 60_000, 2_000);
       const esc = escalations.find((e) =>
         e.description?.includes('Hierarchy test escalation'),
       );

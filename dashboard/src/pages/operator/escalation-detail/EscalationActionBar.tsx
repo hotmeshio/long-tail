@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Collapsible } from '../../../components/common/Collapsible';
 import { CountdownTimer } from '../../../components/common/CountdownTimer';
+import { UserName } from '../../../components/common/UserName';
 import { CLAIM_DURATION_OPTIONS } from '../../../lib/constants';
 
 // ---------------------------------------------------------------------------
@@ -120,7 +121,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
         {mode === 'claimed_by_other' && (
           <div className="flex items-center gap-4" data-testid="claimed-other-bar">
             <p className="text-sm text-text-secondary">
-              Claimed by <span className="font-mono">{assignedTo}</span>
+              Claimed by <span className="font-medium text-text-primary">{assignedTo ? <UserName userId={assignedTo} /> : 'unknown'}</span>
             </p>
             {assignedUntil && <CountdownTimer until={assignedUntil} />}
           </div>

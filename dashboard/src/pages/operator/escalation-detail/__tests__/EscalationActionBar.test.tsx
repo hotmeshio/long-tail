@@ -1,6 +1,15 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi } from 'vitest';
 import { EscalationActionBar, type EscalationActionBarProps } from '../EscalationActionBar';
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+
+function withProviders(ui: React.ReactElement) {
+  return <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>;
+}
 
 function makeProps(overrides: Partial<EscalationActionBarProps> = {}): EscalationActionBarProps {
   return {
@@ -84,12 +93,14 @@ describe('EscalationActionBar', () => {
 
   // ── Claimed by other ──
   it('renders claimed-by-other bar', () => {
-    render(<EscalationActionBar {...makeProps({
+    render(withProviders(<EscalationActionBar {...makeProps({
       mode: 'claimed_by_other',
       assignedTo: 'user-abc',
-    })} />);
+    })} />));
     expect(screen.getByTestId('claimed-other-bar')).toBeInTheDocument();
-    expect(screen.getByText('user-abc')).toBeInTheDocument();
+    // UserName shows truncated ID while loading
+    expect(screen.getByText('Claimed by')).toBeInTheDocument();
+    expect(screen.getByText('user-abc…')).toBeInTheDocument();
   });
 
   // ── Claimed by me: resolve ──

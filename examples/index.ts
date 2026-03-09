@@ -404,6 +404,15 @@ const VISION_TOOLS = [
   },
 ];
 
+const DB_QUERY_TOOLS = [
+  { name: 'find_tasks', description: 'Search tasks by status, workflow type, or origin.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'find_escalations', description: 'Search escalations by status, role, type, or priority.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_process_summary', description: 'Aggregate process view grouped by origin_id.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_escalation_stats', description: 'Real-time escalation statistics.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_workflow_types', description: 'List registered workflow configurations.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_system_health', description: 'Overall system health snapshot.', inputSchema: { type: 'object', properties: {} } },
+];
+
 const TELEMETRY_TOOLS = [
   {
     name: 'query_trace',
@@ -526,6 +535,14 @@ const WORKFLOW_COMPILER_TOOLS = [
 
 const SEED_MCP_SERVERS = [
   {
+    name: 'long-tail-db-query',
+    description: 'Read-only query tools for tasks, escalations, processes, and system health. Used by triage workflows to gather context before making decisions.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: DB_QUERY_TOOLS,
+    metadata: { builtin: true, category: 'database' },
+  },
+  {
     name: 'long-tail-human-queue',
     description: 'Built-in escalation and human queue management. Exposes the escalation API as MCP tools for AI agents and remediation workflows.',
     transport_type: 'stdio',
@@ -565,6 +582,23 @@ const SEED_MCP_SERVERS = [
     tool_manifest: TELEMETRY_TOOLS,
     metadata: { builtin: true, category: 'telemetry' },
   },
+  {
+    name: 'long-tail-playwright',
+    description: 'Browser automation via Playwright. Navigate pages, take screenshots, click elements, fill forms, run JavaScript. Used for QA capture, visual regression, and documentation.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: [
+      { name: 'navigate', description: 'Open a URL in a new browser page.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' } }, required: ['url'] } },
+      { name: 'screenshot', description: 'Capture a screenshot and save as PNG.', inputSchema: { type: 'object', properties: { path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
+      { name: 'click', description: 'Click an element by CSS selector.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector'] } },
+      { name: 'fill', description: 'Type a value into an input field.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector', 'value'] } },
+      { name: 'wait_for', description: 'Wait for an element to appear on the page.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' }, timeout: { type: 'number' } }, required: ['selector'] } },
+      { name: 'evaluate', description: 'Evaluate JavaScript in the page context.', inputSchema: { type: 'object', properties: { script: { type: 'string' }, page_id: { type: 'string' } }, required: ['script'] } },
+      { name: 'list_pages', description: 'List all open browser pages.', inputSchema: { type: 'object', properties: {} } },
+      { name: 'close_page', description: 'Close a browser page by ID.', inputSchema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
+    ],
+    metadata: { builtin: true, category: 'browser-automation' },
+  },
 ];
 
 async function seedMcpServers(): Promise<void> {
@@ -577,6 +611,8 @@ async function seedMcpServers(): Promise<void> {
          VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, NOW())
          ON CONFLICT (name) DO UPDATE SET
            tool_manifest = EXCLUDED.tool_manifest,
+           metadata = EXCLUDED.metadata,
+           description = EXCLUDED.description,
            status = 'connected',
            last_connected_at = NOW()`,
         [

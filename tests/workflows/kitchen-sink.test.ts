@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor, waitForEscalation } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation, waitForEscalationStatus } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
@@ -125,9 +125,8 @@ describe('kitchenSink workflow', () => {
     expect(escalations[0].description).toContain('Kitchen sink');
 
     await resolveEscalation(escalations[0].id, { approved: true });
-    await sleepFor(8000);
 
-    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
-    expect(resolvedEsc!.status).toBe('resolved');
-  }, 60_000);
+    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 30_000);
+    expect(resolvedEsc.status).toBe('resolved');
+  }, 90_000);
 });

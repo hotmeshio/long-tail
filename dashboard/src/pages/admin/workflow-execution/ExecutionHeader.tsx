@@ -96,7 +96,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setActionsOpen(!actionsOpen)}
-              className="btn-secondary text-xs"
+              className="btn-primary text-xs"
             >
               Actions
             </button>
@@ -107,7 +107,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                     onAction('restart');
                     setActionsOpen(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-sunken"
+                  className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
                 >
                   Restart Workflow
                 </button>
@@ -117,7 +117,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                       onAction('terminate');
                       setActionsOpen(false);
                     }}
-                    className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-sunken"
+                    className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
                   >
                     Terminate
                   </button>
@@ -128,7 +128,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                       onAction('convert_yaml');
                       setActionsOpen(false);
                     }}
-                    className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-sunken"
+                    className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
                   >
                     Convert to Pipeline
                   </button>

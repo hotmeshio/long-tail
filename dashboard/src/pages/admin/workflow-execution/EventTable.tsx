@@ -180,7 +180,7 @@ export function EventTable({ events, childTasks }: EventTableProps) {
               >
                 {/* Row header */}
                 <div
-                  className="px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-surface-sunken transition-colors duration-200"
+                  className="px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-surface-hover transition-colors duration-200"
                   onClick={() => toggleEvent(evt.event_id)}
                 >
                   {/* Expand chevron */}
