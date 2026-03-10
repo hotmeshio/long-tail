@@ -21,7 +21,7 @@ const LLM_MAX_INPUT_CHARS = 12_000;
  * Compact input data for LLM consumption: truncate large arrays and
  * strip fields that are unhelpful for summarization (ids, trace data).
  */
-function compactForLlm(input: Record<string, unknown>): Record<string, unknown> {
+export function compactForLlm(input: Record<string, unknown>): Record<string, unknown> {
   const omitKeys = new Set(['trace_id', 'span_id', 'resolved_at']);
   const compact = (val: unknown): unknown => {
     if (Array.isArray(val)) {

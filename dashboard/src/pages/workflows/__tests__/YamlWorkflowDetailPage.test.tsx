@@ -30,6 +30,8 @@ import {
   useDeleteYamlWorkflow,
   useRegenerateYamlWorkflow,
   useUpdateYamlWorkflow,
+  useYamlWorkflowVersions,
+  useYamlWorkflowVersion,
 } from '../../../api/yaml-workflows';
 
 // ── Fixtures ──────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ const draftWorkflow = {
     },
   },
   output_schema: { type: 'object' },
+  content_version: 2,
   source_workflow_id: 'triage-123',
   created_at: '2026-03-09T00:00:00Z',
 };
@@ -74,13 +77,37 @@ const draftWorkflow = {
 const activeWorkflow = { ...draftWorkflow, id: 'wf-2', status: 'active' };
 const archivedWorkflow = { ...draftWorkflow, id: 'wf-3', status: 'archived' };
 
+const versionsFixture = {
+  versions: [
+    {
+      id: 'ver-2', workflow_id: 'wf-1', version: 2,
+      yaml_content: 'app:\n  id: lt-yaml\n  version: "1"\n',
+      activity_manifest: draftWorkflow.activity_manifest,
+      input_schema: draftWorkflow.input_schema,
+      output_schema: draftWorkflow.output_schema,
+      change_summary: 'Added validation step',
+      created_at: '2026-03-09T01:00:00Z',
+    },
+    {
+      id: 'ver-1', workflow_id: 'wf-1', version: 1,
+      yaml_content: 'app:\n  id: lt-yaml\n  version: "0"\n',
+      activity_manifest: [draftWorkflow.activity_manifest[0]],
+      input_schema: { type: 'object', properties: { image_ref: { type: 'string' } } },
+      output_schema: { type: 'object' },
+      change_summary: 'Initial export',
+      created_at: '2026-03-09T00:00:00Z',
+    },
+  ],
+  total: 2,
+};
+
 // ── Helpers ───────────────────────────────────────────────────────
 
-function renderPage(wfId = 'wf-1') {
+function renderPage(wfId = 'wf-1', queryString = '') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[`/mcp/workflows/${wfId}`]}>
+      <MemoryRouter initialEntries={[`/mcp/workflows/${wfId}${queryString}`]}>
         <Routes>
           <Route path="/mcp/workflows/:id" element={<YamlWorkflowDetailPage />} />
         </Routes>
@@ -306,5 +333,83 @@ describe('YamlWorkflowDetailPage', () => {
     fireEvent.click(invokeElements[invokeElements.length - 1]);
     fireEvent.click(screen.getByText('JSON view'));
     expect(screen.getByText('Form view')).toBeInTheDocument();
+  });
+
+  // ── Version browsing ──
+
+  it('shows Version History sidebar when multiple versions exist', () => {
+    vi.mocked(useYamlWorkflowVersions).mockReturnValue({
+      data: versionsFixture,
+    } as any);
+    renderPage();
+    expect(screen.getByText('Version History')).toBeInTheDocument();
+    expect(screen.getAllByText(/^v[12]$/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('(current)')).toBeInTheDocument();
+  });
+
+  it('does NOT show Version History when only one version exists', () => {
+    vi.mocked(useYamlWorkflowVersions).mockReturnValue({
+      data: { versions: [versionsFixture.versions[0]], total: 1 },
+    } as any);
+    renderPage();
+    expect(screen.queryByText('Version History')).not.toBeInTheDocument();
+  });
+
+  it('shows history banner with "Back to current" when viewing old version', () => {
+    vi.mocked(useYamlWorkflowVersions).mockReturnValue({
+      data: versionsFixture,
+    } as any);
+    vi.mocked(useYamlWorkflowVersion).mockReturnValue({
+      data: versionsFixture.versions[1], // version 1
+    } as any);
+    renderPage('wf-1', '?version=1');
+    expect(screen.getByText(/Viewing version/)).toBeInTheDocument();
+    expect(screen.getByText('(read-only)')).toBeInTheDocument();
+    expect(screen.getByText('Back to current')).toBeInTheDocument();
+  });
+
+  it('hides Edit button when viewing a historical version', () => {
+    vi.mocked(useYamlWorkflowVersions).mockReturnValue({
+      data: versionsFixture,
+    } as any);
+    vi.mocked(useYamlWorkflowVersion).mockReturnValue({
+      data: versionsFixture.versions[1],
+    } as any);
+    renderPage('wf-1', '?version=1');
+    fireEvent.click(screen.getByText('Config'));
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+  });
+
+  it('hides Invoke tab when viewing a historical version (even for active workflows)', () => {
+    // Without history: active workflow has both header Invoke button AND Invoke tab
+    setupMocks(activeWorkflow as any);
+    const { unmount } = renderPage('wf-2');
+    const invokeCountNormal = screen.getAllByText('Invoke').length;
+    unmount();
+
+    // With history: Invoke tab is hidden, only header button remains
+    setupMocks(activeWorkflow as any);
+    vi.mocked(useYamlWorkflowVersions).mockReturnValue({
+      data: versionsFixture,
+    } as any);
+    vi.mocked(useYamlWorkflowVersion).mockReturnValue({
+      data: versionsFixture.versions[1],
+    } as any);
+    renderPage('wf-2', '?version=1');
+    const invokeCountHistory = screen.getAllByText('Invoke').length;
+    expect(invokeCountHistory).toBeLessThan(invokeCountNormal);
+  });
+
+  it('uses version snapshot data for Config tab when viewing history', () => {
+    vi.mocked(useYamlWorkflowVersions).mockReturnValue({
+      data: versionsFixture,
+    } as any);
+    vi.mocked(useYamlWorkflowVersion).mockReturnValue({
+      data: versionsFixture.versions[1], // version 1 with old YAML
+    } as any);
+    renderPage('wf-1', '?version=1');
+    fireEvent.click(screen.getByText('Config'));
+    // The version 1 YAML has version: "0"
+    expect(screen.getByText(/version: "0"/)).toBeInTheDocument();
   });
 });

@@ -12,7 +12,7 @@ import type {
 } from '@hotmeshio/hotmesh/build/types/exporter';
 
 /** Cap `limit` in tool arguments to avoid sending huge payloads to downstream LLM steps. */
-function capToolArguments(args: Record<string, unknown>): Record<string, unknown> {
+export function capToolArguments(args: Record<string, unknown>): Record<string, unknown> {
   const capped = { ...args };
   if (typeof capped.limit === 'number' && capped.limit > 25) {
     capped.limit = 25;
