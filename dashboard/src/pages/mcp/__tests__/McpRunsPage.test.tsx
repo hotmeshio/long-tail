@@ -69,7 +69,7 @@ function findFilterSelect(labelText: string): HTMLSelectElement | null {
 describe('McpRunsPage', () => {
   it('renders page header', () => {
     render(<McpRunsPage />, { wrapper });
-    expect(screen.getByText('MCP Workflow Runs')).toBeInTheDocument();
+    expect(screen.getByText('Runs')).toBeInTheDocument();
   });
 
   it('renders job rows with entity', () => {
@@ -99,7 +99,7 @@ describe('McpRunsPage', () => {
   it('shows empty message when no jobs', () => {
     vi.mocked(useMcpRuns).mockReturnValue({ data: { jobs: [], total: 0 }, isLoading: false } as any);
     render(<McpRunsPage />, { wrapper });
-    expect(screen.getByText('No workflow server runs found')).toBeInTheDocument();
+    expect(screen.getByText('No runs found')).toBeInTheDocument();
   });
 
   it('includes URL entity param in filter options even if not from API', () => {

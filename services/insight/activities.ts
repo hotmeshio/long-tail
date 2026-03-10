@@ -86,18 +86,43 @@ export async function callDbTool(
 }
 
 /**
+ * Shared OpenAI client — reuses HTTP connections across calls.
+ */
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openai;
+}
+
+export interface CallLLMOptions {
+  tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
+  max_tokens?: number;
+  response_format?: { type: 'json_object' | 'text' };
+}
+
+/**
  * Call the LLM (OpenAI) with messages and optional tool definitions.
  * Returns the assistant message (content + tool_calls).
  */
 export async function callLLM(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-  tools?: OpenAI.Chat.Completions.ChatCompletionTool[],
+  toolsOrOptions?: OpenAI.Chat.Completions.ChatCompletionTool[] | CallLLMOptions,
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Support legacy (tools array) and new (options object) signatures
+  const opts: CallLLMOptions = Array.isArray(toolsOrOptions)
+    ? { tools: toolsOrOptions }
+    : (toolsOrOptions || {});
+
+  const openai = getOpenAI();
+  const t0 = Date.now();
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     messages,
-    ...(tools?.length ? { tools } : {}),
+    ...(opts.tools?.length ? { tools: opts.tools } : {}),
+    ...(opts.response_format ? { response_format: opts.response_format } : {}),
+    max_tokens: opts.max_tokens ?? (opts.tools?.length ? undefined : 1500),
   });
+  const usage = response.usage;
+  console.log(`[callLLM] ${Date.now() - t0}ms | in=${usage?.prompt_tokens} out=${usage?.completion_tokens} total=${usage?.total_tokens}`);
   return response.choices[0].message;
 }

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useProcessStats } from '../../api/tasks';
 import { useProcessListEvents } from '../../hooks/useNatsEvents';
 import { PageHeader } from '../../components/common/PageHeader';
-import { InsightSearch } from '../../components/insight/InsightSearch';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -194,9 +193,6 @@ export function ProcessesOverview() {
           </p>
         </div>
       )}
-
-      {/* Insight search */}
-      <InsightSearch />
     </div>
   );
 }

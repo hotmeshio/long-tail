@@ -11,15 +11,6 @@ vi.mock('../../../hooks/useNatsEvents', () => ({
   useProcessListEvents: vi.fn(),
 }));
 
-vi.mock('../../../api/insight', () => ({
-  useInsightQuery: () => ({
-    data: null,
-    isFetching: false,
-    error: null,
-  }),
-  useLastInsightQuestion: () => null,
-}));
-
 import { ProcessesOverview } from '../ProcessesOverview';
 import { useProcessStats } from '../../../api/tasks';
 

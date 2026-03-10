@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus } from './types';
+import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus, LTYamlWorkflowVersion } from './types';
 
 interface YamlWorkflowListResponse {
   workflows: LTYamlWorkflowRecord[];
@@ -38,10 +38,14 @@ export function useYamlWorkflowAppIds() {
   });
 }
 
-export function useYamlWorkflowByTopic(graphTopic: string | undefined) {
+export function useYamlWorkflowByTopic(graphTopic: string | undefined, appId?: string) {
   return useQuery<YamlWorkflowListResponse>({
-    queryKey: ['yamlWorkflows', 'byTopic', graphTopic],
-    queryFn: () => apiFetch(`/yaml-workflows?graph_topic=${encodeURIComponent(graphTopic!)}&limit=1`),
+    queryKey: ['yamlWorkflows', 'byTopic', graphTopic, appId],
+    queryFn: () => {
+      const params = new URLSearchParams({ graph_topic: graphTopic!, limit: '1' });
+      if (appId) params.set('app_id', appId);
+      return apiFetch(`/yaml-workflows?${params}`);
+    },
     enabled: !!graphTopic,
   });
 }
@@ -167,5 +171,23 @@ export function useDeleteYamlWorkflow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
     },
+  });
+}
+
+// ── Version history ─────────────────────────────────────────────
+
+export function useYamlWorkflowVersions(id: string) {
+  return useQuery<{ versions: LTYamlWorkflowVersion[]; total: number }>({
+    queryKey: ['yamlWorkflows', id, 'versions'],
+    queryFn: () => apiFetch(`/yaml-workflows/${id}/versions`),
+    enabled: !!id,
+  });
+}
+
+export function useYamlWorkflowVersion(id: string, version: number | null) {
+  return useQuery<LTYamlWorkflowVersion>({
+    queryKey: ['yamlWorkflows', id, 'versions', version],
+    queryFn: () => apiFetch(`/yaml-workflows/${id}/versions/${version}`),
+    enabled: !!id && version !== null,
   });
 }

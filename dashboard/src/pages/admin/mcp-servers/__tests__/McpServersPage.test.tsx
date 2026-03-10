@@ -81,12 +81,12 @@ beforeEach(() => {
 describe('McpServersPage', () => {
   it('renders page header', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('MCP Servers')).toBeInTheDocument();
+    expect(screen.getByText('Server Tools')).toBeInTheDocument();
   });
 
   it('renders tagline', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText(/Prebuilt, user-registered, and external/)).toBeInTheDocument();
+    expect(screen.getByText(/Built-in, user-registered, and external MCP servers/)).toBeInTheDocument();
   });
 
   it('renders all server rows', () => {

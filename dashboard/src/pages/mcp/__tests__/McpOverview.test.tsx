@@ -15,10 +15,15 @@ vi.mock('../../../api/namespaces', () => ({
   useNamespaces: vi.fn(),
 }));
 
+vi.mock('../../../api/yaml-workflows', () => ({
+  useYamlWorkflows: vi.fn(),
+}));
+
 import { McpOverview } from '../McpOverview';
 import { useMcpRuns } from '../../../api/mcp-runs';
 import { useMcpServers } from '../../../api/mcp';
 import { useNamespaces } from '../../../api/namespaces';
+import { useYamlWorkflows } from '../../../api/yaml-workflows';
 
 const now = Date.now();
 const recent = new Date(now - 3_600_000 / 2).toISOString(); // 30 min ago
@@ -36,8 +41,8 @@ const mockRuns = {
 
 const mockServers = {
   servers: [
-    { name: 's1', status: 'connected', tool_manifest: [{ name: 't1' }, { name: 't2' }] },
-    { name: 's2', status: 'disconnected', tool_manifest: [] },
+    { id: 's1', name: 's1', status: 'connected', tool_manifest: [{ name: 't1' }, { name: 't2' }], updated_at: recent },
+    { id: 's2', name: 's2', status: 'disconnected', tool_manifest: [], updated_at: old },
   ],
 };
 
@@ -58,13 +63,14 @@ describe('McpOverview', () => {
     vi.mocked(useMcpRuns).mockReturnValue({ data: mockRuns } as any);
     vi.mocked(useMcpServers).mockReturnValue({ data: mockServers, isLoading: false } as any);
     vi.mocked(useNamespaces).mockReturnValue({ data: { namespaces: [{ name: 'longtail', is_default: true }] } } as any);
+    vi.mocked(useYamlWorkflows).mockReturnValue({ data: { workflows: [], total: 0 }, isLoading: false } as any);
   });
 
   // ── Header & Duration tabs ──
 
   it('renders header and duration tabs', () => {
     renderPage();
-    expect(screen.getByText('MCP')).toBeInTheDocument();
+    expect(screen.getByText('Durable MCP')).toBeInTheDocument();
     expect(screen.getByText('1h')).toBeInTheDocument();
     expect(screen.getByText('24h')).toBeInTheDocument();
     expect(screen.getByText('7d')).toBeInTheDocument();
@@ -73,7 +79,15 @@ describe('McpOverview', () => {
 
   it('shows server and tool counts in header', () => {
     renderPage();
-    expect(screen.getByText(/1 server · 2 tools/)).toBeInTheDocument();
+    expect(screen.getByText(/2 servers · 2 tools/)).toBeInTheDocument();
+  });
+
+  // ── Section headings ──
+
+  it('renders All Servers and Recent Runs section headings', () => {
+    renderPage();
+    expect(screen.getByText('All Servers')).toBeInTheDocument();
+    expect(screen.getByText('Recent Runs')).toBeInTheDocument();
   });
 
   // ── Summary cards (default 24h → 3 recent runs) ──
@@ -103,11 +117,11 @@ describe('McpOverview', () => {
     expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
   });
 
-  // ── By-pipeline table ──
+  // ── By-pipeline table (now "Tool" column) ──
 
   it('renders by-pipeline breakdown', () => {
     renderPage();
-    expect(screen.getByText('Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Tool')).toBeInTheDocument();
     expect(screen.getByText('vision-pipeline')).toBeInTheDocument();
     expect(screen.getByText('triage-pipeline')).toBeInTheDocument();
   });
@@ -142,7 +156,7 @@ describe('McpOverview', () => {
 
   it('shows server and tool info', () => {
     renderPage();
-    expect(screen.getByText(/1 server · 2 tools/)).toBeInTheDocument();
+    expect(screen.getByText(/2 servers · 2 tools/)).toBeInTheDocument();
   });
 
   // ── Loading state ──

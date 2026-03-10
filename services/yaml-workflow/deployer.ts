@@ -73,7 +73,8 @@ export async function deployAppId(
   const mergedYaml = await buildMergedYaml(appId, version);
   const engine = await getEngine(appId);
   const manifest = await engine.deploy(mergedYaml);
-  loggerRegistry.info(`[yaml-workflow] deployed ${appId} v${version} (merged)`);
+  await engine.activate(version);
+  loggerRegistry.info(`[yaml-workflow] deployed+activated ${appId} v${version} (merged)`);
   return manifest;
 }
 

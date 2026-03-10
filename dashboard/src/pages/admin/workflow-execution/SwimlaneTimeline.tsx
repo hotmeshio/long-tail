@@ -4,6 +4,15 @@ import type { WorkflowExecutionEvent, LTTaskRecord } from '../../../api/types';
 import { EventDetailPanel } from './EventDetailPanel';
 import { formatDuration } from './utils';
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Truncate a string in the middle, keeping the start and end visible. */
+function middleTruncate(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  const keep = Math.floor((maxLen - 1) / 2);
+  return `${str.slice(0, keep)}…${str.slice(str.length - keep)}`;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Segment {
@@ -278,7 +287,7 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
 
       {/* Time axis */}
       <div className="flex">
-        <div className="w-40 shrink-0" />
+        <div className="w-56 shrink-0" />
         <div className="flex-1 relative h-6 border-b border-surface-border">
           {ticks.map((tick) => (
             <span
@@ -301,13 +310,13 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
           <div key={`${lane.category}:${lane.name}`}>
             {/* Lane row */}
             <div className="flex items-center border-b border-surface-border">
-              <div className="w-40 shrink-0 py-3 pr-4 flex items-center gap-2">
+              <div className="w-56 shrink-0 py-3 pr-4 flex items-center gap-2">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${catColor?.bar ?? 'bg-text-tertiary'}`} />
                 <p
-                  className="text-xs font-mono text-text-secondary truncate"
+                  className="text-xs font-mono text-text-secondary whitespace-nowrap overflow-hidden"
                   title={lane.name}
                 >
-                  {lane.name}
+                  {middleTruncate(lane.name, 28)}
                 </p>
                 {MCP_ACTIVITY_NAMES.has(lane.name) && (
                   <span className="shrink-0 text-accent/60" title="MCP tool interaction">

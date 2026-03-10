@@ -12,6 +12,8 @@ vi.mock('../../../api/yaml-workflows', () => ({
   useDeleteYamlWorkflow: vi.fn(),
   useRegenerateYamlWorkflow: vi.fn(),
   useUpdateYamlWorkflow: vi.fn(),
+  useYamlWorkflowVersions: vi.fn(() => ({ data: null })),
+  useYamlWorkflowVersion: vi.fn(() => ({ data: null })),
 }));
 
 vi.mock('../../../api/settings', () => ({
@@ -252,10 +254,10 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText('Deploy')).toBeInTheDocument();
   });
 
-  it('shows Activate button for deployed status', () => {
+  it('treats deployed status as active (deploy auto-activates)', () => {
     setupMocks({ ...draftWorkflow, status: 'deployed' } as any);
     renderPage();
-    expect(screen.getByText('Activate')).toBeInTheDocument();
+    expect(screen.getByText('Archive')).toBeInTheDocument();
   });
 
   it('shows Archive button for active status', () => {
@@ -264,9 +266,9 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText('Archive')).toBeInTheDocument();
   });
 
-  it('shows Delete workflow server link for draft status', () => {
+  it('shows Delete workflow tool link for draft status', () => {
     renderPage();
-    expect(screen.getByText('Delete workflow server')).toBeInTheDocument();
+    expect(screen.getByText('Delete workflow tool')).toBeInTheDocument();
   });
 
   it('shows Regenerate button when source workflow exists', () => {
@@ -279,7 +281,7 @@ describe('YamlWorkflowDetailPage', () => {
   it('shows Invoke tab only for active workflows', () => {
     setupMocks(activeWorkflow as any);
     renderPage('wf-2');
-    expect(screen.getByText('Invoke')).toBeInTheDocument();
+    expect(screen.getAllByText('Invoke').length).toBeGreaterThanOrEqual(1);
   });
 
   it('does not show Invoke tab for draft workflows', () => {
@@ -290,16 +292,18 @@ describe('YamlWorkflowDetailPage', () => {
   it('renders input form with schema fields on Invoke tab', () => {
     setupMocks(activeWorkflow as any);
     renderPage('wf-2');
-    fireEvent.click(screen.getByText('Invoke'));
+    // Click the tab (not the header button)
+    const invokeElements = screen.getAllByText('Invoke');
+    fireEvent.click(invokeElements[invokeElements.length - 1]);
     expect(screen.getByText('image_ref')).toBeInTheDocument();
     expect(screen.getByText('degrees')).toBeInTheDocument();
-    expect(screen.getByText('Run Pipeline')).toBeInTheDocument();
   });
 
   it('can toggle between form and JSON view', () => {
     setupMocks(activeWorkflow as any);
     renderPage('wf-2');
-    fireEvent.click(screen.getByText('Invoke'));
+    const invokeElements = screen.getAllByText('Invoke');
+    fireEvent.click(invokeElements[invokeElements.length - 1]);
     fireEvent.click(screen.getByText('JSON view'));
     expect(screen.getByText('Form view')).toBeInTheDocument();
   });

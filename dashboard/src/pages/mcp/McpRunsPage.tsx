@@ -118,7 +118,7 @@ export function McpRunsPage() {
 
   return (
     <div>
-      <PageHeader title="MCP Workflow Runs" />
+      <PageHeader title="Runs" />
 
       <FilterBar>
         <FilterSelect
@@ -161,7 +161,7 @@ export function McpRunsPage() {
         keyFn={(row) => row.workflow_id}
         onRowClick={(row) => navigate(`/mcp/runs/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
         isLoading={isLoading}
-        emptyMessage="No workflow server runs found"
+        emptyMessage="No runs found"
       />
 
       <StickyPagination

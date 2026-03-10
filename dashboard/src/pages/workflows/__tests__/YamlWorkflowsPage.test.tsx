@@ -76,12 +76,12 @@ beforeEach(() => {
 describe('YamlWorkflowsPage', () => {
   it('renders page header', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText('MCP Workflow Servers')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Workflow Tools' })).toBeInTheDocument();
   });
 
   it('renders description text', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText(/MCP Workflow Servers and Tools are generated/)).toBeInTheDocument();
+    expect(screen.getByText(/Compiled from successful triage runs/)).toBeInTheDocument();
   });
 
   it('groups workflows by app_id as server rows', () => {
@@ -114,7 +114,7 @@ describe('YamlWorkflowsPage', () => {
       isLoading: false,
     } as any);
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText('No workflow servers found')).toBeInTheDocument();
+    expect(screen.getByText('No workflow tools found')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {

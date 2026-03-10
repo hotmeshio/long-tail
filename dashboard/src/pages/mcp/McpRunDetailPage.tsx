@@ -75,7 +75,7 @@ export function McpRunDetailPage() {
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
   const workflowTopic = execution?.workflow_name || execution?.workflow_type;
-  const { data: yamlMatch } = useYamlWorkflowByTopic(workflowTopic);
+  const { data: yamlMatch } = useYamlWorkflowByTopic(workflowTopic, namespace);
   const sourceWorkflow = yamlMatch?.workflows?.[0];
 
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
@@ -92,7 +92,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Workflow Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Workflow Runs" />
+        <PageHeader title="Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Runs" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -122,7 +122,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Workflow Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Workflow Runs" />
+      <PageHeader title="Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Runs" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
@@ -177,7 +177,7 @@ export function McpRunDetailPage() {
             )}
           </div>
           <div className="flex items-center gap-5">
-            <Stat label="Workers" value={summary.activities.user} />
+            <Stat label="Tools" value={summary.activities.user} />
             <Stat label="System" value={summary.activities.system} muted />
             {summary.child_workflows.total > 0 && (
               <Stat label="Children" value={summary.child_workflows.total} />
@@ -192,22 +192,18 @@ export function McpRunDetailPage() {
       {/* ── Sections ────────────────────────────────────── */}
       <div className="space-y-6">
         {/* Details: Input + Result */}
-        {(triggerInput || result) && (
-          <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {triggerInput !== null && (
-                <div>
-                  <JsonViewer data={triggerInput} label="Input" />
-                </div>
-              )}
-              {result !== null && (
-                <div>
-                  <JsonViewer data={result} label="Result" />
-                </div>
-              )}
+        <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <JsonViewer data={triggerInput ?? {}} label="Input" />
             </div>
-          </CollapsibleSection>
-        )}
+            {result !== null && (
+              <div>
+                <JsonViewer data={result} label="Result" />
+              </div>
+            )}
+          </div>
+        </CollapsibleSection>
 
         {/* Execution Timeline (swimlane) */}
         <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle}>

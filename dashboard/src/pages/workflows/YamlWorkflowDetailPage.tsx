@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { Play } from 'lucide-react';
 import {
   useYamlWorkflow,
   useDeployYamlWorkflow,
@@ -9,6 +10,8 @@ import {
   useDeleteYamlWorkflow,
   useRegenerateYamlWorkflow,
   useUpdateYamlWorkflow,
+  useYamlWorkflowVersions,
+  useYamlWorkflowVersion,
 } from '../../api/yaml-workflows';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
@@ -270,17 +273,15 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
 
 // ── Lifecycle sidebar ─────────────────────────────────────────
 
-const LIFECYCLE_STEPS = ['draft', 'deployed', 'active', 'archived'] as const;
+const LIFECYCLE_STEPS = ['draft', 'active', 'archived'] as const;
 const LIFECYCLE_LABELS: Record<string, string> = {
   draft: 'Draft',
-  deployed: 'Deployed',
   active: 'Active',
   archived: 'Archived',
 };
 
 const LIFECYCLE_COLORS: Record<string, { filled: string; faded: string; line: string }> = {
   draft:    { filled: 'bg-status-pending border-status-pending', faded: 'bg-status-pending/30 border-status-pending/50', line: 'bg-status-pending/30' },
-  deployed: { filled: 'bg-status-active border-status-active',   faded: 'bg-status-active/30 border-status-active/50',   line: 'bg-status-active/30' },
   active:   { filled: 'bg-status-success border-status-success', faded: 'bg-status-success/30 border-status-success/50', line: 'bg-status-success/30' },
   archived: { filled: 'bg-text-tertiary border-text-tertiary',   faded: 'bg-text-tertiary/30 border-text-tertiary/50',   line: 'bg-text-tertiary/30' },
 };
@@ -291,7 +292,6 @@ function LifecycleSidebar({
   contentVersion,
   deployedContentVersion,
   onDeploy,
-  onActivate,
   onArchive,
   onDelete,
   onRegenerate,
@@ -303,14 +303,15 @@ function LifecycleSidebar({
   contentVersion?: number;
   deployedContentVersion?: number | null;
   onDeploy: () => void;
-  onActivate: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onRegenerate: () => void;
   isPending: boolean;
   error?: string;
 }) {
-  const currentIdx = LIFECYCLE_STEPS.indexOf(status as any);
+  // Treat 'deployed' as 'active' since deploy now auto-activates
+  const effectiveStatus = status === 'deployed' ? 'active' : status;
+  const currentIdx = LIFECYCLE_STEPS.indexOf(effectiveStatus as any);
   const needsRedeploy = contentVersion != null && contentVersion > (deployedContentVersion ?? 0);
 
   return (
@@ -318,7 +319,7 @@ function LifecycleSidebar({
       <SectionLabel className="mb-4">Lifecycle</SectionLabel>
 
       {/* Out-of-sync warning */}
-      {needsRedeploy && status !== 'draft' && status !== 'archived' && (
+      {needsRedeploy && effectiveStatus !== 'draft' && effectiveStatus !== 'archived' && (
         <div className="mb-4 px-3 py-2 rounded-md bg-status-pending/10 border border-status-pending/30">
           <p className="text-[10px] font-semibold text-status-pending mb-1">YAML modified</p>
           <p className="text-[10px] text-text-secondary leading-relaxed">
@@ -333,7 +334,7 @@ function LifecycleSidebar({
       {/* Step sequence */}
       <div className="space-y-0">
         {LIFECYCLE_STEPS.map((step, idx) => {
-          const isCurrent = step === status;
+          const isCurrent = step === effectiveStatus;
           const isDone = idx < currentIdx;
           const isFuture = idx > currentIdx;
           const isLast = idx === LIFECYCLE_STEPS.length - 1;
@@ -375,13 +376,6 @@ function LifecycleSidebar({
                     )}
                   </div>
                 )}
-                {isCurrent && step === 'deployed' && (
-                  <div className="mt-2">
-                    <button onClick={onActivate} disabled={isPending} className="btn-primary text-[11px] px-3 py-1">
-                      {isPending ? 'Activating...' : 'Activate'}
-                    </button>
-                  </div>
-                )}
                 {isCurrent && step === 'active' && (
                   <div className="mt-2">
                     <button onClick={onArchive} disabled={isPending} className="text-[11px] text-text-tertiary hover:text-status-error">
@@ -412,7 +406,7 @@ function LifecycleSidebar({
       {(status === 'draft' || status === 'archived') && (
         <div className="mt-4 pt-4 border-t border-surface-border">
           <button onClick={onDelete} disabled={isPending} className="text-[11px] text-status-error hover:underline">
-            Delete workflow server
+            Delete workflow tool
           </button>
         </div>
       )}
@@ -430,6 +424,7 @@ type Tab = 'tools' | 'config' | 'invoke';
 
 export function YamlWorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: wf, isLoading, refetch } = useYamlWorkflow(id!);
   const { data: settings } = useSettings();
   const deployMutation = useDeployYamlWorkflow();
@@ -446,6 +441,19 @@ export function YamlWorkflowDetailPage() {
   const [showMetadata, setShowMetadata] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('tools');
   const [selectedStep, setSelectedStep] = useState(0);
+
+  // ── Version browsing ──────────────────────────────────────────
+  const versionParam = searchParams.get('version');
+  const viewingVersion = versionParam ? parseInt(versionParam, 10) : null;
+  const isViewingHistory = viewingVersion !== null && wf && viewingVersion !== wf.content_version;
+  const { data: versionsData } = useYamlWorkflowVersions(id!);
+  const { data: versionSnapshot } = useYamlWorkflowVersion(id!, isViewingHistory ? viewingVersion : null);
+
+  // Resolved data: use version snapshot if viewing history, otherwise current
+  const resolvedManifest = isViewingHistory && versionSnapshot ? versionSnapshot.activity_manifest : wf?.activity_manifest;
+  const resolvedInputSchema = isViewingHistory && versionSnapshot ? versionSnapshot.input_schema : wf?.input_schema;
+  const resolvedOutputSchema = isViewingHistory && versionSnapshot ? versionSnapshot.output_schema : wf?.output_schema;
+  const resolvedYaml = isViewingHistory && versionSnapshot ? versionSnapshot.yaml_content : wf?.yaml_content;
 
   // ── YAML editing state ──────────────────────────────────────
   const [yamlDraft, setYamlDraft] = useState('');
@@ -477,8 +485,8 @@ export function YamlWorkflowDetailPage() {
     return <p className="text-sm text-text-secondary">Workflow server not found.</p>;
   }
 
-  const workerActivities = wf.activity_manifest.filter((a) => a.type === 'worker');
-  const inputProps = (wf.input_schema as any)?.properties || {};
+  const workerActivities = (resolvedManifest ?? wf.activity_manifest).filter((a) => a.type === 'worker');
+  const inputProps = (resolvedInputSchema as any)?.properties || {};
   const inputKeys = Object.keys(inputProps);
   const lifecycleError =
     deployMutation.error?.message || activateMutation.error?.message ||
@@ -490,7 +498,7 @@ export function YamlWorkflowDetailPage() {
     regenerateMutation.isPending;
 
   const handleDeploy = async () => { await deployMutation.mutateAsync(wf.id); refetch(); };
-  const handleActivate = async () => { await activateMutation.mutateAsync(wf.id); refetch(); };
+
   const handleArchive = async () => {
     if (!confirm('Archive this workflow server? It will no longer accept invocations.')) return;
     await archiveMutation.mutateAsync(wf.id); refetch();
@@ -531,18 +539,48 @@ export function YamlWorkflowDetailPage() {
     setInvokeJson(JSON.stringify(updated, null, 2));
   };
 
-  const isActive = wf.status === 'active';
-  const canEditYaml = wf.status !== 'archived';
+  const isActive = wf.status === 'active' || wf.status === 'deployed';
+  const canEditYaml = wf.status !== 'archived' && !isViewingHistory;
 
   const tabs: { key: Tab; label: string; show: boolean }[] = [
     { key: 'tools', label: 'Tools', show: true },
     { key: 'config', label: 'Config', show: true },
-    { key: 'invoke', label: 'Invoke', show: isActive },
+    { key: 'invoke', label: 'Invoke', show: isActive && !isViewingHistory },
   ];
 
   return (
     <div>
-      <PageHeader title="Workflow Server Tool" backTo="/mcp/workflows" backLabel="Workflow Servers" />
+      <PageHeader title="Workflow Tool" backTo="/mcp/workflows" backLabel="Workflow Tools" />
+
+      {/* History banner */}
+      {isViewingHistory && (
+        <div className="mb-6 px-4 py-3 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+          <p className="text-xs text-text-primary">
+            Viewing version <span className="font-mono font-medium">{viewingVersion}</span>
+            {versionSnapshot?.change_summary && (
+              <span className="text-text-tertiary ml-2">— {versionSnapshot.change_summary}</span>
+            )}
+            <span className="ml-2 text-text-tertiary">(read-only)</span>
+          </p>
+          <button
+            onClick={() => { const next = new URLSearchParams(searchParams); next.delete('version'); setSearchParams(next); }}
+            className="text-xs text-accent hover:underline"
+          >
+            Back to current
+          </button>
+        </div>
+      )}
+
+      {/* Getting started banner for newly exported tools */}
+      {wf.status === 'draft' && !isViewingHistory && (
+        <div className="mb-6 px-4 py-3 rounded-md bg-accent/5 border border-accent/20">
+          <p className="text-xs text-text-primary font-medium mb-1">Workflow tool exported</p>
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            Deploy this tool to register and activate it with HotMesh, making it callable by MCP workflows like Insight and Triage.
+            Use the lifecycle panel on the right to progress through <span className="font-medium">Draft → Active</span>.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12">
         {/* ── Left: main content ─────────────────────────── */}
@@ -552,17 +590,34 @@ export function YamlWorkflowDetailPage() {
             <div className="flex items-center gap-4 mb-3">
               <h2 className="text-lg font-medium text-text-primary font-mono truncate flex-1">{wf.name}</h2>
               <StatusBadge status={wf.status} />
+              {isActive && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('invoke')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-medium hover:bg-purple-500/20 transition-colors"
+                >
+                  <Play className="w-3 h-3" />
+                  Invoke
+                </button>
+              )}
             </div>
 
             {wf.description && <p className="text-xs text-text-secondary mb-4">{wf.description}</p>}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-8">
               <Field label="App ID" value={<span className="font-mono text-xs">{wf.app_id}</span>} />
-              <Field label="Version" value={<span className="font-mono text-xs">{wf.app_version}</span>} />
+              <Field label="Version" value={
+                <span className="font-mono text-xs">
+                  {wf.app_version}
+                  {versionsData && versionsData.total > 1 && (
+                    <span className="text-text-tertiary ml-1">(v{wf.content_version})</span>
+                  )}
+                </span>
+              } />
               <Field label="Topic" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
               <Field label="Steps" value={<span className="text-xs">{workerActivities.length}</span>} />
               {wf.source_workflow_id && (
-                <Field label="Source MCP Workflow" value={
+                <Field label="Compiled From" value={
                   <Link to={`/workflows/detail/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
                     {wf.source_workflow_id}
                   </Link>
@@ -617,8 +672,8 @@ export function YamlWorkflowDetailPage() {
           {activeTab === 'config' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <JsonViewer data={wf.input_schema} label="Input Schema" />
-                <JsonViewer data={wf.output_schema} label="Output Schema" />
+                <JsonViewer data={resolvedInputSchema ?? {}} label="Input Schema" />
+                <JsonViewer data={resolvedOutputSchema ?? {}} label="Output Schema" />
               </div>
 
               <div>
@@ -677,7 +732,7 @@ export function YamlWorkflowDetailPage() {
                   />
                 ) : (
                   <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
-                    {wf.yaml_content}
+                    {resolvedYaml ?? wf.yaml_content}
                   </pre>
                 )}
               </div>
@@ -749,7 +804,12 @@ export function YamlWorkflowDetailPage() {
                         <span className="inline-block w-3 h-3 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
                         Running...
                       </span>
-                    ) : 'Run Pipeline'}
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <Play className="w-3 h-3" fill="currentColor" />
+                        Invoke
+                      </span>
+                    )}
                   </button>
                 </form>
               )}
@@ -777,20 +837,56 @@ export function YamlWorkflowDetailPage() {
         </div>
 
         {/* ── Right sidebar: lifecycle ────────────────────── */}
-        <div className="lg:border-l lg:border-surface-border lg:pl-8">
+        <div className="lg:border-l lg:border-surface-border lg:pl-8 space-y-8">
           <LifecycleSidebar
             status={wf.status}
             sourceWorkflowId={wf.source_workflow_id}
             contentVersion={wf.content_version}
             deployedContentVersion={wf.deployed_content_version}
             onDeploy={handleDeploy}
-            onActivate={handleActivate}
+
             onArchive={handleArchive}
             onDelete={handleDelete}
             onRegenerate={handleRegenerate}
             isPending={lifecyclePending}
             error={lifecycleError}
           />
+
+          {/* Version history */}
+          {versionsData && versionsData.versions.length > 1 && (
+            <div>
+              <SectionLabel className="mb-3">Version History</SectionLabel>
+              <div className="space-y-1">
+                {versionsData.versions.map((v) => {
+                  const isCurrent = v.version === wf.content_version;
+                  const isViewing = viewingVersion === v.version;
+                  return (
+                    <button
+                      key={v.version}
+                      type="button"
+                      onClick={() => {
+                        const next = new URLSearchParams(searchParams);
+                        if (isCurrent) next.delete('version');
+                        else next.set('version', String(v.version));
+                        setSearchParams(next);
+                      }}
+                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                        isViewing
+                          ? 'bg-accent/10 text-accent'
+                          : 'text-text-secondary hover:bg-surface-sunken hover:text-text-primary'
+                      }`}
+                    >
+                      <span className="font-mono font-medium">v{v.version}</span>
+                      {isCurrent && <span className="text-text-tertiary ml-1">(current)</span>}
+                      {v.change_summary && (
+                        <p className="text-[10px] text-text-tertiary truncate mt-0.5">{v.change_summary}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

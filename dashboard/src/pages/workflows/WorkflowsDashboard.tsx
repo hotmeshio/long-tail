@@ -144,7 +144,7 @@ export function WorkflowsDashboard() {
 
   return (
     <div>
-      <PageHeader title="Workflow Runs" />
+      <PageHeader title="Runs" />
 
       <FilterBar>
         <input

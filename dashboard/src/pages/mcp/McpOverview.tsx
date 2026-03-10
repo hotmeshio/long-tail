@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Server, Workflow } from 'lucide-react';
 import { useMcpServers } from '../../api/mcp';
 import { useMcpRuns } from '../../api/mcp-runs';
+import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useNamespaces } from '../../api/namespaces';
 import { PageHeader } from '../../components/common/PageHeader';
+import type { McpToolManifest } from '../../api/types';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -58,6 +61,17 @@ function StatCell({
   );
 }
 
+// ── Unified server entry ─────────────────────────────────────────────────────
+
+interface UnifiedServer {
+  id: string;
+  name: string;
+  kind: 'tool' | 'workflow';
+  status: string;
+  toolCount: number;
+  updatedAt: string;
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function McpOverview() {
@@ -68,18 +82,58 @@ export function McpOverview() {
   const { data: nsData } = useNamespaces();
   const { data: allRuns } = useMcpRuns({ limit: 500, app_id: namespace });
   const { data: serverData, isLoading: serversLoading } = useMcpServers();
+  const { data: yamlData, isLoading: yamlLoading } = useYamlWorkflows({ limit: 200 });
+
   const namespaces = useMemo(
     () => (nsData?.namespaces ?? []).map((ns) => ns.name),
     [nsData?.namespaces],
   );
 
+  // ── Unified server list ────────────────────────────────────────
   const servers = serverData?.servers ?? [];
-  const connectedServers = servers.filter((s) => s.status === 'connected').length;
-  const totalTools = servers.reduce((sum, s) => {
-    if (Array.isArray(s.tool_manifest)) return sum + s.tool_manifest.length;
-    return sum;
-  }, 0);
+  const yamlWorkflows = yamlData?.workflows ?? [];
 
+  const toolServerEntries: UnifiedServer[] = useMemo(
+    () =>
+      servers.map((s) => ({
+        id: s.id,
+        name: s.name,
+        kind: 'tool' as const,
+        status: s.status,
+        toolCount: Array.isArray(s.tool_manifest) ? (s.tool_manifest as McpToolManifest[]).length : 0,
+        updatedAt: s.updated_at,
+      })),
+    [servers],
+  );
+
+  const workflowServerEntries: UnifiedServer[] = useMemo(() => {
+    const map = new Map<string, { count: number; status: string; updatedAt: string }>();
+    for (const wf of yamlWorkflows) {
+      const entry = map.get(wf.app_id) ?? { count: 0, status: wf.status, updatedAt: wf.updated_at };
+      entry.count++;
+      if (wf.updated_at > entry.updatedAt) entry.updatedAt = wf.updated_at;
+      const statusPriority: Record<string, number> = { active: 0, deployed: 1, draft: 2, archived: 3 };
+      if ((statusPriority[wf.status] ?? 9) < (statusPriority[entry.status] ?? 9)) entry.status = wf.status;
+      map.set(wf.app_id, entry);
+    }
+    return [...map.entries()].map(([appId, info]) => ({
+      id: `wf-${appId}`,
+      name: appId,
+      kind: 'workflow' as const,
+      status: info.status,
+      toolCount: info.count,
+      updatedAt: info.updatedAt,
+    }));
+  }, [yamlWorkflows]);
+
+  const allServers = useMemo(
+    () => [...toolServerEntries, ...workflowServerEntries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [toolServerEntries, workflowServerEntries],
+  );
+
+  const totalToolCount = allServers.reduce((sum, s) => sum + s.toolCount, 0);
+
+  // ── Run stats ──────────────────────────────────────────────────
   const cutoff = useMemo(() => {
     const d = DURATIONS.find((d) => d.label === duration)!;
     return Date.now() - d.ms;
@@ -139,13 +193,73 @@ export function McpOverview() {
   return (
     <div>
       <PageHeader
-        title="MCP"
+        title="Durable MCP"
         actions={
           <span className="text-xs text-text-tertiary">
-            {serversLoading ? '—' : `${connectedServers} server${connectedServers !== 1 ? 's' : ''} · ${totalTools} tool${totalTools !== 1 ? 's' : ''}`}
+            {serversLoading || yamlLoading
+              ? '—'
+              : `${allServers.length} server${allServers.length !== 1 ? 's' : ''} · ${totalToolCount} tool${totalToolCount !== 1 ? 's' : ''}`}
           </span>
         }
       />
+
+      {/* ── All Servers ───────────────────────────────────── */}
+      <SectionHeading>All Servers</SectionHeading>
+
+      {allServers.length > 0 ? (
+        <table className="w-full text-left mb-10">
+          <thead>
+            <tr className="border-b border-surface-border">
+              <th className={thCls}>Server</th>
+              <th className={`${thCls} w-28`}>Type</th>
+              <th className={`${thCls} text-right w-20`}>Tools</th>
+              <th className={`${thCls} w-28`}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allServers.map((s) => (
+              <tr
+                key={s.id}
+                onClick={() =>
+                  navigate(s.kind === 'tool' ? `/mcp/servers?search=${encodeURIComponent(s.name)}` : '/mcp/workflows')
+                }
+                className="border-b border-surface-border last:border-b-0 cursor-pointer row-hover"
+              >
+                <td className="py-3 text-sm text-text-primary font-mono">
+                  {s.name}
+                </td>
+                <td className="py-3">
+                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    s.kind === 'tool'
+                      ? 'bg-accent-primary/10 text-accent border border-accent-primary/20'
+                      : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                  }`}>
+                    {s.kind === 'tool' ? <Server size={10} /> : <Workflow size={10} />}
+                    {s.kind === 'tool' ? 'Server Tool' : 'Workflow Tool'}
+                  </span>
+                </td>
+                <td className="py-3 text-sm text-right tabular-nums text-text-secondary">
+                  {s.toolCount}
+                </td>
+                <td className="py-3">
+                  <span className={`text-xs ${
+                    s.status === 'connected' || s.status === 'active' ? 'text-status-success' :
+                    s.status === 'error' ? 'text-status-error' :
+                    'text-text-tertiary'
+                  }`}>
+                    {s.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-sm text-text-tertiary mb-10 py-6 text-center">No servers registered</p>
+      )}
+
+      {/* ── Recent Runs ───────────────────────────────────── */}
+      <SectionHeading>Recent Runs</SectionHeading>
 
       {/* Duration tabs + Namespace selector */}
       <div className="flex items-center gap-4 mb-6">
@@ -190,7 +304,7 @@ export function McpOverview() {
         <table className="w-full text-left mb-10">
           <thead>
             <tr className="border-b border-surface-border">
-              <th className={thCls}>Pipeline</th>
+              <th className={thCls}>Tool</th>
               <th className={`${thCls} text-right w-20`}>Total</th>
               <th className={`${thCls} text-right w-20`}>Running</th>
               <th className={`${thCls} text-right w-24`}>Completed</th>
@@ -237,6 +351,17 @@ export function McpOverview() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Section heading ──────────────────────────────────────────────────────────
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <span className="text-xs font-semibold uppercase tracking-widest text-text-secondary">{children}</span>
+      <span className="flex-1 border-b border-surface-border" />
     </div>
   );
 }

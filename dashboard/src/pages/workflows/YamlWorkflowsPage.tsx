@@ -240,7 +240,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="MCP Workflow Servers" />
+        <PageHeader title="Workflow Tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -254,10 +254,10 @@ export function YamlWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="MCP Workflow Servers" />
+      <PageHeader title="Workflow Tools" />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        MCP Workflow Servers and Tools are generated from successful MCP triage runs.
+        Compiled from successful triage runs. Each workflow is a deterministic tool — no LLM, direct tool-to-tool piping.
       </p>
 
       <FilterBar>
@@ -289,7 +289,7 @@ export function YamlWorkflowsPage() {
       </FilterBar>
 
       {filteredServers.length === 0 ? (
-        <EmptyState title="No workflow servers found" />
+        <EmptyState title="No workflow tools found" />
       ) : (
         <table className="w-full">
           <thead>

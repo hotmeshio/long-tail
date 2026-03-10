@@ -16,6 +16,27 @@ export interface CreateYamlWorkflowInput {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Extract the `app.version` value from YAML content using a simple regex.
+ * Returns null if not found.
+ */
+export function parseVersionFromYaml(yaml: string): string | null {
+  const match = yaml.match(/^app:\s*\n(?:.*\n)*?\s+version:\s*['"]?(\S+?)['"]?\s*$/m);
+  if (match) return match[1];
+  // Fallback: look for version anywhere under app block
+  const lines = yaml.split('\n');
+  let inApp = false;
+  for (const line of lines) {
+    if (/^app:\s*$/.test(line)) { inApp = true; continue; }
+    if (inApp && /^\S/.test(line)) break; // left app block
+    if (inApp) {
+      const vm = line.match(/^\s+version:\s*['"]?(.+?)['"]?\s*$/);
+      if (vm) return vm[1];
+    }
+  }
+  return null;
+}
+
 export async function createYamlWorkflow(
   input: CreateYamlWorkflowInput,
 ): Promise<LTYamlWorkflowRecord> {
@@ -32,7 +53,7 @@ export async function createYamlWorkflow(
       input.name,
       input.description || null,
       input.app_id,
-      input.app_version || '1',
+      input.app_version || parseVersionFromYaml(input.yaml_content) || '0',
       input.source_workflow_id || null,
       input.source_workflow_type || null,
       input.yaml_content,
@@ -117,9 +138,14 @@ export async function updateYamlWorkflow(
   if (updates.activity_manifest !== undefined) { sets.push(`activity_manifest = $${idx++}`); values.push(JSON.stringify(updates.activity_manifest)); }
   if (updates.metadata !== undefined) { sets.push(`metadata = $${idx++}`); values.push(JSON.stringify(updates.metadata)); }
 
-  // When YAML content changes, bump the content_version
+  // When YAML content changes, bump the content_version and sync app_version from YAML
   if (yamlChanging) {
     sets.push(`content_version = content_version + 1`);
+    const parsedVersion = parseVersionFromYaml(updates.yaml_content!);
+    if (parsedVersion) {
+      sets.push(`app_version = $${idx++}`);
+      values.push(parsedVersion);
+    }
   }
 
   if (sets.length === 0) return getYamlWorkflow(id);
@@ -281,6 +307,18 @@ export async function getVersionHistory(
     versions: dataResult.rows,
     total: parseInt(countResult.rows[0].count, 10),
   };
+}
+
+export async function getVersionSnapshot(
+  workflowId: string,
+  version: number,
+): Promise<LTYamlWorkflowVersionRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT * FROM lt_yaml_workflow_versions WHERE workflow_id = $1 AND version = $2`,
+    [workflowId, version],
+  );
+  return rows[0] || null;
 }
 
 export async function markContentDeployed(workflowId: string): Promise<void> {

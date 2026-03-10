@@ -11,6 +11,15 @@ import type {
   ActivityTaskCompletedAttributes,
 } from '@hotmeshio/hotmesh/build/types/exporter';
 
+/** Cap `limit` in tool arguments to avoid sending huge payloads to downstream LLM steps. */
+function capToolArguments(args: Record<string, unknown>): Record<string, unknown> {
+  const capped = { ...args };
+  if (typeof capped.limit === 'number' && capped.limit > 25) {
+    capped.limit = 25;
+  }
+  return capped;
+}
+
 export interface GenerateYamlOptions {
   workflowId: string;
   taskQueue: string;
@@ -369,7 +378,8 @@ export async function generateYamlFromExecution(
       ...(step.kind === 'tool' ? {
         mcp_server_id: step.source === 'mcp' ? step.mcpServerId : 'db',
         mcp_tool_name: step.toolName,
-        tool_arguments: Object.keys(step.arguments).length > 0 ? step.arguments : undefined,
+        tool_arguments: Object.keys(step.arguments).length > 0
+          ? capToolArguments(step.arguments) : undefined,
       } : {}),
       input_mappings: inputMappings,
       output_fields: outputFields,
