@@ -6,7 +6,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
 import { PageHeader } from '../../components/common/PageHeader';
 import { CopyableId } from '../../components/common/CopyableId';
-import { Collapsible } from '../../components/common/Collapsible';
+import { CollapsibleSection } from '../../components/common/CollapsibleSection';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { formatDuration } from '../../lib/format';
 
@@ -24,45 +24,6 @@ const statusMap: Record<string, string> = {
 function formatTimestamp(iso: string | null): string {
   if (!iso) return '—';
   return iso.replace('T', ' ').replace('Z', '').slice(0, 23);
-}
-
-// ── Collapsible section (matches WorkflowExecutionPage) ──────────────────────
-
-function CollapsibleSection({
-  title,
-  sectionKey,
-  isCollapsed,
-  onToggle,
-  children,
-}: {
-  title: string;
-  sectionKey: string;
-  isCollapsed: boolean;
-  onToggle: (key: string) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <button
-        onClick={() => onToggle(sectionKey)}
-        className="flex items-center gap-3 w-full group/section"
-      >
-        <svg
-          className={`w-4 h-4 shrink-0 text-text-tertiary/40 group-hover/section:text-text-tertiary transition-all duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-        <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-200 ${isCollapsed ? 'text-text-tertiary' : 'text-text-secondary'}`}>
-          {title}
-        </span>
-        <span className="flex-1 border-b border-surface-border" />
-      </button>
-      <Collapsible open={!isCollapsed}>
-        <div className="mt-4 ml-7">{children}</div>
-      </Collapsible>
-    </div>
-  );
 }
 
 // ── Main page ────────────────────────────────────────────────────────────────
@@ -135,11 +96,11 @@ export function McpRunDetailPage() {
         {/* Row 1: Namespace, Topic, Duration, Started, Completed */}
         <div className="grid grid-cols-5 gap-x-6">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Namespace</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">MCP Workflow Server</p>
             <p className="text-xs font-mono text-text-primary truncate">{namespace}</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Topic</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">MCP Workflow Tool</p>
             {sourceWorkflow ? (
               <Link to={`/mcp/workflows/${sourceWorkflow.id}`} className="text-xs font-mono text-accent hover:underline truncate block">
                 {execution.workflow_type}

@@ -129,7 +129,7 @@ describe('McpRunsPage', () => {
     expect(select!.querySelector('option[value="lt-yaml"]')).toBeTruthy();
   });
 
-  it('defaults namespace to longtail', () => {
+  it('defaults namespace to first available app_id', () => {
     render(<McpRunsPage />, { wrapper });
     expect(useMcpRuns).toHaveBeenCalledWith(
       expect.objectContaining({ app_id: 'longtail' }),

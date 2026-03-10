@@ -10,33 +10,7 @@ When the AI isn’t confident, the task escalates to a human. When the human can
 
 Once the issue is resolved, the sequence of actions is compiled into a deterministic workflow. The next time the same edge case appears, it runs automatically.
 
-AI handles the routine. Humans catch the ambiguity. The system absorbs the exception, adapts and moves on.
-
-```
-                    ┌────────────────────────────────────────┐
-                    │      Deterministic Flow                │
-                    │                                        │
-  input ──────────► │  AI confident? ── yes ──► done         |
-                    │       │                                │
-                    │       no                               │
-                    │       ▼                                │
-                    │   escalate to human                    │
-                    │       │                                │
-                    │       ▼                                │
-                    │  human confident? ── yes ──► done      │
-                    │       │                                │
-                    │       no                               │
-                    │       ▼                                │
-                    │   escalate back to AI                  │
-                    │   (MCP triage + tools)                 │
-                    │       │                                │
-                    │       ▼                                │
-                    │  fix applied, flow retried             │
-                    │       │                                │
-                    │       ▼                                │
-                    │  compile to YAML workflow ──► hardened │
-                    └────────────────────────────────────────┘
-```
+AI handles the routine. Humans catch the ambiguity. The system absorbs the exception, codifies the latest adaptation and moves on.
 
 ## Quick Start
 
@@ -341,7 +315,6 @@ An MCP server is a namespace for related tools. Long Tail ships with six built-i
 | `long-tail-document-vision` | 5 | Rotate pages, extract data, translate, validate members |
 | `long-tail-workflow-compiler` | 3 | Convert triage executions to YAML, deploy, list |
 | `long-tail-mcp-workflows` | 3 | Discover and invoke compiled workflow tools |
-| `long-tail-telemetry` | 2 | Query traces and spans from Honeycomb |
 
 Engineers can register external servers — Playwright for browser automation, file storage, custom APIs. The triage agent can even recommend that engineers add a new MCP server when it encounters a capability gap. Every server's tools become available as proxy activities in deterministic workflows and as callable tools in dynamic triage.
 

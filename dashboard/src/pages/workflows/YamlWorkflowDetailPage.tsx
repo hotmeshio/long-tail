@@ -18,6 +18,8 @@ import { JsonViewer } from '../../components/common/JsonViewer';
 import { PageHeader } from '../../components/common/PageHeader';
 import { SectionLabel } from '../../components/common/SectionLabel';
 import { Field } from '../../components/common/Field';
+import { Collapsible } from '../../components/common/Collapsible';
+import { CollapsibleSection } from '../../components/common/CollapsibleSection';
 import { useSettings } from '../../api/settings';
 import type { ActivityManifestEntry } from '../../api/types/yaml-workflows';
 
@@ -48,8 +50,8 @@ function inferFieldType(schemaProp: any): string {
 // ── Metadata helpers ──────────────────────────────────────────
 
 const metadataLabels: Record<string, string> = {
-  ngn: 'Engine ID', tpc: 'Topic', app: 'App ID', vrs: 'Version',
-  jid: 'Job ID', gid: 'Job GUID', aid: 'Activity ID', ts: 'Time Series',
+  app: 'MCP Workflow Server', tpc: 'MCP Workflow Tool', vrs: 'Version', ngn: 'Engine ID',
+  jid: 'Job ID', gid: 'Run ID', aid: 'Activity ID', ts: 'Time Series',
   jc: 'Created', ju: 'Updated', trc: 'Trace ID', js: 'Job Status',
 };
 
@@ -98,11 +100,16 @@ function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl, na
           )}
         </div>
       </div>
-      {showMetadata && hasEnvelope && (
-        <div className="bg-surface-raised border border-surface-border rounded-md p-3">
+      <Collapsible open={showMetadata && !!hasEnvelope}>
+        <div className="bg-surface-raised border border-surface-border rounded-md p-3 mb-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Metadata</p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-            {Object.entries(raw.metadata as Record<string, unknown>).map(([key, val]) => (
+            {hasEnvelope && Object.entries(raw.metadata as Record<string, unknown>)
+              .sort((a, b) => {
+                const order = Object.keys(metadataLabels);
+                return (order.indexOf(a[0]) === -1 ? 99 : order.indexOf(a[0])) - (order.indexOf(b[0]) === -1 ? 99 : order.indexOf(b[0]));
+              })
+              .map(([key, val]) => (
               <div key={key}>
                 <p className="text-[10px] text-text-tertiary">{metadataLabels[key] ?? key}</p>
                 {key === 'trc' && traceUrl && val ? (
@@ -119,7 +126,7 @@ function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl, na
             ))}
           </div>
         </div>
-      )}
+      </Collapsible>
       <JsonViewer data={displayData} label="Data" />
     </div>
   );
@@ -416,11 +423,9 @@ function LifecycleSidebar({
   );
 }
 
-// ── Tab types ──────────────────────────────────────────────────
-
-type Tab = 'tools' | 'config' | 'invoke';
-
 // ── Main Page ─────────────────────────────────────────────────
+
+type Section = 'invoke' | 'tools' | 'config';
 
 export function YamlWorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -439,7 +444,7 @@ export function YamlWorkflowDetailPage() {
   const [invokeJson, setInvokeJson] = useState('{}');
   const [invokeResult, setInvokeResult] = useState<Record<string, unknown> | null>(null);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('tools');
+  const [openSection, setOpenSection] = useState<Section | null>('tools');
   const [selectedStep, setSelectedStep] = useState(0);
 
   // ── Version browsing ──────────────────────────────────────────
@@ -455,14 +460,18 @@ export function YamlWorkflowDetailPage() {
   const resolvedOutputSchema = isViewingHistory && versionSnapshot ? versionSnapshot.output_schema : wf?.output_schema;
   const resolvedYaml = isViewingHistory && versionSnapshot ? versionSnapshot.yaml_content : wf?.yaml_content;
 
-  // ── YAML editing state ──────────────────────────────────────
+  // ── Configuration editing state ─────────────────────────────
   const [yamlDraft, setYamlDraft] = useState('');
-  const [yamlEditing, setYamlEditing] = useState(false);
+  const [inputSchemaDraft, setInputSchemaDraft] = useState('');
+  const [outputSchemaDraft, setOutputSchemaDraft] = useState('');
+  const [configEditing, setConfigEditing] = useState(false);
   const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (wf?.yaml_content) setYamlDraft(wf.yaml_content);
-  }, [wf?.id, wf?.yaml_content]);
+    if (wf?.input_schema) setInputSchemaDraft(JSON.stringify(wf.input_schema, null, 2));
+    if (wf?.output_schema) setOutputSchemaDraft(JSON.stringify(wf.output_schema, null, 2));
+  }, [wf?.id, wf?.yaml_content, wf?.input_schema, wf?.output_schema]);
 
   useEffect(() => {
     if (wf?.input_schema) {
@@ -511,14 +520,25 @@ export function YamlWorkflowDetailPage() {
     if (!confirm('Re-generate from the source execution? This will overwrite the current definition.')) return;
     await regenerateMutation.mutateAsync({ id: wf.id }); refetch();
   };
-  const handleSaveYaml = async () => {
-    await updateMutation.mutateAsync({ id: wf.id, yaml_content: yamlDraft });
-    setYamlEditing(false);
+  const handleSaveConfig = async () => {
+    let inputSchema: Record<string, unknown> | undefined;
+    let outputSchema: Record<string, unknown> | undefined;
+    try { inputSchema = JSON.parse(inputSchemaDraft); } catch { /* keep current */ }
+    try { outputSchema = JSON.parse(outputSchemaDraft); } catch { /* keep current */ }
+    await updateMutation.mutateAsync({
+      id: wf.id,
+      yaml_content: yamlDraft,
+      ...(inputSchema ? { input_schema: inputSchema } : {}),
+      ...(outputSchema ? { output_schema: outputSchema } : {}),
+    });
+    setConfigEditing(false);
     refetch();
   };
   const handleCancelEdit = () => {
     setYamlDraft(wf.yaml_content);
-    setYamlEditing(false);
+    setInputSchemaDraft(JSON.stringify(wf.input_schema, null, 2));
+    setOutputSchemaDraft(JSON.stringify(wf.output_schema, null, 2));
+    setConfigEditing(false);
   };
   const handleInvoke = async () => {
     setInvokeResult(null);
@@ -540,17 +560,36 @@ export function YamlWorkflowDetailPage() {
   };
 
   const isActive = wf.status === 'active' || wf.status === 'deployed';
-  const canEditYaml = wf.status !== 'archived' && !isViewingHistory;
-
-  const tabs: { key: Tab; label: string; show: boolean }[] = [
-    { key: 'tools', label: 'Tools', show: true },
-    { key: 'config', label: 'Config', show: true },
-    { key: 'invoke', label: 'Invoke', show: isActive && !isViewingHistory },
-  ];
+  const canEditConfig = wf.status !== 'archived' && !isViewingHistory;
+  const showInvoke = isActive && !isViewingHistory;
+  const toggleSection = (key: string) => setOpenSection(openSection === key ? null : key as Section);
 
   return (
     <div>
-      <PageHeader title="Workflow Tool" backTo="/mcp/workflows" backLabel="Workflow Tools" />
+      <PageHeader
+        title="Workflow Tool"
+        backTo="/mcp/workflows"
+        backLabel="Workflow Tools"
+        actions={
+          wf.status === 'draft' && !isViewingHistory ? (
+            <button
+              onClick={handleDeploy}
+              disabled={lifecyclePending}
+              className="group flex items-center gap-2 text-left"
+            >
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </span>
+              <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-accent/10 text-accent font-medium group-hover:bg-accent/20 transition-colors mr-1">Deploy</span>
+                {' '}to register <span className="font-mono font-medium text-text-primary">{wf.app_id}/{wf.graph_topic}</span> as an MCP Workflow Tool.
+              </span>
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* History banner */}
       {isViewingHistory && (
@@ -571,29 +610,18 @@ export function YamlWorkflowDetailPage() {
         </div>
       )}
 
-      {/* Getting started banner for newly exported tools */}
-      {wf.status === 'draft' && !isViewingHistory && (
-        <div className="mb-6 px-4 py-3 rounded-md bg-accent/5 border border-accent/20">
-          <p className="text-xs text-text-primary font-medium mb-1">Workflow tool exported</p>
-          <p className="text-[11px] text-text-secondary leading-relaxed">
-            Deploy this tool to register and activate it with HotMesh, making it callable by MCP workflows like Insight and Triage.
-            Use the lifecycle panel on the right to progress through <span className="font-medium">Draft → Active</span>.
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12">
         {/* ── Left: main content ─────────────────────────── */}
         <div>
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-4 mb-3">
+          {/* Header card */}
+          <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
+            <div className="flex items-center gap-4 mb-4">
               <h2 className="text-lg font-medium text-text-primary font-mono truncate flex-1">{wf.name}</h2>
               <StatusBadge status={wf.status} />
-              {isActive && (
+              {isActive && !isViewingHistory && (
                 <button
                   type="button"
-                  onClick={() => setActiveTab('invoke')}
+                  onClick={() => setOpenSection('invoke')}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-medium hover:bg-purple-500/20 transition-colors"
                 >
                   <Play className="w-3 h-3" />
@@ -605,7 +633,8 @@ export function YamlWorkflowDetailPage() {
             {wf.description && <p className="text-xs text-text-secondary mb-4">{wf.description}</p>}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-8">
-              <Field label="App ID" value={<span className="font-mono text-xs">{wf.app_id}</span>} />
+              <Field label="MCP Workflow Server" value={<span className="font-mono text-xs">{wf.app_id}</span>} />
+              <Field label="MCP Workflow Tool" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
               <Field label="Version" value={
                 <span className="font-mono text-xs">
                   {wf.app_version}
@@ -614,10 +643,9 @@ export function YamlWorkflowDetailPage() {
                   )}
                 </span>
               } />
-              <Field label="Topic" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
-              <Field label="Steps" value={<span className="text-xs">{workerActivities.length}</span>} />
+              <Field label="Tool Calls" value={<span className="text-xs">{workerActivities.length}</span>} />
               {wf.source_workflow_id && (
-                <Field label="Compiled From" value={
+                <Field label="Compiled From Workflow" value={
                   <Link to={`/workflows/detail/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
                     {wf.source_workflow_id}
                   </Link>
@@ -632,81 +660,158 @@ export function YamlWorkflowDetailPage() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-0 border-b border-surface-border mb-6">
-            {tabs.filter((t) => t.show).map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActiveTab(t.key)}
-                className={`px-4 py-2 text-xs font-medium transition-colors relative ${
-                  activeTab === t.key
-                    ? 'text-accent'
-                    : 'text-text-tertiary hover:text-text-secondary'
-                }`}
-              >
-                {t.label}
-                {activeTab === t.key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-t" />
-                )}
-              </button>
-            ))}
-          </div>
+          {/* ── Collapsible sections ─────────────────────── */}
+          <div className="space-y-6">
 
-          {/* ── Tools Tab ───────────────────────────────── */}
-          {activeTab === 'tools' && (
-            <div className="space-y-4">
-              <PipelineStrip
-                activities={workerActivities}
-                selectedIdx={selectedStep}
-                onSelect={setSelectedStep}
-              />
+            {/* ── Invoke / Try ────────────────────────────── */}
+            {showInvoke && (
+              <CollapsibleSection sectionKey="invoke" title="Invoke / Try" isCollapsed={openSection !== 'invoke'} onToggle={toggleSection} >
+                <div className="space-y-4">
+                  {/* Input form */}
+                  {!invokeResult && (
+                    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleInvoke(); }}>
+                      <div className="flex items-center justify-between">
+                        <SectionLabel>Input</SectionLabel>
+                        <button type="button" onClick={() => {
+                          if (!invokeJsonMode) setInvokeJson(JSON.stringify(invokeFields, null, 2));
+                          else { try { setInvokeFields(JSON.parse(invokeJson)); } catch { /* keep */ } }
+                          setInvokeJsonMode(!invokeJsonMode);
+                        }} className="text-[10px] text-accent hover:underline">
+                          {invokeJsonMode ? 'Form view' : 'JSON view'}
+                        </button>
+                      </div>
 
-              {workerActivities[selectedStep] && (
-                <StepDetail activity={workerActivities[selectedStep]} />
-              )}
-            </div>
-          )}
+                      {invokeJsonMode ? (
+                        <textarea value={invokeJson} onChange={(e) => setInvokeJson(e.target.value)}
+                          className="input font-mono text-[11px] w-full leading-relaxed"
+                          rows={8} spellCheck={false} />
+                      ) : inputKeys.length > 0 ? (
+                        <div className="space-y-3">
+                          {inputKeys.map((key) => {
+                            const fieldType = inferFieldType(inputProps[key]);
+                            return (
+                              <div key={key}>
+                                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+                                  {key}<span className="ml-2 font-normal normal-case">{fieldType}</span>
+                                </label>
+                                {fieldType === 'boolean' ? (
+                                  <select value={String(invokeFields[key] ?? false)} onChange={(e) => updateField(key, e.target.value, fieldType)}
+                                    className="select text-xs w-full">
+                                    <option value="true">true</option><option value="false">false</option>
+                                  </select>
+                                ) : fieldType === 'object' || fieldType === 'array' ? (
+                                  <textarea
+                                    value={typeof invokeFields[key] === 'string' ? invokeFields[key] : JSON.stringify(invokeFields[key] ?? (fieldType === 'array' ? [] : {}), null, 2)}
+                                    onChange={(e) => { try { updateField(key, JSON.parse(e.target.value), fieldType); } catch { setInvokeFields({ ...invokeFields, [key]: e.target.value }); } }}
+                                    className="input font-mono text-[11px] w-full leading-relaxed"
+                                    rows={4} spellCheck={false} />
+                                ) : (
+                                  <input type={fieldType === 'number' || fieldType === 'integer' ? 'number' : 'text'}
+                                    value={invokeFields[key] ?? ''} onChange={(e) => updateField(key, e.target.value, fieldType)}
+                                    className="input text-xs w-full" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-tertiary">No input schema defined. Switch to JSON view to provide custom input.</p>
+                      )}
 
-          {/* ── Config Tab ───────────────────────────────── */}
-          {activeTab === 'config' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <JsonViewer data={resolvedInputSchema ?? {}} label="Input Schema" />
-                <JsonViewer data={resolvedOutputSchema ?? {}} label="Output Schema" />
-              </div>
+                      {invokeMutation.error && !invokeResult && (
+                        <p className="text-xs text-status-error">{invokeMutation.error.message}</p>
+                      )}
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-text-primary">YAML Definition</h3>
-                  <div className="flex items-center gap-3">
-                    <a
-                      href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-accent hover:underline flex items-center gap-1"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                      YAML Guide
-                    </a>
-                    {canEditYaml && !yamlEditing && (
+                      <button type="submit" disabled={invokeMutation.isPending} className="btn-primary text-xs">
+                        {invokeMutation.isPending ? (
+                          <span className="flex items-center gap-2">
+                            <span className="inline-block w-3 h-3 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
+                            Running...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5">
+                            <Play className="w-3 h-3" fill="currentColor" />
+                            Invoke
+                          </span>
+                        )}
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Result */}
+                  {invokeResult && (
+                    <div className="space-y-4">
+                      <InvokeResultView
+                        result={invokeResult}
+                        showMetadata={showMetadata}
+                        onToggleMetadata={() => setShowMetadata(!showMetadata)}
+                        traceUrl={settings?.telemetry?.traceUrl}
+                        namespace={wf.app_id}
+                      />
                       <button
-                        onClick={() => { setYamlEditing(true); setTimeout(() => yamlTextareaRef.current?.focus(), 50); }}
+                        onClick={() => { setInvokeResult(null); invokeMutation.reset(); }}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Run again
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleSection>
+            )}
+
+            {/* ── Tools ──────────────────────────────────── */}
+            <CollapsibleSection sectionKey="tools" title="Tools" isCollapsed={openSection !== 'tools'} onToggle={toggleSection} >
+              <div className="space-y-4">
+                <PipelineStrip
+                  activities={workerActivities}
+                  selectedIdx={selectedStep}
+                  onSelect={setSelectedStep}
+                />
+
+                {workerActivities[selectedStep] && (
+                  <StepDetail activity={workerActivities[selectedStep]} />
+                )}
+              </div>
+            </CollapsibleSection>
+
+            {/* ── Config ─────────────────────────────────── */}
+            <CollapsibleSection sectionKey="config" title="Configuration" isCollapsed={openSection !== 'config'} onToggle={toggleSection} >
+              <div className="space-y-6">
+                {/* Edit / Save / Cancel controls */}
+                <div className="flex items-center justify-between">
+                  <a
+                    href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-accent hover:underline flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    YAML Guide
+                  </a>
+                  <div className="flex items-center gap-3">
+                    {canEditConfig && !configEditing && (
+                      <button
+                        onClick={() => { setConfigEditing(true); setTimeout(() => yamlTextareaRef.current?.focus(), 50); }}
                         className="text-[10px] text-accent hover:underline"
                       >
                         Edit
                       </button>
                     )}
-                    {yamlEditing && (
+                    {configEditing && (
                       <>
                         <button onClick={handleCancelEdit} className="text-[10px] text-text-tertiary hover:text-text-primary">
                           Cancel
                         </button>
                         <button
-                          onClick={handleSaveYaml}
-                          disabled={updateMutation.isPending || yamlDraft === wf.yaml_content}
+                          onClick={handleSaveConfig}
+                          disabled={updateMutation.isPending || (
+                            yamlDraft === wf.yaml_content
+                            && inputSchemaDraft === JSON.stringify(wf.input_schema, null, 2)
+                            && outputSchemaDraft === JSON.stringify(wf.output_schema, null, 2)
+                          )}
                           className="text-[10px] text-accent hover:underline disabled:opacity-40 disabled:no-underline"
                         >
                           {updateMutation.isPending ? 'Saving...' : 'Save'}
@@ -717,123 +822,67 @@ export function YamlWorkflowDetailPage() {
                 </div>
 
                 {updateMutation.error && (
-                  <p className="text-xs text-status-error mb-2">{updateMutation.error.message}</p>
+                  <p className="text-xs text-status-error">{updateMutation.error.message}</p>
                 )}
 
-                {yamlEditing ? (
-                  <textarea
-                    ref={yamlTextareaRef}
-                    value={yamlDraft}
-                    onChange={(e) => setYamlDraft(e.target.value)}
-                    className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
-                    rows={yamlDraft.split('\n').length + 1}
-                    style={{ fieldSizing: 'content' } as React.CSSProperties}
-                    spellCheck={false}
-                  />
-                ) : (
-                  <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
-                    {resolvedYaml ?? wf.yaml_content}
-                  </pre>
-                )}
-              </div>
-
-            </div>
-          )}
-
-          {/* ── Invoke Tab ───────────────────────────────── */}
-          {activeTab === 'invoke' && isActive && (
-            <div className="space-y-4">
-              {/* Input form */}
-              {!invokeResult && (
-                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleInvoke(); }}>
-                  <div className="flex items-center justify-between">
-                    <SectionLabel>Input</SectionLabel>
-                    <button type="button" onClick={() => {
-                      if (!invokeJsonMode) setInvokeJson(JSON.stringify(invokeFields, null, 2));
-                      else { try { setInvokeFields(JSON.parse(invokeJson)); } catch { /* keep */ } }
-                      setInvokeJsonMode(!invokeJsonMode);
-                    }} className="text-[10px] text-accent hover:underline">
-                      {invokeJsonMode ? 'Form view' : 'JSON view'}
-                    </button>
-                  </div>
-
-                  {invokeJsonMode ? (
-                    <textarea value={invokeJson} onChange={(e) => setInvokeJson(e.target.value)}
-                      className="input font-mono text-[11px] w-full leading-relaxed"
-                      rows={8} spellCheck={false} />
-                  ) : inputKeys.length > 0 ? (
-                    <div className="space-y-3">
-                      {inputKeys.map((key) => {
-                        const fieldType = inferFieldType(inputProps[key]);
-                        return (
-                          <div key={key}>
-                            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
-                              {key}<span className="ml-2 font-normal normal-case">{fieldType}</span>
-                            </label>
-                            {fieldType === 'boolean' ? (
-                              <select value={String(invokeFields[key] ?? false)} onChange={(e) => updateField(key, e.target.value, fieldType)}
-                                className="select text-xs w-full">
-                                <option value="true">true</option><option value="false">false</option>
-                              </select>
-                            ) : fieldType === 'object' || fieldType === 'array' ? (
-                              <textarea
-                                value={typeof invokeFields[key] === 'string' ? invokeFields[key] : JSON.stringify(invokeFields[key] ?? (fieldType === 'array' ? [] : {}), null, 2)}
-                                onChange={(e) => { try { updateField(key, JSON.parse(e.target.value), fieldType); } catch { setInvokeFields({ ...invokeFields, [key]: e.target.value }); } }}
-                                className="input font-mono text-[11px] w-full leading-relaxed"
-                                rows={4} spellCheck={false} />
-                            ) : (
-                              <input type={fieldType === 'number' || fieldType === 'integer' ? 'number' : 'text'}
-                                value={invokeFields[key] ?? ''} onChange={(e) => updateField(key, e.target.value, fieldType)}
-                                className="input text-xs w-full" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                {/* Schemas */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {configEditing ? (
+                    <>
+                      <div>
+                        <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
+                        <textarea
+                          value={inputSchemaDraft}
+                          onChange={(e) => setInputSchemaDraft(e.target.value)}
+                          className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                          rows={Math.max(inputSchemaDraft.split('\n').length + 1, 6)}
+                          style={{ fieldSizing: 'content' } as React.CSSProperties}
+                          spellCheck={false}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
+                        <textarea
+                          value={outputSchemaDraft}
+                          onChange={(e) => setOutputSchemaDraft(e.target.value)}
+                          className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                          rows={Math.max(outputSchemaDraft.split('\n').length + 1, 6)}
+                          style={{ fieldSizing: 'content' } as React.CSSProperties}
+                          spellCheck={false}
+                        />
+                      </div>
+                    </>
                   ) : (
-                    <p className="text-xs text-text-tertiary">No input schema defined. Switch to JSON view to provide custom input.</p>
+                    <>
+                      <JsonViewer data={resolvedInputSchema ?? {}} label="Input Schema" />
+                      <JsonViewer data={resolvedOutputSchema ?? {}} label="Output Schema" />
+                    </>
                   )}
-
-                  {invokeMutation.error && !invokeResult && (
-                    <p className="text-xs text-status-error">{invokeMutation.error.message}</p>
-                  )}
-
-                  <button type="submit" disabled={invokeMutation.isPending} className="btn-primary text-xs">
-                    {invokeMutation.isPending ? (
-                      <span className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
-                        Running...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5">
-                        <Play className="w-3 h-3" fill="currentColor" />
-                        Invoke
-                      </span>
-                    )}
-                  </button>
-                </form>
-              )}
-
-              {/* Result */}
-              {invokeResult && (
-                <div className="space-y-4">
-                  <InvokeResultView
-                    result={invokeResult}
-                    showMetadata={showMetadata}
-                    onToggleMetadata={() => setShowMetadata(!showMetadata)}
-                    traceUrl={settings?.telemetry?.traceUrl}
-                    namespace={wf.app_id}
-                  />
-                  <button
-                    onClick={() => { setInvokeResult(null); invokeMutation.reset(); }}
-                    className="text-xs text-accent hover:underline"
-                  >
-                    Run again
-                  </button>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* YAML Definition */}
+                <div>
+                  <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">YAML Definition</h4>
+                  {configEditing ? (
+                    <textarea
+                      ref={yamlTextareaRef}
+                      value={yamlDraft}
+                      onChange={(e) => setYamlDraft(e.target.value)}
+                      className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                      rows={yamlDraft.split('\n').length + 1}
+                      style={{ fieldSizing: 'content' } as React.CSSProperties}
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
+                      {resolvedYaml ?? wf.yaml_content}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </CollapsibleSection>
+
+          </div>
         </div>
 
         {/* ── Right sidebar: lifecycle ────────────────────── */}
