@@ -8,8 +8,6 @@ import * as verifyDocumentOrchWorkflow from './workflows/verify-document/orchest
 import * as verifyDocumentMcpOrchWorkflow from './workflows/verify-document-mcp/orchestrator';
 import * as processClaimWorkflow from './workflows/process-claim';
 import * as processClaimOrchWorkflow from './workflows/process-claim/orchestrator';
-import * as mcpTriageWorkflow from './workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from './workflows/mcp-triage/orchestrator';
 import * as kitchenSinkWorkflow from './workflows/kitchen-sink';
 import * as kitchenSinkOrchWorkflow from './workflows/kitchen-sink/orchestrator';
 
@@ -23,7 +21,6 @@ import type {
 import { loggerRegistry } from '../services/logger';
 import { getUserByExternalId, createUser } from '../services/user';
 import { addEscalationChain, createRole } from '../services/role';
-import { getPool } from '../services/db';
 
 /**
  * Example workers that ship with Long Tail.
@@ -39,8 +36,6 @@ export const exampleWorkers = [
   { taskQueue: 'lt-verify-mcp-orch', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
   { taskQueue: 'lt-process-claim', workflow: processClaimWorkflow.processClaim },
   { taskQueue: 'lt-process-claim-orch', workflow: processClaimOrchWorkflow.processClaimOrchestrator },
-  { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
-  { taskQueue: 'lt-mcp-triage-orch', workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator },
   { taskQueue: 'lt-kitchen-sink', workflow: kitchenSinkWorkflow.kitchenSink },
   { taskQueue: 'lt-kitchen-sink-orch', workflow: kitchenSinkOrchWorkflow.kitchenSinkOrchestrator },
 ];
@@ -288,302 +283,6 @@ async function seedEscalationChains(): Promise<void> {
   loggerRegistry.info(`[examples] escalation chains verified (${SEED_CHAINS.length} entries)`);
 }
 
-// ── Seed MCP servers ─────────────────────────────────────────────────────────
-//
-// Register the built-in MCP servers so the dashboard shows them immediately.
-// These are in-process servers (no external transport) — the tool manifests
-// are pre-populated from the actual server definitions.
-
-const HUMAN_QUEUE_TOOLS = [
-  {
-    name: 'escalate_to_human',
-    description: 'Create a new escalation for human review. Returns the escalation ID.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        role: { type: 'string', description: 'Target role for the escalation (e.g., "reviewer")' },
-        message: { type: 'string', description: 'Description of what needs human review' },
-        data: { type: 'object', description: 'Contextual data for the reviewer' },
-        type: { type: 'string', description: 'Escalation type classification', default: 'mcp' },
-        subtype: { type: 'string', description: 'Escalation subtype', default: 'tool_call' },
-        priority: { type: 'number', description: 'Priority: 1 (highest) to 4 (lowest)', default: 2 },
-      },
-      required: ['role', 'message'],
-    },
-  },
-  {
-    name: 'check_resolution',
-    description: 'Check the status of an escalation. Returns status and resolver payload if resolved.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        escalation_id: { type: 'string', description: 'The escalation ID to check' },
-      },
-      required: ['escalation_id'],
-    },
-  },
-  {
-    name: 'get_available_work',
-    description: 'List available escalations for a role. Returns pending, unassigned escalations.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        role: { type: 'string', description: 'Role to filter by' },
-        limit: { type: 'number', description: 'Max results to return', default: 10 },
-      },
-      required: ['role'],
-    },
-  },
-  {
-    name: 'claim_and_resolve',
-    description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        escalation_id: { type: 'string', description: 'The escalation ID to claim and resolve' },
-        resolver_id: { type: 'string', description: 'Identifier for who/what is resolving' },
-        payload: { type: 'object', description: 'Resolution payload data' },
-      },
-      required: ['escalation_id', 'resolver_id', 'payload'],
-    },
-  },
-];
-
-const VISION_TOOLS = [
-  {
-    name: 'list_document_pages',
-    description: 'List available document page images from storage. Returns an array of image references.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
-    name: 'extract_member_info',
-    description: 'Extract member information from a document page image using AI Vision. Returns structured MemberInfo or null.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        image_ref: { type: 'string', description: 'Storage reference to the document page image' },
-        page_number: { type: 'integer', description: '1-based page number' },
-      },
-      required: ['image_ref', 'page_number'],
-    },
-  },
-  {
-    name: 'validate_member',
-    description: 'Validate extracted member information against the member database. Returns match, mismatch, or not_found.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        member_info: { type: 'object', description: 'Extracted member information to validate' },
-      },
-      required: ['member_info'],
-    },
-  },
-  {
-    name: 'rotate_page',
-    description: 'Rotate a document page image by the given degrees. Returns a new image reference for the rotated version.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        image_ref: { type: 'string', description: 'Storage reference to the image to rotate' },
-        degrees: { type: 'integer', description: 'Rotation degrees (90, 180, 270)' },
-      },
-      required: ['image_ref', 'degrees'],
-    },
-  },
-  {
-    name: 'translate_content',
-    description: 'Translate content text to the target language. Returns the translated content and detected source language.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        content: { type: 'string', description: 'The content text to translate' },
-        target_language: { type: 'string', description: 'Target language code (e.g. "en", "es")' },
-      },
-      required: ['content', 'target_language'],
-    },
-  },
-];
-
-const DB_QUERY_TOOLS = [
-  { name: 'find_tasks', description: 'Search tasks by status, workflow type, or origin.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'find_escalations', description: 'Search escalations by status, role, type, or priority.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'get_process_summary', description: 'Aggregate process view grouped by origin_id.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'get_escalation_stats', description: 'Real-time escalation statistics.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_workflow_types', description: 'List registered workflow configurations.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_system_health', description: 'Overall system health snapshot.', inputSchema: { type: 'object', properties: {} } },
-];
-
-const MCP_WORKFLOW_TOOLS = [
-  {
-    name: 'list_workflows',
-    description: 'Discover available compiled YAML workflows. These are deterministic pipelines converted from successful MCP triage executions.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', description: 'Filter by lifecycle status (default: "active")' },
-      },
-    },
-  },
-  {
-    name: 'get_workflow',
-    description: 'Inspect a compiled workflow by name. Returns the activity manifest, input/output schemas, and provenance.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workflow_name: { type: 'string', description: 'Name of the workflow to inspect' },
-      },
-      required: ['workflow_name'],
-    },
-  },
-  {
-    name: 'invoke_workflow',
-    description: 'Run a compiled YAML workflow by name. No LLM reasoning — direct tool-to-tool data piping.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workflow_name: { type: 'string', description: 'Name of the compiled workflow to invoke' },
-        input: { type: 'object', description: 'Input data matching the workflow input schema' },
-        async: { type: 'boolean', description: 'If true, fire-and-forget (returns job ID)' },
-        timeout: { type: 'number', description: 'Max ms to wait for result (sync mode only)' },
-      },
-      required: ['workflow_name'],
-    },
-  },
-];
-
-const WORKFLOW_COMPILER_TOOLS = [
-  {
-    name: 'convert_execution_to_yaml',
-    description: 'Analyze a completed workflow execution and convert its tool call sequence into a deterministic HotMesh YAML workflow.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workflow_id: { type: 'string', description: 'The workflow execution ID to analyze' },
-        task_queue: { type: 'string', description: 'HotMesh task queue' },
-        workflow_name: { type: 'string', description: 'Workflow name' },
-        yaml_name: { type: 'string', description: 'Name for the generated YAML workflow' },
-        description: { type: 'string', description: 'Optional description' },
-      },
-      required: ['workflow_id', 'task_queue', 'workflow_name', 'yaml_name'],
-    },
-  },
-  {
-    name: 'deploy_yaml_workflow',
-    description: 'Deploy a stored YAML workflow to HotMesh. Optionally activate immediately.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        yaml_workflow_id: { type: 'string', description: 'UUID of the stored YAML workflow' },
-        activate: { type: 'boolean', description: 'Whether to activate immediately after deployment' },
-      },
-      required: ['yaml_workflow_id'],
-    },
-  },
-  {
-    name: 'list_yaml_workflows',
-    description: 'List stored YAML workflows with optional status filter.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', description: 'Filter by status (draft, deployed, active, archived)' },
-        limit: { type: 'integer', description: 'Maximum results (default: 25)' },
-        offset: { type: 'integer', description: 'Pagination offset' },
-      },
-    },
-  },
-];
-
-const SEED_MCP_SERVERS = [
-  {
-    name: 'long-tail-db-query',
-    description: 'Read-only query tools for tasks, escalations, processes, and system health. Used by triage workflows to gather context before making decisions.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: DB_QUERY_TOOLS,
-    metadata: { builtin: true, category: 'database' },
-  },
-  {
-    name: 'long-tail-human-queue',
-    description: 'Built-in escalation and human queue management. Exposes the escalation API as MCP tools for AI agents and remediation workflows.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: HUMAN_QUEUE_TOOLS,
-    metadata: { builtin: true, category: 'escalation' },
-  },
-  {
-    name: 'mcp-workflows-longtail',
-    description: 'Compiled YAML workflows — hardened deterministic pipelines from successful MCP triage executions. Invoke proven solutions to edge cases without LLM reasoning.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: MCP_WORKFLOW_TOOLS,
-    metadata: { builtin: true, category: 'workflows' },
-  },
-  {
-    name: 'long-tail-workflow-compiler',
-    description: 'Convert dynamic MCP tool call sequences into deterministic YAML workflows. Analyze executions, generate pipelines, deploy and activate.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: WORKFLOW_COMPILER_TOOLS,
-    metadata: { builtin: true, category: 'compilation' },
-  },
-  {
-    name: 'long-tail-document-vision',
-    description: 'Document vision and analysis tools. Processes document images, extracts structured data, validates against databases, and handles translations.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: VISION_TOOLS,
-    metadata: { builtin: true, category: 'document-processing' },
-  },
-  {
-    name: 'long-tail-playwright',
-    description: 'Browser automation via Playwright. Navigate pages, take screenshots, click elements, fill forms, run JavaScript. Used for QA capture, visual regression, and documentation.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: [
-      { name: 'navigate', description: 'Open a URL in a new browser page.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' } }, required: ['url'] } },
-      { name: 'screenshot', description: 'Capture a screenshot and save as PNG.', inputSchema: { type: 'object', properties: { path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
-      { name: 'click', description: 'Click an element by CSS selector.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector'] } },
-      { name: 'fill', description: 'Type a value into an input field.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector', 'value'] } },
-      { name: 'wait_for', description: 'Wait for an element to appear on the page.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' }, timeout: { type: 'number' } }, required: ['selector'] } },
-      { name: 'evaluate', description: 'Evaluate JavaScript in the page context.', inputSchema: { type: 'object', properties: { script: { type: 'string' }, page_id: { type: 'string' } }, required: ['script'] } },
-      { name: 'list_pages', description: 'List all open browser pages.', inputSchema: { type: 'object', properties: {} } },
-      { name: 'close_page', description: 'Close a browser page by ID.', inputSchema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
-    ],
-    metadata: { builtin: true, category: 'browser-automation' },
-  },
-];
-
-async function seedMcpServers(): Promise<void> {
-  const pool = getPool();
-  for (const srv of SEED_MCP_SERVERS) {
-    try {
-      await pool.query(
-        `INSERT INTO lt_mcp_servers
-           (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, last_connected_at)
-         VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, NOW())
-         ON CONFLICT (name) DO UPDATE SET
-           tool_manifest = EXCLUDED.tool_manifest,
-           metadata = EXCLUDED.metadata,
-           description = EXCLUDED.description,
-           status = 'connected',
-           last_connected_at = NOW()`,
-        [
-          srv.name,
-          srv.description,
-          srv.transport_type,
-          JSON.stringify(srv.transport_config),
-          JSON.stringify(srv.tool_manifest),
-          JSON.stringify(srv.metadata),
-        ],
-      );
-    } catch (err: any) {
-      loggerRegistry.warn(`[examples] failed to seed MCP server ${srv.name}: ${err.message}`);
-    }
-  }
-  const totalTools = SEED_MCP_SERVERS.reduce((sum, s) => sum + s.tool_manifest.length, 0);
-  loggerRegistry.info(`[examples] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${totalTools} tools)`);
-}
-
 /**
  * Seed example workflows so the dashboard tells a story immediately.
  * Called automatically when `examples: true` is set in the start config.
@@ -592,7 +291,6 @@ export async function seedExamples(client: any): Promise<void> {
   await seedRoles();
   await seedUsers();
   await seedEscalationChains();
-  await seedMcpServers();
 
   for (const { workflowName, taskQueue, envelope, label } of SEED_ENVELOPES) {
     try {

@@ -28,6 +28,8 @@ export interface LTMcpServerRecord {
   /** Cached tool manifest from last listTools() */
   tool_manifest: LTMcpToolManifest[] | null;
   metadata: Record<string, any> | null;
+  /** Categorization tags for efficient tool discovery (e.g., ['database', 'analytics']) */
+  tags: string[];
   status: LTMcpServerStatus;
   last_connected_at: Date | null;
   created_at: Date;

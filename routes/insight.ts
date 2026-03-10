@@ -62,4 +62,57 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/insight/mcp-query
+ * Run a general-purpose MCP query using all available tools.
+ * Body: { prompt: string, tags?: string[] }
+ * Returns structured result from the mcpQuery workflow.
+ */
+router.post('/mcp-query', async (req, res) => {
+  try {
+    const { prompt, tags } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+      res.status(400).json({ error: 'prompt is required' });
+      return;
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      res.status(503).json({ error: 'MCP queries require OPENAI_API_KEY to be configured' });
+      return;
+    }
+
+    const startTime = Date.now();
+
+    const connection = { class: Postgres, options: postgres_options };
+    const client = new Durable.Client({ connection });
+
+    const workflowId = `mcp-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const handle = await client.workflow.start({
+      args: [{
+        data: { prompt, tags },
+        metadata: { source: 'dashboard' },
+      }],
+      taskQueue: 'lt-mcp-query',
+      workflowName: 'mcpQuery',
+      workflowId,
+    });
+
+    const result = await handle.result<Record<string, any>>({ state: true });
+    const data = (result as any)?.data || result;
+
+    res.json({
+      ...data,
+      prompt,
+      workflow_id: workflowId,
+      duration_ms: Date.now() - startTime,
+    });
+  } catch (err: any) {
+    if (err.message?.includes('timeout') || err.message?.includes('TIMEOUT')) {
+      res.status(504).json({ error: 'MCP query timed out. Try a simpler prompt.' });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

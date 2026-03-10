@@ -37,6 +37,8 @@ export { escalationStrategyRegistry } from './services/escalation-strategy';
 export { DefaultEscalationStrategy } from './services/escalation-strategy/default';
 export { McpEscalationStrategy } from './services/escalation-strategy/mcp';
 export { exampleWorkers, seedExamples } from './examples';
+export { getSystemWorkers, builtinMcpServerFactories } from './system';
+export { seedSystemMcpServers } from './system/seed';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
