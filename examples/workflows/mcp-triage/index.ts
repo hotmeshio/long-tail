@@ -1,5 +1,6 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
+import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
 
@@ -22,7 +23,7 @@ const {
   },
 });
 
-const MAX_TOOL_ROUNDS = 10;
+const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
 
 // ── Simple intent patterns (bypass LLM entirely) ─────────────
 

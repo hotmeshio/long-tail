@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
+import { LLM_MODEL_PRIMARY, LLM_MAX_TOKENS_DEFAULT } from '../../modules/defaults';
 import { createDbServer } from '../mcp/db-server';
 
 // ── In-process MCP clients (lazy singletons) ─────────────────
@@ -116,11 +117,11 @@ export async function callLLM(
   const openai = getOpenAI();
   const t0 = Date.now();
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: LLM_MODEL_PRIMARY,
     messages,
     ...(opts.tools?.length ? { tools: opts.tools } : {}),
     ...(opts.response_format ? { response_format: opts.response_format } : {}),
-    max_tokens: opts.max_tokens ?? (opts.tools?.length ? undefined : 1500),
+    max_tokens: opts.max_tokens ?? (opts.tools?.length ? undefined : LLM_MAX_TOKENS_DEFAULT),
   });
   const usage = response.usage;
   console.log(`[callLLM] ${Date.now() - t0}ms | in=${usage?.prompt_tokens} out=${usage?.completion_tokens} total=${usage?.total_tokens}`);

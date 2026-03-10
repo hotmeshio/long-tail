@@ -3,6 +3,10 @@ import { describe, it, expect } from 'vitest';
 import { parseVersionFromYaml } from '../services/yaml-workflow/db';
 import { compactForLlm } from '../services/yaml-workflow/workers';
 import { capToolArguments } from '../services/yaml-workflow/generator';
+import {
+  TOOL_ARG_LIMIT_CAP,
+  LLM_MAX_ARRAY_ITEMS,
+} from '../modules/defaults';
 
 // ── parseVersionFromYaml ───────────────────────────────────────
 
@@ -35,12 +39,12 @@ describe('parseVersionFromYaml', () => {
 // ── compactForLlm ──────────────────────────────────────────────
 
 describe('compactForLlm', () => {
-  it('truncates arrays longer than 25 items', () => {
-    const arr = Array.from({ length: 30 }, (_, i) => i);
+  it(`truncates arrays longer than ${LLM_MAX_ARRAY_ITEMS} items`, () => {
+    const arr = Array.from({ length: LLM_MAX_ARRAY_ITEMS + 5 }, (_, i) => i);
     const result = compactForLlm({ items: arr });
     const items = result.items as unknown[];
-    expect(items).toHaveLength(26); // 25 items + 1 truncation message
-    expect(items[25]).toBe('... (5 more)');
+    expect(items).toHaveLength(LLM_MAX_ARRAY_ITEMS + 1); // capped items + 1 truncation message
+    expect(items[LLM_MAX_ARRAY_ITEMS]).toBe('... (5 more)');
   });
 
   it('strips trace_id, span_id, and resolved_at from objects', () => {
@@ -74,13 +78,13 @@ describe('compactForLlm', () => {
 // ── capToolArguments ───────────────────────────────────────────
 
 describe('capToolArguments', () => {
-  it('caps limit > 25 to 25', () => {
-    expect(capToolArguments({ limit: 100 })).toEqual({ limit: 25 });
+  it(`caps limit > ${TOOL_ARG_LIMIT_CAP} to ${TOOL_ARG_LIMIT_CAP}`, () => {
+    expect(capToolArguments({ limit: 100 })).toEqual({ limit: TOOL_ARG_LIMIT_CAP });
   });
 
-  it('leaves limit <= 25 unchanged', () => {
+  it(`leaves limit <= ${TOOL_ARG_LIMIT_CAP} unchanged`, () => {
     expect(capToolArguments({ limit: 10 })).toEqual({ limit: 10 });
-    expect(capToolArguments({ limit: 25 })).toEqual({ limit: 25 });
+    expect(capToolArguments({ limit: TOOL_ARG_LIMIT_CAP })).toEqual({ limit: TOOL_ARG_LIMIT_CAP });
   });
 
   it('passes through other arguments unchanged', () => {

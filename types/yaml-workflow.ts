@@ -62,6 +62,6 @@ export interface ActivityManifestEntry {
   output_fields: string[];
   /** LLM prompt template — use {field} for interpolation from input maps (llm steps only) */
   prompt_template?: string;
-  /** LLM model identifier (llm steps only). Defaults to 'gpt-4o-mini'. */
+  /** LLM model identifier (llm steps only). Defaults to LLM_MODEL_SECONDARY from modules/defaults. */
   model?: string;
 }

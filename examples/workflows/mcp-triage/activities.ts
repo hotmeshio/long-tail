@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 
+import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
 import * as taskService from '../../../services/task';
@@ -173,7 +174,7 @@ export async function callTriageLLM(
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: LLM_MODEL_SECONDARY,
     messages,
     ...(tools?.length ? { tools } : {}),
   });

@@ -3,6 +3,12 @@ import { Client as Postgres } from 'pg';
 import type { StreamData, StreamDataResponse } from '@hotmeshio/hotmesh/build/types/stream';
 
 import { postgres_options } from '../../modules/config';
+import {
+  LLM_MAX_ARRAY_ITEMS,
+  LLM_MAX_INPUT_CHARS,
+  LLM_MAX_TOKENS_JSON,
+  LLM_MODEL_SECONDARY,
+} from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import { callDbTool, callLLM } from '../insight/activities';
 import * as mcpClient from '../mcp/client';
@@ -11,11 +17,6 @@ import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../types/ya
 
 /** Track which topics already have registered workers */
 const registeredTopics = new Set<string>();
-
-/** Max items to keep when truncating arrays before sending to the LLM. */
-const LLM_MAX_ARRAY_ITEMS = 25;
-/** Max characters for the serialized input payload sent to the LLM. */
-const LLM_MAX_INPUT_CHARS = 12_000;
 
 /**
  * Compact input data for LLM consumption: truncate large arrays and
@@ -52,7 +53,7 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
     const rawInput = (data.data || {}) as Record<string, unknown>;
     const input = compactForLlm(rawInput);
     const template = activity.prompt_template || '';
-    const model = activity.model || 'gpt-4o-mini';
+    const model = activity.model || LLM_MODEL_SECONDARY;
 
     // Serialize and enforce hard character limit
     let inputJson = JSON.stringify(input, null, 2);
@@ -86,7 +87,7 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
 
     // Call the LLM with JSON mode for structured output
     const response = await callLLM(messages as any, {
-      max_tokens: 800,
+      max_tokens: LLM_MAX_TOKENS_JSON,
       response_format: { type: 'json_object' },
     });
     const content = response.content || '';

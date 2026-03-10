@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
+import { QUERY_LIMIT_MAX } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import * as yamlDb from '../yaml-workflow/db';
 import * as yamlDeployer from '../yaml-workflow/deployer';
@@ -65,7 +66,7 @@ export async function createWorkflowServer(options?: {
     async (args: z.infer<typeof listWorkflowsSchema>) => {
       const { workflows } = await yamlDb.listYamlWorkflows({
         status: args.status || 'active',
-        limit: 100,
+        limit: QUERY_LIMIT_MAX,
       });
       const items = workflows.map((wf) => ({
         name: wf.name,

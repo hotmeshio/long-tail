@@ -1,4 +1,5 @@
 import { getPool } from '../db';
+import { YAML_LIST_LIMIT, YAML_VERSION_LIMIT } from '../../modules/defaults';
 import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus, LTYamlWorkflowVersionRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
 
 export interface CreateYamlWorkflowInput {
@@ -216,7 +217,7 @@ export async function listYamlWorkflows(filters: {
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = filters.limit || 50;
+  const limit = filters.limit || YAML_LIST_LIMIT;
   const offset = filters.offset || 0;
 
   const [countResult, dataResult] = await Promise.all([
@@ -289,7 +290,7 @@ export async function createVersionSnapshot(
 
 export async function getVersionHistory(
   workflowId: string,
-  limit = 20,
+  limit = YAML_VERSION_LIMIT,
   offset = 0,
 ): Promise<{ versions: LTYamlWorkflowVersionRecord[]; total: number }> {
   const pool = getPool();

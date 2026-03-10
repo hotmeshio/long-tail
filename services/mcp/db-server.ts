@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
+import { QUERY_LIMIT_DEFAULT, QUERY_LIMIT_MAX } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import { getPool } from '../db';
 import * as taskService from '../task';
@@ -17,7 +18,7 @@ const findTasksSchema = z.object({
   workflow_type: z.string().optional().describe('Filter by workflow type (e.g. "processClaim")'),
   workflow_id: z.string().optional().describe('Filter by workflow execution ID'),
   origin_id: z.string().optional().describe('Filter by origin/process ID to see all tasks in a process'),
-  limit: z.number().int().min(1).max(100).optional().default(25)
+  limit: z.number().int().min(1).max(QUERY_LIMIT_MAX).optional().default(QUERY_LIMIT_DEFAULT)
     .describe('Maximum number of results'),
 });
 
@@ -28,14 +29,14 @@ const findEscalationsSchema = z.object({
   type: z.string().optional().describe('Filter by escalation type'),
   priority: z.number().int().min(1).max(4).optional()
     .describe('Filter by priority (1=critical, 4=low)'),
-  limit: z.number().int().min(1).max(100).optional().default(25)
+  limit: z.number().int().min(1).max(QUERY_LIMIT_MAX).optional().default(QUERY_LIMIT_DEFAULT)
     .describe('Maximum number of results'),
 });
 
 const getProcessSummarySchema = z.object({
   workflow_type: z.string().optional()
     .describe('Filter processes to those containing this workflow type'),
-  limit: z.number().int().min(1).max(100).optional().default(25)
+  limit: z.number().int().min(1).max(QUERY_LIMIT_MAX).optional().default(QUERY_LIMIT_DEFAULT)
     .describe('Maximum number of processes'),
 });
 

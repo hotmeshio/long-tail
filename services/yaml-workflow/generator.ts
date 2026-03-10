@@ -2,6 +2,12 @@
 const yaml = require('js-yaml');
 
 import { exportWorkflowExecution } from '../export';
+import {
+  LLM_MODEL_SECONDARY,
+  TOOL_ARG_LIMIT_CAP,
+  WORKFLOW_EXPIRE_SECS,
+  YAML_LINE_WIDTH,
+} from '../../modules/defaults';
 import type { ActivityManifestEntry } from '../../types/yaml-workflow';
 import type {
   WorkflowExecution,
@@ -14,8 +20,8 @@ import type {
 /** Cap `limit` in tool arguments to avoid sending huge payloads to downstream LLM steps. */
 export function capToolArguments(args: Record<string, unknown>): Record<string, unknown> {
   const capped = { ...args };
-  if (typeof capped.limit === 'number' && capped.limit > 25) {
-    capped.limit = 25;
+  if (typeof capped.limit === 'number' && capped.limit > TOOL_ARG_LIMIT_CAP) {
+    capped.limit = TOOL_ARG_LIMIT_CAP;
   }
   return capped;
 }
@@ -384,7 +390,7 @@ export async function generateYamlFromExecution(
       input_mappings: inputMappings,
       output_fields: outputFields,
       ...(promptTemplate ? { prompt_template: promptTemplate } : {}),
-      ...(step.kind === 'llm' ? { model: 'gpt-4o-mini' } : {}),
+      ...(step.kind === 'llm' ? { model: LLM_MODEL_SECONDARY } : {}),
     });
 
     // Transition from previous
@@ -402,7 +408,7 @@ export async function generateYamlFromExecution(
       graphs: [
         {
           subscribes: graphTopic,
-          expire: 120,
+          expire: WORKFLOW_EXPIRE_SECS,
           input: { schema: inputSchema },
           output: { schema: outputSchema },
           activities,
@@ -413,7 +419,7 @@ export async function generateYamlFromExecution(
   };
 
   const yamlContent = yaml.dump(graphDef, {
-    lineWidth: 120,
+    lineWidth: YAML_LINE_WIDTH,
     noRefs: true,
     sortKeys: false,
   });

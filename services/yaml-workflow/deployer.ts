@@ -6,6 +6,7 @@ import type { HotMeshManifest } from '@hotmeshio/hotmesh/build/types/hotmesh';
 const yaml = require('js-yaml');
 
 import { postgres_options } from '../../modules/config';
+import { YAML_LINE_WIDTH, WORKFLOW_SYNC_TIMEOUT_MS } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import * as namespaceService from '../namespace';
 import * as yamlDb from './db';
@@ -57,7 +58,7 @@ export async function buildMergedYaml(appId: string, version: string): Promise<s
     },
   };
 
-  return yaml.dump(merged, { lineWidth: 120, noRefs: true, sortKeys: false });
+  return yaml.dump(merged, { lineWidth: YAML_LINE_WIDTH, noRefs: true, sortKeys: false });
 }
 
 /**
@@ -136,7 +137,7 @@ export async function invokeYamlWorkflowSync(
 ): Promise<{ job_id: string; result: Record<string, unknown> }> {
   const hotmesh = await getEngine(appId);
   const engine = (hotmesh as any).engine;
-  const timeoutMs = timeout ?? 120_000;
+  const timeoutMs = timeout ?? WORKFLOW_SYNC_TIMEOUT_MS;
 
   // Build context with engine GUID for one-time subscription routing
   // (exactly as engine.pubsub does)

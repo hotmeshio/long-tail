@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import OpenAI from 'openai';
 
+import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { MemberInfo } from './types';
 
 /**
@@ -61,7 +62,7 @@ export async function extractMemberInfo(
   const openai = new OpenAI({ apiKey });
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: LLM_MODEL_SECONDARY,
     messages: [
       {
         role: 'user',
