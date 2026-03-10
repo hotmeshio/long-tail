@@ -34,7 +34,6 @@ export function useEscalationStats(period?: string) {
   return useQuery<EscalationStats>({
     queryKey: ['escalationStats', period],
     queryFn: () => apiFetch(`/escalations/stats${params}`),
-    refetchInterval: 10_000,
   });
 }
 
@@ -61,7 +60,6 @@ export function useEscalations(filters: EscalationFilters) {
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', filters],
     queryFn: () => apiFetch(`/escalations?${params}`),
-    refetchInterval: 10_000,
   });
 }
 
@@ -79,7 +77,6 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', 'available', filters],
     queryFn: () => apiFetch(`/escalations/available?${params}`),
-    refetchInterval: 10_000,
   });
 }
 

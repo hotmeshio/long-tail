@@ -55,7 +55,7 @@ interface FilterInputProps {
 
 export function FilterInput({ label, value, onChange, placeholder }: FilterInputProps) {
   const [local, setLocal] = useState(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Sync from parent when the URL-driven value changes externally
   useEffect(() => { setLocal(value); }, [value]);

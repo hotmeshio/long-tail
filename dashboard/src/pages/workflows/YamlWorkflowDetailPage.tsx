@@ -67,22 +67,33 @@ function formatMetadataValue(key: string, value: unknown): string {
 
 // ── Sub-components ────────────────────────────────────────────
 
-function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl }: {
+function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl, namespace }: {
   result: Record<string, unknown>; showMetadata: boolean;
-  onToggleMetadata: () => void; traceUrl?: string | null;
+  onToggleMetadata: () => void; traceUrl?: string | null; namespace?: string;
 }) {
   const raw = (result as any)?.result ?? result;
+  const jobId = (result as any)?.job_id as string | undefined;
   const hasEnvelope = raw?.metadata && raw?.data;
   const displayData = hasEnvelope ? raw.data : raw;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Result</span>
-        {hasEnvelope && (
-          <button type="button" onClick={onToggleMetadata} className="text-[10px] text-accent hover:underline">
-            {showMetadata ? 'Hide metadata' : 'Show metadata'}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {jobId && (
+            <Link
+              to={`/mcp/runs/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(namespace || 'longtail')}`}
+              className="text-[10px] text-accent hover:underline"
+            >
+              View Execution Details
+            </Link>
+          )}
+          {hasEnvelope && (
+            <button type="button" onClick={onToggleMetadata} className="text-[10px] text-accent hover:underline">
+              {showMetadata ? 'Hide metadata' : 'Show metadata'}
+            </button>
+          )}
+        </div>
       </div>
       {showMetadata && hasEnvelope && (
         <div className="bg-surface-raised border border-surface-border rounded-md p-3">
@@ -551,7 +562,7 @@ export function YamlWorkflowDetailPage() {
               <Field label="Topic" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
               <Field label="Steps" value={<span className="text-xs">{workerActivities.length}</span>} />
               {wf.source_workflow_id && (
-                <Field label="Source" value={
+                <Field label="Source MCP Workflow" value={
                   <Link to={`/workflows/detail/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
                     {wf.source_workflow_id}
                   </Link>
@@ -559,7 +570,7 @@ export function YamlWorkflowDetailPage() {
               )}
               <Field label="Invocations" value={
                 <Link to={`/mcp/runs?entity=${encodeURIComponent(wf.graph_topic)}&namespace=${encodeURIComponent(wf.app_id)}`} className="text-xs text-accent hover:underline">
-                  View runs &rarr;
+                  View runs
                 </Link>
               } />
               <Field label="Created" value={<span className="text-xs">{new Date(wf.created_at).toLocaleString()}</span>} />
@@ -751,6 +762,7 @@ export function YamlWorkflowDetailPage() {
                     showMetadata={showMetadata}
                     onToggleMetadata={() => setShowMetadata(!showMetadata)}
                     traceUrl={settings?.telemetry?.traceUrl}
+                    namespace={wf.app_id}
                   />
                   <button
                     onClick={() => { setInvokeResult(null); invokeMutation.reset(); }}

@@ -93,9 +93,6 @@ const McpServersPage = lazy(() =>
 const UsersPage = lazy(() =>
   import('./pages/admin/users').then((m) => ({ default: m.UsersPage })),
 );
-const EscalationChainsPage = lazy(() =>
-  import('./pages/admin/escalation-chains').then((m) => ({ default: m.EscalationChainsPage })),
-);
 const RolesPage = lazy(() =>
   import('./pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
 );
@@ -197,7 +194,7 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
-          { path: 'admin/escalation-chains', element: <Lazy><EscalationChainsPage /></Lazy> },
+          { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
         ],

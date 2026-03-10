@@ -21,7 +21,6 @@ export function useMcpServers(filters: McpServerFilters = {}) {
   return useQuery<McpServerListResponse>({
     queryKey: ['mcpServers', filters],
     queryFn: () => apiFetch(`/mcp/servers${qs ? `?${qs}` : ''}`),
-    refetchInterval: 30_000,
   });
 }
 

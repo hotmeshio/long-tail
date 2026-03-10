@@ -326,13 +326,14 @@ router.post('/:id/invoke', async (req, res) => {
     }
     const data = req.body.data || {};
     if (req.body.sync) {
-      const result = await yamlDeployer.invokeYamlWorkflowSync(
+      const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
         data,
         req.body.timeout,
+        wf.graph_topic,
       );
-      res.json({ result });
+      res.json({ job_id, result });
     } else {
       const jobId = await yamlDeployer.invokeYamlWorkflow(
         wf.app_id,

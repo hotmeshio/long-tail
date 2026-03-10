@@ -51,7 +51,6 @@ export function useTasks(filters: TaskFilters) {
   return useQuery<TaskListResponse>({
     queryKey: ['tasks', filters],
     queryFn: () => apiFetch(`/tasks?${params}`),
-    refetchInterval: 15_000,
   });
 }
 
@@ -120,7 +119,6 @@ export function useProcessStats(period?: string) {
   return useQuery<ProcessStats>({
     queryKey: ['processStats', period],
     queryFn: () => apiFetch(`/tasks/processes/stats${params}`),
-    refetchInterval: 10_000,
   });
 }
 
@@ -143,7 +141,6 @@ export function useProcesses(filters?: {
   return useQuery<ProcessListResponse>({
     queryKey: ['processes', filters],
     queryFn: () => apiFetch(`/tasks/processes?${params}`),
-    refetchInterval: 30_000,
   });
 }
 

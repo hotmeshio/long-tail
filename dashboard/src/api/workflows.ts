@@ -19,7 +19,6 @@ export function useCronStatus() {
       const res = await apiFetch<{ schedules: CronScheduleEntry[] }>('/workflows/cron/status');
       return res.schedules;
     },
-    refetchInterval: 30_000,
   });
 }
 
@@ -61,7 +60,6 @@ export function useJobs(filters: {
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['jobs', filters],
     queryFn: () => apiFetch(`/workflow-states/jobs?${params}`),
-    refetchInterval: 10_000,
   });
 }
 

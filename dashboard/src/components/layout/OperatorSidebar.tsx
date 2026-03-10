@@ -7,5 +7,5 @@ const entries: NavEntry[] = [
 ];
 
 export function OperatorSidebar() {
-  return <SidebarNav heading="HITL Escalations" headingTo="/escalations" entries={entries} />;
+  return <SidebarNav heading="Escalations" headingTo="/escalations" entries={entries} />;
 }

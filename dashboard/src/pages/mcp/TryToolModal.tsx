@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { RotateCcw, Play } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { RotateCcw, Play, ExternalLink } from 'lucide-react';
 import { useCallMcpTool } from '../../api/mcp';
 import { Modal } from '../../components/common/Modal';
 import { JsonViewer } from '../../components/common/JsonViewer';
@@ -80,7 +81,23 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
           </div>
         )}
         {callTool.data ? (
-          <JsonViewer data={callTool.data as Record<string, unknown>} label="Response" />
+          <div className="space-y-2">
+            <JsonViewer data={callTool.data as Record<string, unknown>} label="Response" />
+            {(() => {
+              const res = (callTool.data as any)?.result;
+              const jobId = res?.job_id;
+              const ns = res?.namespace || 'longtail';
+              return jobId ? (
+                <Link
+                  to={`/mcp/runs/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(ns)}`}
+                  className="inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
+                >
+                  <ExternalLink size={12} />
+                  View Execution Details
+                </Link>
+              ) : null;
+            })()}
+          </div>
         ) : null}
         {callTool.error ? (
           <div>

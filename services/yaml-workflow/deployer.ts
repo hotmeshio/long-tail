@@ -119,18 +119,53 @@ export async function invokeYamlWorkflow(
 
 /**
  * Invoke a YAML workflow and wait for the result.
- * Uses engine.pubsub which internally subscribes, publishes, and
- * unsubscribes — handling the full request/response lifecycle.
+ *
+ * Replicates HotMesh's engine.pubsub() logic exactly, but adds the
+ * `extended` parameter (where entity lives) to the internal pub() call.
+ * HotMesh's pubsub omits extended, so entity was never set.
+ *
+ * Source: @hotmeshio/hotmesh engine/index.js pubsub()
  */
 export async function invokeYamlWorkflowSync(
   appId: string,
   topic: string,
   data: Record<string, unknown>,
   timeout?: number,
-): Promise<Record<string, unknown>> {
-  const engine = await getEngine(appId);
-  const result = await engine.pubsub(topic, data, null, timeout ?? 120000);
-  return result as unknown as Record<string, unknown>;
+  entity?: string,
+): Promise<{ job_id: string; result: Record<string, unknown> }> {
+  const hotmesh = await getEngine(appId);
+  const engine = (hotmesh as any).engine;
+  const timeoutMs = timeout ?? 120_000;
+
+  // Build context with engine GUID for one-time subscription routing
+  // (exactly as engine.pubsub does)
+  const context = {
+    metadata: {
+      ngn: engine.guid,
+    },
+  };
+
+  // Publish with entity via extended param
+  const extended = entity ? { entity } : undefined;
+  const jobId: string = await engine.pub(topic, data, context, extended);
+
+  return new Promise((resolve, reject) => {
+    engine.registerJobCallback(jobId, (_topic: string, output: any) => {
+      if (output.metadata.err) {
+        const error = JSON.parse(output.metadata.err);
+        reject({ error, job_id: output.metadata.jid });
+      } else {
+        resolve({
+          job_id: jobId,
+          result: output as unknown as Record<string, unknown>,
+        });
+      }
+    });
+    setTimeout(() => {
+      engine.delistJobCallback(jobId);
+      reject({ code: 598, message: 'timeout', job_id: jobId });
+    }, timeoutMs);
+  });
 }
 
 /**

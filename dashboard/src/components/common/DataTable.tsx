@@ -16,6 +16,8 @@ interface DataTableProps<T> {
   data: T[];
   keyFn: (row: T) => string;
   onRowClick?: (row: T) => void;
+  /** Highlight the row whose keyFn matches this value. */
+  activeRowKey?: string | null;
   isLoading?: boolean;
   emptyMessage?: string;
   /** Current sort state — pass to show active sort indicator. */
@@ -45,6 +47,7 @@ export function DataTable<T>({
   data,
   keyFn,
   onRowClick,
+  activeRowKey,
   isLoading,
   emptyMessage = 'No records found',
   sort,
@@ -94,13 +97,15 @@ export function DataTable<T>({
         </tr>
       </thead>
       <tbody>
-        {data.map((row, index) => (
+        {data.map((row, index) => {
+          const isActive = activeRowKey != null && keyFn(row) === activeRowKey;
+          return (
           <tr
             key={keyFn(row)}
             onClick={onRowClick ? () => onRowClick(row) : undefined}
             className={`group/row border-b last:border-b-0 transition-colors duration-100 ${
               onRowClick ? 'cursor-pointer row-hover' : ''
-            }`}
+            } ${isActive ? 'bg-accent/5 border-l-2 border-l-accent' : ''}`}
           >
             {columns.map((col) => (
               <td
@@ -111,7 +116,8 @@ export function DataTable<T>({
               </td>
             ))}
           </tr>
-        ))}
+          );
+        })}
       </tbody>
     </table>
   );

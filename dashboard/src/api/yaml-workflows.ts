@@ -28,7 +28,6 @@ export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
   return useQuery<YamlWorkflowListResponse>({
     queryKey: ['yamlWorkflows', filters],
     queryFn: () => apiFetch(`/yaml-workflows?${params}`),
-    refetchInterval: 10_000,
   });
 }
 

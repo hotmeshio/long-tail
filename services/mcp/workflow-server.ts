@@ -189,16 +189,19 @@ export async function createWorkflowServer(options?: {
         };
       }
 
-      const result = await yamlDeployer.invokeYamlWorkflowSync(
+      const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
         args.input || {},
         args.timeout,
+        wf.graph_topic,
       );
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
+            job_id,
+            namespace: wf.app_id,
             workflow: wf.name,
             status: 'completed',
             result,
