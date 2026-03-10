@@ -8,6 +8,7 @@ export interface CreateMcpServerInput {
   transport_config: Record<string, any>;
   auto_connect?: boolean;
   metadata?: Record<string, any>;
+  tags?: string[];
 }
 
 export async function createMcpServer(
@@ -16,8 +17,8 @@ export async function createMcpServer(
   const pool = getPool();
   const { rows } = await pool.query(
     `INSERT INTO lt_mcp_servers
-       (name, description, transport_type, transport_config, auto_connect, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6)
+       (name, description, transport_type, transport_config, auto_connect, metadata, tags)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
       input.name,
@@ -26,6 +27,7 @@ export async function createMcpServer(
       JSON.stringify(input.transport_config),
       input.auto_connect ?? false,
       input.metadata ? JSON.stringify(input.metadata) : null,
+      input.tags || [],
     ],
   );
   return rows[0];
@@ -51,7 +53,7 @@ export async function getMcpServerByName(name: string): Promise<LTMcpServerRecor
 
 export async function updateMcpServer(
   id: string,
-  updates: Partial<Pick<CreateMcpServerInput, 'name' | 'description' | 'transport_type' | 'transport_config' | 'auto_connect' | 'metadata'>>,
+  updates: Partial<Pick<CreateMcpServerInput, 'name' | 'description' | 'transport_type' | 'transport_config' | 'auto_connect' | 'metadata' | 'tags'>>,
 ): Promise<LTMcpServerRecord | null> {
   const pool = getPool();
   const sets: string[] = [];
@@ -81,6 +83,10 @@ export async function updateMcpServer(
   if (updates.metadata !== undefined) {
     sets.push(`metadata = $${idx++}`);
     values.push(JSON.stringify(updates.metadata));
+  }
+  if (updates.tags !== undefined) {
+    sets.push(`tags = $${idx++}`);
+    values.push(updates.tags);
   }
 
   if (sets.length === 0) return getMcpServer(id);
@@ -127,6 +133,7 @@ export async function listMcpServers(filters: {
   status?: LTMcpServerStatus;
   auto_connect?: boolean;
   search?: string;
+  tags?: string[];
   limit?: number;
   offset?: number;
 }): Promise<{ servers: LTMcpServerRecord[]; total: number }> {
@@ -147,6 +154,10 @@ export async function listMcpServers(filters: {
     conditions.push(`(name ILIKE $${idx} OR description ILIKE $${idx} OR tool_manifest::text ILIKE $${idx})`);
     values.push(`%${filters.search}%`);
     idx++;
+  }
+  if (filters.tags?.length) {
+    conditions.push(`tags && $${idx++}::text[]`);
+    values.push(filters.tags);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -171,6 +182,25 @@ export async function getAutoConnectServers(): Promise<LTMcpServerRecord[]> {
   const pool = getPool();
   const { rows } = await pool.query(
     'SELECT * FROM lt_mcp_servers WHERE auto_connect = true ORDER BY name',
+  );
+  return rows;
+}
+
+/**
+ * Find MCP servers by tags.
+ * @param tags - Tags to filter by
+ * @param match - 'any' (OR — server has at least one tag) or 'all' (AND — server has all tags)
+ */
+export async function findServersByTags(
+  tags: string[],
+  match: 'any' | 'all' = 'any',
+): Promise<LTMcpServerRecord[]> {
+  if (!tags.length) return [];
+  const pool = getPool();
+  const operator = match === 'all' ? '@>' : '&&';
+  const { rows } = await pool.query(
+    `SELECT * FROM lt_mcp_servers WHERE tags ${operator} $1::text[] ORDER BY name`,
+    [tags],
   );
   return rows;
 }

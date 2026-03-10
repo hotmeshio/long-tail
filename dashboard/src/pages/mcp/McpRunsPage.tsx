@@ -64,7 +64,7 @@ const columns: Column<LTJob>[] = [
 export function McpRunsPage() {
   const navigate = useNavigate();
   const { filters, setFilter, setFilters, pagination } = useFilterParams({
-    filters: { search: '', entity: '', status: '', namespace: 'longtail' },
+    filters: { search: '', entity: '', status: '', namespace: '' },
   });
 
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -75,9 +75,9 @@ export function McpRunsPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 
-  const activeNamespace = filters.namespace || 'longtail';
-
   const { data: appIdData } = useYamlWorkflowAppIds();
+  const firstAppId = appIdData?.app_ids?.[0] ?? '';
+  const activeNamespace = filters.namespace || firstAppId;
   const { data: entitiesData } = useMcpEntities(activeNamespace);
 
   const { data: runsData, isLoading } = useMcpRuns({

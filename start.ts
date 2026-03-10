@@ -143,19 +143,16 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   const connection = { class: Postgres, options: postgres_options };
   let httpServer: ReturnType<typeof express.application.listen> | null = null;
 
+  // System workers always load (mcp-triage, insight when OPENAI_API_KEY set)
+  const { getSystemWorkers, builtinMcpServerFactories } = await import('./system');
+  const allWorkers = [...getSystemWorkers(), ...(startConfig.workers ?? [])];
+  loggerRegistry.info('[long-tail] system workflows loaded');
+
   // Merge example workers when examples flag is set
-  const allWorkers = [...(startConfig.workers ?? [])];
   if (startConfig.examples) {
     const { exampleWorkers } = await import('./examples');
     allWorkers.push(...exampleWorkers);
     loggerRegistry.info('[long-tail] example workflows loaded');
-  }
-
-  // Register insight worker when OpenAI is available
-  if (process.env.OPENAI_API_KEY) {
-    const { insightQuery } = await import('./services/insight');
-    allWorkers.push({ taskQueue: 'lt-insight', workflow: insightQuery });
-    loggerRegistry.info('[long-tail] insight workflow loaded');
   }
 
   if (allWorkers.length) {
@@ -205,26 +202,21 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       loggerRegistry.info('[long-tail] MCP adapter connected');
     }
 
-    // Register built-in MCP server factories so resolveClient can auto-connect
+    // Register built-in MCP server factories from system/
     const { registerBuiltinServer } = await import('./services/mcp/client');
-    const { createVisionServer } = await import('./services/mcp/vision-server');
-    const { createHumanQueueServer } = await import('./services/mcp/server');
-    const { createWorkflowServer } = await import('./services/mcp/workflow-server');
-    const { createWorkflowCompilerServer } = await import('./services/mcp/workflow-compiler-server');
-    const { createDbServer } = await import('./services/mcp/db-server');
-    const { createPlaywrightServer } = await import('./services/mcp/playwright-server');
-    registerBuiltinServer('long-tail-document-vision', createVisionServer);
-    registerBuiltinServer('long-tail-human-queue', createHumanQueueServer);
-    registerBuiltinServer('mcp-workflows-longtail', createWorkflowServer);
-    registerBuiltinServer('long-tail-workflow-compiler', createWorkflowCompilerServer);
-    registerBuiltinServer('long-tail-db', createDbServer);
-    registerBuiltinServer('long-tail-playwright', createPlaywrightServer);
+    for (const [name, factory] of Object.entries(builtinMcpServerFactories)) {
+      registerBuiltinServer(name, factory);
+    }
+    loggerRegistry.info(`[long-tail] ${Object.keys(builtinMcpServerFactories).length} MCP server factories registered`);
 
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
-  // ── 5b. Seed example workflows (fire-and-forget after workers are up) ─
+  // ── 5b. Seed system MCP servers (always) + example data (when enabled) ─
+  const { seedSystemMcpServers } = await import('./system/seed');
+  await seedSystemMcpServers();
+
   if (startConfig.examples) {
     const { seedExamples } = await import('./examples');
     const seedClient = new Durable.Client({ connection });

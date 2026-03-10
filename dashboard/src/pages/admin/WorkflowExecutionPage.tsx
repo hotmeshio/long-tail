@@ -8,7 +8,7 @@ import { useEscalationsByWorkflowId } from '../../api/escalations';
 import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
 
 import { PageHeader } from '../../components/common/PageHeader';
-import { Collapsible } from '../../components/common/Collapsible';
+import { CollapsibleSection } from '../../components/common/CollapsibleSection';
 import { ConvertToYamlModal } from '../../components/common/ConvertToYamlModal';
 
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
@@ -16,45 +16,6 @@ import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult'
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
 import { EventTable } from './workflow-execution/EventTable';
 import { RestartPanel } from './workflow-execution/RestartPanel';
-
-// ── Collapsible section wrapper ──────────────────────────────────────────────
-
-function CollapsibleSection({
-  title,
-  sectionKey,
-  isCollapsed,
-  onToggle,
-  children,
-}: {
-  title: string;
-  sectionKey: string;
-  isCollapsed: boolean;
-  onToggle: (key: string) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <button
-        onClick={() => onToggle(sectionKey)}
-        className="flex items-center gap-3 w-full group/section"
-      >
-        <svg
-          className={`w-4 h-4 shrink-0 text-text-tertiary/40 group-hover/section:text-text-tertiary transition-all duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-        <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-200 ${isCollapsed ? 'text-text-tertiary' : 'text-text-secondary'}`}>
-          {title}
-        </span>
-        <span className="flex-1 border-b border-surface-border" />
-      </button>
-      <Collapsible open={!isCollapsed}>
-        <div className="mt-4 ml-9">{children}</div>
-      </Collapsible>
-    </div>
-  );
-}
 
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -215,18 +176,18 @@ export function WorkflowExecutionPage() {
       />
 
       <div className="space-y-6">
-        <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle}>
+        <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle} contentClassName="mt-4 ml-9">
           <ExecutionInputResult execution={execution} envelope={task?.envelope} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle}>
+        <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle} contentClassName="mt-4 ml-9">
           <SwimlaneTimeline
             events={execution.events}
             childTasks={childTasksData?.tasks}
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle}>
+        <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle} contentClassName="mt-4 ml-9">
           <EventTable
             events={execution.events}
             childTasks={childTasksData?.tasks}

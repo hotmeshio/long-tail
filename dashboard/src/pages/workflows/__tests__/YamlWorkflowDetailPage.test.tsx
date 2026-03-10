@@ -191,18 +191,18 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText('vision/extract_member_info')).toBeInTheDocument();
   });
 
-  // ── Config tab ──
+  // ── Configuration section ──
 
-  it('shows YAML content on Config tab', () => {
+  it('shows YAML content on Configuration section', () => {
     renderPage();
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     expect(screen.getByText(/app:/)).toBeInTheDocument();
     expect(screen.getByText(/id: lt-yaml/)).toBeInTheDocument();
   });
 
-  it('shows YAML Guide link on Config tab', () => {
+  it('shows YAML Guide link on Configuration section', () => {
     renderPage();
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     expect(screen.getByText('YAML Guide')).toBeInTheDocument();
   });
 
@@ -210,36 +210,36 @@ describe('YamlWorkflowDetailPage', () => {
 
   it('shows Edit button for draft workflows', () => {
     renderPage();
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     expect(screen.getByText('Edit')).toBeInTheDocument();
   });
 
   it('does NOT show Edit button for archived workflows', () => {
     setupMocks(archivedWorkflow as any);
     renderPage('wf-3');
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     expect(screen.queryByText('Edit')).not.toBeInTheDocument();
   });
 
-  it('switches to editable textarea when Edit is clicked', () => {
+  it('switches to editable textareas when Edit is clicked', () => {
     renderPage();
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     fireEvent.click(screen.getByText('Edit'));
-    // YAML textarea appears (the assistant input is type="text", not textarea)
+    // Three textareas: input schema, output schema, YAML
     const textareas = document.querySelectorAll('textarea');
-    expect(textareas.length).toBeGreaterThanOrEqual(1);
+    expect(textareas.length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText('Cancel')).toBeInTheDocument();
     expect(screen.getByText('Save')).toBeInTheDocument();
   });
 
   it('reverts to read-only on Cancel', () => {
     renderPage();
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     fireEvent.click(screen.getByText('Edit'));
 
-    // Modify the YAML textarea (first textarea on the page)
-    const textarea = document.querySelector('textarea')!;
-    fireEvent.change(textarea, { target: { value: 'modified yaml' } });
+    // Modify the YAML textarea (last textarea)
+    const textareas = document.querySelectorAll('textarea');
+    fireEvent.change(textareas[textareas.length - 1], { target: { value: 'modified yaml' } });
 
     // Cancel
     fireEvent.click(screen.getByText('Cancel'));
@@ -250,27 +250,32 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText(/app:/)).toBeInTheDocument();
   });
 
-  it('calls updateMutation on Save', async () => {
+  it('calls updateMutation on Save with schemas and YAML', async () => {
     const mutateAsync = vi.fn().mockResolvedValue({});
     vi.mocked(useUpdateYamlWorkflow).mockReturnValue({
       ...baseMutation, mutateAsync,
     } as any);
 
     renderPage();
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     fireEvent.click(screen.getByText('Edit'));
 
-    // Modify the YAML textarea
-    const textarea = document.querySelector('textarea')!;
-    fireEvent.change(textarea, { target: { value: 'new yaml content' } });
+    // In edit mode there are 3 textareas: input schema, output schema, YAML
+    const textareas = document.querySelectorAll('textarea');
+    expect(textareas.length).toBeGreaterThanOrEqual(3);
+
+    // Modify the YAML textarea (last one)
+    fireEvent.change(textareas[textareas.length - 1], { target: { value: 'new yaml content' } });
 
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
-      expect(mutateAsync).toHaveBeenCalledWith({
-        id: 'wf-1',
-        yaml_content: 'new yaml content',
-      });
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'wf-1',
+          yaml_content: 'new yaml content',
+        }),
+      );
     });
   });
 
@@ -278,7 +283,7 @@ describe('YamlWorkflowDetailPage', () => {
 
   it('shows Deploy button for draft status', () => {
     renderPage();
-    expect(screen.getByText('Deploy')).toBeInTheDocument();
+    expect(screen.getAllByText('Deploy').length).toBeGreaterThanOrEqual(1);
   });
 
   it('treats deployed status as active (deploy auto-activates)', () => {
@@ -303,34 +308,31 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getByText('Regenerate')).toBeInTheDocument();
   });
 
-  // ── Invoke tab ──
+  // ── Invoke / Try section ──
 
-  it('shows Invoke tab only for active workflows', () => {
+  it('shows Invoke / Try section only for active workflows', () => {
     setupMocks(activeWorkflow as any);
     renderPage('wf-2');
-    expect(screen.getAllByText('Invoke').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Invoke / Try')).toBeInTheDocument();
   });
 
-  it('does not show Invoke tab for draft workflows', () => {
+  it('does not show Invoke / Try section for draft workflows', () => {
     renderPage();
-    expect(screen.queryByText('Invoke')).not.toBeInTheDocument();
+    expect(screen.queryByText('Invoke / Try')).not.toBeInTheDocument();
   });
 
-  it('renders input form with schema fields on Invoke tab', () => {
+  it('renders input form with schema fields on Invoke / Try section', () => {
     setupMocks(activeWorkflow as any);
     renderPage('wf-2');
-    // Click the tab (not the header button)
-    const invokeElements = screen.getAllByText('Invoke');
-    fireEvent.click(invokeElements[invokeElements.length - 1]);
-    expect(screen.getByText('image_ref')).toBeInTheDocument();
-    expect(screen.getByText('degrees')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Invoke / Try'));
+    expect(screen.getAllByText('image_ref').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('degrees').length).toBeGreaterThanOrEqual(1);
   });
 
   it('can toggle between form and JSON view', () => {
     setupMocks(activeWorkflow as any);
     renderPage('wf-2');
-    const invokeElements = screen.getAllByText('Invoke');
-    fireEvent.click(invokeElements[invokeElements.length - 1]);
+    fireEvent.click(screen.getByText('Invoke / Try'));
     fireEvent.click(screen.getByText('JSON view'));
     expect(screen.getByText('Form view')).toBeInTheDocument();
   });
@@ -376,18 +378,18 @@ describe('YamlWorkflowDetailPage', () => {
       data: versionsFixture.versions[1],
     } as any);
     renderPage('wf-1', '?version=1');
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     expect(screen.queryByText('Edit')).not.toBeInTheDocument();
   });
 
-  it('hides Invoke tab when viewing a historical version (even for active workflows)', () => {
-    // Without history: active workflow has both header Invoke button AND Invoke tab
+  it('hides Invoke / Try section when viewing a historical version (even for active workflows)', () => {
+    // Without history: active workflow shows Invoke / Try section
     setupMocks(activeWorkflow as any);
     const { unmount } = renderPage('wf-2');
-    const invokeCountNormal = screen.getAllByText('Invoke').length;
+    expect(screen.getByText('Invoke / Try')).toBeInTheDocument();
     unmount();
 
-    // With history: Invoke tab is hidden, only header button remains
+    // With history: Invoke / Try section is hidden
     setupMocks(activeWorkflow as any);
     vi.mocked(useYamlWorkflowVersions).mockReturnValue({
       data: versionsFixture,
@@ -396,11 +398,10 @@ describe('YamlWorkflowDetailPage', () => {
       data: versionsFixture.versions[1],
     } as any);
     renderPage('wf-2', '?version=1');
-    const invokeCountHistory = screen.getAllByText('Invoke').length;
-    expect(invokeCountHistory).toBeLessThan(invokeCountNormal);
+    expect(screen.queryByText('Invoke / Try')).not.toBeInTheDocument();
   });
 
-  it('uses version snapshot data for Config tab when viewing history', () => {
+  it('uses version snapshot data for Configuration section when viewing history', () => {
     vi.mocked(useYamlWorkflowVersions).mockReturnValue({
       data: versionsFixture,
     } as any);
@@ -408,7 +409,7 @@ describe('YamlWorkflowDetailPage', () => {
       data: versionsFixture.versions[1], // version 1 with old YAML
     } as any);
     renderPage('wf-1', '?version=1');
-    fireEvent.click(screen.getByText('Config'));
+    fireEvent.click(screen.getByText('Configuration'));
     // The version 1 YAML has version: "0"
     expect(screen.getByText(/version: "0"/)).toBeInTheDocument();
   });

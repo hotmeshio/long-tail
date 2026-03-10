@@ -16,11 +16,13 @@ import yamlWorkflowsRouter from './yaml-workflows';
 import settingsRouter from './settings';
 import mcpRunsRouter from './mcp-runs';
 import namespacesRouter from './namespaces';
+import filesRouter from './files';
 
 const router = Router();
 
 // Public routes (no auth required)
 router.use('/auth', authRouter);
+router.use('/files', filesRouter);
 
 // Apply auth to all API routes
 router.use(requireAuth);

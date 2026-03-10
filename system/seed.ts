@@ -1,0 +1,428 @@
+import { getPool } from '../services/db';
+import { loggerRegistry } from '../services/logger';
+
+// ── Tool manifests ───────────────────────────────────────────────────────────
+// Copied from built-in MCP server definitions.
+
+const HUMAN_QUEUE_TOOLS = [
+  {
+    name: 'escalate_to_human',
+    description: 'Create a new escalation for human review. Returns the escalation ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'Target role for the escalation (e.g., "reviewer")' },
+        message: { type: 'string', description: 'Description of what needs human review' },
+        data: { type: 'object', description: 'Contextual data for the reviewer' },
+        type: { type: 'string', description: 'Escalation type classification', default: 'mcp' },
+        subtype: { type: 'string', description: 'Escalation subtype', default: 'tool_call' },
+        priority: { type: 'number', description: 'Priority: 1 (highest) to 4 (lowest)', default: 2 },
+      },
+      required: ['role', 'message'],
+    },
+  },
+  {
+    name: 'check_resolution',
+    description: 'Check the status of an escalation. Returns status and resolver payload if resolved.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The escalation ID to check' },
+      },
+      required: ['escalation_id'],
+    },
+  },
+  {
+    name: 'get_available_work',
+    description: 'List available escalations for a role. Returns pending, unassigned escalations.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'Role to filter by' },
+        limit: { type: 'number', description: 'Max results to return', default: 10 },
+      },
+      required: ['role'],
+    },
+  },
+  {
+    name: 'claim_and_resolve',
+    description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The escalation ID to claim and resolve' },
+        resolver_id: { type: 'string', description: 'Identifier for who/what is resolving' },
+        payload: { type: 'object', description: 'Resolution payload data' },
+      },
+      required: ['escalation_id', 'resolver_id', 'payload'],
+    },
+  },
+];
+
+const VISION_TOOLS = [
+  {
+    name: 'list_document_pages',
+    description: 'List available document page images from storage. Returns an array of image references.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'extract_member_info',
+    description: 'Extract member information from a document page image using AI Vision. Returns structured MemberInfo or null.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        image_ref: { type: 'string', description: 'Storage reference to the document page image' },
+        page_number: { type: 'integer', description: '1-based page number' },
+      },
+      required: ['image_ref', 'page_number'],
+    },
+  },
+  {
+    name: 'validate_member',
+    description: 'Validate extracted member information against the member database. Returns match, mismatch, or not_found.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        member_info: { type: 'object', description: 'Extracted member information to validate' },
+      },
+      required: ['member_info'],
+    },
+  },
+  {
+    name: 'rotate_page',
+    description: 'Rotate a document page image by the given degrees. Returns a new image reference for the rotated version.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        image_ref: { type: 'string', description: 'Storage reference to the image to rotate' },
+        degrees: { type: 'integer', description: 'Rotation degrees (90, 180, 270)' },
+      },
+      required: ['image_ref', 'degrees'],
+    },
+  },
+  {
+    name: 'translate_content',
+    description: 'Translate content text to the target language. Returns the translated content and detected source language.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'The content text to translate' },
+        target_language: { type: 'string', description: 'Target language code (e.g. "en", "es")' },
+      },
+      required: ['content', 'target_language'],
+    },
+  },
+];
+
+const DB_QUERY_TOOLS = [
+  { name: 'find_tasks', description: 'Search tasks by status, workflow type, or origin.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'find_escalations', description: 'Search escalations by status, role, type, or priority.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_process_summary', description: 'Aggregate process view grouped by origin_id.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_escalation_stats', description: 'Real-time escalation statistics.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_workflow_types', description: 'List registered workflow configurations.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_system_health', description: 'Overall system health snapshot.', inputSchema: { type: 'object', properties: {} } },
+];
+
+const MCP_WORKFLOW_TOOLS = [
+  {
+    name: 'list_workflows',
+    description: 'Discover available compiled YAML workflows. These are deterministic pipelines converted from successful MCP triage executions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by lifecycle status (default: "active")' },
+      },
+    },
+  },
+  {
+    name: 'get_workflow',
+    description: 'Inspect a compiled workflow by name. Returns the activity manifest, input/output schemas, and provenance.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workflow_name: { type: 'string', description: 'Name of the workflow to inspect' },
+      },
+      required: ['workflow_name'],
+    },
+  },
+  {
+    name: 'invoke_workflow',
+    description: 'Run a compiled YAML workflow by name. No LLM reasoning — direct tool-to-tool data piping.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workflow_name: { type: 'string', description: 'Name of the compiled workflow to invoke' },
+        input: { type: 'object', description: 'Input data matching the workflow input schema' },
+        async: { type: 'boolean', description: 'If true, fire-and-forget (returns job ID)' },
+        timeout: { type: 'number', description: 'Max ms to wait for result (sync mode only)' },
+      },
+      required: ['workflow_name'],
+    },
+  },
+];
+
+const WORKFLOW_COMPILER_TOOLS = [
+  {
+    name: 'convert_execution_to_yaml',
+    description: 'Analyze a completed workflow execution and convert its tool call sequence into a deterministic HotMesh YAML workflow.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workflow_id: { type: 'string', description: 'The workflow execution ID to analyze' },
+        task_queue: { type: 'string', description: 'HotMesh task queue' },
+        workflow_name: { type: 'string', description: 'Workflow name' },
+        yaml_name: { type: 'string', description: 'Name for the generated YAML workflow' },
+        description: { type: 'string', description: 'Optional description' },
+      },
+      required: ['workflow_id', 'task_queue', 'workflow_name', 'yaml_name'],
+    },
+  },
+  {
+    name: 'deploy_yaml_workflow',
+    description: 'Deploy a stored YAML workflow to HotMesh. Optionally activate immediately.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        yaml_workflow_id: { type: 'string', description: 'UUID of the stored YAML workflow' },
+        activate: { type: 'boolean', description: 'Whether to activate immediately after deployment' },
+      },
+      required: ['yaml_workflow_id'],
+    },
+  },
+  {
+    name: 'list_yaml_workflows',
+    description: 'List stored YAML workflows with optional status filter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by status (draft, deployed, active, archived)' },
+        limit: { type: 'integer', description: 'Maximum results (default: 25)' },
+        offset: { type: 'integer', description: 'Pagination offset' },
+      },
+    },
+  },
+];
+
+const PLAYWRIGHT_TOOLS = [
+  { name: 'navigate', description: 'Open a URL in a new browser page.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' } }, required: ['url'] } },
+  { name: 'screenshot', description: 'Capture a screenshot and save as PNG.', inputSchema: { type: 'object', properties: { path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
+  { name: 'click', description: 'Click an element by CSS selector.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector'] } },
+  { name: 'fill', description: 'Type a value into an input field.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector', 'value'] } },
+  { name: 'wait_for', description: 'Wait for an element to appear on the page.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' }, timeout: { type: 'number' } }, required: ['selector'] } },
+  { name: 'evaluate', description: 'Evaluate JavaScript in the page context.', inputSchema: { type: 'object', properties: { script: { type: 'string' }, page_id: { type: 'string' } }, required: ['script'] } },
+  { name: 'list_pages', description: 'List all open browser pages.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'close_page', description: 'Close a browser page by ID.', inputSchema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
+];
+
+const FILE_STORAGE_TOOLS = [
+  {
+    name: 'read_file',
+    description: 'Read the contents of a file from managed storage. Returns the file content as text or base64.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path to the file in managed storage' },
+        encoding: { type: 'string', description: 'Encoding to use (utf8 or base64)', default: 'utf8' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'write_file',
+    description: 'Write content to a file in managed storage. Creates directories as needed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path for the file in managed storage' },
+        content: { type: 'string', description: 'File content to write' },
+        encoding: { type: 'string', description: 'Encoding of the content (utf8 or base64)', default: 'utf8' },
+      },
+      required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'list_files',
+    description: 'List files in a managed storage directory. Returns file names, sizes, and modification times.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        directory: { type: 'string', description: 'Directory path to list (default: root)', default: '/' },
+        recursive: { type: 'boolean', description: 'Whether to list recursively', default: false },
+      },
+    },
+  },
+  {
+    name: 'delete_file',
+    description: 'Delete a file from managed storage.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path to the file to delete' },
+      },
+      required: ['path'],
+    },
+  },
+];
+
+const HTTP_FETCH_TOOLS = [
+  {
+    name: 'http_get',
+    description: 'Perform an HTTP GET request. Returns status, headers, and body.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The URL to fetch' },
+        headers: { type: 'object', description: 'Optional request headers' },
+        timeout: { type: 'number', description: 'Request timeout in milliseconds', default: 30000 },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'http_post',
+    description: 'Perform an HTTP POST request with a JSON or text body. Returns status, headers, and body.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The URL to post to' },
+        body: { type: ['object', 'string'], description: 'Request body (object for JSON, string for text)' },
+        headers: { type: 'object', description: 'Optional request headers' },
+        timeout: { type: 'number', description: 'Request timeout in milliseconds', default: 30000 },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'http_request',
+    description: 'Perform an arbitrary HTTP request with full control over method, headers, and body.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The URL for the request' },
+        method: { type: 'string', description: 'HTTP method (GET, POST, PUT, PATCH, DELETE, etc.)' },
+        body: { type: ['object', 'string'], description: 'Request body' },
+        headers: { type: 'object', description: 'Request headers' },
+        timeout: { type: 'number', description: 'Request timeout in milliseconds', default: 30000 },
+      },
+      required: ['url', 'method'],
+    },
+  },
+];
+
+// ── Seed MCP servers ─────────────────────────────────────────────────────────
+//
+// Register the built-in MCP servers so the dashboard shows them immediately.
+// These are in-process servers (no external transport) — the tool manifests
+// are pre-populated from the actual server definitions.
+
+const SEED_MCP_SERVERS = [
+  {
+    name: 'long-tail-db-query',
+    description: 'Read-only query tools for tasks, escalations, processes, and system health. Used by triage workflows to gather context before making decisions.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: DB_QUERY_TOOLS,
+    metadata: { builtin: true, category: 'database' },
+    tags: ['database', 'query', 'analytics'],
+  },
+  {
+    name: 'long-tail-human-queue',
+    description: 'Built-in escalation and human queue management. Exposes the escalation API as MCP tools for AI agents and remediation workflows.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: HUMAN_QUEUE_TOOLS,
+    metadata: { builtin: true, category: 'escalation' },
+    tags: ['escalation', 'human-queue', 'routing'],
+  },
+  {
+    name: 'mcp-workflows-longtail',
+    description: 'Compiled YAML workflows — hardened deterministic pipelines from successful MCP triage executions. Invoke proven solutions to edge cases without LLM reasoning.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: MCP_WORKFLOW_TOOLS,
+    metadata: { builtin: true, category: 'workflows' },
+    tags: ['workflows', 'compiled', 'deterministic'],
+  },
+  {
+    name: 'long-tail-workflow-compiler',
+    description: 'Convert dynamic MCP tool call sequences into deterministic YAML workflows. Analyze executions, generate pipelines, deploy and activate.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: WORKFLOW_COMPILER_TOOLS,
+    metadata: { builtin: true, category: 'compilation' },
+    tags: ['compilation', 'yaml', 'codegen'],
+  },
+  {
+    name: 'long-tail-document-vision',
+    description: 'Document vision and analysis tools. Processes document images, extracts structured data, validates against databases, and handles translations.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: VISION_TOOLS,
+    metadata: { builtin: true, category: 'document-processing' },
+    tags: ['document-processing', 'vision', 'ocr', 'translation'],
+  },
+  {
+    name: 'long-tail-playwright',
+    description: 'Browser automation via Playwright. Navigate pages, take screenshots, click elements, fill forms, run JavaScript. Used for QA capture, visual regression, and documentation.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: PLAYWRIGHT_TOOLS,
+    metadata: { builtin: true, category: 'browser-automation' },
+    tags: ['browser-automation', 'testing', 'screenshots'],
+  },
+  {
+    name: 'long-tail-file-storage',
+    description: 'Managed file storage for reading, writing, listing, and deleting files. Used by workflows and triage agents for persistent file I/O.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: FILE_STORAGE_TOOLS,
+    metadata: { builtin: true, category: 'storage' },
+    tags: ['storage', 'files', 'io'],
+  },
+  {
+    name: 'long-tail-http-fetch',
+    description: 'HTTP client tools for making GET, POST, and arbitrary HTTP requests. Used by triage agents and workflows to call external APIs and fetch remote resources.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: HTTP_FETCH_TOOLS,
+    metadata: { builtin: true, category: 'http' },
+    tags: ['http', 'api', 'fetch', 'network'],
+  },
+];
+
+/**
+ * Seed system MCP servers into lt_mcp_servers.
+ * Upserts each built-in server with its tool manifest, metadata, and tags.
+ */
+export async function seedSystemMcpServers(): Promise<void> {
+  const pool = getPool();
+  for (const srv of SEED_MCP_SERVERS) {
+    try {
+      await pool.query(
+        `INSERT INTO lt_mcp_servers
+           (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, last_connected_at)
+         VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, NOW())
+         ON CONFLICT (name) DO UPDATE SET
+           tool_manifest = EXCLUDED.tool_manifest,
+           metadata = EXCLUDED.metadata,
+           description = EXCLUDED.description,
+           tags = EXCLUDED.tags,
+           status = 'connected',
+           last_connected_at = NOW()`,
+        [
+          srv.name,
+          srv.description,
+          srv.transport_type,
+          JSON.stringify(srv.transport_config),
+          JSON.stringify(srv.tool_manifest),
+          JSON.stringify(srv.metadata),
+          srv.tags,
+        ],
+      );
+    } catch (err: any) {
+      loggerRegistry.warn(`[system] failed to seed MCP server ${srv.name}: ${err.message}`);
+    }
+  }
+  const totalTools = SEED_MCP_SERVERS.reduce((sum, s) => sum + s.tool_manifest.length, 0);
+  loggerRegistry.info(`[system] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${totalTools} tools)`);
+}

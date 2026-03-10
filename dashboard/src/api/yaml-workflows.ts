@@ -150,7 +150,7 @@ export function useArchiveYamlWorkflow() {
 export function useUpdateYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string }) =>
+    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string; input_schema?: Record<string, unknown>; output_schema?: Record<string, unknown> }) =>
       apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}`, {
         method: 'PUT',
         body: JSON.stringify(updates),

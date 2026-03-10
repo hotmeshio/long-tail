@@ -2,17 +2,19 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { InsightResultCard } from './InsightResultCard';
-import type { InsightResult } from '../../api/insight';
+import { McpQueryResultCard } from './McpQueryResultCard';
+import type { QueryMode, InsightResult, McpQueryResult } from '../../api/insight';
 
 interface InsightModalProps {
   open: boolean;
   onClose: () => void;
-  data: InsightResult | undefined;
+  mode: QueryMode;
+  data: InsightResult | McpQueryResult | undefined;
   isFetching: boolean;
   error: Error | null;
 }
 
-export function InsightModal({ open, onClose, data, isFetching, error }: InsightModalProps) {
+export function InsightModal({ open, onClose, mode, data, isFetching, error }: InsightModalProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -24,6 +26,8 @@ export function InsightModal({ open, onClose, data, isFetching, error }: Insight
 
   if (!open) return null;
 
+  const title = mode === 'ask' ? 'Insight' : 'MCP Query';
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
       {/* Backdrop */}
@@ -33,7 +37,7 @@ export function InsightModal({ open, onClose, data, isFetching, error }: Insight
       <div className="relative bg-surface-raised border border-surface-border rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[70vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-surface-border shrink-0">
-          <h2 className="text-sm font-medium text-text-primary">Insight</h2>
+          <h2 className="text-sm font-medium text-text-primary">{title}</h2>
           <button
             onClick={onClose}
             className="text-text-tertiary hover:text-text-primary transition-colors"
@@ -74,7 +78,12 @@ export function InsightModal({ open, onClose, data, isFetching, error }: Insight
           )}
 
           {/* Result */}
-          {data && !isFetching && <InsightResultCard result={data} />}
+          {data && !isFetching && mode === 'ask' && (
+            <InsightResultCard result={data as InsightResult} />
+          )}
+          {data && !isFetching && mode === 'do' && (
+            <McpQueryResultCard result={data as McpQueryResult} />
+          )}
         </div>
       </div>
     </div>,

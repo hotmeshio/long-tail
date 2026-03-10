@@ -4,6 +4,7 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 
 ## Contents
 
+- [The Unifying Concept](#the-unifying-concept) — [Every Activity is a Tool](#every-activity-is-a-tool) · [Humans as Tools](#humans-as-tools) · [Compiled Workflows as Tools](#compiled-workflows-as-tools) · [The Cycle](#the-cycle)
 - [Human Queue Server](#human-queue-server) — escalation as 4 MCP tools
 - [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
 - [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
@@ -13,6 +14,127 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 - [Database Schema](#database-schema)
 - [Testing](#testing) — InMemoryTransport and functional tests
 - [Custom Adapters](#custom-adapters)
+
+## The Unifying Concept
+
+Everything is a tool. Every proxy activity — the functions that workflows call — is an MCP tool. Every collection of related tools is an MCP server. When an engineer writes a workflow, they're composing tool calls. When the triage agent fixes an edge case, it's calling the same tools. When that fix gets compiled into a deterministic pipeline, it becomes a new tool on a new server.
+
+The protocol is the same whether the caller is deterministic code, an LLM, or a human clicking a button.
+
+### Every Activity is a Tool
+
+A proxy activity is a function that runs outside the deterministic sandbox — it makes an API call, queries a database, calls an LLM. HotMesh checkpoints the result. If the process crashes, it replays from cache. The activity isn't called twice.
+
+Every one of these activities is also an MCP tool. Register an MCP server and its tools become proxy activities automatically:
+
+```typescript
+import { Durable } from '@hotmeshio/hotmesh';
+import { McpClient } from '@hotmeshio/long-tail';
+
+const tools = await McpClient.toolActivities(serverId);
+const { mcp_analyzer_classify } = Durable.workflow.proxyActivities<typeof tools>({
+  activities: tools,
+});
+
+export async function classifyDocument(envelope: LTEnvelope) {
+  const result = await mcp_analyzer_classify({ content: envelope.data.content });
+
+  if (result.confidence >= 0.85) {
+    return { type: 'return', data: result };
+  }
+  return { type: 'escalation', data: result, message: 'Low confidence', role: 'reviewer' };
+}
+```
+
+The engineer writes `await mcp_analyzer_classify(...)` in their workflow. That's a proxy activity call. It's also an MCP tool call. Same thing. Durable, checkpointed, exactly-once. The engineer doesn't need to think about protocols — they call functions. The system handles the rest.
+
+### Humans as Tools
+
+Long Tail exposes its escalation queue as an MCP server. Any MCP-aware agent can route work to humans through the same protocol it uses to call any other tool.
+
+```
+MCP Server: "long-tail-human-queue"
+
+Tools:
+  - escalate_to_human(role, message, data)   → escalation_id
+  - check_resolution(escalation_id)          → resolved | pending
+  - get_available_work(role)                 → escalation[]
+  - claim_and_resolve(escalation_id, payload) → result
+```
+
+An AI agent working the queue:
+
+```typescript
+import { Client } from '@modelcontextprotocol/sdk/client';
+
+const client = new Client({ name: 'my-agent', version: '1.0.0' });
+await client.connect(transport);
+
+const work = await client.callTool({
+  name: 'get_available_work',
+  arguments: { role: 'reviewer' },
+});
+
+await client.callTool({
+  name: 'claim_and_resolve',
+  arguments: {
+    escalation_id: 'esc-abc123',
+    resolver_id: 'my-agent',
+    payload: { approved: true, note: 'Verified by automated review' },
+  },
+});
+```
+
+Human labor and AI labor become composable. The protocol is the same whether the resolver is a person clicking a button or an agent calling a tool.
+
+### Compiled Workflows as Tools
+
+Once a triage execution is compiled and deployed, it becomes a tool. The dynamic sequence of tool calls that fixed an edge case — rotate, extract, validate — is now a deterministic pipeline that any workflow or agent can invoke:
+
+```
+MCP Server: "long-tail-mcp-workflows"
+
+Tools:
+  - list_workflows()                              → available compiled workflows
+  - get_workflow(workflow_name)                    → schema, manifest, provenance
+  - invoke_workflow(workflow_name, input, async?)  → result or job_id
+```
+
+An agent encountering a familiar edge case checks for a compiled solution before falling back to dynamic triage:
+
+```typescript
+const available = await client.callTool({
+  name: 'list_workflows',
+  arguments: { status: 'active' },
+});
+
+await client.callTool({
+  name: 'invoke_workflow',
+  arguments: {
+    workflow_name: 'rotate-and-extract',
+    input: { document: 'page1_upside_down.png', rotation: 180 },
+  },
+});
+```
+
+No LLM needed. No token costs. The same fix that once required an agentic reasoning loop now runs as a direct tool-to-tool pipeline — and it's callable as a single tool by any other workflow.
+
+### The Cycle
+
+This is how the system evolves:
+
+```
+1. Engineer writes workflow, calling tools (proxy activities)
+2. Workflow escalates when confidence is low
+3. Human resolves — or flags for triage
+4. Triage agent calls the SAME tools dynamically to fix the issue
+5. Successful fix is compiled into a deterministic workflow
+6. That workflow becomes a new tool on a new server
+7. Next time, the deterministic workflow handles it — no LLM, no human
+8. The triage agent discovers it has one more tool available
+```
+
+Over time, the YAML replaces the procedural. The MCP triage workflow stops entropy by repairing and replacing the flows that eventually all become obsolete. Dynamic processes author themselves. The long tail gets shorter every time.
 
 ## Human Queue Server
 
