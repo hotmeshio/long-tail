@@ -99,7 +99,7 @@ describe('orchestrated workflows (executeLT)', () => {
     await orchWorker.run();
 
     client = new Client({ connection });
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     Durable.clearInterceptors();
@@ -138,7 +138,7 @@ describe('orchestrated workflows (executeLT)', () => {
     const task = tasks.find(t => t.status === 'completed' && t.workflow_type === 'reviewContent');
     expect(task).toBeTruthy();
     expect(task!.status).toBe('completed');
-  }, 45_000);
+  }, 30_000);
 
   // ── executeLT: escalation ends child, resolve starts new child ──────────────
 
@@ -173,8 +173,14 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(childTask).toBeTruthy();
     expect(childTask!.workflow_id).toBeTruthy();
 
-    // Find escalation by the child's specific workflow ID (precise, no stale matches)
-    const escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+    // Poll for escalation — ltCreateEscalation runs asynchronously after ltEscalateTask
+    let escalations: Awaited<ReturnType<typeof escalationService.getEscalationsByWorkflowId>> = [];
+    const escDeadline = Date.now() + 10_000;
+    while (Date.now() < escDeadline) {
+      escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+      if (escalations.length > 0) break;
+      await sleepFor(500);
+    }
     expect(escalations.length).toBeGreaterThan(0);
     const esc = escalations[0];
     expect(esc.task_queue).toBeTruthy();
@@ -198,7 +204,7 @@ describe('orchestrated workflows (executeLT)', () => {
     const resolvedEsc = await escalationService.getEscalation(esc.id);
     expect(resolvedEsc!.status).toBe('resolved');
     expect(resolvedEsc!.resolver_payload).toBeTruthy();
-  }, 60_000);
+  }, 30_000);
 
   // ── executeLT: task record completed after escalation resolve ───────────────
 
@@ -232,8 +238,14 @@ describe('orchestrated workflows (executeLT)', () => {
     }
     expect(childTask).toBeTruthy();
 
-    // Find escalation by child's specific workflow ID
-    const escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+    // Poll for escalation — ltCreateEscalation runs asynchronously after ltEscalateTask
+    let escalations: Awaited<ReturnType<typeof escalationService.getEscalationsByWorkflowId>> = [];
+    const escDeadline2 = Date.now() + 10_000;
+    while (Date.now() < escDeadline2) {
+      escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+      if (escalations.length > 0) break;
+      await sleepFor(500);
+    }
     expect(escalations.length).toBeGreaterThan(0);
 
     await resolveEscalation(escalations[0].id, {
@@ -249,7 +261,7 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(task).toBeTruthy();
     expect(task!.status).toBe('completed');
     expect(task!.data).toBeTruthy();
-  }, 60_000);
+  }, 30_000);
 
   // ── Workflow milestones: persisted to task record via orchestrator ────────────
 
@@ -290,7 +302,7 @@ describe('orchestrated workflows (executeLT)', () => {
         expect.objectContaining({ name: 'llm', value: 'content_analysis' }),
       ]),
     );
-  }, 45_000);
+  }, 30_000);
 
   // ── Orchestrator pass-through: interceptor skips orchestrator workflows ─────
 

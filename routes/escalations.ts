@@ -37,6 +37,8 @@ router.get('/', async (req, res) => {
       priority: req.query.priority ? parseInt(req.query.priority as string, 10) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+      sort_by: req.query.sort_by as string,
+      order: req.query.order as string,
       visibleRoles,
     });
     res.json(result);
@@ -71,6 +73,8 @@ router.get('/available', async (req, res) => {
       priority: req.query.priority ? parseInt(req.query.priority as string, 10) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+      sort_by: req.query.sort_by as string,
+      order: req.query.order as string,
       visibleRoles,
     });
     res.json(result);
@@ -108,14 +112,14 @@ router.get('/stats', async (req, res) => {
       if (visibleRoles.length === 0) {
         res.json({
           pending: 0, claimed: 0,
-          created_1h: 0, created_24h: 0,
-          resolved_1h: 0, resolved_24h: 0,
-          by_role: [],
+          created: 0, resolved: 0,
+          by_role: [], by_type: [],
         });
         return;
       }
     }
-    const stats = await escalationService.getEscalationStats(visibleRoles);
+    const period = (req.query.period as string) || undefined;
+    const stats = await escalationService.getEscalationStats(visibleRoles, period);
     res.json(stats);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -527,6 +531,27 @@ router.post('/:id/claim', async (req, res) => {
     }
 
     res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/escalations/:id/release
+ * Release a claimed escalation back to the available pool.
+ * Only the assigned user may release their own claim.
+ */
+router.post('/:id/release', async (req, res) => {
+  try {
+    const userId = req.auth!.userId;
+    const result = await escalationService.releaseEscalation(req.params.id, userId);
+
+    if (!result) {
+      res.status(409).json({ error: 'Escalation not found or not claimed by you' });
+      return;
+    }
+
+    res.json({ escalation: result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

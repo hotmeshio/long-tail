@@ -6,8 +6,11 @@ import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
 import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
+
 import { PageHeader } from '../../components/common/PageHeader';
+import { Collapsible } from '../../components/common/Collapsible';
 import { ConvertToYamlModal } from '../../components/common/ConvertToYamlModal';
+
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
@@ -35,15 +38,20 @@ function CollapsibleSection({
         onClick={() => onToggle(sectionKey)}
         className="flex items-center gap-3 w-full group/section"
       >
-        <span className="text-xl font-light text-text-tertiary/40 group-hover/section:text-text-tertiary transition-colors select-none w-6 text-center shrink-0">
-          {isCollapsed ? '+' : '\u2212'}
-        </span>
-        <span className={`text-xs font-semibold uppercase tracking-widest ${isCollapsed ? 'text-text-tertiary' : 'text-text-secondary'}`}>
+        <svg
+          className={`w-4 h-4 shrink-0 text-text-tertiary/40 group-hover/section:text-text-tertiary transition-all duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-200 ${isCollapsed ? 'text-text-tertiary' : 'text-text-secondary'}`}>
           {title}
         </span>
         <span className="flex-1 border-b border-surface-border" />
       </button>
-      {!isCollapsed && <div className="mt-4 ml-9">{children}</div>}
+      <Collapsible open={!isCollapsed}>
+        <div className="mt-4 ml-9">{children}</div>
+      </Collapsible>
     </div>
   );
 }
@@ -89,7 +97,7 @@ export function WorkflowExecutionPage() {
       {
         onSuccess: (record) => {
           setConvertModalOpen(false);
-          navigate(`/mcp/pipelines/${record.id}`);
+          navigate(`/mcp/workflows/${record.id}`);
         },
       },
     );
@@ -110,7 +118,7 @@ export function WorkflowExecutionPage() {
 
     return (
       <div>
-        <Link to="/workflows/list" className="text-xs text-text-tertiary hover:text-text-primary">
+        <Link to="/workflows/runs" className="text-xs text-text-tertiary hover:text-text-primary">
           &larr; Workflows
         </Link>
         <div className="mt-4 text-center py-8">
@@ -131,15 +139,46 @@ export function WorkflowExecutionPage() {
     );
   }
 
+  const hasToolCalls = execution.status === 'completed' && execution.events.some(
+    (e) => {
+      if (e.event_type !== 'activity_task_completed') return false;
+      const actType = (e.attributes as any).activity_type;
+      return actType === 'callDbTool' || actType === 'callVisionTool' || actType?.startsWith('mcp_');
+    },
+  );
+
   return (
     <div>
-      <PageHeader title="Workflow Execution" backTo="/workflows/list" backLabel="Workflows" />
+      <PageHeader
+        title="Workflow Execution"
+        backTo="/workflows/runs"
+        backLabel="Workflows"
+        actions={
+          hasToolCalls ? (
+            <button
+              onClick={() => handleAction('convert_yaml')}
+              className="group flex items-center gap-2 text-left"
+            >
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </span>
+              <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                This execution used MCP tools.{' '}
+                <span className="text-accent group-hover:underline">Export as MCP Workflow Tool</span>
+              </span>
+            </button>
+          ) : undefined
+        }
+      />
 
       <ExecutionHeader
         execution={execution}
         task={task}
         childTasks={childTasksData?.tasks}
         escalations={escalationsData?.escalations}
+        hasToolCalls={hasToolCalls}
         onAction={handleAction}
       />
 

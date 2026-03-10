@@ -8,6 +8,12 @@ import { getTaskByWorkflowId } from '../services/task';
 
 const router = Router();
 
+/** Return true if a Postgres error indicates an invalid/missing ID */
+function isNotFoundError(err: any): boolean {
+  const msg: string = err?.message ?? '';
+  return msg.includes('invalid input syntax for type uuid') || msg.includes('not found');
+}
+
 /**
  * GET /api/yaml-workflows
  * List YAML workflows with optional status filter.
@@ -16,11 +22,18 @@ router.get('/', async (req, res) => {
   try {
     const result = await yamlDb.listYamlWorkflows({
       status: req.query.status as any,
+      graph_topic: req.query.graph_topic as string | undefined,
+      app_id: req.query.app_id as string | undefined,
+      search: req.query.search as string | undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });
     res.json(result);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -75,6 +88,19 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/yaml-workflows/app-ids
+ * Return distinct app_id values from non-archived workflows.
+ */
+router.get('/app-ids', async (_req, res) => {
+  try {
+    const appIds = await yamlDb.getDistinctAppIds();
+    res.json({ app_ids: appIds });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Parameterized routes ──────────────────────────────────────────────
 
 /**
@@ -90,6 +116,10 @@ router.get('/:id', async (req, res) => {
     }
     res.json(wf);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -107,6 +137,10 @@ router.put('/:id', async (req, res) => {
     }
     res.json(wf);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -159,6 +193,10 @@ router.post('/:id/regenerate', async (req, res) => {
 
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -181,6 +219,10 @@ router.delete('/:id', async (req, res) => {
     await yamlDb.deleteYamlWorkflow(req.params.id);
     res.json({ deleted: true });
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -198,25 +240,32 @@ router.post('/:id/deploy', async (req, res) => {
       return;
     }
 
-    // Determine next version across all workflows in this app_id
+    // Use the version declared in the YAML (like package.json)
+    const deployVersion = wf.app_version || '1';
+
+    // Deploy + activate merged YAML for the full app_id
     const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
-    const maxVersion = Math.max(...siblings.map((s) => parseInt(s.app_version, 10) || 0), 0);
-    const nextVersion = String(maxVersion + 1);
+    await yamlDeployer.deployAppId(wf.app_id, deployVersion);
 
-    // Deploy merged YAML for the full app_id
-    await yamlDeployer.deployAppId(wf.app_id, nextVersion);
-
-    // Mark all non-archived siblings as deployed with the new version
+    // Register workers and mark all non-archived siblings as active
     for (const sibling of siblings) {
-      await yamlDb.updateYamlWorkflowVersion(sibling.id, nextVersion);
+      await yamlDb.updateYamlWorkflowVersion(sibling.id, deployVersion);
+      await yamlWorkers.registerWorkersForWorkflow(sibling);
       if (sibling.status === 'draft' || sibling.status === 'deployed') {
-        await yamlDb.updateYamlWorkflowStatus(sibling.id, 'deployed');
+        await yamlDb.updateYamlWorkflowStatus(sibling.id, 'active');
       }
     }
+
+    // Mark content as deployed for the entire app_id
+    await yamlDb.markAppIdContentDeployed(wf.app_id);
 
     const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -251,6 +300,10 @@ router.post('/:id/activate', async (req, res) => {
     const updated = await yamlDb.getYamlWorkflow(req.params.id);
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -273,22 +326,28 @@ router.post('/:id/invoke', async (req, res) => {
     }
     const data = req.body.data || {};
     if (req.body.sync) {
-      const result = await yamlDeployer.invokeYamlWorkflowSync(
+      const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
         data,
         req.body.timeout,
+        wf.graph_topic,
       );
-      res.json({ result });
+      res.json({ job_id, result });
     } else {
       const jobId = await yamlDeployer.invokeYamlWorkflow(
         wf.app_id,
         wf.graph_topic,
         data,
+        wf.graph_topic,
       );
       res.json({ job_id: jobId });
     }
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -310,16 +369,75 @@ router.post('/:id/archive', async (req, res) => {
     const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'archived');
     res.json(updated);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/yaml-workflows/:id/versions
+ * Return version history for a YAML workflow.
+ */
+router.get('/:id/versions', async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+    const result = await yamlDb.getVersionHistory(req.params.id, limit, offset);
+    res.json(result);
+  } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/yaml-workflows/:id/versions/:version
+ * Return a single version snapshot with YAML, schemas, and manifest.
+ */
+router.get('/:id/versions/:version', async (req, res) => {
+  try {
+    const version = parseInt(req.params.version, 10);
+    if (isNaN(version) || version < 1) {
+      res.status(400).json({ error: 'Invalid version number' });
+      return;
+    }
+    const snapshot = await yamlDb.getVersionSnapshot(req.params.id, version);
+    if (!snapshot) {
+      res.status(404).json({ error: `Version ${version} not found` });
+      return;
+    }
+    res.json(snapshot);
+  } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
  * GET /api/yaml-workflows/:id/yaml
- * Return raw YAML content.
+ * Return raw YAML content. Supports ?version=N query param.
  */
 router.get('/:id/yaml', async (req, res) => {
   try {
+    const versionParam = req.query.version ? parseInt(req.query.version as string, 10) : null;
+    if (versionParam) {
+      const snapshot = await yamlDb.getVersionSnapshot(req.params.id, versionParam);
+      if (!snapshot) {
+        res.status(404).json({ error: `Version ${versionParam} not found` });
+        return;
+      }
+      res.type('text/yaml').send(snapshot.yaml_content);
+      return;
+    }
     const wf = await yamlDb.getYamlWorkflow(req.params.id);
     if (!wf) {
       res.status(404).json({ error: 'YAML workflow not found' });
@@ -327,6 +445,10 @@ router.get('/:id/yaml', async (req, res) => {
     }
     res.type('text/yaml').send(wf.yaml_content);
   } catch (err: any) {
+    if (isNotFoundError(err)) {
+      res.status(404).json({ error: 'YAML workflow not found' });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });

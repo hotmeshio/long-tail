@@ -1,95 +1,133 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../../../api/tasks', () => ({
-  useProcesses: vi.fn(),
+  useProcessStats: vi.fn(),
 }));
 
-vi.mock('../../../api/insight', () => ({
-  useInsightQuery: () => ({
-    data: null,
-    isFetching: false,
-    error: null,
-  }),
-  useLastInsightQuestion: () => null,
+vi.mock('../../../hooks/useNatsEvents', () => ({
+  useProcessListEvents: vi.fn(),
 }));
 
 import { ProcessesOverview } from '../ProcessesOverview';
-import { useProcesses } from '../../../api/tasks';
+import { useProcessStats } from '../../../api/tasks';
 
-const mockProcesses = {
-  processes: [
-    {
-      origin_id: 'process-001',
-      task_count: 3,
-      completed: 2,
-      escalated: 1,
-      workflow_types: ['reviewContent'],
-      started_at: '2026-01-15T10:00:00Z',
-      last_activity: '2026-01-15T11:30:00Z',
-    },
-    {
-      origin_id: 'process-002',
-      task_count: 1,
-      completed: 1,
-      escalated: 0,
-      workflow_types: ['reviewContent', 'verifyDocument'],
-      started_at: '2026-01-14T08:00:00Z',
-      last_activity: '2026-01-14T08:05:00Z',
-    },
+const mockStats = {
+  total: 25,
+  active: 10,
+  completed: 12,
+  escalated: 3,
+  by_workflow_type: [
+    { workflow_type: 'reviewContent', total: 15, active: 6, completed: 8, escalated: 1 },
+    { workflow_type: 'processClaim', total: 10, active: 4, completed: 4, escalated: 2 },
   ],
-  total: 2,
 };
 
-function renderWithRouter(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+function renderPage() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <ProcessesOverview />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
 describe('ProcessesOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useProcessStats).mockReturnValue({ data: mockStats } as any);
   });
 
-  it('renders header and inline stats with data', () => {
-    vi.mocked(useProcesses).mockReturnValue({
-      data: mockProcesses,
-      isLoading: false,
-    } as any);
+  // ── Header & Duration tabs ──
 
-    renderWithRouter(<ProcessesOverview />);
-
+  it('renders header and duration tabs', () => {
+    renderPage();
     expect(screen.getByText('Business Processes')).toBeInTheDocument();
-    expect(screen.getByText('Total')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Completed')).toBeInTheDocument();
-    expect(screen.getByText('Escalated')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('1h')).toBeInTheDocument();
+    expect(screen.getByText('24h')).toBeInTheDocument();
+    expect(screen.getByText('7d')).toBeInTheDocument();
+    expect(screen.getByText('30d')).toBeInTheDocument();
+  });
+
+  it('defaults to 24h period', () => {
+    renderPage();
+    expect(useProcessStats).toHaveBeenCalledWith('24h');
+  });
+
+  it('switches period on tab click', () => {
+    renderPage();
+    fireEvent.click(screen.getByText('7d'));
+    expect(useProcessStats).toHaveBeenCalledWith('7d');
+  });
+
+  // ── Summary cards ──
+
+  it('renders summary cards with values', () => {
+    renderPage();
+    expect(screen.getAllByText('Total').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('25')).toBeInTheDocument();
+    expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('10').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Completed').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('12').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Escalated').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders dash placeholders when loading', () => {
-    vi.mocked(useProcesses).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    } as any);
-
-    renderWithRouter(<ProcessesOverview />);
-
+    vi.mocked(useProcessStats).mockReturnValue({ data: undefined } as any);
+    renderPage();
     const dashes = screen.getAllByText('—');
     expect(dashes).toHaveLength(4);
   });
 
-  it('renders all four inline stats', () => {
-    vi.mocked(useProcesses).mockReturnValue({
-      data: mockProcesses,
-      isLoading: false,
+  // ── By-workflow-type table ──
+
+  it('renders by-workflow-type breakdown', () => {
+    renderPage();
+    expect(screen.getByText('Workflow Type')).toBeInTheDocument();
+    expect(screen.getByText('reviewContent')).toBeInTheDocument();
+    expect(screen.getByText('processClaim')).toBeInTheDocument();
+    expect(screen.getByText('15')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument();
+  });
+
+  it('hides table when no workflow types', () => {
+    vi.mocked(useProcessStats).mockReturnValue({
+      data: { ...mockStats, by_workflow_type: [] },
     } as any);
+    renderPage();
+    expect(screen.queryByText('reviewContent')).not.toBeInTheDocument();
+  });
 
-    renderWithRouter(<ProcessesOverview />);
+  // ── Zero counts ──
 
-    expect(screen.getByText('Total')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Completed')).toBeInTheDocument();
-    expect(screen.getByText('Escalated')).toBeInTheDocument();
+  it('renders zero counts in tertiary style', () => {
+    vi.mocked(useProcessStats).mockReturnValue({
+      data: {
+        ...mockStats,
+        by_workflow_type: [
+          { workflow_type: 'test', total: 5, active: 5, completed: 0, escalated: 0 },
+        ],
+      },
+    } as any);
+    const { container } = renderPage();
+    const zeroCells = container.querySelectorAll('.text-text-tertiary');
+    const zeroTexts = Array.from(zeroCells).map((el) => el.textContent);
+    expect(zeroTexts).toContain('0');
+  });
+
+  // ── Empty state ──
+
+  it('shows empty state when no activity', () => {
+    vi.mocked(useProcessStats).mockReturnValue({
+      data: { total: 0, active: 0, completed: 0, escalated: 0, by_workflow_type: [] },
+    } as any);
+    renderPage();
+    expect(screen.getByText(/No process activity/)).toBeInTheDocument();
   });
 });

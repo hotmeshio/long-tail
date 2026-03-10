@@ -1,5 +1,6 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
+import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
 
@@ -8,8 +9,9 @@ type ActivitiesType = typeof activities;
 const {
   getUpstreamTasks,
   getEscalationHistory,
-  getVisionTools,
-  callVisionTool,
+  getToolInventory,
+  getAvailableTools,
+  callTool,
   callTriageLLM,
   notifyEngineering,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
@@ -21,75 +23,192 @@ const {
   },
 });
 
-const MAX_TOOL_ROUNDS = 8;
+const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
 
-const SYSTEM_PROMPT = `You are an automated triage specialist for a document processing system. A workflow failed and a human reviewer has flagged the issue for AI-assisted remediation.
+// ── Simple intent patterns (bypass LLM entirely) ─────────────
 
-Your job:
-1. Diagnose why the original workflow failed using the failure context provided
-2. Use the available document processing tools to investigate and fix the issue
-3. Return corrected data so the original workflow can be re-run successfully
+const APPROVE_PATTERNS = [
+  /\bapprove[ds]?\b/i,
+  /\blooks?\s+good\b/i,
+  /\bpass\s+through\b/i,
+  /\blgtm\b/i,
+  /\bjust\s+approve\b/i,
+  /\baccept(ed)?\b/i,
+  /\bok(ay)?\s+to\s+proceed\b/i,
+];
 
-Diagnostic strategy:
-1. Start by listing document pages (list_document_pages) to see what's available
-2. Common issues and their fixes:
-   - **Unreadable/damaged/upside-down images**: Rotate pages with rotate_page (try 180 degrees first). After rotating, use extract_member_info on the rotated reference to verify the fix worked.
-   - **Wrong language content**: Use translate_content to convert to the target language (usually English)
-   - **Extraction failures**: Try extracting from different pages, or rotate and retry
-   - **Validation mismatches**: Use validate_member to check extracted data against the database
-3. After applying fixes, verify the result by extracting/validating the corrected data
-4. Build the corrected data object for re-invocation of the original workflow
+const REJECT_PATTERNS = [
+  /\breject(ed)?\b/i,
+  /\bdeni(ed|y)\b/i,
+  /\bdecline[ds]?\b/i,
+];
 
-IMPORTANT rules:
-- Always call at least one tool — never guess at what's wrong
-- When rotating pages, use the RETURNED rotated_ref from rotate_page as the new image reference
-- After rotating, call extract_member_info with the rotated reference to confirm the fix worked
-- The corrected data must include all fields the original workflow needs
+/**
+ * Check resolver payload for simple approval/rejection intent.
+ * Returns the correctedData if detected, null if the LLM should handle it.
+ */
+function detectSimpleIntent(
+  resolverPayload: Record<string, any>,
+): { correctedData: Record<string, any>; diagnosis: string } | null {
+  // Extract human-readable text from the resolver payload
+  const notes = resolverPayload?.notes || '';
+  const hint = resolverPayload?._lt?.hint || '';
+  const text = `${notes} ${hint}`.trim();
 
-When done, return ONLY a JSON object (no markdown fences):
-{
-  "diagnosis": "Clear description of what went wrong",
-  "actions_taken": ["Step 1: ...", "Step 2: ...", ...],
-  "correctedData": {
-    ...all fields the original workflow needs, with problematic fields corrected...
-    "documents": ["page1_upside_down_rotated.png", "page2.png"] // corrected document list for re-invocation
-  },
-  "confidence": 0.0-1.0,
-  "recommendation": "Suggested pipeline improvement to prevent this in future"
+  if (!text) return null;
+
+  // Check for approval
+  if (APPROVE_PATTERNS.some((p) => p.test(text))) {
+    // Make sure there's no problem description that suggests remediation
+    const hasComplexity = /\b(but|however|except|fix|broken|wrong|error|fail|issue|problem|damaged|missing)\b/i.test(text);
+    if (!hasComplexity) {
+      return {
+        correctedData: { approved: true },
+        diagnosis: `Human requested approval: "${text}"`,
+      };
+    }
+  }
+
+  // Check for rejection
+  if (REJECT_PATTERNS.some((p) => p.test(text))) {
+    const hasComplexity = /\b(but|however|except|fix|try|instead)\b/i.test(text);
+    if (!hasComplexity) {
+      return {
+        correctedData: { approved: false, rejected: true },
+        diagnosis: `Human requested rejection: "${text}"`,
+      };
+    }
+  }
+
+  return null;
 }
 
-If you cannot fix the issue after investigation, return:
+// ── System prompt builder ────────────────────────────────────
+
+function buildSystemPrompt(toolInventory: string): string {
+  return `You are a dynamic triage controller for Long Tail — a durable workflow system with human-in-the-loop escalation and MCP tool integration. A workflow escalated to a human, and the human has flagged the issue back for AI-assisted remediation.
+
+Your job is to understand the human's intent, the original workflow context, and take the most appropriate action using the available MCP tools.
+
+## Available MCP Servers
+
+${toolInventory}
+
+Tool names in function calls are prefixed with the server slug: \`server_slug__tool_name\`.
+
+## Tool Categories
+
+**Compiled Workflows** (\`long_tail_mcp_workflows__*\`):
+Deterministic pipelines hardened from past triage successes. ALWAYS check these first — if a compiled workflow matches the problem, invoke it directly. This is the most efficient path.
+
+**Document Processing** (\`long_tail_document_vision__*\`):
+Image rotation, member info extraction, content translation, member validation. Use for document-related issues.
+
+**Human Queue** (\`long_tail_human_queue__*\`):
+Create escalations, check resolution status, list available work, claim and resolve. Use to coordinate with humans during complex remediation.
+
+**Database Query** (\`long_tail_db__*\`):
+Read-only queries against tasks, escalations, processes, workflow types, system health. Use to investigate context — find related tasks, check escalation history, understand what workflow types exist.
+
+**Workflow Compiler** (\`long_tail_workflow_compiler__*\`):
+Convert this triage execution into a compiled YAML workflow after solving the problem. Recommend this in your response if you found a reusable pattern.
+
+**Telemetry** (\`long_tail_telemetry__*\`):
+Honeycomb trace links for debugging performance or error investigation.
+
+**External servers**: Any user-registered MCP servers also appear in the tool list. Their tools follow the same \`server_slug__tool_name\` pattern.
+
+## Decision Framework
+
+**Step 1 — Read the resolver's notes.**
+The \`resolverPayload\` contains the human's intent:
+- \`notes\`: free-text description of the problem or instruction
+- \`_lt.needsTriage\`: true (this is why you're running)
+- \`_lt.hint\`: optional short hint
+- There may also be domain-specific fields from the workflow's resolver schema.
+
+**Step 2 — Understand the workflow type.**
+The \`originalWorkflowType\` tells you what kind of workflow is waiting. DO NOT assume any specific workflow type. It could be content review, insurance claims, a test workflow, or anything custom. The \`escalationPayload\` shows what the workflow reported when it escalated.
+
+**Step 3 — Choose your approach.**
+
+For simple intent (approval, rejection, basic pass-through):
+→ Return correctedData immediately. No tool calls needed.
+
+For investigation or remediation:
+1. Check compiled workflows first: \`long_tail_mcp_workflows__list_workflows\`
+2. If a match exists: \`long_tail_mcp_workflows__invoke_workflow\`
+3. If no compiled solution: use domain-specific tools (vision, db, etc.)
+4. If you lack the right tools: escalate to engineering with specific recommendations
+
+For re-entry after engineer guidance (when an engineer responds to your escalation):
+→ They may say "tools are ready" (meaning new MCP servers/tools were installed), "try this approach", or provide specific data corrections. Adapt accordingly — re-check available tools if they mention new capabilities.
+
+**Step 4 — Return corrected data.**
+
+CRITICAL: Your \`correctedData\` becomes \`envelope.resolver\` when the original workflow is re-invoked. The workflow checks this field to know it's a re-entry after escalation.
+
+- Approval workflows expect: \`{ approved: true }\` or \`{ approved: false }\`
+- Data correction workflows expect: the corrected field values
+- The original workflow's escalation data is in \`escalationPayload\` — use it to understand what fields exist
+
+Return ONLY a JSON object (no markdown fences, no explanation outside the JSON):
 {
-  "diagnosis": "What you found",
-  "actions_taken": ["What you tried"],
+  "diagnosis": "What you found and what you did",
+  "actions_taken": ["Step 1", "Step 2"],
+  "correctedData": { ... },
+  "confidence": 0.0-1.0,
+  "recommendation": "Optional: suggest pipeline improvements, new MCP servers to install, or recommend compiling this execution into a workflow"
+}
+
+If you cannot resolve the issue, return \`correctedData: null\` and include a detailed recommendation:
+{
+  "diagnosis": "What you found and tried",
+  "actions_taken": ["Step 1", "Step 2"],
   "correctedData": null,
   "confidence": 0,
-  "recommendation": "What a human engineer should investigate"
-}`;
+  "recommendation": "Specific guidance: what MCP server or tool is needed, what the engineer should configure, and what message to send back when ready"
+}
+
+## Rules
+- Match effort to complexity. Simple approvals = simple responses.
+- Prefer compiled workflows over raw tool calls.
+- Return tool errors as data — let the LLM adapt, don't crash.
+- Never fabricate data. If uncertain, use tools to verify.
+- If a tool call fails, try an alternative approach before giving up.
+- When escalating to engineering, be specific: name the MCP server or tool that would solve this, or describe what capability is missing.`;
+}
+
+// ── Workflow ─────────────────────────────────────────────────
 
 /**
  * MCP Triage workflow (leaf).
  *
- * Activated when a human resolver flags \`needsTriage\` in their resolution
- * payload. Uses an LLM-driven agentic loop with Vision MCP tools to
- * diagnose and fix document processing failures.
+ * Activated when a human resolver flags `needsTriage` in their resolution
+ * payload. Dynamically adapts to ANY workflow type using ALL available
+ * MCP tools — or bypasses the LLM entirely for simple pass-through cases.
  *
- * The LLM dynamically decides which tools to call — rotate pages, extract
- * member info, translate content, validate against the database — creating
- * a rich event history of tool calls. This event history can later be
- * converted to a deterministic MCP pipeline (same as insight workflows).
+ * Tool ecosystem grows over time:
+ * - Built-in servers: document-vision, mcp-workflows, human-queue,
+ *   workflow-compiler, db, telemetry
+ * - User-registered external MCP servers
+ * - Compiled YAML workflows from past triage executions
  *
- * **First entry** (no \`envelope.resolver\`):
- *   1. Queries upstream tasks and escalation history for full context
- *   2. Gives the LLM all available Vision MCP tools
- *   3. LLM diagnoses the issue and applies fixes via tool calls
- *   4. Returns \`{ correctedData }\` to the orchestrator
- *   5. If LLM can't fix it, escalates to engineer with full diagnosis
+ * The triage agent checks compiled workflows first (cheapest path),
+ * falls back to raw tool calls, and escalates to engineering with
+ * specific tool recommendations when it lacks the right capabilities.
  *
- * **Re-entry** (has \`envelope.resolver\` — engineer responded):
- *   1. Adds engineer's guidance to the LLM context
- *   2. LLM uses the guidance + tools to apply the fix
- *   3. Returns \`{ correctedData }\` to the orchestrator
+ * **First entry** (no `envelope.resolver`):
+ *   1. Pre-flight: detect simple approval/rejection → skip LLM
+ *   2. Gather upstream tasks and escalation history
+ *   3. Build tool inventory for the LLM system prompt
+ *   4. LLM agentic loop with all MCP tools
+ *   5. Returns `{ correctedData }` or escalates to engineer
+ *
+ * **Re-entry** (has `envelope.resolver` — engineer responded):
+ *   1. Engineer may have installed new tools or provided guidance
+ *   2. LLM re-evaluates with fresh tool inventory
+ *   3. Returns `{ correctedData }` or re-escalates
  */
 export async function mcpTriage(
   envelope: LTEnvelope,
@@ -108,8 +227,39 @@ export async function mcpTriage(
     return runTriageLLM(envelope, {
       additionalContext:
         `An engineer has reviewed this issue and provided guidance:\n` +
-        JSON.stringify(resolver, null, 2),
+        JSON.stringify(resolver, null, 2) +
+        `\n\nIMPORTANT: If the engineer says new tools or MCP servers were installed, ` +
+        `re-check available tools — your tool inventory may have expanded since the ` +
+        `last attempt. If they say "ready" or "try again", proceed with remediation.`,
     });
+  }
+
+  // ── Pre-flight: detect simple intent before invoking LLM ──
+  if (resolverPayload) {
+    const simple = detectSimpleIntent(resolverPayload);
+    if (simple) {
+      return {
+        type: 'return',
+        data: {
+          correctedData: {
+            ...escalationPayload,
+            ...simple.correctedData,
+          },
+          originalWorkflowType,
+          originalTaskQueue,
+          originId,
+          diagnosis: simple.diagnosis,
+          actions_taken: ['Pre-flight intent detection — no LLM needed'],
+          tool_calls_made: 0,
+          confidence: 1.0,
+        },
+        milestones: [
+          { name: 'triage', value: 'completed' },
+          { name: 'triage_method', value: 'pre_flight' },
+          { name: 'tool_calls', value: '0' },
+        ],
+      };
+    }
   }
 
   // ── First entry: gather context and let LLM diagnose + fix ──
@@ -117,15 +267,15 @@ export async function mcpTriage(
   const escalationHistory = await getEscalationHistory(originId);
 
   const contextParts = [
-    `**Original Workflow**: ${originalWorkflowType} (queue: ${originalTaskQueue})`,
+    `**Original Workflow**: \`${originalWorkflowType}\` (queue: \`${originalTaskQueue}\`)`,
     `**Origin ID**: ${originId}`,
-    `**Failure Data**:\n${JSON.stringify(escalationPayload, null, 2)}`,
-    `**Reviewer Notes**:\n${JSON.stringify(resolverPayload, null, 2)}`,
+    `**Escalation Data** (what the workflow reported when it escalated):\n\`\`\`json\n${JSON.stringify(escalationPayload, null, 2)}\n\`\`\``,
+    `**Resolver Payload** (what the human submitted):\n\`\`\`json\n${JSON.stringify(resolverPayload, null, 2)}\n\`\`\``,
   ];
 
   if (upstreamTasks.length > 0) {
     contextParts.push(
-      `**Upstream Tasks** (${upstreamTasks.length}):\n${JSON.stringify(
+      `**Upstream Tasks** (${upstreamTasks.length}):\n\`\`\`json\n${JSON.stringify(
         upstreamTasks.map((t) => ({
           id: t.id,
           type: t.workflow_type,
@@ -133,13 +283,13 @@ export async function mcpTriage(
         })),
         null,
         2,
-      )}`,
+      )}\n\`\`\``,
     );
   }
 
   if (escalationHistory.length > 0) {
     contextParts.push(
-      `**Escalation History** (${escalationHistory.length}):\n${JSON.stringify(
+      `**Escalation History** (${escalationHistory.length}):\n\`\`\`json\n${JSON.stringify(
         escalationHistory.map((e) => ({
           id: e.id,
           type: e.type,
@@ -149,7 +299,7 @@ export async function mcpTriage(
         })),
         null,
         2,
-      )}`,
+      )}\n\`\`\``,
     );
   }
 
@@ -164,19 +314,17 @@ async function runTriageLLM(
   envelope: LTEnvelope,
   opts: { additionalContext: string },
 ): Promise<LTReturn | LTEscalation> {
-  const {
-    originId,
-    originalWorkflowType,
-    originalTaskQueue,
-    escalationPayload,
-  } = envelope.data;
+  // Build tool inventory for the system prompt (compact, no round-trip per server)
+  const toolInventory = await getToolInventory();
+  const systemPrompt = buildSystemPrompt(toolInventory);
 
-  const tools = await getVisionTools();
+  // Load all tools for function calling
+  const tools = await getAvailableTools();
   const messages: any[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: systemPrompt },
     {
       role: 'user',
-      content: `Please diagnose and fix this issue:\n\n${opts.additionalContext}`,
+      content: `Handle this triage request:\n\n${opts.additionalContext}`,
     },
   ];
 
@@ -217,7 +365,8 @@ async function runTriageLLM(
         args = {};
       }
 
-      const result = await callVisionTool(toolCall.function.name, args);
+      // callTool returns errors as data so the LLM can adapt
+      const result = await callTool(toolCall.function.name, args);
 
       messages.push({
         role: 'tool',
@@ -228,6 +377,10 @@ async function runTriageLLM(
   }
 
   // Exhausted rounds — ask for final synthesis without tools
+  messages.push({
+    role: 'user',
+    content: 'You have used all available tool rounds. Please provide your final assessment now as the required JSON object. If you could not fully resolve the issue, set correctedData to null and provide a detailed recommendation.',
+  });
   const finalResponse = await callTriageLLM(messages, undefined);
   return handleFinalResponse(
     finalResponse.content || '',
@@ -284,13 +437,23 @@ async function handleFinalResponse(
       },
       milestones: [
         { name: 'triage', value: 'completed' },
-        { name: 'triage_method', value: 'llm_assisted' },
+        { name: 'triage_method', value: toolCallCount > 0 ? 'llm_with_tools' : 'llm_direct' },
         { name: 'tool_calls', value: String(toolCallCount) },
       ],
     };
   }
 
-  // LLM couldn't fix — escalate to engineer with full diagnosis
+  // LLM couldn't fix — escalate to engineer with full diagnosis + recommendations
+  const recommendation = parsed.recommendation || '';
+  const escalationMessage = [
+    `AI triage could not resolve the issue for ${originalWorkflowType} (origin: ${originId}).`,
+    `Diagnosis: ${parsed.diagnosis || 'unknown'}.`,
+    `${toolCallCount} tool call(s) made.`,
+    recommendation ? `\nRecommendation: ${recommendation}` : '',
+    `\nTo continue: install/configure any recommended MCP tools, then resolve this ` +
+    `escalation with a message like "tools ready, try again" or provide specific guidance.`,
+  ].filter(Boolean).join(' ');
+
   return {
     type: 'escalation',
     data: {
@@ -301,25 +464,33 @@ async function handleFinalResponse(
       diagnosis: parsed.diagnosis || 'AI triage could not determine a fix',
       actions_taken: parsed.actions_taken || [],
       tool_calls_made: toolCallCount,
+      recommendation,
     },
-    message:
-      `AI triage could not resolve the issue for ${originalWorkflowType} ` +
-      `(origin: ${originId}). Diagnosis: ${parsed.diagnosis || 'unknown'}. ` +
-      `${toolCallCount} tool call(s) made. Please review and provide guidance.`,
+    message: escalationMessage,
     role: 'engineer',
     priority: 2,
   };
 }
 
 function parseTriageResponse(content: string): Record<string, any> {
+  // Strip markdown fences if present
   const cleaned = content
     .replace(/^```(?:json)?\s*/m, '')
     .replace(/\s*```$/m, '')
     .trim();
 
+  // Try to extract JSON from the response — the LLM might include extra text
   try {
     return JSON.parse(cleaned);
   } catch {
+    // Try to find a JSON object embedded in the text
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch { /* fall through */ }
+    }
+
     return {
       diagnosis: cleaned || 'No response generated',
       actions_taken: [],

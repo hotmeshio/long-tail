@@ -74,19 +74,26 @@ export function quoteSchema(schema: string): string {
 export async function loadSymbolMap(schema: string, appId: string): Promise<Record<string, string>> {
   const pool = getPool();
   const symKeyPrefix = `hmsh:${appId}:sym:keys:`;
-  const result = await pool.query(
-    `SELECT key, field, value FROM ${schema}.symbols WHERE key LIKE $1`,
-    [`${symKeyPrefix}%`],
-  );
+  try {
+    const result = await pool.query(
+      `SELECT key, field, value FROM ${schema}.symbols WHERE key LIKE $1`,
+      [`${symKeyPrefix}%`],
+    );
 
-  const reverseMap: Record<string, string> = {};
-  for (const row of result.rows) {
-    const symbolName = row.key.slice(symKeyPrefix.length);
-    if (row.field && row.value && symbolName !== '') {
-      reverseMap[row.value] = row.field;
+    const reverseMap: Record<string, string> = {};
+    for (const row of result.rows) {
+      const symbolName = row.key.slice(symKeyPrefix.length);
+      if (row.field && row.value && symbolName !== '') {
+        reverseMap[row.value] = row.field;
+      }
     }
+    return reverseMap;
+  } catch (err: any) {
+    // Schema or symbols table may not exist yet — return empty map
+    // so attribute inflation falls back to raw abbreviated keys.
+    if (err.code === '42P01') return {}; // undefined_table
+    throw err;
   }
-  return reverseMap;
 }
 
 /**

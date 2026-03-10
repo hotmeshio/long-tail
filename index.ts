@@ -33,7 +33,6 @@ export * as McpService from './services/mcp/db';
 export * as McpClient from './services/mcp/client';
 export * as McpServer from './services/mcp/server';
 export * as McpVisionServer from './services/mcp/vision-server';
-export * as McpTelemetryServer from './services/mcp/telemetry-server';
 export { escalationStrategyRegistry } from './services/escalation-strategy';
 export { DefaultEscalationStrategy } from './services/escalation-strategy/default';
 export { McpEscalationStrategy } from './services/escalation-strategy/mcp';

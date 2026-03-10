@@ -120,7 +120,7 @@ export function WorkflowsOverview() {
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
-    navigate(`/workflows/list${qs ? `?${qs}` : ''}`);
+    navigate(`/workflows/runs${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
@@ -145,7 +145,7 @@ export function WorkflowsOverview() {
             className={`px-3 py-1 text-xs rounded-full transition-colors ${
               duration === d.label
                 ? 'bg-accent text-text-inverse'
-                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-sunken'
+                : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
             }`}
           >
             {d.label}

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { Play } from 'lucide-react';
 import {
   useYamlWorkflow,
   useDeployYamlWorkflow,
@@ -8,6 +9,9 @@ import {
   useArchiveYamlWorkflow,
   useDeleteYamlWorkflow,
   useRegenerateYamlWorkflow,
+  useUpdateYamlWorkflow,
+  useYamlWorkflowVersions,
+  useYamlWorkflowVersion,
 } from '../../api/yaml-workflows';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { JsonViewer } from '../../components/common/JsonViewer';
@@ -17,12 +21,8 @@ import { Field } from '../../components/common/Field';
 import { useSettings } from '../../api/settings';
 import type { ActivityManifestEntry } from '../../api/types/yaml-workflows';
 
-const statusMap: Record<string, string> = {
-  draft: 'pending',
-  deployed: 'in_progress',
-  active: 'completed',
-  archived: 'failed',
-};
+// Status values (draft, deployed, active, archived) are passed directly
+// to StatusBadge which handles styling and labels natively.
 
 function buildSkeleton(schema: Record<string, any>): Record<string, any> {
   if (!schema?.properties) return {};
@@ -70,22 +70,33 @@ function formatMetadataValue(key: string, value: unknown): string {
 
 // ── Sub-components ────────────────────────────────────────────
 
-function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl }: {
+function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl, namespace }: {
   result: Record<string, unknown>; showMetadata: boolean;
-  onToggleMetadata: () => void; traceUrl?: string | null;
+  onToggleMetadata: () => void; traceUrl?: string | null; namespace?: string;
 }) {
   const raw = (result as any)?.result ?? result;
+  const jobId = (result as any)?.job_id as string | undefined;
   const hasEnvelope = raw?.metadata && raw?.data;
   const displayData = hasEnvelope ? raw.data : raw;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Result</span>
-        {hasEnvelope && (
-          <button type="button" onClick={onToggleMetadata} className="text-[10px] text-accent hover:underline">
-            {showMetadata ? 'Hide metadata' : 'Show metadata'}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {jobId && (
+            <Link
+              to={`/mcp/runs/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(namespace || 'longtail')}`}
+              className="text-[10px] text-accent hover:underline"
+            >
+              View Execution Details
+            </Link>
+          )}
+          {hasEnvelope && (
+            <button type="button" onClick={onToggleMetadata} className="text-[10px] text-accent hover:underline">
+              {showMetadata ? 'Hide metadata' : 'Show metadata'}
+            </button>
+          )}
+        </div>
       </div>
       {showMetadata && hasEnvelope && (
         <div className="bg-surface-raised border border-surface-border rounded-md p-3">
@@ -135,21 +146,29 @@ function PipelineStrip({ activities, selectedIdx, onSelect }: {
         return (
           <div key={a.activity_id} className="flex items-center shrink-0">
             {idx > 0 && (
-              <svg className="w-4 h-4 text-text-tertiary shrink-0 mx-0.5" viewBox="0 0 16 16" fill="none">
-                <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <div className="w-4 h-px bg-surface-border mx-0.5" />
             )}
             <button
               type="button"
               onClick={() => onSelect(idx)}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${
-                isSelected
-                  ? 'bg-accent text-text-inverse border-accent'
-                  : `${sourceColor(a.tool_source)} hover:opacity-80`
-              }`}
+              className="flex items-center gap-1.5 cursor-pointer"
             >
-              <span className="font-mono">{idx + 1}</span>
-              <span className="ml-1.5">{a.title}</span>
+              <span
+                className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0 transition-colors ${
+                  isSelected
+                    ? 'bg-accent text-text-inverse'
+                    : 'bg-surface-sunken text-text-tertiary hover:bg-accent-muted hover:text-accent'
+                }`}
+              >
+                {idx + 1}
+              </span>
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                  isSelected ? 'text-text-primary' : 'text-text-tertiary hover:text-text-primary'
+                }`}
+              >
+                {a.title}
+              </span>
             </button>
           </div>
         );
@@ -159,66 +178,93 @@ function PipelineStrip({ activities, selectedIdx, onSelect }: {
 }
 
 function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
+  const hasInputs = Object.keys(activity.input_mappings).length > 0;
+  const hasOutputs = activity.output_fields.length > 0;
+  const isLlm = activity.tool_source === 'llm';
+
+  const serverId = activity.mcp_server_id || (activity.tool_source === 'db' ? 'db' : '');
+  const toolDisplay = !isLlm && activity.mcp_tool_name
+    ? `${serverId}/${activity.mcp_tool_name}`
+    : null;
+  const toolIsLinkable = !isLlm && activity.mcp_tool_name && serverId;
+
   return (
-    <div className="p-4 bg-surface-sunken rounded-md space-y-3">
-      <div className="flex items-center gap-2">
-        <h4 className="text-xs font-medium text-text-primary font-mono">{activity.title}</h4>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${sourceColor(activity.tool_source)}`}>
+    <div className="pt-2 space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <h4 className="text-base font-medium text-text-primary">{activity.title}</h4>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${sourceColor(activity.tool_source)}`}>
           {sourceLabel(activity.tool_source)}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+      {/* Identity */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4">
         <div>
-          <p className="text-[10px] text-text-tertiary">Topic</p>
-          <p className="text-xs font-mono text-text-primary truncate">{activity.topic}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Mapped Workflow Topic</p>
+          <p className="text-sm font-mono text-text-primary">{activity.topic}</p>
         </div>
-        {activity.tool_source !== 'llm' && activity.mcp_tool_name && (
+        {toolDisplay && (
           <div>
-            <p className="text-[10px] text-text-tertiary">Tool</p>
-            <p className="text-xs font-mono text-text-primary">
-              {activity.tool_source === 'db' ? 'db' : activity.mcp_server_id}/{activity.mcp_tool_name}
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool</p>
+            {toolIsLinkable ? (
+              <Link
+                to={`/mcp/servers?search=${encodeURIComponent(activity.mcp_tool_name!)}`}
+                className="text-sm font-mono text-accent hover:underline"
+              >
+                {toolDisplay}
+              </Link>
+            ) : (
+              <p className="text-sm font-mono text-text-primary">{toolDisplay}</p>
+            )}
           </div>
         )}
-        {activity.tool_source === 'llm' && (
+        {isLlm && (
           <div>
-            <p className="text-[10px] text-text-tertiary">Model</p>
-            <p className="text-xs font-mono text-text-primary">{activity.model || 'gpt-4o-mini'}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Model</p>
+            <p className="text-sm font-mono text-text-primary">{activity.model || 'gpt-4o-mini'}</p>
           </div>
         )}
       </div>
 
-      {Object.keys(activity.input_mappings).length > 0 && (
-        <div>
-          <p className="text-[10px] text-text-tertiary mb-1">Input Mappings</p>
-          <div className="space-y-0.5">
-            {Object.entries(activity.input_mappings).map(([k, v]) => (
-              <p key={k} className="text-[10px] font-mono text-text-secondary">
-                <span className="text-text-primary">{k}</span> ← <span className="text-accent">{v}</span>
-              </p>
-            ))}
-          </div>
+      {/* Input → Output */}
+      {(hasInputs || hasOutputs) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0">
+          {hasInputs && (
+            <div className="border border-surface-border rounded-md p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Inputs</p>
+              <div className="space-y-1.5">
+                {Object.entries(activity.input_mappings).map(([k, v]) => (
+                  <p key={k} className="text-xs font-mono text-text-secondary leading-relaxed">
+                    <span className="text-text-primary">{k}</span>
+                    <span className="text-text-tertiary mx-1.5">&larr;</span>
+                    <span className="text-accent">{v}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasOutputs && (
+            <div className="border border-surface-border rounded-md p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Outputs</p>
+              <div className="space-y-1.5">
+                {activity.output_fields.map((f) => (
+                  <p key={f} className="text-xs font-mono text-text-secondary leading-relaxed">{f}</p>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {activity.tool_source === 'llm' && activity.prompt_template && (
+      {/* LLM Prompt — special treatment */}
+      {isLlm && activity.prompt_template && (
         <div>
-          <p className="text-[10px] text-text-tertiary mb-1">Prompt Template</p>
-          <pre className="p-2 bg-surface-raised border border-surface-border rounded text-[10px] font-mono text-text-secondary whitespace-pre-wrap max-h-48 overflow-y-auto">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Prompt Template</p>
+          <pre className="p-4 bg-surface-sunken rounded-lg text-xs font-mono text-text-secondary whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
             {activity.prompt_template}
           </pre>
-        </div>
-      )}
-
-      {activity.output_fields.length > 0 && (
-        <div>
-          <p className="text-[10px] text-text-tertiary mb-1">Output Fields</p>
-          <div className="flex flex-wrap gap-1">
-            {activity.output_fields.map((f) => (
-              <span key={f} className="text-[10px] font-mono px-1.5 py-0.5 bg-surface-raised border border-surface-border rounded text-text-secondary">{f}</span>
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -227,19 +273,25 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
 
 // ── Lifecycle sidebar ─────────────────────────────────────────
 
-const LIFECYCLE_STEPS = ['draft', 'deployed', 'active', 'archived'] as const;
+const LIFECYCLE_STEPS = ['draft', 'active', 'archived'] as const;
 const LIFECYCLE_LABELS: Record<string, string> = {
   draft: 'Draft',
-  deployed: 'Deployed',
   active: 'Active',
   archived: 'Archived',
+};
+
+const LIFECYCLE_COLORS: Record<string, { filled: string; faded: string; line: string }> = {
+  draft:    { filled: 'bg-status-pending border-status-pending', faded: 'bg-status-pending/30 border-status-pending/50', line: 'bg-status-pending/30' },
+  active:   { filled: 'bg-status-success border-status-success', faded: 'bg-status-success/30 border-status-success/50', line: 'bg-status-success/30' },
+  archived: { filled: 'bg-text-tertiary border-text-tertiary',   faded: 'bg-text-tertiary/30 border-text-tertiary/50',   line: 'bg-text-tertiary/30' },
 };
 
 function LifecycleSidebar({
   status,
   sourceWorkflowId,
+  contentVersion,
+  deployedContentVersion,
   onDeploy,
-  onActivate,
   onArchive,
   onDelete,
   onRegenerate,
@@ -248,27 +300,45 @@ function LifecycleSidebar({
 }: {
   status: string;
   sourceWorkflowId?: string | null;
+  contentVersion?: number;
+  deployedContentVersion?: number | null;
   onDeploy: () => void;
-  onActivate: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onRegenerate: () => void;
   isPending: boolean;
   error?: string;
 }) {
-  const currentIdx = LIFECYCLE_STEPS.indexOf(status as any);
+  // Treat 'deployed' as 'active' since deploy now auto-activates
+  const effectiveStatus = status === 'deployed' ? 'active' : status;
+  const currentIdx = LIFECYCLE_STEPS.indexOf(effectiveStatus as any);
+  const needsRedeploy = contentVersion != null && contentVersion > (deployedContentVersion ?? 0);
 
   return (
     <div>
       <SectionLabel className="mb-4">Lifecycle</SectionLabel>
 
+      {/* Out-of-sync warning */}
+      {needsRedeploy && effectiveStatus !== 'draft' && effectiveStatus !== 'archived' && (
+        <div className="mb-4 px-3 py-2 rounded-md bg-status-pending/10 border border-status-pending/30">
+          <p className="text-[10px] font-semibold text-status-pending mb-1">YAML modified</p>
+          <p className="text-[10px] text-text-secondary leading-relaxed">
+            v{contentVersion} edited since deploy (v{deployedContentVersion}). Redeploy to apply changes.
+          </p>
+          <button onClick={onDeploy} disabled={isPending} className="mt-1.5 text-[10px] font-medium text-status-pending hover:underline">
+            {isPending ? 'Deploying...' : 'Deploy now'}
+          </button>
+        </div>
+      )}
+
       {/* Step sequence */}
       <div className="space-y-0">
         {LIFECYCLE_STEPS.map((step, idx) => {
-          const isCurrent = step === status;
+          const isCurrent = step === effectiveStatus;
           const isDone = idx < currentIdx;
           const isFuture = idx > currentIdx;
           const isLast = idx === LIFECYCLE_STEPS.length - 1;
+          const colors = LIFECYCLE_COLORS[step];
 
           return (
             <div key={step} className="flex items-stretch gap-3">
@@ -277,14 +347,14 @@ function LifecycleSidebar({
                 <span
                   className={`w-3 h-3 rounded-full shrink-0 border-2 transition-colors ${
                     isCurrent
-                      ? 'bg-accent border-accent'
+                      ? colors.filled
                       : isDone
-                        ? 'bg-accent/30 border-accent/50'
+                        ? colors.faded
                         : 'bg-surface-sunken border-surface-border'
                   }`}
                 />
                 {!isLast && (
-                  <span className={`w-px flex-1 ${isDone ? 'bg-accent/30' : 'bg-surface-border'}`} />
+                  <span className={`w-px flex-1 ${isDone ? colors.line : 'bg-surface-border'}`} />
                 )}
               </div>
 
@@ -306,13 +376,6 @@ function LifecycleSidebar({
                     )}
                   </div>
                 )}
-                {isCurrent && step === 'deployed' && (
-                  <div className="mt-2">
-                    <button onClick={onActivate} disabled={isPending} className="btn-primary text-[11px] px-3 py-1">
-                      {isPending ? 'Activating...' : 'Activate'}
-                    </button>
-                  </div>
-                )}
                 {isCurrent && step === 'active' && (
                   <div className="mt-2">
                     <button onClick={onArchive} disabled={isPending} className="text-[11px] text-text-tertiary hover:text-status-error">
@@ -326,11 +389,24 @@ function LifecycleSidebar({
         })}
       </div>
 
+      {/* Version info */}
+      {contentVersion != null && (
+        <div className="mt-4 pt-4 border-t border-surface-border">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Content Version</p>
+          <p className="text-xs font-mono text-text-primary">
+            v{contentVersion}
+            {deployedContentVersion != null && (
+              <span className="text-text-tertiary ml-1.5">(deployed: v{deployedContentVersion})</span>
+            )}
+          </p>
+        </div>
+      )}
+
       {/* Delete — only for draft/archived */}
       {(status === 'draft' || status === 'archived') && (
         <div className="mt-4 pt-4 border-t border-surface-border">
           <button onClick={onDelete} disabled={isPending} className="text-[11px] text-status-error hover:underline">
-            Delete pipeline
+            Delete workflow tool
           </button>
         </div>
       )}
@@ -342,12 +418,13 @@ function LifecycleSidebar({
 
 // ── Tab types ──────────────────────────────────────────────────
 
-type Tab = 'pipeline' | 'config' | 'invoke';
+type Tab = 'tools' | 'config' | 'invoke';
 
 // ── Main Page ─────────────────────────────────────────────────
 
 export function YamlWorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: wf, isLoading, refetch } = useYamlWorkflow(id!);
   const { data: settings } = useSettings();
   const deployMutation = useDeployYamlWorkflow();
@@ -356,15 +433,36 @@ export function YamlWorkflowDetailPage() {
   const archiveMutation = useArchiveYamlWorkflow();
   const deleteMutation = useDeleteYamlWorkflow();
   const regenerateMutation = useRegenerateYamlWorkflow();
+  const updateMutation = useUpdateYamlWorkflow();
   const [invokeFields, setInvokeFields] = useState<Record<string, any>>({});
   const [invokeJsonMode, setInvokeJsonMode] = useState(false);
   const [invokeJson, setInvokeJson] = useState('{}');
   const [invokeResult, setInvokeResult] = useState<Record<string, unknown> | null>(null);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('pipeline');
+  const [activeTab, setActiveTab] = useState<Tab>('tools');
   const [selectedStep, setSelectedStep] = useState(0);
 
+  // ── Version browsing ──────────────────────────────────────────
+  const versionParam = searchParams.get('version');
+  const viewingVersion = versionParam ? parseInt(versionParam, 10) : null;
+  const isViewingHistory = viewingVersion !== null && wf && viewingVersion !== wf.content_version;
+  const { data: versionsData } = useYamlWorkflowVersions(id!);
+  const { data: versionSnapshot } = useYamlWorkflowVersion(id!, isViewingHistory ? viewingVersion : null);
 
+  // Resolved data: use version snapshot if viewing history, otherwise current
+  const resolvedManifest = isViewingHistory && versionSnapshot ? versionSnapshot.activity_manifest : wf?.activity_manifest;
+  const resolvedInputSchema = isViewingHistory && versionSnapshot ? versionSnapshot.input_schema : wf?.input_schema;
+  const resolvedOutputSchema = isViewingHistory && versionSnapshot ? versionSnapshot.output_schema : wf?.output_schema;
+  const resolvedYaml = isViewingHistory && versionSnapshot ? versionSnapshot.yaml_content : wf?.yaml_content;
+
+  // ── YAML editing state ──────────────────────────────────────
+  const [yamlDraft, setYamlDraft] = useState('');
+  const [yamlEditing, setYamlEditing] = useState(false);
+  const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (wf?.yaml_content) setYamlDraft(wf.yaml_content);
+  }, [wf?.id, wf?.yaml_content]);
 
   useEffect(() => {
     if (wf?.input_schema) {
@@ -384,11 +482,11 @@ export function YamlWorkflowDetailPage() {
   }
 
   if (!wf) {
-    return <p className="text-sm text-text-secondary">Pipeline not found.</p>;
+    return <p className="text-sm text-text-secondary">Workflow server not found.</p>;
   }
 
-  const workerActivities = wf.activity_manifest.filter((a) => a.type === 'worker');
-  const inputProps = (wf.input_schema as any)?.properties || {};
+  const workerActivities = (resolvedManifest ?? wf.activity_manifest).filter((a) => a.type === 'worker');
+  const inputProps = (resolvedInputSchema as any)?.properties || {};
   const inputKeys = Object.keys(inputProps);
   const lifecycleError =
     deployMutation.error?.message || activateMutation.error?.message ||
@@ -400,18 +498,27 @@ export function YamlWorkflowDetailPage() {
     regenerateMutation.isPending;
 
   const handleDeploy = async () => { await deployMutation.mutateAsync(wf.id); refetch(); };
-  const handleActivate = async () => { await activateMutation.mutateAsync(wf.id); refetch(); };
+
   const handleArchive = async () => {
-    if (!confirm('Archive this pipeline? It will no longer accept invocations.')) return;
+    if (!confirm('Archive this workflow server? It will no longer accept invocations.')) return;
     await archiveMutation.mutateAsync(wf.id); refetch();
   };
   const handleDelete = async () => {
-    if (!confirm('Delete this pipeline permanently?')) return;
+    if (!confirm('Delete this workflow server permanently?')) return;
     await deleteMutation.mutateAsync(wf.id);
   };
   const handleRegenerate = async () => {
     if (!confirm('Re-generate from the source execution? This will overwrite the current definition.')) return;
     await regenerateMutation.mutateAsync({ id: wf.id }); refetch();
+  };
+  const handleSaveYaml = async () => {
+    await updateMutation.mutateAsync({ id: wf.id, yaml_content: yamlDraft });
+    setYamlEditing(false);
+    refetch();
+  };
+  const handleCancelEdit = () => {
+    setYamlDraft(wf.yaml_content);
+    setYamlEditing(false);
   };
   const handleInvoke = async () => {
     setInvokeResult(null);
@@ -432,17 +539,48 @@ export function YamlWorkflowDetailPage() {
     setInvokeJson(JSON.stringify(updated, null, 2));
   };
 
-  const isActive = wf.status === 'active';
+  const isActive = wf.status === 'active' || wf.status === 'deployed';
+  const canEditYaml = wf.status !== 'archived' && !isViewingHistory;
 
   const tabs: { key: Tab; label: string; show: boolean }[] = [
-    { key: 'pipeline', label: 'Pipeline', show: true },
+    { key: 'tools', label: 'Tools', show: true },
     { key: 'config', label: 'Config', show: true },
-    { key: 'invoke', label: 'Invoke', show: isActive },
+    { key: 'invoke', label: 'Invoke', show: isActive && !isViewingHistory },
   ];
 
   return (
     <div>
-      <PageHeader title="MCP Pipelines" backTo="/mcp/pipelines" backLabel="MCP Pipelines" />
+      <PageHeader title="Workflow Tool" backTo="/mcp/workflows" backLabel="Workflow Tools" />
+
+      {/* History banner */}
+      {isViewingHistory && (
+        <div className="mb-6 px-4 py-3 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+          <p className="text-xs text-text-primary">
+            Viewing version <span className="font-mono font-medium">{viewingVersion}</span>
+            {versionSnapshot?.change_summary && (
+              <span className="text-text-tertiary ml-2">— {versionSnapshot.change_summary}</span>
+            )}
+            <span className="ml-2 text-text-tertiary">(read-only)</span>
+          </p>
+          <button
+            onClick={() => { const next = new URLSearchParams(searchParams); next.delete('version'); setSearchParams(next); }}
+            className="text-xs text-accent hover:underline"
+          >
+            Back to current
+          </button>
+        </div>
+      )}
+
+      {/* Getting started banner for newly exported tools */}
+      {wf.status === 'draft' && !isViewingHistory && (
+        <div className="mb-6 px-4 py-3 rounded-md bg-accent/5 border border-accent/20">
+          <p className="text-xs text-text-primary font-medium mb-1">Workflow tool exported</p>
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            Deploy this tool to register and activate it with HotMesh, making it callable by MCP workflows like Insight and Triage.
+            Use the lifecycle panel on the right to progress through <span className="font-medium">Draft → Active</span>.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12">
         {/* ── Left: main content ─────────────────────────── */}
@@ -451,23 +589,45 @@ export function YamlWorkflowDetailPage() {
           <div className="mb-6">
             <div className="flex items-center gap-4 mb-3">
               <h2 className="text-lg font-medium text-text-primary font-mono truncate flex-1">{wf.name}</h2>
-              <StatusBadge status={statusMap[wf.status] ?? wf.status} />
+              <StatusBadge status={wf.status} />
+              {isActive && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('invoke')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-medium hover:bg-purple-500/20 transition-colors"
+                >
+                  <Play className="w-3 h-3" />
+                  Invoke
+                </button>
+              )}
             </div>
 
             {wf.description && <p className="text-xs text-text-secondary mb-4">{wf.description}</p>}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-8">
               <Field label="App ID" value={<span className="font-mono text-xs">{wf.app_id}</span>} />
-              <Field label="Version" value={<span className="font-mono text-xs">{wf.app_version}</span>} />
+              <Field label="Version" value={
+                <span className="font-mono text-xs">
+                  {wf.app_version}
+                  {versionsData && versionsData.total > 1 && (
+                    <span className="text-text-tertiary ml-1">(v{wf.content_version})</span>
+                  )}
+                </span>
+              } />
               <Field label="Topic" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
               <Field label="Steps" value={<span className="text-xs">{workerActivities.length}</span>} />
               {wf.source_workflow_id && (
-                <Field label="Source" value={
+                <Field label="Compiled From" value={
                   <Link to={`/workflows/detail/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
                     {wf.source_workflow_id}
                   </Link>
                 } />
               )}
+              <Field label="Invocations" value={
+                <Link to={`/mcp/runs?entity=${encodeURIComponent(wf.graph_topic)}&namespace=${encodeURIComponent(wf.app_id)}`} className="text-xs text-accent hover:underline">
+                  View runs
+                </Link>
+              } />
               <Field label="Created" value={<span className="text-xs">{new Date(wf.created_at).toLocaleString()}</span>} />
             </div>
           </div>
@@ -493,8 +653,8 @@ export function YamlWorkflowDetailPage() {
             ))}
           </div>
 
-          {/* ── Pipeline Tab ─────────────────────────────── */}
-          {activeTab === 'pipeline' && (
+          {/* ── Tools Tab ───────────────────────────────── */}
+          {activeTab === 'tools' && (
             <div className="space-y-4">
               <PipelineStrip
                 activities={workerActivities}
@@ -512,16 +672,71 @@ export function YamlWorkflowDetailPage() {
           {activeTab === 'config' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <JsonViewer data={wf.input_schema} label="Input Schema" />
-                <JsonViewer data={wf.output_schema} label="Output Schema" />
+                <JsonViewer data={resolvedInputSchema ?? {}} label="Input Schema" />
+                <JsonViewer data={resolvedOutputSchema ?? {}} label="Output Schema" />
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-text-primary mb-3">YAML Definition</h3>
-                <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre max-h-[600px] overflow-y-auto">
-                  {wf.yaml_content}
-                </pre>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-text-primary">YAML Definition</h3>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-accent hover:underline flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      YAML Guide
+                    </a>
+                    {canEditYaml && !yamlEditing && (
+                      <button
+                        onClick={() => { setYamlEditing(true); setTimeout(() => yamlTextareaRef.current?.focus(), 50); }}
+                        className="text-[10px] text-accent hover:underline"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {yamlEditing && (
+                      <>
+                        <button onClick={handleCancelEdit} className="text-[10px] text-text-tertiary hover:text-text-primary">
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveYaml}
+                          disabled={updateMutation.isPending || yamlDraft === wf.yaml_content}
+                          className="text-[10px] text-accent hover:underline disabled:opacity-40 disabled:no-underline"
+                        >
+                          {updateMutation.isPending ? 'Saving...' : 'Save'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {updateMutation.error && (
+                  <p className="text-xs text-status-error mb-2">{updateMutation.error.message}</p>
+                )}
+
+                {yamlEditing ? (
+                  <textarea
+                    ref={yamlTextareaRef}
+                    value={yamlDraft}
+                    onChange={(e) => setYamlDraft(e.target.value)}
+                    className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                    rows={yamlDraft.split('\n').length + 1}
+                    style={{ fieldSizing: 'content' } as React.CSSProperties}
+                    spellCheck={false}
+                  />
+                ) : (
+                  <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
+                    {resolvedYaml ?? wf.yaml_content}
+                  </pre>
+                )}
               </div>
+
             </div>
           )}
 
@@ -589,7 +804,12 @@ export function YamlWorkflowDetailPage() {
                         <span className="inline-block w-3 h-3 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
                         Running...
                       </span>
-                    ) : 'Run Pipeline'}
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <Play className="w-3 h-3" fill="currentColor" />
+                        Invoke
+                      </span>
+                    )}
                   </button>
                 </form>
               )}
@@ -602,6 +822,7 @@ export function YamlWorkflowDetailPage() {
                     showMetadata={showMetadata}
                     onToggleMetadata={() => setShowMetadata(!showMetadata)}
                     traceUrl={settings?.telemetry?.traceUrl}
+                    namespace={wf.app_id}
                   />
                   <button
                     onClick={() => { setInvokeResult(null); invokeMutation.reset(); }}
@@ -616,18 +837,56 @@ export function YamlWorkflowDetailPage() {
         </div>
 
         {/* ── Right sidebar: lifecycle ────────────────────── */}
-        <div className="lg:border-l lg:border-surface-border lg:pl-8">
+        <div className="lg:border-l lg:border-surface-border lg:pl-8 space-y-8">
           <LifecycleSidebar
             status={wf.status}
             sourceWorkflowId={wf.source_workflow_id}
+            contentVersion={wf.content_version}
+            deployedContentVersion={wf.deployed_content_version}
             onDeploy={handleDeploy}
-            onActivate={handleActivate}
+
             onArchive={handleArchive}
             onDelete={handleDelete}
             onRegenerate={handleRegenerate}
             isPending={lifecyclePending}
             error={lifecycleError}
           />
+
+          {/* Version history */}
+          {versionsData && versionsData.versions.length > 1 && (
+            <div>
+              <SectionLabel className="mb-3">Version History</SectionLabel>
+              <div className="space-y-1">
+                {versionsData.versions.map((v) => {
+                  const isCurrent = v.version === wf.content_version;
+                  const isViewing = viewingVersion === v.version;
+                  return (
+                    <button
+                      key={v.version}
+                      type="button"
+                      onClick={() => {
+                        const next = new URLSearchParams(searchParams);
+                        if (isCurrent) next.delete('version');
+                        else next.set('version', String(v.version));
+                        setSearchParams(next);
+                      }}
+                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                        isViewing
+                          ? 'bg-accent/10 text-accent'
+                          : 'text-text-secondary hover:bg-surface-sunken hover:text-text-primary'
+                      }`}
+                    >
+                      <span className="font-mono font-medium">v{v.version}</span>
+                      {isCurrent && <span className="text-text-tertiary ml-1">(current)</span>}
+                      {v.change_summary && (
+                        <p className="text-[10px] text-text-tertiary truncate mt-0.5">{v.change_summary}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

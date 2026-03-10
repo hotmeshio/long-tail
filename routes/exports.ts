@@ -8,6 +8,16 @@ import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
 
 const router = Router();
 
+const JOB_SORTABLE_COLUMNS = new Set(['created_at', 'updated_at', 'entity', 'status']);
+
+function buildJobOrderBy(sortBy?: string, order?: string): string {
+  if (!sortBy || !JOB_SORTABLE_COLUMNS.has(sortBy)) {
+    return '(CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC';
+  }
+  const dir = order === 'asc' ? 'ASC' : 'DESC';
+  return `j.${sortBy} ${dir}`;
+}
+
 /**
  * GET /api/workflow-states/jobs
  * List workflow jobs from durable.jobs where entity IS NOT NULL.
@@ -25,6 +35,8 @@ router.get('/jobs', async (req, res) => {
     const entity = (req.query.entity as string) || undefined;
     const search = (req.query.search as string) || undefined;
     const status = (req.query.status as string) || undefined;
+    const sortBy = (req.query.sort_by as string) || undefined;
+    const order = (req.query.order as string) || undefined;
 
     const pool = getPool();
     const conditions = ['j.entity IS NOT NULL'];
@@ -61,7 +73,7 @@ router.get('/jobs', async (req, res) => {
         `SELECT j.key, j.entity, j.status, j.is_live, j.created_at, j.updated_at
          FROM durable.jobs j
          WHERE ${where}
-         ORDER BY (CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC
+         ORDER BY ${buildJobOrderBy(sortBy, order)}
          LIMIT $${idx++} OFFSET $${idx++}`,
         [...values, limit, offset],
       ),

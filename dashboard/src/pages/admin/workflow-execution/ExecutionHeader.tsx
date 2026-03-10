@@ -48,10 +48,11 @@ interface ExecutionHeaderProps {
   task?: LTTaskRecord | null;
   childTasks?: LTTaskRecord[];
   escalations?: LTEscalationRecord[];
+  hasToolCalls?: boolean;
   onAction?: (action: 'restart' | 'terminate' | 'convert_yaml') => void;
 }
 
-export function ExecutionHeader({ execution, task, escalations, onAction }: ExecutionHeaderProps) {
+export function ExecutionHeader({ execution, task, escalations, hasToolCalls, onAction }: ExecutionHeaderProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -73,15 +74,6 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
 
   const isRunning = execution.status !== 'completed' && execution.status !== 'failed';
 
-  // Check for convertible tool patterns: callLLM→callDbTool/callVisionTool pairs or mcp_* activities
-  const hasToolCalls = execution.status === 'completed' && execution.events.some(
-    (e) => {
-      if (e.event_type !== 'activity_task_completed') return false;
-      const actType = (e.attributes as any).activity_type;
-      return actType === 'callDbTool' || actType === 'callVisionTool' || actType?.startsWith('mcp_');
-    },
-  );
-
   // Split compound HotMesh keys into separate task queue / workflow type
   const { taskQueue, workflowType } = splitEntityKey(execution.workflow_type);
 
@@ -96,7 +88,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setActionsOpen(!actionsOpen)}
-              className="btn-secondary text-xs"
+              className="btn-primary text-xs"
             >
               Actions
             </button>
@@ -107,7 +99,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                     onAction('restart');
                     setActionsOpen(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-sunken"
+                  className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
                 >
                   Restart Workflow
                 </button>
@@ -117,7 +109,7 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                       onAction('terminate');
                       setActionsOpen(false);
                     }}
-                    className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-sunken"
+                    className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
                   >
                     Terminate
                   </button>
@@ -128,9 +120,9 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
                       onAction('convert_yaml');
                       setActionsOpen(false);
                     }}
-                    className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-sunken"
+                    className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
                   >
-                    Convert to Pipeline
+                    Export as Workflow Tool
                   </button>
                 )}
               </div>
@@ -185,13 +177,13 @@ export function ExecutionHeader({ execution, task, escalations, onAction }: Exec
           )}
 
           {/* Process link — deep-links to process list filtered by this workflow */}
-          {task && (
+          {false && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">
                 Process
               </span>
               <Link
-                to={`/processes/list?search=${encodeURIComponent(execution.workflow_id)}`}
+                to={`/processes/runs?search=${encodeURIComponent(execution.workflow_id)}`}
                 className="text-xs font-mono text-accent hover:underline truncate"
               >
                 Find in Processes

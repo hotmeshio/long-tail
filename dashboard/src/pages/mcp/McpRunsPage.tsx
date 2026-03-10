@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMcpRuns } from '../../api/mcp-runs';
+import { useMcpRuns, useMcpEntities } from '../../api/mcp-runs';
+import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -24,9 +25,9 @@ const columns: Column<LTJob>[] = [
   },
   {
     key: 'entity',
-    label: 'Pipeline',
+    label: 'Tool',
     render: (row) => (
-      <span className="font-mono text-xs text-text-secondary">{row.entity}</span>
+      <span className="font-mono text-xs text-text-secondary">{row.entity || '—'}</span>
     ),
   },
   {
@@ -62,8 +63,8 @@ const columns: Column<LTJob>[] = [
 
 export function McpRunsPage() {
   const navigate = useNavigate();
-  const { filters, setFilter, pagination } = useFilterParams({
-    filters: { search: '', entity: '', status: '' },
+  const { filters, setFilter, setFilters, pagination } = useFilterParams({
+    filters: { search: '', entity: '', status: '', namespace: 'longtail' },
   });
 
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -74,7 +75,13 @@ export function McpRunsPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 
+  const activeNamespace = filters.namespace || 'longtail';
+
+  const { data: appIdData } = useYamlWorkflowAppIds();
+  const { data: entitiesData } = useMcpEntities(activeNamespace);
+
   const { data: runsData, isLoading } = useMcpRuns({
+    app_id: activeNamespace,
     limit: pagination.pageSize,
     offset: pagination.offset,
     entity: filters.entity || undefined,
@@ -95,17 +102,34 @@ export function McpRunsPage() {
     });
   }, [runsData?.jobs]);
 
-  // Collect unique entity values for the filter
+  const namespaces = useMemo(() => {
+    const ids = appIdData?.app_ids ?? [];
+    const set = new Set(ids);
+    // Always include the active namespace so deep-linked values appear
+    set.add(activeNamespace);
+    return [...set].sort().map((id) => ({ value: id, label: id }));
+  }, [appIdData?.app_ids, activeNamespace]);
+
   const entities = useMemo(() => {
-    const set = new Set((runsData?.jobs ?? []).map((j) => j.entity));
-    return [...set].sort();
-  }, [runsData?.jobs]);
+    const known = new Set(entitiesData?.entities ?? []);
+    if (filters.entity && !known.has(filters.entity)) known.add(filters.entity);
+    return [...known].sort().map((e) => ({ value: e, label: e }));
+  }, [entitiesData?.entities, filters.entity]);
 
   return (
     <div>
-      <PageHeader title="Pipeline Runs" />
+      <PageHeader title="Runs" />
 
       <FilterBar>
+        <FilterSelect
+          label="Namespace"
+          value={activeNamespace}
+          onChange={(v) => {
+            setFilters({ namespace: v, entity: '' });
+          }}
+          options={namespaces}
+          required
+        />
         <input
           type="text"
           placeholder="Search run ID..."
@@ -114,10 +138,10 @@ export function McpRunsPage() {
           className="input text-[11px] py-1 px-2 w-56"
         />
         <FilterSelect
-          label="Pipeline"
+          label="Tool"
           value={filters.entity}
           onChange={(v) => setFilter('entity', v)}
-          options={entities.map((e) => ({ value: e, label: e }))}
+          options={entities}
         />
         <FilterSelect
           label="Status"
@@ -135,9 +159,9 @@ export function McpRunsPage() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/mcp/runs/${encodeURIComponent(row.workflow_id)}`)}
+        onRowClick={(row) => navigate(`/mcp/runs/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
         isLoading={isLoading}
-        emptyMessage="No pipeline runs found"
+        emptyMessage="No runs found"
       />
 
       <StickyPagination

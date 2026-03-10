@@ -23,7 +23,13 @@ export function useMcpRuns(filters: McpRunFilters = {}) {
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['mcpRuns', filters],
     queryFn: () => apiFetch(`/mcp-runs?${params}`),
-    refetchInterval: 10_000,
+  });
+}
+
+export function useMcpEntities(appId = 'longtail') {
+  return useQuery<{ entities: string[] }>({
+    queryKey: ['mcpEntities', appId],
+    queryFn: () => apiFetch(`/mcp-runs/entities?app_id=${appId}`),
   });
 }
 

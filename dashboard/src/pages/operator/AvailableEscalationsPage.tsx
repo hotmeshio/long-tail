@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useEscalationListEvents } from '../../hooks/useNatsEvents';
 import { useToast } from '../../hooks/useToast';
 import {
-  useAvailableEscalations,
+  useEscalations,
   useEscalationTypes,
   useClaimEscalation,
   useSetEscalationPriority,
@@ -17,14 +17,15 @@ import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { StickyPagination } from '../../components/common/StickyPagination';
-import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
 import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { BulkActionBar } from '../../components/common/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/BulkTriageModal';
 import { CLAIM_DURATION_OPTIONS } from '../../lib/constants';
-import { ESCALATION_COLUMNS, PRIORITY_OPTIONS } from './escalation-columns';
+import { Lock } from 'lucide-react';
+import { ESCALATION_COLUMNS, STATUS_COLUMN, EscalationFilterBar } from './escalation-columns';
+import { RowAction, RowActionGroup } from '../../components/common/RowActions';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
@@ -32,8 +33,8 @@ export function AvailableEscalationsPage() {
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const { addToast } = useToast();
-  const { filters, setFilter, pagination } = useFilterParams({
-    filters: { role: '', type: '', priority: '' },
+  const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
+    filters: { role: '', type: '', priority: '', status: 'pending' },
   });
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
   const [claimDuration, setClaimDuration] = useState('30');
@@ -53,14 +54,17 @@ export function AvailableEscalationsPage() {
   // Clear selections on filter/page changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filters.role, filters.type, filters.priority, pagination.page, pagination.pageSize]);
+  }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
-  const { data, isLoading } = useAvailableEscalations({
+  const { data, isLoading } = useEscalations({
+    status: filters.status || undefined,
     role: filters.role || undefined,
     type: filters.type || undefined,
     priority: filters.priority ? parseInt(filters.priority) : undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
+    sort_by: sort.sort_by || undefined,
+    order: sort.sort_by ? sort.order : undefined,
   });
 
   const escalations = data?.escalations ?? [];
@@ -206,22 +210,21 @@ export function AvailableEscalationsPage() {
   }
 
   columns.push(
+    STATUS_COLUMN,
     ...ESCALATION_COLUMNS,
     {
       key: 'actions',
       label: '',
       render: (row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setClaimTarget(row);
-          }}
-          className="btn-primary text-xs"
-        >
-          Claim
-        </button>
+        <RowActionGroup>
+          <RowAction
+            icon={Lock}
+            title="Claim escalation"
+            onClick={() => setClaimTarget(row)}
+          />
+        </RowActionGroup>
       ),
-      className: 'w-24',
+      className: 'w-16 text-right',
     },
   );
 
@@ -229,26 +232,13 @@ export function AvailableEscalationsPage() {
     <div>
       <PageHeader title="All Escalations" />
 
-      <FilterBar>
-        <FilterSelect
-          label="Role"
-          value={filters.role}
-          onChange={(v) => setFilter('role', v)}
-          options={(rolesData?.roles ?? []).map((r) => ({ value: r, label: r }))}
-        />
-        <FilterSelect
-          label="Type"
-          value={filters.type}
-          onChange={(v) => setFilter('type', v)}
-          options={(typesData?.types ?? []).map((t) => ({ value: t, label: t }))}
-        />
-        <FilterSelect
-          label="Priority"
-          value={filters.priority}
-          onChange={(v) => setFilter('priority', v)}
-          options={PRIORITY_OPTIONS}
-        />
-      </FilterBar>
+      <EscalationFilterBar
+        filters={filters}
+        setFilter={setFilter}
+        roles={rolesData?.roles ?? []}
+        types={typesData?.types ?? []}
+        showStatus
+      />
 
       {selectedIds.size > 0 && (
         <BulkActionBar
@@ -275,6 +265,8 @@ export function AvailableEscalationsPage() {
         onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
         isLoading={isLoading}
         emptyMessage="No available escalations"
+        sort={sort}
+        onSort={setSort}
       />
 
       <StickyPagination

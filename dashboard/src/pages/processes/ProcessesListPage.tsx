@@ -104,7 +104,7 @@ export function ProcessesListPage() {
 
   return (
     <div>
-      <PageHeader title="Business Processes" />
+      <PageHeader title="Process Runs" />
 
       <FilterBar>
         <FilterInput

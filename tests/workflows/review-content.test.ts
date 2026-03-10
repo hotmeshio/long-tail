@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation, waitForEscalationStatus, waitForTaskStatus } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
@@ -71,7 +71,7 @@ describe('reviewContent workflow', () => {
     await worker.run();
 
     client = new Client({ connection });
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     Durable.clearInterceptors();
@@ -164,11 +164,8 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    // Wait for the workflow to complete (it ends on escalation now)
-    await sleepFor(5000);
-
-    // Verify escalation was created (found via workflow_id, not task)
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until escalation appears
+    const escalations = await waitForEscalation(workflowId, 15_000);
     expect(escalations.length).toBe(1);
     expect(escalations[0].status).toBe('pending');
     expect(escalations[0].role).toBe('reviewer');
@@ -181,15 +178,11 @@ describe('reviewContent workflow', () => {
       humanNote: 'Reviewed and approved by human',
     });
 
-    // Wait for the re-run workflow to complete
-    await sleepFor(5000);
-
-    // Verify the escalation was resolved by the interceptor
-    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
-    expect(resolvedEsc!.status).toBe('resolved');
-    expect(resolvedEsc!.resolved_at).toBeTruthy();
-    expect(resolvedEsc!.resolver_payload).toBeTruthy();
-  }, 45_000);
+    // Poll until escalation is resolved by the interceptor
+    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
+    expect(resolvedEsc.resolved_at).toBeTruthy();
+    expect(resolvedEsc.resolver_payload).toBeTruthy();
+  }, 30_000);
 
   // ── Escalation: claim → resolve lifecycle ─────────────────────────────────
 
@@ -210,10 +203,8 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    await sleepFor(5000);
-
-    // Find the pending escalation (via workflow_id)
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until escalation appears
+    const escalations = await waitForEscalation(workflowId, 15_000);
     const escalation = escalations[0];
     expect(escalation.status).toBe('pending');
 
@@ -236,14 +227,11 @@ describe('reviewContent workflow', () => {
       reason: 'Content violates policy',
     });
 
-    await sleepFor(5000);
-
-    // Verify the interceptor resolved the escalation
-    const resolvedEsc = await escalationService.getEscalation(escalation.id);
-    expect(resolvedEsc!.status).toBe('resolved');
-    expect(resolvedEsc!.resolved_at).toBeTruthy();
-    expect(resolvedEsc!.resolver_payload).toBeTruthy();
-  }, 45_000);
+    // Poll until resolved
+    const resolvedEsc = await waitForEscalationStatus(escalation.id, 'resolved', 15_000);
+    expect(resolvedEsc.resolved_at).toBeTruthy();
+    expect(resolvedEsc.resolver_payload).toBeTruthy();
+  }, 30_000);
 
   // ── Escalation: expired claim release ─────────────────────────────────────
 
@@ -264,9 +252,8 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    await sleepFor(5000);
-
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until escalation appears
+    const escalations = await waitForEscalation(workflowId, 15_000);
     const escalation = escalations[0];
 
     // Claim with a 0-minute duration (expires immediately)
@@ -285,7 +272,7 @@ describe('reviewContent workflow', () => {
     const updated = await escalationService.getEscalation(escalation.id);
     expect(updated!.status).toBe('pending');
     expect(updated!.assigned_to).toBeNull();
-  }, 45_000);
+  }, 30_000);
 
   // ── Error flag detection ──────────────────────────────────────────────────
 
@@ -306,10 +293,8 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    await sleepFor(5000);
-
-    // Find and resolve escalation (via workflow_id)
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until escalation appears
+    const escalations = await waitForEscalation(workflowId, 15_000);
     expect(escalations.length).toBe(1);
     await resolveEscalation(escalations[0].id, {
       contentId: 'err-1',
@@ -317,12 +302,9 @@ describe('reviewContent workflow', () => {
       note: 'Error was a false positive',
     });
 
-    await sleepFor(5000);
-
-    // Verify escalation was resolved
-    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
-    expect(resolvedEsc!.status).toBe('resolved');
-  }, 45_000);
+    // Poll until resolved
+    await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
+  }, 30_000);
 
   // ── Multiple workflows: isolation ─────────────────────────────────────────
 
@@ -372,10 +354,8 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    await sleepFor(5000);
-
-    // Find and resolve escalation (via workflow_id)
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until escalation appears
+    const escalations = await waitForEscalation(workflowId, 15_000);
     expect(escalations.length).toBe(1);
     await resolveEscalation(escalations[0].id, {
       contentId: 'short-1',
@@ -383,11 +363,9 @@ describe('reviewContent workflow', () => {
       reason: 'Content too short to evaluate',
     });
 
-    await sleepFor(5000);
-
-    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
-    expect(resolvedEsc!.status).toBe('resolved');
-  }, 45_000);
+    // Poll until resolved
+    await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
+  }, 30_000);
 
   // ── Activity interceptor: clean analysis data in result ──────────────────
 
@@ -435,10 +413,8 @@ describe('reviewContent workflow', () => {
       expire: 120,
     });
 
-    await sleepFor(5000);
-
-    // The escalation MUST have a task_id
-    const escalations = await escalationService.getEscalationsByWorkflowId(workflowId);
+    // Poll until escalation appears
+    const escalations = await waitForEscalation(workflowId, 15_000);
     expect(escalations.length).toBe(1);
     expect(escalations[0].task_id).toBeTruthy();
 
@@ -455,12 +431,11 @@ describe('reviewContent workflow', () => {
       contentId: 'inv-1',
       approved: true,
     });
-    await sleepFor(5000);
 
-    // After resolution, the task should be completed
-    const completedTask = await taskService.getTask(escalations[0].task_id!);
-    expect(completedTask!.status).toBe('completed');
-  }, 60_000);
+    // Poll until task completes
+    const completedTask = await waitForTaskStatus(escalations[0].task_id!, 'completed', 15_000);
+    expect(completedTask.status).toBe('completed');
+  }, 30_000);
 
   // ── Task lifecycle: standalone completion ──────────────────────────────────
 

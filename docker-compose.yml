@@ -12,6 +12,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+      - /app/dashboard/node_modules
     ports:
       - "${LT_PORT:-3000}:3000"
       - "9229:9229"

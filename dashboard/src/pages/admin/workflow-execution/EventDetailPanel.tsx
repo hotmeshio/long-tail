@@ -271,6 +271,8 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
           scheduled_event_id,
           initiated_event_id,
           failure,
+          trace_id,
+          span_id,
           ...rest
         } = event.attributes;
         return Object.keys(rest).length > 0 ? (

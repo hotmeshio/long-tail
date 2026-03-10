@@ -10,11 +10,9 @@ import {
 } from '../../../api/escalations';
 import { useEscalationTargets } from '../../../api/roles';
 import { StatusBadge } from '../../../components/common/StatusBadge';
-import { PriorityBadge } from '../../../components/common/PriorityBadge';
 import { CountdownTimer } from '../../../components/common/CountdownTimer';
 import { JsonViewer } from '../../../components/common/JsonViewer';
 import { PageHeader } from '../../../components/common/PageHeader';
-import { Pill } from '../../../components/common/Pill';
 import { Collapsible } from '../../../components/common/Collapsible';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
@@ -22,6 +20,7 @@ import { TimeAgo } from '../../../components/common/TimeAgo';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useNatsEvents';
 import { CopyableId } from '../../../components/common/CopyableId';
+import { UserName } from '../../../components/common/UserName';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
 
@@ -143,28 +142,39 @@ export function EscalationDetailPage() {
       >
         {middleEllipsis(esc.description || `${esc.type} escalation`, 72)}
       </h2>
-      <div className="flex flex-wrap items-center gap-3 mt-3">
+      <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+        {/* Status + time as a readable phrase */}
         <StatusBadge status={esc.status} />
-        <PriorityBadge priority={esc.priority} />
-        <Pill>{esc.role}</Pill>
-        <span className="text-xs text-text-tertiary"><TimeAgo date={esc.created_at} /></span>
-        {esc.resolved_at && (
-          <span className="text-xs text-text-tertiary">
-            Resolved <TimeAgo date={esc.resolved_at} />
+        {esc.resolved_at ? (
+          <span className="text-text-tertiary">
+            <TimeAgo date={esc.resolved_at} />
+          </span>
+        ) : (
+          <span className="text-text-tertiary">
+            <TimeAgo date={esc.created_at} />
           </span>
         )}
-        {claimed && (
-          <span className="text-xs font-mono text-text-secondary">
-            {esc.assigned_to?.slice(0, 8)}...
-            {claimedByMe && <span className="text-accent ml-1 font-sans">(you)</span>}
+        {esc.assigned_to && (
+          <span className="text-text-secondary">
+            by{' '}
+            <span className="font-medium text-text-primary">
+              {claimedByMe ? 'you' : <UserName userId={esc.assigned_to} />}
+            </span>
           </span>
         )}
-        {claimed && esc.assigned_until && (
-          <CountdownTimer until={esc.assigned_until} />
+
+        {/* Active claim countdown — only for non-terminal */}
+        {claimed && !isTerminal && esc.assigned_until && (
+          <>
+            <span className="text-text-quaternary">·</span>
+            <CountdownTimer until={esc.assigned_until} />
+          </>
         )}
+
+        <span className="text-text-quaternary">·</span>
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="flex items-center gap-1 text-xs text-text-tertiary hover:text-accent transition-colors"
+          className="flex items-center gap-1 text-text-tertiary hover:text-accent transition-colors"
         >
           Details
           <svg
@@ -176,7 +186,7 @@ export function EscalationDetailPage() {
         </button>
         <button
           onClick={() => setShowContext(!contextOpen)}
-          className="flex items-center gap-1 text-xs text-text-tertiary hover:text-accent transition-colors"
+          className="flex items-center gap-1 text-text-tertiary hover:text-accent transition-colors"
         >
           Input/Output
           <svg
@@ -191,6 +201,14 @@ export function EscalationDetailPage() {
       {/* Details — copyable IDs */}
       <Collapsible open={showDetails}>
         <div className="mt-4 bg-surface-raised border border-surface-border rounded-md p-4 flex flex-wrap gap-x-8 gap-y-4">
+          <div className="text-left">
+            <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Priority</span>
+            <p className="text-[12px] text-text-primary mt-0.5">P{esc.priority}</p>
+          </div>
+          <div className="text-left">
+            <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Role</span>
+            <p className="text-[12px] text-text-primary mt-0.5">{esc.role}</p>
+          </div>
           <CopyableId label="Escalation ID" value={esc.id} />
           {esc.task_id && (
             <CopyableId label="Task" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />

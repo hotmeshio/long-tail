@@ -6,7 +6,9 @@ import type { HotMeshManifest } from '@hotmeshio/hotmesh/build/types/hotmesh';
 const yaml = require('js-yaml');
 
 import { postgres_options } from '../../modules/config';
+import { YAML_LINE_WIDTH, WORKFLOW_SYNC_TIMEOUT_MS } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
+import * as namespaceService from '../namespace';
 import * as yamlDb from './db';
 
 /** Cache of HotMesh engine instances keyed by appId */
@@ -56,7 +58,7 @@ export async function buildMergedYaml(appId: string, version: string): Promise<s
     },
   };
 
-  return yaml.dump(merged, { lineWidth: 120, noRefs: true, sortKeys: false });
+  return yaml.dump(merged, { lineWidth: YAML_LINE_WIDTH, noRefs: true, sortKeys: false });
 }
 
 /**
@@ -66,10 +68,14 @@ export async function deployAppId(
   appId: string,
   version: string,
 ): Promise<HotMeshManifest> {
+  // Auto-register the namespace so it appears in the UI
+  await namespaceService.registerNamespace(appId);
+
   const mergedYaml = await buildMergedYaml(appId, version);
   const engine = await getEngine(appId);
   const manifest = await engine.deploy(mergedYaml);
-  loggerRegistry.info(`[yaml-workflow] deployed ${appId} v${version} (merged)`);
+  await engine.activate(version);
+  loggerRegistry.info(`[yaml-workflow] deployed+activated ${appId} v${version} (merged)`);
   return manifest;
 }
 
@@ -107,23 +113,61 @@ export async function invokeYamlWorkflow(
   appId: string,
   topic: string,
   data: Record<string, unknown>,
+  entity?: string,
 ): Promise<string> {
   const engine = await getEngine(appId);
-  return engine.pub(topic, data);
+  return engine.pub(topic, data, undefined, entity ? { entity } : undefined);
 }
 
 /**
  * Invoke a YAML workflow and wait for the result.
+ *
+ * Replicates HotMesh's engine.pubsub() logic exactly, but adds the
+ * `extended` parameter (where entity lives) to the internal pub() call.
+ * HotMesh's pubsub omits extended, so entity was never set.
+ *
+ * Source: @hotmeshio/hotmesh engine/index.js pubsub()
  */
 export async function invokeYamlWorkflowSync(
   appId: string,
   topic: string,
   data: Record<string, unknown>,
   timeout?: number,
-): Promise<Record<string, unknown>> {
-  const engine = await getEngine(appId);
-  const result = await engine.pubsub(topic, data, null, timeout ?? 120000);
-  return result as unknown as Record<string, unknown>;
+  entity?: string,
+): Promise<{ job_id: string; result: Record<string, unknown> }> {
+  const hotmesh = await getEngine(appId);
+  const engine = (hotmesh as any).engine;
+  const timeoutMs = timeout ?? WORKFLOW_SYNC_TIMEOUT_MS;
+
+  // Build context with engine GUID for one-time subscription routing
+  // (exactly as engine.pubsub does)
+  const context = {
+    metadata: {
+      ngn: engine.guid,
+    },
+  };
+
+  // Publish with entity via extended param
+  const extended = entity ? { entity } : undefined;
+  const jobId: string = await engine.pub(topic, data, context, extended);
+
+  return new Promise((resolve, reject) => {
+    engine.registerJobCallback(jobId, (_topic: string, output: any) => {
+      if (output.metadata.err) {
+        const error = JSON.parse(output.metadata.err);
+        reject({ error, job_id: output.metadata.jid });
+      } else {
+        resolve({
+          job_id: jobId,
+          result: output as unknown as Record<string, unknown>,
+        });
+      }
+    });
+    setTimeout(() => {
+      engine.delistJobCallback(jobId);
+      reject({ code: 598, message: 'timeout', job_id: jobId });
+    }, timeoutMs);
+  });
 }
 
 /**

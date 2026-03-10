@@ -1,63 +1,44 @@
 # Long Tail
 
-Every enterprise has business processes — approval chains, compliance checks, document reviews, data validation. These processes exist for good reasons: regulatory requirements, quality standards, institutional knowledge. You can't just hand them to an LLM and hope for the best.
+**Models provides capability. Process provides continuity.**
 
-The realistic path is process-first: start AI on the granular, well-defined tasks where confidence is measurable. Content classification. Data extraction. Document validation. Let the existing workforce handle the judgment calls — the ambiguous, high-stakes, long-tail work that requires human context. Then evolve the boundary over time as trust is earned and models improve.
+Business workflows can’t simply be handed to an LLM and left to chance. Approval chains, compliance checks, document review, and data validation exist because the cost of being wrong is real. The practical approach is simple: let AI handle what it’s confident about, and route the rest to whatever can resolve it next.
 
-Long Tail gives you the machinery to do this. Write a workflow. If AI is confident, the work completes. If not, it escalates — durably, transactionally, with full context — to whoever should handle it next.
+That remainder is the *long tail*.
 
-- **MCP-native** — AI tools and human escalation on the same protocol, both durable
-- **Postgres-only** — state, queues, escalations, audit trails
-- **Durable execution** — survives crashes, deploys, restarts
-- **Pluggable** — auth, events, telemetry, logging, maintenance; ship defaults or wire your own
+When the AI isn’t confident, the task escalates to a human. When the human can’t resolve it either — a corrupted image, an upside-down scan, a document in the wrong language — the problem escalates back. An AI triage agent uses MCP tools to diagnose, repair, and retry the step.
 
-Write a workflow. If AI is confident, the task completes. The deterministic path handles it.
+Once the issue is resolved, the sequence of actions is compiled into a deterministic workflow. The next time the same edge case appears, it runs automatically.
 
-### When AI isn't confident — escalate
-
-When the model can't decide, the workflow returns an **escalation**. A background interceptor creates a record with full context — what the AI tried, what it saw, why it wasn't confident — and the workflow ends. No long-running poll. No open connection. A human (or another agent) claims the escalation, resolves it, and the workflow re-runs with the resolver's payload. The deterministic path resumes.
-
-### When the resolver can't fix it — remediate
-
-Sometimes the human *can't* produce the correct data. An upside-down page. A corrupted image. A document in the wrong language. The resolver knows what's wrong but can't fix it themselves. They need the system to fix it and retry.
-
-This is where MCP triage takes over. The resolver flags `needsTriage` with a hint — say, `image_orientation`. Long Tail starts a triage orchestrator that:
-
-1. Queries all upstream tasks to understand what happened
-2. Reads the hint to determine what remediation is needed
-3. Calls MCP tools to apply the fix (rotate the page, re-encode the image, translate the document)
-4. Re-invokes the original workflow with corrected data
-
-The original workflow runs again — this time with a rotated page instead of an upside-down one. Extraction succeeds. Validation passes. The triage orchestrator signals back to the parent. The deterministic path completes as if nothing went wrong.
+AI handles the routine. Humans catch the ambiguity. The system absorbs the exception, adapts and moves on.
 
 ```
-Deterministic pipeline ──► AI fails ──► Escalation
-                                             │
-                              Resolver says "page is upside down"
-                                             │
-                              Triage orchestrator ──► MCP tools fix it
-                                             │
-                              Re-invokes original workflow
-                                             │
-                              Deterministic pipeline completes ◄──
+                    ┌────────────────────────────────────────┐
+                    │      Deterministic Flow                │
+                    │                                        │
+  input ──────────► │  AI confident? ── yes ──► done         |
+                    │       │                                │
+                    │       no                               │
+                    │       ▼                                │
+                    │   escalate to human                    │
+                    │       │                                │
+                    │       ▼                                │
+                    │  human confident? ── yes ──► done      │
+                    │       │                                │
+                    │       no                               │
+                    │       ▼                                │
+                    │   escalate back to AI                  │
+                    │   (MCP triage + tools)                 │
+                    │       │                                │
+                    │       ▼                                │
+                    │  fix applied, flow retried             │
+                    │       │                                │
+                    │       ▼                                │
+                    │  compile to YAML workflow ──► hardened │
+                    └────────────────────────────────────────┘
 ```
-
-### Who resolves? Anyone. What resolves? Anything.
-
-The escalation queue is an API. Who — or what — consumes it is a deployment decision, not an architectural one:
-
-- **A human team** triaging a queue of AI-flagged items in a purpose-built SPA
-- **An MCP-aware AI agent** connecting to Long Tail's Human Queue server — the same protocol it uses to call any other tool
-- **A triage orchestrator** calling MCP tools to remediate the problem autonomously
-- **A hybrid** — AI diagnoses the issue, tools fix it, a human signs off
-
-Humans and AI are interchangeable at every resolution point. Both speak MCP. Both are checkpointed. Both feed their results back into the same deterministic flow. The system doesn't care who's on either end — it cares that the work gets done, the state is consistent, and the audit trail is complete.
-
-This is the shape of AI in the enterprise: not AI *replacing* process, but AI *participating* in process — with deterministic execution as the foundation, escalation as the safety net, and tool-aware remediation as the escape hatch when neither AI nor humans can produce the answer directly.
 
 ## Quick Start
-
-Run the full stack locally with Docker. This starts Postgres, NATS, the API server, the dashboard, and seeds example workflows and users — everything needed to explore Long Tail immediately.
 
 ```bash
 git clone https://github.com/hotmeshio/long-tail.git
@@ -65,11 +46,7 @@ cd long-tail
 docker compose up -d --build
 ```
 
-Once the container is healthy (~10 seconds), open the dashboard at [http://localhost:3000](http://localhost:3000).
-
-> **Local development** — If you want to run tests or start the server outside Docker, install dependencies first: `npm install`
-
-### Demo accounts
+Open [http://localhost:3000](http://localhost:3000) once the container is healthy (~10 seconds). Four workflows run on startup to populate the dashboard.
 
 | User | Password | Role |
 |------|----------|------|
@@ -78,41 +55,32 @@ Once the container is healthy (~10 seconds), open the dashboard at [http://local
 | `engineer` | `engineer123` | engineer |
 | `reviewer` | `reviewer123` | reviewer |
 
-### Seeded processes
+**What you'll see seeded:**
 
-Four workflows run automatically on startup to populate the dashboard:
+1. **Clean Review** — AI auto-approves high-quality content. Happy path, no escalation.
+2. **Flagged for Review** — AI flags content for human review. Log in as `reviewer` to approve or reject.
+3. **Wrong Language** — Content arrives in Spanish. Walk the escalation chain: reviewer to admin to engineer, who triggers MCP triage. The AI translates the content, re-runs the workflow, and recommends adding language detection.
+4. **Damaged Claim** — Insurance claim with an upside-down document scan. AI Vision detects the issue. As `reviewer`, request AI triage. The MCP agent rotates the page, re-extracts member info, and re-runs the claim.
 
-1. **Clean Review** — AI auto-approves high-quality content. Happy path.
-2. **Flagged for Review** — AI flags content for human review. Log in as `reviewer` and approve or reject.
-3. **Wrong Language** — Content arrives in Spanish. Walk the escalation chain: `reviewer` escalates to `admin`, `admin` escalates to `engineer`, `engineer` triggers MCP triage with hint `wrong_language`. The triage orchestrator translates the content, re-runs the workflow, and recommends adding language detection.
-4. **Damaged Claim** — Insurance claim arrives with an upside-down document scan. AI Vision detects the orientation issue and flags low confidence. As `reviewer`, check "Request AI Triage" and describe the problem. The MCP triage orchestrator uses AI + Vision tools to diagnose, rotate the page, re-extract member info, and re-run the claim workflow.
+To reset: `docker compose down -v && docker compose up -d --build`
 
-### Reset
-
-To wipe the database and start fresh:
-
-```bash
-docker compose down -v
-docker compose up -d --build
-```
+> **Local development** — Run tests or start the server outside Docker: `npm install`
 
 ## Contents
 
-- [Quick Start](#quick-start)
-- [Install](#install)
-- [Connect and Start Workers](#connect-and-start-workers)
 - [Write a Workflow](#write-a-workflow)
-- [What Happens When It Runs](#what-happens-when-it-runs)
-- [The Human Side](#the-human-side)
+- [What Happens When AI Isn't Confident](#what-happens-when-ai-isnt-confident)
+- [What Happens When the Human Isn't Either](#what-happens-when-the-human-isnt-either)
+- [Hardening the Edge](#hardening-the-edge)
 - [Composing Workflows](#composing-workflows)
-- [Milestones](#milestones)
-- [Roles](#roles)
-- [Invoking Workflows](#invoking-workflows)
-- [MCP Integration](#mcp-integration)
+- [MCP Integration](#mcp-integration) — [Every Activity is a Tool](#every-activity-is-a-tool) · [Every Server is a Collection of Tools](#every-server-is-a-collection-of-tools) · [Humans as Tools](#humans-as-tools) · [Compiled Workflows as Tools](#compiled-workflows-as-tools) · [The Cycle](#the-cycle)
 - [Pluggable Architecture](#pluggable-architecture) — [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [MCP](docs/mcp.md) · [Maintenance](docs/maintenance.md) · [Escalation Strategies](docs/escalation-strategies.md)
+- [Invoking Workflows](#invoking-workflows)
 - [Execution History Export](#execution-history-export)
 - [How It Works](#how-it-works)
 - [API Reference](#api-reference) — [Workflows](docs/api/workflows.md) · [Tasks](docs/api/tasks.md) · [Escalations](docs/api/escalations.md) · [Users](docs/api/users.md) · [Roles](docs/api/roles.md) · [Maintenance](docs/api/maintenance.md) · [DBA](docs/api/dba.md) · [Exports](docs/api/exports.md)
+- [Milestones](#milestones)
+- [Roles](#roles)
 - [Deployment](#deployment) — [Cloud Deployment](docs/cloud.md)
 - [Data Model](docs/data.md)
 - [Contributing](docs/contributing.md)
@@ -123,56 +91,9 @@ docker compose up -d --build
 npm install @hotmeshio/long-tail @hotmeshio/hotmesh
 ```
 
-## Connect and Start Workers
-
-Long Tail embeds its own server, starts workers, and manages all cross-cutting concerns. Pass a config object to `start()` and everything is handled:
-
-```typescript
-import { start } from '@hotmeshio/long-tail';
-import * as myWorkflow from './workflows/my-workflow';
-
-const lt = await start({
-  database: {
-    host: 'localhost',
-    port: 5432,
-    user: 'postgres',
-    password: 'password',
-    database: 'mydb',
-  },
-  workers: [
-    {
-      taskQueue: 'my-queue',
-      workflow: myWorkflow.myWorkflow,
-    },
-  ],
-});
-```
-
-That's it. Migrations run, the interceptor registers, workers start, the API server listens on port 3000, and maintenance is scheduled. The only infrastructure is PostgreSQL.
-
-### Start a workflow
-
-```typescript
-const handle = await lt.client.workflow.start({
-  args: [{ data: { contentId: '123', content: 'Review this' }, metadata: {} }],
-  taskQueue: 'my-queue',
-  workflowName: 'myWorkflow',
-  workflowId: `review-${Date.now()}`,
-  expire: 86_400,
-});
-
-const result = await handle.result();
-```
-
-### Shutdown
-
-```typescript
-await lt.shutdown();
-```
-
 ## Write a Workflow
 
-A workflow is a function. It receives input (an envelope), does work, and returns a result or an escalation.
+A workflow is a function. It receives an envelope, does work, and returns a result or an escalation.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -187,41 +108,35 @@ const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({
 export async function reviewContent(
   envelope: LTEnvelope,
 ): Promise<LTReturn | LTEscalation> {
-  // On re-entry after human resolution, return the resolver's decision
+  // Re-entry after human resolution — return the resolver's decision
   if (envelope.resolver) {
     return {
       type: 'return',
       data: { ...envelope.data, resolution: envelope.resolver },
-      milestones: [{ name: 'human_review', value: 'resolved' }],
     };
   }
 
-  const { content } = envelope.data;
-  const analysis = await analyzeContent(content);
+  const analysis = await analyzeContent(envelope.data.content);
 
   if (analysis.confidence >= 0.85) {
-    return {
-      type: 'return',
-      data: { approved: true, analysis },
-      milestones: [{ name: 'ai_review', value: 'approved' }],
-    };
+    return { type: 'return', data: { approved: true, analysis } };
   }
 
   // Not confident — escalate to a human
   return {
     type: 'escalation',
-    data: { content, analysis },
+    data: { content: envelope.data.content, analysis },
     message: `Review needed (confidence: ${analysis.confidence})`,
     role: 'reviewer',
   };
 }
 ```
 
-Activities are where side effects live — API calls, LLMs, database reads. They run outside the deterministic sandbox so they can do I/O:
+Activities are where side effects live — API calls, LLMs, database reads. They run outside the deterministic sandbox, are retried on failure, and checkpointed. If the process crashes mid-workflow, it replays from the last checkpoint.
 
 ```typescript
 // activities.ts
-export async function analyzeContent(content: string): Promise<AnalysisResult> {
+export async function analyzeContent(content: string) {
   const response = await openai.chat.completions.create({
     model: 'gpt-4',
     messages: [{ role: 'user', content: `Analyze this content: ${content}` }],
@@ -230,87 +145,129 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
 }
 ```
 
-Activities are retried on failure and checkpointed. If the process crashes mid-workflow, it replays from the last checkpoint — not from the beginning.
+Register the workflow and start:
 
-## What Happens When It Runs
+```typescript
+import { start } from '@hotmeshio/long-tail';
+import * as myWorkflow from './workflows/my-workflow';
 
-Before you run a workflow, you register it with Long Tail. This ensures automatic task tracking, escalation management, and audit trails:
-
-```
-PUT /api/workflows/reviewContent/config
-
-{
-  "is_lt": true,
-  "default_role": "reviewer",
-  "roles": ["reviewer"],
-  "invocable": true
-}
+const lt = await start({
+  database: {
+    host: 'localhost', port: 5432,
+    user: 'postgres', password: 'password', database: 'mydb',
+  },
+  workers: [{ taskQueue: 'my-queue', workflow: myWorkflow.reviewContent }],
+});
 ```
 
-`is_lt: true` turns on the interceptor for this workflow. `default_role` and `roles` control who gets the escalation when the AI isn't confident enough to decide on its own. `invocable: true` exposes the workflow for invocation via the public API (see [Invoking Workflows](#invoking-workflows)).
+That's it. Migrations run, workers start, the API server listens, and maintenance is scheduled. The only infrastructure is PostgreSQL.
 
-From there, two things can happen when `reviewContent` runs:
+```typescript
+// Start a workflow
+const handle = await lt.client.workflow.start({
+  args: [{ data: { content: 'Review this' }, metadata: {} }],
+  taskQueue: 'my-queue',
+  workflowName: 'reviewContent',
+  workflowId: `review-${Date.now()}`,
+});
 
-- **AI is confident** — the task completes. A record lands in `lt_tasks` with the status and the data your workflow returned.
-- **AI isn't confident** — the workflow pauses and an escalation appears in `lt_escalations` with the target role and the message your workflow provided. A human (or another agent) claims it, resolves it, and the workflow resumes exactly where it left off.
+const result = await handle.result();
+```
 
-It's just Postgres. You can query it, join it, export it, build dashboards on it.
+## What Happens When AI Isn't Confident
 
-## The Human Side
+Two outcomes when `reviewContent` runs:
 
-When AI escalates, someone needs to handle it — a human team, another AI agent, or a hybrid where AI does a first pass and routes to a human for sign-off. The escalation API is the same regardless.
+- **Confident** — the task completes. A record lands in `lt_tasks` with the result.
+- **Not confident** — the workflow returns an escalation. The interceptor creates a record with full context in `lt_escalations` — what the AI tried, what it saw, why it wasn't sure. The workflow ends cleanly. No long-running poll.
 
-### Checking the queue
-
-A reviewer pulls their available work. Escalations are filtered by role, so each reviewer only sees what's relevant to them:
+A reviewer pulls their queue:
 
 ```
 GET /api/escalations/available?role=reviewer
 ```
 
-```json
-{
-  "escalations": [
-    {
-      "id": "esc-abc123",
-      "workflow_type": "reviewContent",
-      "message": "Review needed (confidence: 0.72)",
-      "data": { "content": "...", "analysis": { "confidence": 0.72 } },
-      "role": "reviewer",
-      "status": "pending"
-    }
-  ]
-}
-```
-
-The escalation carries everything the AI tried and why it wasn't confident — the reviewer has full context.
-
-### Claiming an escalation
-
-Claiming locks the escalation so no one else picks it up. The lock is time-boxed — if the reviewer doesn't finish, it goes back to the queue automatically:
+Claims the work (time-boxed — if they don't finish, it goes back):
 
 ```
 POST /api/escalations/esc-abc123/claim
-
 { "durationMinutes": 30 }
 ```
 
-### Resolving it
-
-The reviewer makes their decision and resolves the escalation. This restarts the workflow with the resolver's payload injected into `envelope.resolver`:
+Resolves it:
 
 ```
 POST /api/escalations/esc-abc123/resolve
-
-{
-  "resolverPayload": {
-    "approved": true,
-    "notes": "Content is fine, AI was overly cautious"
-  }
-}
+{ "resolverPayload": { "approved": true, "notes": "Content is fine" } }
 ```
 
-The workflow re-runs. This time `envelope.resolver` is populated, so the `if (envelope.resolver)` branch from the workflow code above executes — the resolver's decision becomes the final result, and the task completes.
+This restarts the workflow with `envelope.resolver` populated. The `if (envelope.resolver)` branch executes, the resolver's decision becomes the final result, and the task completes. The deterministic path resumes as if nothing went wrong.
+
+## What Happens When the Human Isn't Either
+
+Sometimes the reviewer *can't* produce the correct answer. An upside-down page. A corrupted scan. A document in the wrong language. They know what's wrong but can't fix it themselves — they need the system to fix it and retry.
+
+The resolver flags `needsTriage` with a hint — say, `image_orientation`. Long Tail's MCP triage interceptor takes over:
+
+1. Queries upstream tasks and escalation history for full context
+2. Reads the hint to understand what remediation is needed
+3. Starts an LLM-driven agentic loop with MCP tools (rotate pages, translate content, re-extract data, validate against databases)
+4. Returns corrected data to the orchestrator
+5. The orchestrator re-invokes the original workflow with fixed inputs
+
+```
+Claim pipeline ──► AI extracts data ──► low confidence ──► escalate
+                                                              │
+                                         reviewer: "page is upside down"
+                                                              │
+                                         MCP triage agent ──► Vision tools
+                                              │
+                                         rotate page, re-extract, validate
+                                              │
+                                         re-invoke original workflow
+                                              │
+                                         extraction succeeds ◄──
+```
+
+The triage workflow is itself durable. Every MCP tool call is checkpointed. If the LLM can't fix it either, it escalates to an engineer with a full diagnosis — what it tried, what it found, what it recommends. The engineer provides guidance, the triage re-runs with that context, and applies the guided fix.
+
+This is the loop: AI catches what humans miss. Humans catch what AI misses. Each escalation carries full context. Nothing is lost.
+
+## Hardening the Edge
+
+Here's what makes the loop tighten over time.
+
+Every MCP triage execution produces a rich event history — which tools were called, in what order, with what arguments, producing what results. That history is a *recording* of how a particular edge case was solved.
+
+Long Tail's workflow compiler converts that recording into a deterministic YAML workflow:
+
+```
+MCP triage execution (dynamic, LLM-driven)
+  │
+  │  rotate_page(page1, 180°) → page1_rotated.png
+  │  extract_member_info(page1_rotated.png) → { name, id, ... }
+  │  validate_member({ name, id }) → { verified: true }
+  │
+  ▼
+Deterministic YAML workflow (no LLM, direct tool piping)
+  │
+  │  step 1: rotate_page → step 2: extract_member_info → step 3: validate_member
+  │
+  ▼
+Deploy and activate
+```
+
+The generated workflow replaces LLM reasoning with direct tool-to-tool data piping. No inference calls, no token costs, no latency from model reasoning. The same fix that once required an agentic loop now runs as a deterministic pipeline.
+
+The compiler is itself an MCP server with three tools:
+
+| Tool | What it does |
+|------|-------------|
+| `convert_execution_to_yaml` | Analyze a completed execution, extract the tool sequence, generate a YAML workflow, store as draft |
+| `deploy_yaml_workflow` | Deploy the YAML to HotMesh, optionally activate and register workers |
+| `list_yaml_workflows` | List stored YAML workflows with status and metadata |
+
+This means an AI agent can observe its own triage executions, compile the successful ones into deterministic flows, and deploy them — closing the loop without human intervention. The long tail gets shorter every time.
 
 ## Composing Workflows
 
@@ -338,102 +295,30 @@ export async function processDocument(envelope: LTEnvelope) {
 
 If `extractDocument` escalates to a human, the orchestrator waits. When the escalation is resolved, it resumes exactly where it left off and runs `validateExtraction`. No polling, no callbacks — just sequential code.
 
-Children that share an `originId` can read each other's completed data automatically. Declare what a workflow [`consumes`](docs/api/workflows.md#create-or-replace-a-workflow-configuration) in its config, and Long Tail injects sibling results into `envelope.lt.providers` at runtime — no manual threading required.
-
-## Milestones
-
-Milestones are structured markers that workflows emit at key decision points. They're included in the return value:
-
-```typescript
-return {
-  type: 'return',
-  data: { approved: true },
-  milestones: [{ name: 'ai_review', value: 'approved' }],
-};
-```
-
-Milestones are persisted on the task record and published to any registered event adapters (NATS, SNS, Kafka, webhooks). This means external systems can react to workflow progress in real time — trigger notifications, update dashboards, or feed analytics — without polling.
-
-When a human resolves an escalation, the interceptor automatically appends `escalated` and `resolved_by_human` milestones, so you always know which tasks went through human review.
-
-## Roles
-
-Roles connect workflows to people. When a workflow escalates to the `reviewer` role, every user assigned that role sees it in their queue. Roles are implicit — they exist the moment you reference them. There's no separate "create role" step.
-
-A role appears in two places: the [workflow config](docs/api/workflows.md#create-or-replace-a-workflow-configuration) (`default_role` and `roles`) and the [user record](docs/api/roles.md) (assigned via the roles API).
-
-### Role types
-
-Every role assignment has a `type` that controls what the user can manage — not what they can see. All three types can claim and resolve escalations for their role.
-
-| Type | Permissions |
-|------|-------------|
-| `member` | Claim and resolve escalations for this role |
-| `admin` | Everything a member can do, plus manage users within this role |
-| `superadmin` | Full access — manage all roles, all users, system configuration |
-
-A user can hold multiple roles with different types. See the [Users](docs/api/users.md) and [Roles](docs/api/roles.md) API docs for assignment examples.
-
-## Invoking Workflows
-
-Any registered workflow can be invoked via the public API. Set `invocable: true` in the [workflow config](docs/api/workflows.md#create-or-replace-a-workflow-configuration) and optionally restrict access with `invocation_roles`:
-
-```
-PUT /api/workflows/reviewContent/config
-
-{
-  "is_lt": true,
-  "default_role": "reviewer",
-  "roles": ["reviewer"],
-  "invocable": true,
-  "invocation_roles": ["submitter", "admin"]
-}
-```
-
-Then invoke it:
-
-```
-POST /api/workflows/reviewContent/invoke
-
-{
-  "data": {
-    "contentId": "doc-42",
-    "content": "Review this document"
-  }
-}
-```
-
-```json
-{
-  "workflowId": "reviewContent-a1b2c3",
-  "message": "Workflow started"
-}
-```
-
-The workflow runs durably from here. Track progress with the [status and result endpoints](docs/api/workflows.md#observation), or let milestones and events handle downstream notifications.
-
-When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one matching role. Superadmins always bypass. Authorization lives in the database config — change who can invoke without redeploying. See the full [invocation API](docs/api/workflows.md#invocation) for details.
+Children that share an `originId` can read each other's completed data automatically. Declare what a workflow [`consumes`](docs/api/workflows.md#create-or-replace-a-workflow-configuration) in its config, and Long Tail injects sibling results into `envelope.lt.providers` at runtime.
 
 ## MCP Integration
 
-MCP is the shared language. AI tools — vision, classification, search — run as MCP servers whose calls are checkpointed as durable activities. Human escalation runs as an MCP server too. A workflow can call an AI tool and escalate to a human reviewer through the same protocol, with the same durability guarantees. See [docs/mcp.md](docs/mcp.md) for the full guide.
+Everything is a tool. Every proxy activity — the functions that workflows call — is an MCP tool. Every collection of related tools is an MCP server. When an engineer writes a workflow, they're composing tool calls. When the triage agent fixes an edge case, it's calling the same tools. When that fix gets compiled into a deterministic pipeline, it becomes a new tool on a new server.
 
-### MCP Tool Calls as Durable Activities
+The protocol is the same whether the caller is deterministic code, an LLM, or a human clicking a button. This is the unifying concept.
 
-Register external MCP servers and invoke their tools as checkpointed activities. If the process crashes between the call and the checkpoint, it replays from cache — the MCP server isn't called twice. You get exactly-once semantics over a protocol that doesn't natively guarantee them.
+### Every Activity is a Tool
+
+A proxy activity is a function that runs outside the deterministic sandbox — it makes an API call, queries a database, calls an LLM. HotMesh checkpoints the result. If the process crashes, it replays from cache. The activity isn't called twice.
+
+Every one of these activities is also an MCP tool. Register an MCP server and its tools become proxy activities automatically:
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
 import { McpClient } from '@hotmeshio/long-tail';
 
-// Get tool functions from a registered MCP server
 const tools = await McpClient.toolActivities(serverId);
 const { mcp_analyzer_classify } = Durable.workflow.proxyActivities<typeof tools>({
   activities: tools,
 });
 
 export async function classifyDocument(envelope: LTEnvelope) {
-  // This MCP tool call is now durable — checkpointed, retried, audited
   const result = await mcp_analyzer_classify({ content: envelope.data.content });
 
   if (result.confidence >= 0.85) {
@@ -443,9 +328,26 @@ export async function classifyDocument(envelope: LTEnvelope) {
 }
 ```
 
-### Humans as an MCP Server
+The engineer writes `await mcp_analyzer_classify(...)` in their workflow. That's a proxy activity call. It's also an MCP tool call. Same thing. Durable, checkpointed, exactly-once. The engineer doesn't need to think about protocols — they call functions. The system handles the rest.
 
-Long Tail exposes its escalation queue as an MCP server. Any MCP-aware agent — LangGraph, CrewAI, raw API calls — can route work to humans through the same protocol it uses to call any other tool.
+### Every Server is a Collection of Tools
+
+An MCP server is a namespace for related tools. Long Tail ships with six built-in servers:
+
+| Server | Tools | Purpose |
+|--------|-------|---------|
+| `long-tail-human-queue` | 4 | Route work to humans, check resolution, claim and resolve |
+| `long-tail-db` | 6 | Query tasks, escalations, process summaries, system health |
+| `long-tail-document-vision` | 5 | Rotate pages, extract data, translate, validate members |
+| `long-tail-workflow-compiler` | 3 | Convert triage executions to YAML, deploy, list |
+| `long-tail-mcp-workflows` | 3 | Discover and invoke compiled workflow tools |
+| `long-tail-telemetry` | 2 | Query traces and spans from Honeycomb |
+
+Engineers can register external servers — Playwright for browser automation, file storage, custom APIs. The triage agent can even recommend that engineers add a new MCP server when it encounters a capability gap. Every server's tools become available as proxy activities in deterministic workflows and as callable tools in dynamic triage.
+
+### Humans as Tools
+
+Long Tail exposes its escalation queue as an MCP server. Any MCP-aware agent can route work to humans through the same protocol it uses to call any other tool.
 
 ```
 MCP Server: "long-tail-human-queue"
@@ -457,21 +359,19 @@ Tools:
   - claim_and_resolve(escalation_id, payload) → result
 ```
 
-An AI agent working the queue looks like this:
+An AI agent working the queue:
 
 ```typescript
 import { Client } from '@modelcontextprotocol/sdk/client';
 
 const client = new Client({ name: 'my-agent', version: '1.0.0' });
-await client.connect(transport); // stdio, SSE, or in-memory
+await client.connect(transport);
 
-// Check the queue
 const work = await client.callTool({
   name: 'get_available_work',
   arguments: { role: 'reviewer' },
 });
 
-// Claim and resolve
 await client.callTool({
   name: 'claim_and_resolve',
   arguments: {
@@ -482,66 +382,85 @@ await client.callTool({
 });
 ```
 
-Human labor — and AI labor — becomes composable across the entire MCP ecosystem. Long Tail handles the durable wait, the routing, the claim/release lifecycle, and the audit trail. The protocol is the same whether the resolver is a human clicking a button or an agent calling a tool.
+Human labor and AI labor become composable. The protocol is the same whether the resolver is a person clicking a button or an agent calling a tool.
 
-### Managing MCP Servers
+### Compiled Workflows as Tools
 
-Register, connect, and manage MCP servers via the REST API:
+Once a triage execution is compiled and deployed, it becomes a tool. The dynamic sequence of tool calls that fixed an edge case — rotate, extract, validate — is now a deterministic pipeline that any workflow or agent can invoke:
 
 ```
-POST /api/mcp/servers
-{
-  "name": "doc-analyzer",
-  "transport_type": "stdio",
-  "transport_config": { "command": "npx", "args": ["-y", "doc-analyzer-mcp"] },
-  "auto_connect": true
-}
+MCP Server: "long-tail-mcp-workflows"
+
+Tools:
+  - list_workflows()                              → available compiled workflows
+  - get_workflow(workflow_name)                    → schema, manifest, provenance
+  - invoke_workflow(workflow_name, input, async?)  → result or job_id
 ```
 
-Or configure at startup:
+An agent encountering a familiar edge case checks for a compiled solution before falling back to dynamic triage:
+
+```typescript
+const available = await client.callTool({
+  name: 'list_workflows',
+  arguments: { status: 'active' },
+});
+
+await client.callTool({
+  name: 'invoke_workflow',
+  arguments: {
+    workflow_name: 'rotate-and-extract',
+    input: { document: 'page1_upside_down.png', rotation: 180 },
+  },
+});
+```
+
+No LLM needed. No token costs. The same fix that once required an agentic reasoning loop now runs as a direct tool-to-tool pipeline — and it's callable as a single tool by any other workflow.
+
+### The Cycle
+
+This is how the system evolves:
+
+```
+1. Engineer writes workflow, calling tools (proxy activities)
+2. Workflow escalates when confidence is low
+3. Human resolves — or flags for triage
+4. Triage agent calls the SAME tools dynamically to fix the issue
+5. Successful fix is compiled into a deterministic workflow
+6. That workflow becomes a new tool on a new server
+7. Next time, the deterministic workflow handles it — no LLM, no human
+8. The triage agent discovers it has one more tool available
+```
+
+Over time, the YAML replaces the procedural. The MCP triage workflow stops entropy by repairing and replacing the flows that eventually all become obsolete. Dynamic processes author themselves. The long tail gets shorter every time.
+
+### Managing Servers
+
+Register, connect, and manage MCP servers via the REST API or at startup:
 
 ```typescript
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   workers: [ ... ],
-  mcp: {
-    server: { enabled: true },
-  },
+  mcp: { server: { enabled: true } },
 });
 ```
 
+See [docs/mcp.md](docs/mcp.md) for the full guide.
+
 ## Pluggable Architecture
 
-Long Tail separates concerns through adapter registries. Each cross-cutting capability — authentication, event publishing, telemetry, logging, database maintenance — follows the same contract: implement a typed interface, register at startup, done.
-
-No capability requires configuration unless you want it. Auth ships with a working JWT adapter. Maintenance ships with a default nightly schedule. Telemetry, events, and logging are opt-in: register nothing and they do nothing.
-
-The fastest way to configure adapters is through the `start()` config:
+Every cross-cutting concern — auth, events, telemetry, logging, maintenance — follows the same pattern: implement a typed interface, register at startup, done. Nothing requires configuration unless you want it.
 
 ```typescript
 await start({
-  database: {
-    connectionString: process.env.DATABASE_URL,
-  },
+  database: { connectionString: process.env.DATABASE_URL },
   workers: [ ... ],
-  auth: {
-    secret: process.env.JWT_SECRET,
-  },
-  telemetry: {
-    honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY },
-  },
-  events: {
-    nats: { url: 'nats://localhost:4222' },
-  },
-  logging: {
-    pino: { level: 'info' },
-  },
-  mcp: {
-    server: { enabled: true },
-  },
-  escalation: {
-    strategy: 'mcp',  // 'default' | 'mcp' | custom adapter
-  },
+  auth: { secret: process.env.JWT_SECRET },
+  telemetry: { honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY } },
+  events: { nats: { url: 'nats://localhost:4222' } },
+  logging: { pino: { level: 'info' } },
+  mcp: { server: { enabled: true } },
+  escalation: { strategy: 'mcp' },
   maintenance: {
     schedule: '0 3 * * *',
     rules: [
@@ -554,70 +473,120 @@ await start({
 });
 ```
 
-Every adapter can also be registered programmatically for advanced use cases (custom adapters, conditional logic). See the detailed docs for each:
+Every adapter can also be registered programmatically for advanced use cases. See the detailed docs:
 
 - **[Auth](docs/auth.md)** — JWT (built-in), OAuth, API keys, or any custom `LTAuthAdapter`
 - **[Events](docs/events.md)** — NATS (built-in), SNS, Kafka, webhooks, or any custom `LTEventAdapter`
 - **[Telemetry](docs/telemetry.md)** — Honeycomb (built-in), Datadog, or any OTLP backend via `LTTelemetryAdapter`
 - **[Logging](docs/logging.md)** — Pino (built-in), Winston, or any custom `LTLoggerAdapter`
-- **[MCP](docs/mcp.md)** — Register MCP servers as durable tool providers, expose Long Tail's escalation queue as an MCP server
+- **[MCP](docs/mcp.md)** — Register MCP servers as durable tool providers, expose escalation as an MCP server
 - **[Maintenance](docs/maintenance.md)** — Scheduled cleanup with prune/delete rules, runtime API
-- **[Escalation Strategies](docs/escalation-strategies.md)** — Default (deterministic re-run), MCP (dynamic triage with tool-based remediation), or custom `LTEscalationStrategy`
+- **[Escalation Strategies](docs/escalation-strategies.md)** — Default (deterministic re-run), MCP (dynamic triage), or custom `LTEscalationStrategy`
+
+## Invoking Workflows
+
+Any registered workflow can be invoked via the public API. Set `invocable: true` in the [workflow config](docs/api/workflows.md#create-or-replace-a-workflow-configuration) and optionally restrict with `invocation_roles`:
+
+```
+PUT /api/workflows/reviewContent/config
+{
+  "is_lt": true,
+  "default_role": "reviewer",
+  "roles": ["reviewer"],
+  "invocable": true,
+  "invocation_roles": ["submitter", "admin"]
+}
+```
+
+```
+POST /api/workflows/reviewContent/invoke
+{ "data": { "contentId": "doc-42", "content": "Review this document" } }
+```
+
+When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one matching role. Superadmins always bypass. See the full [invocation API](docs/api/workflows.md#invocation).
+
+## Milestones
+
+Structured markers that workflows emit at decision points. Persisted on the task record and published to event adapters (NATS, SNS, Kafka, webhooks) so external systems can react in real time.
+
+```typescript
+return {
+  type: 'return',
+  data: { approved: true },
+  milestones: [{ name: 'ai_review', value: 'approved' }],
+};
+```
+
+When a human resolves an escalation, the interceptor automatically appends `escalated` and `resolved_by_human` milestones.
+
+## Roles
+
+Roles connect workflows to people. When a workflow escalates to the `reviewer` role, every user assigned that role sees it in their queue. Roles are implicit — they exist the moment you reference them.
+
+| Type | Permissions |
+|------|-------------|
+| `member` | Claim and resolve escalations for this role |
+| `admin` | Member permissions + manage users within this role |
+| `superadmin` | Full access — all roles, all users, system config |
+
+A user can hold multiple roles with different types. See [Users](docs/api/users.md) and [Roles](docs/api/roles.md).
 
 ## Execution History Export
 
-Every workflow's full execution history can be exported in a Temporal-compatible format — typed events (`workflow_execution_started`, `activity_task_scheduled`, `activity_task_completed`, etc.) with ISO timestamps, durations, and event cross-references.
+Every workflow's full execution history can be exported in a Temporal-compatible format — typed events with ISO timestamps, durations, and event cross-references.
 
 ```
 GET /api/workflow-states/:workflowId/execution
 ```
 
-Options:
-- `excludeSystem=true` — omit interceptor activities (lt*)
-- `omitResults=true` — strip result payloads
-- `mode=verbose` — include nested child workflow executions
-- `maxDepth=N` — recursion limit for verbose mode (default: 5)
-
-Programmatic access:
+Options: `excludeSystem=true`, `omitResults=true`, `mode=verbose`, `maxDepth=N`
 
 ```typescript
-const client = new Durable.Client({ connection });
 const handle = await client.workflow.getHandle(taskQueue, workflowName, workflowId);
 const execution = await handle.exportExecution({ exclude_system: true });
 ```
 
 ## How It Works
 
-Long Tail is built on [HotMesh](https://github.com/hotmeshio/sdk-typescript), a workflow engine that delivers Temporal-style durable execution using PostgreSQL. Workflow state is transactionally checkpointed — crashes, deploys, restarts, the workflow resumes from its last checkpoint. Activities execute exactly once; their results are cached and replayed on recovery. Workflows can pause and wait for external signals (like a human resolving an escalation), then resume with the signal payload.
+Long Tail is built on [HotMesh](https://github.com/hotmeshio/sdk-typescript), a workflow engine that delivers Temporal-style durable execution using PostgreSQL. Workflow state is transactionally checkpointed. Activities execute exactly once. Workflows can pause and wait for external signals, then resume with the signal payload.
 
 The LT interceptor adds the human-in-the-loop layer: task tracking, escalation management, claim/release with expiration, milestone recording, and audit trails. All stored in Postgres alongside the workflow state.
 
+- **Postgres-only** — state, queues, escalations, audit trails, compiled workflows
+- **Durable execution** — survives crashes, deploys, restarts
+- **MCP-native** — AI tools, human escalation, and workflow compilation on the same protocol
+- **Pluggable** — auth, events, telemetry, logging, maintenance; ship defaults or wire your own
+
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Your Workflow Code                   │
+│                    Your Workflow Code                    │
 │                                                         │
 │   envelope ──► AI Processing ──► return (confident)     │
 │                      │                                  │
 │                      └──► escalation (not confident)    │
-└────────────────────────────┬────────────────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  LT Interceptor │
-                    │                 │
-                    │  • Task records │
-                    │  • Escalations  │
-                    │  • Signal/Wait  │
-                    │  • Milestones   │
-                    └────────┬────────┘
-                             │
-                        ┌────▼─────┐
-                        │ Postgres │
-                        │          │
-                        │ • State  │
-                        │ • Tasks  │
-                        │ • Queue  │
-                        │ • Audit  │
-                        └──────────┘
+│                                    │                    │
+│                      ┌─────────────┘                    │
+│                      ▼                                  │
+│               Human resolves ──► re-run ──► done        │
+│                      │                                  │
+│               Human can't fix ──► MCP triage            │
+│                      │                                  │
+│               Tools fix it ──► re-run ──► done          │
+│                      │                                  │
+│               Compile to YAML ──► deploy ──► hardened   │
+└─────────────────────────────────────────────────────────┘
+                       │
+              ┌────────▼────────┐
+              │  LT Interceptor │
+              │  • Task records │
+              │  • Escalations  │
+              │  • Signal/Wait  │
+              │  • Milestones   │
+              └────────┬────────┘
+                       │
+                  ┌────▼─────┐
+                  │ Postgres │
+                  └──────────┘
 ```
 
 ## API Reference
@@ -626,103 +595,93 @@ The LT interceptor adds the human-in-the-loop layer: task tracking, escalation m
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/workflows/:type/invoke` | Invoke a workflow (requires `invocable: true`) |
-| `GET` | `/api/workflows/:id/status` | Get workflow execution status |
-| `GET` | `/api/workflows/:id/result` | Get workflow result (200 if complete, 202 if running) |
-| `GET` | `/api/workflows/:id/export` | Export full execution history |
-| `GET` | `/api/workflows/config` | List all workflow configurations |
-| `GET` | `/api/workflows/:type/config` | Get a workflow's configuration |
-| `PUT` | `/api/workflows/:type/config` | Create or replace a workflow configuration |
-| `DELETE` | `/api/workflows/:type/config` | Delete a workflow configuration |
+| `POST` | `/api/workflows/:type/invoke` | Invoke a workflow |
+| `GET` | `/api/workflows/:id/status` | Execution status |
+| `GET` | `/api/workflows/:id/result` | Result (200 if complete, 202 if running) |
+| `GET` | `/api/workflows/:id/export` | Full execution history |
+| `GET` | `/api/workflows/config` | List all configurations |
+| `GET` | `/api/workflows/:type/config` | Get configuration |
+| `PUT` | `/api/workflows/:type/config` | Create or replace configuration |
+| `DELETE` | `/api/workflows/:type/config` | Delete configuration |
 
 ### Workflow States (Export)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/workflow-states/:id` | Raw workflow state export (allow/block facet filters) |
+| `GET` | `/api/workflow-states/:id` | Raw state export |
 | `GET` | `/api/workflow-states/:id/execution` | Temporal-compatible execution history |
-| `GET` | `/api/workflow-states/:id/status` | Workflow status semaphore |
-| `GET` | `/api/workflow-states/:id/state` | Current workflow state |
+| `GET` | `/api/workflow-states/:id/status` | Status semaphore |
+| `GET` | `/api/workflow-states/:id/state` | Current state |
 
 ### Tasks
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/tasks` | List tasks (filter by `status`, `lt_type`, `workflow_type`) |
-| `GET` | `/api/tasks/:id` | Get task details |
+| `GET` | `/api/tasks` | List tasks |
+| `GET` | `/api/tasks/:id` | Task details |
 
 ### Escalations
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/escalations` | List escalations (filter by `status`, `role`, `type`) |
-| `GET` | `/api/escalations/available` | Available escalations (pending + unassigned/expired) |
-| `GET` | `/api/escalations/:id` | Get escalation details |
-| `POST` | `/api/escalations/:id/claim` | Claim an escalation (time-boxed lock) |
-| `POST` | `/api/escalations/:id/resolve` | Resolve — resumes the paused workflow |
-| `POST` | `/api/escalations/release-expired` | Release expired claims back to the queue |
+| `GET` | `/api/escalations` | List escalations |
+| `GET` | `/api/escalations/available` | Available (pending + unassigned/expired) |
+| `GET` | `/api/escalations/:id` | Escalation details |
+| `POST` | `/api/escalations/:id/claim` | Claim (time-boxed lock) |
+| `POST` | `/api/escalations/:id/resolve` | Resolve — resumes the workflow |
+| `POST` | `/api/escalations/release-expired` | Release expired claims |
 
-### Users
+### Users & Roles
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/users` | List users (filter by `role`, `status`) |
-| `GET` | `/api/users/:id` | Get user details |
-| `POST` | `/api/users` | Create user with roles |
+| `GET` | `/api/users` | List users |
+| `POST` | `/api/users` | Create user |
 | `PUT` | `/api/users/:id` | Update user |
 | `DELETE` | `/api/users/:id` | Delete user |
-
-### Roles
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/users/:id/roles` | List roles for a user |
-| `POST` | `/api/users/:id/roles` | Add role to user |
-| `DELETE` | `/api/users/:id/roles/:role` | Remove role from user |
+| `GET` | `/api/users/:id/roles` | List roles |
+| `POST` | `/api/users/:id/roles` | Add role |
+| `DELETE` | `/api/users/:id/roles/:role` | Remove role |
 
 ### MCP
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/mcp/servers` | List registered MCP servers |
-| `POST` | `/api/mcp/servers` | Register a new MCP server |
-| `GET` | `/api/mcp/servers/:id` | Get MCP server details |
-| `PUT` | `/api/mcp/servers/:id` | Update MCP server registration |
-| `DELETE` | `/api/mcp/servers/:id` | Delete MCP server registration |
-| `POST` | `/api/mcp/servers/:id/connect` | Connect to an MCP server |
-| `POST` | `/api/mcp/servers/:id/disconnect` | Disconnect from an MCP server |
-| `GET` | `/api/mcp/servers/:id/tools` | List tools on a connected server |
-| `POST` | `/api/mcp/servers/:id/tools/:tool/call` | Call a tool on a connected server |
+| `GET` | `/api/mcp/servers` | List registered servers |
+| `POST` | `/api/mcp/servers` | Register server |
+| `GET` | `/api/mcp/servers/:id` | Server details |
+| `PUT` | `/api/mcp/servers/:id` | Update server |
+| `DELETE` | `/api/mcp/servers/:id` | Delete server |
+| `POST` | `/api/mcp/servers/:id/connect` | Connect |
+| `POST` | `/api/mcp/servers/:id/disconnect` | Disconnect |
+| `GET` | `/api/mcp/servers/:id/tools` | List tools |
+| `POST` | `/api/mcp/servers/:id/tools/:tool/call` | Call tool |
 
 ### Maintenance
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `PUT` | `/api/config/maintenance` | Set the maintenance schedule and rules |
-| `GET` | `/api/config/maintenance` | Get the current maintenance configuration |
-| `POST` | `/api/dba/prune` | Run maintenance rules on demand |
-| `POST` | `/api/dba/deploy` | Deploy server-side prune function |
+| `PUT` | `/api/config/maintenance` | Set schedule and rules |
+| `GET` | `/api/config/maintenance` | Get configuration |
+| `POST` | `/api/dba/prune` | Run on demand |
+| `POST` | `/api/dba/deploy` | Deploy prune function |
 
 ## Deployment
 
 In production, run two container types from the same codebase — one serves the API, the other executes workflows:
 
 ```typescript
-// api.ts — serves REST endpoints, no workflow execution
+// api.ts — REST endpoints, no workflow execution
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   auth: { secret: process.env.JWT_SECRET },
 });
-```
 
-```typescript
-// worker.ts — executes workflows, no HTTP server
+// worker.ts — workflow execution, no HTTP server
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   server: { enabled: false },
-  workers: [
-    { taskQueue: 'long-tail', workflow: reviewContent.reviewContent },
-  ],
+  workers: [{ taskQueue: 'long-tail', workflow: reviewContent.reviewContent }],
 });
 ```
 

@@ -7,11 +7,20 @@ interface McpServerListResponse {
   total: number;
 }
 
-export function useMcpServers() {
+interface McpServerFilters {
+  status?: string;
+  search?: string;
+}
+
+export function useMcpServers(filters: McpServerFilters = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.search) params.set('search', filters.search);
+  const qs = params.toString();
+
   return useQuery<McpServerListResponse>({
-    queryKey: ['mcpServers'],
-    queryFn: () => apiFetch('/mcp/servers'),
-    refetchInterval: 30_000,
+    queryKey: ['mcpServers', filters],
+    queryFn: () => apiFetch(`/mcp/servers${qs ? `?${qs}` : ''}`),
   });
 }
 

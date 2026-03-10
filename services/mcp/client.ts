@@ -38,6 +38,43 @@ export async function connectToServer(server: LTMcpServerRecord): Promise<Client
     return clients.get(server.id)!;
   }
 
+  // Built-in servers use InMemoryTransport via their registered factory
+  if ((server.transport_config as any)?.builtin) {
+    // Find matching factory by server name
+    for (const [name, factory] of builtinFactories) {
+      if (server.name === name || name.includes(server.name) || server.name.includes(name)) {
+        // Reuse existing client if factory was already connected
+        if (clients.has(name)) {
+          clients.set(server.id, clients.get(name)!);
+          await mcpDbService.updateMcpServerStatus(server.id, 'connected');
+          return clients.get(name)!;
+        }
+
+        const srv = await factory();
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await srv.connect(serverTransport);
+
+        const client = new Client({ name: `builtin-${name}`, version: '1.0.0' });
+        await client.connect(clientTransport);
+        clients.set(name, client);
+        clients.set(server.id, client);
+
+        // Cache the tool manifest
+        const { tools } = await client.listTools();
+        const manifest: LTMcpToolManifest[] = tools.map((t: any) => ({
+          name: t.name,
+          description: t.description || '',
+          inputSchema: t.inputSchema || {},
+        }));
+
+        await mcpDbService.updateMcpServerStatus(server.id, 'connected', manifest);
+        loggerRegistry.info(`[lt-mcp:client] connected builtin server: ${name} (${manifest.length} tools)`);
+        return client;
+      }
+    }
+    throw new Error(`No builtin factory registered for server: ${server.name}`);
+  }
+
   const client = new Client({ name: 'long-tail', version: '1.0.0' });
 
   let transport: any;
@@ -133,12 +170,40 @@ async function resolveClient(serverId: string): Promise<Client | null> {
     }
   }
 
-  // 3. Look up by name in DB — maybe the serverId is actually a name
+  // 3. Look up in DB by ID or name, then try to match a built-in factory
   try {
-    const dbServer = await mcpDbService.getMcpServerByName(serverId);
-    if (dbServer && clients.has(dbServer.id)) {
-      clients.set(serverId, clients.get(dbServer.id)!);
-      return clients.get(dbServer.id)!;
+    const dbServer =
+      (await mcpDbService.getMcpServer(serverId)) ||
+      (await mcpDbService.getMcpServerByName(serverId));
+
+    if (dbServer) {
+      // Already connected under its DB id?
+      if (clients.has(dbServer.id)) {
+        clients.set(serverId, clients.get(dbServer.id)!);
+        return clients.get(dbServer.id)!;
+      }
+
+      // Match DB server name to a built-in factory
+      for (const [name, factory] of builtinFactories) {
+        if (dbServer.name === name || name.includes(dbServer.name) || dbServer.name.includes(name)) {
+          if (clients.has(name)) {
+            clients.set(serverId, clients.get(name)!);
+            return clients.get(name)!;
+          }
+
+          const srv = await factory();
+          const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+          await srv.connect(serverTransport);
+
+          const client = new Client({ name: `builtin-${name}`, version: '1.0.0' });
+          await client.connect(clientTransport);
+          clients.set(name, client);
+          clients.set(dbServer.id, client);
+          if (serverId !== name && serverId !== dbServer.id) clients.set(serverId, client);
+          loggerRegistry.info(`[lt-mcp:client] auto-connected built-in server: ${name} (via DB id '${serverId}')`);
+          return client;
+        }
+      }
     }
   } catch {
     // DB lookup failed — not critical
@@ -214,6 +279,11 @@ export async function toolActivities(
 export async function connectAutoServers(): Promise<void> {
   const servers = await mcpDbService.getAutoConnectServers();
   for (const server of servers) {
+    // Skip built-in servers — they auto-connect lazily via resolveClient()
+    // on first tool call using InMemoryTransport, not stdio/SSE.
+    if ((server.transport_config as any)?.builtin) {
+      continue;
+    }
     try {
       await connectToServer(server);
     } catch (err: any) {

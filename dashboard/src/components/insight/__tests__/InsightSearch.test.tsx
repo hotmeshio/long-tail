@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
@@ -18,67 +18,37 @@ describe('InsightSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useLastInsightQuestion).mockReturnValue(null);
-  });
-
-  it('renders search input and Ask button', () => {
     vi.mocked(useInsightQuery).mockReturnValue({
       data: undefined,
       isFetching: false,
       error: null,
     } as any);
-
-    renderWithRouter(<InsightSearch />);
-
-    expect(screen.getByPlaceholderText('Ask about your processes...')).toBeInTheDocument();
-    expect(screen.getByText('Ask')).toBeInTheDocument();
   });
 
-  it('renders all 6 suggestion chips', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: undefined,
-      isFetching: false,
-      error: null,
-    } as any);
-
+  it('renders search input with sparkle icon placeholder', () => {
     renderWithRouter(<InsightSearch />);
-
-    expect(screen.getByText('Show me all escalated processes')).toBeInTheDocument();
-    expect(screen.getByText("What is the current workload by role?")).toBeInTheDocument();
-    expect(screen.getByText("Summarize today's activity")).toBeInTheDocument();
-    expect(screen.getByText('How many tasks completed in the last 24 hours?')).toBeInTheDocument();
-    expect(screen.getByText('Which workflow types have the most escalations?')).toBeInTheDocument();
-  });
-
-  it('renders the telemetry suggestion chip', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: undefined,
-      isFetching: false,
-      error: null,
-    } as any);
-
-    renderWithRouter(<InsightSearch />);
-
     expect(
-      screen.getByText(
-        'Trace the most recent failed task — what happened in the workflow execution?',
-      ),
+      screen.getByPlaceholderText('Which workflow types have the most escalations?'),
     ).toBeInTheDocument();
   });
 
-  it('disables Ask button when input is empty', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: undefined,
-      isFetching: false,
-      error: null,
-    } as any);
-
+  it('shows suggestion dropdown on focus when input is empty', () => {
     renderWithRouter(<InsightSearch />);
-
-    const button = screen.getByText('Ask');
-    expect(button).toBeDisabled();
+    const input = screen.getByPlaceholderText('Which workflow types have the most escalations?');
+    fireEvent.focus(input);
+    expect(screen.getByText('Show me all escalated processes')).toBeInTheDocument();
+    expect(screen.getByText('What is the current workload by role?')).toBeInTheDocument();
   });
 
-  it('shows loading state with Analyzing button and skeleton', () => {
+  it('hides suggestions when input has text', () => {
+    renderWithRouter(<InsightSearch />);
+    const input = screen.getByPlaceholderText('Which workflow types have the most escalations?');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'test query' } });
+    expect(screen.queryByText('Show me all escalated processes')).not.toBeInTheDocument();
+  });
+
+  it('opens modal with loading state when fetching', () => {
     vi.mocked(useInsightQuery).mockReturnValue({
       data: undefined,
       isFetching: true,
@@ -86,11 +56,11 @@ describe('InsightSearch', () => {
     } as any);
 
     renderWithRouter(<InsightSearch />);
-
-    expect(screen.getByText('Analyzing...')).toBeInTheDocument();
+    // Modal should be open with loading skeleton (animate-pulse)
+    expect(document.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
-  it('renders error message', () => {
+  it('shows error in modal', () => {
     vi.mocked(useInsightQuery).mockReturnValue({
       data: undefined,
       isFetching: false,
@@ -98,11 +68,10 @@ describe('InsightSearch', () => {
     } as any);
 
     renderWithRouter(<InsightSearch />);
-
     expect(screen.getByText('Analysis failed')).toBeInTheDocument();
   });
 
-  it('renders InsightResultCard when data is present', () => {
+  it('shows result in modal when data is present', () => {
     vi.mocked(useInsightQuery).mockReturnValue({
       data: {
         title: 'Test Insight Result',
@@ -119,22 +88,27 @@ describe('InsightSearch', () => {
     } as any);
 
     renderWithRouter(<InsightSearch />);
-
     expect(screen.getByText('Test Insight Result')).toBeInTheDocument();
     expect(screen.getByText('Everything looks good.')).toBeInTheDocument();
   });
 
-  it('restores last question from cache', () => {
-    vi.mocked(useLastInsightQuestion).mockReturnValue('Previous question?');
+  it('modal has Insight title and close button', () => {
     vi.mocked(useInsightQuery).mockReturnValue({
-      data: undefined,
+      data: {
+        title: 'Result',
+        summary: 'Summary.',
+        sections: [],
+        metrics: [],
+        tool_calls_made: 1,
+        query: 'q',
+        workflow_id: 'wf-1',
+        duration_ms: 500,
+      },
       isFetching: false,
       error: null,
     } as any);
 
     renderWithRouter(<InsightSearch />);
-
-    const input = screen.getByPlaceholderText('Ask about your processes...') as HTMLInputElement;
-    expect(input.value).toBe('Previous question?');
+    expect(screen.getByText('Insight')).toBeInTheDocument();
   });
 });

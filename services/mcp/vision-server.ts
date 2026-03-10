@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import OpenAI from 'openai';
 
+import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import * as verifyActivities from '../../examples/workflows/verify-document/activities';
 
@@ -189,7 +190,7 @@ function registerTools(srv: McpServer): void {
 
       const openai = new OpenAI({ apiKey });
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: LLM_MODEL_SECONDARY,
         messages: [
           {
             role: 'system',
@@ -197,7 +198,7 @@ function registerTools(srv: McpServer): void {
           },
           { role: 'user', content: args.content },
         ],
-        max_tokens: 2000,
+        max_tokens: LLM_MAX_TOKENS_VISION,
       });
 
       const raw = response.choices?.[0]?.message?.content || '';

@@ -4,6 +4,15 @@ import type { WorkflowExecutionEvent, LTTaskRecord } from '../../../api/types';
 import { EventDetailPanel } from './EventDetailPanel';
 import { formatDuration } from './utils';
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Truncate a string in the middle, keeping the start and end visible. */
+function middleTruncate(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  const keep = Math.floor((maxLen - 1) / 2);
+  return `${str.slice(0, keep)}…${str.slice(str.length - keep)}`;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Segment {
@@ -37,6 +46,9 @@ const CATEGORY_COLORS: Record<string, { bar: string; label: string }> = {
 };
 
 const PENDING_CLASS = 'bg-stripes animate-pulse opacity-70';
+
+/** Activity names that indicate LLM/MCP tool interaction */
+const MCP_ACTIVITY_NAMES = new Set(['callLLM', 'callDbTool', 'callVisionTool', 'getDBTools', 'getVisionTools']);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -275,7 +287,7 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
 
       {/* Time axis */}
       <div className="flex">
-        <div className="w-40 shrink-0" />
+        <div className="w-56 shrink-0" />
         <div className="flex-1 relative h-6 border-b border-surface-border">
           {ticks.map((tick) => (
             <span
@@ -298,14 +310,21 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
           <div key={`${lane.category}:${lane.name}`}>
             {/* Lane row */}
             <div className="flex items-center border-b border-surface-border">
-              <div className="w-40 shrink-0 py-3 pr-4 flex items-center gap-2">
+              <div className="w-56 shrink-0 py-3 pr-4 flex items-center gap-2">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${catColor?.bar ?? 'bg-text-tertiary'}`} />
                 <p
-                  className="text-xs font-mono text-text-secondary truncate"
+                  className="text-xs font-mono text-text-secondary whitespace-nowrap overflow-hidden"
                   title={lane.name}
                 >
-                  {lane.name}
+                  {middleTruncate(lane.name, 28)}
                 </p>
+                {MCP_ACTIVITY_NAMES.has(lane.name) && (
+                  <span className="shrink-0 text-accent/60" title="MCP tool interaction">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </span>
+                )}
               </div>
 
               <div className="flex-1 relative h-10">

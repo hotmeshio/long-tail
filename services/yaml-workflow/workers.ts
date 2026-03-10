@@ -3,6 +3,12 @@ import { Client as Postgres } from 'pg';
 import type { StreamData, StreamDataResponse } from '@hotmeshio/hotmesh/build/types/stream';
 
 import { postgres_options } from '../../modules/config';
+import {
+  LLM_MAX_ARRAY_ITEMS,
+  LLM_MAX_INPUT_CHARS,
+  LLM_MAX_TOKENS_JSON,
+  LLM_MODEL_SECONDARY,
+} from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import { callDbTool, callLLM } from '../insight/activities';
 import * as mcpClient from '../mcp/client';
@@ -13,14 +19,47 @@ import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../types/ya
 const registeredTopics = new Set<string>();
 
 /**
+ * Compact input data for LLM consumption: truncate large arrays and
+ * strip fields that are unhelpful for summarization (ids, trace data).
+ */
+export function compactForLlm(input: Record<string, unknown>): Record<string, unknown> {
+  const omitKeys = new Set(['trace_id', 'span_id', 'resolved_at']);
+  const compact = (val: unknown): unknown => {
+    if (Array.isArray(val)) {
+      const mapped = val.map(compact);
+      if (mapped.length > LLM_MAX_ARRAY_ITEMS) {
+        return [...mapped.slice(0, LLM_MAX_ARRAY_ITEMS), `... (${mapped.length - LLM_MAX_ARRAY_ITEMS} more)`];
+      }
+      return mapped;
+    }
+    if (val && typeof val === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val)) {
+        if (!omitKeys.has(k)) out[k] = compact(v);
+      }
+      return out;
+    }
+    return val;
+  };
+  return compact(input) as Record<string, unknown>;
+}
+
+/**
  * Build an LLM worker callback that interpolates a prompt template with
  * input data and calls the LLM for interpretation/synthesis.
  */
 function buildLlmCallback(activity: ActivityManifestEntry) {
   return async (data: StreamData): Promise<StreamDataResponse> => {
-    const input = (data.data || {}) as Record<string, unknown>;
+    const rawInput = (data.data || {}) as Record<string, unknown>;
+    const input = compactForLlm(rawInput);
     const template = activity.prompt_template || '';
-    const model = activity.model || 'gpt-4o-mini';
+    const model = activity.model || LLM_MODEL_SECONDARY;
+
+    // Serialize and enforce hard character limit
+    let inputJson = JSON.stringify(input, null, 2);
+    if (inputJson.length > LLM_MAX_INPUT_CHARS) {
+      inputJson = inputJson.slice(0, LLM_MAX_INPUT_CHARS) + '\n... (truncated)';
+    }
 
     // Parse the template into messages. Format: [role]\ncontent\n\n[role]\ncontent
     const messages: Array<{ role: string; content: string }> = [];
@@ -31,7 +70,7 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
         let content = roleMatch[2];
         // Interpolate {field} placeholders with input data
         // {input_data} is a special placeholder for the full JSON input
-        content = content.replace(/\{input_data\}/g, JSON.stringify(input, null, 2));
+        content = content.replace(/\{input_data\}/g, inputJson);
         content = content.replace(/\{(\w+)\}/g, (_, key) => {
           if (key in input) return String(input[key]);
           return `{${key}}`;
@@ -43,11 +82,14 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
     }
 
     if (messages.length === 0) {
-      messages.push({ role: 'user', content: `Analyze the following data:\n${JSON.stringify(input, null, 2)}` });
+      messages.push({ role: 'user', content: `Analyze the following data:\n${inputJson}` });
     }
 
-    // Call the LLM (reuses the existing activity — no tools, just text completion)
-    const response = await callLLM(messages as any);
+    // Call the LLM with JSON mode for structured output
+    const response = await callLLM(messages as any, {
+      max_tokens: LLM_MAX_TOKENS_JSON,
+      response_format: { type: 'json_object' },
+    });
     const content = response.content || '';
 
     // Try to parse JSON from the response

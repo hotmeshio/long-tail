@@ -109,7 +109,7 @@ export function BulkAssignModal({
                 <button
                   key={user.id}
                   onClick={() => handleSelectUser(user)}
-                  className="w-full text-left px-3 py-2 hover:bg-surface-sunken transition-colors"
+                  className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors"
                 >
                   <p className="text-xs font-medium text-text-primary">
                     {user.display_name || user.external_id}

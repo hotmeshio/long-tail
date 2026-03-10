@@ -193,7 +193,7 @@ describe('DB MCP server', () => {
 
   // ── find_escalations with trace_id ──────────────────────────────────
 
-  it('should return trace_id and span_id in find_escalations results', async () => {
+  it('should return core fields in find_escalations results (trace_id/span_id omitted for LLM efficiency)', async () => {
     const result = await mcpClient.callTool({
       name: 'find_escalations',
       arguments: { type: 'test', limit: 10 },
@@ -203,12 +203,13 @@ describe('DB MCP server', () => {
     expect(parsed.total).toBeGreaterThanOrEqual(1);
 
     const esc = parsed.escalations.find(
-      (e: any) => e.trace_id === 'trace-esc-test-001',
+      (e: any) => e.type === 'test',
     );
     expect(esc).toBeTruthy();
-    expect(esc.trace_id).toBe('trace-esc-test-001');
-    expect(esc.span_id).toBe('span-esc-test-001');
     expect(esc.type).toBe('test');
+    expect(esc.status).toBeDefined();
+    expect(esc.trace_id).toBeUndefined();
+    expect(esc.span_id).toBeUndefined();
   });
 
   // ── get_workflow_types ──────────────────────────────────────────────

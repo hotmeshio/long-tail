@@ -10,6 +10,11 @@ interface PaginationState {
   totalPages: (total: number) => number;
 }
 
+export interface SortState {
+  sort_by: string;
+  order: 'asc' | 'desc';
+}
+
 interface UseFilterParamsResult<F extends Record<string, string>> {
   /** Current filter values, read from URL search params. */
   filters: F;
@@ -19,6 +24,10 @@ interface UseFilterParamsResult<F extends Record<string, string>> {
   setFilters: (updates: Partial<F>) => void;
   /** Pagination state — same interface as usePagination. */
   pagination: PaginationState;
+  /** Current sort state (from URL params). */
+  sort: SortState;
+  /** Toggle sort: if same column, flip direction; if different, default DESC. */
+  setSort: (column: string) => void;
 }
 
 /**
@@ -129,5 +138,27 @@ export function useFilterParams<F extends Record<string, string> = Record<string
     [page, pageSize, offset, setPage, setPageSize, totalPages],
   );
 
-  return { filters, setFilter, setFilters, pagination };
+  // ── Sort ─────────────────────────────────────────────────────────────────
+
+  const sort: SortState = useMemo(
+    () => ({
+      sort_by: searchParams.get('sort_by') ?? '',
+      order: (searchParams.get('order') as 'asc' | 'desc') || 'desc',
+    }),
+    [searchParams],
+  );
+
+  const setSort = useCallback(
+    (column: string) => {
+      const isSame = sort.sort_by === column;
+      updateParams({
+        sort_by: column || null,
+        order: isSame ? (sort.order === 'desc' ? 'asc' : 'desc') : 'desc',
+        page: null,
+      });
+    },
+    [sort.sort_by, sort.order, updateParams],
+  );
+
+  return { filters, setFilter, setFilters, pagination, sort, setSort };
 }

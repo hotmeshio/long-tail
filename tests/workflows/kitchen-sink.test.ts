@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options, sleepFor, waitForEscalation } from '../setup';
+import { postgres_options, sleepFor, waitForEscalation, waitForEscalationStatus } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
@@ -100,7 +100,7 @@ describe('kitchenSink workflow', () => {
     expect(result.data.result).toBeTruthy();
     expect(result.data.result.merged).toHaveProperty('source-a');
     expect(result.data.result.merged).toHaveProperty('source-b');
-  }, 60_000);
+  }, 30_000);
 
   // ── Full mode: escalates then resolves ────────────────────────────────────
 
@@ -118,16 +118,15 @@ describe('kitchenSink workflow', () => {
       expire: 120,
     });
 
-    const escalations = await waitForEscalation(workflowId, 45_000);
+    const escalations = await waitForEscalation(workflowId, 15_000);
     expect(escalations.length).toBe(1);
     expect(escalations[0].status).toBe('pending');
     expect(escalations[0].role).toBe('reviewer');
     expect(escalations[0].description).toContain('Kitchen sink');
 
     await resolveEscalation(escalations[0].id, { approved: true });
-    await sleepFor(8000);
 
-    const resolvedEsc = await escalationService.getEscalation(escalations[0].id);
-    expect(resolvedEsc!.status).toBe('resolved');
-  }, 60_000);
+    const resolvedEsc = await waitForEscalationStatus(escalations[0].id, 'resolved', 15_000);
+    expect(resolvedEsc.status).toBe('resolved');
+  }, 30_000);
 });

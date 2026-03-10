@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import OpenAI from 'openai';
 
+import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { ClaimAnalysis } from './types';
 
 // ── Resolve fixtures directory ──────────────────────────────────────────────
@@ -55,7 +56,7 @@ export async function analyzeDocuments(
 
     const imageContent = fs.readFileSync(filePath, 'base64');
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: LLM_MODEL_SECONDARY,
       messages: [
         {
           role: 'user',

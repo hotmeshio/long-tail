@@ -65,7 +65,7 @@ export function StartWorkflowPage() {
         data: data as Record<string, unknown>,
         metadata: (metadata as Record<string, unknown>) ?? undefined,
       });
-      navigate(`/workflows/list`);
+      navigate(`/workflows/runs`);
     } catch {
       // Error is available via invokeMutation.error
     }
@@ -82,7 +82,7 @@ export function StartWorkflowPage() {
 
   return (
     <div>
-      <PageHeader title="Start Workflow" />
+      <PageHeader title="Start" />
 
       {invocableConfigs.length === 0 ? (
         <div className="py-16 text-center">

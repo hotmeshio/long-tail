@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
 import { NatsProvider } from './hooks/useNats';
@@ -26,9 +26,7 @@ const ProcessDetailPage = lazy(() =>
 const McpOverview = lazy(() =>
   import('./pages/mcp/McpOverview').then((m) => ({ default: m.McpOverview })),
 );
-const McpToolsPage = lazy(() =>
-  import('./pages/mcp/McpToolsPage').then((m) => ({ default: m.McpToolsPage })),
-);
+// McpToolsPage removed — tools are now inline in the Servers page
 const McpRunsPage = lazy(() =>
   import('./pages/mcp/McpRunsPage').then((m) => ({ default: m.McpRunsPage })),
 );
@@ -95,9 +93,6 @@ const McpServersPage = lazy(() =>
 const UsersPage = lazy(() =>
   import('./pages/admin/users').then((m) => ({ default: m.UsersPage })),
 );
-const EscalationChainsPage = lazy(() =>
-  import('./pages/admin/escalation-chains').then((m) => ({ default: m.EscalationChainsPage })),
-);
 const RolesPage = lazy(() =>
   import('./pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
 );
@@ -153,7 +148,7 @@ const router = createBrowserRouter([
       { index: true, element: <Lazy><ProcessesOverview /></Lazy> },
 
       // Processes section (all authenticated users)
-      { path: 'processes/list', element: <Lazy><ProcessesListPage /></Lazy> },
+      { path: 'processes/runs', element: <Lazy><ProcessesListPage /></Lazy> },
       { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
 
       // Escalation section (all authenticated users)
@@ -167,12 +162,15 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
-          { path: 'workflows/list', element: <Lazy><WorkflowsDashboard /></Lazy> },
+          { path: 'workflows/runs', element: <Lazy><WorkflowsDashboard /></Lazy> },
           { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
           { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
           { path: 'workflows/detail/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
           { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
+          { path: 'workflows/config', element: <Lazy><WorkflowConfigsPage /></Lazy> },
+          { path: 'workflows/config/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+          { path: 'workflows/config/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
         ],
       },
 
@@ -181,10 +179,10 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
-          { path: 'mcp/tools', element: <Lazy><McpToolsPage /></Lazy> },
+          { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
-          { path: 'mcp/pipelines', element: <Lazy><YamlWorkflowsPage /></Lazy> },
-          { path: 'mcp/pipelines/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
+          { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+          { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
           { path: 'mcp/runs', element: <Lazy><McpRunsPage /></Lazy> },
           { path: 'mcp/runs/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
         ],
@@ -195,11 +193,8 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} />,
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
-          { path: 'admin/config', element: <Lazy><WorkflowConfigsPage /></Lazy> },
-          { path: 'admin/config/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
-          { path: 'admin/config/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
-          { path: 'admin/escalation-chains', element: <Lazy><EscalationChainsPage /></Lazy> },
+          { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
         ],

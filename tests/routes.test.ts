@@ -374,6 +374,438 @@ describe('Exports routes', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// /api/mcp-runs
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('MCP Runs routes', () => {
+  describe('GET /api/mcp-runs', () => {
+    it('returns 400 without app_id', async () => {
+      const res = await fetch(`${BASE}/mcp-runs`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain('app_id');
+    });
+
+    it('returns jobs list for valid app_id', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=longtail`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('jobs');
+      expect(body).toHaveProperty('total');
+      expect(Array.isArray(body.jobs)).toBe(true);
+      expect(typeof body.total).toBe('number');
+    });
+
+    it('returns empty list for non-existent schema', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=nonexistent_schema_xyz`, {
+        headers: authHeaders(adminToken),
+      });
+      // May return 200 with empty or 500 depending on schema existence
+      const body = await res.json();
+      if (res.status === 200) {
+        expect(body.jobs).toEqual([]);
+        expect(body.total).toBe(0);
+      }
+    });
+
+    it('supports status filter', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=longtail&status=completed`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      for (const job of body.jobs) {
+        expect(job.status).toBe('completed');
+      }
+    });
+
+    it('supports pagination params', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=longtail&limit=2&offset=0`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.jobs.length).toBeLessThanOrEqual(2);
+    });
+
+    it('supports entity filter', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=longtail&entity=nonexistent_entity`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.jobs).toEqual([]);
+      expect(body.total).toBe(0);
+    });
+
+    it('supports search filter', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=longtail&search=zzz_no_match_zzz`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.jobs).toEqual([]);
+    });
+
+    it('job records have expected shape', async () => {
+      const res = await fetch(`${BASE}/mcp-runs?app_id=longtail&limit=1`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      if (body.jobs.length > 0) {
+        const job = body.jobs[0];
+        expect(job).toHaveProperty('workflow_id');
+        expect(job).toHaveProperty('entity');
+        expect(job).toHaveProperty('status');
+        expect(['running', 'completed', 'failed']).toContain(job.status);
+        expect(job).toHaveProperty('is_live');
+        expect(job).toHaveProperty('created_at');
+        expect(job).toHaveProperty('updated_at');
+      }
+    });
+  });
+
+  describe('GET /api/mcp-runs/entities', () => {
+    it('returns 400 without app_id', async () => {
+      const res = await fetch(`${BASE}/mcp-runs/entities`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns entities array for valid app_id', async () => {
+      const res = await fetch(`${BASE}/mcp-runs/entities?app_id=longtail`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('entities');
+      expect(Array.isArray(body.entities)).toBe(true);
+    });
+
+    it('returns empty array for non-existent schema', async () => {
+      const res = await fetch(`${BASE}/mcp-runs/entities?app_id=nonexistent_schema_xyz`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.entities).toEqual([]);
+    });
+
+    it('entities are sorted and contain no nulls', async () => {
+      const res = await fetch(`${BASE}/mcp-runs/entities?app_id=longtail`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const { entities } = await res.json();
+      for (const e of entities) {
+        expect(e).not.toBeNull();
+        expect(e).not.toBe('');
+      }
+      const sorted = [...entities].sort();
+      expect(entities).toEqual(sorted);
+    });
+  });
+
+  describe('GET /api/mcp-runs/:jobId/execution', () => {
+    it('returns 400 without app_id', async () => {
+      const res = await fetch(`${BASE}/mcp-runs/some-job/execution`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 404 for non-existent job', async () => {
+      const res = await fetch(`${BASE}/mcp-runs/nonexistent_job_xyz/execution?app_id=longtail`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// /api/yaml-workflows
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('YAML Workflows routes', () => {
+  describe('GET /api/yaml-workflows', () => {
+    it('returns workflow list', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('workflows');
+      expect(body).toHaveProperty('total');
+      expect(Array.isArray(body.workflows)).toBe(true);
+      expect(typeof body.total).toBe('number');
+    });
+
+    it('supports status filter', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows?status=active`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      for (const wf of body.workflows) {
+        expect(wf.status).toBe('active');
+      }
+    });
+
+    it('supports graph_topic filter', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows?graph_topic=nonexistent_topic`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.workflows).toEqual([]);
+      expect(body.total).toBe(0);
+    });
+
+    it('supports app_id filter', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows?app_id=nonexistent_app`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.workflows).toEqual([]);
+      expect(body.total).toBe(0);
+    });
+
+    it('supports search filter', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows?search=zzz_no_match_zzz`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.workflows).toEqual([]);
+      expect(body.total).toBe(0);
+    });
+
+    it('supports pagination', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows?limit=1&offset=0`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.workflows.length).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe('GET /api/yaml-workflows/app-ids', () => {
+    it('returns an array of app_ids', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/app-ids`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('app_ids');
+      expect(Array.isArray(body.app_ids)).toBe(true);
+    });
+
+    it('app_ids are strings and sorted', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/app-ids`, {
+        headers: authHeaders(adminToken),
+      });
+      const body = await res.json();
+      for (const id of body.app_ids) {
+        expect(typeof id).toBe('string');
+      }
+      const sorted = [...body.app_ids].sort();
+      expect(body.app_ids).toEqual(sorted);
+    });
+  });
+
+  describe('GET /api/yaml-workflows/:id', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('PUT /api/yaml-workflows/:id', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id`, {
+        method: 'PUT',
+        headers: authHeaders(adminToken),
+        body: JSON.stringify({ name: 'updated' }),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('DELETE /api/yaml-workflows/:id', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id`, {
+        method: 'DELETE',
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/yaml-workflows/:id/deploy', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id/deploy`, {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/yaml-workflows/:id/invoke', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id/invoke`, {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+        body: JSON.stringify({ data: {} }),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/yaml-workflows/:id/regenerate', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id/regenerate`, {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/yaml-workflows/:id/archive', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id/archive`, {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/yaml-workflows (create)', () => {
+    it('returns 400 when required fields missing', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows`, {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+        body: JSON.stringify({ name: 'test' }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /api/yaml-workflows/:id/yaml', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${BASE}/yaml-workflows/nonexistent-id/yaml`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// /api/mcp/servers
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('MCP Servers routes', () => {
+  describe('GET /api/mcp/servers', () => {
+    it('returns server list', async () => {
+      const res = await fetch(`${BASE}/mcp/servers`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty('servers');
+      expect(body).toHaveProperty('total');
+      expect(Array.isArray(body.servers)).toBe(true);
+      expect(typeof body.total).toBe('number');
+    });
+
+    it('supports status filter', async () => {
+      const res = await fetch(`${BASE}/mcp/servers?status=connected`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      for (const srv of body.servers) {
+        expect(srv.status).toBe('connected');
+      }
+    });
+
+    it('supports search filter', async () => {
+      const res = await fetch(`${BASE}/mcp/servers?search=zzz_no_match_zzz`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.servers).toEqual([]);
+      expect(body.total).toBe(0);
+    });
+
+    it('supports pagination', async () => {
+      const res = await fetch(`${BASE}/mcp/servers?limit=1&offset=0`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.servers.length).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe('GET /api/mcp/servers/:id', () => {
+    it('returns 404 for non-existent server', async () => {
+      const res = await fetch(`${BASE}/mcp/servers/00000000-0000-0000-0000-000000000099`, {
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/mcp/servers', () => {
+    it('returns 400 when required fields missing', async () => {
+      const res = await fetch(`${BASE}/mcp/servers`, {
+        method: 'POST',
+        headers: authHeaders(adminToken),
+        body: JSON.stringify({ name: 'test' }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PUT /api/mcp/servers/:id', () => {
+    it('returns 404 for non-existent server', async () => {
+      const res = await fetch(`${BASE}/mcp/servers/00000000-0000-0000-0000-000000000099`, {
+        method: 'PUT',
+        headers: authHeaders(adminToken),
+        body: JSON.stringify({ description: 'updated' }),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('DELETE /api/mcp/servers/:id', () => {
+    it('returns 404 for non-existent server', async () => {
+      const res = await fetch(`${BASE}/mcp/servers/00000000-0000-0000-0000-000000000099`, {
+        method: 'DELETE',
+        headers: authHeaders(adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Auth: 401 behavior across routes
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -1,5 +1,6 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
+import { TOOL_ROUNDS_INSIGHT } from '../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../types';
 import * as activities from './activities';
 
@@ -96,7 +97,7 @@ For Honeycomb trace links: use the full https:// URL returned by get_trace_link.
 - Trace: [View trace in Honeycomb](https://ui.honeycomb.io/team/environments/env/datasets/long-tail/trace?trace_id=abc123)
 ALWAYS include links when results reference specific items. Place links inline in summary and section content fields.`;
 
-const MAX_TOOL_ROUNDS = 5;
+const MAX_TOOL_ROUNDS = TOOL_ROUNDS_INSIGHT;
 
 /**
  * Insight Query workflow (leaf).

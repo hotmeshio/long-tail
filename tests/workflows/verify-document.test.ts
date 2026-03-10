@@ -82,7 +82,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
 
     // Connect MCP client for escalation queue interaction via protocol
     mcpCtx = await createMcpTestClient();
-  }, 60_000);
+  }, 30_000);
 
   afterAll(async () => {
     await mcpCtx.cleanup();
@@ -164,7 +164,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     const resolved = parseMcpResult(checkResolved);
     expect(resolved.status).toBe('resolved');
     expect(resolved.resolver_payload).toBeTruthy();
-  }, 90_000);
+  }, 60_000);
 
   // ── Vision: escalation payload contains full context for human review ─────
 
@@ -221,7 +221,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       arguments: { escalation_id: escalations[0].id },
     });
     expect(parseMcpResult(checkResolved).status).toBe('resolved');
-  }, 90_000);
+  }, 60_000);
 
   // ── Vision: multi-page extraction merges data ─────────────────────────────
 
@@ -276,7 +276,7 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       arguments: { escalation_id: escalations[0].id },
     });
     expect(parseMcpResult(checkResolved).status).toBe('resolved');
-  }, 90_000);
+  }, 60_000);
 
   // ── Skipped without key ───────────────────────────────────────────────────
 

@@ -29,6 +29,20 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/tasks/processes/stats
+ * Aggregated process statistics with optional time period.
+ */
+router.get('/processes/stats', async (req, res) => {
+  try {
+    const period = (req.query.period as string) || undefined;
+    const stats = await taskService.getProcessStats(period);
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/tasks/processes
  * List distinct origin_id values with summary stats.
  */

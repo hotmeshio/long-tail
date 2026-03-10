@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { RotateCcw, Play, ExternalLink } from 'lucide-react';
 import { useCallMcpTool } from '../../api/mcp';
 import { Modal } from '../../components/common/Modal';
 import { JsonViewer } from '../../components/common/JsonViewer';
@@ -35,8 +37,11 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
   );
   const [jsonError, setJsonError] = useState('');
 
+  const hasResult = !!callTool.data || !!callTool.error;
+
   const handleRun = () => {
     setJsonError('');
+    callTool.reset();
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(argsJson);
@@ -49,12 +54,14 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
 
   return (
     <Modal open={open} onClose={onClose} title={`${serverName} / ${tool.name}`} maxWidth="max-w-2xl">
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
+        {/* Tool description */}
         <p className="text-xs text-text-secondary">{tool.description}</p>
 
+        {/* Request */}
         <div>
           <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
-            Arguments (JSON)
+            Request
           </label>
           <textarea
             value={argsJson}
@@ -66,30 +73,65 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
           {jsonError && <p className="text-xs text-status-error mt-1">{jsonError}</p>}
         </div>
 
-        <div className="flex justify-end gap-3">
+        {/* Response */}
+        {callTool.isPending && (
+          <div className="animate-pulse">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
+            <div className="h-20 bg-surface-sunken rounded-md" />
+          </div>
+        )}
+        {callTool.data ? (
+          <div className="space-y-2">
+            <JsonViewer data={callTool.data as Record<string, unknown>} label="Response" />
+            {(() => {
+              const res = (callTool.data as any)?.result;
+              const jobId = res?.job_id;
+              const ns = res?.namespace || 'longtail';
+              return jobId ? (
+                <Link
+                  to={`/mcp/runs/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(ns)}`}
+                  className="inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
+                >
+                  <ExternalLink size={12} />
+                  View Execution Details
+                </Link>
+              ) : null;
+            })()}
+          </div>
+        ) : null}
+        {callTool.error ? (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
+            <div className="bg-status-error/10 border border-status-error/20 rounded-md px-3 py-2">
+              <p className="text-xs text-status-error">
+                {callTool.error instanceof Error ? callTool.error.message : 'Tool call failed'}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Actions — pinned at bottom */}
+        <div className="flex justify-end gap-3 pt-2 border-t border-surface-border">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+            className="btn-ghost text-xs"
           >
             Close
           </button>
           <button
             onClick={handleRun}
             disabled={callTool.isPending}
-            className="px-3 py-1.5 text-xs bg-accent-primary text-white rounded-md hover:bg-accent-primary/90 disabled:opacity-50 transition-colors"
+            className="btn-primary text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
           >
-            {callTool.isPending ? 'Running...' : 'Run'}
+            {callTool.isPending ? (
+              'Running...'
+            ) : hasResult ? (
+              <><RotateCcw size={12} /> Re-run</>
+            ) : (
+              <><Play size={12} /> Run</>
+            )}
           </button>
         </div>
-
-        {callTool.data ? (
-          <JsonViewer data={callTool.data} label="Result" />
-        ) : null}
-        {callTool.error ? (
-          <p className="text-xs text-status-error">
-            {callTool.error instanceof Error ? callTool.error.message : 'Tool call failed'}
-          </p>
-        ) : null}
       </div>
     </Modal>
   );

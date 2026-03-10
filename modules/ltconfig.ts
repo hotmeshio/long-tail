@@ -1,11 +1,12 @@
 import * as configService from '../services/config';
+import { CONFIG_CACHE_TTL_MS } from './defaults';
 import type {
   LTResolvedConfig,
   LTLifecycleHook,
   LTProviderData,
 } from '../types';
 
-const TTL_MS = 5 * 60 * 1000; // 5 minutes
+const TTL_MS = CONFIG_CACHE_TTL_MS;
 
 class LTConfigCache {
   private configs: Map<string, LTResolvedConfig> | null = null;

@@ -167,7 +167,7 @@ export function WorkflowConfigDetailPage() {
       {
         onSuccess: () => {
           addToast(isNew ? 'Config created' : 'Config saved', 'success');
-          navigate('/admin/config');
+          navigate('/workflows/config');
         },
       },
     );
@@ -497,7 +497,7 @@ export function WorkflowConfigDetailPage() {
         data: data as Record<string, unknown>,
         metadata: (metadata as Record<string, unknown>) ?? undefined,
       });
-      navigate('/workflows/list');
+      navigate('/workflows/runs');
     } catch {
       // Error available via invokeMutation.error
     }
@@ -543,7 +543,7 @@ export function WorkflowConfigDetailPage() {
               )}
             </div>
             <div className="flex gap-3">
-              <button onClick={() => navigate('/admin/config')} className="btn-ghost text-xs">
+              <button onClick={() => navigate('/workflows/config')} className="btn-ghost text-xs">
                 Cancel
               </button>
               {isLast ? (

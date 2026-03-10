@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 
 interface FilterBarProps {
   children: ReactNode;
@@ -21,9 +21,12 @@ interface FilterSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
+  /** When true, omit the default "All" option — a value is always required. */
+  required?: boolean;
+  placeholder?: string;
 }
 
-export function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
+export function FilterSelect({ label, value, onChange, options, required, placeholder }: FilterSelectProps) {
   return (
     <div className="flex items-center gap-1.5">
       <label className="text-[10px] text-text-tertiary">{label}</label>
@@ -32,7 +35,7 @@ export function FilterSelect({ label, value, onChange, options }: FilterSelectPr
         onChange={(e) => onChange(e.target.value)}
         className="select text-[11px] py-1 px-2"
       >
-        <option value="">All</option>
+        {!required && <option value="">{placeholder || 'All'}</option>}
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -51,13 +54,28 @@ interface FilterInputProps {
 }
 
 export function FilterInput({ label, value, onChange, placeholder }: FilterInputProps) {
+  const [local, setLocal] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Sync from parent when the URL-driven value changes externally
+  useEffect(() => { setLocal(value); }, [value]);
+
+  const handleChange = (v: string) => {
+    setLocal(v);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => onChange(v), 300);
+  };
+
+  // Flush on unmount
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
   return (
     <div className="flex items-center gap-1.5">
       <label className="text-[10px] text-text-tertiary whitespace-nowrap">{label}</label>
       <input
         type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={local}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         className="input text-[11px] py-1 px-2 w-48 font-mono"
       />

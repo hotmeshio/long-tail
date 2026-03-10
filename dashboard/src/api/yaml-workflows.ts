@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus } from './types';
+import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus, LTYamlWorkflowVersion } from './types';
 
 interface YamlWorkflowListResponse {
   workflows: LTYamlWorkflowRecord[];
@@ -9,6 +9,9 @@ interface YamlWorkflowListResponse {
 
 interface YamlWorkflowFilters {
   status?: LTYamlWorkflowStatus;
+  graph_topic?: string;
+  app_id?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -16,13 +19,34 @@ interface YamlWorkflowFilters {
 export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
+  if (filters.graph_topic) params.set('graph_topic', filters.graph_topic);
+  if (filters.app_id) params.set('app_id', filters.app_id);
+  if (filters.search) params.set('search', filters.search);
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
 
   return useQuery<YamlWorkflowListResponse>({
     queryKey: ['yamlWorkflows', filters],
     queryFn: () => apiFetch(`/yaml-workflows?${params}`),
-    refetchInterval: 10_000,
+  });
+}
+
+export function useYamlWorkflowAppIds() {
+  return useQuery<{ app_ids: string[] }>({
+    queryKey: ['yamlWorkflowAppIds'],
+    queryFn: () => apiFetch('/yaml-workflows/app-ids'),
+  });
+}
+
+export function useYamlWorkflowByTopic(graphTopic: string | undefined, appId?: string) {
+  return useQuery<YamlWorkflowListResponse>({
+    queryKey: ['yamlWorkflows', 'byTopic', graphTopic, appId],
+    queryFn: () => {
+      const params = new URLSearchParams({ graph_topic: graphTopic!, limit: '1' });
+      if (appId) params.set('app_id', appId);
+      return apiFetch(`/yaml-workflows?${params}`);
+    },
+    enabled: !!graphTopic,
   });
 }
 
@@ -123,6 +147,20 @@ export function useArchiveYamlWorkflow() {
   });
 }
 
+export function useUpdateYamlWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string }) =>
+      apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
+    },
+  });
+}
+
 export function useDeleteYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -133,5 +171,23 @@ export function useDeleteYamlWorkflow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
     },
+  });
+}
+
+// ── Version history ─────────────────────────────────────────────
+
+export function useYamlWorkflowVersions(id: string) {
+  return useQuery<{ versions: LTYamlWorkflowVersion[]; total: number }>({
+    queryKey: ['yamlWorkflows', id, 'versions'],
+    queryFn: () => apiFetch(`/yaml-workflows/${id}/versions`),
+    enabled: !!id,
+  });
+}
+
+export function useYamlWorkflowVersion(id: string, version: number | null) {
+  return useQuery<LTYamlWorkflowVersion>({
+    queryKey: ['yamlWorkflows', id, 'versions', version],
+    queryFn: () => apiFetch(`/yaml-workflows/${id}/versions/${version}`),
+    enabled: !!id && version !== null,
   });
 }
