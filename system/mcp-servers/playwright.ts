@@ -6,6 +6,21 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../services/logger';
 
+// All file output (screenshots, etc.) is routed through the managed file-storage directory
+// so files are visible to list_files / read_file tools and served via GET /api/files/*.
+const FILE_STORAGE_DIR = process.env.LT_FILE_STORAGE_DIR || './data/files';
+
+function resolveToStorage(filePath: string): string {
+  // Strip leading slash to make it relative, then resolve against storage dir
+  const relative = filePath.replace(/^\/+/, '');
+  const resolved = path.resolve(FILE_STORAGE_DIR, relative);
+  const base = path.resolve(FILE_STORAGE_DIR);
+  if (!resolved.startsWith(base + path.sep) && resolved !== base) {
+    throw new Error(`Path traversal denied: ${filePath}`);
+  }
+  return resolved;
+}
+
 // ── Browser lifecycle ────────────────────────────────────────────────────────
 // Shared browser instance across tool calls within a single server lifetime.
 // Lazy-launched on first use, cleaned up via stopPlaywrightServer().
@@ -140,8 +155,9 @@ function registerTools(srv: McpServer): void {
       const page = getPage(args.page_id);
       const pageId = getPageId(args.page_id);
 
-      // Ensure output directory exists
-      const dir = path.dirname(args.path);
+      // Resolve path into managed file-storage directory
+      const storagePath = resolveToStorage(args.path);
+      const dir = path.dirname(storagePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
@@ -157,15 +173,15 @@ function registerTools(srv: McpServer): void {
             isError: true,
           };
         }
-        await element.screenshot({ path: args.path });
+        await element.screenshot({ path: storagePath });
       } else {
         await page.screenshot({
-          path: args.path,
+          path: storagePath,
           fullPage: args.full_page ?? false,
         });
       }
 
-      const stats = fs.statSync(args.path);
+      const stats = fs.statSync(storagePath);
       loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${args.path} (${stats.size} bytes)`);
 
       return {
