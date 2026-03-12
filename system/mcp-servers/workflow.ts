@@ -71,6 +71,7 @@ export async function createWorkflowServer(options?: {
       const items = workflows.map((wf) => ({
         name: wf.name,
         description: wf.description,
+        tags: wf.tags,
         graph_topic: wf.graph_topic,
         source_workflow_type: wf.source_workflow_type,
         input_schema: wf.input_schema,

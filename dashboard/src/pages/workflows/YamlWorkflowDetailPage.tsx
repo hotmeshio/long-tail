@@ -265,6 +265,11 @@ function StepDetail({ activity }: { activity: ActivityManifestEntry }) {
         </div>
       )}
 
+      {/* Tool Arguments — captured from the original execution */}
+      {!isLlm && activity.tool_arguments && Object.keys(activity.tool_arguments).length > 0 && (
+        <JsonViewer data={activity.tool_arguments} label="Default Arguments" variant="panel" />
+      )}
+
       {/* LLM Prompt — special treatment */}
       {isLlm && activity.prompt_template && (
         <div>
@@ -688,12 +693,21 @@ export function YamlWorkflowDetailPage() {
                       ) : inputKeys.length > 0 ? (
                         <div className="space-y-3">
                           {inputKeys.map((key) => {
-                            const fieldType = inferFieldType(inputProps[key]);
+                            const prop = inputProps[key] as any;
+                            const fieldType = inferFieldType(prop);
+                            const desc = prop?.description as string | undefined;
+                            const jsonValue = typeof invokeFields[key] === 'string'
+                              ? invokeFields[key]
+                              : JSON.stringify(invokeFields[key] ?? (fieldType === 'array' ? [] : {}), null, 2);
+                            const textareaRows = Math.min(20, Math.max(4, (jsonValue?.split?.('\n')?.length ?? 4)));
                             return (
                               <div key={key}>
                                 <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                                   {key}<span className="ml-2 font-normal normal-case">{fieldType}</span>
                                 </label>
+                                {desc && (
+                                  <p className="text-[10px] text-text-tertiary mb-1">{desc}</p>
+                                )}
                                 {fieldType === 'boolean' ? (
                                   <select value={String(invokeFields[key] ?? false)} onChange={(e) => updateField(key, e.target.value, fieldType)}
                                     className="select text-xs w-full">
@@ -701,10 +715,10 @@ export function YamlWorkflowDetailPage() {
                                   </select>
                                 ) : fieldType === 'object' || fieldType === 'array' ? (
                                   <textarea
-                                    value={typeof invokeFields[key] === 'string' ? invokeFields[key] : JSON.stringify(invokeFields[key] ?? (fieldType === 'array' ? [] : {}), null, 2)}
+                                    value={jsonValue}
                                     onChange={(e) => { try { updateField(key, JSON.parse(e.target.value), fieldType); } catch { setInvokeFields({ ...invokeFields, [key]: e.target.value }); } }}
                                     className="input font-mono text-[11px] w-full leading-relaxed"
-                                    rows={4} spellCheck={false} />
+                                    rows={textareaRows} spellCheck={false} />
                                 ) : (
                                   <input type={fieldType === 'number' || fieldType === 'integer' ? 'number' : 'text'}
                                     value={invokeFields[key] ?? ''} onChange={(e) => updateField(key, e.target.value, fieldType)}

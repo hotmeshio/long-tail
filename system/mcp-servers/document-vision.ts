@@ -34,6 +34,7 @@ const extractMemberInfoSchema = z.object({
 const rotatePageSchema = z.object({
   image_ref: z.string().describe('Storage reference to the image to rotate'),
   degrees: z.number().int().describe('Rotation degrees (90, 180, 270)'),
+  replace_original: z.boolean().optional().default(true).describe('Delete the original file after rotation (default: true)'),
 });
 
 const translateContentSchema = z.object({
@@ -147,9 +148,23 @@ function registerTools(srv: McpServer): void {
         .rotate(args.degrees)
         .toFile(destPath);
 
-      loggerRegistry.info(
-        `[lt-mcp:vision-server] rotated ${args.image_ref} by ${args.degrees}° → ${rotatedName}`,
-      );
+      // Clean up original if requested (default: true)
+      if (args.replace_original !== false) {
+        try {
+          fs.unlinkSync(srcPath);
+          loggerRegistry.info(
+            `[lt-mcp:vision-server] rotated ${args.image_ref} by ${args.degrees}° → ${rotatedName} (original deleted)`,
+          );
+        } catch (err) {
+          loggerRegistry.warn(
+            `[lt-mcp:vision-server] rotated ${args.image_ref} but failed to delete original: ${err}`,
+          );
+        }
+      } else {
+        loggerRegistry.info(
+          `[lt-mcp:vision-server] rotated ${args.image_ref} by ${args.degrees}° → ${rotatedName}`,
+        );
+      }
 
       return {
         content: [{
@@ -158,6 +173,7 @@ function registerTools(srv: McpServer): void {
             rotated_ref: rotatedName,
             degrees: args.degrees,
             source_ref: args.image_ref,
+            original_deleted: args.replace_original !== false,
           }),
         }],
       };

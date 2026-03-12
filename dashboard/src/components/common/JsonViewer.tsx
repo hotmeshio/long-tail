@@ -230,9 +230,12 @@ type ViewMode = 'json' | 'tree';
 export function JsonViewer({
   data,
   label,
+  variant,
 }: {
   data: unknown;
   label?: ReactNode;
+  /** Optional visual variant. `panel` adds a lavender border and lighter background. */
+  variant?: 'default' | 'panel';
 }) {
   const [mode, setMode] = useState<ViewMode>('json');
   const [copied, setCopied] = useState(false);
@@ -260,8 +263,16 @@ export function JsonViewer({
 
   const iconBtn = 'p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised transition-colors duration-150';
 
+  const isPanel = variant === 'panel';
+  const wrapperClass = isPanel
+    ? 'border border-accent-muted/40 rounded-lg p-3 bg-surface-hover/30'
+    : '';
+  const contentClass = isPanel
+    ? 'font-mono text-xs leading-relaxed bg-white rounded-md p-4 overflow-x-auto'
+    : 'font-mono text-xs leading-relaxed bg-surface-sunken rounded-md p-4 overflow-x-auto';
+
   return (
-    <div>
+    <div className={wrapperClass}>
       <div className="flex items-center justify-between mb-2">
         {label ? <SectionLabel>{label}</SectionLabel> : <span />}
         <div className="flex items-center gap-1">
@@ -302,7 +313,7 @@ export function JsonViewer({
           </button>
         </div>
       </div>
-      <div className="font-mono text-xs leading-relaxed bg-surface-sunken rounded-md p-4 overflow-x-auto">
+      <div className={contentClass}>
         {mode === 'json' ? <JsonNode data={parsed} generation={generation} /> : <TreeNode data={parsed} />}
       </div>
     </div>

@@ -2,6 +2,7 @@
 const yaml = require('js-yaml');
 
 import { exportWorkflowExecution } from '../export';
+import { listMcpServers } from '../mcp/db';
 import {
   LLM_MODEL_SECONDARY,
   TOOL_ARG_LIMIT_CAP,
@@ -46,6 +47,7 @@ export interface GenerateYamlResult {
   activityManifest: ActivityManifestEntry[];
   graphTopic: string;
   appId: string;
+  tags: string[];
 }
 
 /** A step extracted from an execution's event timeline. */
@@ -93,12 +95,16 @@ function sanitizeName(name: string): string {
 /**
  * Extract the ordered step sequence from an execution's events.
  *
- * Supports three patterns:
+ * Supports four patterns:
  *
- * 1. **callLLM → callDbTool** — Insight/agentic workflows where the LLM
- *    decides which DB tool to call. The `callLLM` result contains
- *    `tool_calls[].function.name` and `tool_calls[].function.arguments`.
- *    The subsequent `callDbTool` result contains the tool output.
+ * 1a. **callLLM → callDbTool/callVisionTool** — Insight/agentic workflows where the LLM
+ *     decides which DB/vision tool to call. The `callLLM` result contains
+ *     `tool_calls[].function.name` and `tool_calls[].function.arguments`.
+ *     The subsequent callDbTool/callVisionTool result contains the tool output.
+ *
+ * 1b. **callLLM → callMcpTool** — mcpQuery workflows where the LLM chooses
+ *     any MCP tool via qualified names (server_slug__tool_name). The callMcpTool
+ *     result contains the tool output.
  *
  * 2. **mcp_* activities** — Workflows that call external MCP server tools
  *    directly via proxyActivities (e.g., vision, document tools).
@@ -107,13 +113,58 @@ function sanitizeName(name: string): string {
  *    content (no tool_calls). This is the LLM synthesizing/interpreting
  *    tool results into a structured response.
  */
+/**
+ * Extract the tool arguments from an enriched activity event's input.
+ *
+ * The enriched `input` field (from ebh,0) contains the raw arguments
+ * passed to the activity function. The shape depends on the activity:
+ * - callMcpTool(qualifiedName, args) → [qualifiedName, args]
+ * - callDbTool(name, args) → [name, args]
+ * - callLLM(messages, tools?) → [messages, tools?]
+ * - mcp_* activities(args) → [args]
+ */
+function extractToolArgs(attrs: Record<string, unknown>): Record<string, unknown> {
+  const input = attrs.input as unknown[] | undefined;
+  if (!input || !Array.isArray(input)) return {};
+
+  // callMcpTool / callDbTool / callVisionTool: [name, args]
+  if (['callMcpTool', 'callDbTool', 'callVisionTool'].includes(attrs.activity_type as string)) {
+    const args = input[1];
+    return (args && typeof args === 'object' && !Array.isArray(args))
+      ? args as Record<string, unknown>
+      : {};
+  }
+
+  // mcp_* activities: [args] (single argument — the tool parameters)
+  if ((attrs.activity_type as string)?.startsWith('mcp_')) {
+    const args = input[0];
+    return (args && typeof args === 'object' && !Array.isArray(args))
+      ? args as Record<string, unknown>
+      : {};
+  }
+
+  return {};
+}
+
+/**
+ * Extract the LLM prompt messages from an enriched callLLM event's input.
+ * callLLM(messages, tools?) → input = [messages, tools?]
+ */
+function extractLlmMessages(attrs: Record<string, unknown>): Array<{ role: string; content: string }> | undefined {
+  const input = attrs.input as unknown[] | undefined;
+  if (!input || !Array.isArray(input) || input.length === 0) return undefined;
+  const messages = input[0];
+  if (!Array.isArray(messages)) return undefined;
+  return messages.filter((m: any) => m?.role && m?.content) as Array<{ role: string; content: string }>;
+}
+
 function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] {
   const steps: ExtractedStep[] = [];
   let pendingLlmCall: { toolName: string; arguments: Record<string, unknown> } | null = null;
 
   for (const evt of events) {
     if (evt.event_type !== 'activity_task_completed') continue;
-    const attrs = evt.attributes as ActivityTaskCompletedAttributes;
+    const attrs = evt.attributes as ActivityTaskCompletedAttributes & { input?: unknown };
 
     // Pattern 1a: callLLM/callTriageLLM with tool_calls → record pending tool call
     if (attrs.activity_type === 'callLLM' || attrs.activity_type === 'callTriageLLM') {
@@ -159,7 +210,7 @@ function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] 
           arguments: {},
           result: parsed,
           source: 'llm',
-          promptMessages: buildDefaultPrompt(steps),
+          promptMessages: extractLlmMessages(attrs as unknown as Record<string, unknown>) || buildDefaultPrompt(steps),
         });
       }
       continue;
@@ -167,10 +218,14 @@ function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] 
 
     // Pattern 1b: callDbTool/callVisionTool — paired with the preceding callLLM
     if ((attrs.activity_type === 'callDbTool' || attrs.activity_type === 'callVisionTool') && pendingLlmCall) {
+      // Prefer the actual input args over the LLM's stated args
+      const actualArgs = extractToolArgs(attrs as unknown as Record<string, unknown>);
+      const args = Object.keys(actualArgs).length > 0 ? actualArgs : pendingLlmCall.arguments;
+
       steps.push({
         kind: 'tool',
         toolName: pendingLlmCall.toolName,
-        arguments: pendingLlmCall.arguments,
+        arguments: args,
         result: attrs.result,
         source: attrs.activity_type === 'callVisionTool' ? 'mcp' : 'db',
         ...(attrs.activity_type === 'callVisionTool' ? { mcpServerId: 'vision' } : {}),
@@ -179,13 +234,40 @@ function extractStepSequence(events: WorkflowExecutionEvent[]): ExtractedStep[] 
       continue;
     }
 
-    // Pattern 2: mcp_* activities (external MCP tools)
-    if (attrs.activity_type?.startsWith('mcp_')) {
-      const { serverName, toolName } = parseMcpActivityType(attrs.activity_type);
+    // Pattern 1c: callMcpTool — mcpQuery uses qualified names (server_slug__tool_name)
+    // paired with the preceding callLLM that chose the tool
+    if (attrs.activity_type === 'callMcpTool' && pendingLlmCall) {
+      // Parse qualified name to extract server and tool
+      const qualifiedName = pendingLlmCall.toolName;
+      const sepIdx = qualifiedName.indexOf('__');
+      const serverSlug = sepIdx >= 0 ? qualifiedName.slice(0, sepIdx) : qualifiedName;
+      const toolName = sepIdx >= 0 ? qualifiedName.slice(sepIdx + 2) : qualifiedName;
+
+      // Prefer the actual input args over the LLM's stated args
+      const actualArgs = extractToolArgs(attrs as unknown as Record<string, unknown>);
+      const args = Object.keys(actualArgs).length > 0 ? actualArgs : pendingLlmCall.arguments;
+
       steps.push({
         kind: 'tool',
         toolName,
-        arguments: {},
+        arguments: args,
+        result: attrs.result,
+        source: 'mcp',
+        mcpServerId: serverSlug,
+      });
+      pendingLlmCall = null;
+      continue;
+    }
+
+    // Pattern 2: mcp_* activities (external MCP tools called via proxyActivities)
+    if (attrs.activity_type?.startsWith('mcp_')) {
+      const { serverName, toolName } = parseMcpActivityType(attrs.activity_type);
+      const args = extractToolArgs(attrs as unknown as Record<string, unknown>);
+
+      steps.push({
+        kind: 'tool',
+        toolName,
+        arguments: args,
         result: attrs.result,
         source: 'mcp',
         mcpServerId: serverName,
@@ -218,28 +300,90 @@ function buildDefaultPrompt(priorSteps: ExtractedStep[]): Array<{ role: string; 
 }
 
 /**
- * Build a JSON Schema object from a sample value (shallow, single level).
+ * Infer a JSON Schema from a sample value, recursively.
+ *
+ * Produces a rich schema with:
+ * - `items` for arrays (merged from all elements)
+ * - `default` values from the captured execution
+ * - `description` hints derived from field names
+ *
+ * @param value    - The sample value to infer from
+ * @param withDefault - When true, embed `value` as the schema's `default`
  */
-function inferSchema(value: unknown): Record<string, unknown> {
+function inferSchema(value: unknown, withDefault = false): Record<string, unknown> {
   if (value === null || value === undefined) {
-    return { type: 'object' };
+    return { type: 'string' };
   }
+
+  if (typeof value === 'string') {
+    const schema: Record<string, unknown> = { type: 'string' };
+    if (withDefault) schema.default = value;
+    return schema;
+  }
+
+  if (typeof value === 'number') {
+    const schema: Record<string, unknown> = { type: 'number' };
+    if (withDefault) schema.default = value;
+    return schema;
+  }
+
+  if (typeof value === 'boolean') {
+    const schema: Record<string, unknown> = { type: 'boolean' };
+    if (withDefault) schema.default = value;
+    return schema;
+  }
+
   if (Array.isArray(value)) {
-    return { type: 'array' };
-  }
-  if (typeof value === 'object') {
-    const props: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (v === null || v === undefined) props[k] = { type: 'string' };
-      else if (typeof v === 'number') props[k] = { type: 'number' };
-      else if (typeof v === 'boolean') props[k] = { type: 'boolean' };
-      else if (Array.isArray(v)) props[k] = { type: 'array' };
-      else if (typeof v === 'object') props[k] = { type: 'object' };
-      else props[k] = { type: 'string' };
+    const schema: Record<string, unknown> = { type: 'array' };
+    if (withDefault) schema.default = value;
+
+    // Infer items schema from the union of all elements
+    if (value.length > 0) {
+      if (value.every((v) => typeof v === 'string')) {
+        schema.items = { type: 'string' };
+      } else if (value.every((v) => typeof v === 'number')) {
+        schema.items = { type: 'number' };
+      } else if (value.every((v) => v && typeof v === 'object' && !Array.isArray(v))) {
+        // Merge all object keys to build a union items schema
+        const allKeys = new Map<string, unknown>();
+        for (const el of value) {
+          for (const [k, v] of Object.entries(el as Record<string, unknown>)) {
+            if (!allKeys.has(k)) allKeys.set(k, v);
+          }
+        }
+        const props: Record<string, unknown> = {};
+        for (const [k, v] of allKeys) {
+          props[k] = inferSchema(v, false);
+          (props[k] as Record<string, unknown>).description = humanize(k);
+        }
+        schema.items = { type: 'object', properties: props };
+      }
     }
-    return { type: 'object', properties: props };
+    return schema;
   }
-  return { type: typeof value };
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    const props: Record<string, unknown> = {};
+    for (const [k, v] of entries) {
+      props[k] = inferSchema(v, withDefault);
+      (props[k] as Record<string, unknown>).description = humanize(k);
+    }
+    const schema: Record<string, unknown> = { type: 'object', properties: props };
+    if (withDefault) schema.default = value;
+    return schema;
+  }
+
+  return { type: 'string' };
+}
+
+/** Convert a snake_case/camelCase field name to a readable label. */
+function humanize(name: string): string {
+  return name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
 }
 
 /**
@@ -256,6 +400,34 @@ function buildInputMappings(
     }
   }
   return mappings;
+}
+
+/**
+ * Resolve slugified server IDs (e.g., "long_tail_playwright") back to
+ * real MCP server names (e.g., "long-tail-playwright").
+ *
+ * mcpQuery qualifies tool names as `server_slug__tool_name` where the slug
+ * replaces non-alphanumeric chars with underscores. The YAML worker needs
+ * the real server name to call `callServerTool`.
+ */
+async function resolveServerIds(steps: ExtractedStep[]): Promise<void> {
+  const mcpSteps = steps.filter((s) => s.source === 'mcp' && s.mcpServerId);
+  if (mcpSteps.length === 0) return;
+
+  // Build slug → real name map from registered MCP servers
+  const { servers } = await listMcpServers({ limit: 100 });
+  const slugToName = new Map<string, string>();
+  for (const srv of servers) {
+    const slug = srv.name.replace(/[^a-zA-Z0-9]/g, '_');
+    slugToName.set(slug, srv.name);
+  }
+
+  for (const step of mcpSteps) {
+    const realName = slugToName.get(step.mcpServerId!);
+    if (realName) {
+      step.mcpServerId = realName;
+    }
+  }
 }
 
 /**
@@ -285,14 +457,32 @@ export async function generateYamlFromExecution(
     );
   }
 
+  // 2b. Resolve slugified server IDs back to real MCP server names.
+  // mcpQuery stores tools as `server_slug__tool_name` where slug uses underscores,
+  // but callServerTool needs the original name (e.g., "long-tail-playwright").
+  await resolveServerIds(steps);
+
+  // 2c. Advisory: consecutive single-action playwright steps could use run_script
+  const consecutivePlaywright = steps.filter((s, i) =>
+    s.mcpServerId === 'long-tail-playwright' &&
+    i > 0 && steps[i - 1].mcpServerId === 'long-tail-playwright',
+  );
+  if (consecutivePlaywright.length > 0) {
+    const { loggerRegistry } = await import('../logger');
+    loggerRegistry.info(
+      `[yaml-workflow] hint: ${consecutivePlaywright.length + 1} consecutive playwright steps detected — consider run_script for single-activity execution`,
+    );
+  }
+
   const appId = options.appId || 'longtail';
   const graphTopic = options.subscribes || sanitizeName(name);
 
   // 3. Infer input schema from the first tool step's arguments.
+  //    withDefault=true embeds captured values so the invoke form pre-populates.
   const firstToolStep = steps.find((s) => s.kind === 'tool');
   const firstCallArgs = firstToolStep?.arguments ?? {};
   const inputSchema = Object.keys(firstCallArgs).length > 0
-    ? inferSchema(firstCallArgs)
+    ? inferSchema(firstCallArgs, true)
     : { type: 'object' as const };
 
   // 4. Infer output schema from the last step's result.
@@ -424,6 +614,9 @@ export async function generateYamlFromExecution(
     sortKeys: false,
   });
 
+  // 7. Auto-generate tags from the tool calls for capability-based discovery
+  const tags = deriveTagsFromSteps(steps, name, description);
+
   return {
     yaml: yamlContent,
     inputSchema,
@@ -431,5 +624,52 @@ export async function generateYamlFromExecution(
     activityManifest,
     graphTopic,
     appId,
+    tags,
   };
 }
+
+/**
+ * Derive searchable tags from the extracted steps.
+ * Tags enable mcpQuery to efficiently locate compiled workflows
+ * that match a user's request without scanning all tools.
+ */
+function deriveTagsFromSteps(
+  steps: ExtractedStep[],
+  name: string,
+  description?: string,
+): string[] {
+  const tags = new Set<string>();
+
+  // Add tags from tool names and server IDs
+  for (const step of steps) {
+    if (step.kind === 'tool') {
+      // Tool name as tag (e.g., "find_tasks", "screenshot", "navigate")
+      tags.add(step.toolName);
+
+      // Server slug as tag (e.g., "db", "playwright", "vision")
+      if (step.mcpServerId) {
+        tags.add(step.mcpServerId);
+      }
+
+      // Source type as tag
+      tags.add(step.source);
+    }
+  }
+
+  // Extract meaningful words from name and description
+  const text = `${name} ${description || ''}`.toLowerCase();
+  const keywords = text
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+  for (const kw of keywords) {
+    tags.add(kw);
+  }
+
+  return Array.from(tags);
+}
+
+const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was',
+  'not', 'but', 'has', 'have', 'had', 'been', 'will', 'can', 'all',
+]);

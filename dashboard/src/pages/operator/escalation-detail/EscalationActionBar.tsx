@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Collapsible } from '../../../components/common/Collapsible';
 import { CountdownTimer } from '../../../components/common/CountdownTimer';
 import { UserName } from '../../../components/common/UserName';
@@ -63,6 +63,16 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
   const [escalateTarget, setEscalateTarget] = useState('');
+  const triageNotesRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus triage notes when checkbox is checked
+  useEffect(() => {
+    if (requestTriage) {
+      // Small delay to let Collapsible animate open
+      const timer = setTimeout(() => triageNotesRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [requestTriage]);
 
   if (mode === 'terminal') return null;
 
@@ -158,6 +168,18 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
             {activeView === 'resolve' && (
               workflowType ? (
                 <div className="space-y-2">
+                  <Collapsible open={requestTriage}>
+                    <textarea
+                      ref={triageNotesRef}
+                      value={triageNotes}
+                      onChange={(e) => setTriageNotes(e.target.value)}
+                      placeholder="Describe the issue for AI triage..."
+                      className="input text-xs w-full mb-2"
+                      rows={2}
+                      data-testid="triage-notes"
+                    />
+                  </Collapsible>
+
                   <div className="flex items-center gap-4">
                     <label
                       className={`flex items-center gap-2 cursor-pointer px-2.5 py-1 rounded-md transition-colors ${
@@ -189,17 +211,6 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                       {resolvePending ? 'Submitting...' : requestTriage ? 'Resolve & Triage' : 'Submit'}
                     </button>
                   </div>
-
-                  <Collapsible open={requestTriage}>
-                    <textarea
-                      value={triageNotes}
-                      onChange={(e) => setTriageNotes(e.target.value)}
-                      placeholder="Describe the issue for AI triage..."
-                      className="input text-xs w-full"
-                      rows={2}
-                      data-testid="triage-notes"
-                    />
-                  </Collapsible>
                 </div>
               ) : (
                 <div className="flex items-center">

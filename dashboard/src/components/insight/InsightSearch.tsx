@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import {
   useInsightQuery,
   useMcpQuery,
@@ -9,21 +9,23 @@ import {
 import type { QueryMode } from '../../api/insight';
 import { InsightModal } from './InsightModal';
 
-const ASK_SUGGESTIONS = [
-  'Which workflow types have the most escalations?',
-  'Show me all escalated processes',
-  'What is the current workload by role?',
-  'How many tasks completed in the last 24 hours?',
-  'Summarize today\'s activity',
-  'Trace the most recent failed task — what happened in the workflow execution?',
-];
+// Ask suggestions retained for future re-enablement of Ask/Do mode toggle
+// const ASK_SUGGESTIONS = [
+//   'Which workflow types have the most escalations?',
+//   'Show me all escalated processes',
+//   'What is the current workload by role?',
+//   'How many tasks completed in the last 24 hours?',
+//   'Summarize today\'s activity',
+//   'Trace the most recent failed task — what happened in the workflow execution?',
+// ];
 
-const DO_SUGGESTIONS = [
-  'Take a screenshot of https://example.com and save to file storage',
+const SUGGESTIONS = [
+  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "superadmin123", click button[type="submit"], then screenshot the full page and save to /screenshots/docs/home.png',
+  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "superadmin123", click button[type="submit"], then navigate to http://localhost:3000/escalations and screenshot to /screenshots/docs/escalations.png',
+  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "superadmin123", click button[type="submit"], then navigate to http://localhost:3000/workflows, screenshot to /screenshots/docs/workflows.png, then navigate to http://localhost:3000/mcp/servers and screenshot to /screenshots/docs/mcp-servers.png',
+  'Run a browser script: navigate to https://news.ycombinator.com, screenshot the front page as /screenshots/hn.png, click the first story link, and screenshot that page as /screenshots/hn-top-story.png',
+  'Take a screenshot of https://example.com and save as /screenshots/example.png',
   'Fetch https://api.github.com/zen and save the response to /notes/zen.txt',
-  'List all files in storage',
-  'Find all pending escalations and summarize by role',
-  'Navigate to https://news.ycombinator.com, screenshot, and save as /screenshots/hn.png',
   'Check system health and write a summary report to /reports/health.txt',
 ];
 
@@ -31,7 +33,8 @@ export function InsightSearch() {
   const lastQuestion = useLastInsightQuestion();
   const lastPrompt = useLastMcpQueryPrompt();
 
-  const [mode, setMode] = useState<QueryMode>('ask');
+  // Mode toggle hidden for now — default to 'do'. Re-enable by uncommenting the toggle below.
+  const [mode, setMode] = useState<QueryMode>('do');
   const [input, setInput] = useState('');
   const [activeQuestion, setActiveQuestion] = useState<string | null>(lastQuestion);
   const [activePrompt, setActivePrompt] = useState<string | null>(lastPrompt);
@@ -77,19 +80,15 @@ export function InsightSearch() {
     submit(input);
   };
 
-  const suggestions = mode === 'ask' ? ASK_SUGGESTIONS : DO_SUGGESTIONS;
-  const placeholder = mode === 'ask'
-    ? 'Ask about system state...'
-    : 'Do something with tools...';
-
-  const Icon = mode === 'ask' ? Sparkles : Play;
+  // Keep setMode wired up for future re-enablement
+  void setMode;
 
   return (
     <>
       <div ref={wrapperRef} className="relative">
-        <form onSubmit={handleSubmit} className="relative flex items-center gap-1">
-          {/* Mode toggle */}
-          <div className="flex rounded-md border border-surface-border bg-surface-sunken overflow-hidden shrink-0">
+        <form onSubmit={handleSubmit} className="relative flex items-center">
+          {/* Mode toggle — hidden for now; re-enable by uncommenting
+          <div className="flex rounded-md border border-surface-border bg-surface-sunken overflow-hidden shrink-0 mr-1">
             <button
               type="button"
               onClick={() => setMode('ask')}
@@ -113,16 +112,17 @@ export function InsightSearch() {
               Do
             </button>
           </div>
+          */}
 
           {/* Input */}
           <div className="relative flex items-center">
-            <Icon className="absolute left-2.5 w-3.5 h-3.5 text-accent/60 pointer-events-none" />
+            <Play className="absolute left-2.5 w-3.5 h-3.5 text-accent/60 pointer-events-none" />
             <input
               type="text"
               value={input}
               onChange={(e) => { setInput(e.target.value); setSuggestionsOpen(true); }}
               onFocus={() => setSuggestionsOpen(true)}
-              placeholder={placeholder}
+              placeholder="Do something with tools..."
               className="w-[22rem] pl-8 pr-3 py-1.5 rounded-md bg-surface-sunken border border-surface-border
                          text-[11px] text-text-primary placeholder:text-text-tertiary
                          focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent
@@ -133,16 +133,16 @@ export function InsightSearch() {
 
         {/* Suggestion dropdown */}
         {suggestionsOpen && !input.trim() && (
-          <div className="absolute top-full right-0 mt-1 w-96 bg-surface-raised border border-surface-border rounded-md shadow-lg z-40 py-1">
+          <div className="absolute top-full right-0 mt-1 w-[28rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg z-40 py-1">
             <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">
-              {mode === 'ask' ? 'Ask about your system' : 'Do something with tools'}
+              Try something
             </div>
-            {suggestions.map((s) => (
+            {SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => submit(s)}
                 className="w-full text-left px-3 py-2 text-[11px] text-text-secondary
-                           hover:bg-surface-hover transition-colors"
+                           hover:bg-surface-hover transition-colors leading-relaxed"
               >
                 {s}
               </button>

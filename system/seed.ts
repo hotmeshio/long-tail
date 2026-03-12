@@ -90,12 +90,13 @@ const VISION_TOOLS = [
   },
   {
     name: 'rotate_page',
-    description: 'Rotate a document page image by the given degrees. Returns a new image reference for the rotated version.',
+    description: 'Rotate a document page image by the given degrees. Deletes the original by default and returns the new image reference. Use the exact rotated_ref in correctedData.',
     inputSchema: {
       type: 'object',
       properties: {
         image_ref: { type: 'string', description: 'Storage reference to the image to rotate' },
         degrees: { type: 'integer', description: 'Rotation degrees (90, 180, 270)' },
+        replace_original: { type: 'boolean', description: 'Delete the original file after rotation (default: true)' },
       },
       required: ['image_ref', 'degrees'],
     },
@@ -205,11 +206,40 @@ const WORKFLOW_COMPILER_TOOLS = [
 
 const PLAYWRIGHT_TOOLS = [
   { name: 'navigate', description: 'Open a URL in a new browser page.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' } }, required: ['url'] } },
-  { name: 'screenshot', description: 'Capture a screenshot and save as PNG.', inputSchema: { type: 'object', properties: { path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
+  { name: 'screenshot', description: 'Capture a screenshot and save as PNG. Pass url for a self-contained navigate+screenshot in one call.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' }, path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
   { name: 'click', description: 'Click an element by CSS selector.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector'] } },
   { name: 'fill', description: 'Type a value into an input field.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector', 'value'] } },
   { name: 'wait_for', description: 'Wait for an element to appear on the page.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' }, timeout: { type: 'number' } }, required: ['selector'] } },
   { name: 'evaluate', description: 'Evaluate JavaScript in the page context.', inputSchema: { type: 'object', properties: { script: { type: 'string' }, page_id: { type: 'string' } }, required: ['script'] } },
+  {
+    name: 'run_script',
+    description: 'Execute a multi-step browser script (navigate, screenshot, click, fill, wait_for, evaluate) in a single call. All steps share one page. Preferred for deterministic YAML workflows.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        steps: {
+          type: 'array',
+          description: 'Ordered list of browser actions to execute sequentially on a single page',
+          items: {
+            type: 'object',
+            properties: {
+              action: { type: 'string', enum: ['navigate', 'screenshot', 'click', 'fill', 'wait_for', 'evaluate'] },
+              url: { type: 'string' },
+              wait_until: { type: 'string' },
+              path: { type: 'string' },
+              full_page: { type: 'boolean' },
+              selector: { type: 'string' },
+              value: { type: 'string' },
+              script: { type: 'string' },
+              timeout: { type: 'number' },
+            },
+            required: ['action'],
+          },
+        },
+      },
+      required: ['steps'],
+    },
+  },
   { name: 'list_pages', description: 'List all open browser pages.', inputSchema: { type: 'object', properties: {} } },
   { name: 'close_page', description: 'Close a browser page by ID.', inputSchema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
 ];

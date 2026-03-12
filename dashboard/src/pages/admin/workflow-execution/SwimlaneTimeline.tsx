@@ -48,7 +48,7 @@ const CATEGORY_COLORS: Record<string, { bar: string; label: string }> = {
 const PENDING_CLASS = 'bg-stripes animate-pulse opacity-70';
 
 /** Activity names that indicate LLM/MCP tool interaction */
-const MCP_ACTIVITY_NAMES = new Set(['callLLM', 'callDbTool', 'callVisionTool', 'getDBTools', 'getVisionTools']);
+const MCP_ACTIVITY_NAMES = new Set(['callLLM', 'callDbTool', 'callVisionTool', 'callMcpTool', 'getDBTools', 'getVisionTools']);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -104,7 +104,7 @@ export function WorkflowExecutionPage() {
     (e) => {
       if (e.event_type !== 'activity_task_completed') return false;
       const actType = (e.attributes as any).activity_type;
-      return actType === 'callDbTool' || actType === 'callVisionTool' || actType?.startsWith('mcp_');
+      return actType === 'callDbTool' || actType === 'callVisionTool' || actType === 'callMcpTool' || actType?.startsWith('mcp_');
     },
   );
 
