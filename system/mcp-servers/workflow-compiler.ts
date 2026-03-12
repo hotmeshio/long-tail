@@ -81,6 +81,7 @@ export async function createWorkflowCompilerServer(options?: {
         input_schema: result.inputSchema,
         output_schema: result.outputSchema,
         activity_manifest: result.activityManifest,
+        tags: result.tags,
         source_workflow_id: args.workflow_id,
         source_workflow_type: args.workflow_name,
       });

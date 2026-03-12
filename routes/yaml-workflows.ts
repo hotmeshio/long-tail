@@ -74,6 +74,7 @@ router.post('/', async (req, res) => {
       input_schema: result.inputSchema,
       output_schema: result.outputSchema,
       activity_manifest: result.activityManifest,
+      tags: result.tags,
       source_workflow_id: workflow_id,
       source_workflow_type: workflow_name,
     });
@@ -189,6 +190,7 @@ router.post('/:id/regenerate', async (req, res) => {
       input_schema: result.inputSchema,
       output_schema: result.outputSchema,
       activity_manifest: result.activityManifest,
+      tags: result.tags,
     });
 
     res.json(updated);

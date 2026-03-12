@@ -21,4 +21,5 @@ export {
 
 export {
   ltSignalParent,
+  ltStartWorkflow,
 } from './workflow';

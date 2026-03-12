@@ -617,17 +617,22 @@ router.post('/:id/resolve', async (req, res) => {
         const triageWorkflowId = `triage-${escalation.id}-${Date.now()}`;
         const client = createClient();
 
+        // Triage lives on a separate axis — do NOT copy the original
+        // task's parent routing (signalId, parentWorkflowId) into the
+        // triage task. Otherwise the container interceptor would signal
+        // the original parent when triage completes, prematurely closing
+        // the original workflow. Triage exits the vortex by creating a
+        // targeted escalation on the original task instead.
         await taskService.createTask({
           workflow_id: triageWorkflowId,
           workflow_type: 'mcpTriageOrchestrator',
           lt_type: 'mcpTriageOrchestrator',
           task_queue: 'lt-mcp-triage-orch',
           signal_id: `lt-triage-${triageWorkflowId}`,
-          parent_workflow_id: routing?.parentWorkflowId || triageWorkflowId,
+          parent_workflow_id: triageWorkflowId,
           origin_id: escalation.origin_id || triageWorkflowId,
           parent_id: escalation.parent_id ?? undefined,
           envelope: JSON.stringify(directive.triageEnvelope),
-          metadata: routing || undefined,
         });
 
         await client.workflow.start({

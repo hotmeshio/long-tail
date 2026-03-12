@@ -225,34 +225,55 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
             )}
           </div>
 
-          {/* Input envelope sent to the child workflow */}
-          {childInput != null ? (
-            <JsonViewer data={childInput} label="Input (Envelope)" />
-          ) : null}
-
-          {/* Output / result data from the child workflow */}
-          {childOutput != null ? (
-            <JsonViewer data={childOutput} label="Output (Result)" />
-          ) : null}
+          {/* Input / Output side-by-side */}
+          {(childInput != null || childOutput != null) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {childInput != null ? (
+                <JsonViewer data={childInput} label="Input (Envelope)" variant="panel" />
+              ) : <div />}
+              {childOutput != null ? (
+                <JsonViewer data={childOutput} label="Output (Result)" variant="panel" />
+              ) : <div />}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Signal payload */}
-      {event.attributes.input !== undefined && (
-        <JsonViewer data={event.attributes.input} label="Signal Payload" />
-      )}
+      {/* Input / Result side-by-side for activities and child workflows */}
+      {(() => {
+        const input = event.attributes.input;
+        const result = event.attributes.result;
+        const isSignal = event.category === 'signal';
+        const isActivity = event.category === 'activity';
+        const isChild = event.category === 'child_workflow';
+        const hasInput = input !== undefined && (isActivity || isChild);
+        const hasResult = !childTask && result !== undefined && (isActivity || isChild);
+        const resultLabel = event.attributes.activity_type === 'ltSignalParent' ? 'Signal Payload' : 'Result';
+
+        if (hasInput || hasResult) {
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {hasInput ? (
+                <JsonViewer data={input} label="Input" variant="panel" />
+              ) : <div />}
+              {hasResult ? (
+                <JsonViewer data={result} label={resultLabel} variant="panel" />
+              ) : <div />}
+            </div>
+          );
+        }
+
+        // Signal payload — standalone (no result pairing)
+        if (isSignal && input !== undefined) {
+          return <JsonViewer data={input} label="Signal Payload" variant="panel" />;
+        }
+
+        return null;
+      })()}
 
       {/* Failure detail */}
       {event.attributes.failure !== undefined && (
         <JsonViewer data={event.attributes.failure} label="Failure" />
-      )}
-
-      {/* Activity result (from HotMesh event — for non-child activities) */}
-      {!childTask && event.attributes.result !== undefined && (
-        <JsonViewer
-          data={event.attributes.result}
-          label={event.attributes.activity_type === 'ltSignalParent' ? 'Signal Payload' : 'Result'}
-        />
       )}
 
       {/* Remaining attributes (exclude the fields shown above) */}

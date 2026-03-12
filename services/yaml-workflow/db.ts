@@ -14,6 +14,7 @@ export interface CreateYamlWorkflowInput {
   input_schema?: Record<string, unknown>;
   output_schema?: Record<string, unknown>;
   activity_manifest?: ActivityManifestEntry[];
+  tags?: string[];
   metadata?: Record<string, unknown>;
 }
 
@@ -46,9 +47,9 @@ export async function createYamlWorkflow(
     `INSERT INTO lt_yaml_workflows
        (name, description, app_id, app_version, source_workflow_id,
         source_workflow_type, yaml_content, graph_topic,
-        input_schema, output_schema, activity_manifest, metadata,
+        input_schema, output_schema, activity_manifest, tags, metadata,
         content_version)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 1)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 1)
      RETURNING *`,
     [
       input.name,
@@ -62,6 +63,7 @@ export async function createYamlWorkflow(
       JSON.stringify(input.input_schema || {}),
       JSON.stringify(input.output_schema || {}),
       JSON.stringify(input.activity_manifest || []),
+      input.tags || [],
       input.metadata ? JSON.stringify(input.metadata) : null,
     ],
   );
@@ -121,7 +123,7 @@ export async function updateYamlWorkflowVersion(
 
 export async function updateYamlWorkflow(
   id: string,
-  updates: Partial<Pick<CreateYamlWorkflowInput, 'name' | 'description' | 'app_id' | 'yaml_content' | 'graph_topic' | 'input_schema' | 'output_schema' | 'activity_manifest' | 'metadata'>>,
+  updates: Partial<Pick<CreateYamlWorkflowInput, 'name' | 'description' | 'app_id' | 'yaml_content' | 'graph_topic' | 'input_schema' | 'output_schema' | 'activity_manifest' | 'tags' | 'metadata'>>,
 ): Promise<LTYamlWorkflowRecord | null> {
   const pool = getPool();
   const sets: string[] = [];
@@ -137,6 +139,7 @@ export async function updateYamlWorkflow(
   if (updates.input_schema !== undefined) { sets.push(`input_schema = $${idx++}`); values.push(JSON.stringify(updates.input_schema)); }
   if (updates.output_schema !== undefined) { sets.push(`output_schema = $${idx++}`); values.push(JSON.stringify(updates.output_schema)); }
   if (updates.activity_manifest !== undefined) { sets.push(`activity_manifest = $${idx++}`); values.push(JSON.stringify(updates.activity_manifest)); }
+  if (updates.tags !== undefined) { sets.push(`tags = $${idx++}`); values.push(updates.tags); }
   if (updates.metadata !== undefined) { sets.push(`metadata = $${idx++}`); values.push(JSON.stringify(updates.metadata)); }
 
   // When YAML content changes, bump the content_version and sync app_version from YAML
@@ -186,6 +189,7 @@ export async function listYamlWorkflows(filters: {
   status?: LTYamlWorkflowStatus;
   graph_topic?: string;
   app_id?: string;
+  tags?: string[];
   search?: string;
   limit?: number;
   offset?: number;
@@ -210,6 +214,11 @@ export async function listYamlWorkflows(filters: {
     values.push(filters.app_id);
   }
 
+  if (filters.tags?.length) {
+    conditions.push(`tags && $${idx++}::text[]`);
+    values.push(filters.tags);
+  }
+
   if (filters.search) {
     conditions.push(`(name ILIKE $${idx} OR graph_topic ILIKE $${idx} OR description ILIKE $${idx} OR app_id ILIKE $${idx})`);
     values.push(`%${filters.search}%`);
@@ -232,6 +241,25 @@ export async function listYamlWorkflows(filters: {
     workflows: dataResult.rows,
     total: parseInt(countResult.rows[0].count, 10),
   };
+}
+
+/**
+ * Find active YAML workflows matching any of the given tags.
+ * Uses GIN index on tags column for efficient lookup.
+ */
+export async function findYamlWorkflowsByTags(
+  tags: string[],
+  match: 'any' | 'all' = 'any',
+): Promise<LTYamlWorkflowRecord[]> {
+  const pool = getPool();
+  const operator = match === 'all' ? '@>' : '&&';
+  const { rows } = await pool.query(
+    `SELECT * FROM lt_yaml_workflows
+     WHERE status = 'active' AND tags ${operator} $1::text[]
+     ORDER BY name`,
+    [tags],
+  );
+  return rows;
 }
 
 export async function getActiveYamlWorkflows(): Promise<LTYamlWorkflowRecord[]> {

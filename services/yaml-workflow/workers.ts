@@ -167,14 +167,19 @@ export async function registerWorkersForWorkflow(
       const serverId = activity.mcp_server_id;
       if (!serverId) continue;
 
+      const storedArgs = activity.tool_arguments;
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
         callback: async (data: StreamData): Promise<StreamDataResponse> => {
+          const args = (data.data || {}) as Record<string, unknown>;
+          const mergedArgs = storedArgs
+            ? { ...storedArgs, ...args }
+            : args;
           const result = await mcpClient.callServerTool(
             serverId,
             toolName,
-            (data.data || {}) as Record<string, unknown>,
+            mergedArgs,
           );
           return {
             metadata: { ...data.metadata },

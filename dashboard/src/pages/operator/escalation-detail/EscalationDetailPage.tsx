@@ -13,6 +13,7 @@ import { StatusBadge } from '../../../components/common/StatusBadge';
 import { CountdownTimer } from '../../../components/common/CountdownTimer';
 import { JsonViewer } from '../../../components/common/JsonViewer';
 import { PageHeader } from '../../../components/common/PageHeader';
+import { CollapsibleSection } from '../../../components/common/CollapsibleSection';
 import { Collapsible } from '../../../components/common/Collapsible';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
@@ -21,6 +22,8 @@ import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useNatsEvents';
 import { CopyableId } from '../../../components/common/CopyableId';
 import { UserName } from '../../../components/common/UserName';
+import { TriageContext } from '../../../components/escalation/TriageContext';
+import { ResolverForm } from '../../../components/escalation/ResolverForm';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
 
@@ -66,10 +69,15 @@ export function EscalationDetailPage() {
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
   const returnPath = (location.state as { from?: string } | null)?.from ?? '/escalations/available';
   const [showDetails, setShowDetails] = useState(false);
-  const [showContext, setShowContext] = useState<boolean | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('resolve');
   const [json, setJson] = useState('{}');
 
+  // Section collapse state
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) =>
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const [resolverView, setResolverView] = useState<'form' | 'json'>('form');
   const resolverSchema = wfConfig?.resolver_schema ?? null;
   useEffect(() => {
     setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
@@ -96,8 +104,11 @@ export function EscalationDetailPage() {
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
 
-  // Input/Output expanded when terminal or not claimed by me (context-first); collapsed when acting
-  const contextOpen = showContext ?? (isTerminal || !claimedByMe);
+  // Detect triage context in escalation payload
+  const payloadObj = (typeof escalationPayload === 'object' && escalationPayload !== null && !Array.isArray(escalationPayload))
+    ? escalationPayload as Record<string, unknown>
+    : null;
+  const triageData = payloadObj?._triage as Record<string, unknown> | undefined;
 
   // Derive action bar mode
   const actionBarMode: ActionBarMode = isTerminal
@@ -110,6 +121,7 @@ export function EscalationDetailPage() {
 
   const handleClaim = (durationMinutes: number) => {
     claim.mutate({ id: esc.id, durationMinutes });
+    setCollapsed({ context: true, triage: true, resolver: false });
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
@@ -143,7 +155,6 @@ export function EscalationDetailPage() {
         {middleEllipsis(esc.description || `${esc.type} escalation`, 72)}
       </h2>
       <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
-        {/* Status + time as a readable phrase */}
         <StatusBadge status={esc.status} />
         {esc.resolved_at ? (
           <span className="text-text-tertiary">
@@ -163,15 +174,14 @@ export function EscalationDetailPage() {
           </span>
         )}
 
-        {/* Active claim countdown — only for non-terminal */}
         {claimed && !isTerminal && esc.assigned_until && (
           <>
-            <span className="text-text-quaternary">·</span>
+            <span className="text-text-quaternary">&middot;</span>
             <CountdownTimer until={esc.assigned_until} />
           </>
         )}
 
-        <span className="text-text-quaternary">·</span>
+        <span className="text-text-quaternary">&middot;</span>
         <button
           onClick={() => setShowDetails(!showDetails)}
           className="flex items-center gap-1 text-text-tertiary hover:text-accent transition-colors"
@@ -179,18 +189,6 @@ export function EscalationDetailPage() {
           Details
           <svg
             className={`w-3 h-3 transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <button
-          onClick={() => setShowContext(!contextOpen)}
-          className="flex items-center gap-1 text-text-tertiary hover:text-accent transition-colors"
-        >
-          Input/Output
-          <svg
-            className={`w-3 h-3 transition-transform duration-200 ${contextOpen ? 'rotate-180' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -230,43 +228,84 @@ export function EscalationDetailPage() {
         </div>
       </Collapsible>
 
-      {/* Input/Output — collapsed when claimed */}
-      <Collapsible open={contextOpen}>
-        <div className="mt-4 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {esc.envelope && (
-              <div>
-                <JsonViewer data={esc.envelope} label="Input Envelope" />
-              </div>
-            )}
-            {escalationPayload != null && (
-              <div>
-                <JsonViewer data={escalationPayload} label="Workflow Result" />
+      {/* Collapsible sections — matching WorkflowExecutionPage pattern */}
+      <div className="mt-8 space-y-6">
+
+        {/* Input/Output */}
+        <CollapsibleSection
+          title="Input / Output"
+          sectionKey="context"
+          isCollapsed={collapsed.context ?? true}
+          onToggle={toggleSection}
+          contentClassName="mt-4 ml-9"
+        >
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {esc.envelope && (
+                <div>
+                  <JsonViewer data={esc.envelope} label="Input Envelope" />
+                </div>
+              )}
+              {escalationPayload != null && (
+                <div>
+                  <JsonViewer data={escalationPayload} label="Escalation Context" />
+                </div>
+              )}
+            </div>
+
+            {resolverPayload != null && (
+              <div className="max-w-xl">
+                <JsonViewer data={resolverPayload} label="Resolver Payload" />
               </div>
             )}
           </div>
+        </CollapsibleSection>
 
-          {resolverPayload != null && (
-            <div className="max-w-xl">
-              <JsonViewer data={resolverPayload} label="Resolver Payload" />
+        {/* Triage context — only when present */}
+        {triageData && payloadObj && (
+          <CollapsibleSection
+            title="AI Triage"
+            sectionKey="triage"
+            isCollapsed={!!collapsed.triage}
+            onToggle={toggleSection}
+            contentClassName="mt-4 ml-9"
+          >
+            <TriageContext triage={triageData} payload={payloadObj} />
+          </CollapsibleSection>
+        )}
+
+        {/* Resolver form — when claimed and resolving */}
+        {!isTerminal && claimedByMe && activeView === 'resolve' && esc.workflow_type && (
+          <CollapsibleSection
+            title="Submit Your Resolution"
+            sectionKey="resolver"
+            isCollapsed={!!collapsed.resolver}
+            onToggle={toggleSection}
+            contentClassName="mt-4 ml-9"
+          >
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={() => setResolverView(resolverView === 'form' ? 'json' : 'form')}
+                className="text-[10px] text-text-tertiary hover:text-accent transition-colors"
+              >
+                {resolverView === 'form' ? 'Raw JSON' : 'Form'}
+              </button>
             </div>
-          )}
-        </div>
-      </Collapsible>
-
-      {/* Resolver JSON input — in viewport when resolving */}
-      {!isTerminal && claimedByMe && activeView === 'resolve' && esc.workflow_type && (
-        <div className="mt-6">
-          <textarea
-            value={json}
-            onChange={(e) => setJson(e.target.value)}
-            className="input font-mono text-xs w-full"
-            rows={6}
-            spellCheck={false}
-            data-testid="resolve-json"
-          />
-        </div>
-      )}
+            {resolverView === 'form' ? (
+              <ResolverForm value={json} onChange={setJson} />
+            ) : (
+              <textarea
+                value={json}
+                onChange={(e) => setJson(e.target.value)}
+                className="input font-mono text-xs w-full"
+                rows={8}
+                spellCheck={false}
+                data-testid="resolve-json"
+              />
+            )}
+          </CollapsibleSection>
+        )}
+      </div>
 
       <div className="flex-1" />
 

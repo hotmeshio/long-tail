@@ -7,6 +7,7 @@ import * as activities from './activities';
 type ActivitiesType = typeof activities;
 
 const {
+  findCompiledWorkflows,
   getAllTools,
   getToolInventory,
   callMcpTool,
@@ -24,7 +25,7 @@ const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
 
 const SYSTEM_PROMPT = `You are a general-purpose AI assistant for Long Tail — a durable workflow system with MCP tool integration.
 
-You have access to ALL registered MCP tools across the system. Use them to fulfill the user's request.
+You have access to compiled workflows AND raw MCP tools. Use them to fulfill the user's request.
 
 When answering, call the appropriate tools to accomplish the task, then respond with a JSON object:
 {
@@ -34,8 +35,9 @@ When answering, call the appropriate tools to accomplish the task, then respond 
   "tool_calls_made": 0
 }
 
-Tool selection:
-- Tool names are prefixed with the server slug: \`server_slug__tool_name\`
+Tool selection priority:
+1. **Compiled workflows first** (yaml__* prefix) — these are deterministic, fast, and proven. ALWAYS prefer these when available.
+2. **Raw MCP tools** (server_slug__tool_name) — use when no compiled workflow matches the task.
 - Always call tools when they can provide real data — never guess
 - Chain tools when needed (e.g., navigate then screenshot, or fetch then write_file)
 - If a tool fails, try an alternative approach before giving up
@@ -69,15 +71,31 @@ export async function mcpQuery(
     };
   }
 
-  // 1. Get available tools (optionally filtered by tags)
-  const tools = await getAllTools(tags);
+  // 1. Phase 1: Search for compiled YAML workflows that match the prompt.
+  //    These are deterministic — no LLM reasoning needed, just direct execution.
+  const compiled = await findCompiledWorkflows(prompt);
+
+  // 2. Phase 2: Get raw MCP tools (optionally filtered by tags)
+  const rawTools = await getAllTools(tags);
   const inventory = await getToolInventory();
 
-  // 2. Start the conversation
+  // Merge: compiled workflows first (preferred), then raw MCP tools
+  const tools = [...compiled.tools, ...rawTools];
+
+  // Build system prompt with compiled workflows highlighted
+  let serverSection = '';
+  if (compiled.inventory) {
+    serverSection += `## Compiled Workflows (PREFERRED — deterministic, fast)\n\n${compiled.inventory}\n\n`;
+    serverSection += `## MCP Servers (use if no compiled workflow matches)\n\n${inventory}`;
+  } else {
+    serverSection += `## Available MCP Servers\n\n${inventory}`;
+  }
+
+  // 3. Start the conversation
   const messages: any[] = [
     {
       role: 'system',
-      content: SYSTEM_PROMPT + `\n\n## Available MCP Servers\n\n${inventory}`,
+      content: SYSTEM_PROMPT + `\n\n${serverSection}`,
     },
     { role: 'user', content: prompt },
   ];

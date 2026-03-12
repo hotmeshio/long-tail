@@ -174,10 +174,15 @@ export function createLTInterceptor(options: {
         reRunMetadata = reRunTask?.metadata as Record<string, any> | null;
       }
 
-      // Resolve the old escalation on re-run
-      if (isReRun) {
+      // Resolve the old escalation on re-run.
+      // Skip for auto-triage synthetic IDs (not real escalation UUIDs) —
+      // the triage orchestrator already resolved the original escalation.
+      const escalationId = envelope?.lt?.escalationId;
+      const isRealEscalation = isReRun && escalationId && !escalationId.startsWith('auto-triage-');
+
+      if (isRealEscalation) {
         await activities.ltResolveEscalation({
-          escalationId: envelope!.lt!.escalationId!,
+          escalationId: escalationId!,
           resolverPayload: envelope!.resolver!,
         });
 
@@ -188,7 +193,7 @@ export function createLTInterceptor(options: {
           workflowName,
           taskQueue,
           taskId: reRunTask?.id || existingTask?.id,
-          escalationId: envelope!.lt!.escalationId!,
+          escalationId: escalationId!,
           originId: envelope?.lt?.originId,
           status: 'resolved',
         });
@@ -200,6 +205,20 @@ export function createLTInterceptor(options: {
       // This ensures every escalation is tied to a task.
       let taskId = reRunTask?.id || existingTask?.id;
       let routing = reRunMetadata || taskMetadata;
+
+      // Fallback: if routing doesn't have parentWorkflowId but the
+      // envelope carries routing fields (e.g., from triage auto-resolve),
+      // use them. This ensures the signal chain works even when the
+      // task lookup doesn't yield routing metadata.
+      if (!routing?.parentWorkflowId && envelope?.lt?.parentWorkflowId) {
+        routing = {
+          ...(routing || {}),
+          signalId: envelope.lt.signalId,
+          parentWorkflowId: envelope.lt.parentWorkflowId,
+          parentTaskQueue: envelope.lt.parentTaskQueue,
+          parentWorkflowType: envelope.lt.parentWorkflowType,
+        };
+      }
 
       if (!taskId) {
         const standaloneSignalId = `lt-standalone-${workflowId}`;

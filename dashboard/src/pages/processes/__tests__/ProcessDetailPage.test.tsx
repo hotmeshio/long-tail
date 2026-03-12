@@ -1,18 +1,19 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 
 vi.mock('../../../api/tasks', () => ({
   useProcessDetail: vi.fn(),
 }));
 
-vi.mock('../../../api/insight', () => ({
-  useInsightQuery: vi.fn(),
+vi.mock('../../../api/settings', () => ({
+  useSettings: vi.fn(),
 }));
 
 import { ProcessDetailPage } from '../ProcessDetailPage';
 import { useProcessDetail } from '../../../api/tasks';
-import { useInsightQuery } from '../../../api/insight';
+import { useSettings } from '../../../api/settings';
 import type { LTTaskRecord } from '../../../api/types';
 
 function makeTask(overrides: Partial<LTTaskRecord> = {}): LTTaskRecord {
@@ -45,26 +46,25 @@ function makeTask(overrides: Partial<LTTaskRecord> = {}): LTTaskRecord {
 }
 
 function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={['/processes/detail/origin-1']}>
-      <Routes>
-        <Route path="/processes/detail/:originId" element={<ProcessDetailPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/processes/detail/origin-1']}>
+        <Routes>
+          <Route path="/processes/detail/:originId" element={<ProcessDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
-describe('ProcessDetailPage — Telemetry Pill', () => {
+describe('ProcessDetailPage — Trace ID', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: null,
-      isFetching: false,
-      error: null,
-    } as any);
+    vi.mocked(useSettings).mockReturnValue({ data: { telemetry: { traceUrl: 'https://ui.honeycomb.io/trace?trace_id={traceId}' } } } as any);
   });
 
-  it('renders "Get Telemetry" pill for tasks with trace_id', () => {
+  it('renders trace CopyableId for tasks with trace_id', () => {
     vi.mocked(useProcessDetail).mockReturnValue({
       data: { origin_id: 'origin-1', tasks: [makeTask()], escalations: [] },
       isLoading: false,
@@ -72,10 +72,11 @@ describe('ProcessDetailPage — Telemetry Pill', () => {
 
     renderPage();
 
-    expect(screen.getByText('Get Telemetry')).toBeInTheDocument();
+    expect(screen.getByText('Trace')).toBeInTheDocument();
+    expect(screen.getByText('abc123trace')).toBeInTheDocument();
   });
 
-  it('does NOT render pill for tasks without trace_id', () => {
+  it('does NOT render trace for tasks without trace_id', () => {
     vi.mocked(useProcessDetail).mockReturnValue({
       data: {
         origin_id: 'origin-1',
@@ -87,103 +88,35 @@ describe('ProcessDetailPage — Telemetry Pill', () => {
 
     renderPage();
 
-    expect(screen.queryByText('Get Telemetry')).not.toBeInTheDocument();
+    expect(screen.queryByText('Trace')).not.toBeInTheDocument();
   });
 
-  it('clicking pill triggers insight query with workflow_id', () => {
+  it('shows summary stats', () => {
     vi.mocked(useProcessDetail).mockReturnValue({
-      data: { origin_id: 'origin-1', tasks: [makeTask()], escalations: [] },
+      data: {
+        origin_id: 'origin-1',
+        tasks: [makeTask(), makeTask({ id: 'task-2', status: 'needs_intervention' })],
+        escalations: [],
+      },
       isLoading: false,
     } as any);
 
     renderPage();
 
-    fireEvent.click(screen.getByText('Get Telemetry'));
-
-    // useInsightQuery should have been called with a question containing the workflow_id
-    const calls = vi.mocked(useInsightQuery).mock.calls;
-    const lastCall = calls[calls.length - 1];
-    expect(lastCall[0]).toContain('wf-abc-123');
+    // Summary cards should show task count
+    expect(screen.getByText('Tasks')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
-  it('shows loading skeleton when insight is fetching', () => {
+  it('shows loading skeleton when data is loading', () => {
     vi.mocked(useProcessDetail).mockReturnValue({
-      data: { origin_id: 'origin-1', tasks: [makeTask()], escalations: [] },
-      isLoading: false,
-    } as any);
-
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: null,
-      isFetching: true,
-      error: null,
+      data: undefined,
+      isLoading: true,
     } as any);
 
     renderPage();
 
-    // Loading skeleton has animate-pulse divs
     const pulseElements = document.querySelectorAll('.animate-pulse');
     expect(pulseElements.length).toBeGreaterThan(0);
-  });
-
-  it('shows InsightResultCard when data is returned', () => {
-    vi.mocked(useProcessDetail).mockReturnValue({
-      data: { origin_id: 'origin-1', tasks: [makeTask()], escalations: [] },
-      isLoading: false,
-    } as any);
-
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: {
-        title: 'Workflow Execution Timeline',
-        summary: 'The workflow completed in 1.2s with no errors.',
-        sections: [],
-        metrics: [{ label: 'Duration', value: '1.2s' }],
-        tool_calls_made: 2,
-        query: 'Get telemetry...',
-        workflow_id: 'insight-123',
-        duration_ms: 3400,
-      },
-      isFetching: false,
-      error: null,
-    } as any);
-
-    renderPage();
-
-    expect(screen.getByText('Workflow Execution Timeline')).toBeInTheDocument();
-    expect(screen.getByText('The workflow completed in 1.2s with no errors.')).toBeInTheDocument();
-  });
-
-  it('shows error message when insight query fails', () => {
-    vi.mocked(useProcessDetail).mockReturnValue({
-      data: { origin_id: 'origin-1', tasks: [makeTask()], escalations: [] },
-      isLoading: false,
-    } as any);
-
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: null,
-      isFetching: false,
-      error: new Error('Insight service unavailable'),
-    } as any);
-
-    renderPage();
-
-    expect(screen.getByText('Insight service unavailable')).toBeInTheDocument();
-  });
-
-  it('disables pill when insight is fetching', () => {
-    vi.mocked(useProcessDetail).mockReturnValue({
-      data: { origin_id: 'origin-1', tasks: [makeTask()], escalations: [] },
-      isLoading: false,
-    } as any);
-
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: null,
-      isFetching: true,
-      error: null,
-    } as any);
-
-    renderPage();
-
-    const pill = screen.getByText('Get Telemetry');
-    expect(pill).toBeDisabled();
   });
 });

@@ -2,6 +2,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../../modules/config';
+import { loggerRegistry } from '../../services/logger';
 
 /**
  * Signal an orchestrator workflow from within the interceptor.
@@ -24,4 +25,33 @@ export async function ltSignalParent(input: {
     input.parentWorkflowId,
   );
   await handle.signal(input.signalId, input.data);
+}
+
+/**
+ * Start a workflow from within an activity context.
+ * Used by the triage orchestrator to auto-resolve: directly re-run the
+ * original workflow with correctedData as the resolver, bypassing the
+ * "create escalation → human resolves → re-run" cycle for high-confidence
+ * pass-through cases.
+ */
+export async function ltStartWorkflow(input: {
+  workflowName: string;
+  taskQueue: string;
+  workflowId: string;
+  args: any[];
+  expire?: number;
+}): Promise<void> {
+  const client = new Durable.Client({
+    connection: { class: Postgres, options: postgres_options },
+  });
+  await client.workflow.start({
+    workflowName: input.workflowName,
+    args: input.args,
+    taskQueue: input.taskQueue,
+    workflowId: input.workflowId,
+    expire: input.expire ?? 180,
+  });
+  loggerRegistry.info(
+    `[ltStartWorkflow] started ${input.workflowName} (${input.workflowId})`,
+  );
 }

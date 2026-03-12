@@ -27,37 +27,29 @@ describe('InsightSearch', () => {
     vi.mocked(useMcpQuery).mockReturnValue(EMPTY_QUERY);
   });
 
-  it('renders search input with Ask mode placeholder', () => {
+  it('renders search input with Do mode placeholder by default', () => {
     renderWithRouter(<InsightSearch />);
-    expect(screen.getByPlaceholderText('Ask about system state...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Do something with tools...')).toBeInTheDocument();
   });
 
-  it('shows Ask suggestions on focus when input is empty', () => {
+  it('shows suggestions on focus when input is empty', () => {
     renderWithRouter(<InsightSearch />);
-    const input = screen.getByPlaceholderText('Ask about system state...');
-    fireEvent.focus(input);
-    expect(screen.getByText('Which workflow types have the most escalations?')).toBeInTheDocument();
-    expect(screen.getByText('What is the current workload by role?')).toBeInTheDocument();
-  });
-
-  it('switches to Do mode and shows Do suggestions', () => {
-    renderWithRouter(<InsightSearch />);
-    fireEvent.click(screen.getByText('Do'));
     const input = screen.getByPlaceholderText('Do something with tools...');
     fireEvent.focus(input);
-    expect(screen.getByText(/Take a screenshot/)).toBeInTheDocument();
+    expect(screen.getByText(/fill #username with "superadmin".*home\.png/)).toBeInTheDocument();
+    expect(screen.getByText(/screenshot of https:\/\/example\.com/)).toBeInTheDocument();
   });
 
   it('hides suggestions when input has text', () => {
     renderWithRouter(<InsightSearch />);
-    const input = screen.getByPlaceholderText('Ask about system state...');
+    const input = screen.getByPlaceholderText('Do something with tools...');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'test query' } });
-    expect(screen.queryByText('Which workflow types have the most escalations?')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Run a browser script/)).not.toBeInTheDocument();
   });
 
   it('opens modal with loading state when fetching', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
+    vi.mocked(useMcpQuery).mockReturnValue({
       data: undefined,
       isFetching: true,
       error: null,
@@ -68,55 +60,34 @@ describe('InsightSearch', () => {
   });
 
   it('shows error in modal', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
+    vi.mocked(useMcpQuery).mockReturnValue({
       data: undefined,
       isFetching: false,
-      error: new Error('Analysis failed'),
+      error: new Error('Tool call failed'),
     } as any);
 
     renderWithRouter(<InsightSearch />);
-    expect(screen.getByText('Analysis failed')).toBeInTheDocument();
+    expect(screen.getByText('Tool call failed')).toBeInTheDocument();
   });
 
   it('shows result in modal when data is present', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
+    vi.mocked(useMcpQuery).mockReturnValue({
       data: {
-        title: 'Test Insight Result',
-        summary: 'Everything looks good.',
-        sections: [],
-        metrics: [],
-        tool_calls_made: 2,
-        query: 'test query',
-        workflow_id: 'wf-1',
-        duration_ms: 1500,
+        title: 'Screenshot taken',
+        summary: 'Saved to /screenshots/test.png',
+        result: { path: '/screenshots/test.png' },
+        tool_calls_made: 3,
+        prompt: 'take a screenshot',
+        workflow_id: 'mcp-1',
+        duration_ms: 2000,
       },
       isFetching: false,
       error: null,
     } as any);
 
     renderWithRouter(<InsightSearch />);
-    expect(screen.getByText('Test Insight Result')).toBeInTheDocument();
-    expect(screen.getByText('Everything looks good.')).toBeInTheDocument();
-  });
-
-  it('modal has Insight title in Ask mode', () => {
-    vi.mocked(useInsightQuery).mockReturnValue({
-      data: {
-        title: 'Result',
-        summary: 'Summary.',
-        sections: [],
-        metrics: [],
-        tool_calls_made: 1,
-        query: 'q',
-        workflow_id: 'wf-1',
-        duration_ms: 500,
-      },
-      isFetching: false,
-      error: null,
-    } as any);
-
-    renderWithRouter(<InsightSearch />);
-    expect(screen.getByText('Insight')).toBeInTheDocument();
+    expect(screen.getByText('Screenshot taken')).toBeInTheDocument();
+    expect(screen.getByText(/Saved to/)).toBeInTheDocument();
   });
 
   it('modal has MCP Query title in Do mode', () => {
@@ -135,8 +106,12 @@ describe('InsightSearch', () => {
     } as any);
 
     renderWithRouter(<InsightSearch />);
-    fireEvent.click(screen.getByText('Do'));
     expect(screen.getByText('MCP Query')).toBeInTheDocument();
-    expect(screen.getByText('Screenshot taken')).toBeInTheDocument();
+  });
+
+  it('does not render Ask/Do toggle buttons', () => {
+    renderWithRouter(<InsightSearch />);
+    expect(screen.queryByText('Ask')).not.toBeInTheDocument();
+    expect(screen.queryByText('Do')).not.toBeInTheDocument();
   });
 });

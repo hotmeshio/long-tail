@@ -105,6 +105,11 @@ export function WorkflowConfigDetailPage() {
   const [schemaError, setSchemaError] = useState('');
   const [initialized, setInitialized] = useState(false);
 
+  // Invoke sidebar hooks — must be called unconditionally (before early returns)
+  const invokeMutation = useInvokeWorkflow();
+  const [invokeJson, setInvokeJson] = useState(DEFAULT_ENVELOPE);
+  const [invokeParseError, setInvokeParseError] = useState('');
+
   useEffect(() => {
     if (initialized) return;
     if (isNew) { setInitialized(true); return; }
@@ -113,6 +118,16 @@ export function WorkflowConfigDetailPage() {
       setInitialized(true);
     }
   }, [editing, isNew, initialized]);
+
+  // Sync invoke editor when config loads
+  useEffect(() => {
+    if (!editing) return;
+    setInvokeJson(
+      editing.envelope_schema
+        ? JSON.stringify(editing.envelope_schema, null, 2)
+        : DEFAULT_ENVELOPE,
+    );
+  }, [editing]);
 
   const set = (field: keyof ConfigFormState, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -457,20 +472,6 @@ export function WorkflowConfigDetailPage() {
   }
 
   // ── Invoke sidebar ──────────────────────────────────────────────────────
-
-  const invokeMutation = useInvokeWorkflow();
-  const [invokeJson, setInvokeJson] = useState(DEFAULT_ENVELOPE);
-  const [invokeParseError, setInvokeParseError] = useState('');
-
-  // Sync invoke editor when config loads
-  useEffect(() => {
-    if (!editing) return;
-    setInvokeJson(
-      editing.envelope_schema
-        ? JSON.stringify(editing.envelope_schema, null, 2)
-        : DEFAULT_ENVELOPE,
-    );
-  }, [editing]);
 
   const handleInvoke = async () => {
     const wfType = form.workflow_type.trim();

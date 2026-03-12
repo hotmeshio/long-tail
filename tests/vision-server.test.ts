@@ -71,7 +71,7 @@ describe('Vision MCP Server', () => {
     const client = await connectClient();
     const result = await client.callTool({
       name: 'rotate_page',
-      arguments: { image_ref: 'page1_upside_down.png', degrees: 180 },
+      arguments: { image_ref: 'page1_upside_down.png', degrees: 180, replace_original: false },
     });
     const data = parseMcpResult(result);
     expect(data.rotated_ref).toBe('page1_upside_down_rotated.png');
