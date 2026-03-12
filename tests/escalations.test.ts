@@ -10,7 +10,23 @@ import * as userService from '../services/user';
 
 const { Connection } = Durable;
 
-describe('Escalation service', () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Escalation Service
+//
+// Escalations are the human-in-the-loop mechanism. When a workflow cannot
+// proceed automatically, it creates an escalation assigned to a role.
+// Users claim escalations, review the data, and resolve them — which
+// signals the paused workflow to continue.
+//
+// This suite walks through the full escalation lifecycle:
+//   1. Create escalations across roles and types
+//   2. Claim an escalation (lock it for a user)
+//   3. Query statistics (global, role-scoped, time-windowed)
+//   4. List and filter escalations with RBAC scoping
+//   5. List available (unclaimed) escalations
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('escalation service', () => {
   let userId: string;
   let escalationIds: string[] = [];
 
@@ -22,7 +38,6 @@ describe('Escalation service', () => {
     });
     await migrate();
 
-    // Create a test user with a role for RBAC tests
     const user = await userService.createUser({
       external_id: `esc-test-${Date.now()}`,
       email: 'esc-test@example.com',
@@ -35,96 +50,104 @@ describe('Escalation service', () => {
   }, 30_000);
 
   afterAll(async () => {
+    // Clean up test escalations
+    const { getPool } = await import('../services/db');
+    const pool = getPool();
+    await pool.query(
+      'DELETE FROM lt_escalations WHERE id = ANY($1::uuid[])',
+      [escalationIds],
+    );
     await userService.deleteUser(userId);
     await Durable.shutdown();
     await disconnectTelemetry();
   }, 10_000);
 
-  // ── Seed test data ───────────────────────────────────────────────────────
+  // ── 1. Create and claim ────────────────────────────────────────────────
+  //
+  // Seed escalations across two roles (reviewer, engineer) and one
+  // resolved record. Then claim one to set up state for stats queries.
 
-  it('should create escalations for stats testing', async () => {
-    // 3 pending reviewer escalations
-    for (let i = 0; i < 3; i++) {
-      const esc = await escalationService.createEscalation({
+  describe('create and claim', () => {
+    it('should create escalations across roles and types', async () => {
+      // 3 pending reviewer escalations (one high-priority)
+      for (let i = 0; i < 3; i++) {
+        const esc = await escalationService.createEscalation({
+          type: 'document',
+          subtype: 'verify',
+          modality: 'portal',
+          role: 'reviewer',
+          envelope: JSON.stringify({ data: { idx: i } }),
+          priority: i === 0 ? 1 : 2,
+        });
+        escalationIds.push(esc.id);
+      }
+
+      // 2 pending engineer escalations
+      for (let i = 0; i < 2; i++) {
+        const esc = await escalationService.createEscalation({
+          type: 'content',
+          subtype: 'review',
+          modality: 'default',
+          role: 'engineer',
+          envelope: JSON.stringify({ data: {} }),
+        });
+        escalationIds.push(esc.id);
+      }
+
+      // 1 resolved escalation (for resolved_* stats)
+      const resolved = await escalationService.createEscalation({
         type: 'document',
         subtype: 'verify',
         modality: 'portal',
         role: 'reviewer',
-        envelope: JSON.stringify({ data: { idx: i } }),
-        priority: i === 0 ? 1 : 2,
-      });
-      escalationIds.push(esc.id);
-    }
-
-    // 2 pending engineer escalations
-    for (let i = 0; i < 2; i++) {
-      const esc = await escalationService.createEscalation({
-        type: 'content',
-        subtype: 'review',
-        modality: 'default',
-        role: 'engineer',
         envelope: JSON.stringify({ data: {} }),
       });
-      escalationIds.push(esc.id);
-    }
+      await escalationService.resolveEscalation(resolved.id, { ok: true });
+      escalationIds.push(resolved.id);
 
-    // 1 resolved escalation (for resolved_* stats)
-    const resolved = await escalationService.createEscalation({
-      type: 'document',
-      subtype: 'verify',
-      modality: 'portal',
-      role: 'reviewer',
-      envelope: JSON.stringify({ data: {} }),
+      expect(escalationIds).toHaveLength(6);
     });
-    await escalationService.resolveEscalation(resolved.id, { ok: true });
-    escalationIds.push(resolved.id);
 
-    expect(escalationIds).toHaveLength(6);
+    it('should claim an escalation and record assignment', async () => {
+      const result = await escalationService.claimEscalation(
+        escalationIds[0],
+        userId,
+        60,
+      );
+      expect(result).toBeTruthy();
+      expect(result!.escalation.assigned_to).toBe(userId);
+    });
   });
 
-  // ── Claim one escalation ─────────────────────────────────────────────────
+  // ── 2. Statistics ──────────────────────────────────────────────────────
+  //
+  // Stats aggregate escalation counts by status, role, and type.
+  // RBAC scoping ensures users only see stats for their own roles.
 
-  it('should claim an escalation for claimed stats', async () => {
-    const result = await escalationService.claimEscalation(
-      escalationIds[0],
-      userId,
-      60,
-    );
-    expect(result).toBeTruthy();
-    expect(result!.escalation.assigned_to).toBe(userId);
-  });
-
-  // ── Stats ────────────────────────────────────────────────────────────────
-
-  describe('getEscalationStats', () => {
+  describe('statistics', () => {
     it('should return global stats (no role filter)', async () => {
       const stats = await escalationService.getEscalationStats();
 
-      // 5 pending (3 reviewer + 2 engineer), 1 resolved
       expect(stats.pending).toBeGreaterThanOrEqual(5);
       expect(stats.claimed).toBeGreaterThanOrEqual(1);
       expect(stats.created).toBeGreaterThanOrEqual(6);
       expect(stats.resolved).toBeGreaterThanOrEqual(1);
 
-      // by_role breakdown
       expect(stats.by_role.length).toBeGreaterThanOrEqual(2);
       const reviewer = stats.by_role.find(r => r.role === 'reviewer');
       expect(reviewer).toBeTruthy();
       expect(reviewer!.pending).toBeGreaterThanOrEqual(3);
       expect(reviewer!.claimed).toBeGreaterThanOrEqual(1);
 
-      // by_type breakdown
       expect(stats.by_type.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should scope stats by visible roles', async () => {
       const stats = await escalationService.getEscalationStats(['reviewer']);
 
-      // Only reviewer data should be counted
       expect(stats.pending).toBeGreaterThanOrEqual(3);
       expect(stats.by_role.every(r => r.role === 'reviewer')).toBe(true);
 
-      // Engineer escalations should NOT be counted
       const engineer = stats.by_role.find(r => r.role === 'engineer');
       expect(engineer).toBeUndefined();
     });
@@ -140,35 +163,30 @@ describe('Escalation service', () => {
       expect(stats.by_type).toHaveLength(0);
     });
 
-    it('should accept period parameter', async () => {
+    it('should widen counts with longer time periods', async () => {
       const stats1h = await escalationService.getEscalationStats(undefined, '1h');
-      expect(stats1h.created).toBeGreaterThanOrEqual(0);
-      expect(stats1h.resolved).toBeGreaterThanOrEqual(0);
-
       const stats7d = await escalationService.getEscalationStats(undefined, '7d');
-      expect(stats7d.created).toBeGreaterThanOrEqual(stats1h.created);
-
       const stats30d = await escalationService.getEscalationStats(undefined, '30d');
+
+      expect(stats7d.created).toBeGreaterThanOrEqual(stats1h.created);
       expect(stats30d.created).toBeGreaterThanOrEqual(stats7d.created);
     });
-  });
 
-  // ── Distinct types ───────────────────────────────────────────────────────
-
-  describe('listDistinctTypes', () => {
-    it('should return distinct type values', async () => {
+    it('should return distinct type values sorted alphabetically', async () => {
       const types = await escalationService.listDistinctTypes();
 
       expect(types).toContain('document');
       expect(types).toContain('content');
-      // Should be sorted
       expect(types).toEqual([...types].sort());
     });
   });
 
-  // ── List / Available with sorting ────────────────────────────────────────
+  // ── 3. List and filter ─────────────────────────────────────────────────
+  //
+  // Listing supports filtering by status, type, role, and RBAC-scoped
+  // visible roles. Results are paginated and sorted by priority.
 
-  describe('listEscalations', () => {
+  describe('list and filter', () => {
     it('should return escalations with total count', async () => {
       const result = await escalationService.listEscalations({});
 
@@ -197,7 +215,7 @@ describe('Escalation service', () => {
       expect(result.escalations.every(e => e.role === 'reviewer')).toBe(true);
     });
 
-    it('should sort by priority ASC, created_at ASC', async () => {
+    it('should sort by priority ASC, created_at ASC by default', async () => {
       const result = await escalationService.listEscalations({});
 
       for (let i = 1; i < result.escalations.length; i++) {
@@ -212,24 +230,28 @@ describe('Escalation service', () => {
       }
     });
 
-    it('should respect limit and offset', async () => {
+    it('should paginate with limit and offset', async () => {
       const page1 = await escalationService.listEscalations({ limit: 2, offset: 0 });
       const page2 = await escalationService.listEscalations({ limit: 2, offset: 2 });
 
       expect(page1.escalations).toHaveLength(2);
       expect(page1.total).toBe(page2.total);
-      // Pages should not overlap
+
       const ids1 = new Set(page1.escalations.map(e => e.id));
       expect(page2.escalations.every(e => !ids1.has(e.id))).toBe(true);
     });
   });
 
-  describe('listAvailableEscalations', () => {
+  // ── 4. Available escalations ───────────────────────────────────────────
+  //
+  // "Available" means pending AND unclaimed (or claim expired). This is
+  // the queue a human reviewer pulls from.
+
+  describe('available escalations', () => {
     it('should only return pending, unassigned escalations', async () => {
       const result = await escalationService.listAvailableEscalations({});
 
       expect(result.escalations.every(e => e.status === 'pending')).toBe(true);
-      // All should be either unassigned or have expired claims
       for (const esc of result.escalations) {
         if (esc.assigned_to) {
           expect(new Date(esc.assigned_until!).getTime())
@@ -245,16 +267,5 @@ describe('Escalation service', () => {
 
       expect(result.escalations.every(e => e.role === 'engineer')).toBe(true);
     });
-  });
-
-  // ── Cleanup ──────────────────────────────────────────────────────────────
-
-  it('should clean up test escalations', async () => {
-    const { getPool } = await import('../services/db');
-    const pool = getPool();
-    await pool.query(
-      'DELETE FROM lt_escalations WHERE id = ANY($1::uuid[])',
-      [escalationIds],
-    );
   });
 });

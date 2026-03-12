@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const yaml = require('js-yaml');
 
-import { exportWorkflowExecution } from '../export';
+import { exportWorkflowExecution } from '../export/index';
 import { listMcpServers } from '../mcp/db';
 import {
   LLM_MODEL_SECONDARY,

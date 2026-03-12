@@ -67,6 +67,10 @@ export function quoteSchema(schema: string): string {
 
 // ── Symbol inflation ────────────────────────────────────────────────────────
 
+/** Schema-qualified symbol lookup — schema is injected as an identifier, not a parameter. */
+export const LOAD_SYMBOL_MAP = (schema: string) =>
+  `SELECT key, field, value FROM ${schema}.symbols WHERE key LIKE $1`;
+
 /**
  * Load all symbol key mappings from {schema}.symbols for the given appId.
  * Returns a reverse map: abbreviated 3-char key → human-readable path.
@@ -76,7 +80,7 @@ export async function loadSymbolMap(schema: string, appId: string): Promise<Reco
   const symKeyPrefix = `hmsh:${appId}:sym:keys:`;
   try {
     const result = await pool.query(
-      `SELECT key, field, value FROM ${schema}.symbols WHERE key LIKE $1`,
+      LOAD_SYMBOL_MAP(schema),
       [`${symKeyPrefix}%`],
     );
 

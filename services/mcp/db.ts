@@ -1,5 +1,14 @@
 import { getPool } from '../db';
 import type { LTMcpServerRecord, LTMcpServerStatus, LTMcpToolManifest } from '../../types';
+import {
+  CREATE_MCP_SERVER,
+  GET_MCP_SERVER,
+  GET_MCP_SERVER_BY_NAME,
+  DELETE_MCP_SERVER,
+  UPDATE_STATUS_CONNECTED,
+  UPDATE_STATUS,
+  GET_AUTO_CONNECT_SERVERS,
+} from './sql';
 
 export interface CreateMcpServerInput {
   name: string;
@@ -16,10 +25,7 @@ export async function createMcpServer(
 ): Promise<LTMcpServerRecord> {
   const pool = getPool();
   const { rows } = await pool.query(
-    `INSERT INTO lt_mcp_servers
-       (name, description, transport_type, transport_config, auto_connect, metadata, tags)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
+    CREATE_MCP_SERVER,
     [
       input.name,
       input.description || null,
@@ -35,18 +41,13 @@ export async function createMcpServer(
 
 export async function getMcpServer(id: string): Promise<LTMcpServerRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    'SELECT * FROM lt_mcp_servers WHERE id = $1',
-    [id],
-  );
+  const { rows } = await pool.query(GET_MCP_SERVER, [id]);
   return rows[0] || null;
 }
 
 export async function getMcpServerByName(name: string): Promise<LTMcpServerRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    'SELECT * FROM lt_mcp_servers WHERE name = $1',
-    [name],
+  const { rows } = await pool.query(GET_MCP_SERVER_BY_NAME, [name],
   );
   return rows[0] || null;
 }
@@ -101,10 +102,7 @@ export async function updateMcpServer(
 
 export async function deleteMcpServer(id: string): Promise<boolean> {
   const pool = getPool();
-  const { rowCount } = await pool.query(
-    'DELETE FROM lt_mcp_servers WHERE id = $1',
-    [id],
-  );
+  const { rowCount } = await pool.query(DELETE_MCP_SERVER, [id]);
   return (rowCount || 0) > 0;
 }
 
@@ -116,16 +114,11 @@ export async function updateMcpServerStatus(
   const pool = getPool();
   if (status === 'connected') {
     await pool.query(
-      `UPDATE lt_mcp_servers
-       SET status = $2, last_connected_at = NOW(), tool_manifest = $3
-       WHERE id = $1`,
+      UPDATE_STATUS_CONNECTED,
       [id, status, toolManifest ? JSON.stringify(toolManifest) : null],
     );
   } else {
-    await pool.query(
-      'UPDATE lt_mcp_servers SET status = $2 WHERE id = $1',
-      [id, status],
-    );
+    await pool.query(UPDATE_STATUS, [id, status]);
   }
 }
 
@@ -180,9 +173,7 @@ export async function listMcpServers(filters: {
 
 export async function getAutoConnectServers(): Promise<LTMcpServerRecord[]> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    'SELECT * FROM lt_mcp_servers WHERE auto_connect = true ORDER BY name',
-  );
+  const { rows } = await pool.query(GET_AUTO_CONNECT_SERVERS);
   return rows;
 }
 

@@ -6,9 +6,9 @@ import { postgres_options, sleepFor, waitForEscalation, waitForEscalationStatus,
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../interceptor';
-import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
-import * as interceptorActivities from '../../interceptor/activities';
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
 import * as reviewContentWorkflow from '../../examples/workflows/review-content';
 import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';

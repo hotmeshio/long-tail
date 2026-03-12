@@ -1,4 +1,4 @@
-import { executeLT } from '../../../orchestrator';
+import { executeLT } from '../../../services/orchestrator';
 import type { LTEnvelope } from '../../../types';
 
 /**

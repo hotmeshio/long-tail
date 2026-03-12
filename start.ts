@@ -7,7 +7,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { config, postgres_options } from './modules/config';
 import { setAuthAdapter } from './modules/auth';
 import { migrate } from './services/db/migrate';
-import { registerLT } from './interceptor';
+import { registerLT } from './services/interceptor';
 import { loggerRegistry } from './services/logger';
 import { PinoLoggerAdapter } from './services/logger/pino';
 import { telemetryRegistry } from './services/telemetry';

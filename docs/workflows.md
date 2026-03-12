@@ -537,9 +537,9 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { Client as Postgres } from 'pg';
 
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../interceptor';
-import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
-import * as interceptorActivities from '../../interceptor/activities';
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
 import * as myWorkflow from '../../workflows/my-workflow';
 
 const { Connection, Client, Worker } = Durable;

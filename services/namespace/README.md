@@ -1,0 +1,3 @@
+Namespace management service — maps HotMesh `appId` values to PostgreSQL schema names, allowing multi-tenant workflow isolation. `index.ts` exports CRUD for the `lt_namespaces` table; `sql.ts` contains all query templates.
+
+The `UPSERT_NAMESPACE` uses `COALESCE(EXCLUDED.x, lt_namespaces.x)` to preserve existing description/metadata when the caller only wants to touch-update the timestamp — this prevents accidental data loss during re-registration. The `is_default` column has no unique constraint; ordering by `is_default DESC` in `LIST_NAMESPACES` surfaces the default first without enforcing uniqueness at the DB level (there's typically exactly one).

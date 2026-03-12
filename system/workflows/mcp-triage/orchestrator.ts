@@ -1,7 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { executeLT } from '../../../orchestrator';
-import * as interceptorActivities from '../../../interceptor/activities';
+import { executeLT } from '../../../services/orchestrator';
+import * as interceptorActivities from '../../../services/interceptor/activities';
 import type { LTEnvelope } from '../../../types';
 
 type ActivitiesType = typeof interceptorActivities;
