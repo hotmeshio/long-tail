@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { MemberInfo } from './types';
+import { EXTRACT_MEMBER_INFO_PROMPT } from './prompts';
 
 /**
  * Local filesystem abstraction that mirrors cloud storage (GCS/S3).
@@ -69,20 +70,7 @@ export async function extractMemberInfo(
         content: [
           {
             type: 'text',
-            text: `Extract member information from this document image (page ${pageNumber}).
-
-Return ONLY a valid JSON object:
-{
-  "memberId": "string or null",
-  "name": "string or null",
-  "address": { "street": "string", "city": "string", "state": "string", "zip": "string" },
-  "phone": "string or null",
-  "email": "string or null",
-  "emergencyContact": { "name": "string", "phone": "string" }
-}
-
-Include only fields visible in the image. Omit fields not found.
-Return raw JSON only — no markdown fences, no explanation.`,
+            text: EXTRACT_MEMBER_INFO_PROMPT(pageNumber),
           },
           {
             type: 'image_url',

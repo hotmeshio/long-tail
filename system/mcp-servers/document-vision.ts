@@ -8,6 +8,7 @@ import OpenAI from 'openai';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../../services/logger';
 import * as verifyActivities from '../../examples/workflows/verify-document/activities';
+import { TRANSLATE_SYSTEM_PROMPT } from './prompts';
 
 // ── Resolve fixtures directory ──────────────────────────────────────────────
 function fixturesDir(): string {
@@ -210,7 +211,7 @@ function registerTools(srv: McpServer): void {
         messages: [
           {
             role: 'system',
-            content: `You are a translation assistant. Translate the user's text to ${args.target_language}. Return ONLY a JSON object: {"translated_content": "...", "source_language": "detected ISO code"}. No markdown, no explanation.`,
+            content: TRANSLATE_SYSTEM_PROMPT(args.target_language),
           },
           { role: 'user', content: args.content },
         ],

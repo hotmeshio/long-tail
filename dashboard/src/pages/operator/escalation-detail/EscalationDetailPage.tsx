@@ -73,7 +73,7 @@ export function EscalationDetailPage() {
   const [json, setJson] = useState('{}');
 
   // Section collapse state
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ context: false });
   const toggleSection = (key: string) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
