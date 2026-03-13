@@ -128,7 +128,7 @@ Navigate to the **Processes** view. You'll see five workflows in various states:
 | 2 | Flagged for Review | **Needs Intervention** | Content flagged. Waiting for reviewer. |
 | 3 | Wrong Language | **Needs Intervention** | Spanish content. Walk the escalation chain. |
 | 4 | Damaged Claim | **Needs Intervention** | Upside-down document. Trigger AI triage. |
-| 5 | Dynamic Triage | **Needs Intervention** | Generic workflow. Test pre-flight detection. |
+| 5 | Dynamic Triage | **Needs Intervention** | Generic workflow. Test AI triage. |
 
 ![Processes list](img/03-processes-list.png)
 
@@ -499,11 +499,10 @@ When the next upside-down document appears, the triage controller has three reso
 
 | Tier | Method | LLM Calls | Speed |
 |------|--------|-----------|-------|
-| 1 | **Pre-flight regex** | 0 | Instant |
-| 2 | **Compiled workflow** | 0 | Seconds |
-| 3 | **Full agentic loop** | N | 30-60s |
+| 1 | **Compiled workflow** | 0 | Seconds |
+| 2 | **Full agentic loop** | N | 30-60s |
 
-The compiled workflow you just created lives at Tier 2. The system checks it *before* firing up the full LLM agentic loop. If the problem matches, the fix is deterministic and near-instant.
+The compiled workflow you just created lives at Tier 1. The LLM checks for compiled workflows *before* using raw tool calls. If the problem matches, the fix is deterministic and near-instant.
 
 ---
 
@@ -680,7 +679,7 @@ Process 5 proves the triage controller works with *any* workflow, not just docum
 
 The `kitchenSink` workflow is intentionally generic — it runs a durable sleep, does some basic processing, and always escalates for reviewer approval. There are no documents, no claims, no domain logic.
 
-### Pre-Flight Detection
+### Simple Approval
 
 Log in as `reviewer` and navigate to the **Process 5** detail page. Find the escalation in the timeline, click into the escalation detail, **Claim** it, and resolve with triage checked and a simple message:
 
@@ -688,7 +687,7 @@ Log in as `reviewer` and navigate to the **Process 5** detail page. Find the esc
 This looks fine, just approve it.
 ```
 
-The triage controller detects this as a simple approval via regex pre-flight matching. No LLM call needed. The response comes back instantly with `triage_method: pre_flight`.
+The triage controller sends this to the LLM, which recognizes the simple approval intent and returns the correctedData immediately without tool calls. The LLM produces schema-appropriate correctedData based on the original escalation payload.
 
 Navigate back to the **Process 5** detail page to see the updated timeline with the completed task.
 
@@ -700,7 +699,7 @@ Try a more complex message instead:
 Something seems wrong. Check the system health and recent escalation stats before approving.
 ```
 
-Now the triage controller can't pattern-match this. It fires up the full LLM loop. The agent:
+The LLM recognizes this requires investigation and fires up the full tool loop. The agent:
 
 1. Calls `long_tail_db__find_tasks` — queries recent task history
 2. Calls `long_tail_db__get_system_health` — checks system metrics

@@ -136,9 +136,9 @@ async function seedUsers(): Promise<void> {
 //   Demonstrates the GENERIC triage controller with a non-domain-specific
 //   workflow:
 //     reviewer → check "Request AI Triage", write: "This looks fine, approve"
-//   The triage controller detects simple approval intent via pre-flight
-//   pattern matching and passes through without LLM calls (fastest path).
-//   Or, with a complex message: "Check system health before approving",
+//   The triage controller sends the message to the LLM, which recognizes
+//   simple approval intent and returns correctedData without tool calls.
+//   With a complex message like "Check system health before approving",
 //   the LLM uses DB query tools (find_tasks, get_system_health) to
 //   investigate, then decides whether to approve.
 

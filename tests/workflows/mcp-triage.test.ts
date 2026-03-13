@@ -24,8 +24,8 @@ import type { MemberInfo } from '../../examples/workflows/verify-document/types'
 
 // ── MCP triage workflow + activities (real) ──────────────────────────────────
 
-import * as mcpTriageWorkflow from '../../examples/workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '../../examples/workflows/mcp-triage/orchestrator';
+import * as mcpTriageWorkflow from '../../system/workflows/mcp-triage';
+import * as mcpTriageOrchWorkflow from '../../system/workflows/mcp-triage/orchestrator';
 
 const { Connection, Client, Worker } = Durable;
 

@@ -25,64 +25,6 @@ const {
 
 const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
 
-// ── Simple intent patterns (bypass LLM entirely) ─────────────
-
-const APPROVE_PATTERNS = [
-  /\bapprove[ds]?\b/i,
-  /\blooks?\s+good\b/i,
-  /\bpass\s+through\b/i,
-  /\blgtm\b/i,
-  /\bjust\s+approve\b/i,
-  /\baccept(ed)?\b/i,
-  /\bok(ay)?\s+to\s+proceed\b/i,
-];
-
-const REJECT_PATTERNS = [
-  /\breject(ed)?\b/i,
-  /\bdeni(ed|y)\b/i,
-  /\bdecline[ds]?\b/i,
-];
-
-/**
- * Check resolver payload for simple approval/rejection intent.
- * Returns the correctedData if detected, null if the LLM should handle it.
- */
-function detectSimpleIntent(
-  resolverPayload: Record<string, any>,
-): { correctedData: Record<string, any>; diagnosis: string } | null {
-  // Extract human-readable text from the resolver payload
-  const notes = resolverPayload?.notes || '';
-  const hint = resolverPayload?._lt?.hint || '';
-  const text = `${notes} ${hint}`.trim();
-
-  if (!text) return null;
-
-  // Check for approval
-  if (APPROVE_PATTERNS.some((p) => p.test(text))) {
-    // Make sure there's no problem description that suggests remediation
-    const hasComplexity = /\b(but|however|except|fix|broken|wrong|error|fail|issue|problem|damaged|missing)\b/i.test(text);
-    if (!hasComplexity) {
-      return {
-        correctedData: { approved: true },
-        diagnosis: `Human requested approval: "${text}"`,
-      };
-    }
-  }
-
-  // Check for rejection
-  if (REJECT_PATTERNS.some((p) => p.test(text))) {
-    const hasComplexity = /\b(but|however|except|fix|try|instead)\b/i.test(text);
-    if (!hasComplexity) {
-      return {
-        correctedData: { approved: false, rejected: true },
-        diagnosis: `Human requested rejection: "${text}"`,
-      };
-    }
-  }
-
-  return null;
-}
-
 // ── System prompt builder ────────────────────────────────────
 
 function buildSystemPrompt(toolInventory: string): string {
@@ -214,7 +156,7 @@ Only return \`correctedData: null\` when you truly could NOT produce any useful 
  *
  * Activated when a human resolver flags `needsTriage` in their resolution
  * payload. Dynamically adapts to ANY workflow type using ALL available
- * MCP tools — or bypasses the LLM entirely for simple pass-through cases.
+ * MCP tools.
  *
  * Tool ecosystem grows over time:
  * - Built-in servers: document-vision, mcp-workflows, human-queue,
@@ -227,11 +169,10 @@ Only return \`correctedData: null\` when you truly could NOT produce any useful 
  * specific tool recommendations when it lacks the right capabilities.
  *
  * **First entry** (no `envelope.resolver`):
- *   1. Pre-flight: detect simple approval/rejection → skip LLM
- *   2. Gather upstream tasks and escalation history
- *   3. Build tool inventory for the LLM system prompt
- *   4. LLM agentic loop with all MCP tools
- *   5. Returns `{ correctedData }` or escalates to engineer
+ *   1. Gather upstream tasks and escalation history
+ *   2. Build tool inventory for the LLM system prompt
+ *   3. LLM agentic loop with all MCP tools
+ *   4. Returns `{ correctedData }` or escalates to engineer
  *
  * **Re-entry** (has `envelope.resolver` — engineer responded):
  *   1. Engineer may have installed new tools or provided guidance
@@ -260,34 +201,6 @@ export async function mcpTriage(
         `re-check available tools — your tool inventory may have expanded since the ` +
         `last attempt. If they say "ready" or "try again", proceed with remediation.`,
     });
-  }
-
-  // ── Pre-flight: detect simple intent before invoking LLM ──
-  if (resolverPayload) {
-    const simple = detectSimpleIntent(resolverPayload);
-    if (simple) {
-      return {
-        type: 'return',
-        data: {
-          correctedData: {
-            ...escalationPayload,
-            ...simple.correctedData,
-          },
-          originalWorkflowType,
-          originalTaskQueue,
-          originId,
-          diagnosis: simple.diagnosis,
-          actions_taken: ['Pre-flight intent detection — no LLM needed'],
-          tool_calls_made: 0,
-          confidence: 1.0,
-        },
-        milestones: [
-          { name: 'triage', value: 'completed' },
-          { name: 'triage_method', value: 'pre_flight' },
-          { name: 'tool_calls', value: '0' },
-        ],
-      };
-    }
   }
 
   // ── First entry: gather context and let LLM diagnose + fix ──

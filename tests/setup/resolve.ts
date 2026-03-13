@@ -61,7 +61,7 @@ export async function resolveEscalation(
         signal_id: `lt-triage-${triageWorkflowId}`,
         parent_workflow_id: routing?.parentWorkflowId || triageWorkflowId,
         origin_id: escalation.origin_id || triageWorkflowId,
-        parent_id: escalation.parent_id,
+        parent_id: escalation.parent_id || undefined,
         envelope: JSON.stringify(directive.triageEnvelope),
         metadata: routing || undefined,
       });
