@@ -143,7 +143,7 @@ describe('ConvertToYamlModal', () => {
     expect(screen.getByText(/Tool Name/)).toBeInTheDocument();
     expect(screen.getByText(/Subscribes Topic/)).toBeInTheDocument();
     expect(screen.getByPlaceholderText('e.g. show-escalated-processes')).toBeInTheDocument();
-    expect(screen.getByText('Export')).toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
     expect(screen.getByText('Back')).toBeInTheDocument();
   });
 
@@ -176,16 +176,20 @@ describe('ConvertToYamlModal', () => {
     fireEvent.change(screen.getByPlaceholderText('e.g. Show Escalated Processes'), {
       target: { value: 'My Great Tool' },
     });
+    fireEvent.click(screen.getByText('Next'));
+
+    // Step 3 (tags) — export directly
     fireEvent.click(screen.getByText('Export'));
 
     expect(props.onSubmit).toHaveBeenCalledWith({
       name: 'My Great Tool',
       app_id: 'myns',
       subscribes: 'my-great-tool',
+      tags: [],
     });
   });
 
-  it('does not submit when tool name is empty', () => {
+  it('does not advance to step 3 when tool name is empty', () => {
     const { props } = renderModal();
 
     fireEvent.change(screen.getByPlaceholderText('e.g. mydbinsights'), {
@@ -193,10 +197,13 @@ describe('ConvertToYamlModal', () => {
     });
     fireEvent.click(screen.getByText('Next'));
 
-    // Leave name empty, click Export
-    fireEvent.click(screen.getByText('Export'));
+    // Leave name empty, click Next — should stay on step 2
+    const nextButtons = screen.getAllByText('Next');
+    fireEvent.click(nextButtons[nextButtons.length - 1]);
 
     expect(props.onSubmit).not.toHaveBeenCalled();
+    // Still on step 2
+    expect(screen.getByText(/Tool Name/)).toBeInTheDocument();
   });
 
   // 9. Shows "Exporting..." disabled state when isPending
@@ -209,10 +216,13 @@ describe('ConvertToYamlModal', () => {
     });
     fireEvent.click(screen.getByText('Next'));
 
+    // Step 2
     fireEvent.change(screen.getByPlaceholderText('e.g. Show Escalated Processes'), {
       target: { value: 'Some Tool' },
     });
+    fireEvent.click(screen.getByText('Next'));
 
+    // Step 3 — Export button should show pending
     const exportBtn = screen.getByText('Exporting...');
     expect(exportBtn).toBeInTheDocument();
     expect(exportBtn).toBeDisabled();

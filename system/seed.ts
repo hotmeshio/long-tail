@@ -1,5 +1,6 @@
 import { getPool } from '../services/db';
 import { loggerRegistry } from '../services/logger';
+import { SEED_MCP_SERVER } from '../services/mcp/sql';
 
 // ── Tool manifests ───────────────────────────────────────────────────────────
 // Copied from built-in MCP server definitions.
@@ -429,16 +430,7 @@ export async function seedSystemMcpServers(): Promise<void> {
   for (const srv of SEED_MCP_SERVERS) {
     try {
       await pool.query(
-        `INSERT INTO lt_mcp_servers
-           (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, last_connected_at)
-         VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, NOW())
-         ON CONFLICT (name) DO UPDATE SET
-           tool_manifest = EXCLUDED.tool_manifest,
-           metadata = EXCLUDED.metadata,
-           description = EXCLUDED.description,
-           tags = EXCLUDED.tags,
-           status = 'connected',
-           last_connected_at = NOW()`,
+        SEED_MCP_SERVER,
         [
           srv.name,
           srv.description,

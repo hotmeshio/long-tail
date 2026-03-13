@@ -93,6 +93,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
       invocation_roles: req.body.invocation_roles ?? [],
       lifecycle: req.body.lifecycle ?? { onBefore: [], onAfter: [] },
       consumes: req.body.consumes ?? [],
+      tool_tags: req.body.tool_tags ?? [],
       envelope_schema: req.body.envelope_schema ?? null,
       resolver_schema: req.body.resolver_schema ?? null,
       cron_schedule: req.body.cron_schedule ?? null,

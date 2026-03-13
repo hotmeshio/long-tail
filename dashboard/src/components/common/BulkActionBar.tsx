@@ -1,4 +1,5 @@
-import { PRIORITY_OPTIONS, CLAIM_DURATION_OPTIONS } from '../../lib/constants';
+import { PRIORITY_OPTIONS } from '../../lib/constants';
+import { useClaimDurations } from '../../hooks/useClaimDurations';
 
 interface BulkActionBarProps {
   selectedCount: number;
@@ -21,6 +22,7 @@ const anyPending = (props: BulkActionBarProps) =>
 
 export function BulkActionBar(props: BulkActionBarProps) {
   const disabled = anyPending(props);
+  const claimDurations = useClaimDurations();
 
   return (
     <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-accent/5 border border-accent/20 rounded-lg mb-4">
@@ -59,7 +61,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
         defaultValue=""
       >
         <option value="" disabled>Claim for...</option>
-        {CLAIM_DURATION_OPTIONS.map((opt) => (
+        {claimDurations.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>

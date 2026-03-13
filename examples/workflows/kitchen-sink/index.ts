@@ -92,11 +92,9 @@ export async function kitchenSink(envelope: LTEnvelope): Promise<any> {
 
   // ── 7. Re-entry after human resolution ────────────────────────────────
   // envelope.resolver contains the operator's payload from the dashboard.
-  const approved = envelope.resolver.approved !== false;
-
-  if (approved) {
-    await notifyComplete({ status: 'approved', result });
-  }
+  // No resolver_schema is defined for this workflow — any response from
+  // the human (or triage) means "approved". The workflow completes.
+  await notifyComplete({ status: 'approved', result });
 
   return {
     type: 'return' as const,
@@ -104,7 +102,7 @@ export async function kitchenSink(envelope: LTEnvelope): Promise<any> {
       greeting,
       result,
       resolver: envelope.resolver,
-      approved,
+      approved: true,
       completedAt: new Date().toISOString(),
     },
   };

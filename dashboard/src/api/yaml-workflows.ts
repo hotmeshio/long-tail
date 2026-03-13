@@ -69,6 +69,7 @@ export function useCreateYamlWorkflow() {
       description?: string;
       app_id?: string;
       subscribes?: string;
+      tags?: string[];
     }) =>
       apiFetch<LTYamlWorkflowRecord>('/yaml-workflows', {
         method: 'POST',
@@ -150,7 +151,7 @@ export function useArchiveYamlWorkflow() {
 export function useUpdateYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string; input_schema?: Record<string, unknown>; output_schema?: Record<string, unknown> }) =>
+    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string; input_schema?: Record<string, unknown>; output_schema?: Record<string, unknown>; tags?: string[] }) =>
       apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}`, {
         method: 'PUT',
         body: JSON.stringify(updates),

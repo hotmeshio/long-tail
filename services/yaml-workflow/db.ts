@@ -1,6 +1,22 @@
 import { getPool } from '../db';
 import { YAML_LIST_LIMIT, YAML_VERSION_LIMIT } from '../../modules/defaults';
 import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus, LTYamlWorkflowVersionRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
+import {
+  CREATE_YAML_WORKFLOW,
+  GET_YAML_WORKFLOW,
+  GET_YAML_WORKFLOW_BY_NAME,
+  UPDATE_YAML_WORKFLOW_VERSION,
+  DELETE_YAML_WORKFLOW,
+  GET_ACTIVE_YAML_WORKFLOWS,
+  LIST_BY_APP_ID,
+  GET_DISTINCT_APP_IDS,
+  MARK_CONTENT_DEPLOYED,
+  MARK_APP_ID_CONTENT_DEPLOYED,
+  CREATE_VERSION_SNAPSHOT as CREATE_VERSION_SNAPSHOT_SQL,
+  COUNT_VERSIONS,
+  LIST_VERSIONS,
+  GET_VERSION_SNAPSHOT,
+} from './sql';
 
 export interface CreateYamlWorkflowInput {
   name: string;
@@ -44,13 +60,7 @@ export async function createYamlWorkflow(
 ): Promise<LTYamlWorkflowRecord> {
   const pool = getPool();
   const { rows } = await pool.query(
-    `INSERT INTO lt_yaml_workflows
-       (name, description, app_id, app_version, source_workflow_id,
-        source_workflow_type, yaml_content, graph_topic,
-        input_schema, output_schema, activity_manifest, tags, metadata,
-        content_version)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 1)
-     RETURNING *`,
+    CREATE_YAML_WORKFLOW,
     [
       input.name,
       input.description || null,
@@ -78,18 +88,13 @@ export async function createYamlWorkflow(
 
 export async function getYamlWorkflow(id: string): Promise<LTYamlWorkflowRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    'SELECT * FROM lt_yaml_workflows WHERE id = $1',
-    [id],
-  );
+  const { rows } = await pool.query(GET_YAML_WORKFLOW, [id]);
   return rows[0] || null;
 }
 
 export async function getYamlWorkflowByName(name: string): Promise<LTYamlWorkflowRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    'SELECT * FROM lt_yaml_workflows WHERE name = $1',
-    [name],
+  const { rows } = await pool.query(GET_YAML_WORKFLOW_BY_NAME, [name],
   );
   return rows[0] || null;
 }
@@ -115,10 +120,7 @@ export async function updateYamlWorkflowVersion(
   version: string,
 ): Promise<void> {
   const pool = getPool();
-  await pool.query(
-    'UPDATE lt_yaml_workflows SET app_version = $2 WHERE id = $1',
-    [id, version],
-  );
+  await pool.query(UPDATE_YAML_WORKFLOW_VERSION, [id, version]);
 }
 
 export async function updateYamlWorkflow(
@@ -178,10 +180,7 @@ export async function updateYamlWorkflow(
 
 export async function deleteYamlWorkflow(id: string): Promise<boolean> {
   const pool = getPool();
-  const { rowCount } = await pool.query(
-    'DELETE FROM lt_yaml_workflows WHERE id = $1',
-    [id],
-  );
+  const { rowCount } = await pool.query(DELETE_YAML_WORKFLOW, [id]);
   return (rowCount || 0) > 0;
 }
 
@@ -264,26 +263,20 @@ export async function findYamlWorkflowsByTags(
 
 export async function getActiveYamlWorkflows(): Promise<LTYamlWorkflowRecord[]> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    "SELECT * FROM lt_yaml_workflows WHERE status = 'active' ORDER BY name",
-  );
+  const { rows } = await pool.query(GET_ACTIVE_YAML_WORKFLOWS);
   return rows;
 }
 
 export async function listYamlWorkflowsByAppId(appId: string): Promise<LTYamlWorkflowRecord[]> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    "SELECT * FROM lt_yaml_workflows WHERE app_id = $1 AND status != 'archived' ORDER BY name",
-    [appId],
+  const { rows } = await pool.query(LIST_BY_APP_ID, [appId],
   );
   return rows;
 }
 
 export async function getDistinctAppIds(): Promise<string[]> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    "SELECT DISTINCT app_id FROM lt_yaml_workflows WHERE status != 'archived' ORDER BY app_id",
-  );
+  const { rows } = await pool.query(GET_DISTINCT_APP_IDS);
   return rows.map((r: { app_id: string }) => r.app_id);
 }
 
@@ -300,11 +293,7 @@ export async function createVersionSnapshot(
 ): Promise<LTYamlWorkflowVersionRecord> {
   const pool = getPool();
   const { rows } = await pool.query(
-    `INSERT INTO lt_yaml_workflow_versions
-       (workflow_id, version, yaml_content, activity_manifest, input_schema, output_schema, change_summary)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (workflow_id, version) DO NOTHING
-     RETURNING *`,
+    CREATE_VERSION_SNAPSHOT_SQL,
     [
       workflowId, version, yamlContent,
       JSON.stringify(activityManifest),
@@ -323,14 +312,8 @@ export async function getVersionHistory(
 ): Promise<{ versions: LTYamlWorkflowVersionRecord[]; total: number }> {
   const pool = getPool();
   const [countResult, dataResult] = await Promise.all([
-    pool.query('SELECT COUNT(*) FROM lt_yaml_workflow_versions WHERE workflow_id = $1', [workflowId]),
-    pool.query(
-      `SELECT * FROM lt_yaml_workflow_versions
-       WHERE workflow_id = $1
-       ORDER BY version DESC
-       LIMIT $2 OFFSET $3`,
-      [workflowId, limit, offset],
-    ),
+    pool.query(COUNT_VERSIONS, [workflowId]),
+    pool.query(LIST_VERSIONS, [workflowId, limit, offset]),
   ]);
   return {
     versions: dataResult.rows,
@@ -343,26 +326,17 @@ export async function getVersionSnapshot(
   version: number,
 ): Promise<LTYamlWorkflowVersionRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(
-    `SELECT * FROM lt_yaml_workflow_versions WHERE workflow_id = $1 AND version = $2`,
-    [workflowId, version],
+  const { rows } = await pool.query(GET_VERSION_SNAPSHOT, [workflowId, version],
   );
   return rows[0] || null;
 }
 
 export async function markContentDeployed(workflowId: string): Promise<void> {
   const pool = getPool();
-  await pool.query(
-    'UPDATE lt_yaml_workflows SET deployed_content_version = content_version WHERE id = $1',
-    [workflowId],
-  );
+  await pool.query(MARK_CONTENT_DEPLOYED, [workflowId]);
 }
 
 export async function markAppIdContentDeployed(appId: string): Promise<void> {
   const pool = getPool();
-  await pool.query(
-    `UPDATE lt_yaml_workflows SET deployed_content_version = content_version
-     WHERE app_id = $1 AND status != 'archived'`,
-    [appId],
-  );
+  await pool.query(MARK_APP_ID_CONTENT_DEPLOYED, [appId]);
 }

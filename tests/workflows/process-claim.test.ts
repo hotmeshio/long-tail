@@ -7,10 +7,10 @@ import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { createMcpTestClient, parseMcpResult, type McpTestContext } from '../setup/mcp';
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../interceptor';
-import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
-import * as interceptorActivities from '../../interceptor/activities';
-import { executeLT } from '../../orchestrator';
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
+import { executeLT } from '../../services/orchestrator';
 import * as configService from '../../services/config';
 import * as taskService from '../../services/task';
 import * as mcpDbService from '../../services/mcp/db';
@@ -24,8 +24,8 @@ import type { LTEnvelope, LTReturn, LTEscalation } from '../../types';
 // ── Real workflow + activities ───────────────────────────────────────────────
 
 import * as processClaimWorkflow from '../../examples/workflows/process-claim';
-import * as mcpTriageWorkflow from '../../examples/workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '../../examples/workflows/mcp-triage/orchestrator';
+import * as mcpTriageWorkflow from '../../system/workflows/mcp-triage';
+import * as mcpTriageOrchWorkflow from '../../system/workflows/mcp-triage/orchestrator';
 
 const { Connection, Client, Worker } = Durable;
 
@@ -60,7 +60,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     });
     await migrate();
 
-    // Seed MCP server record so getAvailableTools() finds vision tools
+    // Seed MCP server record so loadTools() finds vision tools
     let visionServer = await mcpDbService.getMcpServerByName('long-tail-document-vision');
     if (!visionServer) {
       visionServer = await mcpDbService.createMcpServer({
@@ -279,26 +279,26 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     const resolvedData = parseMcpResult(checkResolved);
     expect(resolvedData.status).toBe('resolved');
 
-    // 7. Poll until triage task and re-invoked processClaim appear
-    // Triage chains multiple workflows; give it time even without OpenAI
+    // 7. Verify triage tasks exist in the database.
+    //
+    // The system orchestrator has two exit paths:
+    //   Path A (auto-resolve): high confidence → re-invokes processClaim directly
+    //   Path B (escalation):   low confidence  → creates escalation on original task
+    //
+    // Both paths are valid outcomes. We verify triage ran by checking
+    // for mcpTriageOrchestrator and mcpTriage task records.
     const taskDeadline = Date.now() + 60_000;
     let triageTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
-    let claimTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
     while (Date.now() < taskDeadline) {
       const { tasks } = await taskService.listTasks({ limit: 100 });
       triageTasks = tasks.filter(t =>
         t.workflow_type === 'mcpTriageOrchestrator' ||
         t.workflow_type === 'mcpTriage',
       );
-      claimTasks = tasks.filter(t =>
-        t.workflow_type === 'processClaim' &&
-        t.created_at > esc.created_at,
-      );
-      if (triageTasks.length >= 1 && claimTasks.length >= 1) break;
+      if (triageTasks.length >= 2) break; // orchestrator + leaf
       await sleepFor(3_000);
     }
     expect(triageTasks.length).toBeGreaterThanOrEqual(1);
-    expect(claimTasks.length).toBeGreaterThanOrEqual(1);
   }, 90_000);
 
   // ── Test 2: Standard re-run when needsTriage is not set ────────────────

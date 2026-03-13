@@ -7,6 +7,12 @@ import { getPool } from '../../services/db';
 import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
+import {
+  HEALTH_TASK_COUNTS,
+  HEALTH_ESCALATION_COUNTS,
+  HEALTH_ACTIVE_WORKFLOW_TYPES,
+  HEALTH_RECENT_ACTIVITY,
+} from '../../services/mcp/sql';
 
 let server: McpServer | null = null;
 
@@ -261,27 +267,10 @@ export async function createDbServer(options?: {
       const pool = getPool();
 
       const [taskCounts, escalationCounts, activeTypes, recentActivity] = await Promise.all([
-        pool.query(
-          `SELECT status, COUNT(*)::int AS count
-           FROM lt_tasks GROUP BY status ORDER BY status`,
-        ),
-        pool.query(
-          `SELECT status, COUNT(*)::int AS count
-           FROM lt_escalations GROUP BY status ORDER BY status`,
-        ),
-        pool.query(
-          `SELECT DISTINCT workflow_type FROM lt_tasks
-           WHERE status IN ('pending', 'in_progress')
-           ORDER BY workflow_type`,
-        ),
-        pool.query(
-          `SELECT
-             COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 hour')::int AS tasks_created_1h,
-             COUNT(*) FILTER (WHERE completed_at > NOW() - INTERVAL '1 hour')::int AS tasks_completed_1h,
-             COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS tasks_created_24h,
-             COUNT(*) FILTER (WHERE completed_at > NOW() - INTERVAL '24 hours')::int AS tasks_completed_24h
-           FROM lt_tasks`,
-        ),
+        pool.query(HEALTH_TASK_COUNTS),
+        pool.query(HEALTH_ESCALATION_COUNTS),
+        pool.query(HEALTH_ACTIVE_WORKFLOW_TYPES),
+        pool.query(HEALTH_RECENT_ACTIVITY),
       ]);
 
       const tasksByStatus: Record<string, number> = {};

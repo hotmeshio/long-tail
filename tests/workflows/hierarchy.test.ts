@@ -6,14 +6,14 @@ import { postgres_options, sleepFor, waitForEscalationByOriginId } from '../setu
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../interceptor';
-import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
-import * as interceptorActivities from '../../interceptor/activities';
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
 import * as configService from '../../services/config';
 import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';
 import { ltConfig } from '../../modules/ltconfig';
-import { executeLT } from '../../orchestrator';
+import { executeLT } from '../../services/orchestrator';
 import { getPool } from '../../services/db';
 import type { LTEnvelope, LTReturn, LTEscalation, LTTaskRecord } from '../../types';
 

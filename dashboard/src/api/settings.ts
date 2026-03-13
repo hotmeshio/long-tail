@@ -5,6 +5,9 @@ interface AppSettings {
   telemetry: {
     traceUrl: string | null;
   };
+  escalation?: {
+    claimDurations?: number[];
+  };
 }
 
 function fetchSettings(): Promise<AppSettings> {

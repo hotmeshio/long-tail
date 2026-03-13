@@ -3,13 +3,13 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
+import { MCP_QUERY_SYSTEM_PROMPT } from './prompts';
 
 type ActivitiesType = typeof activities;
 
 const {
   findCompiledWorkflows,
-  getAllTools,
-  getToolInventory,
+  loadTools,
   callMcpTool,
   callLLM,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
@@ -23,35 +23,17 @@ const {
 
 const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
 
-const SYSTEM_PROMPT = `You are a general-purpose AI assistant for Long Tail — a durable workflow system with MCP tool integration.
-
-You have access to compiled workflows AND raw MCP tools. Use them to fulfill the user's request.
-
-When answering, call the appropriate tools to accomplish the task, then respond with a JSON object:
-{
-  "title": "Short headline (under 60 chars)",
-  "summary": "1-3 sentence overview of what was accomplished",
-  "result": { ... },
-  "tool_calls_made": 0
-}
-
-Tool selection priority:
-1. **Compiled workflows first** (yaml__* prefix) — these are deterministic, fast, and proven. ALWAYS prefer these when available.
-2. **Raw MCP tools** (server_slug__tool_name) — use when no compiled workflow matches the task.
-- Always call tools when they can provide real data — never guess
-- Chain tools when needed (e.g., navigate then screenshot, or fetch then write_file)
-- If a tool fails, try an alternative approach before giving up
-
-Return ONLY the JSON object, no markdown fences or extra text.`;
-
 /**
  * MCP Query workflow (leaf).
  *
  * General-purpose "ask it to do anything with tools" workflow.
- * Discovers ALL available MCP tools by tag and uses an LLM agentic
+ * Discovers available MCP tools by tag and uses an LLM agentic
  * loop to fulfill arbitrary requests. Unlike insightQuery (DB-focused),
  * mcpQuery has access to the full tool inventory: browser automation,
  * file storage, HTTP fetch, vision, workflows, and any user-registered servers.
+ *
+ * Tool definitions are cached at the module level — only lightweight
+ * IDs flow through the durable execution log.
  */
 export async function mcpQuery(
   envelope: LTEnvelope,
@@ -75,36 +57,36 @@ export async function mcpQuery(
   //    These are deterministic — no LLM reasoning needed, just direct execution.
   const compiled = await findCompiledWorkflows(prompt);
 
-  // 2. Phase 2: Get raw MCP tools (optionally filtered by tags)
-  const rawTools = await getAllTools(tags);
-  const inventory = await getToolInventory();
+  // 2. Phase 2: Load raw MCP tools (optionally filtered by tags), cached + lightweight
+  const raw = await loadTools(tags);
 
-  // Merge: compiled workflows first (preferred), then raw MCP tools
-  const tools = [...compiled.tools, ...rawTools];
+  // Merge tool IDs: compiled workflows first (preferred), then raw MCP tools
+  const toolIds = [...compiled.toolIds, ...raw.toolIds];
 
   // Build system prompt with compiled workflows highlighted
   let serverSection = '';
   if (compiled.inventory) {
     serverSection += `## Compiled Workflows (PREFERRED — deterministic, fast)\n\n${compiled.inventory}\n\n`;
-    serverSection += `## MCP Servers (use if no compiled workflow matches)\n\n${inventory}`;
+    serverSection += `## MCP Servers (use if no compiled workflow matches)\n\n${raw.inventory}`;
   } else {
-    serverSection += `## Available MCP Servers\n\n${inventory}`;
+    serverSection += `## Available MCP Servers\n\n${raw.inventory}`;
   }
 
   // 3. Start the conversation
   const messages: any[] = [
     {
       role: 'system',
-      content: SYSTEM_PROMPT + `\n\n${serverSection}`,
+      content: MCP_QUERY_SYSTEM_PROMPT + `\n\n${serverSection}`,
     },
     { role: 'user', content: prompt },
   ];
 
   let toolCallCount = 0;
 
-  // 3. Agentic loop: LLM decides → execute tools → feed back → repeat
+  // 4. Agentic loop: LLM decides → execute tools → feed back → repeat
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await callLLM(messages, tools);
+    // Only lightweight toolIds (string[]) flow through the durable pipe
+    const response = await callLLM(messages, toolIds);
 
     // If no tool calls, we have the final answer
     if (!response.tool_calls?.length) {

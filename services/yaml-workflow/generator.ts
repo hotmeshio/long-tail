@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const yaml = require('js-yaml');
 
-import { exportWorkflowExecution } from '../export';
+import { exportWorkflowExecution } from '../export/index';
 import { listMcpServers } from '../mcp/db';
 import {
   LLM_MODEL_SECONDARY,
@@ -369,9 +369,10 @@ function inferSchema(value: unknown, withDefault = false): Record<string, unknow
       props[k] = inferSchema(v, withDefault);
       (props[k] as Record<string, unknown>).description = humanize(k);
     }
-    const schema: Record<string, unknown> = { type: 'object', properties: props };
-    if (withDefault) schema.default = value;
-    return schema;
+    // Defaults live at the property level — no object-level default needed
+    // (avoids duplication where properties.x.default and object.default.x
+    // express the same value).
+    return { type: 'object', properties: props };
   }
 
   return { type: 'string' };

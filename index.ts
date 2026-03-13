@@ -6,10 +6,10 @@ import { start } from './start';
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
 export { start } from './start';
-export { registerLT, createLTInterceptor } from './interceptor';
-export { createLTActivityInterceptor } from './interceptor/activity-interceptor';
-export { executeLT } from './orchestrator';
-export type { ExecuteLTOptions } from './orchestrator';
+export { registerLT, createLTInterceptor } from './services/interceptor';
+export { createLTActivityInterceptor } from './services/interceptor/activity-interceptor';
+export { executeLT } from './services/orchestrator';
+export type { ExecuteLTOptions } from './services/orchestrator';
 export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken } from './modules/auth';
 export * from './types';
 export * as TaskService from './services/task';

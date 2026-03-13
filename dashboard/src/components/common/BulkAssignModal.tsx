@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Modal } from './Modal';
+import { CustomDurationPicker } from './CustomDurationPicker';
 import { useUsers } from '../../api/users';
 import { useAuth } from '../../hooks/useAuth';
-import { CLAIM_DURATION_OPTIONS } from '../../lib/constants';
+import { useClaimDurations } from '../../hooks/useClaimDurations';
 import type { LTUserRecord } from '../../api/types';
 
 interface BulkAssignModalProps {
@@ -24,10 +25,13 @@ export function BulkAssignModal({
   isPending,
 }: BulkAssignModalProps) {
   const { isSuperAdmin } = useAuth();
+  const claimDurations = useClaimDurations();
   const [step, setStep] = useState<'user' | 'duration'>('user');
   const [selectedUser, setSelectedUser] = useState<LTUserRecord | null>(null);
   const [search, setSearch] = useState('');
   const [duration, setDuration] = useState('30');
+  const [customMinutes, setCustomMinutes] = useState(0);
+  const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
 
   // Admins with a single role: scope to that role. Otherwise show all active users.
   const roleFilter =
@@ -55,6 +59,7 @@ export function BulkAssignModal({
     setSelectedUser(null);
     setSearch('');
     setDuration('30');
+    setCustomMinutes(0);
     onClose();
   };
 
@@ -69,7 +74,9 @@ export function BulkAssignModal({
 
   const handleSubmit = () => {
     if (!selectedUser) return;
-    onSubmit(selectedUser.id, parseInt(duration));
+    const minutes = duration === 'custom' ? customMinutes : parseInt(duration);
+    if (!minutes || minutes <= 0) return;
+    onSubmit(selectedUser.id, minutes);
   };
 
   return (
@@ -143,15 +150,19 @@ export function BulkAssignModal({
 
             <select
               value={duration}
-              onChange={(e) => setDuration(e.target.value)}
+              onChange={(e) => { setDuration(e.target.value); setCustomMinutes(0); }}
               className="select w-full text-sm"
             >
-              {CLAIM_DURATION_OPTIONS.map((opt) => (
+              {claimDurations.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
+              <option value="custom">Other...</option>
             </select>
+            {duration === 'custom' && (
+              <CustomDurationPicker onChange={onCustomChange} autoFocus />
+            )}
 
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={handleBack} className="btn-secondary text-xs">

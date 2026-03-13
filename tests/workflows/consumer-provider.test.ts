@@ -5,13 +5,13 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options, sleepFor } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../interceptor';
-import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
-import * as interceptorActivities from '../../interceptor/activities';
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
 import * as configService from '../../services/config';
 import * as taskService from '../../services/task';
 import { ltConfig } from '../../modules/ltconfig';
-import { executeLT } from '../../orchestrator';
+import { executeLT } from '../../services/orchestrator';
 import type { LTEnvelope, LTReturn } from '../../types';
 
 const { Connection, Client, Worker } = Durable;

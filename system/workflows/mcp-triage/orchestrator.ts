@@ -1,7 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { executeLT } from '../../../orchestrator';
-import * as interceptorActivities from '../../../interceptor/activities';
+import { executeLT } from '../../../services/orchestrator';
+import * as interceptorActivities from '../../../services/interceptor/activities';
 import type { LTEnvelope } from '../../../types';
 
 type ActivitiesType = typeof interceptorActivities;
@@ -12,20 +12,20 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  * Orchestrator for the MCP triage workflow.
  *
  * The triage vortex exists on a **separate axis** from the original
- * workflow pipeline. It NEVER signals the original parent or creates
- * new tasks for the original workflow. Instead, it:
+ * workflow pipeline. It NEVER signals the original parent directly.
+ * Instead, it exits via one of two paths:
  *
- * 1. Runs the triage leaf (which may use MCP tools, escalate to
- *    engineers, etc.)
- * 2. Creates a targeted escalation on the ORIGINAL task with the
- *    triage results (translated content, corrected data, etc.)
- * 3. Completes itself — vortex unwound.
+ * **Direct resolution** (simple approval/rejection/pass-through):
+ *   The LLM recognizes unambiguous human intent (e.g., "I approve")
+ *   and sets `directResolution: true`. The orchestrator directly
+ *   starts a re-run of the original workflow with the corrected data
+ *   as `envelope.resolver`, bypassing the escalation cycle entirely.
+ *   The standard interceptor handles everything from there.
  *
- * The original task remains `needs_intervention`. The new escalation
- * carries proper routing (workflowType, taskQueue, envelope) so that
- * when a human resolves it, the standard re-run flow handles
- * everything: starts a new instance of the original workflow with
- * `envelope.resolver`, which signals the parent orchestrator.
+ * **Escalation** (tool-assisted fix or failure):
+ *   Creates a targeted escalation on the ORIGINAL task with the
+ *   triage results. A human reviews and resolves that escalation,
+ *   which triggers the standard re-run flow.
  */
 export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
   const {
@@ -57,21 +57,9 @@ export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
 
   const triageData = (triageResult as any)?.data;
   const correctedData = triageData?.correctedData;
-  const needsHumanReview = triageData?.needsHumanReview === true;
-  const confidence = triageData?.confidence ?? 0;
+  const directResolution = triageData?.directResolution === true;
 
   // Phase 2: Exit the vortex.
-  //
-  // Two paths:
-  //
-  // A) AUTO-RESOLVE: High confidence, no human review needed.
-  //    Directly re-run the original workflow with correctedData as
-  //    the resolver payload. This closes the loop without creating
-  //    another escalation for the human to click through.
-  //
-  // B) ESCALATION: Low confidence, human review requested, or no
-  //    corrected data. Create a targeted escalation on the original
-  //    task so a human can review and resolve.
 
   if (originalWorkflowType && originalTaskQueue && originalTaskId) {
     const originalTask = await ltGetTask(originalTaskId);
@@ -85,41 +73,44 @@ export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
       } catch { /* use empty */ }
     }
 
-    const canAutoResolve = correctedData && !needsHumanReview && confidence >= 0.8;
+    // Extract routing metadata once — used by both resolution paths
+    // to ensure the interceptor finds the EXISTING task and can
+    // signal the parent orchestrator on completion.
+    const originalMeta = originalTask?.metadata as Record<string, any> | null;
 
-    if (canAutoResolve) {
-      // ── Path A: Auto-resolve ──────────────────────────────────
-      // Inject correctedData as the resolver and re-run the original
-      // workflow directly. This is the same thing the resolution route
-      // does when a human clicks "Submit" — but we skip the middleman.
-      //
-      // Critical: set taskId + escalationId so the interceptor treats
-      // this as a re-run and finds the original task's routing metadata
-      // (parentWorkflowId, signalId) to signal the parent orchestrator.
-      // Also copy routing fields directly from the original task's metadata
-      // as a safety net — the interceptor can fall back to envelope.lt routing
-      // if the task lookup fails.
-      const originalRouting = (originalTask?.metadata as Record<string, any>) || {};
+    // Enrich the envelope with full routing context. Both paths
+    // (direct resolution and escalation) need this so re-runs
+    // find the original task instead of creating orphan tasks.
+    originalEnvelope.lt = {
+      ...originalEnvelope.lt,
+      taskId: originalTaskId,
+      originId,
+      parentId: originalTask?.parent_id || originalEnvelope.lt?.parentId,
+      signalId: originalMeta?.signalId,
+      parentWorkflowId: originalMeta?.parentWorkflowId,
+      parentTaskQueue: originalMeta?.parentTaskQueue,
+      parentWorkflowType: originalMeta?.parentWorkflowType,
+    };
+
+    // ── Direct resolution: simple approval/rejection/pass-through ──
+    // Bypass escalation cycle — directly re-run the original workflow
+    // with correctedData as the resolver. The interceptor handles
+    // task completion and parent signaling from there.
+    if (directResolution && correctedData) {
       originalEnvelope.resolver = correctedData;
       originalEnvelope.lt = {
         ...originalEnvelope.lt,
-        taskId: originalTaskId,
-        escalationId: `auto-triage-${originalTaskId}`,
-        // Copy parent routing from original task metadata
-        signalId: originalRouting.signalId,
-        parentWorkflowId: originalRouting.parentWorkflowId,
-        parentTaskQueue: originalRouting.parentTaskQueue,
-        parentWorkflowType: originalRouting.parentWorkflowType,
-        autoResolved: true,
-        triageDiagnosis: triageData?.diagnosis,
+        escalationId: envelope.data.escalationId,
+        _triageDirect: true,
       };
 
-      const rerunId = `triage-auto-${originalTaskId}-${Date.now()}`;
+      const rerunWorkflowId = `triage-rerun-${originalTaskId}-${Durable.guid()}`;
       await ltStartWorkflow({
         workflowName: originalWorkflowType,
         taskQueue: originalTaskQueue,
-        workflowId: rerunId,
+        workflowId: rerunWorkflowId,
         args: [originalEnvelope],
+        expire: 180,
       });
 
       return {
@@ -127,19 +118,24 @@ export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
         data: {
           triaged: true,
           exitedVortex: true,
-          autoResolved: true,
+          directResolution: true,
           targetedOriginalTask: originalTaskId,
-          rerunWorkflowId: rerunId,
+          hasCorrectedData: true,
+          rerunWorkflowId,
           triageResult: triageData,
         },
         milestones: [
           ...((triageResult as any)?.milestones || []),
-          { name: 'vortex', value: 'auto-resolved' },
+          { name: 'vortex', value: 'direct_resolution' },
         ],
       };
     }
 
-    // ── Path B: Create escalation for human review ────────────
+    // ── Escalation path: tool-assisted fix or triage failure ──
+    // Create a targeted escalation on the original task so a human
+    // can review the corrected data (or triage failure) before it
+    // goes back to the original workflow. The envelope was already
+    // enriched with routing context above.
     const escalationPayload: Record<string, any> = correctedData
       ? {
           ...correctedData,
@@ -164,10 +160,8 @@ export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
         };
 
     const description = correctedData
-      ? `AI triage completed for ${originalWorkflowType}: ${triageData?.diagnosis || 'work done'}. ` +
-        `Review the corrected data and resolve to apply.`
-      : `AI triage could not fully resolve the issue for ${originalWorkflowType}. ` +
-        `${triageData?.diagnosis || 'Needs manual intervention.'}`;
+      ? `AI Triage — Ready for Review`
+      : `AI Triage — Needs Attention`;
 
     await ltCreateEscalation({
       type: originalWorkflowType,
@@ -197,6 +191,7 @@ export async function mcpTriageOrchestrator(envelope: LTEnvelope) {
     data: {
       triaged: true,
       exitedVortex: true,
+      directResolution: false,
       targetedOriginalTask: originalTaskId || null,
       hasCorrectedData: !!correctedData,
       triageResult: triageData,

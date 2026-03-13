@@ -1,5 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BulkActionBar } from '../BulkActionBar';
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
 
 function defaultProps(): React.ComponentProps<typeof BulkActionBar> {
   return {
@@ -19,9 +24,17 @@ function defaultProps(): React.ComponentProps<typeof BulkActionBar> {
   };
 }
 
+function renderBar(overrides: Partial<React.ComponentProps<typeof BulkActionBar>> = {}) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <BulkActionBar {...defaultProps()} {...overrides} />
+    </QueryClientProvider>,
+  );
+}
+
 describe('BulkActionBar', () => {
   it('renders selected count and all action controls', () => {
-    render(<BulkActionBar {...defaultProps()} />);
+    renderBar();
 
     expect(screen.getByText('5 selected')).toBeInTheDocument();
     expect(screen.getByText('Assign to...')).toBeInTheDocument();
@@ -31,7 +44,11 @@ describe('BulkActionBar', () => {
 
   it('calls onAssign when Assign to button is clicked', () => {
     const props = defaultProps();
-    render(<BulkActionBar {...props} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BulkActionBar {...props} />
+      </QueryClientProvider>,
+    );
 
     fireEvent.click(screen.getByText('Assign to...'));
     expect(props.onAssign).toHaveBeenCalledOnce();
@@ -39,7 +56,11 @@ describe('BulkActionBar', () => {
 
   it('calls onTriage when Triage button is clicked', () => {
     const props = defaultProps();
-    render(<BulkActionBar {...props} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BulkActionBar {...props} />
+      </QueryClientProvider>,
+    );
 
     fireEvent.click(screen.getByText('Triage'));
     expect(props.onTriage).toHaveBeenCalledOnce();
@@ -47,14 +68,18 @@ describe('BulkActionBar', () => {
 
   it('calls onClearSelection when Clear is clicked', () => {
     const props = defaultProps();
-    render(<BulkActionBar {...props} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BulkActionBar {...props} />
+      </QueryClientProvider>,
+    );
 
     fireEvent.click(screen.getByText('Clear'));
     expect(props.onClearSelection).toHaveBeenCalledOnce();
   });
 
   it('disables all controls when assign is pending', () => {
-    render(<BulkActionBar {...defaultProps()} isAssignPending={true} />);
+    renderBar({ isAssignPending: true });
 
     expect(screen.getByText('Assigning...')).toBeDisabled();
     expect(screen.getByText('Triage')).toBeDisabled();
@@ -62,7 +87,7 @@ describe('BulkActionBar', () => {
   });
 
   it('disables all controls when any action is pending', () => {
-    render(<BulkActionBar {...defaultProps()} isClaimPending={true} />);
+    renderBar({ isClaimPending: true });
 
     expect(screen.getByText('Assign to...')).toBeDisabled();
     expect(screen.getByText('Triage')).toBeDisabled();

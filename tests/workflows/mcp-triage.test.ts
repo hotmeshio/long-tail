@@ -9,10 +9,10 @@ import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
 import { createMcpTestClient, parseMcpResult, type McpTestContext } from '../setup/mcp';
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../interceptor';
-import { createLTActivityInterceptor } from '../../interceptor/activity-interceptor';
-import * as interceptorActivities from '../../interceptor/activities';
-import { executeLT } from '../../orchestrator';
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
+import { executeLT } from '../../services/orchestrator';
 import * as configService from '../../services/config';
 import * as taskService from '../../services/task';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
@@ -24,8 +24,8 @@ import type { MemberInfo } from '../../examples/workflows/verify-document/types'
 
 // ── MCP triage workflow + activities (real) ──────────────────────────────────
 
-import * as mcpTriageWorkflow from '../../examples/workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '../../examples/workflows/mcp-triage/orchestrator';
+import * as mcpTriageWorkflow from '../../system/workflows/mcp-triage';
+import * as mcpTriageOrchWorkflow from '../../system/workflows/mcp-triage/orchestrator';
 
 const { Connection, Client, Worker } = Durable;
 

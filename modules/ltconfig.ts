@@ -92,6 +92,11 @@ class LTConfigCache {
     return hooks.length > 0;
   }
 
+  async getToolTags(name: string): Promise<string[]> {
+    const config = await this.get(name);
+    return config?.toolTags ?? [];
+  }
+
   async getProviders(name: string): Promise<string[]> {
     const config = await this.get(name);
     return config?.consumes ?? [];

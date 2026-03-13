@@ -44,7 +44,7 @@ export function WorkflowExecutionPage() {
     }
   };
 
-  const handleConvertSubmit = (values: { name: string; app_id: string; subscribes: string }) => {
+  const handleConvertSubmit = (values: { name: string; app_id: string; subscribes: string; tags: string[] }) => {
     if (!execution || !task) return;
     createYamlMutation.mutate(
       {
@@ -54,6 +54,7 @@ export function WorkflowExecutionPage() {
         name: values.name,
         app_id: values.app_id,
         subscribes: values.subscribes,
+        tags: values.tags,
       },
       {
         onSuccess: (record) => {

@@ -28,6 +28,7 @@ export interface LTYamlWorkflowRecord {
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
   activity_manifest: ActivityManifestEntry[];
+  tags: string[];
   status: LTYamlWorkflowStatus;
   content_version: number;
   deployed_content_version: number | null;

@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { ClaimAnalysis } from './types';
+import { ASSESS_DOCUMENT_QUALITY_PROMPT } from './prompts';
 
 // ── Resolve fixtures directory ──────────────────────────────────────────────
 function fixturesDir(): string {
@@ -63,8 +64,7 @@ export async function analyzeDocuments(
           content: [
             {
               type: 'text',
-              text: `Assess this document image quality. Is the text readable and right-side up?
-Return ONLY a JSON object: {"readable": true/false, "orientation": "normal"|"upside_down"|"rotated"|"unknown", "issues": ["list of issues"]}`,
+              text: ASSESS_DOCUMENT_QUALITY_PROMPT,
             },
             {
               type: 'image_url',
