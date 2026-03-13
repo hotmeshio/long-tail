@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Modal } from './Modal';
+import { TagInput } from './TagInput';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
 
 interface ConvertToYamlModalProps {
@@ -9,6 +10,7 @@ interface ConvertToYamlModalProps {
     name: string;
     app_id: string;
     subscribes: string;
+    tags: string[];
   }) => void;
   isPending?: boolean;
 }
@@ -33,19 +35,22 @@ function sanitize(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
+const STEP_LABELS = ['Namespace', 'Tool', 'Tags'] as const;
+
 export function ConvertToYamlModal({
   open,
   onClose,
   onSubmit,
   isPending,
 }: ConvertToYamlModalProps) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [appId, setAppId] = useState('');
   const [appIdTouched, setAppIdTouched] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [name, setName] = useState('');
   const [subscribes, setSubscribes] = useState('');
   const [autoSubscribes, setAutoSubscribes] = useState(true);
+  const [tags, setTags] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -82,22 +87,27 @@ export function ConvertToYamlModal({
       setName('');
       setSubscribes('');
       setAutoSubscribes(true);
+      setTags([]);
     }
   }, [open]);
 
-  const handleNext = () => {
+  const handleNextNamespace = () => {
     setAppIdTouched(true);
     if (validateNamespace(appId)) return;
     setStep(2);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleNextTool = () => {
     if (!name.trim()) return;
+    setStep(3);
+  };
+
+  const handleSubmit = () => {
     onSubmit({
       name: name.trim(),
       app_id: appId,
       subscribes: derivedSubscribes,
+      tags,
     });
   };
 
@@ -105,7 +115,7 @@ export function ConvertToYamlModal({
     <Modal open={open} onClose={onClose} title="Export as MCP Workflow Tool" maxWidth="max-w-lg">
       {/* Step indicator */}
       <div className="flex items-center gap-3 mb-6">
-        {[1, 2].map((s) => (
+        {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-2">
             {s > 1 && <div className={`w-8 h-px ${step >= s ? 'bg-accent' : 'bg-surface-border'}`} />}
             <span
@@ -120,7 +130,7 @@ export function ConvertToYamlModal({
               {s}
             </span>
             <span className={`text-xs ${step === s ? 'text-text-primary font-medium' : 'text-text-tertiary'}`}>
-              {s === 1 ? 'Namespace' : 'Tool'}
+              {STEP_LABELS[s - 1]}
             </span>
           </div>
         ))}
@@ -205,7 +215,7 @@ export function ConvertToYamlModal({
             </button>
             <button
               type="button"
-              onClick={handleNext}
+              onClick={handleNextNamespace}
               disabled={!appId || !!validateNamespace(appId)}
               className="btn-primary text-xs"
             >
@@ -217,7 +227,7 @@ export function ConvertToYamlModal({
 
       {/* ── Step 2: Tool details ── */}
       {step === 2 && (
-        <form onSubmit={handleSubmit}>
+        <div>
           <p className="text-xs text-text-secondary mb-4 leading-relaxed">
             Define the tool name and topic for namespace <span className="font-mono text-text-primary">{appId}</span>.
           </p>
@@ -285,15 +295,67 @@ export function ConvertToYamlModal({
                 Cancel
               </button>
               <button
-                type="submit"
-                disabled={!name.trim() || isPending}
+                type="button"
+                onClick={handleNextTool}
+                disabled={!name.trim()}
+                className="btn-primary text-xs"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Tags ── */}
+      {step === 3 && (
+        <div>
+          <p className="text-xs text-text-secondary mb-4 leading-relaxed">
+            Add tags to describe what <span className="font-mono text-text-primary">{name}</span> does.
+            Tags help LLMs and users discover this tool by capability.
+          </p>
+
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+              Tags
+            </label>
+            <TagInput
+              tags={tags}
+              onChange={setTags}
+              placeholder="e.g. database, analytics, query"
+            />
+            <p className="text-[10px] text-text-tertiary mt-1.5">
+              Lowercase, hyphenated. Press Enter or comma to add. These are used for tag-based tool discovery (e.g. <span className="font-mono">database</span>, <span className="font-mono">vision</span>, <span className="font-mono">document-processing</span>).
+            </p>
+          </div>
+
+          <div className="flex justify-between pt-6">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isPending}
                 className="btn-primary text-xs"
               >
                 {isPending ? 'Exporting...' : 'Export'}
               </button>
             </div>
           </div>
-        </form>
+        </div>
       )}
     </Modal>
   );

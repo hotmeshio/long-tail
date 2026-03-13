@@ -260,6 +260,7 @@ async function handleFinalResponse(
         tool_calls_made: toolCallCount,
         confidence: parsed.confidence,
         needsHumanReview: parsed.needsHumanReview || false,
+        directResolution: parsed.directResolution || false,
       },
       milestones: [
         { name: 'triage', value: 'completed' },

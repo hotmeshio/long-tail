@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
+import { TagInput } from '../../components/common/TagInput';
 import {
   useYamlWorkflow,
   useDeployYamlWorkflow,
@@ -389,10 +391,15 @@ function LifecycleSidebar({
                   </div>
                 )}
                 {isCurrent && step === 'active' && (
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center gap-2">
                     <button onClick={onArchive} disabled={isPending} className="text-[11px] text-text-tertiary hover:text-status-error">
                       Archive
                     </button>
+                    {sourceWorkflowId && (
+                      <button onClick={onRegenerate} disabled={isPending} className="text-[10px] text-text-tertiary hover:text-text-primary">
+                        Regenerate
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -435,6 +442,7 @@ type Section = 'invoke' | 'tools' | 'config';
 export function YamlWorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { data: wf, isLoading, refetch } = useYamlWorkflow(id!);
   const { data: settings } = useSettings();
   const deployMutation = useDeployYamlWorkflow();
@@ -662,6 +670,34 @@ export function YamlWorkflowDetailPage() {
                 </Link>
               } />
               <Field label="Created" value={<span className="text-xs">{new Date(wf.created_at).toLocaleString()}</span>} />
+            </div>
+
+            {/* Tags */}
+            <div className="mt-4 pt-4 border-t border-surface-border">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Tags</p>
+              {wf.status !== 'archived' ? (
+                <TagInput
+                  tags={wf.tags ?? []}
+                  onChange={(next) => {
+                    // Optimistically update the cache so the UI reflects instantly
+                    queryClient.setQueryData(['yamlWorkflows', wf.id], { ...wf, tags: next });
+                    updateMutation.mutate({ id: wf.id, tags: next });
+                  }}
+                  placeholder="Add tags for tool discovery..."
+                />
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {(wf.tags ?? []).length > 0 ? (
+                    (wf.tags ?? []).map((tag) => (
+                      <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-medium">
+                        {tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-text-tertiary">No tags</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

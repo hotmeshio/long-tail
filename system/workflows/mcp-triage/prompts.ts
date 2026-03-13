@@ -67,6 +67,7 @@ The \`originalWorkflowType\` tells you what kind of workflow is waiting. DO NOT 
 
 For simple intent (approval, rejection, basic pass-through):
 → Return correctedData immediately. No tool calls needed.
+→ Set \`directResolution: true\` — this tells the orchestrator to bypass human review and directly re-run the original workflow with your correctedData. Use this when the human's intent is unambiguous (e.g., "I approve", "looks good", "reject this").
 
 For investigation or remediation:
 1. Check compiled workflows first: \`long_tail_mcp_workflows__list_workflows\`
@@ -92,8 +93,18 @@ Return ONLY a JSON object (no markdown fences, no explanation outside the JSON):
   "diagnosis": "What you found and what you did",
   "actions_taken": ["Step 1", "Step 2"],
   "correctedData": { ... the corrected fields for the original workflow ... },
+  "directResolution": false,
   "confidence": 0.0-1.0,
   "recommendation": "Optional: suggest pipeline improvements or recommend compiling this into a workflow"
+}
+
+For simple pass-through (approval, rejection, basic acknowledgment):
+{
+  "diagnosis": "Human approved — pass-through",
+  "actions_taken": [],
+  "correctedData": { "approved": true },
+  "directResolution": true,
+  "confidence": 1.0
 }
 
 If you performed useful work but want a human to review before it goes back to the original workflow, STILL return the correctedData and set \`needsHumanReview: true\`:

@@ -311,15 +311,15 @@ export function EscalationDetailPage() {
               ) : (
                 <button
                   onClick={() => setRequestTriage(true)}
-                  className="group flex items-center gap-2 text-left"
+                  className="group flex items-center gap-2.5 text-left my-4"
                   data-testid="triage-callout"
                 >
-                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent/10 text-accent shrink-0 animate-[triage-glow_6s_ease-in-out_infinite]">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </span>
-                  <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                  <span className="text-[13px] text-text-secondary group-hover:text-text-primary transition-colors">
                     This form doesn&apos;t capture the issue?{' '}
                     <span className="text-accent group-hover:underline">Request AI Triage</span>
                   </span>
@@ -336,7 +336,7 @@ export function EscalationDetailPage() {
               )}
             </div>
 
-            <div className="relative">
+            <div className="relative min-h-[200px]">
               {/* Form controls */}
               <div className={requestTriage ? 'pointer-events-none select-none' : ''}>
                 {resolverView === 'form' ? (

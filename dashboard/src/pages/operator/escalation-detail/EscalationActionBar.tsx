@@ -119,7 +119,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
               {claimDurations.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => { setDuration(opt.value); setCustomMinutes(''); }}
+                  onClick={() => { setDuration(opt.value); setCustomMinutes(0); }}
                   className={tabClass(!isCustom && duration === opt.value)}
                 >
                   {opt.label}

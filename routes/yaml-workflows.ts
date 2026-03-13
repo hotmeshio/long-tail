@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { workflow_id, task_queue, workflow_name, name, description, app_id, subscribes } = req.body;
+    const { workflow_id, task_queue, workflow_name, name, description, app_id, subscribes, tags: userTags } = req.body;
     if (!workflow_id || !task_queue || !workflow_name || !name) {
       res.status(400).json({
         error: 'workflow_id, task_queue, workflow_name, and name are required',
@@ -64,6 +64,9 @@ router.post('/', async (req, res) => {
       subscribes,
     });
 
+    // Merge auto-derived tags with user-provided tags
+    const mergedTags = [...new Set([...(result.tags || []), ...(Array.isArray(userTags) ? userTags : [])])];
+
     // Store in DB
     const record = await yamlDb.createYamlWorkflow({
       name,
@@ -74,7 +77,7 @@ router.post('/', async (req, res) => {
       input_schema: result.inputSchema,
       output_schema: result.outputSchema,
       activity_manifest: result.activityManifest,
-      tags: result.tags,
+      tags: mergedTags,
       source_workflow_id: workflow_id,
       source_workflow_type: workflow_name,
     });
@@ -158,8 +161,8 @@ router.post('/:id/regenerate', async (req, res) => {
       res.status(404).json({ error: 'YAML workflow not found' });
       return;
     }
-    if (wf.status !== 'draft') {
-      res.status(400).json({ error: 'Only draft workflows can be regenerated' });
+    if (wf.status === 'archived') {
+      res.status(400).json({ error: 'Archived workflows cannot be regenerated' });
       return;
     }
     if (!wf.source_workflow_id || !wf.source_workflow_type) {
