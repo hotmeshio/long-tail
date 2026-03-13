@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { telemetryRegistry } from '../services/telemetry';
+import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 
 const router = Router();
 
@@ -11,6 +12,9 @@ router.get('/', (_req, res) => {
   res.json({
     telemetry: {
       traceUrl: telemetryRegistry.traceUrl ?? null,
+    },
+    escalation: {
+      claimDurations: CLAIM_DURATION_OPTIONS,
     },
   });
 });

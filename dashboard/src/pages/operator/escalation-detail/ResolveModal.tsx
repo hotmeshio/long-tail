@@ -24,18 +24,25 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
 
   const handleResolve = () => {
     setResolveError('');
+
+    // When triage is requested, ignore the form payload entirely.
+    // Only the triage flag and notes matter — the form data must
+    // NOT leak through to the triage workflow.
+    if (requestTriage) {
+      const payload: Record<string, unknown> = {
+        _lt: { needsTriage: true },
+      };
+      if (triageNotes.trim()) payload.notes = triageNotes.trim();
+      onResolve(payload);
+      return;
+    }
+
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(resolverJson);
     } catch {
       setResolveError('Invalid JSON');
       return;
-    }
-
-    // Inject _lt triage routing when requested
-    if (requestTriage) {
-      payload._lt = { needsTriage: true };
-      if (triageNotes.trim()) payload.notes = triageNotes.trim();
     }
 
     onResolve(payload);
@@ -111,7 +118,7 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
             Cancel
           </button>
           <button onClick={handleResolve} className="btn-primary text-xs" disabled={isPending}>
-            {isPending ? 'Resolving...' : requestTriage ? 'Resolve & Triage' : 'Resolve'}
+            {isPending ? 'Resolving...' : requestTriage ? 'Send to Triage' : 'Resolve'}
           </button>
         </div>
       </div>

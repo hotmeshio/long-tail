@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { CLAIM_DURATION_OPTIONS } from '../../../lib/constants';
+import { CustomDurationPicker } from '../../../components/common/CustomDurationPicker';
+import { useClaimDurations } from '../../../hooks/useClaimDurations';
 
 interface ClaimModalProps {
   open: boolean;
@@ -10,7 +11,13 @@ interface ClaimModalProps {
 }
 
 export function ClaimModal({ open, onClose, onClaim, isPending }: ClaimModalProps) {
+  const claimDurations = useClaimDurations();
   const [claimDuration, setClaimDuration] = useState('30');
+  const [customMinutes, setCustomMinutes] = useState(0);
+
+  const isCustom = claimDuration === 'custom';
+  const effectiveMinutes = isCustom ? customMinutes : parseInt(claimDuration);
+  const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
 
   return (
     <Modal open={open} onClose={onClose} title="Claim Escalation">
@@ -20,21 +27,25 @@ export function ClaimModal({ open, onClose, onClaim, isPending }: ClaimModalProp
         </p>
         <select
           value={claimDuration}
-          onChange={(e) => setClaimDuration(e.target.value)}
+          onChange={(e) => { setClaimDuration(e.target.value); setCustomMinutes(0); }}
           className="select w-full text-sm"
         >
-          {CLAIM_DURATION_OPTIONS.map((opt) => (
+          {claimDurations.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
+          <option value="custom">Other...</option>
         </select>
+        {isCustom && (
+          <CustomDurationPicker onChange={onCustomChange} autoFocus />
+        )}
         <div className="flex justify-end gap-3 pt-2">
           <button onClick={onClose} className="btn-secondary text-xs">
             Cancel
           </button>
           <button
-            onClick={() => onClaim(parseInt(claimDuration))}
+            onClick={() => onClaim(effectiveMinutes)}
             className="btn-primary text-xs"
-            disabled={isPending}
+            disabled={isPending || !effectiveMinutes || effectiveMinutes <= 0}
           >
             {isPending ? 'Claiming...' : 'Claim'}
           </button>

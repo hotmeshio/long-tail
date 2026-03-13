@@ -6,16 +6,24 @@ import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
 
+// ── Tool caches (module-level, persist across proxy activity calls) ──
+
 /** Maps qualified tool name → MCP server name for routing calls */
 const toolServerMap = new Map<string, string>();
 
 /** Tracks which qualified names are compiled YAML workflows (not raw MCP tools) */
 const yamlWorkflowMap = new Map<string, string>();
 
+/** Maps qualified tool name → full ChatCompletionTool definition */
+const toolDefCache = new Map<string, OpenAI.Chat.Completions.ChatCompletionTool>();
+
 /**
  * Search for active compiled YAML workflows that match the user's prompt.
  * Extracts keywords from the prompt and searches by tags (GIN-indexed).
- * Returns a compact summary for the LLM and tools in OpenAI format.
+ * Returns a compact summary for the LLM and tool IDs.
+ *
+ * Full tool definitions are cached in module-level toolDefCache — only
+ * lightweight IDs flow through the durable pipe.
  *
  * This is Phase 1 of tool discovery — compiled workflows are preferred
  * because they execute deterministically without LLM reasoning overhead.
@@ -24,7 +32,7 @@ export async function findCompiledWorkflows(
   prompt: string,
 ): Promise<{
   inventory: string;
-  tools: OpenAI.Chat.Completions.ChatCompletionTool[];
+  toolIds: string[];
 }> {
   // Extract search keywords from the prompt
   const keywords = prompt
@@ -34,23 +42,23 @@ export async function findCompiledWorkflows(
     .filter((w) => w.length > 2 && !PROMPT_STOP_WORDS.has(w));
 
   if (keywords.length === 0) {
-    return { inventory: '', tools: [] };
+    return { inventory: '', toolIds: [] };
   }
 
   // Query YAML workflows by tags using GIN index
   const workflows = await yamlDb.findYamlWorkflowsByTags(keywords, 'any');
   if (workflows.length === 0) {
-    return { inventory: '', tools: [] };
+    return { inventory: '', toolIds: [] };
   }
 
-  const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
+  const toolIds: string[] = [];
   const inventoryLines: string[] = [];
 
   for (const wf of workflows) {
     const qualifiedName = `yaml__${wf.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
     yamlWorkflowMap.set(qualifiedName, wf.name);
 
-    tools.push({
+    toolDefCache.set(qualifiedName, {
       type: 'function' as const,
       function: {
         name: qualifiedName,
@@ -60,6 +68,8 @@ export async function findCompiledWorkflows(
       },
     });
 
+    toolIds.push(qualifiedName);
+
     const activityCount = wf.activity_manifest.filter((a) => a.type === 'worker').length;
     inventoryLines.push(
       `★ ${wf.name} [compiled, ${activityCount} steps, tags: ${wf.tags.join(', ')}]: ${wf.description || 'deterministic workflow'}`
@@ -68,58 +78,43 @@ export async function findCompiledWorkflows(
 
   return {
     inventory: inventoryLines.join('\n'),
-    tools,
+    toolIds,
   };
 }
 
 /**
- * Build a compact inventory of all MCP servers and their tools.
- * Injected into the system prompt so the LLM understands what's available.
+ * Single activity that discovers, caches, and returns lightweight tool data.
+ *
+ * Full ChatCompletionTool definitions are cached in module-level toolDefCache
+ * so they never flow through the durable pipe. Only tool IDs (qualified name
+ * strings) and a compact inventory string are returned.
+ *
+ * @param tags - MCP server tags to scope by. Pass undefined to load all servers.
  */
-export async function getToolInventory(): Promise<string> {
-  const { servers } = await mcpDbService.listMcpServers({ limit: 100 });
-  const lines: string[] = [];
-
-  for (const server of servers) {
-    const manifest = server.tool_manifest || [];
-    const tags = (server as any).tags?.length ? (server as any).tags.join(', ') : 'general';
-    const toolNames = manifest.map((t: any) => t.name).join(', ');
-    lines.push(`• ${server.name} [${tags}] (${manifest.length} tools): ${toolNames}`);
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Discover tools from available MCP servers, optionally filtered by tags.
- * Returns tools in OpenAI function-calling format with qualified names.
- */
-export async function getAllTools(
+export async function loadTools(
   tags?: string[],
-): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+): Promise<{ toolIds: string[]; inventory: string }> {
   let servers;
   if (tags?.length) {
-    // Use tag-based filtering when available
-    const result = await mcpDbService.listMcpServers({ limit: 100 });
-    servers = result.servers.filter((s: any) =>
-      s.tags?.some((t: string) => tags.includes(t)),
-    );
+    servers = await mcpDbService.findServersByTags(tags, 'any');
   } else {
     const result = await mcpDbService.listMcpServers({ limit: 100 });
     servers = result.servers;
   }
 
-  const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
+  const toolIds: string[] = [];
+  const inventoryLines: string[] = [];
 
   for (const server of servers) {
     const manifest = server.tool_manifest || [];
     const slug = server.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const serverTags = (server as any).tags?.length ? (server as any).tags.join(', ') : 'general';
+    const toolNames: string[] = [];
 
     for (const t of manifest) {
       const qualifiedName = `${slug}__${t.name}`;
       toolServerMap.set(qualifiedName, server.name);
-
-      tools.push({
+      toolDefCache.set(qualifiedName, {
         type: 'function' as const,
         function: {
           name: qualifiedName,
@@ -127,10 +122,16 @@ export async function getAllTools(
           parameters: (t.inputSchema || { type: 'object', properties: {} }) as Record<string, unknown>,
         },
       });
+      toolIds.push(qualifiedName);
+      toolNames.push(t.name);
     }
+
+    inventoryLines.push(
+      `• ${server.name} [${serverTags}] (${manifest.length} tools): ${toolNames.join(', ')}`,
+    );
   }
 
-  return tools;
+  return { toolIds, inventory: inventoryLines.join('\n') };
 }
 
 /**
@@ -210,13 +211,25 @@ function getOpenAI(): OpenAI {
 }
 
 /**
- * Call the LLM with messages and optional tool definitions.
+ * Call the LLM with messages and optional tool IDs.
+ *
+ * Tool IDs are resolved from the module-level toolDefCache so that only
+ * lightweight string arrays flow through the durable pipe.
  */
 export async function callLLM(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-  tools?: OpenAI.Chat.Completions.ChatCompletionTool[],
+  toolIds?: string[],
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
   const openai = getOpenAI();
+
+  // Resolve full tool definitions from module-level cache
+  let tools: OpenAI.Chat.Completions.ChatCompletionTool[] | undefined;
+  if (toolIds?.length) {
+    tools = toolIds
+      .map((id) => toolDefCache.get(id))
+      .filter((t): t is OpenAI.Chat.Completions.ChatCompletionTool => !!t);
+  }
+
   const t0 = Date.now();
   const response = await openai.chat.completions.create({
     model: LLM_MODEL_PRIMARY,

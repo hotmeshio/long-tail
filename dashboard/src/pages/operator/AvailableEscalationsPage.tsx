@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalationListEvents } from '../../hooks/useNatsEvents';
@@ -22,7 +22,8 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { BulkActionBar } from '../../components/common/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/BulkTriageModal';
-import { CLAIM_DURATION_OPTIONS } from '../../lib/constants';
+import { CustomDurationPicker } from '../../components/common/CustomDurationPicker';
+import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
 import { ESCALATION_COLUMNS, STATUS_COLUMN, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/RowActions';
@@ -36,8 +37,11 @@ export function AvailableEscalationsPage() {
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'pending' },
   });
+  const claimDurations = useClaimDurations();
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
   const [claimDuration, setClaimDuration] = useState('30');
+  const [customClaimMinutes, setCustomClaimMinutes] = useState(0);
+  const onCustomClaimChange = useCallback((m: number) => setCustomClaimMinutes(m), []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [triageModalOpen, setTriageModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -81,8 +85,10 @@ export function AvailableEscalationsPage() {
 
   const handleClaim = () => {
     if (!claimTarget) return;
+    const minutes = claimDuration === 'custom' ? customClaimMinutes : parseInt(claimDuration);
+    if (!minutes || minutes <= 0) return;
     claim.mutate(
-      { id: claimTarget.id, durationMinutes: parseInt(claimDuration) },
+      { id: claimTarget.id, durationMinutes: minutes },
       {
         onSuccess: () => {
           setClaimTarget(null);
@@ -289,13 +295,17 @@ export function AvailableEscalationsPage() {
           </p>
           <select
             value={claimDuration}
-            onChange={(e) => setClaimDuration(e.target.value)}
+            onChange={(e) => { setClaimDuration(e.target.value); setCustomClaimMinutes(0); }}
             className="select w-full text-sm"
           >
-            {CLAIM_DURATION_OPTIONS.map((opt) => (
+            {claimDurations.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
+            <option value="custom">Other...</option>
           </select>
+          {claimDuration === 'custom' && (
+            <CustomDurationPicker onChange={onCustomClaimChange} autoFocus />
+          )}
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setClaimTarget(null)} className="btn-secondary text-xs">
               Cancel

@@ -10,8 +10,8 @@ type ActivitiesType = typeof activities;
 const {
   getUpstreamTasks,
   getEscalationHistory,
-  getToolInventory,
-  getAvailableTools,
+  getToolTags,
+  loadTools,
   callTool,
   callTriageLLM,
   notifyEngineering,
@@ -32,8 +32,8 @@ const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
  * MCP Triage workflow (leaf).
  *
  * Activated when a human resolver flags `needsTriage` in their resolution
- * payload. Dynamically adapts to ANY workflow type using ALL available
- * MCP tools.
+ * payload. Dynamically adapts to ANY workflow type using available
+ * MCP tools scoped by tag affinity.
  *
  * Tool ecosystem grows over time:
  * - Built-in servers: document-vision, mcp-workflows, human-queue,
@@ -41,14 +41,15 @@ const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
  * - User-registered external MCP servers
  * - Compiled YAML workflows from past triage executions
  *
- * The triage agent checks compiled workflows first (cheapest path),
- * falls back to raw tool calls, and escalates to engineering with
- * specific tool recommendations when it lacks the right capabilities.
+ * Tools are scoped by the original workflow's `tool_tags` configuration
+ * (plus base tags: workflows, compiled, database). Full tool definitions
+ * are cached at the module level — only lightweight IDs flow through
+ * the durable execution log.
  *
  * **First entry** (no `envelope.resolver`):
  *   1. Gather upstream tasks and escalation history
- *   2. Build tool inventory for the LLM system prompt
- *   3. LLM agentic loop with all MCP tools
+ *   2. Load scoped tools (tag-filtered, cached)
+ *   3. LLM agentic loop with tool IDs
  *   4. Returns `{ correctedData }` or escalates to engineer
  *
  * **Re-entry** (has `envelope.resolver` — engineer responded):
@@ -130,12 +131,19 @@ async function runTriageLLM(
   envelope: LTEnvelope,
   opts: { additionalContext: string },
 ): Promise<LTReturn | LTEscalation> {
-  // Build tool inventory for the system prompt (compact, no round-trip per server)
-  const toolInventory = await getToolInventory();
-  const systemPrompt = TRIAGE_SYSTEM_PROMPT(toolInventory);
+  const { originalWorkflowType } = envelope.data;
 
-  // Load all tools for function calling
-  const tools = await getAvailableTools();
+  // 1. Infer tool tags from the original workflow type (from config cache, no DB hit)
+  const workflowTags = await getToolTags(originalWorkflowType);
+
+  // 2. Single activity: load scoped tools, cache definitions, return IDs + inventory
+  const { toolIds, inventory } = await loadTools(
+    workflowTags.length > 0 ? workflowTags : undefined,
+  );
+
+  // 3. Build system prompt with scoped inventory
+  const systemPrompt = TRIAGE_SYSTEM_PROMPT(inventory);
+
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
     {
@@ -147,7 +155,8 @@ async function runTriageLLM(
   let toolCallCount = 0;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await callTriageLLM(messages, tools);
+    // Only lightweight toolIds (string[]) flow through the durable pipe
+    const response = await callTriageLLM(messages, toolIds);
 
     // No tool calls — LLM has produced its final answer
     if (!response.tool_calls?.length) {

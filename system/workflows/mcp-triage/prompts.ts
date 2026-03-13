@@ -2,7 +2,7 @@
 
 /**
  * Build the triage system prompt with the current tool inventory injected.
- * The toolInventory comes from getToolInventory() at runtime.
+ * The toolInventory comes from loadTools() at runtime.
  */
 export function TRIAGE_SYSTEM_PROMPT(toolInventory: string): string {
   return `You are a dynamic triage controller for Long Tail — a durable workflow system with human-in-the-loop escalation and MCP tool integration. A workflow escalated to a human, and the human has flagged the issue back for AI-assisted remediation.

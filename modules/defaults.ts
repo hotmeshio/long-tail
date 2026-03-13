@@ -78,6 +78,24 @@ export const YAML_LIST_LIMIT = envInt('LT_YAML_LIST_LIMIT', 50);
 /** Default page size for YAML workflow version history. */
 export const YAML_VERSION_LIMIT = envInt('LT_YAML_VERSION_LIMIT', 20);
 
+// ── Escalation ──────────────────────────────────────────────────────
+
+/**
+ * Claim duration presets shown in the dashboard (minutes).
+ * Override via JSON array, e.g. LT_CLAIM_DURATION_OPTIONS='[15,30,60,480]'
+ */
+export const CLAIM_DURATION_OPTIONS: number[] = (() => {
+  const raw = process.env.LT_CLAIM_DURATION_OPTIONS;
+  if (!raw) return [15, 30, 60, 240];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((n: any) => typeof n === 'number' && n > 0)) {
+      return parsed;
+    }
+  } catch { /* fall through */ }
+  return [15, 30, 60, 240];
+})();
+
 // ── Formatting ───────────────────────────────────────────────────────
 
 /** YAML dump line width. */

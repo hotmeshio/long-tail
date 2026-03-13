@@ -47,6 +47,7 @@ export async function upsertWorkflowConfig(
         config.envelope_schema ?? null,
         config.resolver_schema ?? null,
         config.cron_schedule ?? null,
+        config.tool_tags || [],
       ],
     );
 

@@ -60,7 +60,7 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     });
     await migrate();
 
-    // Seed MCP server record so getAvailableTools() finds vision tools
+    // Seed MCP server record so loadTools() finds vision tools
     let visionServer = await mcpDbService.getMcpServerByName('long-tail-document-vision');
     if (!visionServer) {
       visionServer = await mcpDbService.createMcpServer({

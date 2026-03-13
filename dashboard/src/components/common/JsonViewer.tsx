@@ -292,7 +292,7 @@ export function JsonViewer({
           <button
             onClick={() => setMode(mode === 'json' ? 'tree' : 'json')}
             className={iconBtn}
-            title={mode === 'json' ? 'Switch to tree view' : 'Switch to JSON view'}
+            title={mode === 'json' ? 'Switch to outline view' : 'Switch to JSON view'}
           >
             {mode === 'json' ? (
               <TreeIcon className="w-3.5 h-3.5" />

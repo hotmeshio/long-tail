@@ -31,12 +31,6 @@ import type { ActionBarMode, ActiveView } from './EscalationActionBar';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function middleEllipsis(text: string, max: number): string {
-  if (text.length <= max) return text;
-  const keep = Math.floor((max - 1) / 2);
-  return `${text.slice(0, keep)}…${text.slice(text.length - keep)}`;
-}
-
 function safeParse(value: string | null | undefined): unknown {
   if (!value) return null;
   try {
@@ -78,10 +72,26 @@ export function EscalationDetailPage() {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const [resolverView, setResolverView] = useState<'form' | 'json'>('form');
+  const [requestTriage, setRequestTriage] = useState(false);
+  const [triageNotes, setTriageNotes] = useState('');
   const resolverSchema = wfConfig?.resolver_schema ?? null;
   useEffect(() => {
     setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
   }, [resolverSchema]);
+
+  // When triage data is present, collapse Input/Output so triage context is central
+  const hasTriage = (() => {
+    if (!esc?.escalation_payload) return false;
+    try {
+      const p = JSON.parse(esc.escalation_payload);
+      return !!(p && typeof p === 'object' && p._triage);
+    } catch { return false; }
+  })();
+  useEffect(() => {
+    if (hasTriage) {
+      setCollapsed((prev) => ({ ...prev, context: true }));
+    }
+  }, [hasTriage]);
 
   if (isLoading) {
     return (
@@ -148,12 +158,9 @@ export function EscalationDetailPage() {
       <PageHeader title="Escalation" />
 
       {/* Hero */}
-      <h2
-        className="text-2xl font-medium text-text-primary leading-snug whitespace-nowrap overflow-hidden"
-        title={esc.description || `${esc.type} escalation`}
-      >
-        {middleEllipsis(esc.description || `${esc.type} escalation`, 72)}
-      </h2>
+      <p className="text-[1.5rem] leading-snug font-light text-text-secondary mb-8">
+        {esc.description || `${esc.type} escalation`}
+      </p>
       <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
         <StatusBadge status={esc.status} />
         {esc.resolved_at ? (
@@ -283,26 +290,92 @@ export function EscalationDetailPage() {
             onToggle={toggleSection}
             contentClassName="mt-4 ml-9"
           >
-            <div className="flex justify-end mb-3">
-              <button
-                onClick={() => setResolverView(resolverView === 'form' ? 'json' : 'form')}
-                className="text-[10px] text-text-tertiary hover:text-accent transition-colors"
-              >
-                {resolverView === 'form' ? 'Raw JSON' : 'Form'}
-              </button>
+            {/* Toolbar row: form/JSON toggle + triage callout */}
+            <div className="flex items-center justify-between mb-3">
+              {requestTriage ? (
+                <button
+                  onClick={() => setRequestTriage(false)}
+                  className="group flex items-center gap-2 text-left"
+                  data-testid="triage-cancel"
+                >
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                    AI Triage active.{' '}
+                    <span className="text-accent group-hover:underline">Cancel</span>
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setRequestTriage(true)}
+                  className="group flex items-center gap-2 text-left"
+                  data-testid="triage-callout"
+                >
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                    This form doesn&apos;t capture the issue?{' '}
+                    <span className="text-accent group-hover:underline">Request AI Triage</span>
+                  </span>
+                </button>
+              )}
+
+              {!requestTriage && (
+                <button
+                  onClick={() => setResolverView(resolverView === 'form' ? 'json' : 'form')}
+                  className="text-[10px] text-text-tertiary hover:text-accent transition-colors"
+                >
+                  {resolverView === 'form' ? 'Raw JSON' : 'Form'}
+                </button>
+              )}
             </div>
-            {resolverView === 'form' ? (
-              <ResolverForm value={json} onChange={setJson} />
-            ) : (
-              <textarea
-                value={json}
-                onChange={(e) => setJson(e.target.value)}
-                className="input font-mono text-xs w-full"
-                rows={8}
-                spellCheck={false}
-                data-testid="resolve-json"
-              />
-            )}
+
+            <div className="relative">
+              {/* Form controls */}
+              <div className={requestTriage ? 'pointer-events-none select-none' : ''}>
+                {resolverView === 'form' ? (
+                  <ResolverForm value={json} onChange={setJson} />
+                ) : (
+                  <textarea
+                    value={json}
+                    onChange={(e) => setJson(e.target.value)}
+                    className="input font-mono text-xs w-full"
+                    rows={8}
+                    spellCheck={false}
+                    data-testid="resolve-json"
+                  />
+                )}
+              </div>
+
+              {/* Triage overlay — occludes the form when AI Triage is checked */}
+              {requestTriage && (
+                <div
+                  className="absolute inset-0 z-10 flex flex-col bg-surface/90 backdrop-blur-[2px] rounded-md border border-accent/20 p-5"
+                  data-testid="triage-overlay"
+                >
+                  <p className="text-xs text-text-secondary mb-3 leading-relaxed">
+                    The resolution form will not be submitted. Describe the issue
+                    so AI triage can diagnose and fix it using available tools.
+                    The corrected result will come back as a new escalation for
+                    your review.
+                  </p>
+                  <textarea
+                    value={triageNotes}
+                    onChange={(e) => setTriageNotes(e.target.value)}
+                    placeholder="e.g. Content is in Spanish — needs translation to English before review..."
+                    className="input text-xs w-full flex-1 min-h-[80px] resize-none"
+                    autoFocus
+                    data-testid="triage-notes"
+                  />
+                </div>
+              )}
+            </div>
           </CollapsibleSection>
         )}
       </div>
@@ -320,6 +393,8 @@ export function EscalationDetailPage() {
         onResolve={handleResolve}
         resolvePending={resolve.isPending}
         resolveError={resolve.error as Error | null}
+        requestTriage={requestTriage}
+        triageNotes={triageNotes}
         currentRole={esc.role}
         escalationTargets={escalationTargets?.targets ?? []}
         onEscalate={handleEscalate}
