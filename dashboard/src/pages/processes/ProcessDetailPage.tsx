@@ -4,7 +4,7 @@ import { useProcessDetail } from '../../api/tasks';
 import { useSettings } from '../../api/settings';
 import { PageHeader } from '../../components/common/PageHeader';
 import { SectionLabel } from '../../components/common/SectionLabel';
-import { ProcessSwimlaneTimeline } from './ProcessSwimlaneTimeline';
+import { ProcessSwimlaneTimeline } from './process-swimlane/ProcessSwimlaneTimeline';
 
 function formatElapsed(startIso: string, endIso?: string | null): string {
   const start = new Date(startIso).getTime();

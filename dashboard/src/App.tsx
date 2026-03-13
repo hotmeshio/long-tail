@@ -65,7 +65,7 @@ const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
 );
 const YamlWorkflowDetailPage = lazy(() =>
-  import('./pages/workflows/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
+  import('./pages/workflows/yaml-workflow-detail/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
 );
 const TasksListPage = lazy(() =>
   import('./pages/admin/TasksListPage').then((m) => ({ default: m.TasksListPage })),
