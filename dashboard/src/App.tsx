@@ -99,6 +99,9 @@ const RolesPage = lazy(() =>
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
 );
+const ControlPlanePage = lazy(() =>
+  import('./pages/admin/controlplane').then((m) => ({ default: m.ControlPlanePage })),
+);
 
 // ---------------------------------------------------------------------------
 // Suspense fallback
@@ -203,6 +206,7 @@ const router = createBrowserRouter([
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
+          { path: 'admin/controlplane', element: <Lazy><ControlPlanePage /></Lazy> },
         ],
       },
     ],

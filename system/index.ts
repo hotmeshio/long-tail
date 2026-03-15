@@ -7,19 +7,19 @@ import * as mcpTriageWorkflow from './workflows/mcp-triage';
  */
 export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...args: any[]) => any }> {
   const workers: Array<{ taskQueue: string; workflow: (...args: any[]) => any }> = [
-    { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
+    { taskQueue: 'long-tail-system', workflow: mcpTriageWorkflow.mcpTriage },
   ];
 
   if (process.env.OPENAI_API_KEY) {
     // Lazy-require to avoid loading OpenAI when not configured
     try {
       const { insightQuery } = require('./workflows/insight');
-      workers.push({ taskQueue: 'lt-insight', workflow: insightQuery });
+      workers.push({ taskQueue: 'long-tail-system', workflow: insightQuery });
     } catch { /* insight not available */ }
 
     try {
       const { mcpQuery } = require('./workflows/mcp-query');
-      workers.push({ taskQueue: 'lt-mcp-query', workflow: mcpQuery });
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpQuery });
     } catch { /* mcp-query not available */ }
   }
 

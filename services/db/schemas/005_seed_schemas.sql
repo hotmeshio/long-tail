@@ -56,9 +56,9 @@ WHERE workflow_type = 'verifyDocumentMcp' AND resolver_schema IS NULL;
 INSERT INTO lt_config_workflows
   (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable, description, envelope_schema)
 VALUES
-  ('kitchenSink', true, false, 'lt-kitchen-sink', 'reviewer', 'default', false,
+  ('kitchenSink', true, false, 'long-tail-examples', 'reviewer', 'default', false,
    'Kitchen sink leaf — demonstrates sleep, signals, parallel activities, and more', NULL),
-  ('kitchenSinkOrchestrator', true, true, 'lt-kitchen-sink-orch', 'reviewer', 'default', true,
+  ('kitchenSinkOrchestrator', true, true, 'long-tail-examples', 'reviewer', 'default', true,
    'Kitchen sink — demonstrates sleep, signals, parallel activities, escalation, and every durable primitive',
    '{"data": {"name": "World", "mode": "full"}, "metadata": {"source": "dashboard"}}'::jsonb)
 ON CONFLICT (workflow_type) DO NOTHING;

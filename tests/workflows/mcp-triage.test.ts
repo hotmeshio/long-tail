@@ -30,7 +30,7 @@ const { Connection, Client, Worker } = Durable;
 
 const VERIFY_QUEUE = 'test-triage-verify';
 const ORCH_QUEUE = 'test-triage-orch';
-const TRIAGE_QUEUE = 'lt-mcp-triage';
+const TRIAGE_QUEUE = 'long-tail-system';
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
 // ── Mock activities for testVerifyDocument ──────────────────────────────────

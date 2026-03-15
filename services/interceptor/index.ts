@@ -111,7 +111,7 @@ export function createLTInterceptor(options: {
 
         const containerTaskQueue = workflowTopic
           ? workflowTopic.replace(new RegExp(`-${workflowName}$`), '')
-          : 'long-tail';
+          : 'long-tail-examples';
 
         // Mark the container task as in_progress
         if (existingContainerTask?.id && existingContainerTask.status === 'pending') {
@@ -156,7 +156,7 @@ export function createLTInterceptor(options: {
       // Derive the task queue from workflowTopic
       const taskQueue = workflowTopic
         ? workflowTopic.replace(new RegExp(`-${workflowName}$`), '')
-        : 'long-tail';
+        : 'long-tail-examples';
 
       // ── Find existing task and extract routing ─────────────────────
       const existingTask = await activities.ltGetTaskByWorkflowId(workflowId);

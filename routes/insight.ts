@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
         data: { question },
         metadata: { source: 'dashboard' },
       }],
-      taskQueue: 'lt-insight',
+      taskQueue: 'long-tail-system',
       workflowName: 'insightQuery',
       workflowId,
     });
@@ -92,7 +92,7 @@ router.post('/mcp-query', async (req, res) => {
         data: { prompt, tags },
         metadata: { source: 'dashboard' },
       }],
-      taskQueue: 'lt-mcp-query',
+      taskQueue: 'long-tail-system',
       workflowName: 'mcpQuery',
       workflowId,
     });

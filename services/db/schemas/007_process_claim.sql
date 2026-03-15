@@ -5,10 +5,10 @@
 INSERT INTO lt_config_workflows
   (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable, description, envelope_schema)
 VALUES
-  ('processClaim', true, false, 'lt-process-claim', 'reviewer', 'default', false,
+  ('processClaim', true, false, 'long-tail-examples', 'reviewer', 'default', false,
    'Process claim leaf — analyzes insurance claim documents and validates claims',
    NULL),
-  ('processClaimOrchestrator', true, true, 'lt-process-claim-orch', 'reviewer', 'default', true,
+  ('processClaimOrchestrator', true, true, 'long-tail-examples', 'reviewer', 'default', true,
    'Process claim — insurance claim processing with document analysis',
    '{"data": {"claimId": "CLM-2024-001", "claimantId": "POL-5551234", "claimType": "auto_collision", "amount": 12500, "documents": ["incident_report.pdf", "photo_evidence.jpg", "police_report.pdf"]}, "metadata": {"source": "dashboard"}}'::jsonb)
 ON CONFLICT (workflow_type) DO NOTHING;

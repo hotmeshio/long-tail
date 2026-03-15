@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { connect, type NatsConnection, type Subscription, StringCodec } from 'nats.ws';
 
-import { NATS_WS_URL, NATS_TOKEN, NATS_SUBJECT_PREFIX } from '../lib/nats/config';
+import { NATS_WS_URL, NATS_TOKEN } from '../lib/nats/config';
 import type { NatsLTEvent, NatsEventHandler } from '../lib/nats/types';
 
 // ── Context ─────────────────────────────────────────────────────────────────
@@ -140,8 +140,8 @@ export function NatsProvider({ children }: { children: ReactNode }) {
       ncRef.current = nc;
       setConnected(true);
 
-      // Subscribe to all Long Tail events
-      const sub = nc.subscribe(`${NATS_SUBJECT_PREFIX}.>`);
+      // Subscribe to all Long Tail events and mesh control plane
+      const sub = nc.subscribe('lt.>');
       subRef.current = sub;
 
       (async () => {

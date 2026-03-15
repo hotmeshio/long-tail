@@ -28,16 +28,16 @@ import { addEscalationChain, createRole } from '../services/role';
  * via `examples: true` in the start config.
  */
 export const exampleWorkers = [
-  { taskQueue: 'long-tail', workflow: reviewContentWorkflow.reviewContent },
-  { taskQueue: 'long-tail-verify', workflow: verifyDocumentWorkflow.verifyDocument },
-  { taskQueue: 'long-tail-verify-mcp', workflow: verifyDocumentMcpWorkflow.verifyDocumentMcp },
-  { taskQueue: 'lt-review-orch', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
-  { taskQueue: 'lt-verify-orch', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
-  { taskQueue: 'lt-verify-mcp-orch', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
-  { taskQueue: 'lt-process-claim', workflow: processClaimWorkflow.processClaim },
-  { taskQueue: 'lt-process-claim-orch', workflow: processClaimOrchWorkflow.processClaimOrchestrator },
-  { taskQueue: 'lt-kitchen-sink', workflow: kitchenSinkWorkflow.kitchenSink },
-  { taskQueue: 'lt-kitchen-sink-orch', workflow: kitchenSinkOrchWorkflow.kitchenSinkOrchestrator },
+  { taskQueue: 'long-tail-examples', workflow: reviewContentWorkflow.reviewContent },
+  { taskQueue: 'long-tail-examples', workflow: verifyDocumentWorkflow.verifyDocument },
+  { taskQueue: 'long-tail-examples', workflow: verifyDocumentMcpWorkflow.verifyDocumentMcp },
+  { taskQueue: 'long-tail-examples', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
+  { taskQueue: 'long-tail-examples', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
+  { taskQueue: 'long-tail-examples', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
+  { taskQueue: 'long-tail-examples', workflow: processClaimWorkflow.processClaim },
+  { taskQueue: 'long-tail-examples', workflow: processClaimOrchWorkflow.processClaimOrchestrator },
+  { taskQueue: 'long-tail-examples', workflow: kitchenSinkWorkflow.kitchenSink },
+  { taskQueue: 'long-tail-examples', workflow: kitchenSinkOrchWorkflow.kitchenSinkOrchestrator },
 ];
 
 const SEED_USERS = [
@@ -152,7 +152,7 @@ const SEED_ENVELOPES: Array<{
   {
     label: 'Process 1 — Clean Review',
     workflowName: 'reviewContentOrchestrator',
-    taskQueue: 'lt-review-orch',
+    taskQueue: 'long-tail-examples',
     envelope: {
       data: {
         contentId: 'process-clean-001',
@@ -171,7 +171,7 @@ const SEED_ENVELOPES: Array<{
   {
     label: 'Process 2 — Flagged for Review',
     workflowName: 'reviewContentOrchestrator',
-    taskQueue: 'lt-review-orch',
+    taskQueue: 'long-tail-examples',
     envelope: {
       data: {
         contentId: 'process-flagged-001',
@@ -190,7 +190,7 @@ const SEED_ENVELOPES: Array<{
   {
     label: 'Process 3 — Wrong Language',
     workflowName: 'reviewContentOrchestrator',
-    taskQueue: 'lt-review-orch',
+    taskQueue: 'long-tail-examples',
     envelope: {
       data: {
         contentId: 'process-language-001',
@@ -209,7 +209,7 @@ const SEED_ENVELOPES: Array<{
   {
     label: 'Process 4 — Damaged Claim',
     workflowName: 'processClaimOrchestrator',
-    taskQueue: 'lt-process-claim-orch',
+    taskQueue: 'long-tail-examples',
     envelope: {
       data: {
         claimId: 'CLM-2024-042',
@@ -240,7 +240,7 @@ const SEED_ENVELOPES: Array<{
   {
     label: 'Process 5 — Dynamic Triage',
     workflowName: 'kitchenSinkOrchestrator',
-    taskQueue: 'lt-kitchen-sink-orch',
+    taskQueue: 'long-tail-examples',
     envelope: {
       data: {
         name: 'Triage Demo',

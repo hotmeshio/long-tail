@@ -49,7 +49,7 @@ export function createLTActivityInterceptor(_options?: {
                 new RegExp(`-${workflowName}$`),
                 '',
               )
-            : 'long-tail';
+            : 'long-tail-examples';
 
           await publishMilestoneEvent({
             source: 'activity',

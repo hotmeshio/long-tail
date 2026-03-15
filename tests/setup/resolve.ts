@@ -57,7 +57,7 @@ export async function resolveEscalation(
         workflow_id: triageWorkflowId,
         workflow_type: 'mcpTriage',
         lt_type: 'mcpTriage',
-        task_queue: 'lt-mcp-triage',
+        task_queue: 'long-tail-system',
         signal_id: `lt-triage-${triageWorkflowId}`,
         parent_workflow_id: routing?.parentWorkflowId || triageWorkflowId,
         origin_id: escalation.origin_id || triageWorkflowId,
@@ -69,7 +69,7 @@ export async function resolveEscalation(
       await client.workflow.start({
         workflowName: 'mcpTriage',
         args: [directive.triageEnvelope],
-        taskQueue: 'lt-mcp-triage',
+        taskQueue: 'long-tail-system',
         workflowId: triageWorkflowId,
         expire: 300,
       });

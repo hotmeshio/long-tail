@@ -33,7 +33,7 @@ async function waitForEvent(
 }
 
 // Must match the hardcoded taskQueue in orchestrator workflow
-const LEAF_QUEUE = 'long-tail';
+const LEAF_QUEUE = 'long-tail-examples';
 const ORCH_QUEUE = 'test-events-orch';
 const MILESTONE_QUEUE = 'test-events-milestone';
 // Must match the default in orchestrator/index.ts so proxyActivities routes correctly

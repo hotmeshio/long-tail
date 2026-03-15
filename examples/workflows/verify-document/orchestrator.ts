@@ -13,6 +13,6 @@ export async function verifyDocumentOrchestrator(envelope: LTEnvelope) {
   return await executeLT({
     workflowName: 'verifyDocument',
     args: [envelope],
-    taskQueue: 'long-tail-verify',
+    taskQueue: 'long-tail-examples',
   });
 }
