@@ -7,6 +7,7 @@ import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
@@ -41,9 +42,7 @@ function buildColumns(
     {
       key: 'entity',
       label: 'Workflow Type',
-      render: (row) => (
-        <span className="font-mono text-xs text-text-secondary">{row.entity}</span>
-      ),
+      render: (row) => <WorkflowPill type={row.entity} />,
     },
     {
       key: 'workflow_id',

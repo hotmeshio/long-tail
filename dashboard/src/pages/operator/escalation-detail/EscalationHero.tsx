@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { Bell } from 'lucide-react';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { RolePill } from '../../../components/common/display/RolePill';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { UserName } from '../../../components/common/display/UserName';
+import { isAckEscalation } from '../../../lib/escalation';
 import type { LTEscalationRecord } from '../../../api/types';
 
 export function EscalationHero({
@@ -21,52 +24,90 @@ export function EscalationHero({
   traceUrl: string | null;
 }) {
   const [showDetails, setShowDetails] = useState(false);
+  const isAck = isAckEscalation(esc);
 
   return (
     <>
-      <p className="text-[1.5rem] leading-snug font-light text-text-secondary mb-8">
-        {esc.description || `${esc.type} escalation`}
-      </p>
-      <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
-        <StatusBadge status={esc.status} />
-        {esc.resolved_at ? (
-          <span className="text-text-tertiary">
-            <TimeAgo date={esc.resolved_at} />
-          </span>
-        ) : (
-          <span className="text-text-tertiary">
+      {/* Title */}
+      <div className="flex items-center gap-3 mb-2">
+        {isAck && <Bell className="w-5 h-5 text-text-tertiary shrink-0" />}
+        <p className="text-[1.5rem] leading-snug font-light text-text-secondary">
+          {esc.type}{esc.subtype ? ` / ${esc.subtype}` : ''}
+        </p>
+      </div>
+
+      {/* Description */}
+      {esc.description && (
+        <p className="text-sm leading-relaxed text-text-tertiary mb-4">
+          {esc.description}
+        </p>
+      )}
+
+      {/* Meta bar — labeled sections with spacing */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-4 mb-2">
+        {/* Status */}
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Status</p>
+          <StatusBadge status={esc.status} />
+        </div>
+
+        {/* Role */}
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Role</p>
+          <RolePill role={esc.role} size="md" />
+        </div>
+
+        {/* Created */}
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
+          <span className="text-xs text-text-secondary">
             <TimeAgo date={esc.created_at} />
           </span>
-        )}
+        </div>
+
+        {/* Claimed by */}
         {esc.assigned_to && (
-          <span className="text-text-secondary">
-            by{' '}
-            <span className="font-medium text-text-primary">
-              {claimedByMe ? 'you' : <UserName userId={esc.assigned_to} />}
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Claimed by</p>
+            <span className="text-xs font-medium text-text-primary">
+              {claimedByMe ? 'You' : <UserName userId={esc.assigned_to} />}
             </span>
-          </span>
+          </div>
         )}
 
+        {/* Time left */}
         {claimed && !isTerminal && esc.assigned_until && (
-          <>
-            <span className="text-text-quaternary">&middot;</span>
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Time left</p>
             <CountdownTimer until={esc.assigned_until} />
-          </>
+          </div>
         )}
 
-        <span className="text-text-quaternary">&middot;</span>
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="flex items-center gap-1 text-text-tertiary hover:text-accent transition-colors"
-        >
-          Details
-          <svg
-            className={`w-3 h-3 transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        {/* Resolved */}
+        {esc.resolved_at && (
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Resolved</p>
+            <span className="text-xs text-text-secondary">
+              <TimeAgo date={esc.resolved_at} />
+            </span>
+          </div>
+        )}
+
+        {/* Details toggle */}
+        <div className="flex items-end">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="flex items-center gap-1 text-xs text-text-tertiary hover:text-accent transition-colors mt-3"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+            Details
+            <svg
+              className={`w-3 h-3 transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <Collapsible open={showDetails}>
@@ -74,10 +115,6 @@ export function EscalationHero({
           <div className="text-left">
             <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Priority</span>
             <p className="text-[12px] text-text-primary mt-0.5">P{esc.priority}</p>
-          </div>
-          <div className="text-left">
-            <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Role</span>
-            <p className="text-[12px] text-text-primary mt-0.5">{esc.role}</p>
           </div>
           <CopyableId label="Escalation ID" value={esc.id} />
           {esc.task_id && (

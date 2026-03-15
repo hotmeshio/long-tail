@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
 import { formatDuration } from '../../../lib/format';
 import type { LTTaskRecord } from '../../../api/types';
@@ -19,12 +20,12 @@ export function TaskDetailPanel({
     : Date.now() - new Date(task.created_at).getTime();
 
   return (
-    <div className="grid grid-cols-[1fr_1fr] gap-6">
+    <div className="grid grid-cols-[3fr_1fr] gap-6">
       {/* Left: timing metrics */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <StatusBadge status={task.status} />
-          <span className="text-xs font-mono text-text-secondary">{task.workflow_type}</span>
+          <WorkflowPill type={task.workflow_type} />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -73,7 +74,7 @@ export function TaskDetailPanel({
       </div>
 
       {/* Right: links */}
-      <div className="space-y-2">
+      <div className="flex flex-col items-end gap-2">
         <Link
           to={`/workflows/executions/${encodeURIComponent(task.workflow_id)}`}
           className="block text-[11px] text-accent hover:underline"

@@ -17,7 +17,17 @@ export function TraceLink({ traceId, href }: { traceId: string; href?: string })
 
   return (
     <span className="group/trace inline-flex items-center gap-1.5">
-      <span className="text-[11px] text-accent">Trace Details</span>
+      {href && (
+        <button
+          onClick={handleNav}
+          title="Open trace"
+          className="opacity-0 group-hover/trace:opacity-100 transition-opacity p-0.5"
+        >
+          <svg className="w-3 h-3 text-text-tertiary hover:text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-4.5-4.5h6m0 0v6m0-6L10.5 15" />
+          </svg>
+        </button>
+      )}
       <button
         onClick={handleCopy}
         title="Copy trace ID"
@@ -33,17 +43,7 @@ export function TraceLink({ traceId, href }: { traceId: string; href?: string })
           }
         </svg>
       </button>
-      {href && (
-        <button
-          onClick={handleNav}
-          title="Open trace"
-          className="opacity-0 group-hover/trace:opacity-100 transition-opacity p-0.5"
-        >
-          <svg className="w-3 h-3 text-text-tertiary hover:text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-4.5-4.5h6m0 0v6m0-6L10.5 15" />
-          </svg>
-        </button>
-      )}
+      <span className="text-[11px] text-accent">Trace Details</span>
     </span>
   );
 }

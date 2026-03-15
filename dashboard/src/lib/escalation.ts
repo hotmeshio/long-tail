@@ -8,6 +8,11 @@ export function isEffectivelyClaimed(esc: LTEscalationRecord): boolean {
   );
 }
 
+/** An ACK escalation has no associated workflow — it's a notification, not a task. */
+export function isAckEscalation(esc: LTEscalationRecord): boolean {
+  return !esc.workflow_type;
+}
+
 export function isAvailable(esc: LTEscalationRecord): boolean {
   return (
     esc.status === 'pending' &&

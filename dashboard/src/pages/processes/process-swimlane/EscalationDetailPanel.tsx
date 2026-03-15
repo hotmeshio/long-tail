@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { RolePill } from '../../../components/common/display/RolePill';
 import { UserName } from '../../../components/common/display/UserName';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
 import { formatDuration } from '../../../lib/format';
@@ -21,14 +22,12 @@ export function EscalationDetailPanel({
     : null;
 
   return (
-    <div className="grid grid-cols-[1fr_1fr] gap-6">
+    <div className="grid grid-cols-[3fr_1fr] gap-6">
       {/* Left: timing metrics */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <StatusBadge status={escalation.status} />
-          <span className="text-xs text-text-secondary">
-            Role: <span className="font-mono">{escalation.role}</span>
-          </span>
+          <RolePill role={escalation.role} />
           {escalation.type && (
             <span className="text-[10px] text-text-tertiary">
               {escalation.type}
@@ -93,7 +92,7 @@ export function EscalationDetailPanel({
       </div>
 
       {/* Right: links */}
-      <div className="space-y-2">
+      <div className="flex flex-col items-end gap-2">
         {escalation.workflow_id && (
           <Link
             to={`/workflows/executions/${encodeURIComponent(escalation.workflow_id)}`}

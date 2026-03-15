@@ -9,6 +9,7 @@ import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { PageHeader } from '../../components/common/layout/PageHeader';
+import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -32,12 +33,7 @@ const columns: Column<ProcessSummary>[] = [
     render: (row) => (
       <div className="flex flex-wrap gap-1">
         {row.workflow_types.map((wt) => (
-          <span
-            key={wt}
-            className="px-2 py-0.5 text-[10px] font-mono bg-surface-sunken rounded text-text-secondary"
-          >
-            {wt}
-          </span>
+          <WorkflowPill key={wt} type={wt} />
         ))}
       </div>
     ),

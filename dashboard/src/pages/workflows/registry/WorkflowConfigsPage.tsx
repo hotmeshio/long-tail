@@ -12,6 +12,8 @@ import { RowAction, RowActionGroup } from '../../../components/common/layout/Row
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import type { LTWorkflowConfig } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { RolePill } from '../../../components/common/display/RolePill';
+import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,7 +89,7 @@ export function WorkflowConfigsPage() {
       label: 'Workflow Type',
       render: (row) => (
         <div>
-          <span className="font-mono text-xs">{row.workflow_type}</span>
+          <WorkflowPill type={row.workflow_type} />
           {row.description && (
             <p className="text-[10px] text-text-tertiary mt-0.5">{row.description}</p>
           )}
@@ -150,7 +152,7 @@ export function WorkflowConfigsPage() {
     {
       key: 'default_role',
       label: 'Default Role',
-      render: (row) => <span className="text-xs text-text-secondary">{row.default_role}</span>,
+      render: (row) => <RolePill role={row.default_role} />,
     },
     {
       key: 'roles',
@@ -158,9 +160,7 @@ export function WorkflowConfigsPage() {
       render: (row) => (
         <div className="flex gap-1 flex-wrap">
           {(row.roles ?? []).map((r) => (
-            <span key={r} className="px-2 py-0.5 text-[10px] bg-surface-sunken rounded-full text-text-secondary">
-              {r}
-            </span>
+            <RolePill key={r} role={r} />
           ))}
         </div>
       ),

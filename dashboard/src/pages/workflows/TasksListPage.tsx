@@ -9,6 +9,7 @@ import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { PageHeader } from '../../components/common/layout/PageHeader';
+import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import type { LTTaskRecord } from '../../api/types';
 
 const statusOptions = [
@@ -29,9 +30,7 @@ const columns: Column<LTTaskRecord>[] = [
   {
     key: 'workflow_type',
     label: 'Workflow Type',
-    render: (row) => (
-      <span className="font-mono text-xs">{row.workflow_type}</span>
-    ),
+    render: (row) => <WorkflowPill type={row.workflow_type} />,
   },
   {
     key: 'lt_type',

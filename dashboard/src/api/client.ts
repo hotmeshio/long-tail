@@ -1,3 +1,5 @@
+import { isTokenExpired } from '../lib/jwt';
+
 const BASE_URL = '/api';
 
 let authToken: string | null = null;
@@ -52,6 +54,21 @@ export async function apiFetch<T>(
   };
 
   if (authToken) {
+    // Proactive check: if the token is already expired client-side,
+    // skip the network round-trip and go straight to refresh/logout.
+    if (isTokenExpired(authToken)) {
+      if (!refreshPromise) {
+        refreshPromise = tryRefresh().finally(() => { refreshPromise = null; });
+      }
+      const newToken = await refreshPromise;
+      if (newToken) {
+        authToken = newToken;
+        window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: { token: newToken } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        throw new Error('Session expired');
+      }
+    }
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 

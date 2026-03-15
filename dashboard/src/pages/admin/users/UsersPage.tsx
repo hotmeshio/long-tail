@@ -11,6 +11,7 @@ import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDele
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { LTUserRecord } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { RolePill } from '../../../components/common/display/RolePill';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
 import { RoleManagementModal } from './RoleManagementModal';
@@ -67,13 +68,7 @@ export function UsersPage() {
       render: (row) => (
         <div className="flex gap-1 flex-wrap">
           {(row.roles ?? []).map((r) => (
-            <span
-              key={r.role}
-              className="px-2 py-0.5 text-[10px] bg-surface-sunken rounded-full text-text-secondary"
-            >
-              {r.role}
-              <span className="text-text-tertiary ml-1">({r.type})</span>
-            </span>
+            <RolePill key={r.role} role={r.role} />
           ))}
         </div>
       ),
