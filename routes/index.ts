@@ -17,6 +17,7 @@ import settingsRouter from './settings';
 import mcpRunsRouter from './mcp-runs';
 import namespacesRouter from './namespaces';
 import filesRouter from './files';
+import controlplaneRouter from './controlplane';
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use('/yaml-workflows', yamlWorkflowsRouter);
 router.use('/settings', settingsRouter);
 router.use('/mcp-runs', mcpRunsRouter);
 router.use('/namespaces', namespacesRouter);
+router.use('/controlplane', controlplaneRouter);
 
 export default router;
