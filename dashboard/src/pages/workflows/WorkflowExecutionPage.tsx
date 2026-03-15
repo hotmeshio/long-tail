@@ -113,8 +113,6 @@ export function WorkflowExecutionPage() {
     <div>
       <PageHeader
         title="Workflow Execution"
-        backTo="/workflows/executions"
-        backLabel="Workflows"
         actions={
           hasToolCalls ? (
             <button

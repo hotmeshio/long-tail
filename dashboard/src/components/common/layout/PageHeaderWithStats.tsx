@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 
 export interface InlineStat {
   label: string;
@@ -11,8 +10,6 @@ interface PageHeaderWithStatsProps {
   title: string;
   subtitle?: string;
   stats?: InlineStat[];
-  backTo?: string;
-  backLabel?: string;
   actions?: ReactNode;
 }
 
@@ -20,18 +17,11 @@ export function PageHeaderWithStats({
   title,
   subtitle,
   stats,
-  backTo,
-  backLabel,
   actions,
 }: PageHeaderWithStatsProps) {
   return (
     <div className="flex items-baseline justify-between mb-10">
       <div className="flex items-center gap-4">
-        {backTo && (
-          <Link to={backTo} className="text-xs text-text-tertiary hover:text-text-primary">
-            &larr; {backLabel ?? 'Back'}
-          </Link>
-        )}
         <h1 className="text-3xl font-light text-text-primary">{title}</h1>
         {subtitle && (
           <span className="text-sm text-text-tertiary font-light">{subtitle}</span>

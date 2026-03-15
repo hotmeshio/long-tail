@@ -53,7 +53,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Run" backTo={namespace !== 'longtail' ? `/mcp/executions?namespace=${namespace}` : '/mcp/executions'} backLabel="Executions" />
+        <PageHeader title="Run" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -83,7 +83,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Run" backTo={namespace !== 'longtail' ? `/mcp/executions?namespace=${namespace}` : '/mcp/executions'} backLabel="Executions" />
+      <PageHeader title="Run" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">

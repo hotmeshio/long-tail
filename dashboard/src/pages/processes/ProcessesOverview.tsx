@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useProcessStats } from '../../api/tasks';
 import { useProcessListEvents } from '../../hooks/useNatsEvents';
 import { PageHeader } from '../../components/common/layout/PageHeader';
+import { StatCard } from '../../components/common/data/StatCard';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -35,30 +36,6 @@ function StatCell({
       className={`${colorClass} hover:underline tabular-nums font-medium`}
     >
       {value}
-    </button>
-  );
-}
-
-// ── Summary card ─────────────────────────────────────────────────────────────
-
-function SummaryCard({
-  label,
-  value,
-  colorClass = 'text-text-primary',
-  onClick,
-}: {
-  label: string;
-  value: number | string;
-  colorClass?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-surface-raised border border-surface-border rounded-md p-4 text-left hover:border-accent/40 transition-colors"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{label}</p>
-      <p className={`text-2xl font-light tabular-nums ${colorClass}`}>{value}</p>
     </button>
   );
 }
@@ -102,29 +79,10 @@ export function ProcessesOverview() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <SummaryCard
-          label="Total"
-          value={stats?.total ?? '—'}
-          onClick={() => goToList()}
-        />
-        <SummaryCard
-          label="Active"
-          value={stats?.active ?? '—'}
-          colorClass="text-status-active"
-          onClick={() => goToList({ status: 'active' })}
-        />
-        <SummaryCard
-          label="Completed"
-          value={stats?.completed ?? '—'}
-          colorClass="text-status-success"
-          onClick={() => goToList({ status: 'completed' })}
-        />
-        <SummaryCard
-          label="Escalated"
-          value={stats?.escalated ?? '—'}
-          colorClass="text-status-error"
-          onClick={() => goToList({ status: 'escalated' })}
-        />
+        <StatCard label="Total" value={stats?.total ?? '—'} onClick={() => goToList()} />
+        <StatCard label="Active" value={stats?.active ?? '—'} colorClass="text-status-active" onClick={() => goToList({ status: 'active' })} />
+        <StatCard label="Completed" value={stats?.completed ?? '—'} colorClass="text-status-success" onClick={() => goToList({ status: 'completed' })} />
+        <StatCard label="Escalated" value={stats?.escalated ?? '—'} colorClass="text-status-error" onClick={() => goToList({ status: 'escalated' })} />
       </div>
 
       {/* By workflow type table */}

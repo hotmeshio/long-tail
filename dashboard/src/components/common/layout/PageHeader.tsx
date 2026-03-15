@@ -2,10 +2,6 @@ import type { ReactNode } from 'react';
 
 interface PageHeaderProps {
   title: string;
-  /** @deprecated Browser provides back navigation */
-  backTo?: string;
-  /** @deprecated Browser provides back navigation */
-  backLabel?: string;
   actions?: ReactNode;
 }
 

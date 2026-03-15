@@ -85,3 +85,131 @@ export function formatAbsoluteTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
+
+// ── Build lanes from raw task + escalation records ──────────────────────────
+
+export function buildLanes(
+  tasks: LTTaskRecord[],
+  escalations: LTEscalationRecord[],
+): { lanes: ProcessLane[]; timeMin: number; timeMax: number } {
+  const now = Date.now();
+
+  // Group escalations by task_id
+  const escByTask = new Map<string, LTEscalationRecord[]>();
+  const unlinked: LTEscalationRecord[] = [];
+  for (const e of escalations) {
+    if (e.task_id) {
+      if (!escByTask.has(e.task_id)) escByTask.set(e.task_id, []);
+      escByTask.get(e.task_id)!.push(e);
+    } else {
+      unlinked.push(e);
+    }
+  }
+
+  // Sort tasks by created_at
+  const sorted = [...tasks].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+
+  // Collect all timestamps for axis bounds
+  const allTimes: number[] = [];
+  for (const t of tasks) {
+    allTimes.push(new Date(t.created_at).getTime());
+    if (t.completed_at) allTimes.push(new Date(t.completed_at).getTime());
+  }
+  for (const e of escalations) {
+    allTimes.push(new Date(e.created_at).getTime());
+    if (e.resolved_at) allTimes.push(new Date(e.resolved_at).getTime());
+    if (e.claimed_at) allTimes.push(new Date(e.claimed_at).getTime());
+  }
+  if (allTimes.length === 0) return { lanes: [], timeMin: 0, timeMax: 1 };
+
+  const timeMin = Math.min(...allTimes);
+  const hasOpen =
+    tasks.some((t) => !t.completed_at) || escalations.some((e) => !e.resolved_at);
+  const timeMax = hasOpen ? Math.max(now, Math.max(...allTimes)) : Math.max(...allTimes);
+  const span = timeMax - timeMin || 1;
+
+  const toPct = (ms: number) => ((ms - timeMin) / span) * 100;
+
+  const lanes: ProcessLane[] = [];
+
+  for (const task of sorted) {
+    const tStart = new Date(task.created_at).getTime();
+    const tEnd = task.completed_at ? new Date(task.completed_at).getTime() : now;
+    const tOpen = !task.completed_at;
+
+    lanes.push({
+      kind: 'task',
+      id: task.id,
+      label: task.workflow_type,
+      taskId: task.id,
+      startMs: tStart,
+      endMs: tEnd,
+      startPct: toPct(tStart),
+      widthPct: Math.max(((tEnd - tStart) / span) * 100, 0.5),
+      durationMs: tEnd - tStart,
+      isOpen: tOpen,
+      task,
+    });
+
+    const taskEscs = (escByTask.get(task.id) || []).sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+    for (const esc of taskEscs) {
+      const eStart = new Date(esc.created_at).getTime();
+      const eEnd = esc.resolved_at ? new Date(esc.resolved_at).getTime() : now;
+      const eOpen = !esc.resolved_at;
+
+      let claimPct: number | null = null;
+      if (esc.claimed_at) {
+        const claimMs = new Date(esc.claimed_at).getTime();
+        const escSpan = eEnd - eStart || 1;
+        claimPct = ((claimMs - eStart) / escSpan) * 100;
+      }
+
+      lanes.push({
+        kind: 'escalation',
+        id: esc.id,
+        label: esc.role,
+        taskId: task.id,
+        startMs: eStart,
+        endMs: eEnd,
+        startPct: toPct(eStart),
+        widthPct: Math.max(((eEnd - eStart) / span) * 100, 0.5),
+        durationMs: eEnd - eStart,
+        isOpen: eOpen,
+        escalation: esc,
+        claimPct,
+      });
+    }
+  }
+
+  // Unlinked escalations at the bottom
+  for (const esc of unlinked) {
+    const eStart = new Date(esc.created_at).getTime();
+    const eEnd = esc.resolved_at ? new Date(esc.resolved_at).getTime() : now;
+    let claimPct: number | null = null;
+    if (esc.claimed_at) {
+      const claimMs = new Date(esc.claimed_at).getTime();
+      const escSpan = eEnd - eStart || 1;
+      claimPct = ((claimMs - eStart) / escSpan) * 100;
+    }
+    lanes.push({
+      kind: 'escalation',
+      id: esc.id,
+      label: esc.role,
+      taskId: '',
+      startMs: eStart,
+      endMs: eEnd,
+      startPct: toPct(eStart),
+      widthPct: Math.max(((eEnd - eStart) / span) * 100, 0.5),
+      durationMs: eEnd - eStart,
+      isOpen: !esc.resolved_at,
+      escalation: esc,
+      claimPct,
+    });
+  }
+
+  return { lanes, timeMin, timeMax };
+}

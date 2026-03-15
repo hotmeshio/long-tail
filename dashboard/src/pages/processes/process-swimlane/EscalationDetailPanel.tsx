@@ -94,12 +94,6 @@ export function EscalationDetailPanel({
 
       {/* Right: links */}
       <div className="space-y-2">
-        <Link
-          to={`/escalations/detail/${escalation.id}`}
-          className="block text-[11px] text-accent hover:underline"
-        >
-          Escalation Details
-        </Link>
         {escalation.workflow_id && (
           <Link
             to={`/workflows/executions/${encodeURIComponent(escalation.workflow_id)}`}
@@ -108,6 +102,12 @@ export function EscalationDetailPanel({
             Execution Details
           </Link>
         )}
+        <Link
+          to={`/escalations/detail/${escalation.id}`}
+          className="block text-[11px] text-accent hover:underline"
+        >
+          Escalation Details
+        </Link>
       </div>
     </div>
   );

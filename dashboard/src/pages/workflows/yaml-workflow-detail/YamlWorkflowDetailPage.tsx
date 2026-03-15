@@ -163,8 +163,6 @@ export function YamlWorkflowDetailPage() {
     <div>
       <PageHeader
         title="Workflow Tool"
-        backTo="/mcp/workflows"
-        backLabel="Workflow Tools"
         actions={
           wf.status === 'draft' && !isViewingHistory ? (
             <button

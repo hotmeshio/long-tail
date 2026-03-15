@@ -39,7 +39,7 @@ export function TaskDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Task Detail" backTo="/workflows/executions" backLabel="Workflows" />
+      <PageHeader title="Task Detail" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Left column — metadata */}
