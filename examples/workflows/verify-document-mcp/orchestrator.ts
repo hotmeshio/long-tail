@@ -13,6 +13,6 @@ export async function verifyDocumentMcpOrchestrator(envelope: LTEnvelope) {
   return await executeLT({
     workflowName: 'verifyDocumentMcp',
     args: [envelope],
-    taskQueue: 'long-tail-verify-mcp',
+    taskQueue: 'long-tail-examples',
   });
 }

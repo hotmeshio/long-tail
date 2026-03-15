@@ -18,7 +18,7 @@ import type { LTReturn } from '../../types';
 
 const { Connection, Client, Worker } = Durable;
 
-const LEAF_QUEUE = 'long-tail';
+const LEAF_QUEUE = 'long-tail-examples';
 const ORCH_QUEUE = 'test-orch';
 // Must match the default in orchestrator/index.ts so proxyActivities routes correctly
 const ACTIVITY_QUEUE = 'lt-interceptor';

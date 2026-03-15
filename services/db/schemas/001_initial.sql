@@ -296,12 +296,12 @@ CREATE INDEX IF NOT EXISTS idx_lt_config_role_escalations_source
 -- are started by orchestrators only (invocable = false).
 INSERT INTO lt_config_workflows (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable)
 VALUES
-  ('reviewContent',                  true,  false, 'long-tail',            'reviewer', 'default', false),
-  ('reviewContentOrchestrator',      true,  true,  'lt-review-orch',       'reviewer', 'default', true),
-  ('verifyDocument',                 true,  false, 'long-tail-verify',     'reviewer', 'default', false),
-  ('verifyDocumentOrchestrator',     true,  true,  'lt-verify-orch',       'reviewer', 'default', true),
-  ('verifyDocumentMcp',              true,  false, 'long-tail-verify-mcp', 'reviewer', 'default', false),
-  ('verifyDocumentMcpOrchestrator',  true,  true,  'lt-verify-mcp-orch',   'reviewer', 'default', true)
+  ('reviewContent',                  true,  false, 'long-tail-examples', 'reviewer', 'default', false),
+  ('reviewContentOrchestrator',      true,  true,  'long-tail-examples', 'reviewer', 'default', true),
+  ('verifyDocument',                 true,  false, 'long-tail-examples', 'reviewer', 'default', false),
+  ('verifyDocumentOrchestrator',     true,  true,  'long-tail-examples', 'reviewer', 'default', true),
+  ('verifyDocumentMcp',              true,  false, 'long-tail-examples', 'reviewer', 'default', false),
+  ('verifyDocumentMcpOrchestrator',  true,  true,  'long-tail-examples', 'reviewer', 'default', true)
 ON CONFLICT (workflow_type) DO NOTHING;
 
 -- Assign roles to all LT workflows

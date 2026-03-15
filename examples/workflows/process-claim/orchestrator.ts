@@ -13,6 +13,6 @@ export async function processClaimOrchestrator(envelope: LTEnvelope) {
   return await executeLT({
     workflowName: 'processClaim',
     args: [envelope],
-    taskQueue: 'lt-process-claim',
+    taskQueue: 'long-tail-examples',
   });
 }

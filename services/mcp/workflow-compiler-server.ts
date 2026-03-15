@@ -13,7 +13,7 @@ let server: McpServer | null = null;
 
 const convertSchema = z.object({
   workflow_id: z.string().describe('The workflow execution ID to analyze'),
-  task_queue: z.string().describe('HotMesh task queue (e.g., "long-tail")'),
+  task_queue: z.string().describe('HotMesh task queue (e.g., "long-tail-examples")'),
   workflow_name: z.string().describe('Workflow name (e.g., "reviewContent")'),
   yaml_name: z.string().describe('Name for the generated YAML workflow'),
   description: z.string().optional().describe('Optional description'),

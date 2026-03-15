@@ -17,6 +17,6 @@ export async function kitchenSinkOrchestrator(envelope: LTEnvelope) {
   return await executeLT({
     workflowName: 'kitchenSink',
     args: [envelope],
-    taskQueue: 'lt-kitchen-sink',
+    taskQueue: 'long-tail-examples',
   });
 }

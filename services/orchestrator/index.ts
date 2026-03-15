@@ -42,7 +42,7 @@ export interface ExecuteLTOptions {
  *   return await executeLT({
  *     workflowName: 'reviewContent',
  *     args: [envelope],
- *     taskQueue: 'long-tail',
+ *     taskQueue: 'long-tail-examples',
  *     originId: envelope.data.orderId,
  *   });
  * }

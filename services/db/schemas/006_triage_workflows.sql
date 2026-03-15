@@ -5,7 +5,7 @@
 INSERT INTO lt_config_workflows
   (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable, description)
 VALUES
-  ('mcpTriage', true, false, 'lt-mcp-triage', 'engineer', 'default', false,
+  ('mcpTriage', true, false, 'long-tail-system', 'engineer', 'default', false,
    'MCP triage — remediates stalled workflows using MCP tools and engineer guidance')
 ON CONFLICT (workflow_type) DO NOTHING;
 
@@ -14,7 +14,7 @@ ON CONFLICT (workflow_type) DO NOTHING;
 INSERT INTO lt_config_workflows
   (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable, description)
 VALUES
-  ('mcpQuery', true, false, 'lt-mcp-query', 'engineer', 'default', true,
+  ('mcpQuery', true, false, 'long-tail-system', 'engineer', 'default', true,
    'Do anything with tools — browser automation, file operations, HTTP requests, database queries, document processing, and more')
 ON CONFLICT (workflow_type) DO NOTHING;
 

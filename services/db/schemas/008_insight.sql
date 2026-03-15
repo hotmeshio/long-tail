@@ -14,7 +14,7 @@ ON CONFLICT (name) DO NOTHING;
 INSERT INTO lt_config_workflows
   (workflow_type, is_lt, is_container, task_queue, default_role, default_modality, invocable, description)
 VALUES
-  ('insightQuery', true, false, 'lt-insight', 'admin', 'default', false,
+  ('insightQuery', true, false, 'long-tail-system', 'admin', 'default', false,
    'AI-powered insight query — answers natural language questions about system state using DB tools')
 ON CONFLICT (workflow_type) DO NOTHING;
 

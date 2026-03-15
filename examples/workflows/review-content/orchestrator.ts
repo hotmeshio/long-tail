@@ -12,6 +12,6 @@ export async function reviewContentOrchestrator(envelope: LTEnvelope) {
   return await executeLT({
     workflowName: 'reviewContent',
     args: [envelope],
-    taskQueue: 'long-tail',
+    taskQueue: 'long-tail-examples',
   });
 }

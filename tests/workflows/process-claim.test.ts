@@ -30,7 +30,7 @@ const { Connection, Client, Worker } = Durable;
 
 const CLAIM_QUEUE = 'test-claim';
 const ORCH_QUEUE = 'test-claim-orch';
-const TRIAGE_QUEUE = 'lt-mcp-triage';
+const TRIAGE_QUEUE = 'long-tail-system';
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
 // ── Test orchestrator: thin container wrapping processClaim ──────────────
