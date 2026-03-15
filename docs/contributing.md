@@ -2,7 +2,7 @@
 
 ## Running the Demo
 
-The repository includes a working server with two example workflows (`reviewContent` and `verifyDocument`), Postgres, and NATS.
+The repository includes a working server with five example workflows (`reviewContent`, `verifyDocument`, `verifyDocumentMcp`, `processClaim`, and `kitchenSink`), Postgres, NATS, and a React dashboard.
 
 ### Prerequisites
 
@@ -16,7 +16,7 @@ cd long-tail
 docker compose up
 ```
 
-Postgres, NATS, and the API server start together. Migrations run automatically.
+Postgres, NATS, the API server, and the dashboard start together. The dashboard is built during the Docker image build and served as static assets. Migrations run automatically.
 
 Default ports are `3000` (API), `5432` (Postgres), `4222`/`8222` (NATS). Override any of them:
 

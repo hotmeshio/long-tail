@@ -2,8 +2,8 @@ import { AlertTriangle, Inbox } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 const entries: NavEntry[] = [
-  { to: '/escalations/available', label: 'All Escalations', icon: AlertTriangle },
-  { to: '/escalations/queue', label: 'My Escalations', icon: Inbox },
+  { to: '/escalations/available', label: 'Available', icon: AlertTriangle },
+  { to: '/escalations/queue', label: 'Mine', icon: Inbox },
 ];
 
 export function OperatorSidebar() {

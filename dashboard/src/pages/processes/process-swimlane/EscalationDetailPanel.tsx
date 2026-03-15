@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { StatusBadge } from '../../../components/common/StatusBadge';
-import { UserName } from '../../../components/common/UserName';
-import { TimeAgo } from '../../../components/common/TimeAgo';
+import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { UserName } from '../../../components/common/display/UserName';
+import { TimeAgo } from '../../../components/common/display/TimeAgo';
 import { formatDuration } from '../../../lib/format';
 import type { LTEscalationRecord } from '../../../api/types';
 import { MetricCell } from './MetricCell';
@@ -102,7 +102,7 @@ export function EscalationDetailPanel({
         </Link>
         {escalation.workflow_id && (
           <Link
-            to={`/workflows/detail/${encodeURIComponent(escalation.workflow_id)}`}
+            to={`/workflows/executions/${encodeURIComponent(escalation.workflow_id)}`}
             className="block text-[11px] text-accent hover:underline"
           >
             Execution Details

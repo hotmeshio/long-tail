@@ -41,7 +41,7 @@ function wrapperWithParams(search: string) {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return (
       <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={[`/mcp/runs${search}`]}>{children}</MemoryRouter>
+        <MemoryRouter initialEntries={[`/mcp/executions${search}`]}>{children}</MemoryRouter>
       </QueryClientProvider>
     );
   };
@@ -69,7 +69,7 @@ function findFilterSelect(labelText: string): HTMLSelectElement | null {
 describe('McpRunsPage', () => {
   it('renders page header', () => {
     render(<McpRunsPage />, { wrapper });
-    expect(screen.getByText('Runs')).toBeInTheDocument();
+    expect(screen.getByText('Executions')).toBeInTheDocument();
   });
 
   it('renders job rows with entity', () => {

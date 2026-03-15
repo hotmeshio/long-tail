@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/common/layout/PageHeader';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -120,7 +120,7 @@ export function WorkflowsOverview() {
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
-    navigate(`/workflows/runs${qs ? `?${qs}` : ''}`);
+    navigate(`/workflows/executions${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';

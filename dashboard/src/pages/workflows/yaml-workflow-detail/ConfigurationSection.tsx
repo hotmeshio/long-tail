@@ -1,5 +1,5 @@
-import { CollapsibleSection } from '../../../components/common/CollapsibleSection';
-import { JsonViewer } from '../../../components/common/JsonViewer';
+import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
+import { JsonViewer } from '../../../components/common/data/JsonViewer';
 
 export function ConfigurationSection({
   wf,

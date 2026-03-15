@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useMcpServers } from '../../api/mcp';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { StickyPagination } from '../../components/common/StickyPagination';
-import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
-import { PageHeader } from '../../components/common/PageHeader';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
+import { PageHeader } from '../../components/common/layout/PageHeader';
 import { TryToolModal } from './TryToolModal';
 import type { McpToolManifest } from '../../api/types';
 

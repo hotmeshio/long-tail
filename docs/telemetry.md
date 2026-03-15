@@ -61,6 +61,8 @@ telemetryRegistry.hasAdapter;          // boolean — true if an adapter is regi
 
 ## Initialization Order
 
+The registry is simple, but initialization order matters.
+
 The adapter must be registered and connected **before** workers start. HotMesh creates its tracers during worker initialization. If no `TracerProvider` is registered at that point, spans are silently discarded for the lifetime of the process.
 
 `start()` handles this automatically — it connects the telemetry adapter before creating any workers. If you register the adapter programmatically instead, ensure you call `connect()` before starting workers.

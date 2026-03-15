@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { TimeAgo } from '../../components/common/TimeAgo';
-import { PageHeader } from '../../components/common/PageHeader';
-import { FilterBar, FilterSelect, FilterInput } from '../../components/common/FilterBar';
-import { EmptyState } from '../../components/common/EmptyState';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
+import { EmptyState } from '../../components/common/display/EmptyState';
 import type { LTYamlWorkflowRecord } from '../../api/types';
 
 // ── Grouped data ─────────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ export function YamlWorkflowsPage() {
       <PageHeader title="Workflow Tools" />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Compiled from successful triage runs. Each workflow is a deterministic tool — no LLM, direct tool-to-tool piping.
+        Compiled from successful triage runs. Each workflow is a deterministic tool.
       </p>
 
       <FilterBar>

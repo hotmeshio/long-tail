@@ -9,9 +9,9 @@ import {
   useEscalateToRole,
 } from '../../../api/escalations';
 import { useEscalationTargets } from '../../../api/roles';
-import { JsonViewer } from '../../../components/common/JsonViewer';
-import { PageHeader } from '../../../components/common/PageHeader';
-import { CollapsibleSection } from '../../../components/common/CollapsibleSection';
+import { JsonViewer } from '../../../components/common/data/JsonViewer';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';

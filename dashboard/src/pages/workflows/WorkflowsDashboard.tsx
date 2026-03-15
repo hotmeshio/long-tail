@@ -5,12 +5,12 @@ import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { PageHeader } from '../../components/common/PageHeader';
-import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
-import { StickyPagination } from '../../components/common/StickyPagination';
-import { RowAction, RowActionGroup } from '../../components/common/RowActions';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
 const jobStatusMap: Record<string, string> = {
@@ -99,7 +99,7 @@ function buildColumns(
             <RowAction
               icon={Settings}
               title="View config"
-              onClick={() => navigate(`/workflows/config/${encodeURIComponent(row.entity)}`)}
+              onClick={() => navigate(`/workflows/registry/${encodeURIComponent(row.entity)}`)}
             />
           )}
         </RowActionGroup>
@@ -144,7 +144,7 @@ export function WorkflowsDashboard() {
 
   return (
     <div>
-      <PageHeader title="Runs" />
+      <PageHeader title="Executions" />
 
       <FilterBar>
         <input
@@ -176,7 +176,7 @@ export function WorkflowsDashboard() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/workflows/detail/${row.workflow_id}`)}
+        onRowClick={(row) => navigate(`/workflows/executions/${row.workflow_id}`)}
         isLoading={isLoading}
         emptyMessage="No workflow jobs found"
         sort={sort}

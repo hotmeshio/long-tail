@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useUsers, useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import { useRoles } from '../../../api/roles';
 import { useFilterParams } from '../../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../../components/common/DataTable';
-import { StickyPagination } from '../../../components/common/StickyPagination';
-import { Modal } from '../../../components/common/Modal';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { DataTable, type Column } from '../../../components/common/data/DataTable';
+import { StickyPagination } from '../../../components/common/data/StickyPagination';
+import { Modal } from '../../../components/common/modal/Modal';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
 
 export function UserRolesPage() {

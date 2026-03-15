@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { Field } from '../Field';
+import { Field } from '../data/Field';
 
 describe('Field', () => {
   it('renders label and value', () => {

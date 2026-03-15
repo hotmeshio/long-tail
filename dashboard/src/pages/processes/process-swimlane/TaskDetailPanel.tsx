@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { StatusBadge } from '../../../components/common/StatusBadge';
-import { TimeAgo } from '../../../components/common/TimeAgo';
+import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { TimeAgo } from '../../../components/common/display/TimeAgo';
 import { formatDuration } from '../../../lib/format';
 import type { LTTaskRecord } from '../../../api/types';
 import { MetricCell } from './MetricCell';
@@ -75,7 +75,7 @@ export function TaskDetailPanel({
       {/* Right: links */}
       <div className="space-y-2">
         <Link
-          to={`/workflows/detail/${encodeURIComponent(task.workflow_id)}`}
+          to={`/workflows/executions/${encodeURIComponent(task.workflow_id)}`}
           className="block text-[11px] text-accent hover:underline"
         >
           Execution Details

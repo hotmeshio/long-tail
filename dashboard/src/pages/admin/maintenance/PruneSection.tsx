@@ -3,8 +3,8 @@ import {
   usePrune,
   type PruneResult,
 } from '../../../api/maintenance';
-import { Modal } from '../../../components/common/Modal';
-import { SectionLabel } from '../../../components/common/SectionLabel';
+import { Modal } from '../../../components/common/modal/Modal';
+import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import { RETENTION_PERIOD_OPTIONS } from '../../../lib/constants';
 
 export function PruneSection() {

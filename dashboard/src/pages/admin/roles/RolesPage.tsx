@@ -8,10 +8,10 @@ import {
   useRemoveEscalationChain,
   type RoleDetail,
 } from '../../../api/roles';
-import { DataTable, type Column } from '../../../components/common/DataTable';
-import { ConfirmDeleteModal } from '../../../components/common/ConfirmDeleteModal';
-import { Modal } from '../../../components/common/Modal';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { DataTable, type Column } from '../../../components/common/data/DataTable';
+import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
+import { Modal } from '../../../components/common/modal/Modal';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
 
 // ── Create Role Modal ─────────────────────────────────────────
 

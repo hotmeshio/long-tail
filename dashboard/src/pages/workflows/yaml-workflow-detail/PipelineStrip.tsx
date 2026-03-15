@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { JsonViewer } from '../../../components/common/JsonViewer';
+import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import type { ActivityManifestEntry } from '../../../api/types/yaml-workflows';
 import { sourceLabel, sourceColor } from './helpers';
 

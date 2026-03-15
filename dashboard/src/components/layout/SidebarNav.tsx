@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Collapsible } from '../common/Collapsible';
+import { Collapsible } from '../common/layout/Collapsible';
 import { useSidebar } from '../../hooks/useSidebar';
 
 export interface NavItem {

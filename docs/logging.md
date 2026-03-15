@@ -1,8 +1,6 @@
 # Logging
 
-## Overview
-
-All internal log output in Long Tail flows through a single logger registry. By default, logs are written to the console. Replacing the default with a structured logger (Pino, Winston, Bunyan, or any other) requires one call: register an adapter that satisfies the `LTLoggerAdapter` interface. Roughly 15 call sites across the codebase -- the main entry point, workers, maintenance routines, event handling, telemetry, database migrations, and the interceptor -- use the registry directly. No call site chooses its own transport; all defer to whatever adapter is registered.
+All internal log output in Long Tail flows through a single logger registry. The registry delegates to whatever adapter is registered — Pino, Winston, Bunyan, or any class that implements the `LTLoggerAdapter` interface. Long Tail ships with a ready-made Pino adapter; enable it with `logging: { pino: { level: 'info' } }` in the `start()` config. When no adapter is registered, the registry falls back to `console.*` so log output is never silently dropped, but production deployments should always register a structured adapter. Roughly 15 call sites across the codebase — the main entry point, workers, maintenance routines, event handling, telemetry, database migrations, and the interceptor — use the registry directly. No call site chooses its own transport; all defer to whatever adapter is registered.
 
 ## Configuration via start()
 

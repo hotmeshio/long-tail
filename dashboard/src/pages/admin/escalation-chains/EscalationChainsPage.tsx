@@ -5,8 +5,8 @@ import {
   useAddEscalationChain,
   useRemoveEscalationChain,
 } from '../../../api/roles';
-import { PageHeader } from '../../../components/common/PageHeader';
-import { SectionLabel } from '../../../components/common/SectionLabel';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 
 
 export function EscalationChainsPage() {

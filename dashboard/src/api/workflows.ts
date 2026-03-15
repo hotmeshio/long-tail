@@ -127,12 +127,16 @@ export function useSetCronSchedule() {
   return useMutation<
     LTWorkflowConfig,
     Error,
-    { config: LTWorkflowConfig; cron_schedule: string | null }
+    { config: LTWorkflowConfig; cron_schedule: string | null; envelope_schema?: Record<string, unknown> | null }
   >({
-    mutationFn: ({ config, cron_schedule }) =>
+    mutationFn: ({ config, cron_schedule, envelope_schema }) =>
       apiFetch(`/workflows/${encodeURIComponent(config.workflow_type)}/config`, {
         method: 'PUT',
-        body: JSON.stringify({ ...config, cron_schedule }),
+        body: JSON.stringify({
+          ...config,
+          cron_schedule,
+          ...(envelope_schema !== undefined ? { envelope_schema } : {}),
+        }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflowConfigs'], refetchType: 'all' });

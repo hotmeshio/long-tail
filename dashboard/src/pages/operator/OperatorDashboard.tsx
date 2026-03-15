@@ -6,10 +6,10 @@ import { useEscalations, useEscalationTypes, useReleaseEscalation } from '../../
 import { useEscalationListEvents } from '../../hooks/useNatsEvents';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { PageHeader } from '../../components/common/PageHeader';
-import { StickyPagination } from '../../components/common/StickyPagination';
-import { RowAction, RowActionGroup } from '../../components/common/RowActions';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ESCALATION_COLUMNS, CLAIMED_STATUS_COLUMN, TIME_LEFT_COLUMN, EscalationFilterBar } from './escalation-columns';
 import type { LTEscalationRecord } from '../../api/types';
 
@@ -25,7 +25,7 @@ export function OperatorDashboard() {
   const { data: rolesData } = useRoles();
   const { data: typesData } = useEscalationTypes();
 
-  const { data, isLoading } = useEscalations({
+  const { data, isLoading, error: queryError } = useEscalations({
     assigned_to: user?.userId,
     status: 'pending',
     role: filters.role || undefined,
@@ -84,13 +84,21 @@ export function OperatorDashboard() {
         types={typesData?.types ?? []}
       />
 
+      {queryError && (
+        <div className="mb-4 px-4 py-3 rounded-md bg-status-error/10 border border-status-error/20 text-xs text-status-error">
+          {(queryError as Error).message === 'Session expired'
+            ? 'Your session has expired. Please log in again.'
+            : `Failed to load escalations: ${(queryError as Error).message}`}
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         data={activeClaims}
         keyFn={(row) => row.id}
         onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/queue' } })}
         isLoading={isLoading}
-        emptyMessage="No assigned escalations"
+        emptyMessage={queryError ? 'Unable to load data' : 'No assigned escalations'}
         sort={sort}
         onSort={setSort}
       />

@@ -205,12 +205,11 @@ The system responds immediately with `{ triage: true, triageWorkflowId: "triage-
 
 Behind the scenes, a cascade of workflows just started:
 
-1. **mcpTriageOrchestrator** — Container workflow (Phase 1 + Phase 2)
-2. **mcpTriage** — Leaf workflow (LLM agentic loop with MCP tools)
+1. **mcpTriage** — Self-contained workflow (LLM agentic loop with MCP tools, then direct resolution or escalation on the original task)
 
-Navigate back to the **Process 4** detail page to see the triage task appear in the timeline. You'll see new entries for the triage orchestrator and its child workflows as they execute.
+Navigate back to the **Process 4** detail page to see the triage task appear in the timeline. You'll see the triage workflow entry as it executes.
 
-The triage leaf is executing an LLM agentic loop:
+The triage workflow is executing an LLM agentic loop:
 
 1. **Gets tool inventory** — Discovers 5 MCP servers with 20 tools
 2. **Reads the escalation context** — Upstream tasks, escalation history
@@ -229,7 +228,7 @@ This takes 30-60 seconds depending on OpenAI response times.
 
 ### Step 5: Observe the Re-invocation
 
-After triage completes (Phase 1), the orchestrator enters Phase 2:
+After the agentic loop completes, the triage workflow handles the exit directly:
 
 - Re-invokes `processClaim` with the corrected documents
 - The `envelope.resolver` field contains the triage output
@@ -290,14 +289,14 @@ Human resolves with needsTriage: true         │
                                               │
                     TRIAGE                    │
                     ══════                    │
-mcpTriageOrchestrator (container)             │
+mcpTriage (self-contained)                    │
   │                                           │
-  ├─ Phase 1: executeLT(mcpTriage)            │
+  ├─ LLM agentic loop                        │
   │    ├─ LLM + MCP tools                     │
   │    ├─ rotate_page, extract_member_info    │
-  │    └─ return { correctedData }            │
+  │    └─ produces correctedData              │
   │                                           │
-  ├─ Phase 2: executeLT(processClaim)         │
+  ├─ Exit: re-invokes processClaim            │
   │    ├─ envelope.resolver = correctedData   │
   │    ├─ processClaim detects re-entry       │
   │    ├─ Processes with corrected docs       │
@@ -312,7 +311,7 @@ mcpTriageOrchestrator (container)             │
   Pipeline continues deterministically        ▼
 ```
 
-Key insight: The parent orchestrator never died. It stayed alive on `waitFor`. Signals — not child workflows — maintain continuity. This is the "vortex" pattern: a completely separate remediation orchestration runs independently while the parent waits.
+Key insight: The parent orchestrator never died. It stayed alive on `waitFor`. Signals — not child workflows — maintain continuity. This is the "vortex" pattern: a completely separate triage workflow runs independently on a separate axis while the parent waits.
 
 ---
 

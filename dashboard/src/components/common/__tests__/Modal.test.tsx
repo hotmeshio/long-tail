@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Modal } from '../Modal';
+import { Modal } from '../modal/Modal';
 
 describe('Modal', () => {
   it('renders nothing when closed', () => {

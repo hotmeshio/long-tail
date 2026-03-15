@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWorkflowConfigs, useSetCronSchedule, useJobs } from '../../api/workflows';
 import { useCronStatus } from '../../api/workflows';
-import { PageHeader } from '../../components/common/PageHeader';
-import { SectionLabel } from '../../components/common/SectionLabel';
-import { Pill } from '../../components/common/Pill';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { TimeAgo } from '../../components/common/TimeAgo';
-import { StatusBadge } from '../../components/common/StatusBadge';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { SectionLabel } from '../../components/common/layout/SectionLabel';
+import { Pill } from '../../components/common/display/Pill';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
 import type { LTJob } from '../../api/types';
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers -----------------------------------------------------------------
 
 const CRON_DESCRIPTIONS: Record<string, string> = {
   '* * * * *': 'Every minute',
@@ -42,7 +42,29 @@ const COMMON_PATTERNS: [string, string][] = [
   ['0 0 * * 0', 'Weekly (Sun)'],
 ];
 
-// ── Recent jobs table ───────────────────────────────────────────────────────
+const DEFAULT_ENVELOPE = '{\n  "data": {},\n  "metadata": {}\n}';
+
+/** Extract simple string/number/boolean keys from `data` for form view. */
+function extractFormFields(
+  envelope: Record<string, unknown>,
+): { key: string; value: string; type: string }[] | null {
+  const data = envelope?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const entries = Object.entries(data as Record<string, unknown>);
+  if (entries.length === 0) return null;
+  // Only show form if all values are scalar
+  const allScalar = entries.every(
+    ([, v]) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null,
+  );
+  if (!allScalar) return null;
+  return entries.map(([key, value]) => ({
+    key,
+    value: value === null ? '' : String(value),
+    type: value === null ? 'string' : typeof value,
+  }));
+}
+
+// -- Recent jobs table -------------------------------------------------------
 
 const jobColumns: Column<LTJob>[] = [
   {
@@ -51,7 +73,7 @@ const jobColumns: Column<LTJob>[] = [
     render: (row) => (
       <span className="font-mono text-[11px] text-text-secondary">
         {row.workflow_id.length > 40
-          ? `${row.workflow_id.slice(0, 40)}…`
+          ? `${row.workflow_id.slice(0, 40)}...`
           : row.workflow_id}
       </span>
     ),
@@ -70,7 +92,7 @@ const jobColumns: Column<LTJob>[] = [
   },
 ];
 
-// ── Component ───────────────────────────────────────────────────────────────
+// -- Component ---------------------------------------------------------------
 
 export function CronWorkflowsPage() {
   const navigate = useNavigate();
@@ -81,6 +103,9 @@ export function CronWorkflowsPage() {
 
   const selectedType = searchParams.get('type') ?? '';
   const [cronInput, setCronInput] = useState('');
+  const [envelopeInput, setEnvelopeInput] = useState('');
+  const [envelopeError, setEnvelopeError] = useState('');
+  const [viewMode, setViewMode] = useState<'json' | 'form'>('json');
 
   // All invocable workflows are candidates for cron
   const invocable = (configs ?? []).filter((c) => c.invocable);
@@ -89,10 +114,39 @@ export function CronWorkflowsPage() {
   // Active cron types from the server-side registry
   const activeTypes = new Set((cronEntries ?? []).filter((e) => e.active).map((e) => e.workflow_type));
 
+  // Default envelope string for the selected workflow
+  const defaultEnvelope = useMemo(() => {
+    if (!selected?.envelope_schema) return DEFAULT_ENVELOPE;
+    return JSON.stringify(selected.envelope_schema, null, 2);
+  }, [selected?.envelope_schema]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isEnvelopeModified = envelopeInput !== defaultEnvelope;
+
+  // Parse current envelope for form view
+  const parsedEnvelope = useMemo(() => {
+    try {
+      return JSON.parse(envelopeInput) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }, [envelopeInput]);
+
+  const formFields = useMemo(
+    () => (parsedEnvelope ? extractFormFields(parsedEnvelope) : null),
+    [parsedEnvelope],
+  );
+
   // Sync input when selection changes
   useEffect(() => {
     if (selected) {
       setCronInput(selected.cron_schedule ?? '');
+      setEnvelopeInput(
+        selected.envelope_schema
+          ? JSON.stringify(selected.envelope_schema, null, 2)
+          : DEFAULT_ENVELOPE,
+      );
+      setEnvelopeError('');
+      setViewMode('json');
       setCron.reset();
     }
   }, [selectedType]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,9 +158,21 @@ export function CronWorkflowsPage() {
 
   const handleSave = () => {
     if (!selected) return;
+
+    // Validate envelope JSON
+    let envelopeSchema: Record<string, unknown> | undefined;
+    try {
+      envelopeSchema = JSON.parse(envelopeInput);
+    } catch {
+      setEnvelopeError('Invalid JSON in envelope');
+      return;
+    }
+    setEnvelopeError('');
+
     setCron.mutate({
       config: selected,
       cron_schedule: cronInput.trim() || null,
+      envelope_schema: envelopeSchema,
     });
   };
 
@@ -117,6 +183,28 @@ export function CronWorkflowsPage() {
       config: selected,
       cron_schedule: null,
     });
+  };
+
+  const handleResetEnvelope = () => {
+    setEnvelopeInput(defaultEnvelope);
+    setEnvelopeError('');
+  };
+
+  /** Update a single form field and sync back to JSON */
+  const handleFormFieldChange = (key: string, value: string) => {
+    if (!parsedEnvelope) return;
+    const data = { ...((parsedEnvelope.data as Record<string, unknown>) ?? {}) };
+    // Preserve original type
+    const original = data[key];
+    if (typeof original === 'number') {
+      data[key] = value === '' ? 0 : Number(value);
+    } else if (typeof original === 'boolean') {
+      data[key] = value === 'true';
+    } else {
+      data[key] = value;
+    }
+    const updated = { ...parsedEnvelope, data };
+    setEnvelopeInput(JSON.stringify(updated, null, 2));
   };
 
   if (isLoading) {
@@ -286,18 +374,107 @@ export function CronWorkflowsPage() {
                   </div>
                 </div>
 
-                {/* Envelope preview */}
-                {selected.envelope_schema && (
-                  <div>
-                    <SectionLabel className="mb-2">Default Envelope</SectionLabel>
-                    <pre className="bg-surface-sunken rounded-lg p-4 text-[11px] font-mono text-text-secondary leading-relaxed overflow-x-auto">
-                      {JSON.stringify(selected.envelope_schema, null, 2)}
-                    </pre>
-                    <p className="text-[10px] text-text-tertiary mt-1.5">
-                      Sent as the workflow input on each cron invocation
-                    </p>
+                {/* Cron Envelope editor */}
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <SectionLabel>Cron Envelope</SectionLabel>
+                    <div className="flex items-center gap-3">
+                      {isEnvelopeModified && (
+                        <button
+                          type="button"
+                          onClick={handleResetEnvelope}
+                          className="text-[10px] text-status-warning hover:text-status-warning/80 transition-colors"
+                        >
+                          Reset to default
+                        </button>
+                      )}
+                      {formFields && (
+                        <div className="flex rounded overflow-hidden border border-surface-border">
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('form')}
+                            className={`px-2 py-0.5 text-[10px] transition-colors ${
+                              viewMode === 'form'
+                                ? 'bg-accent/10 text-accent'
+                                : 'text-text-tertiary hover:text-text-secondary'
+                            }`}
+                          >
+                            Form
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('json')}
+                            className={`px-2 py-0.5 text-[10px] transition-colors ${
+                              viewMode === 'json'
+                                ? 'bg-accent/10 text-accent'
+                                : 'text-text-tertiary hover:text-text-secondary'
+                            }`}
+                          >
+                            JSON
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                  <p className="text-[10px] text-text-tertiary mb-3">
+                    This envelope is sent as the workflow input on each cron invocation. Edit to customize.
+                  </p>
+
+                  {viewMode === 'form' && formFields ? (
+                    <div className="space-y-3">
+                      {formFields.map(({ key, value, type }) => (
+                        <div key={key}>
+                          <label className="block text-[11px] text-text-secondary mb-1 font-mono">
+                            {key}
+                          </label>
+                          {type === 'boolean' ? (
+                            <select
+                              value={value}
+                              onChange={(e) => handleFormFieldChange(key, e.target.value)}
+                              className="input text-xs w-full"
+                            >
+                              <option value="true">true</option>
+                              <option value="false">false</option>
+                            </select>
+                          ) : (
+                            <input
+                              type={type === 'number' ? 'number' : 'text'}
+                              value={value}
+                              onChange={(e) => handleFormFieldChange(key, e.target.value)}
+                              className="input text-xs font-mono w-full"
+                            />
+                          )}
+                        </div>
+                      ))}
+                      {/* Show metadata as read-only hint if present */}
+                      {parsedEnvelope?.metadata != null && typeof parsedEnvelope.metadata === 'object' && Object.keys(parsedEnvelope.metadata as Record<string, unknown>).length > 0 && (
+                        <p className="text-[10px] text-text-tertiary mt-2">
+                          Metadata fields are editable in JSON view.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={envelopeInput}
+                      onChange={(e) => {
+                        setEnvelopeInput(e.target.value);
+                        setEnvelopeError('');
+                      }}
+                      className="input font-mono text-xs w-full"
+                      rows={10}
+                      spellCheck={false}
+                    />
+                  )}
+
+                  {envelopeError && (
+                    <p className="text-[10px] text-status-error mt-2">{envelopeError}</p>
+                  )}
+                  {isEnvelopeModified && (
+                    <p className="text-[10px] text-accent mt-1.5">
+                      Envelope has been customized. Changes will be saved with the schedule.
+                    </p>
+                  )}
+                </div>
 
                 {/* Recent executions */}
                 <div>
@@ -306,7 +483,7 @@ export function CronWorkflowsPage() {
                     columns={jobColumns}
                     data={jobsData?.jobs ?? []}
                     keyFn={(row) => row.workflow_id}
-                    onRowClick={(row) => navigate(`/workflows/detail/${row.workflow_id}`)}
+                    onRowClick={(row) => navigate(`/workflows/executions/${row.workflow_id}`)}
                     isLoading={jobsLoading}
                     emptyMessage="No executions yet"
                   />

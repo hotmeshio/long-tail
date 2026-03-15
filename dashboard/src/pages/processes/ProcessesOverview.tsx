@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProcessStats } from '../../api/tasks';
 import { useProcessListEvents } from '../../hooks/useNatsEvents';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/common/layout/PageHeader';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -74,14 +74,14 @@ export function ProcessesOverview() {
 
   const goToList = (params?: Record<string, string>) => {
     const qs = new URLSearchParams(params).toString();
-    navigate(`/processes/runs${qs ? `?${qs}` : ''}`);
+    navigate(`/processes/all${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
 
   return (
     <div>
-      <PageHeader title="Business Processes" />
+      <PageHeader title="Processes" />
 
       {/* Duration tabs */}
       <div className="flex items-center gap-1 mb-6">

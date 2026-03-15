@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEscalationStats } from '../../api/escalations';
 import { useEscalationStatsEvents } from '../../hooks/useNatsEvents';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/common/layout/PageHeader';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 

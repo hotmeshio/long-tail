@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/common/SectionLabel';
+import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 
 export function VersionHistory({
   versionsData,

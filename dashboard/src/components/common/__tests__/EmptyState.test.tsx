@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { EmptyState } from '../EmptyState';
+import { EmptyState } from '../display/EmptyState';
 
 describe('EmptyState', () => {
   it('renders default title when none is provided', () => {

@@ -4,9 +4,9 @@ import {
   useUpdateMaintenanceConfig,
   type MaintenanceRule,
 } from '../../../api/maintenance';
-import { Modal } from '../../../components/common/Modal';
-import { SectionLabel } from '../../../components/common/SectionLabel';
-import { DataTable, type Column } from '../../../components/common/DataTable';
+import { Modal } from '../../../components/common/modal/Modal';
+import { SectionLabel } from '../../../components/common/layout/SectionLabel';
+import { DataTable, type Column } from '../../../components/common/data/DataTable';
 
 export function ScheduledMaintenanceSection() {
   const { data, isLoading } = useMaintenanceConfig();

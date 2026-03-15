@@ -15,18 +15,18 @@ import {
 } from '../../api/escalations';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { StickyPagination } from '../../components/common/StickyPagination';
-import { Modal } from '../../components/common/Modal';
-import { PageHeader } from '../../components/common/PageHeader';
-import { BulkActionBar } from '../../components/common/BulkActionBar';
-import { BulkAssignModal } from '../../components/common/BulkAssignModal';
-import { BulkTriageModal } from '../../components/common/BulkTriageModal';
-import { CustomDurationPicker } from '../../components/common/CustomDurationPicker';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { Modal } from '../../components/common/modal/Modal';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
+import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
+import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
+import { CustomDurationPicker } from '../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
 import { ESCALATION_COLUMNS, STATUS_COLUMN, EscalationFilterBar } from './escalation-columns';
-import { RowAction, RowActionGroup } from '../../components/common/RowActions';
+import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
@@ -60,7 +60,7 @@ export function AvailableEscalationsPage() {
     setSelectedIds(new Set());
   }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
-  const { data, isLoading } = useEscalations({
+  const { data, isLoading, error: queryError } = useEscalations({
     status: filters.status || undefined,
     role: filters.role || undefined,
     type: filters.type || undefined,
@@ -236,7 +236,7 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="All Escalations" />
+      <PageHeader title="Available Escalations" />
 
       <EscalationFilterBar
         filters={filters}
@@ -264,13 +264,21 @@ export function AvailableEscalationsPage() {
         />
       )}
 
+      {queryError && (
+        <div className="mb-4 px-4 py-3 rounded-md bg-status-error/10 border border-status-error/20 text-xs text-status-error">
+          {(queryError as Error).message === 'Session expired'
+            ? 'Your session has expired. Please log in again.'
+            : `Failed to load escalations: ${(queryError as Error).message}`}
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         data={escalations}
         keyFn={(row) => row.id}
         onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
         isLoading={isLoading}
-        emptyMessage="No available escalations"
+        emptyMessage={queryError ? 'Unable to load data' : 'No available escalations'}
         sort={sort}
         onSort={setSort}
       />

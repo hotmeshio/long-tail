@@ -4,11 +4,11 @@ import { useWorkflowConfigs } from '../../api/workflows';
 import { useProcessListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { TimeAgo } from '../../components/common/TimeAgo';
-import { StickyPagination } from '../../components/common/StickyPagination';
-import { FilterBar, FilterSelect, FilterInput } from '../../components/common/FilterBar';
-import { PageHeader } from '../../components/common/PageHeader';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
+import { PageHeader } from '../../components/common/layout/PageHeader';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -104,7 +104,7 @@ export function ProcessesListPage() {
 
   return (
     <div>
-      <PageHeader title="Process Runs" />
+      <PageHeader title="All Processes" />
 
       <FilterBar>
         <FilterInput

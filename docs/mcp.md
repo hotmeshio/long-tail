@@ -136,6 +136,8 @@ This is how the system evolves:
 
 Over time, the YAML replaces the procedural. The MCP triage workflow stops entropy by repairing and replacing the flows that eventually all become obsolete. Dynamic processes author themselves. The long tail gets shorter every time.
 
+The sections above describe the concept. The rest of this guide covers the concrete servers, tools, and APIs that implement it.
+
 ## Human Queue Server
 
 The Human Queue is a built-in MCP server that exposes Long Tail's escalation API as standard MCP tools. Any MCP-compatible client — Claude, LangGraph, CrewAI, a custom agent — can connect and work the queue.
@@ -271,6 +273,8 @@ const work = await client.callTool({
 
 **Over stdio or SSE:** Connect your MCP client to Long Tail's Streamable HTTP endpoint or spawn the server as a subprocess. The tools and responses are identical regardless of transport.
 
+The Human Queue handles the people side. The Document Vision server handles the AI side — wrapping model capabilities as MCP tools.
+
 ## Document Vision Server
 
 The Document Vision server (`services/mcp/vision-server.ts`) wraps AI processing activities as MCP tools. It follows the same singleton pattern as the Human Queue server — Zod schemas at module level, `createVisionServer()` / `stopVisionServer()` lifecycle.
@@ -402,6 +406,8 @@ OPENAI_API_KEY=sk-... npm run test:mcp:vision
 npx vitest run tests/workflows/verify-document-mcp.test.ts --reporter=verbose
 ```
 
+The examples above use built-in servers. Long Tail can also connect to any external MCP server.
+
 ## External MCP Servers
 
 Long Tail can connect to any external MCP server and invoke its tools as durable activities. Register servers in the database, then wrap their tools with `proxyActivities()` — the same mechanism used for any workflow activity.
@@ -473,6 +479,8 @@ export async function classifyDocument(envelope: LTEnvelope) {
 Tool names are derived from the server name and tool name: `mcp_{serverName}_{toolName}`, with non-alphanumeric characters replaced by underscores.
 
 If the process crashes between an MCP tool call and its checkpoint, HotMesh replays from cache. The external server is not called a second time. This gives you exactly-once semantics over a protocol that doesn't natively guarantee them.
+
+Server registration can happen at runtime via the REST API (shown above) or at startup via configuration.
 
 ## Configuration
 
@@ -550,6 +558,8 @@ curl -X POST http://localhost:3000/api/mcp/servers/$ID/tools/search/call \
   -d '{ "arguments": { "query": "hello" } }'
 ```
 
+Server registrations are persisted in PostgreSQL so they survive restarts.
+
 ## Database Schema
 
 MCP server registrations are stored in `lt_mcp_servers`:
@@ -575,6 +585,8 @@ CREATE TABLE IF NOT EXISTS lt_mcp_servers (
 The `tool_manifest` column caches the result of `listTools()` on each successful connection, so tools can be enumerated without a live connection.
 
 The schema is created automatically by `migrate()`. See `services/db/schemas/001_initial.sql`.
+
+The test suite verifies the full MCP protocol against real PostgreSQL — no mocks.
 
 ## Testing
 

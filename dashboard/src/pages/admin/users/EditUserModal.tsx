@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useUpdateUser } from '../../../api/users';
-import { Modal } from '../../../components/common/Modal';
+import { Modal } from '../../../components/common/modal/Modal';
 import type { LTUserRecord } from '../../../api/types';
 
 export function EditUserModal({

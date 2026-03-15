@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RotateCcw, Play, ExternalLink } from 'lucide-react';
 import { useCallMcpTool } from '../../api/mcp';
-import { Modal } from '../../components/common/Modal';
-import { JsonViewer } from '../../components/common/JsonViewer';
+import { Modal } from '../../components/common/modal/Modal';
+import { JsonViewer } from '../../components/common/data/JsonViewer';
 import type { McpToolManifest } from '../../api/types';
 
 interface TryToolModalProps {
@@ -89,7 +89,7 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
               const ns = res?.namespace || 'longtail';
               return jobId ? (
                 <Link
-                  to={`/mcp/runs/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(ns)}`}
+                  to={`/mcp/executions/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(ns)}`}
                   className="inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
                 >
                   <ExternalLink size={12} />

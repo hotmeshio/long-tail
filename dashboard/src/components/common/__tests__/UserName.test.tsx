@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi } from 'vitest';
-import { UserName } from '../UserName';
+import { UserName } from '../display/UserName';
 
 vi.mock('../../../api/users', () => ({
   useUser: vi.fn(),

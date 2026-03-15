@@ -49,6 +49,8 @@ const lt = await start({
 });
 ```
 
+All three tiers follow the same directory conventions. The next section explains that convention and why it matters.
+
 ## The Convention
 
 Every tier follows the same structure. Activities are where side effects live. Workflows are deterministic functions that call activities. MCP servers are thin wrappers that expose activities as tools.
@@ -91,6 +93,8 @@ export async function classifyContent(envelope: LTEnvelope) {
 server.tool('classify', schema, async (args) => activities.classify(args));
 ```
 
+With this convention in place, the system ships with a set of built-in capabilities that demonstrate the pattern.
+
 ## System Capabilities
 
 ### Tag-Based Tool Discovery
@@ -119,6 +123,8 @@ Tags are GIN-indexed in PostgreSQL for fast lookup. Register a new MCP server ta
 
 Engineers can register external servers — Playwright for browser automation, file storage, custom APIs. The triage agent can even recommend that engineers add a new MCP server when it encounters a capability gap. Every server's tools become available as proxy activities in deterministic workflows and as callable tools in dynamic triage.
 
+The eight built-in servers are the starting inventory.
+
 ## Built-in MCP Servers
 
 Long Tail ships with eight built-in servers:
@@ -135,6 +141,8 @@ Long Tail ships with eight built-in servers:
 | `long-tail-http-fetch` | 3 | HTTP requests, JSON fetch, text fetch for external APIs |
 
 For details on managing servers via the REST API or at startup, see [docs/mcp.md](mcp.md).
+
+To add your own tools to this inventory, follow the same convention.
 
 ## Registering Your Own
 

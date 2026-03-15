@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { CountdownTimer } from '../../../components/common/CountdownTimer';
-import { UserName } from '../../../components/common/UserName';
-import { CustomDurationPicker } from '../../../components/common/CustomDurationPicker';
+import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
+import { UserName } from '../../../components/common/display/UserName';
+import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
 
 // ---------------------------------------------------------------------------

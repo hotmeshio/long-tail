@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BulkActionBar } from '../BulkActionBar';
+import { BulkActionBar } from '../modal/BulkActionBar';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { Collapsible } from '../Collapsible';
+import { Collapsible } from '../layout/Collapsible';
 
 describe('Collapsible', () => {
   it('renders children when open', () => {

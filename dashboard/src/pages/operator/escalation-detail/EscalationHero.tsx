@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { StatusBadge } from '../../../components/common/StatusBadge';
-import { CountdownTimer } from '../../../components/common/CountdownTimer';
-import { Collapsible } from '../../../components/common/Collapsible';
-import { TimeAgo } from '../../../components/common/TimeAgo';
-import { CopyableId } from '../../../components/common/CopyableId';
-import { UserName } from '../../../components/common/UserName';
+import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
+import { Collapsible } from '../../../components/common/layout/Collapsible';
+import { TimeAgo } from '../../../components/common/display/TimeAgo';
+import { CopyableId } from '../../../components/common/display/CopyableId';
+import { UserName } from '../../../components/common/display/UserName';
 import type { LTEscalationRecord } from '../../../api/types';
 
 export function EscalationHero({

@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Pagination } from '../Pagination';
+import { Pagination } from '../data/Pagination';
 
 describe('Pagination', () => {
   it('renders nothing when total is 0', () => {

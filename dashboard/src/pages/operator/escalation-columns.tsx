@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink, Circle } from 'lucide-react';
-import type { Column } from '../../components/common/DataTable';
-import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
-import { PriorityBadge } from '../../components/common/PriorityBadge';
-import { TimeAgo } from '../../components/common/TimeAgo';
-import { CountdownTimer } from '../../components/common/CountdownTimer';
+import type { Column } from '../../components/common/data/DataTable';
+import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
+import { PriorityBadge } from '../../components/common/display/PriorityBadge';
+import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { CountdownTimer } from '../../components/common/display/CountdownTimer';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import type { LTEscalationRecord } from '../../api/types';
 

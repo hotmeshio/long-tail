@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
-import { TagInput } from '../../../components/common/TagInput';
+import { TagInput } from '../../../components/common/form/TagInput';
 import {
   useYamlWorkflow,
   useDeployYamlWorkflow,
@@ -15,10 +15,10 @@ import {
   useYamlWorkflowVersions,
   useYamlWorkflowVersion,
 } from '../../../api/yaml-workflows';
-import { StatusBadge } from '../../../components/common/StatusBadge';
-import { PageHeader } from '../../../components/common/PageHeader';
-import { Field } from '../../../components/common/Field';
-import { CollapsibleSection } from '../../../components/common/CollapsibleSection';
+import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { Field } from '../../../components/common/data/Field';
+import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { useSettings } from '../../../api/settings';
 import { buildSkeleton } from './helpers';
 import type { Section } from './helpers';
@@ -241,13 +241,13 @@ export function YamlWorkflowDetailPage() {
               <Field label="Tool Calls" value={<span className="text-xs">{workerActivities.length}</span>} />
               {wf.source_workflow_id && (
                 <Field label="Compiled From Workflow" value={
-                  <Link to={`/workflows/detail/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
+                  <Link to={`/workflows/executions/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
                     {wf.source_workflow_id}
                   </Link>
                 } />
               )}
               <Field label="Invocations" value={
-                <Link to={`/mcp/runs?entity=${encodeURIComponent(wf.graph_topic)}&namespace=${encodeURIComponent(wf.app_id)}`} className="text-xs text-accent hover:underline">
+                <Link to={`/mcp/executions?entity=${encodeURIComponent(wf.graph_topic)}&namespace=${encodeURIComponent(wf.app_id)}`} className="text-xs text-accent hover:underline">
                   View runs
                 </Link>
               } />

@@ -1,17 +1,16 @@
 # Long Tail
 
-**Models provide capability. Process provides continuity.**
-
 LLMs are good at making predictions. But production systems need something more: the ability to continue when the prediction is uncertain.
 
 Long Tail treats uncertainty as part of the workflow. When confidence is low, the task escalates. If the issue can be repaired, the system retries the step and records how the problem was resolved. Successful repairs can then be compiled into deterministic workflows so the next occurrence runs automatically.
 
-The system works because everything is treated as a **tool**.  
+The system works because everything is treated as a **tool**.
 Activities, AI models, human reviewers, and compiled workflows all expose the same interface and can be invoked the same way.
 
 The result is simple: **models handle what they know, people handle what they understand, and the system turns solved exceptions into automation.**
 
 > **MCP** (Model Context Protocol) is a standard for exposing tools that AI agents and deterministic code can both call. Long Tail uses MCP as the universal interface — every activity, human queue, and compiled workflow is exposed as a tool.
+
 ## Quick Start
 
 ```bash
@@ -33,7 +32,7 @@ To reset: `docker compose down -v && docker compose up -d --build`
 
 ## Write a Workflow
 
-A **workflow** is a deterministic function. An **activity** is where side effects live (API calls, LLMs, databases). Activities are checkpointed — if the process crashes, they replay from cache, never called twice.
+A **workflow** is a deterministic function. It receives an envelope, makes decisions, and returns a result. If the process crashes mid-execution, the workflow replays from its last checkpoint — no work is lost, no step runs twice.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -47,24 +46,65 @@ const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({
 export async function reviewContent(
   envelope: LTEnvelope,
 ): Promise<LTReturn | LTEscalation> {
+
+  // A resolved escalation re-enters here with the human's decision
   if (envelope.resolver) {
-    return { type: 'return', data: { ...envelope.data, resolution: envelope.resolver } };
+    return {
+      type: 'return',
+      data: {
+        ...envelope.data,
+        resolution: envelope.resolver,
+      },
+    };
   }
 
   const analysis = await analyzeContent(envelope.data.content);
 
   if (analysis.confidence >= 0.85) {
-    return { type: 'return', data: { approved: true, analysis } };
+    return {
+      type: 'return',
+      data: { approved: true, analysis },
+    };
   }
 
+  // Low confidence — escalate to a human reviewer
   return {
     type: 'escalation',
-    data: { content: envelope.data.content, analysis },
+    data: {
+      content: envelope.data.content,
+      analysis,
+    },
     message: `Review needed (confidence: ${analysis.confidence})`,
     role: 'reviewer',
   };
 }
 ```
+
+Side effects — API calls, LLM invocations, database queries — live in **activity** functions. The `proxyActivities` call wraps them so the workflow engine can checkpoint each result. If a crash occurs, activities replay from cache rather than re-executing.
+
+## Every Activity is a Tool
+
+The `proxyActivities` call in the workflow above does more than checkpoint `analyzeContent` — it also registers it as an **MCP tool**. The function you write is both a durable workflow step and a tool that any agent, workflow, or compiled pipeline can invoke.
+
+The same is true in reverse: register an MCP server and its tools become proxy activities automatically.
+
+```typescript
+// This function is BOTH an activity AND a tool.
+// Called by a workflow via proxyActivities, it's checkpointed.
+// Exposed via MCP, it's discoverable by agents and other workflows.
+export async function classify(args: { content: string }) {
+  const response = await llm.analyze(args.content);
+  return { category: response.category, confidence: response.confidence };
+}
+```
+
+Humans are tools too. Long Tail exposes its escalation queue as an MCP server (`long-tail-human-queue`). Compiled workflows are tools. The protocol is the same whether the caller is deterministic code, an LLM, or a person clicking a button.
+
+This uniformity is what makes the system composable — and it's what enables a system that improves itself using tools it already has.
+
+See the [Architecture Guide](docs/architecture.md) for project structure, conventions, built-in servers, and tag-based tool discovery. See the [MCP Guide](docs/mcp.md) for server registration, tool calls, and the human queue protocol.
+
+## Workflow Function Registration and Startup
 
 Register and start. MCP Servers initialize, workers start, and the API listens. The only infrastructure is PostgreSQL.
 
@@ -73,12 +113,24 @@ import { start } from '@hotmeshio/long-tail';
 import * as myWorkflow from './workflows/my-workflow';
 
 const lt = await start({
-  database: { host: 'localhost', port: 5432, user: 'postgres', password: 'password', database: 'mydb' },
-  workers: [{ taskQueue: 'my-queue', workflow: myWorkflow.reviewContent }],
+  database: {
+    host: 'localhost',
+    port: 5432,
+    user: 'postgres',
+    password: 'password',
+    database: 'mydb',
+  },
+  workers: [{
+    taskQueue: 'my-queue',
+    workflow: myWorkflow.reviewContent,
+  }],
 });
 
 const handle = await lt.client.workflow.start({
-  args: [{ data: { content: 'Review this' }, metadata: {} }],
+  args: [{
+    data: { content: 'Review this' },
+    metadata: {},
+  }],
   taskQueue: 'my-queue',
   workflowName: 'reviewContent',
   workflowId: `review-${Date.now()}`,
@@ -89,7 +141,7 @@ See the full [Workflows Guide](docs/workflows.md) for activities, the intercepto
 
 ## How the System Evolves
 
-Three layers work together. Each one feeds the next.
+The escalation in the workflow above — `{ type: 'escalation' }` — is where the system starts learning. Three layers work together, each one feeding the next.
 
 ### 1. Escalation
 
@@ -100,9 +152,13 @@ POST /api/escalations/esc-abc123/resolve
 { "resolverPayload": { "approved": true, "notes": "Content is fine" } }
 ```
 
+Most escalations end here. But sometimes the human *can't* fix it.
+
 ### 2. Triage
 
-Sometimes the human *can't* fix it — an upside-down page, a document in the wrong language. They flag `needsTriage` with a hint. An AI triage agent takes over: it queries the escalation history, discovers available tools by tag, and runs an agentic loop — rotate the page, re-extract data, validate against a database. Every tool call is checkpointed. If the agent can't fix it either, it escalates to an engineer with a full diagnosis.
+An upside-down page, a document in the wrong language — these aren't judgment calls, they're process gaps. The human flags `needsTriage` with a hint, and an AI triage agent takes over.
+
+Because every activity is a tool, the agent already has what it needs. It queries the escalation history, discovers available tools by tag, and runs an agentic loop — rotate the page, re-extract data, validate against a database. Every tool call is checkpointed. If the agent can't fix it either, it escalates to an engineer with a full diagnosis.
 
 ### 3. Compilation
 
@@ -115,25 +171,7 @@ Triage execution (dynamic, LLM-driven)        Compiled workflow (deterministic)
   validate_member({ name, id })                   step 3: validate_member
 ```
 
-The compiled workflow is deployed as a new tool. Next time, it runs without an LLM or a human. The triage agent discovers it has one more tool. The system gets better at handling its own edge cases.
-
-## Activities are Tools
-
-This is the unifying concept. Every activity function — the side-effect functions that workflows call — is also an MCP tool. Write a function, register it as an activity in your workflow, wrap it in an MCP server, and it becomes a tool that any agent can call.
-
-The same is true in reverse: register an MCP server and its tools become proxy activities automatically.
-
-```typescript
-// This function is BOTH an activity AND a tool
-export async function classify(args: { content: string }) {
-  const response = await llm.analyze(args.content);
-  return { category: response.category, confidence: response.confidence };
-}
-```
-
-Humans are tools too. Long Tail exposes its escalation queue as an MCP server (`long-tail-human-queue`). Compiled workflows are tools. The protocol is the same whether the caller is deterministic code, an LLM, or a person clicking a button.
-
-See the [Architecture Guide](docs/architecture.md) for project structure, conventions, built-in servers, and tag-based tool discovery. See the [MCP Guide](docs/mcp.md) for server registration, tool calls, and the human queue protocol.
+The compiled workflow is deployed as a new tool. Next time the same problem occurs, it runs without an LLM or a human. The triage agent discovers it has one more tool in its inventory. The system gets better at handling its own edge cases.
 
 ## Developer API
 

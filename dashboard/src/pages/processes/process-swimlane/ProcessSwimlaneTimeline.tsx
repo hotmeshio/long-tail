@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Collapsible } from '../../../components/common/Collapsible';
+import { Collapsible } from '../../../components/common/layout/Collapsible';
 import { formatDuration } from '../../../lib/format';
 import type { LTTaskRecord, LTEscalationRecord } from '../../../api/types';
 import {

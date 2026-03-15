@@ -46,7 +46,7 @@ describe('ProcessesOverview', () => {
 
   it('renders header and duration tabs', () => {
     renderPage();
-    expect(screen.getByText('Business Processes')).toBeInTheDocument();
+    expect(screen.getByText('Processes')).toBeInTheDocument();
     expect(screen.getByText('1h')).toBeInTheDocument();
     expect(screen.getByText('24h')).toBeInTheDocument();
     expect(screen.getByText('7d')).toBeInTheDocument();

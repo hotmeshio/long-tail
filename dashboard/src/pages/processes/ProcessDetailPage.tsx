@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProcessDetail } from '../../api/tasks';
 import { useSettings } from '../../api/settings';
-import { PageHeader } from '../../components/common/PageHeader';
-import { SectionLabel } from '../../components/common/SectionLabel';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { SectionLabel } from '../../components/common/layout/SectionLabel';
 import { ProcessSwimlaneTimeline } from './process-swimlane/ProcessSwimlaneTimeline';
 
 function formatElapsed(startIso: string, endIso?: string | null): string {
@@ -65,7 +65,7 @@ export function ProcessDetailPage() {
     <div>
       <PageHeader
         title="Process Detail"
-        backTo="/processes/runs"
+        backTo="/processes/all"
         backLabel="All Processes"
         actions={
           duration && (

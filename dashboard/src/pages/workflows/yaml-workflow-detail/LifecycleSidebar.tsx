@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/common/SectionLabel';
+import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 
 const LIFECYCLE_STEPS = ['draft', 'active', 'archived'] as const;
 const LIFECYCLE_LABELS: Record<string, string> = {

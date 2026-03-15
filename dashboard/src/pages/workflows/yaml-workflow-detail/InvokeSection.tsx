@@ -1,6 +1,6 @@
 import { Play } from 'lucide-react';
-import { SectionLabel } from '../../../components/common/SectionLabel';
-import { CollapsibleSection } from '../../../components/common/CollapsibleSection';
+import { SectionLabel } from '../../../components/common/layout/SectionLabel';
+import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { InvokeResultView } from './InvokeResultView';
 import { inferFieldType } from './helpers';
 

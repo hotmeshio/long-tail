@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Collapsible } from '../../../components/common/Collapsible';
-import { JsonViewer } from '../../../components/common/JsonViewer';
+import { Collapsible } from '../../../components/common/layout/Collapsible';
+import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { metadataLabels, formatMetadataValue } from './helpers';
 
 export function InvokeResultView({ result, showMetadata, onToggleMetadata, traceUrl, namespace }: {
@@ -18,7 +18,7 @@ export function InvokeResultView({ result, showMetadata, onToggleMetadata, trace
         <div className="flex items-center gap-3">
           {jobId && (
             <Link
-              to={`/mcp/runs/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(namespace || 'longtail')}`}
+              to={`/mcp/executions/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(namespace || 'longtail')}`}
               className="text-[10px] text-accent hover:underline"
             >
               View Execution Details
