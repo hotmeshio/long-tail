@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BulkAssignModal } from '../BulkAssignModal';
+import { BulkAssignModal } from '../modal/BulkAssignModal';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 

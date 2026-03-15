@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Modal } from '../../../components/common/Modal';
-import { CustomDurationPicker } from '../../../components/common/CustomDurationPicker';
+import { Modal } from '../../../components/common/modal/Modal';
+import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
 
 interface ClaimModalProps {

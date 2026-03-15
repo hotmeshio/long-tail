@@ -1,7 +1,5 @@
 # Authentication
 
-## Overview
-
 Every API request in Long Tail passes through an authentication adapter before reaching route handlers. The adapter inspects the incoming request, verifies the caller's identity, and returns a structured `AuthPayload`. If verification fails, the adapter returns `null` and the middleware responds with `401 Unauthorized`.
 
 This design decouples identity verification from the rest of the application. The built-in adapter handles JWTs. Teams that rely on OAuth providers, API keys, or session cookies can swap in a custom adapter without modifying any route logic.

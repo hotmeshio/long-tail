@@ -1,17 +1,14 @@
 import { getPool } from '../db';
 import type {
   LTWorkflowConfig,
-  LTLifecycleHook,
 } from '../../types';
 import {
   GET_WORKFLOW,
   GET_WORKFLOW_ROLES,
   GET_WORKFLOW_INVOCATION_ROLES,
-  GET_WORKFLOW_LIFECYCLE,
   LIST_ALL_WORKFLOWS,
   LIST_ALL_ROLES,
   LIST_ALL_INVOCATION_ROLES,
-  LIST_ALL_LIFECYCLE,
 } from './sql';
 
 export async function getWorkflowConfig(
@@ -24,23 +21,10 @@ export async function getWorkflowConfig(
 
   const wf = wfRows[0];
 
-  const [rolesResult, invocationRolesResult, lifecycleResult] = await Promise.all([
+  const [rolesResult, invocationRolesResult] = await Promise.all([
     pool.query(GET_WORKFLOW_ROLES, [workflowType]),
     pool.query(GET_WORKFLOW_INVOCATION_ROLES, [workflowType]),
-    pool.query(GET_WORKFLOW_LIFECYCLE, [workflowType]),
   ]);
-
-  const onBefore: LTLifecycleHook[] = [];
-  const onAfter: LTLifecycleHook[] = [];
-  for (const row of lifecycleResult.rows) {
-    const hook: LTLifecycleHook = {
-      target_workflow_type: row.target_workflow_type,
-      target_task_queue: row.target_task_queue,
-      ordinal: row.ordinal,
-    };
-    if (row.hook === 'onBefore') onBefore.push(hook);
-    else onAfter.push(hook);
-  }
 
   return {
     workflow_type: wf.workflow_type,
@@ -53,7 +37,6 @@ export async function getWorkflowConfig(
     description: wf.description,
     roles: rolesResult.rows.map((r: any) => r.role),
     invocation_roles: invocationRolesResult.rows.map((r: any) => r.role),
-    lifecycle: { onBefore, onAfter },
     consumes: wf.consumes || [],
     tool_tags: wf.tool_tags || [],
     envelope_schema: wf.envelope_schema ?? null,
@@ -65,12 +48,11 @@ export async function getWorkflowConfig(
 export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
   const pool = getPool();
 
-  const [wfResult, rolesResult, invocationRolesResult, lifecycleResult] =
+  const [wfResult, rolesResult, invocationRolesResult] =
     await Promise.all([
       pool.query(LIST_ALL_WORKFLOWS),
       pool.query(LIST_ALL_ROLES),
       pool.query(LIST_ALL_INVOCATION_ROLES),
-      pool.query(LIST_ALL_LIFECYCLE),
     ]);
 
   // Index sub-entities by workflow_type
@@ -86,26 +68,6 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     invocationRolesMap.get(r.workflow_type)!.push(r.role);
   }
 
-  const lifecycleMap = new Map<
-    string,
-    { onBefore: LTLifecycleHook[]; onAfter: LTLifecycleHook[] }
-  >();
-  for (const r of lifecycleResult.rows) {
-    if (!lifecycleMap.has(r.workflow_type)) {
-      lifecycleMap.set(r.workflow_type, { onBefore: [], onAfter: [] });
-    }
-    const hook: LTLifecycleHook = {
-      target_workflow_type: r.target_workflow_type,
-      target_task_queue: r.target_task_queue,
-      ordinal: r.ordinal,
-    };
-    if (r.hook === 'onBefore') {
-      lifecycleMap.get(r.workflow_type)!.onBefore.push(hook);
-    } else {
-      lifecycleMap.get(r.workflow_type)!.onAfter.push(hook);
-    }
-  }
-
   return wfResult.rows.map((wf: any) => ({
     workflow_type: wf.workflow_type,
     is_lt: wf.is_lt,
@@ -117,10 +79,6 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     description: wf.description,
     roles: rolesMap.get(wf.workflow_type) || [],
     invocation_roles: invocationRolesMap.get(wf.workflow_type) || [],
-    lifecycle: lifecycleMap.get(wf.workflow_type) || {
-      onBefore: [],
-      onAfter: [],
-    },
     consumes: wf.consumes || [],
     tool_tags: wf.tool_tags || [],
     envelope_schema: wf.envelope_schema ?? null,

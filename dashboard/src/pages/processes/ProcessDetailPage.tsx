@@ -2,9 +2,10 @@ import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProcessDetail } from '../../api/tasks';
 import { useSettings } from '../../api/settings';
-import { PageHeader } from '../../components/common/PageHeader';
-import { SectionLabel } from '../../components/common/SectionLabel';
-import { ProcessSwimlaneTimeline } from './ProcessSwimlaneTimeline';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { SectionLabel } from '../../components/common/layout/SectionLabel';
+import { StatCard } from '../../components/common/data/StatCard';
+import { ProcessSwimlaneTimeline } from './process-swimlane/ProcessSwimlaneTimeline';
 
 function formatElapsed(startIso: string, endIso?: string | null): string {
   const start = new Date(startIso).getTime();
@@ -65,8 +66,6 @@ export function ProcessDetailPage() {
     <div>
       <PageHeader
         title="Process Detail"
-        backTo="/processes/runs"
-        backLabel="All Processes"
         actions={
           duration && (
             <span className="text-xs text-text-tertiary">
@@ -81,24 +80,12 @@ export function ProcessDetailPage() {
         <p className="text-sm font-mono text-text-primary break-all">{originId}</p>
       </div>
 
-      {/* Summary cards — matching WorkflowsOverview pattern */}
+      {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4 mb-10">
-        <div className="bg-surface-raised border border-surface-border rounded-md p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tasks</p>
-          <p className="text-2xl font-light tabular-nums text-text-primary">{stats.tasks}</p>
-        </div>
-        <div className="bg-surface-raised border border-surface-border rounded-md p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Completed</p>
-          <p className="text-2xl font-light tabular-nums text-status-success">{stats.completed}</p>
-        </div>
-        <div className="bg-surface-raised border border-surface-border rounded-md p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Escalations</p>
-          <p className="text-2xl font-light tabular-nums text-status-pending">{stats.escalations}</p>
-        </div>
-        <div className="bg-surface-raised border border-surface-border rounded-md p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Resolved</p>
-          <p className="text-2xl font-light tabular-nums text-status-success">{stats.resolved}</p>
-        </div>
+        <StatCard label="Tasks" value={stats.tasks} />
+        <StatCard label="Completed" value={stats.completed} colorClass="text-status-success" />
+        <StatCard label="Escalations" value={stats.escalations} colorClass="text-status-pending" />
+        <StatCard label="Resolved" value={stats.resolved} colorClass="text-status-success" />
       </div>
 
       <SectionLabel className="mb-6">Timeline</SectionLabel>

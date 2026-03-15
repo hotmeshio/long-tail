@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { FilterBar, FilterSelect } from '../FilterBar';
+import { FilterBar, FilterSelect } from '../data/FilterBar';
 
 describe('FilterBar', () => {
   it('renders children', () => {

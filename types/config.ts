@@ -1,6 +1,6 @@
 /**
  * Full workflow configuration as stored in the database.
- * Includes all sub-entities (roles, lifecycle hooks, consumers).
+ * Includes all sub-entities (roles, consumers).
  */
 export interface LTWorkflowConfig {
   workflow_type: string;
@@ -13,21 +13,11 @@ export interface LTWorkflowConfig {
   description: string | null;
   roles: string[];
   invocation_roles: string[];
-  lifecycle: {
-    onBefore: LTLifecycleHook[];
-    onAfter: LTLifecycleHook[];
-  };
   consumes: string[];
   tool_tags?: string[];
   envelope_schema?: Record<string, any> | null;
   resolver_schema?: Record<string, any> | null;
   cron_schedule?: string | null;
-}
-
-export interface LTLifecycleHook {
-  target_workflow_type: string;
-  target_task_queue: string | null;
-  ordinal: number;
 }
 
 /**
@@ -43,8 +33,6 @@ export interface LTResolvedConfig {
   modality: string;
   roles: string[];
   invocationRoles: string[];
-  onBefore: LTLifecycleHook[];
-  onAfter: LTLifecycleHook[];
   consumes: string[];
   toolTags: string[];
   envelopeSchema: Record<string, any> | null;

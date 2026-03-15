@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { JsonViewer } from '../JsonViewer';
+import { JsonViewer } from '../data/JsonViewer';
 
 describe('JsonViewer', () => {
   it('renders a label when provided', () => {

@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { Pencil, Shield, Trash2 } from 'lucide-react';
 import { useUsers, useDeleteUser } from '../../../api/users';
 import { useFilterParams } from '../../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../../components/common/DataTable';
-import { StatusBadge } from '../../../components/common/StatusBadge';
-import { StickyPagination } from '../../../components/common/StickyPagination';
-import { FilterBar, FilterSelect } from '../../../components/common/FilterBar';
-import { TimeAgo } from '../../../components/common/TimeAgo';
-import { ConfirmDeleteModal } from '../../../components/common/ConfirmDeleteModal';
-import { RowAction, RowActionGroup } from '../../../components/common/RowActions';
+import { DataTable, type Column } from '../../../components/common/data/DataTable';
+import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { StickyPagination } from '../../../components/common/data/StickyPagination';
+import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
+import { TimeAgo } from '../../../components/common/display/TimeAgo';
+import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
+import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { LTUserRecord } from '../../../api/types';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { RolePill } from '../../../components/common/display/RolePill';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
 import { RoleManagementModal } from './RoleManagementModal';
@@ -67,13 +68,7 @@ export function UsersPage() {
       render: (row) => (
         <div className="flex gap-1 flex-wrap">
           {(row.roles ?? []).map((r) => (
-            <span
-              key={r.role}
-              className="px-2 py-0.5 text-[10px] bg-surface-sunken rounded-full text-text-secondary"
-            >
-              {r.role}
-              <span className="text-text-tertiary ml-1">({r.type})</span>
-            </span>
+            <RolePill key={r.role} role={r.role} />
           ))}
         </div>
       ),

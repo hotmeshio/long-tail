@@ -70,24 +70,11 @@ describe('McpOverview', () => {
 
   it('renders header and duration tabs', () => {
     renderPage();
-    expect(screen.getByText('Durable MCP')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'MCP Tools' })).toBeInTheDocument();
     expect(screen.getByText('1h')).toBeInTheDocument();
     expect(screen.getByText('24h')).toBeInTheDocument();
     expect(screen.getByText('7d')).toBeInTheDocument();
     expect(screen.getByText('30d')).toBeInTheDocument();
-  });
-
-  it('shows server and tool counts in header', () => {
-    renderPage();
-    expect(screen.getByText(/2 servers · 2 tools/)).toBeInTheDocument();
-  });
-
-  // ── Section headings ──
-
-  it('renders All Servers and Recent Runs section headings', () => {
-    renderPage();
-    expect(screen.getByText('All Servers')).toBeInTheDocument();
-    expect(screen.getByText('Recent Runs')).toBeInTheDocument();
   });
 
   // ── Summary cards (default 24h → 3 recent runs) ──
@@ -117,7 +104,7 @@ describe('McpOverview', () => {
     expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
   });
 
-  // ── By-pipeline table (now "Tool" column) ──
+  // ── By-pipeline table ──
 
   it('renders by-pipeline breakdown', () => {
     renderPage();
@@ -149,14 +136,16 @@ describe('McpOverview', () => {
       data: { jobs: [], total: 0 },
     } as any);
     renderPage();
-    expect(screen.getByText(/No MCP run activity/)).toBeInTheDocument();
+    expect(screen.getByText(/No MCP tool activity/)).toBeInTheDocument();
   });
 
-  // ── Server info in header ──
+  // ── Server inventory cards ──
 
-  it('shows server and tool info', () => {
+  it('shows server tools and workflow tools cards', () => {
     renderPage();
-    expect(screen.getByText(/2 servers · 2 tools/)).toBeInTheDocument();
+    expect(screen.getByText('Server Tools')).toBeInTheDocument();
+    expect(screen.getByText('Workflow Tools')).toBeInTheDocument();
+    expect(screen.getByText(/2 tools/)).toBeInTheDocument();
   });
 
   // ── Loading state ──

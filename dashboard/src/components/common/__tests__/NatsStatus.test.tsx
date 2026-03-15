@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { NatsStatus } from '../NatsStatus';
+import { NatsStatus } from '../display/NatsStatus';
 
 // Mock the useNats hook so we can control the connected state
 vi.mock('../../../hooks/useNats', () => ({

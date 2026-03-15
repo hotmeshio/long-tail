@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import { useRoles } from '../../../api/roles';
-import { Modal } from '../../../components/common/Modal';
+import { Modal } from '../../../components/common/modal/Modal';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
 
 export function RoleManagementModal({

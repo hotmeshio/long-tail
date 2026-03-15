@@ -60,13 +60,13 @@ export async function reviewContent(
 
 Three things to notice:
 
-1. **`proxyActivities()`** at module scope wraps side-effect functions as durable, checkpointed activities
+1. **`proxyActivities()`** wraps side-effect functions as durable, checkpointed activities (more on this in [Activities and Durable Execution](#activities-and-durable-execution))
 2. **`envelope.resolver`** — when present, this is a re-run after human resolution; return the human's decision as the final result
 3. **Two return types** — `{ type: 'return' }` completes the task; `{ type: 'escalation' }` pauses and creates an escalation record
 
 ### Registration
 
-Before running a workflow, register it with Long Tail:
+Before a workflow can run, Long Tail needs to know about it. Register a workflow config so the interceptor knows how to route escalations:
 
 ```
 PUT /api/workflows/reviewContent/config
@@ -97,7 +97,7 @@ const result = await handle.result();
 
 ## Activities and Durable Execution
 
-Activities are where side effects live — API calls, LLMs, database reads, file I/O. They run outside the deterministic sandbox so they can do I/O.
+The workflow above delegates its side effect — calling the LLM — to `analyzeContent` through `proxyActivities`. Activities are where all I/O lives: API calls, LLM invocations, database reads, file operations. They run outside the deterministic sandbox so they can interact with the outside world.
 
 ```typescript
 // activities.ts
@@ -146,6 +146,8 @@ If all retries are exhausted, the workflow receives the error and can escalate.
 
 ## The Interceptor
 
+With the workflow written and activities checkpointed, the next question is: what happens when the workflow returns `{ type: 'escalation' }` instead of `{ type: 'return' }`? That's where the interceptor comes in.
+
 The interceptor is the machinery that connects your workflow code to Long Tail's task tracking, escalation management, and audit trail. When `is_lt: true` is set in the workflow config, the interceptor wraps every workflow execution.
 
 ### What It Does
@@ -187,7 +189,7 @@ If a workflow throws an unhandled error (instead of returning an escalation), th
 
 ## Escalation Lifecycle
 
-When AI isn't confident, the workflow returns an escalation. Here's the full lifecycle from the REST API perspective.
+The interceptor creates escalation records and manages re-runs, but what does the full lifecycle look like from the outside? Here's the sequence from the REST API perspective.
 
 ### 1. Workflow Escalates
 
@@ -278,7 +280,7 @@ POST /api/escalations/release-expired
 
 ## Composing Workflows
 
-Workflows can call other workflows. An orchestrator coordinates child workflows, each of which can independently succeed or escalate.
+A single workflow handles one task — extract a document, validate a record, review content. But real processes chain multiple tasks together, and any step might escalate. Orchestrators coordinate child workflows, each of which can independently succeed or escalate without blocking the others.
 
 ### `executeLT`
 
@@ -364,7 +366,7 @@ PUT /api/workflows/processDocumentOrchestrator/config
 
 ## Verify Document Example
 
-The `verify-document` workflow demonstrates the full pattern: AI does initial work (OpenAI Vision extraction), validates against a database, and escalates to a human when it isn't confident.
+The concepts above — activities, interceptor, escalation, composition — come together in a concrete example. The `verify-document` workflow demonstrates the full pattern: AI does initial work (OpenAI Vision extraction), validates against a database, and escalates to a human when it isn't confident.
 
 ### The Pipeline
 
@@ -469,12 +471,12 @@ The same pipeline also exists as an MCP-native workflow (`verify-document-mcp`) 
 
 ## Escalation Strategies
 
-The standard escalation path — workflow escalates, human resolves, workflow re-runs — handles most cases. But sometimes the resolver can't fix the problem directly (an upside-down page, a corrupted image). They need the system to remediate before retrying.
+The standard escalation path covers most cases: workflow escalates, human resolves, workflow re-runs. But sometimes the resolver can't fix the problem directly — an upside-down page, a corrupted image, a document in the wrong language. These aren't judgment calls; they're process gaps that need remediation before the workflow can retry.
 
 Escalation strategies are a pluggable layer that intercepts resolution and decides what happens next:
 
 - **Default strategy** — always re-runs the original workflow with the resolver's payload (today's behavior)
-- **MCP strategy** — checks `resolverPayload._lt.needsTriage`; if set, routes to a triage orchestrator that calls MCP tools to remediate, then re-invokes the original workflow with corrected data
+- **MCP strategy** — checks `resolverPayload._lt.needsTriage`; if set, routes to the `mcpTriage` workflow that calls MCP tools to remediate, then re-invokes the original workflow with corrected data
 
 ```typescript
 await start({
@@ -484,7 +486,7 @@ await start({
 });
 ```
 
-When the resolver flags `needsTriage`, the triage orchestrator:
+When the resolver flags `needsTriage`, the triage workflow:
 
 1. Queries all upstream tasks for the `originId` to understand what happened
 2. Reads the `_lt.hint` to determine which tools to call
@@ -496,7 +498,7 @@ The deterministic path is always the default. MCP triage is opt-in. See [Escalat
 
 ## Milestones
 
-Milestones are structured markers that workflows emit at key decision points:
+As workflows run and escalations resolve, you often want external systems to know what happened. Milestones are structured markers that workflows emit at key decision points:
 
 ```typescript
 return {
@@ -532,37 +534,26 @@ A user can hold multiple roles with different types. See the [Users](api/users.m
 
 Tests follow a consistent pattern: connect, migrate, register interceptors, create a worker, run workflows.
 
+The simplest approach uses `registerLT`, which handles the activity worker, workflow interceptor, and activity interceptor in one call:
+
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
 import { Client as Postgres } from 'pg';
 
 import { migrate } from '../../services/db/migrate';
-import { createLTInterceptor } from '../../services/interceptor';
-import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
-import * as interceptorActivities from '../../services/interceptor/activities';
+import { registerLT } from '../../services/interceptor';
 import * as myWorkflow from '../../workflows/my-workflow';
 
 const { Connection, Client, Worker } = Durable;
 
 beforeAll(async () => {
-  await Connection.connect({
-    class: Postgres,
-    options: postgres_options,
-  });
+  const connection = { class: Postgres, options: postgres_options };
+
+  await Connection.connect(connection);
   await migrate();
 
-  // Register interceptor activity worker
-  await Durable.registerActivityWorker(
-    { connection, taskQueue: 'lt-interceptor' },
-    interceptorActivities,
-    'lt-interceptor',
-  );
-
-  // Register interceptors
-  Durable.registerInterceptor(createLTInterceptor({
-    activityTaskQueue: 'lt-interceptor',
-  }));
-  Durable.registerActivityInterceptor(createLTActivityInterceptor());
+  // Register interceptors (activity worker + workflow + activity interceptors)
+  await registerLT(connection, { taskQueue: 'lt-interceptor' });
 
   // Create workflow worker
   const worker = await Worker.create({
@@ -582,11 +573,37 @@ afterAll(async () => {
 });
 ```
 
+For finer control, you can register each piece individually. This is what the actual test files do:
+
+```typescript
+import { createLTInterceptor } from '../../services/interceptor';
+import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
+import * as interceptorActivities from '../../services/interceptor/activities';
+
+// 1. Activity worker for interceptor DB operations
+await Durable.registerActivityWorker(
+  { connection, taskQueue: 'lt-interceptor' },
+  interceptorActivities,
+  'lt-interceptor',
+);
+
+// 2. Workflow interceptor (escalation, routing, re-runs)
+Durable.registerInterceptor(createLTInterceptor({
+  activityTaskQueue: 'lt-interceptor',
+}));
+
+// 3. Activity interceptor (milestone event publishing)
+Durable.registerActivityInterceptor(createLTActivityInterceptor());
+```
+
 ### Testing Escalation
 
 To test a workflow that escalates, start the workflow, wait for the escalation to appear, then resolve it:
 
 ```typescript
+import { waitForEscalation } from '../setup';
+import { resolveEscalation } from '../setup/resolve';
+
 it('should escalate and resolve', async () => {
   const workflowId = `test-${Durable.guid()}`;
 
@@ -598,7 +615,7 @@ it('should escalate and resolve', async () => {
     expire: 120,
   });
 
-  // Wait for the escalation to appear in the database
+  // Poll until the escalation appears (async workflow timing varies)
   const escalations = await waitForEscalation(workflowId);
   expect(escalations.length).toBe(1);
   expect(escalations[0].status).toBe('pending');
@@ -610,25 +627,25 @@ it('should escalate and resolve', async () => {
     verified: true,
   });
 
-  // Wait for the re-run to complete
-  await sleepFor(10_000);
-
-  // Verify the escalation is now resolved
-  // ...
+  // Wait for the re-run to complete, then verify
+  const resolved = await waitForEscalationStatus(
+    escalations[0].id, 'resolved', 30_000,
+  );
+  expect(resolved.status).toBe('resolved');
 });
 ```
 
-The test utilities `waitForEscalation()` and `resolveEscalation()` are in `tests/setup/`.
+The test utilities are in `tests/setup/`: `waitForEscalation()` and `waitForEscalationStatus()` in `index.ts`, `resolveEscalation()` in `resolve.ts`.
 
 ### Running Tests
 
 ```bash
-# All workflow tests
+# All workflow tests (~4-5 min)
 npm run test:workflows
 
 # Verify-document workflow (requires OpenAI key)
 OPENAI_API_KEY=sk-... npm run test:vision
 
-# Full suite
+# Full backend suite
 npm test
 ```

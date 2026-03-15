@@ -21,6 +21,12 @@ UPDATE lt_config_workflows SET envelope_schema = '{
 }'::jsonb
 WHERE workflow_type = 'verifyDocumentMcpOrchestrator' AND envelope_schema IS NULL;
 
+UPDATE lt_config_workflows SET envelope_schema = '{
+  "data": {"claimId": "CLM-2024-001", "claimType": "auto_collision", "claimantId": "MBR-2024-001"},
+  "metadata": {"source": "dashboard"}
+}'::jsonb
+WHERE workflow_type = 'processClaimOrchestrator' AND envelope_schema IS NULL;
+
 -- ── Resolver schemas (leaf workflows — create escalations) ────────────────────
 
 UPDATE lt_config_workflows SET resolver_schema = '{
@@ -53,7 +59,7 @@ VALUES
   ('kitchenSink', true, false, 'lt-kitchen-sink', 'reviewer', 'default', false,
    'Kitchen sink leaf — demonstrates sleep, signals, parallel activities, and more', NULL),
   ('kitchenSinkOrchestrator', true, true, 'lt-kitchen-sink-orch', 'reviewer', 'default', true,
-   'Kitchen sink — showcases every Durable primitive',
+   'Kitchen sink — demonstrates sleep, signals, parallel activities, escalation, and every durable primitive',
    '{"data": {"name": "World", "mode": "full"}, "metadata": {"source": "dashboard"}}'::jsonb)
 ON CONFLICT (workflow_type) DO NOTHING;
 

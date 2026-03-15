@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { AppLogo } from '../components/common/AppLogo';
+import { AppLogo } from '../components/common/display/AppLogo';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');

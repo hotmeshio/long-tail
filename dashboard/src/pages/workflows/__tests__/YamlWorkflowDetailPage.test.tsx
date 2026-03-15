@@ -20,7 +20,7 @@ vi.mock('../../../api/settings', () => ({
   useSettings: vi.fn(() => ({ data: null })),
 }));
 
-import { YamlWorkflowDetailPage } from '../YamlWorkflowDetailPage';
+import { YamlWorkflowDetailPage } from '../yaml-workflow-detail/YamlWorkflowDetailPage';
 import {
   useYamlWorkflow,
   useDeployYamlWorkflow,

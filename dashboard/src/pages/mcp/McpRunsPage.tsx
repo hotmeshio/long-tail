@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useMcpRuns, useMcpEntities } from '../../api/mcp-runs';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../components/common/DataTable';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { PageHeader } from '../../components/common/PageHeader';
-import { FilterBar, FilterSelect } from '../../components/common/FilterBar';
-import { StickyPagination } from '../../components/common/StickyPagination';
+import { DataTable, type Column } from '../../components/common/data/DataTable';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
 import type { LTJob } from '../../api/types';
 
 const statusMap: Record<string, string> = {
@@ -118,7 +118,7 @@ export function McpRunsPage() {
 
   return (
     <div>
-      <PageHeader title="Runs" />
+      <PageHeader title="Executions" />
 
       <FilterBar>
         <FilterSelect
@@ -159,7 +159,7 @@ export function McpRunsPage() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/mcp/runs/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
+        onRowClick={(row) => navigate(`/mcp/executions/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
         isLoading={isLoading}
         emptyMessage="No runs found"
       />

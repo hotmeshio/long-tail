@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEscalationStats } from '../../api/escalations';
 import { useEscalationStatsEvents } from '../../hooks/useNatsEvents';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { StatCard } from '../../components/common/data/StatCard';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -35,30 +36,6 @@ function StatCell({
       className={`${colorClass} hover:underline tabular-nums font-medium`}
     >
       {value}
-    </button>
-  );
-}
-
-// ── Summary card ─────────────────────────────────────────────────────────────
-
-function SummaryCard({
-  label,
-  value,
-  colorClass = 'text-text-primary',
-  onClick,
-}: {
-  label: string;
-  value: number | string;
-  colorClass?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-surface-raised border border-surface-border rounded-md p-4 text-left hover:border-accent/40 transition-colors"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{label}</p>
-      <p className={`text-2xl font-light tabular-nums ${colorClass}`}>{value}</p>
     </button>
   );
 }
@@ -102,29 +79,10 @@ export function EscalationsOverview() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <SummaryCard
-          label="Open"
-          value={stats?.pending ?? '—'}
-          colorClass="text-status-pending"
-          onClick={() => goToList()}
-        />
-        <SummaryCard
-          label="Claimed"
-          value={stats?.claimed ?? '—'}
-          colorClass="text-status-active"
-          onClick={() => goToList()}
-        />
-        <SummaryCard
-          label="Created"
-          value={stats?.created ?? '—'}
-          onClick={() => goToList()}
-        />
-        <SummaryCard
-          label="Resolved"
-          value={stats?.resolved ?? '—'}
-          colorClass="text-status-success"
-          onClick={() => goToList()}
-        />
+        <StatCard label="Open" value={stats?.pending ?? '—'} colorClass="text-status-pending" onClick={() => goToList()} />
+        <StatCard label="Claimed" value={stats?.claimed ?? '—'} colorClass="text-status-active" onClick={() => goToList()} />
+        <StatCard label="Created" value={stats?.created ?? '—'} onClick={() => goToList()} />
+        <StatCard label="Resolved" value={stats?.resolved ?? '—'} colorClass="text-status-success" onClick={() => goToList()} />
       </div>
 
       {/* By-role table */}

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { StatusBadge } from '../StatusBadge';
+import { StatusBadge } from '../display/StatusBadge';
 
 describe('StatusBadge', () => {
   it.each([

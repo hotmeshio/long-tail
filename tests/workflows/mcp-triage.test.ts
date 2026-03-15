@@ -25,14 +25,12 @@ import type { MemberInfo } from '../../examples/workflows/verify-document/types'
 // ── MCP triage workflow + activities (real) ──────────────────────────────────
 
 import * as mcpTriageWorkflow from '../../system/workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '../../system/workflows/mcp-triage/orchestrator';
 
 const { Connection, Client, Worker } = Durable;
 
 const VERIFY_QUEUE = 'test-triage-verify';
 const ORCH_QUEUE = 'test-triage-orch';
 const TRIAGE_QUEUE = 'lt-mcp-triage';
-const TRIAGE_ORCH_QUEUE = 'lt-mcp-triage-orch';
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
 // ── Mock activities for testVerifyDocument ──────────────────────────────────
@@ -251,7 +249,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       description: 'Test verify document (mock activities)',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -266,22 +263,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       description: 'Test orchestrator for verify document',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
-      consumes: [],
-    });
-
-    await configService.upsertWorkflowConfig({
-      workflow_type: 'mcpTriageOrchestrator',
-      is_lt: true,
-      is_container: true,
-      invocable: false,
-      task_queue: TRIAGE_ORCH_QUEUE,
-      default_role: 'reviewer',
-      default_modality: 'default',
-      description: 'MCP triage orchestrator',
-      roles: ['reviewer'],
-      invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -296,7 +277,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       description: 'MCP triage leaf — remediates via MCP tools or engineer guidance',
       roles: ['reviewer', 'engineer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -337,13 +317,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
     });
     await triageWorker.run();
 
-    const triageOrchWorker = await Worker.create({
-      connection,
-      taskQueue: TRIAGE_ORCH_QUEUE,
-      workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator,
-    });
-    await triageOrchWorker.run();
-
     client = new Client({ connection });
 
     // Register MCP escalation strategy
@@ -369,7 +342,7 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
   // 1. Start orchestrator → testVerifyDocument extracts from page1.png → null
   // 2. Workflow escalates (extraction_failed)
   // 3. Human resolves with needsTriage (no hint — just describes the problem)
-  // 4. MCP strategy → starts mcpTriageOrchestrator
+  // 4. MCP strategy → starts mcpTriage
   // 5. LLM-driven triage: diagnoses issue using Vision tools, rotates pages,
   //    verifies extraction, returns corrected data
   // 6. Triage re-invokes testVerifyDocument with corrected pages
@@ -434,10 +407,9 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
 
     // 7. Verify task chain in the database
     // There should be tasks for: testVerifyDocument (original, failed),
-    // mcpTriageOrchestrator, mcpTriage, and testVerifyDocument (re-invoked, succeeded)
+    // mcpTriage, and testVerifyDocument (re-invoked, succeeded)
     const { tasks } = await taskService.listTasks({ limit: 100 });
     const triageTasks = tasks.filter(t =>
-      t.workflow_type === 'mcpTriageOrchestrator' ||
       t.workflow_type === 'mcpTriage',
     );
     expect(triageTasks.length).toBeGreaterThanOrEqual(1);

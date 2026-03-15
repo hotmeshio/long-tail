@@ -218,7 +218,7 @@ async function run() {
     const tasks = detail.tasks || [];
     // Look for a completed reviewContent re-run (from triage)
     const triageTask = tasks.find((t: any) =>
-      t.workflow_type === 'mcpTriageOrchestrator' && t.status === 'completed',
+      t.workflow_type === 'mcpTriage' && t.status === 'completed',
     );
     const rerunTask = tasks.find((t: any) =>
       t.workflow_type === 'reviewContent' &&

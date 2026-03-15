@@ -1,4 +1,4 @@
-import { PageHeader } from '../../../components/common/PageHeader';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { PruneSection } from './PruneSection';
 import { ScheduledMaintenanceSection } from './ScheduledMaintenanceSection';
 

@@ -3,6 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from '../../activities/triage';
+import * as interceptorActivities from '../../../services/interceptor/activities';
 import { TRIAGE_SYSTEM_PROMPT, TRIAGE_REENTRY_CONTEXT, TRIAGE_EXHAUSTED_ROUNDS } from './prompts';
 
 type ActivitiesType = typeof activities;
@@ -22,6 +23,17 @@ const {
     backoffCoefficient: 2,
     maximumInterval: '10 seconds',
   },
+});
+
+const {
+  ltCreateEscalation,
+  ltGetTask,
+  ltGetWorkflowConfig,
+  ltStartWorkflow,
+} = Durable.workflow.proxyActivities<typeof interceptorActivities>({
+  activities: interceptorActivities,
+  taskQueue: 'lt-interceptor',
+  retryPolicy: { maximumAttempts: 3 },
 });
 
 const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
@@ -245,13 +257,151 @@ async function handleFinalResponse(
       );
     }
 
+    const correctedData = {
+      ...escalationPayload,
+      ...parsed.correctedData,
+    };
+    const directResolution = parsed.directResolution || false;
+    const originalTaskId = envelope.data.originalTaskId;
+
+    const triageMilestones = [
+      { name: 'triage', value: 'completed' },
+      { name: 'triage_method', value: toolCallCount > 0 ? 'llm_with_tools' : 'llm_direct' },
+      { name: 'tool_calls', value: String(toolCallCount) },
+    ];
+
+    // ── Exit vortex: route corrected data back to the original workflow ──
+    if (originalWorkflowType && originalTaskQueue && originalTaskId) {
+      const originalTask = await ltGetTask(originalTaskId);
+      const originalWfConfig = await ltGetWorkflowConfig(originalWorkflowType);
+
+      // Reconstruct the original envelope from the task record
+      let originalEnvelope: Record<string, any> = {};
+      if (originalTask?.envelope) {
+        try {
+          originalEnvelope = JSON.parse(originalTask.envelope);
+        } catch { /* use empty */ }
+      }
+
+      // Extract routing metadata — used by both resolution paths
+      const originalMeta = originalTask?.metadata as Record<string, any> | null;
+
+      // Enrich the envelope with full routing context so re-runs
+      // find the original task instead of creating orphan tasks.
+      originalEnvelope.lt = {
+        ...originalEnvelope.lt,
+        taskId: originalTaskId,
+        originId,
+        parentId: originalTask?.parent_id || originalEnvelope.lt?.parentId,
+        signalId: originalMeta?.signalId,
+        parentWorkflowId: originalMeta?.parentWorkflowId,
+        parentTaskQueue: originalMeta?.parentTaskQueue,
+        parentWorkflowType: originalMeta?.parentWorkflowType,
+      };
+
+      // ── Direct resolution: simple approval/rejection/pass-through ──
+      if (directResolution && correctedData) {
+        originalEnvelope.resolver = correctedData;
+        originalEnvelope.lt = {
+          ...originalEnvelope.lt,
+          escalationId: envelope.data.escalationId,
+          _triageDirect: true,
+        };
+
+        const rerunWorkflowId = `triage-rerun-${originalTaskId}-${Durable.guid()}`;
+        await ltStartWorkflow({
+          workflowName: originalWorkflowType,
+          taskQueue: originalTaskQueue,
+          workflowId: rerunWorkflowId,
+          args: [originalEnvelope],
+          expire: 180,
+        });
+
+        return {
+          type: 'return',
+          data: {
+            triaged: true,
+            exitedVortex: true,
+            directResolution: true,
+            targetedOriginalTask: originalTaskId,
+            hasCorrectedData: true,
+            rerunWorkflowId,
+            correctedData,
+            originalWorkflowType,
+            originalTaskQueue,
+            originId,
+            diagnosis: parsed.diagnosis,
+            actions_taken: parsed.actions_taken,
+            tool_calls_made: toolCallCount,
+            confidence: parsed.confidence,
+          },
+          milestones: [
+            ...triageMilestones,
+            { name: 'vortex', value: 'direct_resolution' },
+          ],
+        };
+      }
+
+      // ── Escalation path: tool-assisted fix or triage failure ──
+      const escalationPayloadForOriginal: Record<string, any> = correctedData
+        ? {
+            ...correctedData,
+            _triage: {
+              diagnosis: parsed.diagnosis,
+              actions_taken: parsed.actions_taken,
+              tool_calls_made: toolCallCount,
+              confidence: parsed.confidence,
+              recommendation: parsed.recommendation,
+              originalData: envelope.data.escalationPayload || {},
+            },
+          }
+        : {
+            ...(envelope.data.escalationPayload || {}),
+            _triage: {
+              diagnosis: parsed.diagnosis,
+              actions_taken: parsed.actions_taken,
+              tool_calls_made: toolCallCount,
+              confidence: parsed.confidence,
+              recommendation: parsed.recommendation,
+            },
+          };
+
+      const description = correctedData
+        ? `AI Triage — Ready for Review`
+        : `AI Triage — Needs Attention`;
+
+      await ltCreateEscalation({
+        type: originalWorkflowType,
+        subtype: originalWorkflowType,
+        modality: originalWfConfig?.modality || 'default',
+        description,
+        priority: correctedData ? 3 : 2,
+        taskId: originalTaskId,
+        originId,
+        parentId: envelope.lt?.parentId,
+        role: correctedData
+          ? (originalWfConfig?.role || 'reviewer')
+          : 'engineer',
+        envelope: JSON.stringify(originalEnvelope),
+        escalationPayload: JSON.stringify(escalationPayloadForOriginal),
+        workflowId: originalTask?.workflow_id,
+        workflowType: originalWorkflowType,
+        taskQueue: originalTaskQueue,
+      });
+    }
+
+    // Vortex complete — triage returns successfully.
+    // The interceptor will complete the triage task but will NOT
+    // signal the original parent (routing was stripped / self-referencing).
     return {
       type: 'return',
       data: {
-        correctedData: {
-          ...escalationPayload,
-          ...parsed.correctedData,
-        },
+        triaged: true,
+        exitedVortex: true,
+        directResolution: false,
+        targetedOriginalTask: envelope.data.originalTaskId || null,
+        hasCorrectedData: !!correctedData,
+        correctedData,
         originalWorkflowType,
         originalTaskQueue,
         originId,
@@ -259,13 +409,10 @@ async function handleFinalResponse(
         actions_taken: parsed.actions_taken,
         tool_calls_made: toolCallCount,
         confidence: parsed.confidence,
-        needsHumanReview: parsed.needsHumanReview || false,
-        directResolution: parsed.directResolution || false,
       },
       milestones: [
-        { name: 'triage', value: 'completed' },
-        { name: 'triage_method', value: toolCallCount > 0 ? 'llm_with_tools' : 'llm_direct' },
-        { name: 'tool_calls', value: String(toolCallCount) },
+        ...triageMilestones,
+        { name: 'vortex', value: 'unwound' },
       ],
     };
   }
@@ -300,6 +447,10 @@ async function handleFinalResponse(
   };
 }
 
+function stripJsonComments(text: string): string {
+  return text.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
 function parseTriageResponse(content: string): Record<string, any> {
   // Strip markdown fences if present
   const cleaned = content
@@ -307,12 +458,14 @@ function parseTriageResponse(content: string): Record<string, any> {
     .replace(/\s*```$/m, '')
     .trim();
 
-  // Try to extract JSON from the response — the LLM might include extra text
+  // Try to extract JSON from the response — the LLM might include extra text.
+  // LLMs frequently produce JS-style comments in JSON; strip them before parsing.
+  const noComments = stripJsonComments(cleaned);
   try {
-    return JSON.parse(cleaned);
+    return JSON.parse(noComments);
   } catch {
     // Try to find a JSON object embedded in the text
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    const jsonMatch = noComments.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]);

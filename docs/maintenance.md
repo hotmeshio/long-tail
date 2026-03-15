@@ -1,6 +1,4 @@
-# Maintenance
-
-## Overview
+# DB Maintenance
 
 HotMesh stores execution artifacts in PostgreSQL: stream messages that carry internal signals between activities, transient job rows that track bookkeeping for individual activity invocations, and entity job rows that represent durable workflow instances. Left unmanaged, these tables grow without bound. The maintenance system provides scheduled, rule-based cleanup that runs as a durable cron workflow inside HotMesh itself.
 

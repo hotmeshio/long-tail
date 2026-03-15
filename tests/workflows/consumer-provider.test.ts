@@ -111,7 +111,6 @@ describe('consumer/provider data injection', () => {
       description: 'Enriches order with pricing data',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -127,7 +126,6 @@ describe('consumer/provider data injection', () => {
       description: 'Processes order using provider data from enrichOrder',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: ['enrichOrder'],
     });
 
@@ -143,7 +141,6 @@ describe('consumer/provider data injection', () => {
       description: null,
       roles: [],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

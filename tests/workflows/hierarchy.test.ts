@@ -144,7 +144,6 @@ const defaultConfig = {
   description: null,
   roles: ['reviewer'],
   invocation_roles: [] as string[],
-  lifecycle: { onBefore: [], onAfter: [] },
   consumes: [] as string[],
 };
 

@@ -162,6 +162,8 @@ After each test, call `eventRegistry.clear()` to remove the adapter and reset co
 
 ## Custom Adapters
 
+For production, route events to your own pub/sub system.
+
 Implement `LTEventAdapter` to route events to any pub/sub system. The registry handles error isolation, so adapters can throw freely -- failures are caught, logged, and do not propagate.
 
 ### Example: SNS
@@ -227,6 +229,8 @@ class WebhookEventAdapter implements LTEventAdapter {
 ```
 
 ## When Events Fire
+
+Regardless of which adapter receives them, all events originate from three places in the system.
 
 Milestone events are published from three call sites, distinguished by the `source` field:
 

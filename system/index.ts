@@ -1,5 +1,4 @@
 import * as mcpTriageWorkflow from './workflows/mcp-triage';
-import * as mcpTriageOrch from './workflows/mcp-triage/orchestrator';
 
 /**
  * System workers that always load with Long Tail.
@@ -9,7 +8,6 @@ import * as mcpTriageOrch from './workflows/mcp-triage/orchestrator';
 export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...args: any[]) => any }> {
   const workers: Array<{ taskQueue: string; workflow: (...args: any[]) => any }> = [
     { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
-    { taskQueue: 'lt-mcp-triage-orch', workflow: mcpTriageOrch.mcpTriageOrchestrator },
   ];
 
   if (process.env.OPENAI_API_KEY) {

@@ -1,6 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { apiFetch, setToken, getToken } from '../client';
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Build a fake JWT with the given payload (no real signature). */
+function fakeJwt(payload: Record<string, unknown>): string {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = btoa(JSON.stringify(payload));
+  return `${header}.${body}.fake-sig`;
+}
+
+/** A token that expires far in the future. */
+function validToken(): string {
+  return fakeJwt({ userId: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 });
+}
+
+/** A token that is already expired. */
+function expiredToken(): string {
+  return fakeJwt({ userId: 'u1', exp: Math.floor(Date.now() / 1000) - 60 });
+}
+
 // ── Mock fetch ──────────────────────────────────────────────────────────────
 
 const fetchSpy = vi.fn<typeof fetch>();
@@ -39,13 +58,14 @@ describe('apiFetch', () => {
   });
 
   it('attaches Authorization header when token is set', async () => {
-    setToken('my-jwt-token');
+    const token = validToken();
+    setToken(token);
     fetchSpy.mockResolvedValueOnce(jsonResponse({ data: [] }));
 
     await apiFetch('/tasks');
 
     const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
-    expect(headers['Authorization']).toBe('Bearer my-jwt-token');
+    expect(headers['Authorization']).toBe(`Bearer ${token}`);
   });
 
   it('does not attach Authorization header when no token', async () => {
@@ -77,20 +97,19 @@ describe('apiFetch', () => {
     });
 
     it('attempts silent refresh on 401 when token exists', async () => {
-      setToken('expired-token');
+      setToken(expiredToken());
       // Store credentials for refresh
       sessionStorage.setItem(
         'lt_credentials',
         JSON.stringify({ username: 'alice', password: 'secret' }),
       );
 
-      // First call → 401
-      fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Unauthorized' }, 401));
-      // Refresh call → success
+      const newToken = validToken();
+      // Proactive expiry check triggers refresh call → success
       fetchSpy.mockResolvedValueOnce(
-        jsonResponse({ token: 'new-jwt-token', user: { id: 'u1' } }),
+        jsonResponse({ token: newToken, user: { id: 'u1' } }),
       );
-      // Retry call → success
+      // Actual API call with new token → success
       fetchSpy.mockResolvedValueOnce(jsonResponse({ tasks: ['a'] }));
 
       const refreshHandler = vi.fn();
@@ -99,23 +118,21 @@ describe('apiFetch', () => {
       const result = await apiFetch('/tasks');
 
       expect(result).toEqual({ tasks: ['a'] });
-      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
       expect(refreshHandler).toHaveBeenCalledOnce();
-      expect(getToken()).toBe('new-jwt-token');
+      expect(getToken()).toBe(newToken);
 
       window.removeEventListener('auth:refreshed', refreshHandler);
     });
 
     it('dispatches auth:unauthorized when refresh fails', async () => {
-      setToken('expired-token');
+      setToken(expiredToken());
       sessionStorage.setItem(
         'lt_credentials',
         JSON.stringify({ username: 'alice', password: 'wrong' }),
       );
 
-      // First call → 401
-      fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Unauthorized' }, 401));
-      // Refresh call → 401 (bad credentials)
+      // Proactive expiry check triggers refresh → 401 (bad credentials)
       fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Invalid credentials' }, 401));
 
       const handler = vi.fn();
@@ -128,17 +145,16 @@ describe('apiFetch', () => {
     });
 
     it('dispatches auth:unauthorized when no stored credentials', async () => {
-      setToken('expired-token');
+      setToken(expiredToken());
       // No lt_credentials in sessionStorage
-
-      // First call → 401
-      fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Unauthorized' }, 401));
 
       const handler = vi.fn();
       window.addEventListener('auth:unauthorized', handler);
 
       await expect(apiFetch('/tasks')).rejects.toThrow('Session expired');
       expect(handler).toHaveBeenCalledOnce();
+      // No network calls — proactive check short-circuits
+      expect(fetchSpy).not.toHaveBeenCalled();
 
       window.removeEventListener('auth:unauthorized', handler);
     });

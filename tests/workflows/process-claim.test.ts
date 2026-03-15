@@ -25,14 +25,12 @@ import type { LTEnvelope, LTReturn, LTEscalation } from '../../types';
 
 import * as processClaimWorkflow from '../../examples/workflows/process-claim';
 import * as mcpTriageWorkflow from '../../system/workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '../../system/workflows/mcp-triage/orchestrator';
 
 const { Connection, Client, Worker } = Durable;
 
 const CLAIM_QUEUE = 'test-claim';
 const ORCH_QUEUE = 'test-claim-orch';
 const TRIAGE_QUEUE = 'lt-mcp-triage';
-const TRIAGE_ORCH_QUEUE = 'lt-mcp-triage-orch';
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
 // ── Test orchestrator: thin container wrapping processClaim ──────────────
@@ -92,7 +90,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       description: 'Test process claim (deterministic activities)',
       roles: ['reviewer', 'engineer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -107,22 +104,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       description: 'Test orchestrator for process claim',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
-      consumes: [],
-    });
-
-    await configService.upsertWorkflowConfig({
-      workflow_type: 'mcpTriageOrchestrator',
-      is_lt: true,
-      is_container: true,
-      invocable: false,
-      task_queue: TRIAGE_ORCH_QUEUE,
-      default_role: 'reviewer',
-      default_modality: 'default',
-      description: 'MCP triage orchestrator',
-      roles: ['reviewer'],
-      invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -137,7 +118,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       description: 'MCP triage leaf',
       roles: ['reviewer', 'engineer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -177,13 +157,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       workflow: mcpTriageWorkflow.mcpTriage,
     });
     await triageWorker.run();
-
-    const triageOrchWorker = await Worker.create({
-      connection,
-      taskQueue: TRIAGE_ORCH_QUEUE,
-      workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator,
-    });
-    await triageOrchWorker.run();
 
     client = new Client({ connection });
 
@@ -286,16 +259,15 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     //   Path B (escalation):   low confidence  → creates escalation on original task
     //
     // Both paths are valid outcomes. We verify triage ran by checking
-    // for mcpTriageOrchestrator and mcpTriage task records.
+    // for mcpTriage task records.
     const taskDeadline = Date.now() + 60_000;
     let triageTasks: Awaited<ReturnType<typeof taskService.listTasks>>['tasks'] = [];
     while (Date.now() < taskDeadline) {
       const { tasks } = await taskService.listTasks({ limit: 100 });
       triageTasks = tasks.filter(t =>
-        t.workflow_type === 'mcpTriageOrchestrator' ||
         t.workflow_type === 'mcpTriage',
       );
-      if (triageTasks.length >= 2) break; // orchestrator + leaf
+      if (triageTasks.length >= 1) break;
       await sleepFor(3_000);
     }
     expect(triageTasks.length).toBeGreaterThanOrEqual(1);

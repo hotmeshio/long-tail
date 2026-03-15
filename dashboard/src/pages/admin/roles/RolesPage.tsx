@@ -8,10 +8,11 @@ import {
   useRemoveEscalationChain,
   type RoleDetail,
 } from '../../../api/roles';
-import { DataTable, type Column } from '../../../components/common/DataTable';
-import { ConfirmDeleteModal } from '../../../components/common/ConfirmDeleteModal';
-import { Modal } from '../../../components/common/Modal';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { DataTable, type Column } from '../../../components/common/data/DataTable';
+import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
+import { Modal } from '../../../components/common/modal/Modal';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { RolePill } from '../../../components/common/display/RolePill';
 
 // ── Create Role Modal ─────────────────────────────────────────
 
@@ -221,9 +222,7 @@ export function RolesPage() {
     {
       key: 'role',
       label: 'Role',
-      render: (row) => (
-        <span className="font-mono text-sm text-text-primary">{row.role}</span>
-      ),
+      render: (row) => <RolePill role={row.role} />,
     },
     {
       key: 'user_count',

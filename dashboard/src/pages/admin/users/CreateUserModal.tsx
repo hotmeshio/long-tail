@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useCreateUser } from '../../../api/users';
-import { Modal } from '../../../components/common/Modal';
+import { Modal } from '../../../components/common/modal/Modal';
 
 export function CreateUserModal({
   open,

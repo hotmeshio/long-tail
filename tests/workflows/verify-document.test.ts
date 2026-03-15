@@ -51,7 +51,6 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

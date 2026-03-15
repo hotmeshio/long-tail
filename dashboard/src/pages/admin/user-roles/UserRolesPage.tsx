@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useUsers, useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import { useRoles } from '../../../api/roles';
 import { useFilterParams } from '../../../hooks/useFilterParams';
-import { DataTable, type Column } from '../../../components/common/DataTable';
-import { StickyPagination } from '../../../components/common/StickyPagination';
-import { Modal } from '../../../components/common/Modal';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { DataTable, type Column } from '../../../components/common/data/DataTable';
+import { StickyPagination } from '../../../components/common/data/StickyPagination';
+import { Modal } from '../../../components/common/modal/Modal';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { RolePill } from '../../../components/common/display/RolePill';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
 
 export function UserRolesPage() {
@@ -87,13 +88,7 @@ export function UserRolesPage() {
       render: (row) => (
         <div className="flex gap-1 flex-wrap">
           {(row.roles ?? []).map((r) => (
-            <span
-              key={r.role}
-              className="px-2 py-0.5 text-[10px] bg-surface-sunken rounded-full text-text-secondary"
-            >
-              {r.role}
-              <span className="text-text-tertiary ml-1">({r.type})</span>
-            </span>
+            <RolePill key={r.role} role={r.role} />
           ))}
           {(row.roles ?? []).length === 0 && (
             <span className="text-[10px] text-text-tertiary">No roles</span>

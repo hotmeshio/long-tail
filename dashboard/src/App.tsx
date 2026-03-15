@@ -65,16 +65,16 @@ const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
 );
 const YamlWorkflowDetailPage = lazy(() =>
-  import('./pages/workflows/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
+  import('./pages/workflows/yaml-workflow-detail/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
 );
 const TasksListPage = lazy(() =>
-  import('./pages/admin/TasksListPage').then((m) => ({ default: m.TasksListPage })),
+  import('./pages/workflows/TasksListPage').then((m) => ({ default: m.TasksListPage })),
 );
 const TaskDetailPage = lazy(() =>
-  import('./pages/admin/TaskDetailPage').then((m) => ({ default: m.TaskDetailPage })),
+  import('./pages/workflows/TaskDetailPage').then((m) => ({ default: m.TaskDetailPage })),
 );
 const WorkflowExecutionPage = lazy(() =>
-  import('./pages/admin/WorkflowExecutionPage').then((m) => ({ default: m.WorkflowExecutionPage })),
+  import('./pages/workflows/WorkflowExecutionPage').then((m) => ({ default: m.WorkflowExecutionPage })),
 );
 
 // Admin pages (admin or superadmin)
@@ -82,13 +82,13 @@ const AdminDashboard = lazy(() =>
   import('./pages/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard })),
 );
 const WorkflowConfigsPage = lazy(() =>
-  import('./pages/admin/workflow-configs').then((m) => ({ default: m.WorkflowConfigsPage })),
+  import('./pages/workflows/registry').then((m) => ({ default: m.WorkflowConfigsPage })),
 );
 const WorkflowConfigDetailPage = lazy(() =>
-  import('./pages/admin/workflow-configs').then((m) => ({ default: m.WorkflowConfigDetailPage })),
+  import('./pages/workflows/registry').then((m) => ({ default: m.WorkflowConfigDetailPage })),
 );
 const McpServersPage = lazy(() =>
-  import('./pages/admin/mcp-servers').then((m) => ({ default: m.McpServersPage })),
+  import('./pages/mcp/servers').then((m) => ({ default: m.McpServersPage })),
 );
 const UsersPage = lazy(() =>
   import('./pages/admin/users').then((m) => ({ default: m.UsersPage })),
@@ -138,6 +138,12 @@ const queryClient = new QueryClient({
   },
 });
 
+// Clear cached query data on logout so stale results from a
+// previous session don't appear as empty lists on the next login.
+window.addEventListener('auth:unauthorized', () => {
+  queryClient.clear();
+});
+
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
@@ -148,7 +154,7 @@ const router = createBrowserRouter([
       { index: true, element: <Lazy><ProcessesOverview /></Lazy> },
 
       // Processes section (all authenticated users)
-      { path: 'processes/runs', element: <Lazy><ProcessesListPage /></Lazy> },
+      { path: 'processes/all', element: <Lazy><ProcessesListPage /></Lazy> },
       { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
 
       // Escalation section (all authenticated users)
@@ -162,15 +168,15 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
-          { path: 'workflows/runs', element: <Lazy><WorkflowsDashboard /></Lazy> },
+          { path: 'workflows/executions', element: <Lazy><WorkflowsDashboard /></Lazy> },
           { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
           { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
-          { path: 'workflows/detail/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
+          { path: 'workflows/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
           { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
-          { path: 'workflows/config', element: <Lazy><WorkflowConfigsPage /></Lazy> },
-          { path: 'workflows/config/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
-          { path: 'workflows/config/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+          { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
+          { path: 'workflows/registry/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+          { path: 'workflows/registry/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
         ],
       },
 
@@ -183,8 +189,8 @@ const router = createBrowserRouter([
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
           { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
           { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
-          { path: 'mcp/runs', element: <Lazy><McpRunsPage /></Lazy> },
-          { path: 'mcp/runs/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
+          { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
+          { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
         ],
       },
 

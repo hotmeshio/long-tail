@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { StatCard } from '../../components/common/data/StatCard';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export function WorkflowsOverview() {
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
-    navigate(`/workflows/runs${qs ? `?${qs}` : ''}`);
+    navigate(`/workflows/executions${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
@@ -155,10 +156,10 @@ export function WorkflowsOverview() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <SummaryCard label="Total" value={totals.total} onClick={() => goToList()} />
-        <SummaryCard label="Running" value={totals.running} colorClass="text-status-active" onClick={() => goToList(undefined, 'running')} />
-        <SummaryCard label="Completed" value={totals.completed} colorClass="text-status-success" onClick={() => goToList(undefined, 'completed')} />
-        <SummaryCard label="Failed" value={totals.failed} colorClass="text-status-error" onClick={() => goToList(undefined, 'failed')} />
+        <StatCard label="Total" value={totals.total} onClick={() => goToList()} />
+        <StatCard label="Running" value={totals.running} colorClass="text-status-active" onClick={() => goToList(undefined, 'running')} />
+        <StatCard label="Completed" value={totals.completed} colorClass="text-status-success" onClick={() => goToList(undefined, 'completed')} />
+        <StatCard label="Failed" value={totals.failed} colorClass="text-status-error" onClick={() => goToList(undefined, 'failed')} />
       </div>
 
       {/* By-type table */}
@@ -214,29 +215,5 @@ export function WorkflowsOverview() {
         </div>
       )}
     </div>
-  );
-}
-
-// ── Summary card ─────────────────────────────────────────────────────────────
-
-function SummaryCard({
-  label,
-  value,
-  colorClass = 'text-text-primary',
-  onClick,
-}: {
-  label: string;
-  value: number;
-  colorClass?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-surface-raised border border-surface-border rounded-md p-4 text-left hover:border-accent/40 transition-colors"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{label}</p>
-      <p className={`text-2xl font-light tabular-nums ${colorClass}`}>{value}</p>
-    </button>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Modal } from '../../../components/common/Modal';
+import { Modal } from '../../../components/common/modal/Modal';
 
 interface ResolveModalProps {
   open: boolean;

@@ -2,16 +2,16 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useMcpRunExecution } from '../../api/mcp-runs';
 import { useYamlWorkflowByTopic } from '../../api/yaml-workflows';
 import { useSettings } from '../../api/settings';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { JsonViewer } from '../../components/common/JsonViewer';
-import { PageHeader } from '../../components/common/PageHeader';
-import { CopyableId } from '../../components/common/CopyableId';
-import { CollapsibleSection } from '../../components/common/CollapsibleSection';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { JsonViewer } from '../../components/common/data/JsonViewer';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { CopyableId } from '../../components/common/display/CopyableId';
+import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { formatDuration } from '../../lib/format';
 
-import { SwimlaneTimeline } from '../admin/workflow-execution/SwimlaneTimeline';
-import { EventTable } from '../admin/workflow-execution/EventTable';
+import { SwimlaneTimeline } from '../workflows/workflow-execution/SwimlaneTimeline';
+import { EventTable } from '../workflows/workflow-execution/EventTable';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Runs" />
+        <PageHeader title="Run" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -83,7 +83,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Run" backTo={namespace !== 'longtail' ? `/mcp/runs?namespace=${namespace}` : '/mcp/runs'} backLabel="Runs" />
+      <PageHeader title="Run" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">

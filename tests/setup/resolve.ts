@@ -55,9 +55,9 @@ export async function resolveEscalation(
 
       await taskService.createTask({
         workflow_id: triageWorkflowId,
-        workflow_type: 'mcpTriageOrchestrator',
-        lt_type: 'mcpTriageOrchestrator',
-        task_queue: 'lt-mcp-triage-orch',
+        workflow_type: 'mcpTriage',
+        lt_type: 'mcpTriage',
+        task_queue: 'lt-mcp-triage',
         signal_id: `lt-triage-${triageWorkflowId}`,
         parent_workflow_id: routing?.parentWorkflowId || triageWorkflowId,
         origin_id: escalation.origin_id || triageWorkflowId,
@@ -67,9 +67,9 @@ export async function resolveEscalation(
       });
 
       await client.workflow.start({
-        workflowName: 'mcpTriageOrchestrator',
+        workflowName: 'mcpTriage',
         args: [directive.triageEnvelope],
-        taskQueue: 'lt-mcp-triage-orch',
+        taskQueue: 'lt-mcp-triage',
         workflowId: triageWorkflowId,
         expire: 300,
       });

@@ -4,7 +4,7 @@ By default, when a human resolves an escalation, Long Tail re-runs the original 
 
 But sometimes the human *can't* fix the problem. An upside-down page. A corrupted image. A document in the wrong language. The resolver knows what's wrong but can't produce the correct data themselves. They need the system to remediate and retry.
 
-Escalation strategies are the pluggable layer that decides what happens when a resolution arrives. The default strategy re-runs. The MCP strategy can route to a triage orchestrator that calls tools, fixes the problem, and re-invokes the original workflow with corrected data.
+Escalation strategies are the pluggable layer that decides what happens when a resolution arrives. The default strategy re-runs. The MCP strategy can route to the `mcpTriage` workflow, which calls tools, fixes the problem, and re-invokes the original workflow with corrected data.
 
 ## Contents
 
@@ -12,7 +12,7 @@ Escalation strategies are the pluggable layer that decides what happens when a r
 - [The Default Strategy](#the-default-strategy)
 - [The MCP Strategy](#the-mcp-strategy)
 - [The `_lt` Namespace](#the-_lt-namespace)
-- [The Triage Orchestrator](#the-triage-orchestrator)
+- [The Triage Workflow](#the-triage-workflow)
 - [Writing a Custom Strategy](#writing-a-custom-strategy)
 - [Configuration](#configuration)
 - [Testing](#testing)
@@ -31,7 +31,7 @@ Resolver payload arrives
 │                   │
 │ onResolution()    │──── { action: 'rerun' }  ──── Standard re-run
 │                   │
-│                   │──── { action: 'triage' } ──── MCP triage orchestrator
+│                   │──── { action: 'triage' } ──── MCP triage workflow
 └───────────────────┘
 ```
 
@@ -47,7 +47,7 @@ This is the default when no strategy is configured or when `escalation.strategy`
 
 Checks `resolverPayload._lt.needsTriage`. If the resolver flagged the escalation for triage, the strategy builds a triage envelope and returns `{ action: 'triage' }`. If not, it falls through to `{ action: 'rerun' }`.
 
-The triage envelope contains everything the triage orchestrator needs:
+The triage envelope contains everything the triage workflow needs:
 
 ```typescript
 {
@@ -71,10 +71,10 @@ The `_lt` key in resolver payloads is reserved for Long Tail control flow. Resol
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `_lt.needsTriage` | `boolean` | Route to triage orchestrator instead of standard re-run |
-| `_lt.hint` | `string` | Remediation hint for the triage orchestrator (e.g., `'image_orientation'`) |
+| `_lt.needsTriage` | `boolean` | Route to the triage workflow instead of standard re-run |
+| `_lt.hint` | `string` | Remediation hint for the triage workflow (e.g., `'image_orientation'`) |
 
-Everything outside `_lt` is the resolver's domain-specific data. The strategy reads `_lt` to decide routing; the triage orchestrator reads `_lt.hint` to decide which tools to call.
+Everything outside `_lt` is the resolver's domain-specific data. The strategy reads `_lt` to decide routing; the triage workflow reads `_lt.hint` to decide which tools to call.
 
 Example resolution with triage:
 
@@ -102,21 +102,21 @@ Example resolution without triage (standard re-run):
 }
 ```
 
-## The Triage Orchestrator
+## The Triage Workflow
 
 When the MCP strategy routes to triage, the system:
 
-1. Creates a task record for the triage orchestrator with the original parent's routing metadata
-2. Starts the `mcpTriageOrchestrator` workflow
+1. Creates a task record for the triage workflow with the original parent's routing metadata
+2. Starts the `mcpTriage` workflow
 3. Marks the escalation as resolved (triage is handling it)
 
-The triage orchestrator (`mcpTriageOrchestrator`) is a container that calls the `mcpTriage` workflow via `executeLT`. The triage workflow:
+The `mcpTriage` workflow is a single, self-contained workflow that handles the entire triage lifecycle — the LLM agentic loop and the exit (direct resolution or escalation on the original task). It:
 
 1. **Queries upstream tasks** — reads all tasks sharing the same `originId` to understand what happened before
 2. **Reads the resolver hint** — `_lt.hint` tells it what kind of remediation is needed
 3. **Calls MCP tools** — based on the hint, calls the appropriate tools:
    - `image_orientation` → lists document pages, calls `rotate_page` for each
-4. **Re-invokes the original workflow** — starts the failed workflow again with corrected data (e.g., rotated page references)
+4. **Handles the exit directly** — either starts the original workflow with corrected data (direct resolution) or creates a targeted escalation on the original task
 5. **Signals back** — the re-invoked workflow succeeds, and the interceptor signals through standard channels back to the original parent orchestrator
 
 The full chain:
@@ -126,7 +126,7 @@ Orchestrator waits ──► Child workflow escalates
                               │
                        Human says needsTriage
                               │
-                       MCP triage orchestrator
+                       mcpTriage workflow
                               │
                        Queries upstream tasks
                        Calls MCP tools (rotate_page, etc.)
@@ -141,7 +141,7 @@ Orchestrator waits ──► Child workflow escalates
 
 ### Available MCP Tools
 
-The Vision MCP server provides tools that the triage orchestrator can call:
+The Vision MCP server provides tools that the triage workflow can call:
 
 | Tool | Description |
 |------|-------------|
@@ -151,6 +151,8 @@ The Vision MCP server provides tools that the triage orchestrator can call:
 | `rotate_page` | Rotate a page image by 90/180/270 degrees |
 
 ## Writing a Custom Strategy
+
+The built-in MCP strategy handles the common case. For different routing logic, implement your own.
 
 Implement the `LTEscalationStrategy` interface:
 
@@ -233,18 +235,16 @@ import { escalationStrategyRegistry, McpEscalationStrategy } from '@hotmeshio/lo
 escalationStrategyRegistry.register(new McpEscalationStrategy());
 ```
 
-When the MCP strategy is configured, ensure the triage workers are registered:
+When the MCP strategy is configured, ensure the triage worker is registered:
 
 ```typescript
 import * as mcpTriageWorkflow from '@hotmeshio/long-tail/workflows/mcp-triage';
-import * as mcpTriageOrchWorkflow from '@hotmeshio/long-tail/workflows/mcp-triage/orchestrator';
 
 await start({
   database: { ... },
   workers: [
     // ... your workflows
     { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
-    { taskQueue: 'lt-mcp-triage-orch', workflow: mcpTriageOrchWorkflow.mcpTriageOrchestrator },
   ],
   escalation: { strategy: 'mcp' },
 });
@@ -260,5 +260,5 @@ npx vitest run tests/workflows/mcp-triage.test.ts --reporter=verbose
 ```
 
 The test covers:
-1. **Full triage flow** — extraction fails, human flags `needsTriage`, triage orchestrator rotates pages, re-invoked workflow succeeds, signals back to parent
+1. **Full triage flow** — extraction fails, human flags `needsTriage`, triage workflow rotates pages, re-invoked workflow succeeds, signals back to parent
 2. **Standard fallback** — resolver doesn't set `needsTriage`, standard re-run proceeds as normal

@@ -5,7 +5,8 @@ import { useMcpServers } from '../../api/mcp';
 import { useMcpRuns } from '../../api/mcp-runs';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useNamespaces } from '../../api/namespaces';
-import { PageHeader } from '../../components/common/PageHeader';
+import { PageHeader } from '../../components/common/layout/PageHeader';
+import { StatCard } from '../../components/common/data/StatCard';
 import type { McpToolManifest } from '../../api/types';
 
 // ── Duration filter ──────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ interface PipelineStats {
   avgDuration: number | null;
 }
 
-// ── Clickable stat cell ──────────────────────────────────────────────────────
+// ── Reusable components ──────────────────────────────────────────────────────
 
 function StatCell({
   value,
@@ -61,17 +62,6 @@ function StatCell({
   );
 }
 
-// ── Unified server entry ─────────────────────────────────────────────────────
-
-interface UnifiedServer {
-  id: string;
-  name: string;
-  kind: 'tool' | 'workflow';
-  status: string;
-  toolCount: number;
-  updatedAt: string;
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function McpOverview() {
@@ -89,49 +79,19 @@ export function McpOverview() {
     [nsData?.namespaces],
   );
 
-  // ── Unified server list ────────────────────────────────────────
+  // ── Server counts ────────────────────────────────────────────
   const servers = serverData?.servers ?? [];
   const yamlWorkflows = yamlData?.workflows ?? [];
 
-  const toolServerEntries: UnifiedServer[] = useMemo(
-    () =>
-      servers.map((s) => ({
-        id: s.id,
-        name: s.name,
-        kind: 'tool' as const,
-        status: s.status,
-        toolCount: Array.isArray(s.tool_manifest) ? (s.tool_manifest as McpToolManifest[]).length : 0,
-        updatedAt: s.updated_at,
-      })),
+  const serverToolCount = useMemo(
+    () => servers.reduce((sum, s) => sum + (Array.isArray(s.tool_manifest) ? (s.tool_manifest as McpToolManifest[]).length : 0), 0),
     [servers],
   );
 
-  const workflowServerEntries: UnifiedServer[] = useMemo(() => {
-    const map = new Map<string, { count: number; status: string; updatedAt: string }>();
-    for (const wf of yamlWorkflows) {
-      const entry = map.get(wf.app_id) ?? { count: 0, status: wf.status, updatedAt: wf.updated_at };
-      entry.count++;
-      if (wf.updated_at > entry.updatedAt) entry.updatedAt = wf.updated_at;
-      const statusPriority: Record<string, number> = { active: 0, deployed: 1, draft: 2, archived: 3 };
-      if ((statusPriority[wf.status] ?? 9) < (statusPriority[entry.status] ?? 9)) entry.status = wf.status;
-      map.set(wf.app_id, entry);
-    }
-    return [...map.entries()].map(([appId, info]) => ({
-      id: `wf-${appId}`,
-      name: appId,
-      kind: 'workflow' as const,
-      status: info.status,
-      toolCount: info.count,
-      updatedAt: info.updatedAt,
-    }));
+  const workflowServerCount = useMemo(() => {
+    const appIds = new Set(yamlWorkflows.map((wf) => wf.app_id));
+    return appIds.size;
   }, [yamlWorkflows]);
-
-  const allServers = useMemo(
-    () => [...toolServerEntries, ...workflowServerEntries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [toolServerEntries, workflowServerEntries],
-  );
-
-  const totalToolCount = allServers.reduce((sum, s) => sum + s.toolCount, 0);
 
   // ── Run stats ──────────────────────────────────────────────────
   const cutoff = useMemo(() => {
@@ -185,83 +145,16 @@ export function McpOverview() {
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
-    navigate(`/mcp/runs${qs ? `?${qs}` : ''}`);
+    navigate(`/mcp/executions${qs ? `?${qs}` : ''}`);
   };
 
   const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
 
   return (
     <div>
-      <PageHeader
-        title="Durable MCP"
-        actions={
-          <span className="text-xs text-text-tertiary">
-            {serversLoading || yamlLoading
-              ? '—'
-              : `${allServers.length} server${allServers.length !== 1 ? 's' : ''} · ${totalToolCount} tool${totalToolCount !== 1 ? 's' : ''}`}
-          </span>
-        }
-      />
+      <PageHeader title="MCP Tools" />
 
-      {/* ── All Servers ───────────────────────────────────── */}
-      <SectionHeading>All Servers</SectionHeading>
-
-      {allServers.length > 0 ? (
-        <table className="w-full text-left mb-10">
-          <thead>
-            <tr className="border-b border-surface-border">
-              <th className={thCls}>Server</th>
-              <th className={`${thCls} w-28`}>Type</th>
-              <th className={`${thCls} text-right w-20`}>Tools</th>
-              <th className={`${thCls} w-28`}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allServers.map((s) => (
-              <tr
-                key={s.id}
-                onClick={() =>
-                  navigate(s.kind === 'tool' ? `/mcp/servers?search=${encodeURIComponent(s.name)}` : '/mcp/workflows')
-                }
-                className="border-b border-surface-border last:border-b-0 cursor-pointer row-hover"
-              >
-                <td className="py-3 text-sm text-text-primary font-mono">
-                  {s.name}
-                </td>
-                <td className="py-3">
-                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    s.kind === 'tool'
-                      ? 'bg-accent-primary/10 text-accent border border-accent-primary/20'
-                      : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                  }`}>
-                    {s.kind === 'tool' ? <Server size={10} /> : <Workflow size={10} />}
-                    {s.kind === 'tool' ? 'Server Tool' : 'Workflow Tool'}
-                  </span>
-                </td>
-                <td className="py-3 text-sm text-right tabular-nums text-text-secondary">
-                  {s.toolCount}
-                </td>
-                <td className="py-3">
-                  <span className={`text-xs ${
-                    s.status === 'connected' || s.status === 'active' ? 'text-status-success' :
-                    s.status === 'error' ? 'text-status-error' :
-                    'text-text-tertiary'
-                  }`}>
-                    {s.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-sm text-text-tertiary mb-10 py-6 text-center">No servers registered</p>
-      )}
-
-      {/* ── Recent Runs ───────────────────────────────────── */}
-      <SectionHeading>Recent Runs</SectionHeading>
-
-      {/* Duration tabs + Namespace selector */}
+      {/* ── Duration tabs + namespace ────────────────────────── */}
       <div className="flex items-center gap-4 mb-6">
         <div className="flex items-center gap-1">
           {DURATIONS.map((d) => (
@@ -291,15 +184,15 @@ export function McpOverview() {
         )}
       </div>
 
-      {/* Summary cards */}
+      {/* ── Summary cards ────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <SummaryCard label="Total Runs" value={totals.total} onClick={() => goToRuns()} />
-        <SummaryCard label="Running" value={totals.running} colorClass="text-status-active" onClick={() => goToRuns(undefined, 'running')} />
-        <SummaryCard label="Completed" value={totals.completed} colorClass="text-status-success" onClick={() => goToRuns(undefined, 'completed')} />
-        <SummaryCard label="Failed" value={totals.failed} colorClass="text-status-error" onClick={() => goToRuns(undefined, 'failed')} />
+        <StatCard label="Total Runs" value={totals.total} onClick={() => goToRuns()} />
+        <StatCard label="Running" value={totals.running} colorClass="text-status-active" onClick={() => goToRuns(undefined, 'running')} />
+        <StatCard label="Completed" value={totals.completed} colorClass="text-status-success" onClick={() => goToRuns(undefined, 'completed')} />
+        <StatCard label="Failed" value={totals.failed} colorClass="text-status-error" onClick={() => goToRuns(undefined, 'failed')} />
       </div>
 
-      {/* By-pipeline table */}
+      {/* ── By-pipeline table ────────────────────────────────── */}
       {byPipeline.length > 0 && (
         <table className="w-full text-left mb-10">
           <thead>
@@ -345,47 +238,53 @@ export function McpOverview() {
       )}
 
       {byPipeline.length === 0 && (
-        <div className="py-16 text-center mb-10">
+        <div className="py-12 text-center mb-8">
           <p className="text-sm text-text-tertiary">
-            No MCP run activity in the last {duration}
+            No MCP tool activity in the last {duration}
           </p>
         </div>
       )}
+
+      {/* ── Server inventory (compact cards) ─────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          onClick={() => navigate('/mcp/servers')}
+          className="bg-surface-raised border border-surface-border rounded-md p-5 text-left hover:border-accent/40 transition-colors"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <Server size={16} className="text-accent shrink-0" />
+            <span className="text-sm font-medium text-text-primary">Server Tools</span>
+          </div>
+          <p className="text-2xl font-light tabular-nums text-text-primary mb-1">
+            {serversLoading ? '—' : servers.length}
+            <span className="text-sm text-text-tertiary font-normal ml-2">
+              server{servers.length !== 1 ? 's' : ''} · {serverToolCount} tool{serverToolCount !== 1 ? 's' : ''}
+            </span>
+          </p>
+          <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
+            Built-in and external MCP servers. Each server exposes tools that workflows and agents can call.
+          </p>
+        </button>
+
+        <button
+          onClick={() => navigate('/mcp/workflows')}
+          className="bg-surface-raised border border-surface-border rounded-md p-5 text-left hover:border-accent/40 transition-colors"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <Workflow size={16} className="text-purple-400 shrink-0" />
+            <span className="text-sm font-medium text-text-primary">Workflow Tools</span>
+          </div>
+          <p className="text-2xl font-light tabular-nums text-text-primary mb-1">
+            {yamlLoading ? '—' : yamlWorkflows.length}
+            <span className="text-sm text-text-tertiary font-normal ml-2">
+              workflow{yamlWorkflows.length !== 1 ? 's' : ''} · {workflowServerCount} server{workflowServerCount !== 1 ? 's' : ''}
+            </span>
+          </p>
+          <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
+            Compiled from triage runs. Deterministic tool-to-tool pipelines — no LLM, no token costs.
+          </p>
+        </button>
+      </div>
     </div>
-  );
-}
-
-// ── Section heading ──────────────────────────────────────────────────────────
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 mb-4">
-      <span className="text-xs font-semibold uppercase tracking-widest text-text-secondary">{children}</span>
-      <span className="flex-1 border-b border-surface-border" />
-    </div>
-  );
-}
-
-// ── Summary card ─────────────────────────────────────────────────────────────
-
-function SummaryCard({
-  label,
-  value,
-  colorClass = 'text-text-primary',
-  onClick,
-}: {
-  label: string;
-  value: number;
-  colorClass?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-surface-raised border border-surface-border rounded-md p-4 text-left hover:border-accent/40 transition-colors"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{label}</p>
-      <p className={`text-2xl font-light tabular-nums ${colorClass}`}>{value}</p>
-    </button>
   );
 }

@@ -8,14 +8,11 @@ import {
   INSERT_CONFIG_ROLE,
   DELETE_INVOCATION_ROLES,
   INSERT_INVOCATION_ROLE,
-  DELETE_LIFECYCLE,
-  INSERT_LIFECYCLE_BEFORE,
-  INSERT_LIFECYCLE_AFTER,
   DELETE_WORKFLOW,
 } from './sql';
 
 export async function upsertWorkflowConfig(
-  config: LTWorkflowConfig,
+  config: LTWorkflowConfig & { lifecycle?: any },
 ): Promise<LTWorkflowConfig> {
   const pool = getPool();
   const client = await pool.connect();
@@ -61,25 +58,6 @@ export async function upsertWorkflowConfig(
     await client.query(DELETE_INVOCATION_ROLES, [config.workflow_type]);
     for (const role of config.invocation_roles) {
       await client.query(INSERT_INVOCATION_ROLE, [config.workflow_type, role]);
-    }
-
-    // Replace lifecycle hooks
-    await client.query(DELETE_LIFECYCLE, [config.workflow_type]);
-    for (const hook of config.lifecycle.onBefore) {
-      await client.query(INSERT_LIFECYCLE_BEFORE, [
-        config.workflow_type,
-        hook.target_workflow_type,
-        hook.target_task_queue,
-        hook.ordinal,
-      ]);
-    }
-    for (const hook of config.lifecycle.onAfter) {
-      await client.query(INSERT_LIFECYCLE_AFTER, [
-        config.workflow_type,
-        hook.target_workflow_type,
-        hook.target_task_queue,
-        hook.ordinal,
-      ]);
     }
 
     await client.query('COMMIT');

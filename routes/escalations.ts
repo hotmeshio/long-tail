@@ -376,9 +376,9 @@ router.post('/bulk-triage', async (req, res) => {
 
       await taskService.createTask({
         workflow_id: triageWorkflowId,
-        workflow_type: 'mcpTriageOrchestrator',
-        lt_type: 'mcpTriageOrchestrator',
-        task_queue: 'lt-mcp-triage-orch',
+        workflow_type: 'mcpTriage',
+        lt_type: 'mcpTriage',
+        task_queue: 'lt-mcp-triage',
         signal_id: `lt-triage-${triageWorkflowId}`,
         parent_workflow_id: routing?.parentWorkflowId || triageWorkflowId,
         origin_id: escalation.origin_id || triageWorkflowId,
@@ -388,9 +388,9 @@ router.post('/bulk-triage', async (req, res) => {
       });
 
       await client.workflow.start({
-        workflowName: 'mcpTriageOrchestrator',
+        workflowName: 'mcpTriage',
         args: [triageEnvelope],
-        taskQueue: 'lt-mcp-triage-orch',
+        taskQueue: 'lt-mcp-triage',
         workflowId: triageWorkflowId,
         expire: 300,
       });
@@ -625,9 +625,9 @@ router.post('/:id/resolve', async (req, res) => {
         // targeted escalation on the original task instead.
         await taskService.createTask({
           workflow_id: triageWorkflowId,
-          workflow_type: 'mcpTriageOrchestrator',
-          lt_type: 'mcpTriageOrchestrator',
-          task_queue: 'lt-mcp-triage-orch',
+          workflow_type: 'mcpTriage',
+          lt_type: 'mcpTriage',
+          task_queue: 'lt-mcp-triage',
           signal_id: `lt-triage-${triageWorkflowId}`,
           parent_workflow_id: triageWorkflowId,
           origin_id: escalation.origin_id || triageWorkflowId,
@@ -636,9 +636,9 @@ router.post('/:id/resolve', async (req, res) => {
         });
 
         await client.workflow.start({
-          workflowName: 'mcpTriageOrchestrator',
+          workflowName: 'mcpTriage',
           args: [directive.triageEnvelope],
-          taskQueue: 'lt-mcp-triage-orch',
+          taskQueue: 'lt-mcp-triage',
           workflowId: triageWorkflowId,
           expire: 300,
         });

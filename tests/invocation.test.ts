@@ -59,7 +59,6 @@ describe('Workflow invocation config and RBAC', () => {
       description: 'A workflow that can be invoked via API',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     };
 
@@ -80,7 +79,6 @@ describe('Workflow invocation config and RBAC', () => {
       description: 'An internal-only workflow',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     };
 
@@ -102,7 +100,6 @@ describe('Workflow invocation config and RBAC', () => {
       description: 'Workflow with invocation role restrictions',
       roles: ['reviewer'],
       invocation_roles: ['submitter', 'admin'],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     };
 
@@ -141,7 +138,6 @@ describe('Workflow invocation config and RBAC', () => {
       description: null,
       roles: ['reviewer'],
       invocation_roles: ['operator'],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -164,7 +160,6 @@ describe('Workflow invocation config and RBAC', () => {
       description: null,
       roles: [],
       invocation_roles: ['role-a', 'role-b'],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

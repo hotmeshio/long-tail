@@ -9,7 +9,7 @@ import type {
  *
  * Checks for `resolverPayload._lt.needsTriage`. When set, builds a
  * triage envelope and returns `{ action: 'triage' }` so the resolution
- * route starts the MCP triage orchestrator instead of a standard re-run.
+ * route starts the mcpTriage workflow instead of a standard re-run.
  *
  * When `needsTriage` is not set, falls through to standard `{ action: 'rerun' }`.
  */
@@ -29,6 +29,10 @@ export class McpEscalationStrategy implements LTEscalationStrategy {
       } catch { /* use empty */ }
     }
 
+    // Strip routing fields from the original envelope's `lt` — triage
+    // runs on a separate axis and must NOT signal the original parent.
+    // Keep only originId and parentId which the triage workflow uses.
+    const originalLt = envelope.lt || {};
     const triageEnvelope = {
       data: {
         escalationId: escalation.id,
@@ -40,7 +44,10 @@ export class McpEscalationStrategy implements LTEscalationStrategy {
         resolverPayload,
       },
       metadata: envelope.metadata || {},
-      lt: envelope.lt || {},
+      lt: {
+        originId: originalLt.originId,
+        parentId: originalLt.parentId,
+      },
     };
 
     return { action: 'triage', triageEnvelope };

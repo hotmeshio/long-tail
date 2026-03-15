@@ -101,7 +101,6 @@ describe('events service', () => {
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
     await configService.upsertWorkflowConfig({
@@ -115,7 +114,6 @@ describe('events service', () => {
       description: null,
       roles: [],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

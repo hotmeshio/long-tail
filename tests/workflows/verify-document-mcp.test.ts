@@ -196,7 +196,6 @@ describe('verifyDocumentMcp workflow (MCP-native)', () => {
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

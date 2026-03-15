@@ -2,7 +2,6 @@ import * as configService from '../services/config';
 import { CONFIG_CACHE_TTL_MS } from './defaults';
 import type {
   LTResolvedConfig,
-  LTLifecycleHook,
   LTProviderData,
 } from '../types';
 
@@ -70,26 +69,6 @@ class LTConfigCache {
   async getDefaultModality(name: string): Promise<string> {
     const config = await this.get(name);
     return config?.modality ?? 'default';
-  }
-
-  async getOnBefore(name: string): Promise<LTLifecycleHook[]> {
-    const config = await this.get(name);
-    return config?.onBefore ?? [];
-  }
-
-  async getOnAfter(name: string): Promise<LTLifecycleHook[]> {
-    const config = await this.get(name);
-    return config?.onAfter ?? [];
-  }
-
-  async hasOnBefore(name: string): Promise<boolean> {
-    const hooks = await this.getOnBefore(name);
-    return hooks.length > 0;
-  }
-
-  async hasOnAfter(name: string): Promise<boolean> {
-    const hooks = await this.getOnAfter(name);
-    return hooks.length > 0;
   }
 
   async getToolTags(name: string): Promise<string[]> {

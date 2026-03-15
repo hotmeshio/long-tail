@@ -8,7 +8,7 @@ vi.mock('../../../api/yaml-workflows', () => ({
   useCreateYamlWorkflow: vi.fn(),
 }));
 
-import { ConvertToYamlModal } from '../ConvertToYamlModal';
+import { ConvertToYamlModal } from '../modal/ConvertToYamlModal';
 import {
   useYamlWorkflowAppIds,
   useCreateYamlWorkflow,
