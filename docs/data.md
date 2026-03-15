@@ -176,31 +176,12 @@ Roles allowed to invoke a workflow via the API. When a workflow has `invocable: 
 
 Unique constraint: `(workflow_type, role)`.
 
-### lt_config_lifecycle
-
-Hook definitions that chain workflows together. An `onBefore` hook runs a workflow before the main workflow; an `onAfter` hook runs after.
-
-| Column | Type | Default | Description |
-|--------|------|---------|-------------|
-| `id` | `UUID` | `gen_random_uuid()` | Primary key |
-| `workflow_type` | `TEXT NOT NULL` | — | FK to `lt_config_workflows(workflow_type)`, CASCADE on delete |
-| `hook` | `TEXT NOT NULL` | — | `onBefore` or `onAfter` |
-| `target_workflow_type` | `TEXT NOT NULL` | — | The workflow to invoke |
-| `target_task_queue` | `TEXT` | — | Queue for the target workflow (optional) |
-| `ordinal` | `INTEGER NOT NULL` | `0` | Execution order (lower runs first) |
-| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
-
-Hook type is enforced by a CHECK constraint: `hook IN ('onBefore', 'onAfter')`.
-
-Unique constraint: `(workflow_type, hook, target_workflow_type)`.
-
 ## Entity-Relationship Diagram
 
 ```
 lt_config_workflows
   ├──< lt_config_roles              (workflow_type → workflow_type, CASCADE)
-  ├──< lt_config_invocation_roles   (workflow_type → workflow_type, CASCADE)
-  └──< lt_config_lifecycle          (workflow_type → workflow_type, CASCADE)
+  └──< lt_config_invocation_roles   (workflow_type → workflow_type, CASCADE)
 
 lt_users
   └──< lt_user_roles          (user_id → id, CASCADE)

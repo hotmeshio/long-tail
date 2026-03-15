@@ -249,7 +249,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       description: 'Test verify document (mock activities)',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -264,7 +263,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       description: 'Test orchestrator for verify document',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -279,7 +277,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
       description: 'MCP triage leaf — remediates via MCP tools or engineer guidance',
       roles: ['reviewer', 'engineer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

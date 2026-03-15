@@ -72,7 +72,6 @@ describe('DB MCP server', () => {
       description: 'Test workflow for db-server tests',
       roles: [],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

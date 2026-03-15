@@ -90,7 +90,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       description: 'Test process claim (deterministic activities)',
       roles: ['reviewer', 'engineer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -105,7 +104,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       description: 'Test orchestrator for process claim',
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 
@@ -120,7 +118,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
       description: 'MCP triage leaf',
       roles: ['reviewer', 'engineer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

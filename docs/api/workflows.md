@@ -32,10 +32,6 @@ GET /api/workflows/config
       "consumes": [],
       "roles": ["reviewer"],
       "invocation_roles": ["submitter"],
-      "lifecycle": {
-        "onBefore": [],
-        "onAfter": []
-      },
       "created_at": "2025-01-15T10:00:00.000Z",
       "updated_at": "2025-01-15T10:00:00.000Z"
     }
@@ -90,35 +86,7 @@ PUT /api/workflows/:type/config
 | `description` | `string \| null` | `null` | Human-readable description |
 | `roles` | `string[]` | `[]` | Roles allowed to claim escalations for this workflow |
 | `invocation_roles` | `string[]` | `[]` | Roles allowed to invoke via API. Empty = any authenticated user. |
-| `lifecycle` | `object` | `{ onBefore: [], onAfter: [] }` | Hook definitions (see below) |
 | `consumes` | `string[]` | `[]` | Workflow types whose completed data this workflow receives via `envelope.lt.providers` |
-
-**Lifecycle hooks:**
-
-```json
-{
-  "lifecycle": {
-    "onBefore": [
-      {
-        "target_workflow_type": "precheck",
-        "target_task_queue": "long-tail",
-        "ordinal": 0
-      }
-    ],
-    "onAfter": [
-      {
-        "target_workflow_type": "notify",
-        "ordinal": 0
-      }
-    ]
-  }
-}
-```
-
-Each hook has:
-- `target_workflow_type` (required) — the workflow to invoke
-- `target_task_queue` (optional) — queue for the target workflow
-- `ordinal` (optional, default `0`) — execution order (lower runs first)
 
 **Example request:**
 
@@ -136,7 +104,7 @@ Each hook has:
 
 **Response 200:** The created or updated config object.
 
-This endpoint is idempotent. It replaces the entire configuration, including roles, invocation roles, and lifecycle hooks (cascade delete + re-insert). It also invalidates the in-memory config cache.
+This endpoint is idempotent. It replaces the entire configuration, including roles and invocation roles (cascade delete + re-insert). It also invalidates the in-memory config cache.
 
 ### Delete a workflow configuration
 
@@ -146,7 +114,7 @@ Requires `admin` or `superadmin` role.
 DELETE /api/workflows/:type/config
 ```
 
-Deletes the workflow config and all associated roles, invocation roles, and lifecycle hooks (cascade).
+Deletes the workflow config and all associated roles and invocation roles (cascade).
 
 **Response 200:**
 

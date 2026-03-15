@@ -17,7 +17,7 @@ const { Connection } = Durable;
 //
 // Every workflow in the system is governed by a config record that controls
 // interceptor behavior: whether it's an LT workflow, a container, which
-// role receives escalations, lifecycle hooks, and more.
+// role receives escalations, and more.
 //
 // This suite walks through:
 //   1. CRUD operations on workflow configs
@@ -51,7 +51,7 @@ describe('workflow configuration', () => {
   // ── 1. CRUD ────────────────────────────────────────────────────────────
   //
   // Configs are stored across four tables (workflows, roles, invocation_roles,
-  // lifecycle) and assembled into a single LTWorkflowConfig object.
+  // invocation_roles) and assembled into a single LTWorkflowConfig object.
 
   describe('CRUD operations', () => {
     it('should create a config with all sub-entities', async () => {
@@ -66,10 +66,6 @@ describe('workflow configuration', () => {
         description: 'Test workflow',
         roles: ['reviewer', 'admin'],
         invocation_roles: [],
-        lifecycle: {
-          onBefore: [{ target_workflow_type: 'fetchData', target_task_queue: 'fetch-queue', ordinal: 0 }],
-          onAfter: [{ target_workflow_type: 'notify', target_task_queue: null, ordinal: 0 }],
-        },
         consumes: ['fetchUserProfile'],
       };
 
@@ -81,9 +77,6 @@ describe('workflow configuration', () => {
       expect(result.default_role).toBe('reviewer');
       expect(result.default_modality).toBe('portal');
       expect(result.roles).toEqual(['admin', 'reviewer']); // sorted
-      expect(result.lifecycle.onBefore).toHaveLength(1);
-      expect(result.lifecycle.onBefore[0].target_workflow_type).toBe('fetchData');
-      expect(result.lifecycle.onAfter).toHaveLength(1);
       expect(result.consumes).toEqual(['fetchUserProfile']);
     });
 
@@ -112,7 +105,7 @@ describe('workflow configuration', () => {
         description: null,
         roles: [],
         invocation_roles: [],
-        lifecycle: { onBefore: [], onAfter: [] },
+
         consumes: [],
       });
 
@@ -135,7 +128,7 @@ describe('workflow configuration', () => {
         description: 'Updated description',
         roles: ['senior-reviewer'],
         invocation_roles: [],
-        lifecycle: { onBefore: [], onAfter: [] },
+
         consumes: [],
       });
 
@@ -143,7 +136,6 @@ describe('workflow configuration', () => {
       expect(updated.default_role).toBe('senior-reviewer');
       expect(updated.default_modality).toBe('fax');
       expect(updated.roles).toEqual(['senior-reviewer']);
-      expect(updated.lifecycle.onBefore).toHaveLength(0);
       expect(updated.consumes).toHaveLength(0);
     });
 
@@ -206,11 +198,6 @@ describe('workflow configuration', () => {
       expect(await ltConfig.getDefaultModality('testWorkflow')).toBe('fax');
     });
 
-    it('hasOnBefore/hasOnAfter should return false when no hooks', async () => {
-      expect(await ltConfig.hasOnBefore('testWorkflow')).toBe(false);
-      expect(await ltConfig.hasOnAfter('testWorkflow')).toBe(false);
-    });
-
     it('getProviders should return empty for no consumers', async () => {
       expect(await ltConfig.getProviders('testWorkflow')).toEqual([]);
     });
@@ -239,7 +226,7 @@ describe('workflow configuration', () => {
         description: null,
         roles: ['moderator'],
         invocation_roles: [],
-        lifecycle: { onBefore: [], onAfter: [] },
+
         consumes: [],
       });
 
@@ -291,7 +278,7 @@ describe('workflow configuration', () => {
         description: null,
         roles: ['supervisor'],
         invocation_roles: [],
-        lifecycle: { onBefore: [], onAfter: [] },
+
         consumes: [],
       });
 
@@ -316,7 +303,7 @@ describe('workflow configuration', () => {
         description: null,
         roles: ['moderator'],
         invocation_roles: [],
-        lifecycle: { onBefore: [], onAfter: [] },
+
         consumes: [],
       });
       ltConfig.invalidate();
@@ -351,7 +338,7 @@ describe('workflow configuration', () => {
         description: null,
         roles: [],
         invocation_roles: [],
-        lifecycle: { onBefore: [], onAfter: [] },
+
         consumes: [],
       });
       ltConfig.invalidate();

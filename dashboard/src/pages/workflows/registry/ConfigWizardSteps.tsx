@@ -246,32 +246,3 @@ export function SchemasStep({ form, set }: StepProps) {
   );
 }
 
-export function HooksStep({ form, set }: StepProps) {
-  return (
-    <div className="space-y-5">
-      <p className="text-xs text-text-secondary leading-relaxed">
-        Lifecycle hooks run before or after workflow execution. Use them for logging, metrics, notifications, or data enrichment.
-      </p>
-
-      <div>
-        <label className={labelCls}>Lifecycle</label>
-        <textarea
-          value={form.lifecycle}
-          onChange={(e) => set('lifecycle', e.target.value)}
-          placeholder={`{\n  "onBefore": [\n    {\n      "type": "log",\n      "config": { "level": "info" }\n    }\n  ],\n  "onAfter": [\n    {\n      "type": "notify",\n      "config": { "channel": "#ops" }\n    }\n  ]\n}`}
-          className={jsonCls}
-          rows={12}
-          spellCheck={false}
-        />
-        <p className={hintCls}>
-          <span className="font-mono">onBefore</span> hooks execute before the workflow starts.{' '}
-          <span className="font-mono">onAfter</span> hooks execute after it completes or fails.
-          Each hook has a <span className="font-mono">type</span> and optional <span className="font-mono">config</span>.
-        </p>
-        {form.lifecycle.trim() && !jsonValid(form.lifecycle) && (
-          <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
-        )}
-      </div>
-    </div>
-  );
-}

@@ -7,7 +7,7 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { splitCsv } from '../../../lib/parse';
 import { EMPTY_FORM, configToForm, STEP_LABELS, isStepValid, DEFAULT_ENVELOPE } from './config-form-types';
 import type { ConfigFormState } from './config-form-types';
-import { BasicsStep, AccessStep, SchemasStep, HooksStep } from './ConfigWizardSteps';
+import { BasicsStep, AccessStep, SchemasStep } from './ConfigWizardSteps';
 import { InvokeSidebar } from './InvokeSidebar';
 
 export function WorkflowConfigDetailPage() {
@@ -56,16 +56,9 @@ export function WorkflowConfigDetailPage() {
     if (!form.workflow_type.trim()) return;
     setSchemaError('');
 
-    let lifecycle: Record<string, unknown> = { onBefore: [], onAfter: [] };
     let envelope_schema: Record<string, unknown> | null = null;
     let resolver_schema: Record<string, unknown> | null = null;
 
-    try {
-      if (form.lifecycle.trim()) lifecycle = JSON.parse(form.lifecycle);
-    } catch {
-      setSchemaError('Invalid JSON in Lifecycle');
-      return;
-    }
     try {
       if (form.envelope_schema.trim()) envelope_schema = JSON.parse(form.envelope_schema);
     } catch {
@@ -92,7 +85,6 @@ export function WorkflowConfigDetailPage() {
         roles: splitCsv(form.roles),
         invocation_roles: splitCsv(form.invocation_roles),
         consumes: splitCsv(form.consumes),
-        lifecycle,
         envelope_schema,
         resolver_schema,
         cron_schedule: form.cron_schedule.trim() || null,
@@ -172,7 +164,6 @@ export function WorkflowConfigDetailPage() {
             {step === 0 && <BasicsStep form={form} set={set} editing={!!editing} />}
             {step === 1 && <AccessStep form={form} set={set} />}
             {step === 2 && <SchemasStep form={form} set={set} />}
-            {step === 3 && <HooksStep form={form} set={set} />}
           </div>
 
           {(schemaError || upsert.error) && (

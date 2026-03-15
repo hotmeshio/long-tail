@@ -12,7 +12,6 @@ export interface ConfigFormState {
   roles: string;
   invocation_roles: string;
   consumes: string;
-  lifecycle: string;
   envelope_schema: string;
   resolver_schema: string;
   cron_schedule: string;
@@ -30,7 +29,6 @@ export const EMPTY_FORM: ConfigFormState = {
   roles: '',
   invocation_roles: '',
   consumes: '',
-  lifecycle: '',
   envelope_schema: '',
   resolver_schema: '',
   cron_schedule: '',
@@ -49,16 +47,13 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     roles: (c.roles ?? []).join(', '),
     invocation_roles: (c.invocation_roles ?? []).join(', '),
     consumes: (c.consumes ?? []).join(', '),
-    lifecycle: c.lifecycle && Object.keys(c.lifecycle).length > 0
-      ? JSON.stringify(c.lifecycle, null, 2)
-      : '',
     envelope_schema: c.envelope_schema ? JSON.stringify(c.envelope_schema, null, 2) : '',
     resolver_schema: c.resolver_schema ? JSON.stringify(c.resolver_schema, null, 2) : '',
     cron_schedule: c.cron_schedule ?? '',
   };
 }
 
-export const STEP_LABELS = ['Basics', 'Access', 'Schemas', 'Hooks'];
+export const STEP_LABELS = ['Basics', 'Access', 'Schemas'];
 
 export function jsonValid(v: string): boolean {
   if (!v.trim()) return true;
@@ -68,7 +63,6 @@ export function jsonValid(v: string): boolean {
 export function isStepValid(step: number, form: ConfigFormState): boolean {
   if (step === 0) return !!form.workflow_type.trim();
   if (step === 2) return jsonValid(form.envelope_schema) && jsonValid(form.resolver_schema);
-  if (step === 3) return jsonValid(form.lifecycle);
   return true;
 }
 

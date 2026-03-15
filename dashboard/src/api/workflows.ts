@@ -91,7 +91,6 @@ export function useUpsertWorkflowConfig() {
       default_modality?: string;
       roles?: string[];
       invocation_roles?: string[];
-      lifecycle?: Record<string, unknown>;
       consumes?: string[];
       envelope_schema?: Record<string, unknown> | null;
       resolver_schema?: Record<string, unknown> | null;

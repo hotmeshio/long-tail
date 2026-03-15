@@ -29,7 +29,6 @@ export type {
 
 export type {
   LTWorkflowConfig,
-  LTLifecycleHook,
   LTResolvedConfig,
   LTProviderData,
 } from './config';

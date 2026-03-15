@@ -111,7 +111,7 @@ export async function executeLT<T = any>(
 
   await ltStartTask(taskId);
 
-  // 2. Load workflow config for lifecycle hooks and provider injection
+  // 2. Load workflow config for provider injection
   const wfConfig = await ltGetWorkflowConfig(workflowName);
 
   // 3. Inject provider data into envelope if consumes are configured
@@ -133,19 +133,7 @@ export async function executeLT<T = any>(
     envelope.lt = { ...envelope.lt, taskId, originId, parentId };
   }
 
-  // 5. Execute onBefore lifecycle hooks (still use execChild — not LT)
-  if (wfConfig?.onBefore?.length) {
-    for (const hook of wfConfig.onBefore) {
-      await Durable.workflow.execChild({
-        workflowName: hook.target_workflow_type,
-        args,
-        taskQueue: hook.target_task_queue || taskQueue,
-        expire,
-      });
-    }
-  }
-
-  // 6. Start child workflow (fire-and-forget — only the start is awaited)
+  // 5. Start child workflow (fire-and-forget — only the start is awaited)
   await Durable.workflow.startChild({
     workflowName,
     args,
@@ -155,10 +143,10 @@ export async function executeLT<T = any>(
     entity: workflowName,
   });
 
-  // 7. Wait for the child's interceptor to signal back with the result
+  // 6. Wait for the child's interceptor to signal back with the result
   const result = await Durable.workflow.waitFor<T>(signalId);
 
-  // 8. Complete the task — persist result data
+  // 7. Complete the task — persist result data
   await ltCompleteTask({
     taskId,
     data: JSON.stringify((result as any)?.data),
@@ -167,18 +155,6 @@ export async function executeLT<T = any>(
     workflowName,
     taskQueue,
   });
-
-  // 9. Execute onAfter lifecycle hooks
-  if (wfConfig?.onAfter?.length) {
-    for (const hook of wfConfig.onAfter) {
-      await Durable.workflow.execChild({
-        workflowName: hook.target_workflow_type,
-        args: [...args, result],
-        taskQueue: hook.target_task_queue || taskQueue,
-        expire,
-      });
-    }
-  }
 
   return result;
 }

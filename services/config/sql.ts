@@ -11,12 +11,6 @@ SELECT role FROM lt_config_roles WHERE workflow_type = $1 ORDER BY role`;
 export const GET_WORKFLOW_INVOCATION_ROLES = `\
 SELECT role FROM lt_config_invocation_roles WHERE workflow_type = $1 ORDER BY role`;
 
-export const GET_WORKFLOW_LIFECYCLE = `\
-SELECT hook, target_workflow_type, target_task_queue, ordinal
-  FROM lt_config_lifecycle
- WHERE workflow_type = $1
- ORDER BY hook, ordinal`;
-
 export const LIST_ALL_WORKFLOWS = `\
 SELECT * FROM lt_config_workflows ORDER BY workflow_type`;
 
@@ -25,9 +19,6 @@ SELECT * FROM lt_config_roles ORDER BY workflow_type, role`;
 
 export const LIST_ALL_INVOCATION_ROLES = `\
 SELECT * FROM lt_config_invocation_roles ORDER BY workflow_type, role`;
-
-export const LIST_ALL_LIFECYCLE = `\
-SELECT * FROM lt_config_lifecycle ORDER BY workflow_type, hook, ordinal`;
 
 // ------------------------------------------------------------------ //
 // Write / upsert queries                                             //
@@ -65,17 +56,6 @@ DELETE FROM lt_config_invocation_roles WHERE workflow_type = $1`;
 
 export const INSERT_INVOCATION_ROLE = `\
 INSERT INTO lt_config_invocation_roles (workflow_type, role) VALUES ($1, $2)`;
-
-export const DELETE_LIFECYCLE = `\
-DELETE FROM lt_config_lifecycle WHERE workflow_type = $1`;
-
-export const INSERT_LIFECYCLE_BEFORE = `\
-INSERT INTO lt_config_lifecycle (workflow_type, hook, target_workflow_type, target_task_queue, ordinal)
-VALUES ($1, 'onBefore', $2, $3, $4)`;
-
-export const INSERT_LIFECYCLE_AFTER = `\
-INSERT INTO lt_config_lifecycle (workflow_type, hook, target_workflow_type, target_task_queue, ordinal)
-VALUES ($1, 'onAfter', $2, $3, $4)`;
 
 export const DELETE_WORKFLOW = `\
 DELETE FROM lt_config_workflows WHERE workflow_type = $1`;

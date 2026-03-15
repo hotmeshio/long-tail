@@ -43,7 +43,6 @@ describe('reviewContent workflow', () => {
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

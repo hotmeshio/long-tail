@@ -46,7 +46,6 @@ describe('orchestrated workflows (executeLT)', () => {
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
     await configService.upsertWorkflowConfig({
@@ -60,7 +59,6 @@ describe('orchestrated workflows (executeLT)', () => {
       description: null,
       roles: [],
       invocation_roles: [],
-      lifecycle: { onBefore: [], onAfter: [] },
       consumes: [],
     });
 

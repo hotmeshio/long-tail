@@ -24,7 +24,6 @@ function makeConfig(overrides: Partial<LTWorkflowConfig> = {}): LTWorkflowConfig
     default_modality: 'portal',
     roles: ['reviewer'],
     invocation_roles: [],
-    lifecycle: {},
     consumes: [],
     envelope_schema: null,
     resolver_schema: null,
