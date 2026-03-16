@@ -297,45 +297,42 @@ const FILE_STORAGE_TOOLS = [
 
 const HTTP_FETCH_TOOLS = [
   {
-    name: 'http_get',
-    description: 'Perform an HTTP GET request. Returns status, headers, and body.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'The URL to fetch' },
-        headers: { type: 'object', description: 'Optional request headers' },
-        timeout: { type: 'number', description: 'Request timeout in milliseconds', default: 30000 },
-      },
-      required: ['url'],
-    },
-  },
-  {
-    name: 'http_post',
-    description: 'Perform an HTTP POST request with a JSON or text body. Returns status, headers, and body.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'The URL to post to' },
-        body: { type: ['object', 'string'], description: 'Request body (object for JSON, string for text)' },
-        headers: { type: 'object', description: 'Optional request headers' },
-        timeout: { type: 'number', description: 'Request timeout in milliseconds', default: 30000 },
-      },
-      required: ['url'],
-    },
-  },
-  {
     name: 'http_request',
-    description: 'Perform an arbitrary HTTP request with full control over method, headers, and body.',
+    description: 'Make an HTTP request to any URL. Supports all methods, custom headers, and request bodies. Returns status, headers, and body.',
     inputSchema: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'The URL for the request' },
-        method: { type: 'string', description: 'HTTP method (GET, POST, PUT, PATCH, DELETE, etc.)' },
-        body: { type: ['object', 'string'], description: 'Request body' },
+        url: { type: 'string', description: 'URL to request' },
+        method: { type: 'string', description: 'HTTP method (default: GET)' },
         headers: { type: 'object', description: 'Request headers' },
-        timeout: { type: 'number', description: 'Request timeout in milliseconds', default: 30000 },
+        body: { type: 'string', description: 'Request body' },
+        timeout_ms: { type: 'number', description: 'Request timeout in milliseconds' },
       },
-      required: ['url', 'method'],
+      required: ['url'],
+    },
+  },
+  {
+    name: 'fetch_json',
+    description: 'GET a URL and parse the response as JSON. Convenience wrapper around http_request.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL to fetch JSON from' },
+        headers: { type: 'object', description: 'Request headers' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'fetch_text',
+    description: 'GET a URL and return the response as text. Returns content, status, and content type.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL to fetch text from' },
+        headers: { type: 'object', description: 'Request headers' },
+      },
+      required: ['url'],
     },
   },
 ];

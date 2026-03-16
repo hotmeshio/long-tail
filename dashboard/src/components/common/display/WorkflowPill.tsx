@@ -12,8 +12,8 @@ export function WorkflowPill({ type, size = 'sm' }: WorkflowPillProps) {
   const iconClass = size === 'md' ? 'w-3 h-3' : 'w-2.5 h-2.5';
 
   return (
-    <span className={`inline-flex items-center ${sizeClass} font-mono bg-surface-sunken rounded text-text-secondary`}>
-      <Workflow className={`${iconClass} shrink-0`} />
+    <span className={`inline-flex items-center ${sizeClass} font-mono bg-accent/[0.06] text-text-secondary rounded-lg`}>
+      <Workflow className={`${iconClass} shrink-0 text-accent/75`} />
       {type}
     </span>
   );
