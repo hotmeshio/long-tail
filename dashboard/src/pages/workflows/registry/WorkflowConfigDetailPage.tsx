@@ -79,8 +79,6 @@ export function WorkflowConfigDetailPage() {
         task_queue: form.task_queue.trim() || null,
         default_role: form.default_role.trim() || 'reviewer',
         default_modality: form.default_modality.trim() || 'portal',
-        is_lt: form.is_lt,
-        is_container: form.is_container,
         invocable: form.invocable,
         roles: splitCsv(form.roles),
         invocation_roles: splitCsv(form.invocation_roles),

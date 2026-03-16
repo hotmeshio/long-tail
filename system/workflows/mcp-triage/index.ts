@@ -261,6 +261,8 @@ async function handleFinalResponse(
       ...escalationPayload,
       ...parsed.correctedData,
     };
+    // Strip triage flags that the LLM may have echoed from context
+    delete correctedData._lt;
     const directResolution = parsed.directResolution || false;
     const originalTaskId = envelope.data.originalTaskId;
 
@@ -298,6 +300,12 @@ async function handleFinalResponse(
         parentTaskQueue: originalMeta?.parentTaskQueue,
         parentWorkflowType: originalMeta?.parentWorkflowType,
       };
+
+      // Strip triage flags from the envelope so resolving this
+      // follow-on escalation does NOT re-trigger mcpTriage.
+      if (originalEnvelope.data?._lt) {
+        delete originalEnvelope.data._lt;
+      }
 
       // ── Direct resolution: simple approval/rejection/pass-through ──
       if (directResolution && correctedData) {

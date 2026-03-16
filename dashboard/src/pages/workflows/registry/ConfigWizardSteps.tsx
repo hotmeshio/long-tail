@@ -100,24 +100,6 @@ export function BasicsStep({ form, set, editing }: BasicsStepProps) {
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
-            checked={form.is_lt}
-            onChange={(e) => set('is_lt', e.target.checked)}
-            className="w-4 h-4 rounded border-border accent-accent"
-          />
-          <span className="text-xs text-text-primary">LT Workflow</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.is_container}
-            onChange={(e) => set('is_container', e.target.checked)}
-            className="w-4 h-4 rounded border-border accent-accent"
-          />
-          <span className="text-xs text-text-primary">Container</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
             checked={form.invocable}
             onChange={(e) => set('invocable', e.target.checked)}
             className="w-4 h-4 rounded border-border accent-accent"
@@ -126,8 +108,7 @@ export function BasicsStep({ form, set, editing }: BasicsStepProps) {
         </label>
       </div>
       <p className={hintCls}>
-        <span className="font-medium text-text-secondary">Container</span> = orchestrator that spawns child workflows.{' '}
-        <span className="font-medium text-text-secondary">Invocable</span> = can be started from the dashboard.
+        <span className="font-medium text-text-secondary">Invocable</span> = can be started from the dashboard or API.
       </p>
     </div>
   );

@@ -27,16 +27,12 @@ function matchesSearch(config: LTWorkflowConfig, search: string): boolean {
 
 function matchesKind(config: LTWorkflowConfig, kind: string): boolean {
   if (!kind) return true;
-  if (kind === 'lt') return config.is_lt && !config.is_container;
-  if (kind === 'container') return config.is_container;
   if (kind === 'invocable') return config.invocable;
   if (kind === 'cron') return !!config.cron_schedule;
   return true;
 }
 
 const KIND_OPTIONS = [
-  { value: 'lt', label: 'Leaf (LT)' },
-  { value: 'container', label: 'Container' },
   { value: 'invocable', label: 'Invocable' },
   { value: 'cron', label: 'Cron' },
 ];
@@ -100,26 +96,6 @@ export function WorkflowConfigsPage() {
       key: 'task_queue',
       label: 'Task Queue',
       render: (row) => <span className="font-mono text-xs text-text-secondary">{row.task_queue}</span>,
-    },
-    {
-      key: 'is_lt',
-      label: 'LT',
-      render: (row) => (
-        <span className={`text-xs ${row.is_lt ? 'text-text-primary' : 'text-text-tertiary'}`}>
-          {row.is_lt ? 'Yes' : 'No'}
-        </span>
-      ),
-      className: 'w-16',
-    },
-    {
-      key: 'is_container',
-      label: 'Container',
-      render: (row) => (
-        <span className={`text-xs ${row.is_container ? 'text-text-primary' : 'text-text-tertiary'}`}>
-          {row.is_container ? 'Yes' : 'No'}
-        </span>
-      ),
-      className: 'w-24',
     },
     {
       key: 'invocable',

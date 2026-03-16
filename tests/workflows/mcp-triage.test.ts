@@ -240,8 +240,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
     // Seed workflow configs
     await configService.upsertWorkflowConfig({
       workflow_type: 'testVerifyDocument',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: VERIFY_QUEUE,
       default_role: 'reviewer',
@@ -254,8 +252,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
 
     await configService.upsertWorkflowConfig({
       workflow_type: 'testVerifyDocumentOrchestrator',
-      is_lt: true,
-      is_container: true,
       invocable: false,
       task_queue: ORCH_QUEUE,
       default_role: 'reviewer',
@@ -268,8 +264,6 @@ describe('MCP Triage Orchestrator (dynamic escalation)', () => {
 
     await configService.upsertWorkflowConfig({
       workflow_type: 'mcpTriage',
-      is_lt: true,
-      is_container: false, // Leaf — can escalate to engineer for guidance
       invocable: false,
       task_queue: TRIAGE_QUEUE,
       default_role: 'engineer',

@@ -20,7 +20,7 @@ export async function deploy(): Promise<void> {
  * Prune expired jobs, streams, and/or execution artifacts.
  *
  * - `jobs` — hard-delete expired job rows older than `expire`
- * - `streams` — hard-delete expired stream messages older than `expire`
+ * - `streams` — hard-delete expired stream messages (engine + worker) older than `expire`
  * - `attributes` — strip execution artifacts from completed jobs
  *   (preserves jdata, udata, jmark for Temporal export)
  * - `entities` — allowlist: only prune these entity types

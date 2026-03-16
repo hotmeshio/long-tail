@@ -1,8 +1,6 @@
 export interface LTWorkflowConfig {
   workflow_type: string;
   description: string | null;
-  is_lt: boolean;
-  is_container: boolean;
   invocable: boolean;
   task_queue: string;
   default_role: string;

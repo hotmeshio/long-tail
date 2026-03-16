@@ -50,8 +50,7 @@ describe('Workflow invocation config and RBAC', () => {
   it('should create a config with invocable: true', async () => {
     const input: LTWorkflowConfig = {
       workflow_type: 'invocableWorkflow',
-      is_lt: true,
-      is_container: false,
+
       invocable: true,
       task_queue: 'invoke-queue',
       default_role: 'reviewer',
@@ -70,8 +69,7 @@ describe('Workflow invocation config and RBAC', () => {
   it('should create a config with invocable: false (default)', async () => {
     const input: LTWorkflowConfig = {
       workflow_type: 'privateWorkflow',
-      is_lt: true,
-      is_container: false,
+
       invocable: false,
       task_queue: 'private-queue',
       default_role: 'reviewer',
@@ -91,8 +89,7 @@ describe('Workflow invocation config and RBAC', () => {
   it('should create a config with invocation_roles', async () => {
     const input: LTWorkflowConfig = {
       workflow_type: 'rbacWorkflow',
-      is_lt: true,
-      is_container: false,
+
       invocable: true,
       task_queue: 'rbac-queue',
       default_role: 'reviewer',
@@ -129,8 +126,7 @@ describe('Workflow invocation config and RBAC', () => {
   it('should replace invocation_roles on upsert', async () => {
     const updated = await configService.upsertWorkflowConfig({
       workflow_type: 'rbacWorkflow',
-      is_lt: true,
-      is_container: false,
+
       invocable: true,
       task_queue: 'rbac-queue',
       default_role: 'reviewer',
@@ -151,8 +147,7 @@ describe('Workflow invocation config and RBAC', () => {
     // First create a throwaway config
     await configService.upsertWorkflowConfig({
       workflow_type: 'tempInvocable',
-      is_lt: true,
-      is_container: false,
+
       invocable: true,
       task_queue: 'temp-queue',
       default_role: 'reviewer',

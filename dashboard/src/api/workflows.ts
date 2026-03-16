@@ -83,8 +83,7 @@ export function useUpsertWorkflowConfig() {
     {
       workflow_type: string;
       description?: string | null;
-      is_lt?: boolean;
-      is_container?: boolean;
+
       invocable?: boolean;
       task_queue?: string | null;
       default_role?: string;

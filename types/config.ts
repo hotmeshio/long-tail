@@ -4,8 +4,6 @@
  */
 export interface LTWorkflowConfig {
   workflow_type: string;
-  is_lt: boolean;
-  is_container: boolean;
   invocable: boolean;
   task_queue: string | null;
   default_role: string;
@@ -25,8 +23,6 @@ export interface LTWorkflowConfig {
  * Flat structure with camelCase keys — no DB row noise.
  */
 export interface LTResolvedConfig {
-  isLT: boolean;
-  isContainer: boolean;
   invocable: boolean;
   taskQueue: string | null;
   role: string;

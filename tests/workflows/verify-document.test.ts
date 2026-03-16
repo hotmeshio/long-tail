@@ -42,8 +42,6 @@ describe('verifyDocument workflow (OpenAI Vision)', () => {
     // Seed config so the config-driven interceptor recognizes this workflow
     await configService.upsertWorkflowConfig({
       workflow_type: 'verifyDocument',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: TASK_QUEUE,
       default_role: 'reviewer',

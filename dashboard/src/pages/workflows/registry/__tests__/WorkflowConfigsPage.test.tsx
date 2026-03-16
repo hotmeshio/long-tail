@@ -16,8 +16,7 @@ function makeConfig(overrides: Partial<LTWorkflowConfig> = {}): LTWorkflowConfig
   return {
     workflow_type: 'review-content',
     description: null,
-    is_lt: true,
-    is_container: false,
+
     invocable: true,
     task_queue: 'default',
     default_role: 'reviewer',
@@ -36,8 +35,7 @@ const CONFIGS: LTWorkflowConfig[] = [
   makeConfig({
     workflow_type: 'review-content',
     description: 'Content review workflow',
-    is_lt: true,
-    is_container: false,
+
     invocable: true,
     task_queue: 'default',
     roles: ['reviewer', 'admin'],
@@ -45,16 +43,14 @@ const CONFIGS: LTWorkflowConfig[] = [
   makeConfig({
     workflow_type: 'process-claim-orchestrator',
     description: 'Insurance claim orchestrator',
-    is_lt: false,
-    is_container: true,
+
     invocable: true,
     task_queue: 'claims',
     roles: ['claims-adjuster'],
   }),
   makeConfig({
     workflow_type: 'verify-document',
-    is_lt: true,
-    is_container: false,
+
     invocable: false,
     task_queue: 'default',
     roles: ['reviewer'],
@@ -137,15 +133,6 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Filter: Kind ──
 
-  it('filters by kind=container', () => {
-    renderPage();
-    const selects = screen.getAllByRole('combobox');
-    // Kind is the second select
-    fireEvent.change(selects[1], { target: { value: 'container' } });
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-  });
-
   it('filters by kind=invocable', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
@@ -161,15 +148,6 @@ describe('WorkflowConfigsPage', () => {
     fireEvent.change(selects[1], { target: { value: 'cron' } });
     expect(screen.getByText('verify-document')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-  });
-
-  it('filters by kind=lt (leaf only, not container)', () => {
-    renderPage();
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'lt' } });
-    expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
-    expect(screen.queryByText('process-claim-orchestrator')).not.toBeInTheDocument();
   });
 
   // ── Filter: Role ──

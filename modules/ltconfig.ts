@@ -36,16 +36,6 @@ class LTConfigCache {
     return configs.get(name);
   }
 
-  async isLTWorkflow(name: string): Promise<boolean> {
-    const config = await this.get(name);
-    return config?.isLT ?? false;
-  }
-
-  async isContainer(name: string): Promise<boolean> {
-    const config = await this.get(name);
-    return config?.isContainer ?? false;
-  }
-
   async isInvocable(name: string): Promise<boolean> {
     const config = await this.get(name);
     return config?.invocable ?? false;
