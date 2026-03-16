@@ -1,13 +1,10 @@
 # Long Tail
 
-Long Tail treats uncertainty as part of the workflow. When confidence is low, the task escalates. If the issue can be repaired, the system retries the step and records how the problem was resolved. Successful repairs can then be compiled into deterministic workflows so the next occurrence runs automatically.
+Long Tail treats uncertainty as part of the workflow. When confidence is low, the task escalates. Successful repairs can then be compiled into deterministic workflows so the next occurrence runs automatically.
 
 The system works because everything is treated as a **tool**.
+
 Activities, AI models, human reviewers, and compiled workflows all expose the same interface and can be invoked the same way.
-
-The result is simple: **models handle what they know, people handle what they understand, and the system turns solved exceptions into automation.**
-
-> **MCP** (Model Context Protocol) is a standard for exposing tools that AI agents and deterministic code can both call. Long Tail uses MCP as the universal interface — every activity, human queue, and compiled workflow is exposed as a tool.
 
 ## Quick Start
 

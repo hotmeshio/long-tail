@@ -7,7 +7,6 @@ import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
 import { TaskQueuePill } from '../../../components/common/display/TaskQueuePill';
 import { useFilterParams } from '../../../hooks/useFilterParams';
-import { useNatsSubscription } from '../../../hooks/useNats';
 import {
   useControlPlaneApps,
   useRollCall,
@@ -23,19 +22,15 @@ import {
   formatThrottleHuman,
   formatMemory,
   rowKey,
-  MAX_EVENTS,
   NODE_FILTER_OPTIONS,
   type Duration,
   type NodeFilter,
-  type QuorumEvent,
   type ThrottleTarget,
 } from './helpers';
 import { ThrottleModal } from './ThrottleModal';
 import { MeshBulkActionBar } from './MeshBulkActionBar';
 import { StreamVolumeChart } from './StreamVolumeChart';
 import { QuorumFeed } from './QuorumFeed';
-
-let eventCounter = 0;
 
 export function ControlPlanePage() {
   const { data: appsData } = useControlPlaneApps();
@@ -109,28 +104,16 @@ export function ControlPlanePage() {
     return [...queues].sort().map((q) => ({ value: q, label: q }));
   }, [allProfiles]);
 
-  // ── Selection helpers ─────────────────────────────────────────
+  // ── Selection helpers (per-row, no auto-grouping) ────────────
   const toggleCheckbox = useCallback((profile: QuorumProfile) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       const key = rowKey(profile);
-      const selecting = !prev.has(key);
-
-      const groupMembers = profiles.filter((p) => {
-        if (isWorker(profile)) {
-          return isWorker(p) && p.worker_topic === profile.worker_topic;
-        }
-        return !isWorker(p);
-      });
-
-      for (const m of groupMembers) {
-        const mk = rowKey(m);
-        if (selecting) next.add(mk);
-        else next.delete(mk);
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
-  }, [profiles]);
+  }, []);
 
   const toggleAll = useCallback(() => {
     if (selectedIds.size === profiles.length) {
@@ -140,33 +123,64 @@ export function ControlPlanePage() {
     }
   }, [profiles, selectedIds.size]);
 
-  /** Build throttle targets from checkbox selection (group by type). */
+  /**
+   * Build throttle targets from checkbox selection.
+   *
+   * Smart grouping:
+   * - All nodes selected → no topic/guid (entire mesh)
+   * - All engines selected → topic = engine stream (all engines)
+   * - All workers on a queue selected → topic = queue (all workers on queue)
+   * - Subset of a group → individual guid targets
+   */
   const selectedThrottleTargets = useMemo((): ThrottleTarget[] => {
     const selected = profiles.filter((p) => selectedIds.has(rowKey(p)));
     if (selected.length === 0) return [];
 
-    const engines = selected.filter((p) => !isWorker(p));
-    const workers = selected.filter(isWorker);
-    const targets: ThrottleTarget[] = [];
-
-    if (engines.length > 0) {
-      const topic = engines[0].stream || '';
-      targets.push({ label: 'All Engines', topic });
+    // All nodes → entire mesh
+    if (selected.length === allProfiles.length) {
+      return [{ label: 'Entire Mesh' }];
     }
 
-    // Group workers by queue
+    const engines = selected.filter((p) => !isWorker(p));
+    const workers = selected.filter(isWorker);
+    const allEngines = allProfiles.filter((p) => !isWorker(p));
+    const targets: ThrottleTarget[] = [];
+
+    // Engines
+    if (engines.length > 0) {
+      if (engines.length === allEngines.length) {
+        // All engines selected → target by topic (engine stream)
+        targets.push({ label: 'All Engines', topic: engines[0].stream || '' });
+      } else {
+        // Individual engines → target by guid
+        for (const e of engines) {
+          targets.push({ label: `Engine ${e.engine_id.slice(0, 10)}...`, guid: e.engine_id });
+        }
+      }
+    }
+
+    // Workers — group by queue, then decide per-queue
     const queues = new Map<string, QuorumProfile[]>();
     for (const w of workers) {
       const q = w.worker_topic!;
       if (!queues.has(q)) queues.set(q, []);
       queues.get(q)!.push(w);
     }
-    for (const [queue] of queues) {
-      targets.push({ label: queue, topic: queue });
+    for (const [queue, members] of queues) {
+      const allOnQueue = allProfiles.filter((p) => p.worker_topic === queue);
+      if (members.length === allOnQueue.length) {
+        // All workers on this queue selected → target by topic
+        targets.push({ label: queue, topic: queue });
+      } else {
+        // Individual workers → target by guid
+        for (const w of members) {
+          targets.push({ label: `${queue} ${w.engine_id.slice(0, 10)}...`, guid: w.engine_id });
+        }
+      }
     }
 
     return targets;
-  }, [profiles, selectedIds]);
+  }, [profiles, allProfiles, selectedIds]);
 
   // ── Throttle handlers ─────────────────────────────────────────
   const handleBulkThrottle = (ms: number) => {
@@ -175,7 +189,8 @@ export function ControlPlanePage() {
       throttleMutation.mutate({
         appId: activeAppId,
         throttle: ms,
-        ...(t.guid ? { guid: t.guid } : { topic: t.topic }),
+        ...(t.topic ? { topic: t.topic } : {}),
+        ...(t.guid ? { guid: t.guid } : {}),
       });
     }
     setThrottleModalOpen(false);
@@ -183,15 +198,11 @@ export function ControlPlanePage() {
   };
 
   const handleRowClick = (profile: QuorumProfile) => {
-    if (isWorker(profile)) {
-      setThrottleTargets([{ label: profile.worker_topic!, topic: profile.worker_topic! }]);
-    } else {
-      // Single engine → target by guid
-      setThrottleTargets([{
-        label: `Engine ${profile.engine_id}`,
-        guid: profile.engine_id,
-      }]);
-    }
+    // Single node click → target that specific instance by guid
+    const label = isWorker(profile)
+      ? `${profile.worker_topic} ${profile.engine_id.slice(0, 10)}...`
+      : `Engine ${profile.engine_id.slice(0, 10)}...`;
+    setThrottleTargets([{ label, guid: profile.engine_id }]);
     setThrottleModalOpen(true);
   };
 
@@ -200,8 +211,7 @@ export function ControlPlanePage() {
     setThrottleModalOpen(true);
   };
 
-  // ── Quorum event feed ─────────────────────────────────────────
-  const [events, setEvents] = useState<QuorumEvent[]>([]);
+  // ── Quorum bridge ────────────────────────────────────────────
   const [bridgeActive, setBridgeActive] = useState(false);
 
   const handleStartBridge = useCallback(() => {
@@ -209,19 +219,6 @@ export function ControlPlanePage() {
       onSuccess: () => setBridgeActive(true),
     });
   }, [activeAppId, subscribeMesh]);
-
-  useNatsSubscription('lt.events.mesh.>', useCallback((event: any) => {
-    setEventsActive(true);
-    setEvents((prev) => {
-      const next = [{
-        id: ++eventCounter,
-        type: event.type?.replace('mesh.', '') || 'unknown',
-        timestamp: event.timestamp || new Date().toISOString(),
-        data: event.data || event,
-      }, ...prev];
-      return next.slice(0, MAX_EVENTS);
-    });
-  }, []));
 
   useEffect(() => {
     if (!bridgeActive && activeAppId) {
@@ -436,7 +433,7 @@ export function ControlPlanePage() {
           />
         </div>
 
-        <QuorumFeed events={events} bridgeActive={bridgeActive} onClear={() => setEvents([])} />
+        <QuorumFeed bridgeActive={bridgeActive} onEventsActive={() => setEventsActive(true)} />
       </div>
 
       <ThrottleModal

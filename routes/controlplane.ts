@@ -2,6 +2,8 @@ import { Router } from 'express';
 
 import { requireAdmin } from '../modules/auth';
 import * as controlplane from '../services/controlplane';
+import { eventRegistry } from '../services/events';
+import type { LTEvent } from '../types';
 
 const router = Router();
 
@@ -54,6 +56,20 @@ router.post('/throttle', requireAdmin, async (req, res) => {
     }
 
     const result = await controlplane.applyThrottle(appId, { throttle, topic, guid });
+
+    // Publish a synthetic event so the dashboard event stream sees it
+    // (throttle commands don't echo back through the quorum subscription)
+    const throttleEvent: LTEvent = {
+      type: 'mesh.throttle' as any,
+      source: 'controlplane',
+      workflowId: guid || '',
+      workflowName: '',
+      taskQueue: appId,
+      data: { throttle, topic, guid, appId },
+      timestamp: new Date().toISOString(),
+    };
+    eventRegistry.publish(throttleEvent).catch(() => {});
+
     res.json({ success: result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
