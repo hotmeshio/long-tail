@@ -58,7 +58,7 @@ function RolePanel({ user }: { user: LTUserRecord | null }) {
   };
 
   return (
-    <div className="border-l border-surface-border pl-6 min-h-[300px]">
+    <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px]">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
         Role Membership
       </p>

@@ -8,8 +8,8 @@ export default {
           DEFAULT: '#FFFFFF',
           raised: '#FFFFFF',
           sunken: '#F5F5F7',
-          hover: '#F4F1FB',
-          border: '#E5E5EA',
+          hover: '#F7F4FF',
+          border: '#E0DAF0',
         },
         text: {
           primary: '#1E1535',

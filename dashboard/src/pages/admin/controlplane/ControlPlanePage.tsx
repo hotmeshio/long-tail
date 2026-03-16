@@ -257,13 +257,11 @@ export function ControlPlanePage() {
       key: 'type',
       label: 'Type',
       render: (row) => (
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-          isWorker(row) ? 'bg-accent/10 text-accent' : 'bg-blue-500/10 text-blue-500'
-        }`}>
+        <span className={`text-xs ${isWorker(row) ? 'text-text-secondary' : 'text-blue-500'}`}>
           {isWorker(row) ? 'Worker' : 'Engine'}
         </span>
       ),
-      className: 'w-24',
+      className: 'w-20',
     },
     {
       key: 'worker_topic',
@@ -291,7 +289,7 @@ export function ControlPlanePage() {
         const t = row.throttle;
         if (t === -1) return <span className="text-xs text-status-error font-medium">Paused</span>;
         if (t && t > 0) return <span className="text-xs text-status-warning font-medium">{formatThrottleHuman(t)}</span>;
-        return <span className="text-xs text-status-success">Normal</span>;
+        return <span className="text-xs text-text-tertiary">0</span>;
       },
       className: 'w-24',
     },
@@ -433,7 +431,6 @@ export function ControlPlanePage() {
             data={profiles}
             keyFn={rowKey}
             onRowClick={handleRowClick}
-            rowClassName={(row) => isWorker(row) ? '' : 'bg-blue-500/[0.03]'}
             isLoading={isLoading}
             emptyMessage={isLoading ? 'Discovering mesh nodes...' : 'No nodes found. Click "Roll Call" to discover.'}
           />

@@ -13,6 +13,7 @@ import { useFilterParams } from '../../../hooks/useFilterParams';
 import type { LTWorkflowConfig } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
+import { TaskQueuePill } from '../../../components/common/display/TaskQueuePill';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -91,39 +92,22 @@ export function WorkflowConfigsPage() {
           )}
         </div>
       ),
+      className: 'w-64',
     },
     {
       key: 'task_queue',
       label: 'Task Queue',
-      render: (row) => <span className="font-mono text-xs text-text-secondary">{row.task_queue}</span>,
+      render: (row) => row.task_queue ? <TaskQueuePill queue={row.task_queue} /> : <span className="text-xs text-text-tertiary">—</span>,
     },
     {
       key: 'invocable',
       label: 'Invocable',
       render: (row) => (
         <span className={`text-xs ${row.invocable ? 'text-text-primary' : 'text-text-tertiary'}`}>
-          {row.invocable ? 'Yes' : 'No'}
+          {row.invocable ? 'Yes' : '—'}
         </span>
       ),
-      className: 'w-24',
-    },
-    {
-      key: 'schemas',
-      label: 'Schemas',
-      render: (row) => (
-        <div className="flex gap-1 flex-wrap">
-          {row.envelope_schema && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-accent/10 text-accent rounded">env</span>
-          )}
-          {row.resolver_schema && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-accent/10 text-accent rounded">res</span>
-          )}
-          {row.cron_schedule && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-status-warning/10 text-status-warning rounded font-mono">{row.cron_schedule}</span>
-          )}
-        </div>
-      ),
-      className: 'w-32',
+      className: 'w-20',
     },
     {
       key: 'default_role',
