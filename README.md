@@ -1,7 +1,5 @@
 # Long Tail
 
-LLMs are good at making predictions. But production systems need something more: the ability to continue when the prediction is uncertain.
-
 Long Tail treats uncertainty as part of the workflow. When confidence is low, the task escalates. If the issue can be repaired, the system retries the step and records how the problem was resolved. Successful repairs can then be compiled into deterministic workflows so the next occurrence runs automatically.
 
 The system works because everything is treated as a **tool**.

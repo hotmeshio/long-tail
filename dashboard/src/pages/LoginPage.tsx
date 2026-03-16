@@ -8,6 +8,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [launched, setLaunched] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,7 +16,8 @@ export function LoginPage() {
   // After re-login, return to the page the user was on
   const returnTo = (location.state as { from?: string })?.from ?? '/';
 
-  if (isAuthenticated) {
+  // Skip the instant redirect while the launch animation is playing
+  if (isAuthenticated && !launched) {
     return <Navigate to={returnTo} replace />;
   }
 
@@ -39,12 +41,15 @@ export function LoginPage() {
         setError(data.error || 'Login failed');
         return;
       }
+
+      // Launch the comet, then navigate after animation
+      setLaunched(true);
       login(
         data.token,
         { username: username.trim(), password },
         { displayName: data.user?.display_name, username: data.user?.external_id },
       );
-      navigate(returnTo, { replace: true });
+      setTimeout(() => navigate(returnTo, { replace: true }), 1500);
     } catch {
       setError('Unable to connect to server');
     } finally {
@@ -53,19 +58,28 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center overflow-hidden">
       <div className="w-full max-w-md p-10">
-        <div className="mb-10">
-          <AppLogo size="lg" />
+        <div
+          className={`mb-10 transition-all duration-[1500ms] ease-in ${
+            launched
+              ? 'translate-x-[120vw] -translate-y-[60vh] scale-[3] opacity-0'
+              : ''
+          }`}
+        >
+          <AppLogo size="lg" hideLabel={launched} />
         </div>
 
-        {returnTo !== '/' && (
+        {returnTo !== '/' && !launched && (
           <p className="text-xs text-status-warning mb-4">
             Session expired — sign in to continue
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className={`space-y-5 transition-opacity duration-300 ${launched ? 'opacity-0' : ''}`}
+        >
           <div>
             <label
               htmlFor="username"
@@ -105,7 +119,7 @@ export function LoginPage() {
 
           {error && <p className="text-sm text-status-error">{error}</p>}
 
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
+          <button type="submit" className="btn-primary w-full" disabled={loading || launched}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>

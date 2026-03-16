@@ -1,5 +1,7 @@
 interface AppLogoProps {
   size?: 'sm' | 'lg';
+  /** Hide the wordmark (used during login launch animation). */
+  hideLabel?: boolean;
 }
 
 /**
@@ -10,7 +12,7 @@ interface AppLogoProps {
  * - `sm` (default) — toolbar height
  * - `lg` — login page hero
  */
-export function AppLogo({ size = 'sm' }: AppLogoProps) {
+export function AppLogo({ size = 'sm', hideLabel = false }: AppLogoProps) {
   const isLarge = size === 'lg';
 
   const imgClass = isLarge
@@ -28,7 +30,7 @@ export function AppLogo({ size = 'sm' }: AppLogoProps) {
         alt="LongTail"
         className={`shrink-0 z-0 ${imgClass}`}
       />
-      <span className={`z-[1] ${textClass}`}>
+      <span className={`z-[1] transition-opacity duration-300 ${textClass} ${hideLabel ? 'opacity-0' : ''}`}>
         LongTail
       </span>
     </div>
