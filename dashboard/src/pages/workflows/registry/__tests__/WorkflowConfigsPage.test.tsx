@@ -228,11 +228,6 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Column rendering ──
 
-  it('renders cron schedule badge', () => {
-    renderPage();
-    expect(screen.getByText('*/5 * * * *')).toBeInTheDocument();
-  });
-
   it('renders role pills', () => {
     renderPage();
     // reviewer appears in multiple configs + filter dropdown

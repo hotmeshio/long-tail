@@ -28,7 +28,7 @@ export const EVENT_TYPE_COLORS: Record<string, string> = {
   user: 'text-text-secondary',
 };
 
-export const MAX_EVENTS = 200;
+export const MAX_EVENTS = 250;
 
 export function isWorker(p: QuorumProfile): boolean {
   return !!p.worker_topic;
@@ -66,6 +66,18 @@ export function isEngineStream(streamName: string): boolean {
 }
 
 export type NodeFilter = 'all' | 'workers' | 'engines';
+
+/** Known quorum message types published via the bridge. */
+export const QUORUM_CHANNELS = [
+  { key: 'pong', label: 'Pong', description: 'Roll call responses' },
+  { key: 'ping', label: 'Ping', description: 'Roll call broadcasts' },
+  { key: 'throttle', label: 'Throttle', description: 'Throttle commands' },
+  { key: 'job', label: 'Job', description: 'Job lifecycle events' },
+  { key: 'work', label: 'Work', description: 'Worker dispatch events' },
+  { key: 'activate', label: 'Activate', description: 'Worker activation' },
+  { key: 'cron', label: 'Cron', description: 'Cron schedule triggers' },
+  { key: 'user', label: 'User', description: 'User-defined messages' },
+] as const;
 
 /** Typed throttle target with display label and API params. */
 export interface ThrottleTarget {

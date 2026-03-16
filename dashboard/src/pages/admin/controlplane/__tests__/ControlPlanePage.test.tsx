@@ -135,7 +135,7 @@ describe('ControlPlanePage', () => {
 
   it('renders quorum feed panel', () => {
     renderPage();
-    expect(screen.getByText('Quorum Feed')).toBeInTheDocument();
+    expect(screen.getByText('Event Stream')).toBeInTheDocument();
   });
 
   it('renders roll call button', () => {

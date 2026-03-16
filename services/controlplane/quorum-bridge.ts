@@ -10,15 +10,17 @@ import type { LTEvent } from '../../types';
  * Subscribes to a HotMesh engine's quorum channel via `subQuorum()`
  * and republishes each message as an `LTEvent` on `lt.mesh.{type}`.
  *
- * Topic mapping:
- *   quorum type "pong"     → lt.mesh.pong
- *   quorum type "throttle" → lt.mesh.throttle
- *   quorum type "job"      → lt.mesh.job
- *   quorum type "ping"     → lt.mesh.ping
- *   quorum type "work"     → lt.mesh.work
- *   quorum type "activate" → lt.mesh.activate
- *   quorum type "cron"     → lt.mesh.cron
- *   quorum type "user"     → lt.mesh.user
+ * Topic mapping (quorum subscription receives these types):
+ *   quorum type "pong"     → lt.events.mesh.pong
+ *   quorum type "ping"     → lt.events.mesh.ping
+ *   quorum type "job"      → lt.events.mesh.job
+ *   quorum type "work"     → lt.events.mesh.work
+ *   quorum type "activate" → lt.events.mesh.activate
+ *   quorum type "cron"     → lt.events.mesh.cron
+ *   quorum type "user"     → lt.events.mesh.user
+ *
+ * Note: throttle commands don't echo through the quorum subscription.
+ * The throttle route publishes a synthetic event directly to NATS.
  */
 
 let activeCallback: QuorumMessageCallback | null = null;
