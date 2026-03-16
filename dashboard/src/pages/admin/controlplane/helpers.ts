@@ -67,6 +67,15 @@ export function isEngineStream(streamName: string): boolean {
 
 export type NodeFilter = 'all' | 'workers' | 'engines';
 
+/** Typed throttle target with display label and API params. */
+export interface ThrottleTarget {
+  label: string;
+  /** API param: topic-based throttle (queues, all engines) */
+  topic?: string;
+  /** API param: guid-based throttle (single engine/worker) */
+  guid?: string;
+}
+
 export const NODE_FILTER_OPTIONS = [
   { value: 'all', label: 'All Nodes' },
   { value: 'workers', label: 'Workers' },

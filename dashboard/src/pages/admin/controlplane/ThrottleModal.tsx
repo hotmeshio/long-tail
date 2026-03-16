@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Modal } from '../../../components/common/modal/Modal';
-import { TaskQueuePill } from '../../../components/common/display/TaskQueuePill';
+import type { ThrottleTarget } from './helpers';
 
 interface ThrottleModalProps {
   open: boolean;
   onClose: () => void;
-  targets: string[];
+  targets: ThrottleTarget[];
   onApply: (ms: number) => void;
   isPending: boolean;
 }
@@ -19,6 +19,17 @@ const PRESETS = [
   { label: 'Pause', ms: -1 },
 ];
 
+function TargetPill({ target }: { target: ThrottleTarget }) {
+  const isEngine = target.label === 'All Engines' || target.label.startsWith('Engine ');
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full ${
+      isEngine ? 'bg-blue-500/10 text-blue-500' : 'bg-surface-sunken text-text-secondary'
+    }`}>
+      {target.label}
+    </span>
+  );
+}
+
 export function ThrottleModal({ open, onClose, targets, onApply, isPending }: ThrottleModalProps) {
   const [seconds, setSeconds] = useState('0');
 
@@ -28,8 +39,8 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Targets</p>
           <div className="flex flex-wrap gap-1.5">
-            {targets.map((t) => (
-              <TaskQueuePill key={t} queue={t} />
+            {targets.map((t, i) => (
+              <TargetPill key={t.guid || t.topic || i} target={t} />
             ))}
           </div>
         </div>

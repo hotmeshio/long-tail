@@ -1,26 +1,147 @@
-import { useState } from 'react';
-import { Pencil, Shield, Trash2 } from 'lucide-react';
-import { useUsers, useDeleteUser } from '../../../api/users';
+import { useState, useMemo } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
+import { useUsers, useDeleteUser, useAddUserRole, useRemoveUserRole } from '../../../api/users';
+import { useRoles } from '../../../api/roles';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
-import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
-import type { LTUserRecord } from '../../../api/types';
+import type { LTUserRecord, LTRoleType } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
-import { RoleManagementModal } from './RoleManagementModal';
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
   { value: 'suspended', label: 'Suspended' },
 ];
+
+const statusDot: Record<string, string> = {
+  active: 'bg-status-success',
+  inactive: 'bg-text-tertiary',
+  suspended: 'bg-status-error',
+};
+
+// ── Role Panel (right sidebar) ─────────────────────────────────
+
+function RolePanel({ user }: { user: LTUserRecord | null }) {
+  const { data: allRolesData } = useRoles();
+  const addRole = useAddUserRole();
+  const removeRole = useRemoveUserRole();
+  const [newRole, setNewRole] = useState('');
+  const [newType, setNewType] = useState<LTRoleType>('member');
+
+  const allRoles = allRolesData?.roles ?? [];
+  const currentRoles = user?.roles ?? [];
+
+  const available = useMemo(() => {
+    const assigned = new Set(currentRoles.map((r) => r.role));
+    return allRoles.filter((r) => !assigned.has(r));
+  }, [allRoles, currentRoles]);
+
+  const handleAdd = () => {
+    if (!user || !newRole.trim()) return;
+    addRole.mutate(
+      { userId: user.id, role: newRole.trim(), type: newType },
+      { onSuccess: () => { setNewRole(''); setNewType('member'); } },
+    );
+  };
+
+  const handleRemove = (role: string) => {
+    if (!user) return;
+    removeRole.mutate({ userId: user.id, role });
+  };
+
+  return (
+    <div className="border-l border-surface-border pl-6 min-h-[300px]">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
+        Role Membership
+      </p>
+
+      {!user ? (
+        <p className="text-xs text-text-tertiary">
+          Select a user to manage their roles.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-text-primary">{user.display_name || user.external_id}</p>
+            <p className="text-[10px] text-text-tertiary mt-0.5">Member of:</p>
+          </div>
+
+          {currentRoles.length === 0 ? (
+            <p className="text-xs text-text-tertiary">No roles assigned.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {currentRoles.map((r) => (
+                <span
+                  key={r.role}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
+                >
+                  <RolePill role={r.role} />
+                  <span className="text-[9px] text-text-tertiary">{r.type}</span>
+                  <button
+                    onClick={() => handleRemove(r.role)}
+                    className="text-text-tertiary hover:text-status-error transition-colors ml-0.5"
+                    title={`Remove ${r.role}`}
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {available.length > 0 && (
+            <div className="pt-3 border-t border-surface-border">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+                Add Role
+              </p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="select text-xs font-mono flex-1"
+                >
+                  <option value="">Select a role...</option>
+                  {available.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <select
+                  value={newType}
+                  onChange={(e) => setNewType(e.target.value as LTRoleType)}
+                  className="select text-xs w-24"
+                >
+                  <option value="member">member</option>
+                  <option value="admin">admin</option>
+                  <option value="superadmin">superadmin</option>
+                </select>
+                <button
+                  onClick={handleAdd}
+                  disabled={!newRole || addRole.isPending}
+                  className="btn-primary text-xs"
+                >
+                  {addRole.isPending ? '...' : 'Add'}
+                </button>
+              </div>
+              {addRole.error && (
+                <p className="text-[10px] text-status-error mt-1">{(addRole.error as Error).message}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Users Page ─────────────────────────────────────────────────
 
 export function UsersPage() {
   const { filters, setFilter, pagination } = useFilterParams({
@@ -30,7 +151,7 @@ export function UsersPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [editingUser, setEditingUser] = useState<LTUserRecord | null>(null);
-  const [rolesUser, setRolesUser] = useState<LTUserRecord | null>(null);
+  const [selectedUser, setSelectedUser] = useState<LTUserRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<LTUserRecord | null>(null);
 
   const { data, isLoading } = useUsers({
@@ -40,27 +161,34 @@ export function UsersPage() {
   });
 
   const total = data?.total ?? 0;
+  const users = data?.users ?? [];
+
+  // Keep selected user in sync with refreshed data
+  const activeUser = useMemo(() => {
+    if (!selectedUser) return null;
+    return users.find((u) => u.id === selectedUser.id) ?? selectedUser;
+  }, [users, selectedUser]);
 
   const columns: Column<LTUserRecord>[] = [
     {
       key: 'display_name',
       label: 'User',
       render: (row) => (
-        <div>
-          <p className="text-sm text-text-primary">
-            {row.display_name || row.external_id}
-          </p>
-          {row.email && (
-            <p className="text-xs text-text-tertiary">{row.email}</p>
-          )}
+        <div className="flex items-center gap-2.5">
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
+            title={row.status}
+          />
+          <div>
+            <p className="text-sm text-text-primary">
+              {row.display_name || row.external_id}
+            </p>
+            {row.email && (
+              <p className="text-xs text-text-tertiary">{row.email}</p>
+            )}
+          </div>
         </div>
       ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (row) => <StatusBadge status={row.status} />,
-      className: 'w-28',
     },
     {
       key: 'roles',
@@ -90,11 +218,6 @@ export function UsersPage() {
             onClick={() => setEditingUser(row)}
           />
           <RowAction
-            icon={Shield}
-            title="Manage roles"
-            onClick={() => setRolesUser(row)}
-          />
-          <RowAction
             icon={Trash2}
             title="Delete user"
             onClick={() => setConfirmDelete(row)}
@@ -102,7 +225,7 @@ export function UsersPage() {
           />
         </RowActionGroup>
       ),
-      className: 'w-24 text-right',
+      className: 'w-16 text-right',
     },
   ];
 
@@ -116,7 +239,7 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="RBAC | Users"
+        title="Users"
         actions={
           <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
             Add User
@@ -133,22 +256,32 @@ export function UsersPage() {
         />
       </FilterBar>
 
-      <DataTable
-        columns={columns}
-        data={data?.users ?? []}
-        keyFn={(row) => row.id}
-        isLoading={isLoading}
-        emptyMessage="No users found"
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        {/* Left — users table */}
+        <div>
+          <DataTable
+            columns={columns}
+            data={users}
+            keyFn={(row) => row.id}
+            isLoading={isLoading}
+            emptyMessage="No users found"
+            onRowClick={(row) => setSelectedUser(row)}
+            activeRowKey={activeUser?.id ?? null}
+          />
 
-      <StickyPagination
-        page={pagination.page}
-        totalPages={pagination.totalPages(total)}
-        onPageChange={pagination.setPage}
-        total={total}
-        pageSize={pagination.pageSize}
-        onPageSizeChange={pagination.setPageSize}
-      />
+          <StickyPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages(total)}
+            onPageChange={pagination.setPage}
+            total={total}
+            pageSize={pagination.pageSize}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </div>
+
+        {/* Right — role management panel */}
+        <RolePanel user={activeUser} />
+      </div>
 
       <CreateUserModal open={showCreate} onClose={() => setShowCreate(false)} />
 
@@ -156,12 +289,6 @@ export function UsersPage() {
         open={!!editingUser}
         onClose={() => setEditingUser(null)}
         user={editingUser}
-      />
-
-      <RoleManagementModal
-        open={!!rolesUser}
-        onClose={() => setRolesUser(null)}
-        user={rolesUser}
       />
 
       <ConfirmDeleteModal

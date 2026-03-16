@@ -77,12 +77,12 @@ export function useControlPlaneApps() {
   });
 }
 
-export function useRollCall(appId: string) {
+export function useRollCall(appId: string, refetchInterval?: number | false) {
   return useQuery({
     queryKey: ['controlplane', 'rollcall', appId],
     queryFn: () => fetchRollCall(appId),
     enabled: !!appId,
-    refetchInterval: false,
+    refetchInterval: refetchInterval ?? false,
   });
 }
 
@@ -96,12 +96,13 @@ export function useThrottle() {
   });
 }
 
-export function useStreamStats(appId: string, duration: string, stream?: string) {
+export function useStreamStats(appId: string, duration: string, stream?: string, refetchInterval?: number | false) {
   return useQuery({
     queryKey: ['controlplane', 'streams', appId, duration, stream ?? ''],
     queryFn: () => fetchStreamStats(appId, duration, stream),
     enabled: !!appId,
     staleTime: 15_000,
+    refetchInterval: refetchInterval ?? false,
   });
 }
 
