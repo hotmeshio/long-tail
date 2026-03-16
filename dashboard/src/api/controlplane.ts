@@ -58,7 +58,7 @@ function postSubscribe(body: { appId: string }) {
 export interface StreamStats {
   pending: number;
   processed: number;
-  byStream: Array<{ stream_name: string; count: number }>;
+  byStream: Array<{ stream_type: 'engine' | 'worker'; stream_name: string; count: number }>;
 }
 
 function fetchStreamStats(appId: string, duration: string, stream?: string) {

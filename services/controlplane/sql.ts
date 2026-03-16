@@ -54,16 +54,16 @@ export const COUNT_PROCESSED_SINCE = (schema: string) => `
  * $1 = interval, $2 = stream_name filter (NULL = all streams).
  */
 export const VOLUME_BY_STREAM = (schema: string) => `
-  SELECT stream_name, COUNT(*)::int AS count FROM (
-    SELECT stream_name FROM "${schema}".engine_streams
+  SELECT stream_type, stream_name, COUNT(*)::int AS count FROM (
+    SELECT 'engine' AS stream_type, stream_name FROM "${schema}".engine_streams
     WHERE expired_at IS NOT NULL
       AND expired_at > NOW() - $1::interval
       AND ($2::text IS NULL OR stream_name = $2)
     UNION ALL
-    SELECT stream_name FROM "${schema}".worker_streams
+    SELECT 'worker' AS stream_type, stream_name FROM "${schema}".worker_streams
     WHERE expired_at IS NOT NULL
       AND expired_at > NOW() - $1::interval
       AND ($2::text IS NULL OR stream_name = $2)
   ) combined
-  GROUP BY stream_name
-  ORDER BY count DESC`;
+  GROUP BY stream_type, stream_name
+  ORDER BY stream_type, count DESC`;

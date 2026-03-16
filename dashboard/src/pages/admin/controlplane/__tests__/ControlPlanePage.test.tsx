@@ -32,8 +32,8 @@ const mockProfiles = {
   ],
 };
 const mockStreamStats = { pending: 0, processed: 1234, byStream: [
-  { stream_name: 'hmsh:durable:x:', count: 900 },
-  { stream_name: 'hmsh:durable:x:long-tail-system-mcpTriage', count: 334 },
+  { stream_type: 'engine', stream_name: 'hmsh:durable:x:', count: 900 },
+  { stream_type: 'worker', stream_name: 'long-tail-system', count: 334 },
 ] };
 
 vi.mock('../../../../api/controlplane', () => ({
@@ -72,14 +72,17 @@ describe('ControlPlanePage', () => {
 
   it('renders page header', () => {
     renderPage();
-    expect(screen.getByText('Control Plane')).toBeInTheDocument();
+    expect(screen.getByText('Mesh Activity')).toBeInTheDocument();
   });
 
   it('renders summary stat cards', () => {
     renderPage();
-    expect(screen.getByText('Engines')).toBeInTheDocument();
-    expect(screen.getByText('Workers')).toBeInTheDocument();
+    // "Engines" and "Workers" appear in both stat cards and filter dropdown
+    expect(screen.getAllByText('Engines').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Workers').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Pending')).toBeInTheDocument();
+    expect(screen.getByText('Engine Msgs (1h)')).toBeInTheDocument();
+    expect(screen.getByText('Worker Msgs (1h)')).toBeInTheDocument();
   });
 
   it('shows engine and worker counts from profiles', () => {
@@ -89,16 +92,19 @@ describe('ControlPlanePage', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
   });
 
-  it('renders processed count from stream stats', () => {
+  it('renders engine and worker processed counts from stream stats', () => {
     renderPage();
-    expect(screen.getByText('1,234')).toBeInTheDocument();
+    // Engine: 900 appears in both stat card and chart bar
+    expect(screen.getAllByText('900').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('334').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders mesh nodes table with profiles', () => {
     renderPage();
-    expect(screen.getByText('Mesh Nodes')).toBeInTheDocument();
+    expect(screen.getByText(/Mesh Nodes/)).toBeInTheDocument();
     expect(screen.getAllByText('Worker').length).toBe(2);
-    expect(screen.getByText('Engine')).toBeInTheDocument();
+    // "Engine" appears in both the table badge and the chart section header
+    expect(screen.getAllByText('Engine').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows throttled status for paused workers', () => {
@@ -113,16 +119,18 @@ describe('ControlPlanePage', () => {
     expect(screen.getByText('7d')).toBeInTheDocument();
   });
 
-  it('renders application filter', () => {
+  it('renders application and nodes filters', () => {
     renderPage();
     expect(screen.getByText('Application')).toBeInTheDocument();
+    expect(screen.getByText('Nodes')).toBeInTheDocument();
   });
 
-  it('renders stream volume section', () => {
+  it('renders stream volume section with engine/worker grouping', () => {
     renderPage();
-    // stripStreamPrefix('hmsh:durable:x:') → '(engine)'
+    // Engine stream label in chart
     expect(screen.getByText('(engine)')).toBeInTheDocument();
-    expect(screen.getByText('900')).toBeInTheDocument();
+    // Chart section header
+    expect(screen.getByText('Engine Queue')).toBeInTheDocument();
   });
 
   it('renders quorum feed panel', () => {

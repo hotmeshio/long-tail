@@ -60,6 +60,19 @@ export function stripStreamPrefix(name: string): string {
   return name.replace(/^hmsh:[^:]+:x:/, '') || '(engine)';
 }
 
+/** Engine streams have no suffix after hmsh:{app}:x: */
+export function isEngineStream(streamName: string): boolean {
+  return stripStreamPrefix(streamName) === '(engine)';
+}
+
+export type NodeFilter = 'all' | 'workers' | 'engines';
+
+export const NODE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Nodes' },
+  { value: 'workers', label: 'Workers' },
+  { value: 'engines', label: 'Engines' },
+] as const;
+
 export function rowKey(p: QuorumProfile): string {
   return `${p.engine_id}-${p.worker_topic || 'engine'}`;
 }
