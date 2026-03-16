@@ -63,8 +63,6 @@ describe('DB MCP server', () => {
     // Seed a workflow config so get_workflow_types has data
     await configService.upsertWorkflowConfig({
       workflow_type: 'dbServerTest',
-      is_lt: true,
-      is_container: false,
       invocable: true,
       task_queue: 'lt-db-test',
       default_role: 'reviewer',
@@ -226,7 +224,7 @@ describe('DB MCP server', () => {
       (w: any) => w.workflow_type === 'dbServerTest',
     );
     expect(wf).toBeTruthy();
-    expect(wf.is_lt).toBe(true);
+
     expect(wf.task_queue).toBe('lt-db-test');
   });
 

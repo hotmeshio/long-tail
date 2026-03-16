@@ -92,8 +92,6 @@ describe('events service', () => {
     // Seed configs for leaf + orchestrator workflows
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContent',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: LEAF_QUEUE,
       default_role: 'reviewer',
@@ -105,8 +103,6 @@ describe('events service', () => {
     });
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContentOrchestrator',
-      is_lt: false,
-      is_container: true,
       invocable: false,
       task_queue: ORCH_QUEUE,
       default_role: 'reviewer',

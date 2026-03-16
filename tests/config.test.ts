@@ -16,14 +16,14 @@ const { Connection } = Durable;
 // Workflow Configuration
 //
 // Every workflow in the system is governed by a config record that controls
-// interceptor behavior: whether it's an LT workflow, a container, which
-// role receives escalations, and more.
+// interceptor behavior: whether it's an LT workflow, which role receives
+// escalations, and more.
 //
 // This suite walks through:
 //   1. CRUD operations on workflow configs
 //   2. The in-memory cache (LTConfigCache) that the interceptor reads from
 //   3. The activity bridge (ltGetWorkflowConfig) that resolves configs at runtime
-//   4. Config-driven routing decisions (LT vs container vs pass-through)
+//   4. Config-driven routing decisions (LT vs pass-through)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('workflow configuration', () => {
@@ -57,8 +57,7 @@ describe('workflow configuration', () => {
     it('should create a config with all sub-entities', async () => {
       const input: LTWorkflowConfig = {
         workflow_type: 'testWorkflow',
-        is_lt: true,
-        is_container: false,
+
         invocable: false,
         task_queue: 'test-queue',
         default_role: 'reviewer',
@@ -71,8 +70,7 @@ describe('workflow configuration', () => {
 
       const result = await configService.upsertWorkflowConfig(input);
       expect(result.workflow_type).toBe('testWorkflow');
-      expect(result.is_lt).toBe(true);
-      expect(result.is_container).toBe(false);
+
       expect(result.task_queue).toBe('test-queue');
       expect(result.default_role).toBe('reviewer');
       expect(result.default_modality).toBe('portal');
@@ -96,8 +94,7 @@ describe('workflow configuration', () => {
     it('should list all configs', async () => {
       await configService.upsertWorkflowConfig({
         workflow_type: 'testContainer',
-        is_lt: false,
-        is_container: true,
+
         invocable: false,
         task_queue: 'container-queue',
         default_role: 'reviewer',
@@ -119,8 +116,7 @@ describe('workflow configuration', () => {
     it('should update an existing config via upsert', async () => {
       const updated = await configService.upsertWorkflowConfig({
         workflow_type: 'testWorkflow',
-        is_lt: true,
-        is_container: false,
+
         invocable: false,
         task_queue: 'updated-queue',
         default_role: 'senior-reviewer',
@@ -163,23 +159,8 @@ describe('workflow configuration', () => {
       const map = await configService.loadAllConfigs();
       const resolved = map.get('testWorkflow');
       expect(resolved).toBeTruthy();
-      expect(resolved!.isLT).toBe(true);
-      expect(resolved!.isContainer).toBe(false);
       expect(resolved!.role).toBe('senior-reviewer');
       expect(resolved!.modality).toBe('fax');
-    });
-
-    it('isLTWorkflow should return true for LT workflows', async () => {
-      ltConfig.invalidate();
-      expect(await ltConfig.isLTWorkflow('testWorkflow')).toBe(true);
-    });
-
-    it('isLTWorkflow should return false for unknown workflows', async () => {
-      expect(await ltConfig.isLTWorkflow('unknown')).toBe(false);
-    });
-
-    it('isContainer should return false for non-container workflows', async () => {
-      expect(await ltConfig.isContainer('testWorkflow')).toBe(false);
     });
 
     it('getTargetEscalationRole should return configured role', async () => {
@@ -205,7 +186,6 @@ describe('workflow configuration', () => {
     it('getResolvedConfig should return full config', async () => {
       const config = await ltConfig.getResolvedConfig('testWorkflow');
       expect(config).toBeTruthy();
-      expect(config!.isLT).toBe(true);
       expect(config!.role).toBe('senior-reviewer');
     });
 
@@ -217,8 +197,7 @@ describe('workflow configuration', () => {
     it('should reflect changes after invalidation', async () => {
       await configService.upsertWorkflowConfig({
         workflow_type: 'testWorkflow',
-        is_lt: true,
-        is_container: false,
+
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'moderator',
@@ -250,7 +229,6 @@ describe('workflow configuration', () => {
 
       const config1 = await ltGetWorkflowConfig('testWorkflow');
       expect(config1).toBeTruthy();
-      expect(config1!.isLT).toBe(true);
       expect(config1!.role).toBe('moderator');
 
       // Second call within TTL returns cached data
@@ -269,8 +247,7 @@ describe('workflow configuration', () => {
 
       await configService.upsertWorkflowConfig({
         workflow_type: 'testWorkflow',
-        is_lt: true,
-        is_container: false,
+
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'supervisor',
@@ -294,8 +271,7 @@ describe('workflow configuration', () => {
       // Restore for remaining tests
       await configService.upsertWorkflowConfig({
         workflow_type: 'testWorkflow',
-        is_lt: true,
-        is_container: false,
+
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'moderator',
@@ -313,45 +289,9 @@ describe('workflow configuration', () => {
   // ── 4. Config-driven routing ───────────────────────────────────────────
   //
   // The interceptor uses config to decide how to handle a workflow:
-  //   - isLT: true → full interceptor treatment (escalation, routing)
-  //   - isContainer: true → orchestrator context (AsyncLocalStorage)
   //   - null config → pass-through (call next())
 
   describe('config-driven routing decisions', () => {
-    it('should identify LT workflows via config', async () => {
-      ltConfig.invalidate();
-      const config = await ltGetWorkflowConfig('testWorkflow');
-      expect(config).toBeTruthy();
-      expect(config!.isLT).toBe(true);
-      expect(config!.isContainer).toBe(false);
-    });
-
-    it('should identify container workflows via config', async () => {
-      await configService.upsertWorkflowConfig({
-        workflow_type: 'testContainerRouting',
-        is_lt: false,
-        is_container: true,
-        invocable: false,
-        task_queue: 'container-queue',
-        default_role: 'reviewer',
-        default_modality: 'default',
-        description: null,
-        roles: [],
-        invocation_roles: [],
-
-        consumes: [],
-      });
-      ltConfig.invalidate();
-
-      const config = await ltGetWorkflowConfig('testContainerRouting');
-      expect(config).toBeTruthy();
-      expect(config!.isContainer).toBe(true);
-      expect(config!.isLT).toBe(false);
-
-      await configService.deleteWorkflowConfig('testContainerRouting');
-      ltConfig.invalidate();
-    });
-
     it('should return null for pass-through (unregistered) workflows', async () => {
       ltConfig.invalidate();
       const config = await ltGetWorkflowConfig('plainWorkflowNoConfig');
@@ -364,6 +304,5 @@ describe('workflow configuration', () => {
   it('should clean up test configs', async () => {
     await configService.deleteWorkflowConfig('testWorkflow');
     ltConfig.invalidate();
-    expect(await ltConfig.isLTWorkflow('testWorkflow')).toBe(false);
   });
 });

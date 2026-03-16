@@ -1,17 +1,3 @@
-// ── Job queries ─────────────────────────────────────────────────────────────
-
-export const GET_JOB_BY_KEY = `\
-SELECT key, status, context, created_at, updated_at, expired_at, is_live
-  FROM durable.jobs
- WHERE key = $1
- LIMIT 1`;
-
-export const GET_JOB_ATTRIBUTES = `\
-SELECT field, value
-  FROM durable.jobs_attributes
- WHERE job_id = $1
- ORDER BY field`;
-
 // ── Symbol queries ──────────────────────────────────────────────────────────
 
 export const RESOLVE_SYMBOL = `\

@@ -24,8 +24,11 @@ import {
   formatMemory,
   rowKey,
   MAX_EVENTS,
+  NODE_FILTER_OPTIONS,
   type Duration,
+  type NodeFilter,
   type QuorumEvent,
+  type ThrottleTarget,
 } from './helpers';
 import { ThrottleModal } from './ThrottleModal';
 import { MeshBulkActionBar } from './MeshBulkActionBar';
@@ -39,27 +42,33 @@ export function ControlPlanePage() {
   const apps = appsData?.apps ?? [];
 
   const { filters, setFilter } = useFilterParams({
-    filters: { app_id: '', duration: '1h' },
+    filters: { app_id: '', duration: '1h', nodes: '', queue: '' },
   });
 
   const firstAppId = apps[0]?.appId ?? 'durable';
   const activeAppId = filters.app_id || firstAppId;
   const activeDuration = (filters.duration || '1h') as Duration;
+  const activeNodeFilter = (filters.nodes || 'all') as NodeFilter;
 
-  const { data: rollCallData, isLoading, refetch, isFetching } = useRollCall(activeAppId);
-  const { data: streamStats } = useStreamStats(activeAppId, activeDuration);
   const throttleMutation = useThrottle();
   const subscribeMesh = useSubscribeMesh();
+
+  // ── Auto-refresh: 15s when events flowing, 60s otherwise ───
+  const [eventsActive, setEventsActive] = useState(false);
+  const refreshInterval = eventsActive ? 15_000 : 60_000;
+
+  const { data: rollCallData, isLoading, error: rollCallError, refetch, isFetching } = useRollCall(activeAppId, refreshInterval);
+  const { data: streamStats } = useStreamStats(activeAppId, activeDuration, undefined, refreshInterval);
 
   // ── Selection state ─────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [throttleModalOpen, setThrottleModalOpen] = useState(false);
-  const [throttleTargets, setThrottleTargets] = useState<string[]>([]);
+  const [throttleTargets, setThrottleTargets] = useState<ThrottleTarget[]>([]);
 
   useEffect(() => { setSelectedIds(new Set()); }, [activeAppId]);
 
-  // ── Sort profiles alphabetically ────────────────────────────
-  const profiles = useMemo(() => {
+  // ── All profiles (sorted) ───────────────────────────────────
+  const allProfiles = useMemo(() => {
     const raw = rollCallData?.profiles ?? [];
     return [...raw].sort((a, b) => {
       const ta = a.worker_topic || a.stream || '';
@@ -70,15 +79,35 @@ export function ControlPlanePage() {
     });
   }, [rollCallData?.profiles]);
 
-  const engineCount = profiles.filter((p) => !p.worker_topic).length;
-  const workerCount = profiles.filter(isWorker).length;
-  const throttledCount = profiles.filter(isThrottled).length;
+  // ── Counts from all profiles ────────────────────────────────
+  const engineCount = allProfiles.filter((p) => !p.worker_topic).length;
+  const workerCount = allProfiles.filter(isWorker).length;
+  const throttledCount = allProfiles.filter(isThrottled).length;
+
+  // ── Filtered profiles for table ─────────────────────────────
+  const activeQueue = filters.queue || '';
+
+  const profiles = useMemo(() => {
+    let result = allProfiles;
+    if (activeNodeFilter === 'workers') result = result.filter(isWorker);
+    else if (activeNodeFilter === 'engines') result = result.filter((p) => !isWorker(p));
+    if (activeQueue) result = result.filter((p) => p.worker_topic === activeQueue);
+    return result;
+  }, [allProfiles, activeNodeFilter, activeQueue]);
 
   const appOptions = useMemo(() => {
     const ids = new Set(apps.map((a) => a.appId));
     if (activeAppId) ids.add(activeAppId);
     return [...ids].sort().map((id) => ({ value: id, label: id }));
   }, [apps, activeAppId]);
+
+  const queueOptions = useMemo(() => {
+    const queues = new Set<string>();
+    for (const p of allProfiles) {
+      if (p.worker_topic) queues.add(p.worker_topic);
+    }
+    return [...queues].sort().map((q) => ({ value: q, label: q }));
+  }, [allProfiles]);
 
   // ── Selection helpers ─────────────────────────────────────────
   const toggleCheckbox = useCallback((profile: QuorumProfile) => {
@@ -111,35 +140,63 @@ export function ControlPlanePage() {
     }
   }, [profiles, selectedIds.size]);
 
-  const selectedTopics = useMemo(() => {
-    const targets = new Set<string>();
-    for (const p of profiles) {
-      if (selectedIds.has(rowKey(p))) {
-        targets.add(p.worker_topic || p.stream || '');
-      }
+  /** Build throttle targets from checkbox selection (group by type). */
+  const selectedThrottleTargets = useMemo((): ThrottleTarget[] => {
+    const selected = profiles.filter((p) => selectedIds.has(rowKey(p)));
+    if (selected.length === 0) return [];
+
+    const engines = selected.filter((p) => !isWorker(p));
+    const workers = selected.filter(isWorker);
+    const targets: ThrottleTarget[] = [];
+
+    if (engines.length > 0) {
+      const topic = engines[0].stream || '';
+      targets.push({ label: 'All Engines', topic });
     }
-    return [...targets].filter(Boolean).sort();
+
+    // Group workers by queue
+    const queues = new Map<string, QuorumProfile[]>();
+    for (const w of workers) {
+      const q = w.worker_topic!;
+      if (!queues.has(q)) queues.set(q, []);
+      queues.get(q)!.push(w);
+    }
+    for (const [queue] of queues) {
+      targets.push({ label: queue, topic: queue });
+    }
+
+    return targets;
   }, [profiles, selectedIds]);
 
   // ── Throttle handlers ─────────────────────────────────────────
   const handleBulkThrottle = (ms: number) => {
-    for (const topic of (throttleTargets.length > 0 ? throttleTargets : selectedTopics)) {
-      throttleMutation.mutate({ appId: activeAppId, throttle: ms, topic });
+    const targets = throttleTargets.length > 0 ? throttleTargets : selectedThrottleTargets;
+    for (const t of targets) {
+      throttleMutation.mutate({
+        appId: activeAppId,
+        throttle: ms,
+        ...(t.guid ? { guid: t.guid } : { topic: t.topic }),
+      });
     }
     setThrottleModalOpen(false);
     setThrottleTargets([]);
   };
 
   const handleRowClick = (profile: QuorumProfile) => {
-    const topic = profile.worker_topic || profile.stream || '';
-    if (topic) {
-      setThrottleTargets([topic]);
-      setThrottleModalOpen(true);
+    if (isWorker(profile)) {
+      setThrottleTargets([{ label: profile.worker_topic!, topic: profile.worker_topic! }]);
+    } else {
+      // Single engine → target by guid
+      setThrottleTargets([{
+        label: `Engine ${profile.engine_id}`,
+        guid: profile.engine_id,
+      }]);
     }
+    setThrottleModalOpen(true);
   };
 
   const handleBulkThrottleOpen = () => {
-    setThrottleTargets(selectedTopics);
+    setThrottleTargets(selectedThrottleTargets);
     setThrottleModalOpen(true);
   };
 
@@ -154,6 +211,7 @@ export function ControlPlanePage() {
   }, [activeAppId, subscribeMesh]);
 
   useNatsSubscription('lt.events.mesh.>', useCallback((event: any) => {
+    setEventsActive(true);
     setEvents((prev) => {
       const next = [{
         id: ++eventCounter,
@@ -200,7 +258,7 @@ export function ControlPlanePage() {
       label: 'Type',
       render: (row) => (
         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-          isWorker(row) ? 'bg-accent/10 text-accent' : 'bg-purple-500/10 text-purple-400'
+          isWorker(row) ? 'bg-accent/10 text-accent' : 'bg-blue-500/10 text-blue-500'
         }`}>
           {isWorker(row) ? 'Worker' : 'Engine'}
         </span>
@@ -211,19 +269,20 @@ export function ControlPlanePage() {
       key: 'worker_topic',
       label: 'Task Queue',
       render: (row) => {
-        const topic = row.worker_topic || row.stream;
-        return topic ? <TaskQueuePill queue={topic} /> : <span className="text-xs text-text-tertiary">—</span>;
+        if (!isWorker(row)) return <span className="text-xs text-text-tertiary">—</span>;
+        return <TaskQueuePill queue={row.worker_topic!} />;
       },
+      className: 'w-64',
     },
     {
       key: 'engine_id',
-      label: 'ID',
+      label: 'Engine/Worker ID',
       render: (row) => (
-        <span className="text-xs font-mono text-text-tertiary" title={row.engine_id}>
-          {row.engine_id.slice(0, 12)}…
+        <span className="text-xs font-mono text-text-tertiary">
+          {row.engine_id}
         </span>
       ),
-      className: 'w-32',
+      className: 'w-48',
     },
     {
       key: 'throttle',
@@ -250,7 +309,7 @@ export function ControlPlanePage() {
 
   return (
     <div>
-      <PageHeader title="Control Plane" />
+      <PageHeader title="Mesh Activity" />
 
       <FilterBar
         actions={
@@ -277,6 +336,18 @@ export function ControlPlanePage() {
           onChange={(v) => setFilter('app_id', v)}
           options={appOptions}
         />
+        <FilterSelect
+          label="Nodes"
+          value={filters.nodes}
+          onChange={(v) => setFilter('nodes', v)}
+          options={NODE_FILTER_OPTIONS as any}
+        />
+        <FilterSelect
+          label="Queue"
+          value={filters.queue}
+          onChange={(v) => setFilter('queue', v)}
+          options={queueOptions}
+        />
         <button
           onClick={() => refetch()}
           disabled={isFetching}
@@ -287,32 +358,62 @@ export function ControlPlanePage() {
         </button>
       </FilterBar>
 
+      {/* Error banner */}
+      {rollCallError && (
+        <div className="mb-6 px-4 py-3 rounded bg-status-error/10 border border-status-error/20">
+          <p className="text-xs text-status-error font-medium">
+            {rollCallError.message === 'Session expired'
+              ? 'Session expired — please log in again.'
+              : `Failed to load mesh data: ${rollCallError.message}`}
+          </p>
+        </div>
+      )}
+
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Engines" value={engineCount} />
-        <StatCard label="Workers" value={workerCount} />
-        <StatCard
-          label="Pending"
-          value={streamStats?.pending ?? 0}
-          colorClass={streamStats?.pending ? 'text-status-warning' : 'text-text-primary'}
-        />
-        <StatCard
-          label={`Processed (${activeDuration})`}
-          value={(streamStats?.processed ?? 0).toLocaleString()}
-        />
-      </div>
+      {(() => {
+        const byStream = streamStats?.byStream ?? [];
+        const engineProcessed = byStream.filter((s) => s.stream_type === 'engine').reduce((sum, s) => sum + s.count, 0);
+        const workerProcessed = byStream.filter((s) => s.stream_type === 'worker').reduce((sum, s) => sum + s.count, 0);
+        return (
+          <div className="grid grid-cols-5 gap-4 mb-8">
+            <StatCard label="Engines" value={engineCount} />
+            <StatCard label="Workers" value={workerCount} />
+            <StatCard
+              label="Pending"
+              value={streamStats?.pending ?? 0}
+              colorClass={streamStats?.pending ? 'text-status-warning' : 'text-text-primary'}
+            />
+            <StatCard
+              label={`Engine Msgs (${activeDuration})`}
+              value={engineProcessed.toLocaleString()}
+              colorClass="text-blue-500"
+            />
+            <StatCard
+              label={`Worker Msgs (${activeDuration})`}
+              value={workerProcessed.toLocaleString()}
+            />
+          </div>
+        );
+      })()}
 
       {/* Stream volume chart */}
       <SectionLabel className="mb-3">Stream Volume ({activeDuration})</SectionLabel>
       <div className="mb-8">
-        <StreamVolumeChart byStream={streamStats?.byStream ?? []} />
+        <StreamVolumeChart
+          byStream={streamStats?.byStream ?? []}
+          onNodeFilter={(f) => setFilter('nodes', f)}
+          onQueueFilter={(q) => { setFilter('nodes', 'workers'); setFilter('queue', q); }}
+        />
       </div>
 
       {/* Main content: table (left) + quorum feed (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
         <div>
           <SectionLabel className="mb-4">
-            Mesh Nodes
+            {activeNodeFilter === 'engines' ? 'Engine Nodes' : activeNodeFilter === 'workers' ? 'Worker Nodes' : 'Mesh Nodes'}
+            <span className="ml-2 text-text-tertiary font-normal text-xs">
+              {profiles.length}{activeNodeFilter !== 'all' ? ` of ${allProfiles.length}` : ''}
+            </span>
             {throttledCount > 0 && (
               <span className="ml-2 text-status-warning font-normal">({throttledCount} throttled)</span>
             )}
@@ -332,6 +433,7 @@ export function ControlPlanePage() {
             data={profiles}
             keyFn={rowKey}
             onRowClick={handleRowClick}
+            rowClassName={(row) => isWorker(row) ? '' : 'bg-blue-500/[0.03]'}
             isLoading={isLoading}
             emptyMessage={isLoading ? 'Discovering mesh nodes...' : 'No nodes found. Click "Roll Call" to discover.'}
           />
@@ -343,7 +445,7 @@ export function ControlPlanePage() {
       <ThrottleModal
         open={throttleModalOpen}
         onClose={() => { setThrottleModalOpen(false); setThrottleTargets([]); }}
-        targets={throttleTargets.length > 0 ? throttleTargets : selectedTopics}
+        targets={throttleTargets.length > 0 ? throttleTargets : selectedThrottleTargets}
         onApply={handleBulkThrottle}
         isPending={throttleMutation.isPending}
       />

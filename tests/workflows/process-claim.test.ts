@@ -81,8 +81,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
     // Seed workflow configs
     await configService.upsertWorkflowConfig({
       workflow_type: 'processClaim',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: CLAIM_QUEUE,
       default_role: 'reviewer',
@@ -95,8 +93,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     await configService.upsertWorkflowConfig({
       workflow_type: 'testProcessClaimOrchestrator',
-      is_lt: true,
-      is_container: true,
       invocable: false,
       task_queue: ORCH_QUEUE,
       default_role: 'reviewer',
@@ -109,8 +105,6 @@ describe('Process Claim → MCP Triage (image orientation)', () => {
 
     await configService.upsertWorkflowConfig({
       workflow_type: 'mcpTriage',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: TRIAGE_QUEUE,
       default_role: 'engineer',

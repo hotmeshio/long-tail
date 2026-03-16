@@ -33,8 +33,6 @@ export async function upsertWorkflowConfig(
     // Upsert the workflow row
     await client.query(UPSERT_WORKFLOW, [
         config.workflow_type,
-        config.is_lt,
-        config.is_container,
         config.invocable,
         config.task_queue,
         config.default_role,

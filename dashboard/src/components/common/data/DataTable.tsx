@@ -18,6 +18,8 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   /** Highlight the row whose keyFn matches this value. */
   activeRowKey?: string | null;
+  /** Optional per-row class name for custom styling (e.g., engine vs worker tint). */
+  rowClassName?: (row: T) => string;
   isLoading?: boolean;
   emptyMessage?: string;
   /** Current sort state — pass to show active sort indicator. */
@@ -48,6 +50,7 @@ export function DataTable<T>({
   keyFn,
   onRowClick,
   activeRowKey,
+  rowClassName,
   isLoading,
   emptyMessage = 'No records found',
   sort,
@@ -105,7 +108,7 @@ export function DataTable<T>({
             onClick={onRowClick ? () => onRowClick(row) : undefined}
             className={`group/row border-b last:border-b-0 transition-colors duration-100 ${
               onRowClick ? 'cursor-pointer row-hover' : ''
-            } ${isActive ? 'bg-accent/5 border-l-2 border-l-accent' : ''}`}
+            } ${isActive ? 'bg-accent/5 border-l-2 border-l-accent' : ''} ${rowClassName ? rowClassName(row) : ''}`}
           >
             {columns.map((col) => (
               <td

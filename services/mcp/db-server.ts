@@ -239,8 +239,6 @@ export async function createDbServer(options?: {
             count: configs.length,
             workflows: configs.map((c) => ({
               workflow_type: c.workflow_type,
-              is_lt: c.is_lt,
-              is_container: c.is_container,
               invocable: c.invocable,
               task_queue: c.task_queue,
               default_role: c.default_role,

@@ -37,8 +37,6 @@ describe('orchestrated workflows (executeLT)', () => {
     // Seed config for leaf + orchestrator workflows
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContent',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: LEAF_QUEUE,
       default_role: 'reviewer',
@@ -50,8 +48,6 @@ describe('orchestrated workflows (executeLT)', () => {
     });
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContentOrchestrator',
-      is_lt: false,
-      is_container: true,
       invocable: false,
       task_queue: ORCH_QUEUE,
       default_role: 'reviewer',
@@ -326,9 +322,9 @@ describe('orchestrated workflows (executeLT)', () => {
     await handle.result();
     await sleepFor(500);
 
-    // The orchestrator workflow ID should NOT have a task
-    // (only the child workflow has one)
+    // Every registered workflow now gets a task (unified compositional model)
     const orchTask = await taskService.getTaskByWorkflowId(orchWorkflowId);
-    expect(orchTask).toBeNull();
+    expect(orchTask).toBeTruthy();
+    expect(orchTask!.status).toBe('completed');
   }, 30_000);
 });

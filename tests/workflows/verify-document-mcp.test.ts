@@ -187,8 +187,6 @@ describe('verifyDocumentMcp workflow (MCP-native)', () => {
     // Seed config for the MCP-native workflow
     await configService.upsertWorkflowConfig({
       workflow_type: 'verifyDocumentMcp',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: TASK_QUEUE,
       default_role: 'reviewer',

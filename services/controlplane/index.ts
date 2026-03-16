@@ -98,7 +98,7 @@ const VALID_INTERVALS: Record<string, string> = {
 export interface StreamStats {
   pending: number;
   processed: number;
-  byStream: Array<{ stream_name: string; count: number }>;
+  byStream: Array<{ stream_type: 'engine' | 'worker'; stream_name: string; count: number }>;
 }
 
 /**
@@ -122,7 +122,7 @@ export async function getStreamStats(
   const [pendingRes, processedRes, byStreamRes] = await Promise.all([
     pool.query<{ count: number }>(COUNT_PENDING(schema), [stream]),
     pool.query<{ count: number }>(COUNT_PROCESSED_SINCE(schema), [interval, stream]),
-    pool.query<{ stream_name: string; count: number }>(VOLUME_BY_STREAM(schema), [interval, stream]),
+    pool.query<{ stream_type: 'engine' | 'worker'; stream_name: string; count: number }>(VOLUME_BY_STREAM(schema), [interval, stream]),
   ]);
 
   return {

@@ -11,7 +11,6 @@ import type {
 } from '../../types';
 
 import { getHandle } from './client';
-import { exportExecutionDirect } from './direct-query';
 import { enrichEventInputs } from './enrichment';
 import { postProcessExecution } from './post-process';
 
@@ -60,9 +59,6 @@ export async function getWorkflowStatus(
  * Delegates to HotMesh's native `handle.exportExecution()` which produces
  * typed events with ISO timestamps, durations, event cross-references,
  * system/user classification, and a summary.
- *
- * Falls back to a direct DB query when the job has expired (is_live=false)
- * but the data is still in the durable.jobs_attributes table.
  */
 export async function exportWorkflowExecution(
   workflowId: string,
@@ -70,19 +66,8 @@ export async function exportWorkflowExecution(
   workflowName: string,
   options?: ExecutionExportOptions,
 ): Promise<WorkflowExecution> {
-  let execution: WorkflowExecution;
-  try {
-    const handle = await getHandle(taskQueue, workflowName, workflowId);
-    execution = await handle.exportExecution(options);
-    // Handle may succeed but return empty events for expired (is_live=false) jobs
-    // whose hash has been pruned. Fall back to direct DB query in that case.
-    if (execution.events.length === 0) {
-      execution = await exportExecutionDirect(workflowId, workflowName, taskQueue, options);
-    }
-  } catch {
-    // HotMesh handle API fails for expired/pruned jobs -- fall back to direct query
-    execution = await exportExecutionDirect(workflowId, workflowName, taskQueue, options);
-  }
+  const handle = await getHandle(taskQueue, workflowName, workflowId);
+  const execution = await handle.exportExecution(options);
   await enrichEventInputs(execution);
   return postProcessExecution(execution);
 }

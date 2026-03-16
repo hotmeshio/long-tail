@@ -135,7 +135,7 @@ async function getTasksByOriginId(originId: string): Promise<LTTaskRecord[]> {
 
 const LEAF_TYPES = ['leafA1', 'leafA2', 'leafB1', 'leafB2', 'leafB3'];
 const SUB_ORCH_TYPES = ['subOrchA', 'subOrchB'];
-const ALL_TYPES = [...SUB_ORCH_TYPES, ...LEAF_TYPES];
+const ALL_TYPES = ['topLevelOrch', ...SUB_ORCH_TYPES, ...LEAF_TYPES];
 
 const defaultConfig = {
   invocable: false as const,
@@ -162,34 +162,28 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
 
     // ── Seed configs ──────────────────────────────────────────────────
 
-    // Leaf workflows (isLT: true, isContainer: false)
+    // Leaf workflows
     for (const wfType of LEAF_TYPES) {
       await configService.upsertWorkflowConfig({
         workflow_type: wfType,
-        is_lt: true,
-        is_container: false,
         task_queue: LEAF_QUEUE,
         ...defaultConfig,
       });
     }
 
-    // Sub-orchestrators (isLT: false, isContainer: true)
+    // Sub-orchestrators
     for (const wfType of SUB_ORCH_TYPES) {
       await configService.upsertWorkflowConfig({
         workflow_type: wfType,
-        is_lt: false,
-        is_container: true,
         task_queue: SUB_ORCH_QUEUE,
         ...defaultConfig,
         roles: [],
       });
     }
 
-    // Top-level orchestrator (isLT: false, isContainer: true)
+    // Top-level orchestrator
     await configService.upsertWorkflowConfig({
       workflow_type: 'topLevelOrch',
-      is_lt: false,
-      is_container: true,
       task_queue: TOP_ORCH_QUEUE,
       ...defaultConfig,
       roles: [],
@@ -285,16 +279,11 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
       allTasks = await getTasksByOriginId(topOrchWorkflowId);
     }, 30_000);
 
-    it('should create exactly 7 task records (2 sub-orchestrators + 5 leaves)', () => {
-      expect(allTasks).toHaveLength(7);
+    it('should create exactly 8 task records (1 top-orch + 2 sub-orchestrators + 5 leaves)', () => {
+      expect(allTasks).toHaveLength(8);
 
       const types = allTasks.map((t) => t.workflow_type).sort();
       expect(types).toEqual(ALL_TYPES.sort());
-    });
-
-    it('should NOT create a task record for the top-level container', async () => {
-      const topTask = await taskService.getTaskByWorkflowId(topOrchWorkflowId);
-      expect(topTask).toBeNull();
     });
 
     it('should set originId to the top-level orchestrator workflow ID for ALL tasks', () => {
@@ -303,7 +292,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
       }
     });
 
-    it('should complete all 7 tasks', () => {
+    it('should complete all 8 tasks', () => {
       for (const task of allTasks) {
         expect(task.status).toBe('completed');
       }
@@ -349,12 +338,12 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     });
 
     it('should allow reconstructing the full call tree from parentId relationships', () => {
-      // Build adjacency list: parentId → children
+      // Build adjacency list: parentId → children (skip root which has no parent)
       const childrenOf = new Map<string, LTTaskRecord[]>();
       for (const task of allTasks) {
-        const pid = task.parent_id!;
-        if (!childrenOf.has(pid)) childrenOf.set(pid, []);
-        childrenOf.get(pid)!.push(task);
+        if (!task.parent_id) continue; // root has no parent
+        if (!childrenOf.has(task.parent_id)) childrenOf.set(task.parent_id, []);
+        childrenOf.get(task.parent_id)!.push(task);
       }
 
       // Root level: top-level orchestrator's children
@@ -389,8 +378,8 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     });
 
     it('should allow finding every task in the hierarchy via a single originId query', () => {
-      // All 7 tasks returned from a single origin_id query
-      expect(allTasks.length).toBe(7);
+      // All 8 tasks returned from a single origin_id query
+      expect(allTasks.length).toBe(8);
 
       // Every task has the same origin_id
       const uniqueOrigins = new Set(allTasks.map((t) => t.origin_id));
@@ -399,7 +388,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     });
 
     it('should allow walking from any leaf up to the root via parentId', () => {
-      // Walk from leafA1 → subOrchA → topOrchWorkflowId (no task, root)
+      // Walk from leafA1 → subOrchA → topLevelOrch (root task)
       const leafA1Task = allTasks.find(
         (t) => t.workflow_type === 'leafA1',
       )!;
@@ -412,11 +401,11 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
       const parentOfSubOrchA = allTasks.find(
         (t) => t.workflow_id === parentOfLeafA1!.parent_id,
       );
-      // subOrchA's parent_id is the top-level orchestrator, which has no task
-      expect(parentOfSubOrchA).toBeUndefined();
-      expect(parentOfLeafA1!.parent_id).toBe(topOrchWorkflowId);
+      // subOrchA's parent_id is the top-level orchestrator, which now has a task
+      expect(parentOfSubOrchA).toBeTruthy();
+      expect(parentOfSubOrchA!.workflow_type).toBe('topLevelOrch');
 
-      // Walk from leafB3 → subOrchB → topOrchWorkflowId (root)
+      // Walk from leafB3 → subOrchB → topLevelOrch (root task)
       const leafB3Task = allTasks.find(
         (t) => t.workflow_type === 'leafB3',
       )!;
@@ -483,7 +472,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     }, 30_000);
 
     it('should still link all tasks via the same originId after escalation resolution', () => {
-      expect(allTasks.length).toBe(7);
+      expect(allTasks.length).toBe(8);
 
       for (const task of allTasks) {
         expect(task.origin_id).toBe(topOrchWorkflowId);

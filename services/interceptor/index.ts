@@ -20,7 +20,7 @@ const DEFAULT_ACTIVITY_QUEUE = 'lt-interceptor';
  *
  * This registers:
  * 1. The shared activity worker for interceptor DB operations
- * 2. The workflow interceptor (escalation, routing, re-runs)
+ * 2. The workflow interceptor (escalation, routing, re-runs, composition)
  * 3. The activity interceptor (milestone event publishing)
  */
 export async function registerLT(
@@ -51,19 +51,22 @@ export async function registerLT(
 /**
  * The Long Tail interceptor wraps every registered workflow.
  *
- * Architecture (startChild + signal):
+ * Every workflow in lt_config_workflows gets the same unified treatment:
  *
- * 1. **Container/Orchestrator** — The interceptor wraps `next()` in
- *    `runWithOrchestratorContext` so that `executeLT` can read the
- *    orchestrator's identity and inject parent routing into the envelope.
+ * 1. **Orchestrator context** — `next()` is always wrapped in
+ *    `runWithOrchestratorContext` so that ANY workflow can compose
+ *    children via `executeLT`. If it doesn't, the context is unused.
  *
- * 2. **Leaf workflows (LT)** — On escalation or error, the workflow
- *    ENDS after creating an escalation record. No `waitFor`. When a
- *    human resolves, a NEW workflow is started with resolver data.
- *    The interceptor detects re-runs via `envelope.resolver` +
- *    `envelope.lt.escalationId`, resolves the old escalation, and
- *    runs the workflow again. On success, it signals back to the
- *    orchestrator (if any) and completes the task.
+ * 2. **Task tracking** — Every execution is tied to a task record
+ *    for lifecycle tracking and origin lineage.
+ *
+ * 3. **Escalation routing** — On escalation or error, the workflow
+ *    ENDS after creating an escalation record. When a human resolves,
+ *    a NEW workflow is started with resolver data. The interceptor
+ *    detects re-runs via `envelope.resolver` + `envelope.lt.escalationId`.
+ *
+ * 4. **Parent signaling** — On completion, signals back to the parent
+ *    orchestrator (if any) so the composition chain continues.
  *
  * Routing info is read from the task record's metadata (set by executeLT)
  * rather than from workflow arguments, since the interceptor ctx does not
@@ -101,56 +104,7 @@ export function createLTInterceptor(options: {
       // Load config for this workflow type
       const wfConfig = await activities.ltGetWorkflowConfig(workflowName);
 
-      // ── Container pass-through ─────────────────────────────────────
-      // Wrap next() in orchestrator context so executeLT can read it.
-      // If this container was launched via executeLT (nested container),
-      // signal back to the parent orchestrator when it completes.
-      if (wfConfig?.isContainer) {
-        const existingContainerTask = await activities.ltGetTaskByWorkflowId(workflowId);
-        const containerMeta = existingContainerTask?.metadata as Record<string, any> | null;
-
-        const containerTaskQueue = workflowTopic
-          ? workflowTopic.replace(new RegExp(`-${workflowName}$`), '')
-          : 'long-tail-examples';
-
-        // Mark the container task as in_progress
-        if (existingContainerTask?.id && existingContainerTask.status === 'pending') {
-          await activities.ltStartTask(existingContainerTask.id);
-        }
-
-        const result = await runWithOrchestratorContext(
-          { workflowId, taskQueue: containerTaskQueue, workflowType: workflowName },
-          next,
-        );
-
-        // Complete the container's own task
-        if (existingContainerTask?.id) {
-          await activities.ltCompleteTask({
-            taskId: existingContainerTask.id,
-            data: JSON.stringify(result),
-            workflowId,
-            workflowName,
-            taskQueue: containerTaskQueue,
-          });
-        }
-
-        // Nested container: signal parent when started via executeLT
-        if (containerMeta?.parentWorkflowId && containerMeta?.signalId) {
-          await activities.ltSignalParent({
-            parentTaskQueue: containerMeta.parentTaskQueue,
-            parentWorkflowType: containerMeta.parentWorkflowType,
-            parentWorkflowId: containerMeta.parentWorkflowId,
-            signalId: containerMeta.signalId,
-            data: result,
-          });
-        }
-
-        return result;
-      }
-
-      // Pass through non-LT, legacy orchestrators, and unregistered workflows
-      if (wfConfig?.isLT === false) return next();
-      if (!wfConfig && workflowName?.endsWith('Orchestrator')) return next();
+      // Pass through unregistered workflows
       if (!wfConfig) return next();
 
       // Derive the task queue from workflowTopic
@@ -199,10 +153,7 @@ export function createLTInterceptor(options: {
         });
       }
 
-      // ── Standalone mode: guarantee a task always exists ──────────
-      // If no task was pre-created by executeLT (and this is not a
-      // re-run that already has one), the interceptor creates one.
-      // This ensures every escalation is tied to a task.
+      // ── Guarantee a task always exists ─────────────────────────────
       let taskId = reRunTask?.id || existingTask?.id;
       let routing = reRunMetadata || taskMetadata;
 
@@ -235,6 +186,9 @@ export function createLTInterceptor(options: {
           traceId: workflowTrace,
           spanId: workflowSpan,
         });
+        await activities.ltStartTask(taskId);
+      } else if (existingTask?.status === 'pending') {
+        // Mark pre-created task as in_progress
         await activities.ltStartTask(taskId);
       }
 
@@ -279,7 +233,11 @@ export function createLTInterceptor(options: {
       };
 
       try {
-        const result = await next();
+        // Every workflow gets orchestrator context so it CAN compose
+        const result = await runWithOrchestratorContext(
+          { workflowId, taskQueue, workflowType: workflowName },
+          next,
+        );
 
         if (result?.type === 'escalation') {
           return handleEscalation(state, result as LTEscalation);
@@ -287,6 +245,27 @@ export function createLTInterceptor(options: {
 
         if (result?.type === 'return') {
           return handleCompletion(state, result as LTReturn);
+        }
+
+        // Plain return (e.g., orchestrators that return raw results).
+        // Complete the task and signal parent if routed.
+        if (taskId) {
+          await activities.ltCompleteTask({
+            taskId,
+            data: JSON.stringify(result),
+            workflowId,
+            workflowName,
+            taskQueue,
+          });
+        }
+        if (routing?.parentWorkflowId && routing?.signalId) {
+          await activities.ltSignalParent({
+            parentTaskQueue: routing.parentTaskQueue,
+            parentWorkflowType: routing.parentWorkflowType,
+            parentWorkflowId: routing.parentWorkflowId,
+            signalId: routing.signalId,
+            data: result,
+          });
         }
 
         return result;

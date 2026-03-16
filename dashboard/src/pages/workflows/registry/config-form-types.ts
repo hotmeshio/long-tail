@@ -6,8 +6,6 @@ export interface ConfigFormState {
   task_queue: string;
   default_role: string;
   default_modality: string;
-  is_lt: boolean;
-  is_container: boolean;
   invocable: boolean;
   roles: string;
   invocation_roles: string;
@@ -23,8 +21,6 @@ export const EMPTY_FORM: ConfigFormState = {
   task_queue: '',
   default_role: 'reviewer',
   default_modality: 'portal',
-  is_lt: true,
-  is_container: false,
   invocable: false,
   roles: '',
   invocation_roles: '',
@@ -41,8 +37,6 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     task_queue: c.task_queue ?? '',
     default_role: c.default_role,
     default_modality: c.default_modality,
-    is_lt: c.is_lt,
-    is_container: c.is_container,
     invocable: c.invocable,
     roles: (c.roles ?? []).join(', '),
     invocation_roles: (c.invocation_roles ?? []).join(', '),

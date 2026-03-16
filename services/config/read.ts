@@ -28,8 +28,8 @@ export async function getWorkflowConfig(
 
   return {
     workflow_type: wf.workflow_type,
-    is_lt: wf.is_lt,
-    is_container: wf.is_container,
+
+
     invocable: wf.invocable,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
@@ -70,8 +70,8 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
 
   return wfResult.rows.map((wf: any) => ({
     workflow_type: wf.workflow_type,
-    is_lt: wf.is_lt,
-    is_container: wf.is_container,
+
+
     invocable: wf.invocable,
     task_queue: wf.task_queue,
     default_role: wf.default_role,

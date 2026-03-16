@@ -32,8 +32,6 @@ describe('kitchenSink workflow', () => {
 
     await configService.upsertWorkflowConfig({
       workflow_type: 'kitchenSink',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: TASK_QUEUE,
       default_role: 'reviewer',

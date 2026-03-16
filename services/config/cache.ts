@@ -7,8 +7,6 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
 
   for (const c of configs) {
     map.set(c.workflow_type, {
-      isLT: c.is_lt,
-      isContainer: c.is_container,
       invocable: c.invocable,
       taskQueue: c.task_queue,
       role: c.default_role,

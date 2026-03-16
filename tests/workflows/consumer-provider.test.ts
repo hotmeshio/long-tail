@@ -102,8 +102,6 @@ describe('consumer/provider data injection', () => {
     // ── Config: enrichOrder is a plain LT workflow (producer) ──────────
     await configService.upsertWorkflowConfig({
       workflow_type: 'enrichOrder',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: LEAF_QUEUE,
       default_role: 'reviewer',
@@ -117,8 +115,6 @@ describe('consumer/provider data injection', () => {
     // ── Config: processOrder declares enrichOrder as a provider ────────
     await configService.upsertWorkflowConfig({
       workflow_type: 'processOrder',
-      is_lt: true,
-      is_container: false,
       invocable: false,
       task_queue: LEAF_QUEUE,
       default_role: 'reviewer',
@@ -132,8 +128,6 @@ describe('consumer/provider data injection', () => {
     // ── Config: orchestrator (container) ──────────────────────────────
     await configService.upsertWorkflowConfig({
       workflow_type: 'orderPipeline',
-      is_lt: false,
-      is_container: true,
       invocable: false,
       task_queue: ORCH_QUEUE,
       default_role: 'reviewer',
