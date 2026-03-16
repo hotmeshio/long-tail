@@ -5,7 +5,7 @@ import { ScheduledMaintenanceSection } from './ScheduledMaintenanceSection';
 export function MaintenancePage() {
   return (
     <div>
-      <PageHeader title="Maintenance" />
+      <PageHeader title="DB Maintenance" />
       <PruneSection />
       <ScheduledMaintenanceSection />
     </div>
