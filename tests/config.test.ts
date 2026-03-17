@@ -37,9 +37,7 @@ describe('workflow configuration', () => {
 
     // Clear seeded configs from migration so tests start clean
     await configService.deleteWorkflowConfig('reviewContent');
-    await configService.deleteWorkflowConfig('reviewContentOrchestrator');
     await configService.deleteWorkflowConfig('verifyDocument');
-    await configService.deleteWorkflowConfig('verifyDocumentOrchestrator');
     ltConfig.invalidate();
   }, 30_000);
 

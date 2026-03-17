@@ -18,10 +18,10 @@ Open [http://localhost:3000](http://localhost:3000) once healthy (~10s). Four wo
 
 | User | Password | Role |
 |------|----------|------|
-| `superadmin` | `superadmin123` | superadmin |
-| `admin` | `admin123` | admin |
-| `engineer` | `engineer123` | engineer |
-| `reviewer` | `reviewer123` | reviewer |
+| `superadmin` | `l0ngt@1l` | superadmin |
+| `admin` | `l0ngt@1l` | admin |
+| `engineer` | `l0ngt@1l` | engineer |
+| `reviewer` | `l0ngt@1l` | reviewer |
 
 To reset: `docker compose down -v && docker compose up -d --build`
 

@@ -73,8 +73,8 @@ You'll see output like:
 [long-tail] Dashboard: http://localhost:3000/
 [long-tail] server running on port 3000
 [examples] roles verified (reviewer, engineer, admin, superadmin)
-[examples] seeded user (superadmin / superadmin123)
-[examples] seeded user (reviewer / reviewer123)
+[examples] seeded user (superadmin / l0ngt@1l)
+[examples] seeded user (reviewer / l0ngt@1l)
 [examples] MCP servers seeded (7 servers, 32 tools)
 [examples] seeded: Process 1 — Clean Review
 [examples] seeded: Process 2 — Flagged for Review
@@ -95,10 +95,10 @@ Log in with one of the seeded accounts:
 
 | Username | Password | Role | What you can do |
 |----------|----------|------|-----------------|
-| `superadmin` | `superadmin123` | superadmin | See everything |
-| `reviewer` | `reviewer123` | reviewer | Review escalations, resolve with triage |
-| `engineer` | `engineer123` | engineer | Handle technical escalations |
-| `admin` | `admin123` | admin | Administrative escalations |
+| `superadmin` | `l0ngt@1l` | superadmin | See everything |
+| `reviewer` | `l0ngt@1l` | reviewer | Review escalations, resolve with triage |
+| `engineer` | `l0ngt@1l` | engineer | Handle technical escalations |
+| `admin` | `l0ngt@1l` | admin | Administrative escalations |
 
 Log in as **superadmin** first to see the full picture.
 
@@ -178,7 +178,7 @@ The escalation detail shows:
 
 ### Step 2: Log in as Reviewer and Claim
 
-Log out and log back in as `reviewer` / `reviewer123`.
+Log out and log back in as `reviewer` / `l0ngt@1l`.
 
 Navigate to **Escalations** or find the escalation through the Process 4 detail page. Click into the escalation to see the full detail view.
 
@@ -331,7 +331,7 @@ Call the API to compile the triage execution into a YAML workflow:
 # Get a JWT token first
 TOKEN=$(curl -s http://localhost:3000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"superadmin","password":"superadmin123"}' | jq -r '.token')
+  -d '{"username":"superadmin","password":"l0ngt@1l"}' | jq -r '.token')
 
 # Generate YAML from the triage execution
 curl -s http://localhost:3000/api/yaml-workflows \
@@ -631,20 +631,20 @@ Content arrives in Spanish with a `WRONG_LANGUAGE` marker. The AI flags it with 
 
 ### Walk the Chain
 
-1. **Log in as `reviewer`** (`reviewer123`)
+1. **Log in as `reviewer`** (`l0ngt@1l`)
    - Navigate to the **Process 3** detail page and find the escalation in the timeline
    - Click into the escalation detail — review the Input Envelope and Workflow Result panels for context
    - Click **Claim** to assign it to yourself
    - You're a content reviewer, not a translator
    - **Escalate to admin**: "This is a language issue, outside my review scope"
 
-2. **Log in as `admin`** (`admin123`)
+2. **Log in as `admin`** (`l0ngt@1l`)
    - Navigate to the **Process 3** detail page and find the re-escalated item in the timeline
    - Click into the escalation detail, then **Claim** it
    - This needs engineering, not administrative action
    - **Escalate to engineer**: "Content is in the wrong language, needs technical fix"
 
-3. **Log in as `engineer`** (`engineer123`)
+3. **Log in as `engineer`** (`l0ngt@1l`)
    - Navigate to the **Process 3** detail page and find the escalation
    - Click into the escalation detail, then **Claim** it
    - You have the tools and authority to trigger triage
@@ -786,7 +786,7 @@ npm run start:dev
 # Login → get JWT token
 curl -s http://localhost:3000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"superadmin","password":"superadmin123"}'
+  -d '{"username":"superadmin","password":"l0ngt@1l"}'
 
 # Use token in subsequent requests
 -H "Authorization: Bearer $TOKEN"

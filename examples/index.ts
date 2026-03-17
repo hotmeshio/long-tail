@@ -3,20 +3,14 @@ import { Durable } from '@hotmeshio/hotmesh';
 import * as reviewContentWorkflow from './workflows/review-content';
 import * as verifyDocumentWorkflow from './workflows/verify-document';
 import * as verifyDocumentMcpWorkflow from './workflows/verify-document-mcp';
-import * as reviewContentOrchWorkflow from './workflows/review-content/orchestrator';
-import * as verifyDocumentOrchWorkflow from './workflows/verify-document/orchestrator';
-import * as verifyDocumentMcpOrchWorkflow from './workflows/verify-document-mcp/orchestrator';
 import * as processClaimWorkflow from './workflows/process-claim';
-import * as processClaimOrchWorkflow from './workflows/process-claim/orchestrator';
 import * as kitchenSinkWorkflow from './workflows/kitchen-sink';
-import * as kitchenSinkOrchWorkflow from './workflows/kitchen-sink/orchestrator';
 
 import type { LTEnvelope } from '../types';
 import type {
   ReviewContentEnvelopeData,
   ProcessClaimEnvelopeData,
   KitchenSinkEnvelopeData,
-  InvocableWorkflowType,
 } from './types';
 import { loggerRegistry } from '../services/logger';
 import { getUserByExternalId, createUser } from '../services/user';
@@ -31,13 +25,8 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: reviewContentWorkflow.reviewContent },
   { taskQueue: 'long-tail-examples', workflow: verifyDocumentWorkflow.verifyDocument },
   { taskQueue: 'long-tail-examples', workflow: verifyDocumentMcpWorkflow.verifyDocumentMcp },
-  { taskQueue: 'long-tail-examples', workflow: reviewContentOrchWorkflow.reviewContentOrchestrator },
-  { taskQueue: 'long-tail-examples', workflow: verifyDocumentOrchWorkflow.verifyDocumentOrchestrator },
-  { taskQueue: 'long-tail-examples', workflow: verifyDocumentMcpOrchWorkflow.verifyDocumentMcpOrchestrator },
   { taskQueue: 'long-tail-examples', workflow: processClaimWorkflow.processClaim },
-  { taskQueue: 'long-tail-examples', workflow: processClaimOrchWorkflow.processClaimOrchestrator },
   { taskQueue: 'long-tail-examples', workflow: kitchenSinkWorkflow.kitchenSink },
-  { taskQueue: 'long-tail-examples', workflow: kitchenSinkOrchWorkflow.kitchenSinkOrchestrator },
 ];
 
 const SEED_USERS = [
@@ -45,28 +34,28 @@ const SEED_USERS = [
     external_id: 'superadmin',
     display_name: 'Super Admin',
     email: 'admin@longtail.local',
-    password: 'superadmin123',
+    password: 'l0ngt@1l',
     roles: [{ role: 'superadmin', type: 'superadmin' as const }],
   },
   {
     external_id: 'admin',
     display_name: 'Admin User',
     email: 'admin-user@longtail.local',
-    password: 'admin123',
+    password: 'l0ngt@1l',
     roles: [{ role: 'admin', type: 'admin' as const }],
   },
   {
     external_id: 'engineer',
     display_name: 'Engineer User',
     email: 'engineer@longtail.local',
-    password: 'engineer123',
+    password: 'l0ngt@1l',
     roles: [{ role: 'engineer', type: 'member' as const }],
   },
   {
     external_id: 'reviewer',
     display_name: 'Reviewer User',
     email: 'reviewer@longtail.local',
-    password: 'reviewer123',
+    password: 'l0ngt@1l',
     roles: [{ role: 'reviewer', type: 'member' as const }],
   },
 ];
@@ -100,50 +89,33 @@ async function seedUsers(): Promise<void> {
 
 // ── Seed processes ───────────────────────────────────────────────────────────
 //
-// Four deterministic processes that tell the LongTail story:
+// Five processes that tell the LongTail story. Each workflow is invocable
+// directly — no orchestrator wrappers needed.
 //
 // Process 1 — "Clean Review"
 //   Content passes AI analysis. Auto-approved. The happy path.
 //
 // Process 2 — "Flagged for Review"
 //   Content triggers REVIEW_ME flag. AI escalates to reviewer role.
-//   Instruction: Log in as `reviewer` and approve the content.
 //
 // Process 3 — "Wrong Language → Durable MCP"
-//   Content arrives in Spanish with WRONG_LANGUAGE marker.
-//   AI flags it with low confidence (0.15) → escalates to reviewer.
-//   Instruction chain:
-//     reviewer  → escalate to admin (language issue, outside your role)
-//     admin     → escalate to engineer (needs technical fix)
-//     engineer  → check "Request AI Triage", describe: "Content is in Spanish, needs translation"
-//   The MCP triage orchestrator uses LLM + Vision tools to diagnose the
-//   issue, translate the content, re-run the workflow (auto-approves),
-//   and creates an engineering escalation recommending a language
-//   detection step in the pipeline.
+//   Content arrives in Spanish. AI flags low confidence → escalates.
+//   Walk the escalation chain: reviewer → admin → engineer.
+//   As engineer, check "Request AI Triage" to trigger MCP remediation.
 //
 // Process 4 — "Damaged Claim → MCP Triage (Image Orientation)"
-//   Insurance claim arrives with upside-down document images.
-//   AI analysis returns low confidence (0.35) → escalates to reviewer.
-//   Instruction:
-//     reviewer → check "Request AI Triage", describe: "Document images
-//       appear damaged or upside down, unable to read claim data"
-//   The MCP triage orchestrator uses LLM + Vision tools to diagnose,
-//   rotate images, verify extraction, re-run the claim workflow, and
-//   it auto-approves with corrected docs.
+//   Insurance claim with upside-down document images.
+//   AI Vision detects low confidence → escalates.
+//   As reviewer, check "Request AI Triage" to trigger MCP remediation.
 //
 // Process 5 — "Dynamic Triage (Kitchen Sink)"
-//   Kitchen-sink workflow creates a standard escalation (reviewer approval).
-//   Demonstrates the GENERIC triage controller with a non-domain-specific
-//   workflow:
-//     reviewer → check "Request AI Triage", write: "This looks fine, approve"
-//   The triage controller sends the message to the LLM, which recognizes
-//   simple approval intent and returns correctedData without tool calls.
-//   With a complex message like "Check system health before approving",
-//   the LLM uses DB query tools (find_tasks, get_system_health) to
-//   investigate, then decides whether to approve.
+//   Kitchen-sink workflow creates a standard escalation.
+//   As reviewer, check "Request AI Triage" to trigger dynamic triage.
+
+type SeedWorkflowName = 'reviewContent' | 'processClaim' | 'kitchenSink';
 
 const SEED_ENVELOPES: Array<{
-  workflowName: InvocableWorkflowType;
+  workflowName: SeedWorkflowName;
   taskQueue: string;
   envelope: LTEnvelope;
   label: string;
@@ -151,7 +123,7 @@ const SEED_ENVELOPES: Array<{
   // ── Process 1: Clean Review ─────────────────────────────────────
   {
     label: 'Process 1 — Clean Review',
-    workflowName: 'reviewContentOrchestrator',
+    workflowName: 'reviewContent',
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
@@ -170,7 +142,7 @@ const SEED_ENVELOPES: Array<{
   // ── Process 2: Flagged for Review ───────────────────────────────
   {
     label: 'Process 2 — Flagged for Review',
-    workflowName: 'reviewContentOrchestrator',
+    workflowName: 'reviewContent',
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
@@ -181,7 +153,7 @@ const SEED_ENVELOPES: Array<{
       metadata: {
         source: 'seed',
         process: 'flagged-review',
-        description: 'AI flags content for human review. Log in as reviewer (reviewer/reviewer123) and approve or reject.',
+        description: 'AI flags content for human review. Log in as reviewer (reviewer/l0ngt@1l) and approve or reject.',
       },
     },
   },
@@ -189,7 +161,7 @@ const SEED_ENVELOPES: Array<{
   // ── Process 3: Wrong Language → Durable MCP ────────────────────
   {
     label: 'Process 3 — Wrong Language',
-    workflowName: 'reviewContentOrchestrator',
+    workflowName: 'reviewContent',
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
@@ -200,7 +172,7 @@ const SEED_ENVELOPES: Array<{
       metadata: {
         source: 'seed',
         process: 'wrong-language',
-        description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" and describe: "Content is in Spanish, needs translation to English." The MCP triage orchestrator uses AI + Vision tools to diagnose, translate the content, re-run the workflow, and recommend adding language detection to the pipeline.',
+        description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" and describe: "Content is in Spanish, needs translation to English."',
       },
     },
   },
@@ -208,7 +180,7 @@ const SEED_ENVELOPES: Array<{
   // ── Process 4: Damaged Claim → MCP Triage ────────────────────
   {
     label: 'Process 4 — Damaged Claim',
-    workflowName: 'processClaimOrchestrator',
+    workflowName: 'processClaim',
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
@@ -224,14 +196,7 @@ const SEED_ENVELOPES: Array<{
       metadata: {
         source: 'seed',
         process: 'damaged-claim',
-        description:
-          'Insurance claim with an upside-down member application scan. ' +
-          'AI Vision detects the orientation issue and flags low confidence. ' +
-          'As reviewer, check "Request AI Triage" and describe the problem: ' +
-          '"Page 1 appears to be scanned upside down. Cannot read member ID or address." ' +
-          'The MCP triage orchestrator uses AI + Vision tools to diagnose the issue, ' +
-          'rotate the page with sharp, re-extract member info, validate against the DB, ' +
-          're-run the claim workflow with corrected documents, and it auto-approves.',
+        description: 'Insurance claim with upside-down document. As reviewer, check "Request AI Triage" and describe: "Page 1 appears to be scanned upside down."',
       },
     },
   },
@@ -239,7 +204,7 @@ const SEED_ENVELOPES: Array<{
   // ── Process 5: Kitchen Sink → Dynamic Triage ────────────────
   {
     label: 'Process 5 — Dynamic Triage',
-    workflowName: 'kitchenSinkOrchestrator',
+    workflowName: 'kitchenSink',
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
@@ -249,22 +214,13 @@ const SEED_ENVELOPES: Array<{
       metadata: {
         source: 'seed',
         process: 'dynamic-triage',
-        description:
-          'Demonstrates the dynamic triage controller with a generic workflow. ' +
-          'The kitchen-sink workflow creates an escalation waiting for approval. ' +
-          'As reviewer, check "Request AI Triage" and write a natural language ' +
-          'message like: "This looks fine, just approve it." The triage controller ' +
-          'detects simple approval intent and passes through without LLM calls. ' +
-          'Try again with a complex message like: "Something seems wrong — check ' +
-          'the system health and recent escalation stats before approving." The ' +
-          'triage agent will use database query tools to investigate, then decide.',
+        description: 'As reviewer, check "Request AI Triage" and write: "This looks fine, just approve it."',
       },
     },
   },
 ];
 
-// Escalation chains required for the Process 3 story:
-//   reviewer → admin → engineer (and cross-links for flexibility)
+// Escalation chains: reviewer → admin → engineer (and cross-links)
 const SEED_CHAINS = [
   ['reviewer', 'admin'],
   ['reviewer', 'engineer'],

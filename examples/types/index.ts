@@ -16,8 +16,6 @@ export type {
   InvocableWorkflowType,
 } from './envelopes';
 
-export { ENVELOPE_TEMPLATES } from './envelopes';
-
 // ── Resolver types (escalation resolution contracts) ────────────
 export type {
   ResolverLTBlock,

@@ -9,7 +9,6 @@ import { createLTInterceptor } from '../services/interceptor';
 import { createLTActivityInterceptor } from '../services/interceptor/activity-interceptor';
 import * as interceptorActivities from '../services/interceptor/activities';
 import * as reviewContentWorkflow from '../examples/workflows/review-content';
-import * as reviewContentOrchestrator from '../examples/workflows/review-content/orchestrator';
 import * as configService from '../services/config';
 import { eventRegistry } from '../services/events';
 import { InMemoryEventAdapter } from '../services/events/memory';
@@ -32,11 +31,8 @@ async function waitForEvent(
   return adapter.events.find(predicate);
 }
 
-// Must match the hardcoded taskQueue in orchestrator workflow
 const LEAF_QUEUE = 'long-tail-examples';
-const ORCH_QUEUE = 'test-events-orch';
 const MILESTONE_QUEUE = 'test-events-milestone';
-// Must match the default in orchestrator/index.ts so proxyActivities routes correctly
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
 // ── Test activity that returns milestones (LTActivity pattern) ─────────────
@@ -89,7 +85,7 @@ describe('events service', () => {
     });
     await migrate();
 
-    // Seed configs for leaf + orchestrator workflows
+    // Seed config for reviewContent workflow
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContent',
       invocable: false,
@@ -98,17 +94,6 @@ describe('events service', () => {
       default_modality: 'default',
       description: null,
       roles: ['reviewer'],
-      invocation_roles: [],
-      consumes: [],
-    });
-    await configService.upsertWorkflowConfig({
-      workflow_type: 'reviewContentOrchestrator',
-      invocable: false,
-      task_queue: ORCH_QUEUE,
-      default_role: 'reviewer',
-      default_modality: 'default',
-      description: null,
-      roles: [],
       invocation_roles: [],
       consumes: [],
     });
@@ -129,21 +114,13 @@ describe('events service', () => {
     Durable.registerInterceptor(ltInterceptor);
     Durable.registerActivityInterceptor(createLTActivityInterceptor());
 
-    // Register leaf workflow worker
+    // Register reviewContent workflow worker
     const leafWorker = await Worker.create({
       connection,
       taskQueue: LEAF_QUEUE,
       workflow: reviewContentWorkflow.reviewContent,
     });
     await leafWorker.run();
-
-    // Register orchestrator workflow worker
-    const orchWorker = await Worker.create({
-      connection,
-      taskQueue: ORCH_QUEUE,
-      workflow: reviewContentOrchestrator.reviewContentOrchestrator,
-    });
-    await orchWorker.run();
 
     // Register milestone activity worker + workflow for activity interceptor tests
     await Durable.registerActivityWorker(
@@ -215,20 +192,20 @@ describe('events service', () => {
     expect(evt!.timestamp).toBeTruthy();
   }, 30_000);
 
-  // ── Orchestrated: both interceptor and orchestrator publish ─────────────────
+  // ── Direct invocation: interceptor publishes milestone events ───────────────
 
-  it('should publish milestone events from both interceptor and orchestrator', async () => {
+  it('should publish milestone events from interceptor for direct workflow', async () => {
     const handle = await client.workflow.start({
       args: [{
         data: {
           contentId: 'evt-2',
-          content: 'Good content for orchestrator event test that auto-approves.',
+          content: 'Good content for direct event test that auto-approves.',
         },
         metadata: {},
       }],
-      taskQueue: ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
-      workflowId: `test-event-orch-${Durable.guid()}`,
+      taskQueue: LEAF_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId: `test-event-direct-${Durable.guid()}`,
       expire: 120,
     });
 
@@ -236,23 +213,15 @@ describe('events service', () => {
     expect(result.type).toBe('return');
     expect(result.data.approved).toBe(true);
 
-    // Poll for orchestrator event (fire-and-forget from ltCompleteTask activity)
-    const orchestratorEvt = await waitForEvent(
+    // Poll for interceptor event
+    const interceptorEvt = await waitForEvent(
       eventAdapter,
-      (e) => e.type === 'milestone' && e.source === 'orchestrator',
-      10_000,
-    );
-
-    const interceptorEvt = eventAdapter.events.find(
       (e) => e.type === 'milestone' && e.source === 'interceptor',
+      10_000,
     );
 
     expect(interceptorEvt).toBeTruthy();
     expect(interceptorEvt!.workflowName).toBe('reviewContent');
-
-    expect(orchestratorEvt).toBeTruthy();
-    expect(orchestratorEvt!.workflowName).toBe('reviewContent');
-    expect(orchestratorEvt!.taskId).toBeTruthy();
   }, 45_000);
 
   // ── No milestones: no events published ─────────────────────────────────────
