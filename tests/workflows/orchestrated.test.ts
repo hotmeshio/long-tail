@@ -10,7 +10,6 @@ import { createLTInterceptor } from '../../services/interceptor';
 import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
 import * as interceptorActivities from '../../services/interceptor/activities';
 import * as reviewContentWorkflow from '../../examples/workflows/review-content';
-import * as reviewContentOrchestrator from '../../examples/workflows/review-content/orchestrator';
 import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';
 import * as configService from '../../services/config';
@@ -19,11 +18,10 @@ import type { LTReturn } from '../../types';
 const { Connection, Client, Worker } = Durable;
 
 const LEAF_QUEUE = 'long-tail-examples';
-const ORCH_QUEUE = 'test-orch';
 // Must match the default in orchestrator/index.ts so proxyActivities routes correctly
 const ACTIVITY_QUEUE = 'lt-interceptor';
 
-describe('orchestrated workflows (executeLT)', () => {
+describe('direct workflow invocation with LT treatment', () => {
   let client: InstanceType<typeof Client>;
 
   beforeAll(async () => {
@@ -34,7 +32,7 @@ describe('orchestrated workflows (executeLT)', () => {
     });
     await migrate();
 
-    // Seed config for leaf + orchestrator workflows
+    // Seed config for reviewContent workflow
     await configService.upsertWorkflowConfig({
       workflow_type: 'reviewContent',
       invocable: false,
@@ -43,17 +41,6 @@ describe('orchestrated workflows (executeLT)', () => {
       default_modality: 'default',
       description: null,
       roles: ['reviewer'],
-      invocation_roles: [],
-      consumes: [],
-    });
-    await configService.upsertWorkflowConfig({
-      workflow_type: 'reviewContentOrchestrator',
-      invocable: false,
-      task_queue: ORCH_QUEUE,
-      default_role: 'reviewer',
-      default_modality: 'default',
-      description: null,
-      roles: [],
       invocation_roles: [],
       consumes: [],
     });
@@ -76,21 +63,13 @@ describe('orchestrated workflows (executeLT)', () => {
     const ltActivityInterceptor = createLTActivityInterceptor();
     Durable.registerActivityInterceptor(ltActivityInterceptor);
 
-    // Register LEAF workflow worker
+    // Register reviewContent workflow worker
     const leafWorker = await Worker.create({
       connection,
       taskQueue: LEAF_QUEUE,
       workflow: reviewContentWorkflow.reviewContent,
     });
     await leafWorker.run();
-
-    // Register ORCHESTRATOR workflow worker
-    const orchWorker = await Worker.create({
-      connection,
-      taskQueue: ORCH_QUEUE,
-      workflow: reviewContentOrchestrator.reviewContentOrchestrator,
-    });
-    await orchWorker.run();
 
     client = new Client({ connection });
   }, 30_000);
@@ -103,21 +82,21 @@ describe('orchestrated workflows (executeLT)', () => {
     await disconnectTelemetry();
   }, 10_000);
 
-  // ── executeLT: auto-approve creates task + returns result ───────────────────
+  // ── Direct invocation: auto-approve creates task + returns result ──────────
 
-  it('should auto-approve via orchestrator and create task record', async () => {
-    const workflowId = `test-orch-approve-${Durable.guid()}`;
+  it('should auto-approve and create task record when started directly', async () => {
+    const workflowId = `test-direct-approve-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
         data: {
-          contentId: 'orch-1',
-          content: 'Good content that auto-approves via orchestrator.',
+          contentId: 'direct-1',
+          content: 'Good content that auto-approves directly.',
         },
         metadata: {},
       }],
-      taskQueue: ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
+      taskQueue: LEAF_QUEUE,
+      workflowName: 'reviewContent',
       workflowId,
       expire: 120,
     });
@@ -126,7 +105,7 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(result.type).toBe('return');
     expect(result.data.approved).toBe(true);
 
-    // Verify task was created by executeLT with workflow_type 'reviewContent'
+    // Verify task was created by the interceptor with workflow_type 'reviewContent'
     await sleepFor(500);
     const { tasks } = await taskService.listTasks({ workflow_type: 'reviewContent' });
     const task = tasks.find(t => t.status === 'completed' && t.workflow_type === 'reviewContent');
@@ -134,44 +113,45 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(task!.status).toBe('completed');
   }, 30_000);
 
-  // ── executeLT: escalation ends child, resolve starts new child ──────────────
+  // ── Direct invocation: escalation + resolution via new workflow ────────────
 
-  it('should escalate via orchestrator and resolve via new workflow', async () => {
-    const orchWorkflowId = `test-orch-escalate-${Durable.guid()}`;
+  it('should escalate and resolve via new workflow when started directly', async () => {
+    const workflowId = `test-direct-escalate-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
         data: {
-          contentId: 'orch-esc-1',
-          content: 'REVIEW_ME needs human review via orchestrator',
+          contentId: 'direct-esc-1',
+          content: 'REVIEW_ME needs human review directly',
         },
         metadata: {},
       }],
-      taskQueue: ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
-      workflowId: orchWorkflowId,
+      taskQueue: LEAF_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId,
       expire: 180,
     });
 
-    // Poll for the child task to reach needs_intervention (created by executeLT)
-    let childTask: Awaited<ReturnType<typeof taskService.getTask>> = null;
+    // Poll for the task to reach needs_intervention
+    let task: Awaited<ReturnType<typeof taskService.getTask>> = null;
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
       const { tasks } = await taskService.listTasks({
-        parent_workflow_id: orchWorkflowId,
+        workflow_type: 'reviewContent',
         status: 'needs_intervention',
       });
-      if (tasks.length > 0) { childTask = tasks[0]; break; }
+      const match = tasks.find(t => t.workflow_id === workflowId);
+      if (match) { task = match; break; }
       await sleepFor(1_000);
     }
-    expect(childTask).toBeTruthy();
-    expect(childTask!.workflow_id).toBeTruthy();
+    expect(task).toBeTruthy();
+    expect(task!.workflow_id).toBeTruthy();
 
-    // Poll for escalation — ltCreateEscalation runs asynchronously after ltEscalateTask
+    // Poll for escalation
     let escalations: Awaited<ReturnType<typeof escalationService.getEscalationsByWorkflowId>> = [];
     const escDeadline = Date.now() + 10_000;
     while (Date.now() < escDeadline) {
-      escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+      escalations = await escalationService.getEscalationsByWorkflowId(task!.workflow_id);
       if (escalations.length > 0) break;
       await sleepFor(500);
     }
@@ -180,87 +160,91 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(esc.task_queue).toBeTruthy();
     expect(esc.workflow_type).toBe('reviewContent');
 
-    // Resolve by starting a new workflow (interceptor resolves escalation + signals orchestrator)
+    // Resolve by starting a new workflow (interceptor resolves escalation)
     await resolveEscalation(esc.id, {
-      contentId: 'orch-esc-1',
+      contentId: 'direct-esc-1',
       approved: true,
-      humanNote: 'Reviewed via orchestrator path',
+      humanNote: 'Reviewed via direct path',
     });
 
-    // Orchestrator should complete — the new child signals back
-    const result = await handle.result() as LTReturn;
-    expect(result.type).toBe('return');
-    expect(result.data.approved).toBe(true);
-    expect(result.data.humanNote).toBe('Reviewed via orchestrator path');
+    // The original workflow should have ended with escalation; the new workflow completes
+    await sleepFor(500);
 
     // Verify the interceptor resolved the escalation record
-    await sleepFor(500);
     const resolvedEsc = await escalationService.getEscalation(esc.id);
     expect(resolvedEsc!.status).toBe('resolved');
     expect(resolvedEsc!.resolver_payload).toBeTruthy();
   }, 30_000);
 
-  // ── executeLT: task record completed after escalation resolve ───────────────
+  // ── Direct invocation: task record completed after escalation resolve ──────
 
   it('should complete the task record after escalation is resolved', async () => {
-    const orchWorkflowId = `test-orch-complete-${Durable.guid()}`;
+    const workflowId = `test-direct-complete-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
         data: {
-          contentId: 'orch-complete-1',
+          contentId: 'direct-complete-1',
           content: 'REVIEW_ME check task completion',
         },
         metadata: {},
       }],
-      taskQueue: ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
-      workflowId: orchWorkflowId,
+      taskQueue: LEAF_QUEUE,
+      workflowName: 'reviewContent',
+      workflowId,
       expire: 180,
     });
 
-    // Poll for child task to reach needs_intervention
-    let childTask: Awaited<ReturnType<typeof taskService.getTask>> = null;
+    // Poll for task to reach needs_intervention
+    let task: Awaited<ReturnType<typeof taskService.getTask>> = null;
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
       const { tasks } = await taskService.listTasks({
-        parent_workflow_id: orchWorkflowId,
+        workflow_type: 'reviewContent',
         status: 'needs_intervention',
       });
-      if (tasks.length > 0) { childTask = tasks[0]; break; }
+      const match = tasks.find(t => t.workflow_id === workflowId);
+      if (match) { task = match; break; }
       await sleepFor(1_000);
     }
-    expect(childTask).toBeTruthy();
+    expect(task).toBeTruthy();
 
-    // Poll for escalation — ltCreateEscalation runs asynchronously after ltEscalateTask
+    // Poll for escalation
     let escalations: Awaited<ReturnType<typeof escalationService.getEscalationsByWorkflowId>> = [];
     const escDeadline2 = Date.now() + 10_000;
     while (Date.now() < escDeadline2) {
-      escalations = await escalationService.getEscalationsByWorkflowId(childTask!.workflow_id);
+      escalations = await escalationService.getEscalationsByWorkflowId(task!.workflow_id);
       if (escalations.length > 0) break;
       await sleepFor(500);
     }
     expect(escalations.length).toBeGreaterThan(0);
 
     await resolveEscalation(escalations[0].id, {
-      contentId: 'orch-complete-1',
+      contentId: 'direct-complete-1',
       approved: true,
     });
 
-    await handle.result();
-    await sleepFor(500);
+    await sleepFor(1500);
 
-    // Verify the task is now completed (orchestrator completes it when signal returns)
-    const task = await taskService.getTaskByWorkflowId(childTask!.workflow_id);
-    expect(task).toBeTruthy();
-    expect(task!.status).toBe('completed');
-    expect(task!.data).toBeTruthy();
+    // Verify the resolution workflow created a completed task
+    // (the original task stays needs_intervention; the resolution creates a new completed task)
+    const { tasks: completedTasks } = await taskService.listTasks({
+      workflow_type: 'reviewContent',
+      status: 'completed',
+    });
+    const completed = completedTasks.find(t => {
+      if (!t.data) return false;
+      const parsed = JSON.parse(t.data);
+      return parsed?.contentId === 'direct-complete-1';
+    });
+    expect(completed).toBeTruthy();
+    expect(completed!.status).toBe('completed');
   }, 30_000);
 
-  // ── Workflow milestones: persisted to task record via orchestrator ────────────
+  // ── Workflow milestones: persisted to task record ──────────────────────────
 
   it('should persist workflow milestones to the task record', async () => {
-    const workflowId = `test-orch-milestones-${Durable.guid()}`;
+    const workflowId = `test-direct-milestones-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [{
@@ -270,8 +254,8 @@ describe('orchestrated workflows (executeLT)', () => {
         },
         metadata: {},
       }],
-      taskQueue: ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
+      taskQueue: LEAF_QUEUE,
+      workflowName: 'reviewContent',
       workflowId,
       expire: 120,
     });
@@ -280,7 +264,7 @@ describe('orchestrated workflows (executeLT)', () => {
     expect(result.type).toBe('return');
     expect(result.data.approved).toBe(true);
 
-    // Find the child task created by executeLT
+    // Find the task created by the interceptor
     await sleepFor(500);
     const { tasks } = await taskService.listTasks({ workflow_type: 'reviewContent' });
     const task = tasks.find(t => {
@@ -290,41 +274,11 @@ describe('orchestrated workflows (executeLT)', () => {
     });
     expect(task).toBeTruthy();
 
-    // The orchestrator persists milestones from the child workflow's return value
+    // The interceptor persists milestones from the workflow's return value
     expect(task!.milestones).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'llm', value: 'content_analysis' }),
       ]),
     );
-  }, 30_000);
-
-  // ── Orchestrator pass-through: interceptor skips orchestrator workflows ─────
-
-  it('should pass orchestrator workflows through without interception', async () => {
-    // The orchestrator itself should not get a task record
-    // (only the child workflow gets one via executeLT)
-    const orchWorkflowId = `test-orch-passthrough-${Durable.guid()}`;
-
-    const handle = await client.workflow.start({
-      args: [{
-        data: {
-          contentId: 'passthrough-1',
-          content: 'Good content for pass-through test.',
-        },
-        metadata: {},
-      }],
-      taskQueue: ORCH_QUEUE,
-      workflowName: 'reviewContentOrchestrator',
-      workflowId: orchWorkflowId,
-      expire: 60,
-    });
-
-    await handle.result();
-    await sleepFor(500);
-
-    // Every registered workflow now gets a task (unified compositional model)
-    const orchTask = await taskService.getTaskByWorkflowId(orchWorkflowId);
-    expect(orchTask).toBeTruthy();
-    expect(orchTask!.status).toBe('completed');
   }, 30_000);
 });

@@ -230,9 +230,9 @@ const closePageSchema = z.object({
 });
 
 const runScriptStepSchema = z.object({
-  action: z.enum(['navigate', 'screenshot', 'click', 'fill', 'wait_for', 'evaluate'])
+  action: z.enum(['navigate', 'screenshot', 'click', 'fill', 'wait_for', 'wait_for_url', 'wait', 'evaluate'])
     .describe('Browser action to perform'),
-  url: z.string().optional().describe('URL for navigate action'),
+  url: z.string().optional().describe('URL for navigate action, or URL pattern for wait_for_url'),
   wait_until: z.enum(['load', 'domcontentloaded', 'networkidle']).optional()
     .describe('Navigation wait strategy (default: load)'),
   path: z.string().optional().describe('File path for screenshot action'),
@@ -240,7 +240,8 @@ const runScriptStepSchema = z.object({
   selector: z.string().optional().describe('CSS selector for click/fill/wait_for/screenshot'),
   value: z.string().optional().describe('Value for fill action'),
   script: z.string().optional().describe('JavaScript for evaluate action'),
-  timeout: z.number().optional().describe('Timeout in ms for wait_for action'),
+  timeout: z.number().optional().describe('Timeout in ms for wait_for/wait_for_url/wait actions'),
+  not: z.boolean().optional().describe('For wait_for_url: wait until URL does NOT match (default: false)'),
 });
 
 const runScriptSchema = z.object({
@@ -527,7 +528,8 @@ function registerTools(srv: McpServer): void {
       for (let i = 0; i < args.steps.length; i++) {
         const step = args.steps[i];
 
-        // Auto-create page on first navigate (or if no page yet)
+        // Navigate: reuse existing page to preserve session (cookies, localStorage, SPA state).
+        // Only create a new page on the first navigate.
         if (step.action === 'navigate') {
           if (!step.url) {
             return {
@@ -538,10 +540,12 @@ function registerTools(srv: McpServer): void {
               isError: true,
             };
           }
-          const b = await ensureBrowser();
-          page = await b.newPage();
-          pageId = `page_${++pageCounter}`;
-          pages.set(pageId, page);
+          if (!page) {
+            const b = await ensureBrowser();
+            page = await b.newPage();
+            pageId = `page_${++pageCounter}`;
+            pages.set(pageId, page);
+          }
           await page.goto(step.url, {
             waitUntil: step.wait_until || 'load',
             timeout: 30_000,
@@ -626,6 +630,34 @@ function registerTools(srv: McpServer): void {
             }
             await page.waitForSelector(step.selector, { timeout: step.timeout ?? 10_000 });
             stepResults.push({ step: i, action: 'wait_for', result: { found: step.selector } });
+            break;
+          }
+          case 'wait_for_url': {
+            if (!step.url) {
+              return {
+                content: [{ type: 'text' as const, text: JSON.stringify({ error: `Step ${i}: wait_for_url requires url`, code: RESOURCE_NOT_FOUND }) }],
+                isError: true,
+              };
+            }
+            const urlTimeout = step.timeout ?? 10_000;
+            if (step.not) {
+              // Wait until URL does NOT contain the pattern
+              await page.waitForFunction(
+                (pattern: string) => !window.location.href.includes(pattern),
+                step.url,
+                { timeout: urlTimeout },
+              );
+            } else {
+              // Wait until URL contains the pattern
+              await page.waitForURL(`**${step.url}**`, { timeout: urlTimeout });
+            }
+            stepResults.push({ step: i, action: 'wait_for_url', result: { url: page.url(), matched: !step.not } });
+            break;
+          }
+          case 'wait': {
+            const ms = step.timeout ?? 2000;
+            await page.waitForTimeout(ms);
+            stepResults.push({ step: i, action: 'wait', result: { waited_ms: ms } });
             break;
           }
           case 'evaluate': {

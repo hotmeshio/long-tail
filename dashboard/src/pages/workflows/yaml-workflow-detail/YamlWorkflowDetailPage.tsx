@@ -215,7 +215,7 @@ export function YamlWorkflowDetailPage() {
                 <button
                   type="button"
                   onClick={() => setOpenSection('invoke')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-medium hover:bg-purple-500/20 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
                 >
                   <Play className="w-3 h-3" />
                   Invoke

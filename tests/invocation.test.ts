@@ -29,9 +29,7 @@ describe('Workflow invocation config and RBAC', () => {
 
     // Clear seeded configs so tests start clean
     await configService.deleteWorkflowConfig('reviewContent');
-    await configService.deleteWorkflowConfig('reviewContentOrchestrator');
     await configService.deleteWorkflowConfig('verifyDocument');
-    await configService.deleteWorkflowConfig('verifyDocumentOrchestrator');
     ltConfig.invalidate();
   }, 30_000);
 

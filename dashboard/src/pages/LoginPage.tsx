@@ -70,12 +70,6 @@ export function LoginPage() {
           <AppLogo size="lg" hideLabel={launched} />
         </div>
 
-        {returnTo !== '/' && !launched && (
-          <p className="text-xs text-status-warning mb-4">
-            Session expired — sign in to continue
-          </p>
-        )}
-
         <form
           onSubmit={handleSubmit}
           className={`space-y-5 transition-opacity duration-300 ${launched ? 'opacity-0' : ''}`}

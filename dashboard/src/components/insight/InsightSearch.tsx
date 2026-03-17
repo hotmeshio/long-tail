@@ -20,10 +20,10 @@ import { InsightModal } from './InsightModal';
 // ];
 
 const SUGGESTIONS = [
-  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "superadmin123", click button[type="submit"], then screenshot the full page and save to /screenshots/docs/home.png',
-  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "superadmin123", click button[type="submit"], then navigate to http://localhost:3000/escalations and screenshot to /screenshots/docs/escalations.png',
-  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "superadmin123", click button[type="submit"], then navigate to http://localhost:3000/workflows, screenshot to /screenshots/docs/workflows.png, then navigate to http://localhost:3000/mcp/servers and screenshot to /screenshots/docs/mcp-servers.png',
-  'Run a browser script: navigate to https://news.ycombinator.com, screenshot the front page as /screenshots/hn.png, click the first story link, and screenshot that page as /screenshots/hn-top-story.png',
+  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "l0ngt@1l", click button[type="submit"], wait_for_url not matching /login, wait 5 seconds for SPA data to load, then screenshot the full page and save to /screenshots/docs/home.png',
+  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "l0ngt@1l", click button[type="submit"], wait_for_url not matching /login, navigate to http://localhost:3000/escalations, wait 5 seconds for data to load, and screenshot to /screenshots/docs/escalations.png',
+  'Run a browser script: navigate to http://localhost:3000/login, fill #username with "superadmin", fill #password with "l0ngt@1l", click button[type="submit"], wait_for_url not matching /login, navigate to /workflows, wait 5 seconds, screenshot to /screenshots/docs/workflows.png, then navigate to /mcp/servers, wait 5 seconds, and screenshot to /screenshots/docs/mcp-servers.png',
+  'Run a browser script: navigate to https://news.ycombinator.com, wait 3 seconds, screenshot the front page as /screenshots/hn.png, click the first story link, wait_for_url change, wait 3 seconds, and screenshot that page as /screenshots/hn-top-story.png',
   'Take a screenshot of https://example.com and save as /screenshots/example.png',
   'Fetch https://api.github.com/zen and save the response to /notes/zen.txt',
   'Check system health and write a summary report to /reports/health.txt',

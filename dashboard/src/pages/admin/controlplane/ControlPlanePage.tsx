@@ -304,7 +304,7 @@ export function ControlPlanePage() {
 
   return (
     <div>
-      <PageHeader title="Mesh Activity" />
+      <PageHeader title="Task Queues" />
 
       <FilterBar
         actions={

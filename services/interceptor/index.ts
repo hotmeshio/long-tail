@@ -171,6 +171,21 @@ export function createLTInterceptor(options: {
         };
       }
 
+      // Determine the canonical originId — traces back to the root workflow.
+      // For executeLT children, this comes from the envelope. For standalone
+      // invocations, we use the workflowId as the origin (it IS the root).
+      const originId = envelope?.lt?.originId
+        || reRunTask?.origin_id
+        || existingTask?.origin_id
+        || workflowId;
+
+      // Inject originId back into the envelope so all downstream code
+      // (escalation records, stored envelopes for re-runs, events) reads
+      // it consistently. Without this, standalone workflows lose lineage.
+      if (envelope) {
+        envelope.lt = { ...envelope.lt, originId };
+      }
+
       if (!taskId) {
         const standaloneSignalId = `lt-standalone-${workflowId}`;
         taskId = await activities.ltCreateTask({
@@ -180,7 +195,7 @@ export function createLTInterceptor(options: {
           taskQueue,
           signalId: standaloneSignalId,
           parentWorkflowId: workflowId,
-          originId: envelope?.lt?.originId || workflowId,
+          originId,
           parentId: envelope?.lt?.parentId,
           envelope: JSON.stringify(envelope || {}),
           traceId: workflowTrace,
@@ -200,7 +215,7 @@ export function createLTInterceptor(options: {
         workflowName,
         taskQueue,
         taskId,
-        originId: envelope?.lt?.originId || workflowId,
+        originId,
         status: 'running',
       });
 
@@ -211,7 +226,7 @@ export function createLTInterceptor(options: {
         workflowName,
         taskQueue,
         taskId: taskId!,
-        originId: envelope?.lt?.originId || workflowId,
+        originId,
         status: 'in_progress',
       });
 

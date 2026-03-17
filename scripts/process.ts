@@ -99,11 +99,11 @@ async function run() {
   // ── 1. Login as all users ───────────────────────────────────────────────
 
   header('Authentication');
-  const reviewerToken = await login('reviewer', 'reviewer123');
+  const reviewerToken = await login('reviewer', 'l0ngt@1l');
   log('reviewer', 'Logged in');
-  const adminToken = await login('admin', 'admin123');
+  const adminToken = await login('admin', 'l0ngt@1l');
   log('admin', 'Logged in');
-  const engineerToken = await login('engineer', 'engineer123');
+  const engineerToken = await login('engineer', 'l0ngt@1l');
   log('engineer', 'Logged in');
 
   // ── 2. Wait for Process 3 escalation to appear ──────────────────────────

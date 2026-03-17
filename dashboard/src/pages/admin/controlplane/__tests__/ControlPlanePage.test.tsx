@@ -72,7 +72,7 @@ describe('ControlPlanePage', () => {
 
   it('renders page header', () => {
     renderPage();
-    expect(screen.getByText('Mesh Activity')).toBeInTheDocument();
+    expect(screen.getByText('Task Queues')).toBeInTheDocument();
   });
 
   it('renders summary stat cards', () => {
