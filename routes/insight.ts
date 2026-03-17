@@ -39,7 +39,8 @@ router.post('/', async (req, res) => {
       taskQueue: 'long-tail-system',
       workflowName: 'insightQuery',
       workflowId,
-    });
+      entity: 'insightQuery',
+    } as any);
 
     const result = await handle.result<Record<string, any>>({ state: true });
 
@@ -95,7 +96,8 @@ router.post('/mcp-query', async (req, res) => {
       taskQueue: 'long-tail-system',
       workflowName: 'mcpQuery',
       workflowId,
-    });
+      entity: 'mcpQuery',
+    } as any);
 
     const result = await handle.result<Record<string, any>>({ state: true });
     const data = (result as any)?.data || result;

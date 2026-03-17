@@ -117,18 +117,18 @@ const VISION_TOOLS = [
 ];
 
 const DB_QUERY_TOOLS = [
-  { name: 'find_tasks', description: 'Search tasks by status, workflow type, or origin.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'find_escalations', description: 'Search escalations by status, role, type, or priority.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'get_process_summary', description: 'Aggregate process view grouped by origin_id.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'get_escalation_stats', description: 'Real-time escalation statistics.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_workflow_types', description: 'List registered workflow configurations.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_system_health', description: 'Overall system health snapshot.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'find_tasks', description: 'Search tasks with optional filters. Returns task records with workflow_id, status, workflow_type, milestones, created/completed timestamps, and metadata.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'find_escalations', description: 'Search escalations with optional filters. Returns escalation records with type, role, priority, status, description, and assignment info.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_process_summary', description: 'List business processes grouped by origin_id. Each process shows task count, completed/escalated counts, workflow types involved, and time range.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_escalation_stats', description: 'Real-time escalation statistics: pending/claimed counts, created/resolved in last 1h and 24h, breakdown by role.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_workflow_types', description: 'List all registered workflow configurations with task queue, roles, invocable flag, and description.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_system_health', description: 'Overall system health snapshot: task counts by status, escalation counts by status, active workflow types, and recent activity window.', inputSchema: { type: 'object', properties: {} } },
 ];
 
 const MCP_WORKFLOW_TOOLS = [
   {
     name: 'list_workflows',
-    description: 'Discover available compiled YAML workflows. These are deterministic pipelines converted from successful MCP triage executions.',
+    description: 'List available compiled YAML workflows. These are deterministic pipelines converted from successful MCP triage executions. Each workflow represents a proven solution to a specific edge case. Defaults to listing active (invocable) workflows.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -149,7 +149,7 @@ const MCP_WORKFLOW_TOOLS = [
   },
   {
     name: 'invoke_workflow',
-    description: 'Run a compiled YAML workflow by name. No LLM reasoning — direct tool-to-tool data piping.',
+    description: 'Run a compiled YAML workflow by name. Deterministic — no LLM reasoning, just direct tool-to-tool data piping. Use list_workflows to discover available workflows and their input schemas. Set async=true for fire-and-forget.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -166,7 +166,7 @@ const MCP_WORKFLOW_TOOLS = [
 const WORKFLOW_COMPILER_TOOLS = [
   {
     name: 'convert_execution_to_yaml',
-    description: 'Analyze a completed workflow execution and convert its tool call sequence into a deterministic HotMesh YAML workflow.',
+    description: 'Analyze a completed workflow execution and convert its tool call sequence into a deterministic HotMesh YAML workflow. Extracts tool call pairs and replaces LLM reasoning with direct tool-to-tool data piping. The generated YAML is stored as a draft that can be deployed and activated.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -181,7 +181,7 @@ const WORKFLOW_COMPILER_TOOLS = [
   },
   {
     name: 'deploy_yaml_workflow',
-    description: 'Deploy a stored YAML workflow to HotMesh. Optionally activate immediately.',
+    description: 'Deploy a stored YAML workflow to HotMesh. Optionally activate it immediately and register workers so it can receive invocations.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -206,15 +206,15 @@ const WORKFLOW_COMPILER_TOOLS = [
 ];
 
 const PLAYWRIGHT_TOOLS = [
-  { name: 'navigate', description: 'Open a URL in a new browser page.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' } }, required: ['url'] } },
-  { name: 'screenshot', description: 'Capture a screenshot and save as PNG. Pass url for a self-contained navigate+screenshot in one call.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' }, path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
-  { name: 'click', description: 'Click an element by CSS selector.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector'] } },
-  { name: 'fill', description: 'Type a value into an input field.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector', 'value'] } },
-  { name: 'wait_for', description: 'Wait for an element to appear on the page.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' }, timeout: { type: 'number' } }, required: ['selector'] } },
-  { name: 'evaluate', description: 'Evaluate JavaScript in the page context.', inputSchema: { type: 'object', properties: { script: { type: 'string' }, page_id: { type: 'string' } }, required: ['script'] } },
+  { name: 'navigate', description: 'Open a URL in a browser page. Returns a page_id handle for subsequent tool calls.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string', description: 'load | domcontentloaded | networkidle' } }, required: ['url'] } },
+  { name: 'screenshot', description: 'Capture a screenshot and save as PNG. Pass url for a self-contained navigate+screenshot, or page_id to screenshot an existing page.', inputSchema: { type: 'object', properties: { url: { type: 'string' }, wait_until: { type: 'string' }, path: { type: 'string' }, page_id: { type: 'string' }, full_page: { type: 'boolean' }, selector: { type: 'string' } }, required: ['path'] } },
+  { name: 'click', description: 'Click an element by CSS selector. Waits 500ms after click for SPA transitions.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector'] } },
+  { name: 'fill', description: 'Type a value into an input field by CSS selector.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'string' } }, required: ['selector', 'value'] } },
+  { name: 'wait_for', description: 'Wait for a CSS selector to appear on the page. For URL-based waiting, use run_script with wait_for_url action instead.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'string' }, timeout: { type: 'number' } }, required: ['selector'] } },
+  { name: 'evaluate', description: 'Evaluate JavaScript in the page context. Returns the expression result.', inputSchema: { type: 'object', properties: { script: { type: 'string' }, page_id: { type: 'string' } }, required: ['script'] } },
   {
     name: 'run_script',
-    description: 'Execute a multi-step browser script (navigate, screenshot, click, fill, wait_for, evaluate) in a single call. All steps share one page. Preferred for deterministic YAML workflows.',
+    description: 'Execute a multi-step browser script in a single call. All steps share one page. Actions: navigate (go to URL), screenshot (save PNG), click (CSS selector), fill (input value), wait_for (CSS selector appears), wait_for_url (URL matches/not-matches pattern), wait (fixed delay in ms), evaluate (run JS). Use wait_for_url with not=true after login clicks to wait for SPA navigation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -224,15 +224,16 @@ const PLAYWRIGHT_TOOLS = [
           items: {
             type: 'object',
             properties: {
-              action: { type: 'string', enum: ['navigate', 'screenshot', 'click', 'fill', 'wait_for', 'evaluate'] },
-              url: { type: 'string' },
+              action: { type: 'string', enum: ['navigate', 'screenshot', 'click', 'fill', 'wait_for', 'wait_for_url', 'wait', 'evaluate'] },
+              url: { type: 'string', description: 'URL for navigate, or URL pattern for wait_for_url' },
               wait_until: { type: 'string' },
               path: { type: 'string' },
               full_page: { type: 'boolean' },
               selector: { type: 'string' },
               value: { type: 'string' },
               script: { type: 'string' },
-              timeout: { type: 'number' },
+              timeout: { type: 'number', description: 'Timeout in ms for wait_for/wait_for_url, or delay for wait' },
+              not: { type: 'boolean', description: 'For wait_for_url: wait until URL does NOT match (default: false)' },
             },
             required: ['action'],
           },
@@ -248,7 +249,7 @@ const PLAYWRIGHT_TOOLS = [
 const FILE_STORAGE_TOOLS = [
   {
     name: 'read_file',
-    description: 'Read the contents of a file from managed storage. Returns the file content as text or base64.',
+    description: 'Read file content from managed storage. Returns content, size, and detected MIME type. Supports utf8 (text) or base64 encoding.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -260,7 +261,7 @@ const FILE_STORAGE_TOOLS = [
   },
   {
     name: 'write_file',
-    description: 'Write content to a file in managed storage. Creates directories as needed.',
+    description: 'Write content to a file in managed storage. Creates directories as needed. Returns the storage reference and size.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -273,7 +274,7 @@ const FILE_STORAGE_TOOLS = [
   },
   {
     name: 'list_files',
-    description: 'List files in a managed storage directory. Returns file names, sizes, and modification times.',
+    description: 'List files in a storage directory. Returns file paths, sizes, and modification timestamps.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -284,7 +285,7 @@ const FILE_STORAGE_TOOLS = [
   },
   {
     name: 'delete_file',
-    description: 'Delete a file from managed storage.',
+    description: 'Remove a file from managed storage.',
     inputSchema: {
       type: 'object',
       properties: {

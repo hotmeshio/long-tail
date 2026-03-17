@@ -393,7 +393,8 @@ router.post('/bulk-triage', async (req, res) => {
         taskQueue: 'long-tail-system',
         workflowId: triageWorkflowId,
         expire: 300,
-      });
+        entity: 'mcpTriage',
+      } as any);
 
       workflowIds.push(triageWorkflowId);
     }
@@ -641,7 +642,8 @@ router.post('/:id/resolve', async (req, res) => {
           taskQueue: 'long-tail-system',
           workflowId: triageWorkflowId,
           expire: 300,
-        });
+          entity: 'mcpTriage',
+        } as any);
 
         // Mark escalation as resolved (triage is handling it)
         await escalationService.resolveEscalation(escalation.id, {

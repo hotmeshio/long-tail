@@ -72,7 +72,8 @@ export async function resolveEscalation(
         taskQueue: 'long-tail-system',
         workflowId: triageWorkflowId,
         expire: 300,
-      });
+        entity: 'mcpTriage',
+      } as any);
 
       // Mark escalation as resolved (triage is handling it)
       await escalationService.resolveEscalation(escalation.id, {
