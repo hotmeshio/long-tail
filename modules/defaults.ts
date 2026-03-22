@@ -22,10 +22,10 @@ function envStr(key: string, fallback: string): string {
 // ── LLM ──────────────────────────────────────────────────────────────
 
 /** Primary model for agentic/insight workflows (tool-calling capable). */
-export const LLM_MODEL_PRIMARY = envStr('LT_LLM_MODEL_PRIMARY', 'gpt-4o');
+export const LLM_MODEL_PRIMARY = envStr('LT_LLM_MODEL_PRIMARY', 'claude-sonnet-4-6');
 
 /** Lighter model for summarization, interpretation, and vision tasks. */
-export const LLM_MODEL_SECONDARY = envStr('LT_LLM_MODEL_SECONDARY', 'gpt-4o-mini');
+export const LLM_MODEL_SECONDARY = envStr('LT_LLM_MODEL_SECONDARY', 'claude-haiku-4-5-20251001');
 
 /** Base URL for OpenAI-compatible providers (Groq, Together, local). */
 export const LLM_BASE_URL = process.env.LT_LLM_BASE_URL || undefined;

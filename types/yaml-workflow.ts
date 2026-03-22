@@ -63,7 +63,7 @@ export interface ActivityManifestEntry {
   /** Worker topic for routing */
   topic: string;
   /** How this activity executes at runtime */
-  tool_source: 'db' | 'mcp' | 'llm' | 'trigger';
+  tool_source: 'db' | 'mcp' | 'llm' | 'trigger' | 'transform';
   /** Original MCP server ID that provided this tool (tool steps only) */
   mcp_server_id?: string;
   /** Tool name — MCP tool name or DB tool name (tool steps only) */
@@ -78,4 +78,23 @@ export interface ActivityManifestEntry {
   prompt_template?: string;
   /** LLM model identifier (llm steps only). Defaults to LLM_MODEL_SECONDARY from modules/defaults. */
   model?: string;
+  /** Transform spec for reshape activities (transform steps only) */
+  transform_spec?: {
+    /** Source field to reshape (from prior step's output) */
+    sourceField: string;
+    /** Target field name for the reshaped output */
+    targetField: string;
+    /** Per-field mapping: target key → source key. null = computed. */
+    fieldMap: Record<string, string | null>;
+    /** Static defaults to inject into each reshaped item */
+    defaults?: Record<string, unknown>;
+    /** Derivation specs for computed fields (null in fieldMap) */
+    derivations?: Record<string, {
+      sourceKey: string;
+      strategy: 'slugify' | 'prefix' | 'template' | 'passthrough';
+      prefix?: string;
+      suffix?: string;
+      template?: string;
+    }>;
+  };
 }

@@ -511,7 +511,7 @@ const SEED_MCP_SERVERS = [
     transport_type: 'stdio',
     transport_config: { builtin: true, process: 'in-memory' },
     tool_manifest: PLAYWRIGHT_TOOLS,
-    metadata: { builtin: true, category: 'browser-automation' },
+    metadata: { builtin: true, category: 'browser-automation', level: 'low' },
     tags: ['browser-automation', 'testing', 'screenshots'],
   },
   {
@@ -520,7 +520,7 @@ const SEED_MCP_SERVERS = [
     transport_type: 'stdio',
     transport_config: { builtin: true, process: 'in-memory' },
     tool_manifest: PLAYWRIGHT_CLI_TOOLS,
-    metadata: { builtin: true, category: 'browser-automation' },
+    metadata: { builtin: true, category: 'browser-automation', level: 'high' },
     tags: ['browser-automation', 'screenshots', 'scraping', 'forms'],
   },
   {

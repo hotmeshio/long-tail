@@ -82,7 +82,7 @@ export async function callLLM(options: LLMOptions): Promise<LLMResponse> {
  * when no key is configured).
  */
 export function hasLLMApiKey(model?: string): boolean {
-  const m = model || process.env.LT_LLM_MODEL_PRIMARY || 'gpt-4o';
+  const m = model || process.env.LT_LLM_MODEL_PRIMARY || 'claude-sonnet-4-6';
   const provider = detectProvider(m);
   const key = resolveApiKey(provider);
   return !!key && key !== 'xxx';

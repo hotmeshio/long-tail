@@ -13,6 +13,7 @@ services:
       - .:/app
       - /app/node_modules
       - /app/dashboard/node_modules
+      - lt-data:/app/data/files
     ports:
       - "${LT_PORT:-3000}:3000"
       - "9229:9229"
@@ -72,3 +73,4 @@ services:
 
 volumes:
   pgdata:
+  lt-data:

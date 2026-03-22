@@ -104,6 +104,19 @@ function truncateObject(obj: Record<string, unknown>, maxDepth = 2): Record<stri
  * Summarize extracted steps for the LLM, including result structure.
  */
 function summarizeSteps(steps: ExtractedStep[]): StepSummary[] {
+  // Pre-compute array outputs from all steps for provenance detection
+  const arrayOutputs: Array<{ stepIndex: number; field: string; items: unknown[] }> = [];
+  for (let i = 0; i < steps.length; i++) {
+    const result = steps[i].result;
+    if (result && typeof result === 'object' && !Array.isArray(result)) {
+      for (const [field, value] of Object.entries(result as Record<string, unknown>)) {
+        if (Array.isArray(value) && value.length > 0) {
+          arrayOutputs.push({ stepIndex: i, field, items: value });
+        }
+      }
+    }
+  }
+
   return steps.map((step, index) => {
     const args: Record<string, unknown> = {};
     let iterationMeta: StepSummary['iterationMeta'] = undefined;
@@ -119,7 +132,36 @@ function summarizeSteps(steps: ExtractedStep[]): StepSummary[] {
           arraySource: iter.arraySource as { stepIndex: number; field: string } | null,
         };
       } else if (Array.isArray(value) && value.length > 3) {
-        args[key] = `[Array of ${value.length} items, first: ${JSON.stringify(value[0]).slice(0, 200)}]`;
+        // Check if this array was likely derived from a prior step's output
+        let provenance = '';
+        for (const ao of arrayOutputs) {
+          if (ao.stepIndex >= index) continue; // only prior steps
+          if (ao.items.length > 0 && value.length > 0) {
+            // Check if array items share values (e.g., URLs overlap)
+            const sourceValues = new Set<string>();
+            for (const item of ao.items) {
+              if (item && typeof item === 'object') {
+                for (const v of Object.values(item as Record<string, unknown>)) {
+                  if (typeof v === 'string') sourceValues.add(v);
+                }
+              }
+            }
+            const targetValues: string[] = [];
+            for (const item of value) {
+              if (item && typeof item === 'object') {
+                for (const v of Object.values(item as Record<string, unknown>)) {
+                  if (typeof v === 'string') targetValues.push(v);
+                }
+              }
+            }
+            const overlap = targetValues.filter(v => sourceValues.has(v)).length;
+            if (overlap > value.length * 0.3) {
+              provenance = ` ⚠️ DERIVED FROM step ${ao.stepIndex} field "${ao.field}" (${overlap} overlapping values — this is NOT a user input, it was computed from step ${ao.stepIndex}'s output)`;
+              break;
+            }
+          }
+        }
+        args[key] = `[Array of ${value.length} items, first: ${JSON.stringify(value[0]).slice(0, 200)}]${provenance}`;
       } else if (typeof value === 'string' && value.length > 300) {
         args[key] = value.slice(0, 300) + '...';
       } else {
@@ -182,15 +224,28 @@ For example, if the prompt says "login to site X and take screenshots of all pag
 - Execution may have included probing steps — exclude those
 - Deterministic version: accept credentials → login → extract links → iterate taking screenshots
 
+## Critical: Preserve Discovery Steps
+
+Many workflows follow a "discover then act" pattern: one step DISCOVERS data (e.g., extract navigation links, query a database, list files) and a later step ACTS on that data (e.g., screenshot each page, process each record, transform each file).
+
+**NEVER collapse discovery + action into a single step with the discovered data as a user input.** If the execution trace shows:
+1. Step A: extract_content → produces \`links: [{text, href}, ...]\`
+2. Step B: capture_pages(pages=[...array built from step A's links...])
+
+The compiled workflow MUST keep BOTH steps: A produces the array, B consumes it. Do NOT make the array a trigger input — it was runtime-discovered, not user-provided.
+
+**How to detect**: If a step's argument contains a large array of items that closely mirrors a prior step's output array (same URLs, same items, possibly reshaped), that array was DERIVED from the prior step. Keep both steps and wire them with a data_flow edge (with a transform if formats differ).
+
 ## Rules
 
 ### Step Dispositions
-- **core**: Directly serves the workflow intent. Produces data consumed by later steps.
+- **core**: Directly serves the workflow intent. Produces data consumed by later steps. **Discovery steps that produce arrays consumed by later action steps are ALWAYS core.**
 - **exploratory**: Probing/debugging/discovery steps that don't produce data needed by the workflow. Exclude these:
   - Checking if compiled workflows exist (list_workflows, list_yaml_workflows)
   - Listing files to see what exists (list_files, read_file)
   - Initial tool calls that failed and were retried with different parameters
   - Any step whose result is not consumed by a subsequent core step
+  - **NEVER mark a discovery step as exploratory if its output was used to build arguments for a later step**
 
 ### Iteration Specifications
 When the execution shows repeated tool calls with varying arguments (the pattern detector may have already collapsed these):
@@ -205,6 +260,21 @@ When the execution shows repeated tool calls with varying arguments (the pattern
   For example, screenshot_path is often derived from the link text or URL — it's not a field in the source array directly:
   \`{ "screenshot_path": null }\` — the value must be computed or provided by the trigger.
 
+### Tool Simplification for Iterations (CRITICAL)
+The iteration pattern works by extracting individual values from array items and passing them as simple key=value arguments to the iterated tool. This means:
+
+**The iterated tool MUST accept simple, flat arguments** (url, path, page_id — not complex nested structures like a \`steps\` array).
+
+If the execution used a complex multi-step scripting tool (e.g., \`run_script\` with a \`steps: [{action, url}, {action, path}]\` array) for each iteration, you MUST replace it with a simpler tool from the same server that accepts flat arguments. Check the server's tool inventory for a simpler alternative.
+
+For example:
+- \`run_script(steps=[navigate, wait, screenshot])\` per page → replace with \`capture_page(url, path, full_page, wait_ms)\` (1 call, flat args)
+- \`run_script(steps=[navigate, fill, click])\` per item → replace with \`submit_form(url, fields)\` (1 call, flat args)
+
+When replacing: use the same server_id but the simpler tool_name. The varying_keys and key_mappings should map directly to the simple tool's argument names.
+
+**If no simpler tool alternative exists**, use a data_flow edge with a transform to feed the array into a batch/composite tool that accepts the full array (like \`capture_authenticated_pages\` which takes a \`pages\` array).
+
 ### Data Flow Graph
 Specify directed edges showing how data flows between steps:
 - from_step: "trigger" (user input) or step index number
@@ -215,13 +285,52 @@ Specify directed edges showing how data flows between steps:
 
 Session handles are critical — they maintain authenticated browser sessions, database connections, etc. They must be threaded from their producer through ALL subsequent steps that need them.
 
+### Data Flow Transforms (CRITICAL for array reshaping)
+When a source step produces an array of objects in one format but the consuming step expects a DIFFERENT format, add a \`transform\` to the data_flow edge. Compare the source step's result structure with the consuming step's actual arguments from the trace.
+
+For example: extract_content returns \`links: [{text, href}]\` but capture tool expects \`pages: [{url, screenshot_path, wait_ms, full_page}]\`.
+Add a transform with:
+- \`field_map\`: maps target keys → source keys (e.g., \`{"url": "href"}\`). Use null for keys not in the source.
+- \`defaults\`: static values to inject (e.g., \`{"wait_ms": 3000, "full_page": true}\`)
+- \`derivations\`: for computed keys (null in field_map), how to derive them from source data
+  - strategy: "slugify" (lowercase, replace spaces/special with hyphens), "prefix", "template"
+  - source_key: which source field to derive from
+  - prefix/suffix/template: string manipulation params
+
+Example edge with transform:
+\`\`\`
+{
+  "from_step": 1, "from_field": "links", "to_step": 2, "to_field": "pages",
+  "is_session_wire": false,
+  "transform": {
+    "field_map": { "url": "href", "screenshot_path": null },
+    "defaults": { "wait_ms": 3000, "full_page": true },
+    "derivations": {
+      "screenshot_path": {
+        "source_key": "href",
+        "strategy": "slugify",
+        "prefix": "screenshots/",
+        "suffix": ".png"
+      }
+    }
+  }
+}
+\`\`\`
+
+IMPORTANT: Check EVERY array-typed data_flow edge. Compare the source step's result item keys with the consuming step's argument item keys. If they differ, add a transform. Look at the actual tool_arguments in the execution trace to determine the correct field_map, defaults, and derivations.
+
 ### Input Classification
-- **dynamic**: Values callers MUST provide: URLs, credentials, paths, queries, search terms
+- **dynamic**: Values callers MUST provide: URLs, credentials, file paths, queries, search terms
 - **fixed**: Implementation details with sensible defaults: selectors, timeouts, boolean flags
 
 Flatten nested objects containing dynamic values. E.g., \`login: {url, username, password}\` → separate \`login_url\`, \`username\`, \`password\` fields.
 
-Don't hardcode execution-specific arrays. Arrays of items (18 URLs, list of pages) should be dynamic.
+**Arrays that were DISCOVERED at runtime (by a prior step) are NOT inputs.** They flow between steps via data_flow edges. Only make an array a trigger input if the user explicitly provided it in their prompt. If the array was produced by a discovery step (extract_content, query, list), keep the discovery step as core and wire its output to the consuming step.
+
+### Data Flow Wiring Precision
+- **Only wire inputs that semantically match.** A directory name (e.g., \`screenshot_dir = "screenshots"\`) must NOT be wired to a file path argument (e.g., \`screenshot_path\` which expects \`"screenshots/home.png"\`). If a tool argument needs a specific file path but the trigger only provides a directory, leave that argument unwired — the stored tool_arguments default will provide the correct value.
+- **Trigger inputs should map to the EXACT tool argument they represent.** Don't reuse a trigger input for a different-purpose argument just because the names are vaguely related.
+- **When in doubt, don't wire.** An unwired argument falls back to the stored tool_arguments default from the original execution — this is always correct. An incorrectly wired argument overrides the correct default with a wrong value.
 
 ### Session Fields and Threading Rules
 List all fields that represent session tokens/handles that must flow through the DAG (e.g., page_id, _handle, session_id).
@@ -323,13 +432,37 @@ function parsePlan(raw: string, stepCount: number): EnhancedCompilationPlan {
   }));
 
   // Parse data flow
-  const dataFlow: DataFlowEdge[] = (parsed.data_flow || []).map((df: any) => ({
-    fromStep: df.from_step === 'trigger' ? 'trigger' : (typeof df.from_step === 'number' ? df.from_step : 0),
-    fromField: df.from_field || '',
-    toStep: typeof df.to_step === 'number' ? df.to_step : 0,
-    toField: df.to_field || '',
-    isSessionWire: !!df.is_session_wire,
-  }));
+  const dataFlow: DataFlowEdge[] = (parsed.data_flow || []).map((df: any) => {
+    const edge: DataFlowEdge = {
+      fromStep: df.from_step === 'trigger' ? 'trigger' : (typeof df.from_step === 'number' ? df.from_step : 0),
+      fromField: df.from_field || '',
+      toStep: typeof df.to_step === 'number' ? df.to_step : 0,
+      toField: df.to_field || '',
+      isSessionWire: !!df.is_session_wire,
+    };
+    // Parse transform spec if present — normalize snake_case from LLM to camelCase
+    if (df.transform && typeof df.transform === 'object') {
+      const rawDerivations = df.transform.derivations as Record<string, any> | undefined;
+      const derivations = rawDerivations
+        ? Object.fromEntries(
+            Object.entries(rawDerivations).map(([k, v]) => [k, {
+              sourceKey: v.source_key || v.sourceKey || '',
+              strategy: v.strategy || 'passthrough',
+              ...(v.prefix ? { prefix: v.prefix } : {}),
+              ...(v.suffix ? { suffix: v.suffix } : {}),
+              ...(v.template ? { template: v.template } : {}),
+            }]),
+          )
+        : undefined;
+      edge.transform = {
+        fieldMap: df.transform.field_map && typeof df.transform.field_map === 'object'
+          ? df.transform.field_map : {},
+        ...(df.transform.defaults ? { defaults: df.transform.defaults } : {}),
+        ...(derivations ? { derivations } : {}),
+      };
+    }
+    return edge;
+  });
 
   // Parse inputs
   const inputs = (parsed.inputs || []).map((inp: any) => ({
@@ -391,6 +524,43 @@ export async function compile(ctx: PipelineContext): Promise<PipelineContext> {
 }
 
 /**
+ * Gather the full tool inventory for MCP servers used in the execution trace.
+ * This lets the compile LLM substitute simpler tools for iterations.
+ */
+async function gatherServerToolInventory(
+  steps: ExtractedStep[],
+): Promise<string> {
+  const serverIds = new Set<string>();
+  for (const step of steps) {
+    if (step.mcpServerId) serverIds.add(step.mcpServerId);
+  }
+  if (serverIds.size === 0) return '';
+
+  try {
+    const mcpDbService = await import('../../mcp/db');
+    const { servers } = await mcpDbService.listMcpServers({ limit: 100 });
+    const relevant = servers.filter((s: any) => serverIds.has(s.name));
+
+    const lines: string[] = [];
+    for (const server of relevant) {
+      const tools = (server.tool_manifest || []).map((t: any) => {
+        const params = t.inputSchema?.properties
+          ? Object.entries(t.inputSchema.properties as Record<string, any>)
+              .map(([k, v]: [string, any]) => `${k}: ${v.type || '?'}`)
+              .join(', ')
+          : '';
+        return `    - ${t.name}(${params}): ${(t.description || '').slice(0, 120)}`;
+      });
+      lines.push(`  ${server.name}:`);
+      lines.push(...tools);
+    }
+    return lines.join('\n');
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Call the LLM to produce an EnhancedCompilationPlan.
  * Returns null if the LLM is unavailable or the call fails.
  */
@@ -403,6 +573,7 @@ async function callCompilationLLM(
   if (!hasLLMApiKey(LLM_MODEL_PRIMARY)) return null;
 
   const summaries = summarizeSteps(steps);
+  const toolInventory = await gatherServerToolInventory(steps);
 
   const naiveClassification = naiveInputs.map(f => ({
     key: f.key,
@@ -427,6 +598,12 @@ async function callCompilationLLM(
     ] : []),
     `## Naive Input Classification`,
     JSON.stringify(naiveClassification, null, 2),
+    ``,
+    ...(toolInventory ? [
+      `## Available Tools (full inventory from servers used in this execution)`,
+      `Use these to substitute simpler tools for iterations when the executed tool is too complex.`,
+      toolInventory,
+    ] : []),
   ].join('\n');
 
   try {

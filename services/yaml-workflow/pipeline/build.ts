@@ -256,7 +256,12 @@ function wireStepInputs(
       : stepIdx;
     const edgesForStep = plan.dataFlow.filter(e => e.toStep === collapsedIdx);
     for (const edge of edgesForStep) {
-      if (edge.fromStep === 'trigger') {
+      if (edge.transform && Object.keys(edge.transform.fieldMap).length > 0) {
+        // This edge has a transform — the reshape activity was inserted before this step.
+        // Wire from the transform activity's output (which uses toField as the output key).
+        const transformActId = `${prefix}_xf${stepIdx + 1}`;
+        inputMappings[edge.toField] = `{${transformActId}.output.data.${edge.toField}}`;
+      } else if (edge.fromStep === 'trigger') {
         inputMappings[edge.toField] = `{${triggerId}.output.data.${edge.fromField}}`;
       } else {
         // Remap the source step from collapsed to core index
@@ -672,6 +677,70 @@ export async function build(ctx: PipelineContext): Promise<PipelineContext> {
     const title = step.kind === 'llm'
       ? 'LLM Interpret'
       : step.toolName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+    // ── Check for transform edges targeting this step ──
+    // If a data flow edge has a transform, insert a reshape activity before this step.
+    if (plan) {
+      const collapsedIdx = collapsedToCoreIndex?.size
+        ? [...collapsedToCoreIndex.entries()].find(([_, core]) => core === idx)?.[0] ?? idx
+        : idx;
+      const transformEdges = plan.dataFlow.filter(
+        e => e.toStep === collapsedIdx && e.transform && Object.keys(e.transform.fieldMap).length > 0,
+      );
+
+      for (const edge of transformEdges) {
+        const transformId = `${prefix}_xf${idx + 1}`;
+        const transformTopic = `${graphTopic}.reshape_${edge.toField}`;
+
+        // Wire transform input: source field from prior step + all trigger inputs
+        // (trigger inputs needed for dynamic derivation prefixes like screenshot_dir)
+        const transformInputMaps: Record<string, string> = {};
+        for (const triggerKey of triggerInputKeys) {
+          transformInputMaps[triggerKey] = `{${triggerId}.output.data.${triggerKey}}`;
+        }
+        if (edge.fromStep === 'trigger') {
+          transformInputMaps[edge.fromField] = `{${triggerId}.output.data.${edge.fromField}}`;
+        } else {
+          const remappedFrom = collapsedToCoreIndex?.get(edge.fromStep as number) ?? edge.fromStep;
+          const sourceActId = stepIndexToActivityId.get(remappedFrom as number);
+          if (sourceActId) {
+            transformInputMaps[edge.fromField] = `{${sourceActId}.output.data.${edge.fromField}}`;
+          }
+        }
+
+        activities[transformId] = {
+          title: `Reshape ${humanize(edge.toField)}`,
+          type: 'worker',
+          topic: transformTopic,
+          input: {
+            schema: { type: 'object' },
+            maps: transformInputMaps,
+          },
+          output: { schema: { type: 'object' } },
+        };
+
+        activityManifest.push({
+          activity_id: transformId,
+          title: `Reshape ${humanize(edge.toField)}`,
+          type: 'worker',
+          tool_source: 'transform',
+          topic: transformTopic,
+          input_mappings: transformInputMaps,
+          output_fields: [edge.toField],
+          transform_spec: {
+            sourceField: edge.fromField,
+            targetField: edge.toField,
+            fieldMap: edge.transform!.fieldMap,
+            defaults: edge.transform!.defaults,
+            derivations: edge.transform!.derivations,
+          },
+        });
+
+        // Transition from previous → transform
+        transitions[prevActivityId] = [{ to: transformId }];
+        prevActivityId = transformId;
+      }
+    }
 
     // Build input maps
     const inputMappings = wireStepInputs(

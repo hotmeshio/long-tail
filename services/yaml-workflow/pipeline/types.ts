@@ -62,6 +62,25 @@ export interface DataFlowEdge {
   toField: string;
   /** Whether this is a session/handle wire (page_id, _handle). */
   isSessionWire: boolean;
+  /**
+   * Transform spec when source format doesn't match target format.
+   * When present, the build stage inserts a reshape activity between
+   * the source and consuming step to apply field renames and defaults.
+   */
+  transform?: {
+    /** Per-field mapping: target key → source key. null = computed/not in source. */
+    fieldMap: Record<string, string | null>;
+    /** Static defaults to inject into each reshaped item. */
+    defaults?: Record<string, unknown>;
+    /** For computed fields (null in fieldMap): derivation hint. */
+    derivations?: Record<string, {
+      sourceKey: string;
+      strategy: 'slugify' | 'prefix' | 'template' | 'passthrough';
+      prefix?: string;
+      suffix?: string;
+      template?: string;
+    }>;
+  };
 }
 
 /** Per-step semantic annotation from the LLM. */

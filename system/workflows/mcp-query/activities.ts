@@ -4,6 +4,8 @@ import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
+import { WORKFLOW_MATCH_PROMPT, EXTRACT_INPUTS_PROMPT } from './prompts';
+import { generateStrategySection, type ServerInfo } from './strategy-advisors';
 
 // ── Tool caches (module-level, persist across proxy activity calls) ──
 
@@ -108,21 +110,6 @@ export async function findCompiledWorkflows(
   return { inventory: inventoryLines.join('\n'), toolIds, candidates };
 }
 
-const WORKFLOW_MATCH_PROMPT = `You are a workflow matching evaluator. Given a user request and a list of compiled workflows, determine if any workflow can fulfill the request.
-
-Evaluate each candidate. A workflow matches if it can fulfill the user's request with the inputs they would provide. Consider:
-- Does the workflow's purpose (description, original prompt) align with the user's intent?
-- Can the user's request be mapped to the workflow's input schema?
-- Are the tools used by the workflow appropriate for this task?
-
-Respond with ONLY a JSON object:
-{
-  "match": true or false,
-  "workflow_name": "name-of-best-match" or null,
-  "confidence": 0.0 to 1.0,
-  "reasoning": "Brief explanation"
-}`;
-
 /**
  * Phase 2: LLM-as-judge evaluates whether any discovered workflow
  * matches the user's intent. One cheap call (mini model, ~200 tokens)
@@ -168,6 +155,48 @@ export async function evaluateWorkflowMatch(
 }
 
 /**
+ * Phase 2b: Extract structured inputs from the user's prompt using the
+ * matched workflow's input_schema. Acts as a second confirmation gate —
+ * if the LLM can't map the prompt to the schema, the match is rejected.
+ */
+export async function extractWorkflowInputs(
+  prompt: string,
+  inputSchema: Record<string, unknown>,
+  workflowName: string,
+): Promise<{ inputs: Record<string, any> | null; extracted: boolean }> {
+  try {
+    const response = await callLLMService({
+      model: LLM_MODEL_SECONDARY,
+      max_tokens: 500,
+      messages: [
+        { role: 'system', content: EXTRACT_INPUTS_PROMPT },
+        {
+          role: 'user',
+          content:
+            `## User Request\n${prompt}\n\n` +
+            `## Workflow: ${workflowName}\n` +
+            `## Input Schema\n${JSON.stringify(inputSchema, null, 2)}`,
+        },
+      ],
+    });
+
+    const raw = response.content || '{}';
+    const cleaned = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
+    const result = JSON.parse(cleaned);
+
+    if (result._extraction_failed) {
+      return { inputs: null, extracted: false };
+    }
+
+    // Remove the meta field before passing to the workflow
+    delete result._extraction_failed;
+    return { inputs: result, extracted: true };
+  } catch {
+    return { inputs: null, extracted: false };
+  }
+}
+
+/**
  * Single activity that discovers, caches, and returns lightweight tool data.
  *
  * Full ChatCompletionTool definitions are cached in module-level toolDefCache
@@ -178,7 +207,7 @@ export async function evaluateWorkflowMatch(
  */
 export async function loadTools(
   tags?: string[],
-): Promise<{ toolIds: string[]; inventory: string }> {
+): Promise<{ toolIds: string[]; inventory: string; strategy: string }> {
   let servers;
   if (tags?.length) {
     servers = await mcpDbService.findServersByTags(tags, 'any');
@@ -189,6 +218,7 @@ export async function loadTools(
 
   const toolIds: string[] = [];
   const inventoryLines: string[] = [];
+  const serverInfos: ServerInfo[] = [];
 
   for (const server of servers) {
     const manifest = server.tool_manifest || [];
@@ -214,9 +244,21 @@ export async function loadTools(
     inventoryLines.push(
       `• ${server.name} [${serverTags}] (${manifest.length} tools): ${toolNames.join(', ')}`,
     );
+
+    serverInfos.push({
+      name: server.name,
+      description: server.description || null,
+      tags: (server as any).tags || [],
+      metadata: server.metadata || null,
+      toolNames,
+      toolCount: manifest.length,
+      slug,
+    });
   }
 
-  return { toolIds, inventory: inventoryLines.join('\n') };
+  const strategy = generateStrategySection(serverInfos);
+
+  return { toolIds, inventory: inventoryLines.join('\n'), strategy };
 }
 
 /**

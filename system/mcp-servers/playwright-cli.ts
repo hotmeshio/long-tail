@@ -172,10 +172,14 @@ function registerTools(srv: McpServer): void {
           await page.waitForTimeout(2000);
         }
 
-        // Optional screenshot
+        // Optional screenshot — handle directory-only paths gracefully
         let screenshot;
         if (args.screenshot_path) {
-          screenshot = await saveScreenshot(page, args.screenshot_path, args.full_page ?? true);
+          let screenshotPath = args.screenshot_path;
+          if (!path.extname(screenshotPath)) {
+            screenshotPath = screenshotPath.replace(/\/$/, '') + '/home.png';
+          }
+          screenshot = await saveScreenshot(page, screenshotPath, args.full_page ?? true);
         }
 
         return {
@@ -192,6 +196,7 @@ function registerTools(srv: McpServer): void {
           }],
         };
       } catch (err: any) {
+        loggerRegistry.error(`[lt-mcp:playwright-cli] login_and_capture error: ${err.message}`);
         return errorResult(err.message, err.name === 'TimeoutError' ? 'TIMEOUT' : 'LOGIN_FAILED');
       }
     },
@@ -214,8 +219,18 @@ function registerTools(srv: McpServer): void {
         let pageId: string;
 
         if (args.page_id && pages.has(args.page_id)) {
-          page = pages.get(args.page_id)!;
-          pageId = args.page_id;
+          const existingPage = pages.get(args.page_id)!;
+          try {
+            await existingPage.evaluate('1');
+            page = existingPage;
+            pageId = args.page_id;
+          } catch {
+            pages.delete(args.page_id);
+            const b = await ensureBrowser();
+            page = await b.newPage();
+            pageId = allocatePageId();
+            pages.set(pageId, page);
+          }
         } else {
           const b = await ensureBrowser();
           page = await b.newPage();
@@ -370,9 +385,26 @@ function registerTools(srv: McpServer): void {
 
         if (args.page_id && pages.has(args.page_id)) {
           // Reuse existing page (e.g., from login_and_capture)
-          page = pages.get(args.page_id)!;
-          pageId = args.page_id;
-          if (args.url) {
+          const existingPage = pages.get(args.page_id)!;
+          // Verify page is still usable (not closed)
+          try {
+            await existingPage.evaluate('1');
+            page = existingPage;
+            pageId = args.page_id;
+            if (args.url) {
+              await page.goto(args.url, { waitUntil: 'load', timeout: args.timeout ?? 30_000 });
+            }
+          } catch {
+            // Page is stale/closed — clean it up and fall through to create new page
+            pages.delete(args.page_id);
+            loggerRegistry.info(`[lt-mcp:playwright-cli] extract_content: page_id ${args.page_id} is stale, creating fresh page`);
+            if (!args.url) {
+              return errorResult('page_id is stale and no url provided as fallback', 'STALE_PAGE');
+            }
+            const b = await ensureBrowser();
+            page = await b.newPage();
+            pageId = allocatePageId();
+            pages.set(pageId, page);
             await page.goto(args.url, { waitUntil: 'load', timeout: args.timeout ?? 30_000 });
           }
         } else {
@@ -489,10 +521,14 @@ function registerTools(srv: McpServer): void {
           await page.waitForTimeout(2000);
         }
 
-        // Optional screenshot
+        // Optional screenshot — handle directory-only paths gracefully
         let screenshot;
         if (args.screenshot_path) {
-          screenshot = await saveScreenshot(page, args.screenshot_path, args.full_page ?? true);
+          let screenshotPath = args.screenshot_path;
+          if (!path.extname(screenshotPath)) {
+            screenshotPath = screenshotPath.replace(/\/$/, '') + '/result.png';
+          }
+          screenshot = await saveScreenshot(page, screenshotPath, args.full_page ?? true);
         }
 
         return {
@@ -508,6 +544,7 @@ function registerTools(srv: McpServer): void {
           }],
         };
       } catch (err: any) {
+        loggerRegistry.error(`[lt-mcp:playwright-cli] submit_form error: ${err.message}`);
         return errorResult(err.message, err.name === 'TimeoutError' ? 'TIMEOUT' : 'SUBMIT_FAILED');
       }
     },

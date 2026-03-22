@@ -10,6 +10,7 @@ type ActivitiesType = typeof activities;
 const {
   findCompiledWorkflows,
   evaluateWorkflowMatch,
+  extractWorkflowInputs,
   loadTools,
   callMcpTool,
   callQueryLLM,
@@ -58,29 +59,39 @@ export async function mcpQuery(
   const compiled = await findCompiledWorkflows(prompt);
 
   // 2. Phase 2: LLM-as-judge — one cheap call to evaluate candidates.
-  //    If a compiled workflow matches with high confidence, skip the agentic loop entirely.
+  //    If a compiled workflow matches with high confidence, extract inputs and invoke.
   if (compiled.candidates.length > 0) {
     const match = await evaluateWorkflowMatch(prompt, compiled.candidates);
 
     if (match.matched && match.workflowName) {
-      const qualifiedName = `yaml__${match.workflowName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const result = await callMcpTool(qualifiedName, envelope.data || {});
+      // Phase 2b: Extract structured inputs from the prompt using the workflow's input_schema.
+      // This serves as a second confirmation — if inputs can't be mapped, fall through to dynamic.
+      const candidate = compiled.candidates.find((c) => c.name === match.workflowName);
+      const inputSchema = candidate?.input_schema || { type: 'object', properties: {} };
 
-      return {
-        type: 'return',
-        data: {
-          title: `Executed: ${match.workflowName}`,
-          summary: `Matched compiled workflow with ${(match.confidence * 100).toFixed(0)}% confidence. Executed deterministically — no LLM agentic loop needed.`,
-          result,
-          tool_calls_made: 1,
-          discovery: { method: 'compiled-workflow', confidence: match.confidence, workflowName: match.workflowName },
-        },
-        milestones: [
-          { name: 'mcp_query', value: 'completed' },
-          { name: 'discovery', value: 'compiled_match' },
-          { name: 'confidence', value: String(match.confidence) },
-        ],
-      };
+      const extraction = await extractWorkflowInputs(prompt, inputSchema, match.workflowName);
+
+      if (extraction.extracted && extraction.inputs) {
+        const qualifiedName = `yaml__${match.workflowName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const result = await callMcpTool(qualifiedName, extraction.inputs);
+
+        return {
+          type: 'return',
+          data: {
+            title: `Executed: ${match.workflowName}`,
+            summary: `Matched compiled workflow with ${(match.confidence * 100).toFixed(0)}% confidence. Inputs extracted from prompt and passed to deterministic execution.`,
+            result,
+            tool_calls_made: 1,
+            discovery: { method: 'compiled-workflow', confidence: match.confidence, workflowName: match.workflowName },
+          },
+          milestones: [
+            { name: 'mcp_query', value: 'completed' },
+            { name: 'discovery', value: 'compiled_match' },
+            { name: 'confidence', value: String(match.confidence) },
+          ],
+        };
+      }
+      // Input extraction failed — fall through to dynamic execution
     }
   }
 
@@ -90,8 +101,14 @@ export async function mcpQuery(
   // Merge tool IDs: compiled workflows first (preferred), then raw MCP tools
   const toolIds = [...compiled.toolIds, ...raw.toolIds];
 
-  // Build system prompt with compiled workflows highlighted
+  // Build system prompt: strategy FIRST (so LLM reads it before seeing tools), then inventory
   let serverSection = '';
+
+  // Strategy section first — concrete tool-selection rules from the actual inventory
+  if (raw.strategy) {
+    serverSection += `${raw.strategy}\n\n`;
+  }
+
   if (compiled.inventory) {
     serverSection += `## Compiled Workflows (PREFERRED — deterministic, fast)\n\n${compiled.inventory}\n\n`;
     serverSection += `## MCP Servers (use if no compiled workflow matches)\n\n${raw.inventory}`;
