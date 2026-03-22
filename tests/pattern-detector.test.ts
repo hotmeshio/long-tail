@@ -111,10 +111,24 @@ describe('pattern-detector (tool-agnostic)', () => {
       expect(iter.arraySource.field).toBe('args.pages');
     });
 
-    it('should collapse 2 consecutive calls to the same tool', () => {
+    it('should NOT collapse 2 consecutive calls (requires 3+)', () => {
       const steps = [
         makeStep('fetch', { url: '/a' }),
         makeStep('fetch', { url: '/b' }),
+      ];
+
+      const collapsed = collapseIterationPatterns(steps);
+      // 2 calls is below the minLength=3 threshold — should NOT collapse
+      expect(collapsed).toHaveLength(2);
+      expect(collapsed[0].toolName).toBe('fetch');
+      expect(collapsed[1].toolName).toBe('fetch');
+    });
+
+    it('should collapse 3 consecutive calls to the same tool', () => {
+      const steps = [
+        makeStep('fetch', { url: '/a' }),
+        makeStep('fetch', { url: '/b' }),
+        makeStep('fetch', { url: '/c' }),
       ];
 
       const collapsed = collapseIterationPatterns(steps);
@@ -123,7 +137,7 @@ describe('pattern-detector (tool-agnostic)', () => {
 
       const iter = collapsed[0].arguments._iteration as any;
       expect(iter.tool).toBe('fetch');
-      expect(iter.count).toBe(2);
+      expect(iter.count).toBe(3);
       expect(iter.varyingKeys).toEqual(['url']);
     });
 
