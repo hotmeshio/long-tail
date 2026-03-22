@@ -8,6 +8,7 @@ import * as userService from '../services/user';
 import { requireAdmin } from '../modules/auth';
 import { ltConfig } from '../modules/ltconfig';
 import { cronRegistry } from '../services/cron';
+import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { resolveHandle } from './resolve';
 import type { LTEnvelope } from '../types';
 
@@ -199,7 +200,7 @@ router.post('/:type/invoke', async (req, res) => {
       taskQueue: wfConfig.task_queue,
       workflowName: workflowType,
       workflowId,
-      expire: 86_400,
+      expire: JOB_EXPIRE_SECS,
       entity: workflowType,
     } as any);
 

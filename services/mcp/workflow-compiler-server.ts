@@ -83,6 +83,7 @@ export async function createWorkflowCompilerServer(options?: {
         activity_manifest: result.activityManifest,
         source_workflow_id: args.workflow_id,
         source_workflow_type: args.workflow_name,
+        metadata: { input_field_meta: result.inputFieldMeta },
       });
 
       return {
@@ -93,7 +94,16 @@ export async function createWorkflowCompilerServer(options?: {
             app_id: record.app_id,
             activity_count: result.activityManifest.filter((a) => a.type === 'worker').length,
             input_schema: result.inputSchema,
+            input_field_meta: result.inputFieldMeta,
             yaml_preview: result.yaml.slice(0, 500),
+            ...(result.compilationPlan ? {
+              compilation: {
+                intent: result.compilationPlan.intent,
+                core_steps: result.compilationPlan.coreStepIndices.length,
+                has_iteration: result.compilationPlan.hasIteration,
+                llm_refined: true,
+              },
+            } : { compilation: { llm_refined: false } }),
           }),
         }],
       };

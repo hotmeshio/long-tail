@@ -6,6 +6,7 @@ import * as userService from '../services/user';
 import * as roleService from '../services/role';
 import { escalationStrategyRegistry } from '../services/escalation-strategy';
 import { createClient, LT_TASK_QUEUE } from '../workers';
+import { JOB_EXPIRE_SECS } from '../modules/defaults';
 
 const router = Router();
 
@@ -392,7 +393,7 @@ router.post('/bulk-triage', async (req, res) => {
         args: [triageEnvelope],
         taskQueue: 'long-tail-system',
         workflowId: triageWorkflowId,
-        expire: 300,
+        expire: JOB_EXPIRE_SECS,
         entity: 'mcpTriage',
       } as any);
 
@@ -641,7 +642,7 @@ router.post('/:id/resolve', async (req, res) => {
           args: [directive.triageEnvelope],
           taskQueue: 'long-tail-system',
           workflowId: triageWorkflowId,
-          expire: 300,
+          expire: JOB_EXPIRE_SECS,
           entity: 'mcpTriage',
         } as any);
 

@@ -80,6 +80,7 @@ router.post('/', async (req, res) => {
       tags: mergedTags,
       source_workflow_id: workflow_id,
       source_workflow_type: workflow_name,
+      metadata: { input_field_meta: result.inputFieldMeta },
     });
 
     res.status(201).json(record);
@@ -194,6 +195,7 @@ router.post('/:id/regenerate', async (req, res) => {
       output_schema: result.outputSchema,
       activity_manifest: result.activityManifest,
       tags: result.tags,
+      metadata: { input_field_meta: result.inputFieldMeta },
     });
 
     res.json(updated);

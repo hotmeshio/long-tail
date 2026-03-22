@@ -168,7 +168,12 @@ router.get('/:workflowId/execution', async (req, res) => {
 
     res.json(execution);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const status = err.status === 404 || err.message?.includes('Not Found') ? 404 : 500;
+    res.status(status).json({
+      error: status === 404
+        ? 'Workflow data is no longer available (job may have expired)'
+        : err.message,
+    });
   }
 });
 
@@ -190,7 +195,12 @@ router.get('/:workflowId/status', async (req, res) => {
 
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const status = err.status === 404 || err.message?.includes('Not Found') ? 404 : 500;
+    res.status(status).json({
+      error: status === 404
+        ? 'Workflow data is no longer available (job may have expired)'
+        : err.message,
+    });
   }
 });
 
@@ -211,7 +221,12 @@ router.get('/:workflowId/state', async (req, res) => {
 
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const status = err.status === 404 || err.message?.includes('Not Found') ? 404 : 500;
+    res.status(status).json({
+      error: status === 404
+        ? 'Workflow data is no longer available (job may have expired)'
+        : err.message,
+    });
   }
 });
 

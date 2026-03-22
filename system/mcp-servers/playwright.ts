@@ -10,7 +10,7 @@ import { loggerRegistry } from '../../services/logger';
 // so files are visible to list_files / read_file tools and served via GET /api/files/*.
 const FILE_STORAGE_DIR = process.env.LT_FILE_STORAGE_DIR || './data/files';
 
-function resolveToStorage(filePath: string): string {
+export function resolveToStorage(filePath: string): string {
   // Strip leading slash to make it relative, then resolve against storage dir
   const relative = filePath.replace(/^\/+/, '');
   const resolved = path.resolve(FILE_STORAGE_DIR, relative);
@@ -26,10 +26,15 @@ function resolveToStorage(filePath: string): string {
 // Lazy-launched on first use, cleaned up via stopPlaywrightServer().
 
 let browser: Browser | null = null;
-const pages = new Map<string, Page>();
+export const pages = new Map<string, Page>();
 let pageCounter = 0;
 
-async function ensureBrowser(): Promise<Browser> {
+/** Allocate a unique page ID (shared across both playwright servers). */
+export function allocatePageId(): string {
+  return `page_${++pageCounter}`;
+}
+
+export async function ensureBrowser(): Promise<Browser> {
   if (!browser || !browser.isConnected()) {
     browser = await chromium.launch({ headless: true });
     loggerRegistry.info('[lt-mcp:playwright] browser launched');
@@ -66,7 +71,7 @@ const SESSION_NOT_FOUND = 'SESSION_NOT_FOUND';
 const SESSION_UNREACHABLE = 'SESSION_UNREACHABLE';
 const RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND';
 
-interface PlaywrightHandle {
+export interface PlaywrightHandle {
   type: 'playwright_page';
   cdp_endpoint?: string;
   page_id: string;
@@ -79,7 +84,7 @@ const remoteBrowsers = new Map<string, Browser>();
  * Resolve a page from either a local `page_id`, a `_handle`, or "most recent".
  * Handles cross-container reconnection via CDP when needed.
  */
-async function resolvePage(args: { page_id?: string; _handle?: PlaywrightHandle }): Promise<{ page: Page; pageId: string }> {
+export async function resolvePage(args: { page_id?: string; _handle?: PlaywrightHandle }): Promise<{ page: Page; pageId: string }> {
   // 1. Try local pages Map (fast path — same container)
   const localId = args._handle?.page_id || args.page_id;
   if (localId) {
@@ -142,7 +147,7 @@ async function resolvePage(args: { page_id?: string; _handle?: PlaywrightHandle 
  * Build a _handle for a page. Includes CDP endpoint when available
  * (for cross-container access in distributed deployments).
  */
-function buildHandle(pageId: string): PlaywrightHandle {
+export function buildHandle(pageId: string): PlaywrightHandle {
   const handle: PlaywrightHandle = {
     type: 'playwright_page',
     page_id: pageId,
@@ -169,6 +174,9 @@ const handleProp = z.object({
 }).optional().describe('Resource handle from a prior Playwright tool call. Enables cross-activity page access.');
 
 const navigateSchema = z.object({
+  _handle: handleProp,
+  page_id: z.string().optional()
+    .describe('Reuse an existing page to preserve session (cookies, auth). If omitted, opens a new page.'),
   url: z.string().describe('URL to navigate to'),
   wait_until: z.enum(['load', 'domcontentloaded', 'networkidle']).optional()
     .describe('When to consider navigation complete (default: load)'),
@@ -177,11 +185,11 @@ const navigateSchema = z.object({
 const screenshotSchema = z.object({
   _handle: handleProp,
   url: z.string().optional()
-    .describe('URL to navigate to before screenshotting. Self-contained — no prior navigate needed.'),
+    .describe('URL to navigate to before screenshotting. When used WITH page_id, navigates the existing page (preserving session). Without page_id, opens a new page.'),
   wait_until: z.enum(['load', 'domcontentloaded', 'networkidle']).optional()
     .describe('When to consider navigation complete — only used with url (default: load)'),
   page_id: z.string().optional()
-    .describe('Page to screenshot (default: most recent). Ignored if url is provided.'),
+    .describe('Page to screenshot (default: most recent). When combined with url, navigates that page first (preserving session/cookies).'),
   path: z.string()
     .describe('File path to save the screenshot PNG'),
   full_page: z.boolean().optional()
@@ -259,14 +267,32 @@ function registerTools(srv: McpServer): void {
     'navigate',
     {
       title: 'Navigate to URL',
-      description: 'Open a URL in a new browser page. Returns a _handle for cross-activity page access.',
+      description:
+        'Navigate to a URL. Pass page_id or _handle to reuse an existing page (preserving session/cookies). ' +
+        'Without page_id, opens a NEW page — no cookies from prior pages. ' +
+        'IMPORTANT: After login, always pass the page_id to maintain the authenticated session.',
       inputSchema: navigateSchema,
     },
     async (args: z.infer<typeof navigateSchema>) => {
-      const b = await ensureBrowser();
-      const page = await b.newPage();
-      const id = `page_${++pageCounter}`;
-      pages.set(id, page);
+      let page: Page;
+      let id: string;
+
+      // Reuse existing page if page_id or _handle provided (preserves session/cookies)
+      if (args.page_id || args._handle) {
+        try {
+          ({ page, pageId: id } = await resolvePage(args));
+        } catch (err: any) {
+          if (err.code) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: err.message, code: err.code }) }], isError: true };
+          }
+          throw err;
+        }
+      } else {
+        const b = await ensureBrowser();
+        page = await b.newPage();
+        id = `page_${++pageCounter}`;
+        pages.set(id, page);
+      }
 
       await page.goto(args.url, {
         waitUntil: args.wait_until || 'load',
@@ -294,16 +320,31 @@ function registerTools(srv: McpServer): void {
     {
       title: 'Take Screenshot',
       description:
-        'Capture a screenshot and save as PNG. Accepts _handle from a prior navigate ' +
-        'for cross-activity access, or pass `url` for self-contained navigate+screenshot.',
+        'Capture a screenshot and save as PNG. Accepts _handle or page_id from a prior tool call ' +
+        'for cross-activity access. Pass `url` for self-contained navigate+screenshot. ' +
+        'When both url and page_id are provided, navigates the EXISTING page (preserving session).',
       inputSchema: screenshotSchema,
     },
     async (args: z.infer<typeof screenshotSchema>) => {
       let page: Page;
       let pageId: string;
 
-      if (args.url) {
-        // Self-contained mode: navigate + screenshot in one call
+      if (args.url && (args.page_id || args._handle)) {
+        // Navigate existing page to URL (preserves session/cookies), then screenshot
+        try {
+          ({ page, pageId } = await resolvePage(args));
+          await page.goto(args.url, {
+            waitUntil: args.wait_until || 'load',
+            timeout: 30_000,
+          });
+        } catch (err: any) {
+          if (err.code) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: err.message, code: err.code }) }], isError: true };
+          }
+          throw err;
+        }
+      } else if (args.url) {
+        // Self-contained mode: new page + navigate + screenshot (no session)
         const b = await ensureBrowser();
         page = await b.newPage();
         pageId = `page_${++pageCounter}`;

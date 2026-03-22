@@ -2,6 +2,7 @@ import { Virtual, Durable } from '@hotmeshio/hotmesh';
 import { Client as Postgres } from 'pg';
 
 import { postgres_options } from '../../modules/config';
+import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import * as configService from '../config';
 import type { LTWorkflowConfig } from '../../types';
@@ -80,7 +81,7 @@ class LTCronRegistry {
             taskQueue,
             workflowName: workflowType,
             workflowId,
-            expire: 86_400,
+            expire: JOB_EXPIRE_SECS,
             entity: workflowType,
           } as any);
         } catch (err: any) {

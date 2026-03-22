@@ -257,6 +257,7 @@ CREATE TABLE IF NOT EXISTS lt_yaml_workflows (
   content_version          INTEGER NOT NULL DEFAULT 1,
   deployed_content_version INTEGER,
   tags                     TEXT[] NOT NULL DEFAULT '{}',
+  input_field_meta         JSONB NOT NULL DEFAULT '[]'::JSONB,
   metadata                 JSONB,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -280,6 +281,7 @@ CREATE TABLE IF NOT EXISTS lt_yaml_workflow_versions (
   activity_manifest JSONB NOT NULL DEFAULT '[]'::JSONB,
   input_schema      JSONB NOT NULL DEFAULT '{}'::JSONB,
   output_schema     JSONB NOT NULL DEFAULT '{}'::JSONB,
+  input_field_meta  JSONB NOT NULL DEFAULT '[]'::JSONB,
   change_summary    TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workflow_id, version)

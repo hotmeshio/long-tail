@@ -1,6 +1,5 @@
-import OpenAI from 'openai';
-
-import { LLM_MODEL_PRIMARY, LLM_MAX_TOKENS_DEFAULT } from '../../../modules/defaults';
+import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../../services/llm';
+import { LLM_MODEL_PRIMARY, LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_DEFAULT } from '../../../modules/defaults';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
@@ -14,8 +13,8 @@ const toolServerMap = new Map<string, string>();
 /** Tracks which qualified names are compiled YAML workflows (not raw MCP tools) */
 const yamlWorkflowMap = new Map<string, string>();
 
-/** Maps qualified tool name → full ChatCompletionTool definition */
-const toolDefCache = new Map<string, OpenAI.Chat.Completions.ChatCompletionTool>();
+/** Maps qualified tool name → full tool definition */
+const toolDefCache = new Map<string, ToolDefinition>();
 
 /**
  * Search for active compiled YAML workflows that match the user's prompt.
@@ -28,31 +27,48 @@ const toolDefCache = new Map<string, OpenAI.Chat.Completions.ChatCompletionTool>
  * This is Phase 1 of tool discovery — compiled workflows are preferred
  * because they execute deterministically without LLM reasoning overhead.
  */
+/** Candidate workflow returned by ranked discovery. */
+export interface WorkflowCandidate {
+  name: string;
+  description: string | null;
+  original_prompt: string | null;
+  category: string | null;
+  tags: string[];
+  input_schema: Record<string, unknown>;
+  tool_names: string[];
+  fts_rank: number;
+}
+
+/**
+ * Phase 1: Ranked discovery of compiled YAML workflows.
+ *
+ * Uses PostgreSQL full-text search (tsvector) + tag overlap for
+ * multi-signal ranked matching. Returns candidates for the LLM judge.
+ */
 export async function findCompiledWorkflows(
   prompt: string,
 ): Promise<{
   inventory: string;
   toolIds: string[];
+  candidates: WorkflowCandidate[];
 }> {
-  // Extract search keywords from the prompt
+  // Extract keywords for tag-overlap signal
   const keywords = prompt
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length > 2 && !PROMPT_STOP_WORDS.has(w));
 
-  if (keywords.length === 0) {
-    return { inventory: '', toolIds: [] };
-  }
+  // Ranked discovery: FTS + tag overlap
+  const workflows = await yamlDb.discoverWorkflows(prompt, keywords, undefined, 5);
 
-  // Query YAML workflows by tags using GIN index
-  const workflows = await yamlDb.findYamlWorkflowsByTags(keywords, 'any');
   if (workflows.length === 0) {
-    return { inventory: '', toolIds: [] };
+    return { inventory: '', toolIds: [], candidates: [] };
   }
 
   const toolIds: string[] = [];
   const inventoryLines: string[] = [];
+  const candidates: WorkflowCandidate[] = [];
 
   for (const wf of workflows) {
     const qualifiedName = `yaml__${wf.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -70,16 +86,85 @@ export async function findCompiledWorkflows(
 
     toolIds.push(qualifiedName);
 
-    const activityCount = wf.activity_manifest.filter((a) => a.type === 'worker').length;
+    const activityCount = wf.activity_manifest.filter((a: any) => a.type === 'worker').length;
     inventoryLines.push(
       `★ ${wf.name} [compiled, ${activityCount} steps, tags: ${wf.tags.join(', ')}]: ${wf.description || 'deterministic workflow'}`
     );
+
+    candidates.push({
+      name: wf.name,
+      description: wf.description,
+      original_prompt: wf.original_prompt,
+      category: wf.category,
+      tags: wf.tags,
+      input_schema: wf.input_schema,
+      tool_names: wf.activity_manifest
+        .filter((a: any) => a.type === 'worker' && a.mcp_tool_name)
+        .map((a: any) => a.mcp_tool_name),
+      fts_rank: (wf as any).fts_rank || 0,
+    });
   }
 
-  return {
-    inventory: inventoryLines.join('\n'),
-    toolIds,
-  };
+  return { inventory: inventoryLines.join('\n'), toolIds, candidates };
+}
+
+const WORKFLOW_MATCH_PROMPT = `You are a workflow matching evaluator. Given a user request and a list of compiled workflows, determine if any workflow can fulfill the request.
+
+Evaluate each candidate. A workflow matches if it can fulfill the user's request with the inputs they would provide. Consider:
+- Does the workflow's purpose (description, original prompt) align with the user's intent?
+- Can the user's request be mapped to the workflow's input schema?
+- Are the tools used by the workflow appropriate for this task?
+
+Respond with ONLY a JSON object:
+{
+  "match": true or false,
+  "workflow_name": "name-of-best-match" or null,
+  "confidence": 0.0 to 1.0,
+  "reasoning": "Brief explanation"
+}`;
+
+/**
+ * Phase 2: LLM-as-judge evaluates whether any discovered workflow
+ * matches the user's intent. One cheap call (mini model, ~200 tokens)
+ * to potentially skip the entire agentic loop.
+ */
+export async function evaluateWorkflowMatch(
+  prompt: string,
+  candidates: WorkflowCandidate[],
+): Promise<{ matched: boolean; workflowName: string | null; confidence: number }> {
+  if (candidates.length === 0) {
+    return { matched: false, workflowName: null, confidence: 0 };
+  }
+
+  const candidateText = candidates.map((c, i) =>
+    `${i + 1}. **${c.name}** (category: ${c.category || 'general'})\n` +
+    `   Description: ${c.description || 'N/A'}\n` +
+    `   Original prompt: "${c.original_prompt || 'N/A'}"\n` +
+    `   Tools: ${c.tool_names.join(', ')}\n` +
+    `   Input: ${JSON.stringify(c.input_schema).slice(0, 300)}`
+  ).join('\n\n');
+
+  try {
+    const response = await callLLMService({
+      model: LLM_MODEL_SECONDARY,
+      max_tokens: 200,
+      messages: [
+        { role: 'system', content: WORKFLOW_MATCH_PROMPT },
+        { role: 'user', content: `## User Request\n${prompt}\n\n## Candidate Workflows\n${candidateText}` },
+      ],
+    });
+
+    const raw = response.content || '{}';
+    const cleaned = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
+    const result = JSON.parse(cleaned);
+
+    if (result.match && result.confidence >= 0.7) {
+      return { matched: true, workflowName: result.workflow_name, confidence: result.confidence };
+    }
+    return { matched: false, workflowName: null, confidence: result.confidence || 0 };
+  } catch {
+    return { matched: false, workflowName: null, confidence: 0 };
+  }
 }
 
 /**
@@ -202,36 +287,25 @@ const PROMPT_STOP_WORDS = new Set([
 ]);
 
 /**
- * Shared OpenAI client — reuses HTTP connections across calls.
- */
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return _openai;
-}
-
-/**
  * Call the LLM with messages and optional tool IDs.
  *
  * Tool IDs are resolved from the module-level toolDefCache so that only
  * lightweight string arrays flow through the durable pipe.
  */
-export async function callLLM(
-  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+export async function callQueryLLM(
+  messages: any[],
   toolIds?: string[],
-): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
-  const openai = getOpenAI();
-
+): Promise<LLMResponse> {
   // Resolve full tool definitions from module-level cache
-  let tools: OpenAI.Chat.Completions.ChatCompletionTool[] | undefined;
+  let tools: ToolDefinition[] | undefined;
   if (toolIds?.length) {
     tools = toolIds
       .map((id) => toolDefCache.get(id))
-      .filter((t): t is OpenAI.Chat.Completions.ChatCompletionTool => !!t);
+      .filter((t): t is ToolDefinition => !!t);
   }
 
   const t0 = Date.now();
-  const response = await openai.chat.completions.create({
+  const response = await callLLMService({
     model: LLM_MODEL_PRIMARY,
     messages,
     ...(tools?.length ? { tools } : {}),
@@ -239,5 +313,5 @@ export async function callLLM(
   });
   const usage = response.usage;
   console.log(`[mcpQuery:callLLM] ${Date.now() - t0}ms | in=${usage?.prompt_tokens} out=${usage?.completion_tokens} total=${usage?.total_tokens}`);
-  return response.choices[0].message;
+  return response;
 }

@@ -3,8 +3,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import OpenAI from 'openai';
-
+import { callLLM } from '../../services/llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../../services/logger';
 import * as verifyActivities from '../../examples/workflows/verify-document/activities';
@@ -190,8 +189,8 @@ function registerTools(srv: McpServer): void {
       inputSchema: translateContentSchema,
     },
     async (args: z.infer<typeof translateContentSchema>) => {
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey || apiKey === 'xxx') {
+      const { hasLLMApiKey } = await import('../../services/llm');
+      if (!hasLLMApiKey(LLM_MODEL_SECONDARY)) {
         return {
           content: [{
             type: 'text' as const,
@@ -199,14 +198,13 @@ function registerTools(srv: McpServer): void {
               translated_content: args.content,
               source_language: 'unknown',
               target_language: args.target_language,
-              note: 'OPENAI_API_KEY not configured — returned content unchanged',
+              note: 'LLM API key not configured — returned content unchanged',
             }),
           }],
         };
       }
 
-      const openai = new OpenAI({ apiKey });
-      const response = await openai.chat.completions.create({
+      const response = await callLLM({
         model: LLM_MODEL_SECONDARY,
         messages: [
           {
@@ -218,7 +216,7 @@ function registerTools(srv: McpServer): void {
         max_tokens: LLM_MAX_TOKENS_VISION,
       });
 
-      const raw = response.choices?.[0]?.message?.content || '';
+      const raw = response.content || '';
       try {
         const cleaned = raw.replace(/^```json\n?|\n?```$/g, '').trim();
         const parsed = JSON.parse(cleaned);

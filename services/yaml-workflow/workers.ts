@@ -9,9 +9,29 @@ import {
   LLM_MAX_TOKENS_JSON,
   LLM_MODEL_SECONDARY,
 } from '../../modules/defaults';
+
 import { loggerRegistry } from '../logger';
-import { callDbTool, callLLM } from '../insight/activities';
 import * as mcpClient from '../mcp/client';
+import { callLLM as callLLMService } from '../llm';
+import type { ChatMessage, LLMResponse } from '../llm';
+
+interface CallLLMOptions {
+  max_tokens?: number;
+  response_format?: { type: 'json_object' | 'text' };
+}
+
+/** Call the LLM with messages and optional format options. */
+async function callWorkerLLM(
+  messages: ChatMessage[],
+  options?: CallLLMOptions,
+): Promise<LLMResponse> {
+  return callLLMService({
+    model: LLM_MODEL_SECONDARY,
+    max_tokens: options?.max_tokens ?? LLM_MAX_TOKENS_JSON,
+    messages,
+    ...(options?.response_format ? { response_format: options.response_format } : {}),
+  });
+}
 import * as yamlDb from './db';
 import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
 
@@ -86,7 +106,7 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
     }
 
     // Call the LLM with JSON mode for structured output
-    const response = await callLLM(messages as any, {
+    const response = await callWorkerLLM(messages as any, {
       max_tokens: LLM_MAX_TOKENS_JSON,
       response_format: { type: 'json_object' },
     });
@@ -144,7 +164,8 @@ export async function registerWorkersForWorkflow(
     } else if (toolSource === 'db') {
       if (!activity.mcp_tool_name) continue;
       const toolName = activity.mcp_tool_name;
-      // DB tools — route through callDbTool (internal MCP transport)
+      // DB tools — route through MCP client (same path as external tools)
+      const dbServerId = activity.mcp_server_id || 'long-tail-db';
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
@@ -153,7 +174,11 @@ export async function registerWorkersForWorkflow(
           const mergedArgs = activity.tool_arguments
             ? { ...activity.tool_arguments, ...args }
             : args;
-          const result = await callDbTool(toolName, mergedArgs);
+          const result = await mcpClient.callServerTool(
+            dbServerId,
+            toolName,
+            mergedArgs,
+          );
           return {
             metadata: { ...data.metadata },
             data: result,

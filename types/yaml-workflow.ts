@@ -2,6 +2,16 @@
  * YAML Workflow types — deterministic HotMesh workflows generated from MCP tool call sequences.
  */
 
+export interface InputFieldMeta {
+  key: string;
+  type: string;
+  default?: unknown;
+  description: string;
+  classification: 'dynamic' | 'fixed' | 'wired';
+  source_step_index: number;
+  source_tool: string;
+}
+
 export type LTYamlWorkflowStatus = 'draft' | 'deployed' | 'active' | 'archived';
 
 export interface LTYamlWorkflowRecord {
@@ -23,6 +33,9 @@ export interface LTYamlWorkflowRecord {
   deployed_content_version: number | null;
   deployed_at: Date | null;
   activated_at: Date | null;
+  input_field_meta?: InputFieldMeta[];
+  original_prompt: string | null;
+  category: string | null;
   metadata: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;

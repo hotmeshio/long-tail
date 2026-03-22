@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { InvokeResultView } from './InvokeResultView';
 import { inferFieldType } from './helpers';
+import type { InputFieldMeta } from '../../../api/types';
 
 export function InvokeSection({
   wf,
@@ -18,6 +20,7 @@ export function InvokeSection({
   showMetadata,
   setShowMetadata,
   invokeMutation,
+  inputFieldMeta,
   settings,
   onInvoke,
   isCollapsed,
@@ -37,12 +40,24 @@ export function InvokeSection({
   setShowMetadata: (v: boolean) => void;
   invokeMutation: any;
   settings: any;
+  inputFieldMeta?: InputFieldMeta[];
   onInvoke: () => void;
   isCollapsed: boolean;
   onToggle: (key: string) => void;
 }) {
   const inputProps = (inputSchema as any)?.properties || {};
-  const inputKeys = Object.keys(inputProps);
+  const allKeys = Object.keys(inputProps);
+  const hasFieldMeta = inputFieldMeta && inputFieldMeta.length > 0;
+
+  // When field meta is available, show only dynamic fields by default
+  const [showFixedFields, setShowFixedFields] = useState(false);
+  const dynamicKeys = hasFieldMeta
+    ? inputFieldMeta.filter(f => f.classification === 'dynamic').map(f => f.key)
+    : allKeys;
+  const fixedKeys = hasFieldMeta
+    ? inputFieldMeta.filter(f => f.classification === 'fixed').map(f => f.key)
+    : [];
+  const inputKeys = showFixedFields ? [...dynamicKeys, ...fixedKeys] : dynamicKeys;
 
   const updateField = (key: string, value: any, type: string) => {
     let parsed = value;
@@ -61,13 +76,21 @@ export function InvokeSection({
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onInvoke(); }}>
             <div className="flex items-center justify-between">
               <SectionLabel>Input</SectionLabel>
-              <button type="button" onClick={() => {
-                if (!invokeJsonMode) setInvokeJson(JSON.stringify(invokeFields, null, 2));
-                else { try { setInvokeFields(JSON.parse(invokeJson)); } catch { /* keep */ } }
-                setInvokeJsonMode(!invokeJsonMode);
-              }} className="text-[10px] text-accent hover:underline">
-                {invokeJsonMode ? 'Form view' : 'JSON view'}
-              </button>
+              <div className="flex items-center gap-3">
+                {hasFieldMeta && fixedKeys.length > 0 && !invokeJsonMode && (
+                  <button type="button" onClick={() => setShowFixedFields(!showFixedFields)}
+                    className="text-[10px] text-text-tertiary hover:text-text-primary">
+                    {showFixedFields ? `Hide ${fixedKeys.length} fixed` : `Show ${fixedKeys.length} fixed`}
+                  </button>
+                )}
+                <button type="button" onClick={() => {
+                  if (!invokeJsonMode) setInvokeJson(JSON.stringify(invokeFields, null, 2));
+                  else { try { setInvokeFields(JSON.parse(invokeJson)); } catch { /* keep */ } }
+                  setInvokeJsonMode(!invokeJsonMode);
+                }} className="text-[10px] text-accent hover:underline">
+                  {invokeJsonMode ? 'Form view' : 'JSON view'}
+                </button>
+              </div>
             </div>
 
             {invokeJsonMode ? (
@@ -88,6 +111,9 @@ export function InvokeSection({
                     <div key={key}>
                       <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                         {key}<span className="ml-2 font-normal normal-case">{fieldType}</span>
+                        {hasFieldMeta && fixedKeys.includes(key) && (
+                          <span className="ml-2 px-1 py-0.5 text-[8px] bg-surface-sunken rounded">fixed</span>
+                        )}
                       </label>
                       {desc && (
                         <p className="text-[10px] text-text-tertiary mb-1">{desc}</p>

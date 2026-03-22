@@ -16,6 +16,7 @@ import {
   COUNT_VERSIONS,
   LIST_VERSIONS,
   GET_VERSION_SNAPSHOT,
+  DISCOVER_WORKFLOWS,
 } from './sql';
 
 export interface CreateYamlWorkflowInput {
@@ -30,6 +31,9 @@ export interface CreateYamlWorkflowInput {
   input_schema?: Record<string, unknown>;
   output_schema?: Record<string, unknown>;
   activity_manifest?: ActivityManifestEntry[];
+  input_field_meta?: import('../../types/yaml-workflow').InputFieldMeta[];
+  original_prompt?: string;
+  category?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
 }
@@ -73,6 +77,9 @@ export async function createYamlWorkflow(
       JSON.stringify(input.input_schema || {}),
       JSON.stringify(input.output_schema || {}),
       JSON.stringify(input.activity_manifest || []),
+      JSON.stringify(input.input_field_meta || []),
+      input.original_prompt || null,
+      input.category || null,
       input.tags || [],
       input.metadata ? JSON.stringify(input.metadata) : null,
     ],
@@ -81,7 +88,8 @@ export async function createYamlWorkflow(
 
   // Seed initial version snapshot
   await createVersionSnapshot(record.id, 1, record.yaml_content,
-    input.activity_manifest || [], input.input_schema || {}, input.output_schema || {}, 'Initial version');
+    input.activity_manifest || [], input.input_schema || {}, input.output_schema || {},
+    input.input_field_meta || [], 'Initial version');
 
   return record;
 }
@@ -172,6 +180,7 @@ export async function updateYamlWorkflow(
       record.activity_manifest,
       record.input_schema,
       record.output_schema,
+      record.input_field_meta,
     );
   }
 
@@ -243,6 +252,25 @@ export async function listYamlWorkflows(filters: {
 }
 
 /**
+ * Ranked discovery: find active workflows matching the user's prompt
+ * via full-text search (tsvector) + tag overlap + optional category filter.
+ * Returns results ordered by relevance score.
+ */
+export async function discoverWorkflows(
+  prompt: string,
+  tags: string[],
+  category?: string | null,
+  limit = 5,
+): Promise<(LTYamlWorkflowRecord & { fts_rank: number })[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    DISCOVER_WORKFLOWS,
+    [prompt, tags, category || null, limit],
+  );
+  return rows;
+}
+
+/**
  * Find active YAML workflows matching any of the given tags.
  * Uses GIN index on tags column for efficient lookup.
  */
@@ -289,6 +317,7 @@ export async function createVersionSnapshot(
   activityManifest: ActivityManifestEntry[] | unknown,
   inputSchema: Record<string, unknown> | unknown,
   outputSchema: Record<string, unknown> | unknown,
+  inputFieldMeta?: unknown,
   changeSummary?: string,
 ): Promise<LTYamlWorkflowVersionRecord> {
   const pool = getPool();
@@ -299,6 +328,7 @@ export async function createVersionSnapshot(
       JSON.stringify(activityManifest),
       JSON.stringify(inputSchema),
       JSON.stringify(outputSchema),
+      JSON.stringify(inputFieldMeta || []),
       changeSummary || null,
     ],
   );
