@@ -144,5 +144,6 @@ vite.config.ts.timestamp-*
 
 # Managed file storage (screenshots, uploads, etc.)
 data/
+.docker-data/
 
 .DS_Store
