@@ -3,29 +3,30 @@
 ## Quick Reference
 
 ```bash
-# Frontend tests (fast — ~3s, 47 files, 490 tests)
+# Frontend tests (fast — ~4s, 52 files, 520 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~31s, 20 files)
+# Backend: fast unit/integration tests only (~30s, 20 files)
 npx vitest run --exclude 'tests/workflows/**'
 
 # Backend: workflow tests only (~4-5min, 10 files)
 npx vitest run tests/workflows
 
-# Backend: all tests (~5-6min, 30 files)
+# Backend: all tests (~5-6min, 30 files, 448 tests)
 npx vitest run
 ```
 
 ## Test Categories
 
 ### Frontend (`dashboard/src/**/*.test.{ts,tsx}`)
-- **47 files, 490 tests, ~3 seconds**
+- **52 files, 520 tests, ~4 seconds**
 - Pure unit tests: components, hooks, utils, API mocks
 - Environment: jsdom, no external dependencies
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/*.test.ts` — root level)
-- **20 files, 378 tests, ~31 seconds**
+- **20 files, 378 tests, ~30 seconds**
+- **Recommended for iterative development** — run these first to catch regressions quickly before running the full workflow suite
 - Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, etc.
 - Requires: PostgreSQL (`longtail_test` database)
 - Sequential execution (`fileParallelism: false`)

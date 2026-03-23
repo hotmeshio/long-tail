@@ -9,25 +9,7 @@
 import { callLLM, hasLLMApiKey } from '../../llm';
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { PipelineContext } from './types';
-
-const VALIDATION_PROMPT = `You are a YAML workflow validator. Given a workflow intent, activity manifest, and generated YAML DAG, identify data flow issues.
-
-Check for:
-1. Missing input wiring: a step needs data but no prior step provides it and it's not in the trigger
-2. Broken iteration sources: a cycle references an array field that doesn't exist in the source step's output
-3. Lost session handles: a session field (page_id, _handle) is produced by an early step (e.g., login) but not threaded to later browser/page steps that need it — including steps inside iteration loops
-4. Unparameterized hardcoded values: URLs, credentials, or paths that should be dynamic inputs but are baked in
-5. Iteration array source: verify the referenced items field in a cycle hook actually exists in the source activity's output fields
-6. Trigger completeness: every dynamic input in the trigger schema should be referenced by at least one activity's input maps
-
-Return a JSON object:
-{
-  "issues": ["description of issue 1", "description of issue 2"],
-  "valid": true
-}
-
-If no issues, return { "issues": [], "valid": true }.
-Be concise. Only report real problems, not style suggestions.`;
+import { VALIDATION_PROMPT } from './prompts';
 
 /**
  * Validate pipeline stage: optional LLM review.

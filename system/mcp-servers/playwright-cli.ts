@@ -26,7 +26,7 @@ const loginAndCaptureSchema = z.object({
   screenshot_path: z.string().optional()
     .describe('Path to save a post-login screenshot'),
   full_page: z.boolean().optional().describe('Full-page screenshot (default: false)'),
-  timeout: z.number().optional().describe('Max wait time in ms (default: 15000)'),
+  timeout: z.number().optional().describe('Max wait time in ms (default: 30000)'),
 });
 
 const capturePageSchema = z.object({
@@ -135,10 +135,10 @@ function registerTools(srv: McpServer): void {
         const pageId = allocatePageId();
         pages.set(pageId, page);
 
-        const timeout = args.timeout ?? 15_000;
+        const timeout = args.timeout ?? 30_000;
 
         // Navigate to login page
-        await page.goto(args.url, { waitUntil: 'load', timeout: 30_000 });
+        await page.goto(args.url, { waitUntil: 'load', timeout });
 
         // Fill credentials and submit
         await page.fill(args.username_selector, args.username, { timeout });
@@ -299,10 +299,10 @@ function registerTools(srv: McpServer): void {
         const pageId = allocatePageId();
         pages.set(pageId, page);
 
-        const timeout = login.timeout ?? 15_000;
+        const timeout = login.timeout ?? 30_000;
 
         // Login sequence
-        await page.goto(login.url, { waitUntil: 'load', timeout: 30_000 });
+        await page.goto(login.url, { waitUntil: 'load', timeout });
         await page.fill(login.username_selector, login.username, { timeout });
         await page.fill(login.password_selector, login.password, { timeout });
         await page.click(login.submit_selector, { timeout });
@@ -493,9 +493,9 @@ function registerTools(srv: McpServer): void {
         const pageId = allocatePageId();
         pages.set(pageId, page);
 
-        const timeout = args.timeout ?? 15_000;
+        const timeout = args.timeout ?? 30_000;
 
-        await page.goto(args.url, { waitUntil: 'load', timeout: 30_000 });
+        await page.goto(args.url, { waitUntil: 'load', timeout });
 
         // Fill all fields
         for (const field of args.fields) {
