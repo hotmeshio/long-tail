@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import OpenAI from 'openai';
-
+import { callLLM, hasLLMApiKey } from '../../../services/llm';
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { MemberInfo } from './types';
 import { EXTRACT_MEMBER_INFO_PROMPT } from './prompts';
@@ -52,17 +51,15 @@ export async function extractMemberInfo(
   imageRef: string,
   pageNumber: number,
 ): Promise<MemberInfo | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || apiKey === 'xxx') {
+  if (!hasLLMApiKey(LLM_MODEL_SECONDARY)) {
     throw new Error(
-      'OPENAI_API_KEY required. Set it in .env to run vision workflows.',
+      'LLM API key required. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env to run vision workflows.',
     );
   }
 
   const imageContent = await storage.getObject(imageRef);
-  const openai = new OpenAI({ apiKey });
 
-  const response = await openai.chat.completions.create({
+  const response = await callLLM({
     model: LLM_MODEL_SECONDARY,
     messages: [
       {
@@ -85,7 +82,7 @@ export async function extractMemberInfo(
     max_tokens: 1000,
   });
 
-  const raw = response.choices?.[0]?.message?.content;
+  const raw = response.content;
   if (!raw) return null;
 
   try {

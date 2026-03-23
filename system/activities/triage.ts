@@ -1,5 +1,4 @@
-import OpenAI from 'openai';
-
+import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../services/llm';
 import { LLM_MODEL_SECONDARY } from '../../modules/defaults';
 import { ltConfig } from '../../modules/ltconfig';
 import * as mcpClient from '../../services/mcp/client';
@@ -14,7 +13,7 @@ import type { LTTaskRecord, LTEscalationRecord } from '../../types';
 const toolServerMap = new Map<string, string>();
 
 /** Maps qualified tool name → full ChatCompletionTool definition */
-const toolDefCache = new Map<string, OpenAI.Chat.Completions.ChatCompletionTool>();
+const toolDefCache = new Map<string, ToolDefinition>();
 
 /** Base tags always included — triage always needs DB for investigation + compiled workflows */
 const BASE_TAGS = ['workflows', 'compiled', 'database'];
@@ -184,30 +183,27 @@ export async function callTool(
 }
 
 /**
- * Call the LLM (OpenAI) with messages and optional tool IDs.
+ * Call the LLM with messages and optional tool IDs.
  *
  * Tool IDs are resolved from the module-level toolDefCache so that only
  * lightweight string arrays flow through the durable pipe — never full
- * ChatCompletionTool definitions.
+ * tool definitions.
  */
 export async function callTriageLLM(
-  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  messages: any[],
   toolIds?: string[],
-): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
+): Promise<LLMResponse> {
   // Resolve full tool definitions from module-level cache
-  let tools: OpenAI.Chat.Completions.ChatCompletionTool[] | undefined;
+  let tools: ToolDefinition[] | undefined;
   if (toolIds?.length) {
     tools = toolIds
       .map((id) => toolDefCache.get(id))
-      .filter((t): t is OpenAI.Chat.Completions.ChatCompletionTool => !!t);
+      .filter((t): t is ToolDefinition => !!t);
   }
 
-  const response = await openai.chat.completions.create({
+  return callLLMService({
     model: LLM_MODEL_SECONDARY,
     messages,
     ...(tools?.length ? { tools } : {}),
   });
-  return response.choices[0].message;
 }

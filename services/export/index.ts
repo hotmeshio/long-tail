@@ -14,6 +14,15 @@ import { getHandle } from './client';
 import { enrichEventInputs } from './enrichment';
 import { postProcessExecution } from './post-process';
 
+/** Error thrown when a workflow job is not found (expired or never existed). */
+class WorkflowNotFoundError extends Error {
+  status = 404;
+  constructor(workflowId: string) {
+    super(`${workflowId} Not Found`);
+    this.name = 'WorkflowNotFoundError';
+  }
+}
+
 /**
  * Export the full workflow state for a given workflow (raw HotMesh format).
  *
@@ -26,17 +35,22 @@ export async function exportWorkflow(
   workflowName: string,
   options?: LTExportOptions,
 ): Promise<LTWorkflowExport> {
-  const handle = await getHandle(taskQueue, workflowName, workflowId);
-  const raw = await handle.export(options);
+  try {
+    const handle = await getHandle(taskQueue, workflowName, workflowId);
+    const raw = await handle.export(options);
 
-  return {
-    workflow_id: workflowId,
-    data: raw.data,
-    state: raw.state,
-    status: raw.status,
-    timeline: raw.timeline as LTTimelineEntry[] | undefined,
-    transitions: raw.transitions as LTTransitionEntry[] | undefined,
-  };
+    return {
+      workflow_id: workflowId,
+      data: raw.data,
+      state: raw.state,
+      status: raw.status,
+      timeline: raw.timeline as LTTimelineEntry[] | undefined,
+      transitions: raw.transitions as LTTransitionEntry[] | undefined,
+    };
+  } catch (err: any) {
+    if (err instanceof WorkflowNotFoundError) throw err;
+    throw new WorkflowNotFoundError(workflowId);
+  }
 }
 
 /**
@@ -48,9 +62,13 @@ export async function getWorkflowStatus(
   taskQueue: string,
   workflowName: string,
 ): Promise<{ workflow_id: string; status: number }> {
-  const handle = await getHandle(taskQueue, workflowName, workflowId);
-  const status = await handle.status();
-  return { workflow_id: workflowId, status };
+  try {
+    const handle = await getHandle(taskQueue, workflowName, workflowId);
+    const status = await handle.status();
+    return { workflow_id: workflowId, status };
+  } catch {
+    throw new WorkflowNotFoundError(workflowId);
+  }
 }
 
 /**
@@ -66,10 +84,15 @@ export async function exportWorkflowExecution(
   workflowName: string,
   options?: ExecutionExportOptions,
 ): Promise<WorkflowExecution> {
-  const handle = await getHandle(taskQueue, workflowName, workflowId);
-  const execution = await handle.exportExecution(options);
-  await enrichEventInputs(execution);
-  return postProcessExecution(execution);
+  try {
+    const handle = await getHandle(taskQueue, workflowName, workflowId);
+    const execution = await handle.exportExecution(options);
+    await enrichEventInputs(execution);
+    return postProcessExecution(execution);
+  } catch (err: any) {
+    if (err instanceof WorkflowNotFoundError) throw err;
+    throw new WorkflowNotFoundError(workflowId);
+  }
 }
 
 /**
@@ -81,7 +104,11 @@ export async function getWorkflowState(
   taskQueue: string,
   workflowName: string,
 ): Promise<{ workflow_id: string; state: Record<string, any> }> {
-  const handle = await getHandle(taskQueue, workflowName, workflowId);
-  const state = await handle.state(true);
-  return { workflow_id: workflowId, state };
+  try {
+    const handle = await getHandle(taskQueue, workflowName, workflowId);
+    const state = await handle.state(true);
+    return { workflow_id: workflowId, state };
+  } catch {
+    throw new WorkflowNotFoundError(workflowId);
+  }
 }

@@ -1,18 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock OPENAI_API_KEY to test the filename-based fallback
-const originalKey = process.env.OPENAI_API_KEY;
+// Remove all LLM API keys to test the filename-based fallback
+const originalOpenAI = process.env.OPENAI_API_KEY;
+const originalAnthropic = process.env.ANTHROPIC_API_KEY;
 
 describe('analyzeDocuments — filename fallback', () => {
   beforeEach(() => {
-    // Force fallback by removing API key
+    // Force fallback by removing all LLM API keys
     delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   afterEach(() => {
     // Restore
-    if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+    if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
     else delete process.env.OPENAI_API_KEY;
+    if (originalAnthropic) process.env.ANTHROPIC_API_KEY = originalAnthropic;
+    else delete process.env.ANTHROPIC_API_KEY;
   });
 
   it('should return high confidence for all _rotated documents', async () => {

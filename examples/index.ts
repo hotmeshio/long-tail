@@ -12,6 +12,7 @@ import type {
   ProcessClaimEnvelopeData,
   KitchenSinkEnvelopeData,
 } from './types';
+import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { loggerRegistry } from '../services/logger';
 import { getUserByExternalId, createUser } from '../services/user';
 import { addEscalationChain, createRole } from '../services/role';
@@ -256,7 +257,7 @@ export async function seedExamples(client: any): Promise<void> {
         taskQueue,
         workflowName,
         workflowId,
-        expire: 86_400,
+        expire: JOB_EXPIRE_SECS,
         entity: workflowName,
       } as any);
       loggerRegistry.info(`[examples] seeded: ${label} (${workflowId})`);

@@ -25,6 +25,7 @@ router.get('/', async (req, res) => {
       graph_topic: req.query.graph_topic as string | undefined,
       app_id: req.query.app_id as string | undefined,
       search: req.query.search as string | undefined,
+      source_workflow_id: req.query.source_workflow_id as string | undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });
@@ -80,6 +81,9 @@ router.post('/', async (req, res) => {
       tags: mergedTags,
       source_workflow_id: workflow_id,
       source_workflow_type: workflow_name,
+      original_prompt: result.originalPrompt || undefined,
+      category: result.category || undefined,
+      metadata: { input_field_meta: result.inputFieldMeta },
     });
 
     res.status(201).json(record);
@@ -194,6 +198,7 @@ router.post('/:id/regenerate', async (req, res) => {
       output_schema: result.outputSchema,
       activity_manifest: result.activityManifest,
       tags: result.tags,
+      metadata: { input_field_meta: result.inputFieldMeta },
     });
 
     res.json(updated);

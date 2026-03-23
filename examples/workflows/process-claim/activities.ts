@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import OpenAI from 'openai';
-
+import { callLLM, hasLLMApiKey } from '../../../services/llm';
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { ClaimAnalysis } from './types';
 import { ASSESS_DOCUMENT_QUALITY_PROMPT } from './prompts';
@@ -37,13 +36,11 @@ export async function analyzeDocuments(
     };
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || apiKey === 'xxx') {
+  if (!hasLLMApiKey(LLM_MODEL_SECONDARY)) {
     // Fallback: filename-based heuristic (for testing without API key)
     return analyzeByFilename(documents);
   }
 
-  const openai = new OpenAI({ apiKey });
   const dir = fixturesDir();
   const flags: string[] = [];
   let readableCount = 0;
@@ -56,7 +53,7 @@ export async function analyzeDocuments(
     }
 
     const imageContent = fs.readFileSync(filePath, 'base64');
-    const response = await openai.chat.completions.create({
+    const response = await callLLM({
       model: LLM_MODEL_SECONDARY,
       messages: [
         {
@@ -79,7 +76,7 @@ export async function analyzeDocuments(
       max_tokens: 200,
     });
 
-    const raw = response.choices?.[0]?.message?.content || '';
+    const raw = response.content || '';
     try {
       const cleaned = raw.replace(/^```json\n?|\n?```$/g, '').trim();
       const assessment = JSON.parse(cleaned);

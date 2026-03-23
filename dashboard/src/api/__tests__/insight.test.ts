@@ -3,8 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 
-import { useInsightQuery, useLastInsightQuestion } from '../insight';
-import type { InsightResult } from '../insight';
+import { useMcpQuery, useLastMcpQueryPrompt } from '../insight';
+import type { McpQueryResult } from '../insight';
 
 // ── Mock fetch ────────────────────────────────────────────────────────────
 
@@ -31,20 +31,19 @@ function createWrapper() {
   };
 }
 
-const mockResult: InsightResult = {
+const mockResult: McpQueryResult = {
   title: 'Test',
   summary: 'Test summary',
-  sections: [],
-  metrics: [],
-  tool_calls_made: 1,
-  query: 'test question',
-  workflow_id: 'wf-test',
-  duration_ms: 500,
+  result: { path: '/screenshots/test.png' },
+  tool_calls_made: 3,
+  prompt: 'take a screenshot',
+  workflow_id: 'mcp-test',
+  duration_ms: 2000,
 };
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-describe('useInsightQuery', () => {
+describe('useMcpQuery', () => {
   beforeEach(() => {
     fetchSpy.mockReset();
     vi.stubGlobal('fetch', fetchSpy);
@@ -54,19 +53,19 @@ describe('useInsightQuery', () => {
     vi.restoreAllMocks();
   });
 
-  it('should not fetch when question is null', () => {
+  it('should not fetch when prompt is null', () => {
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useInsightQuery(null), { wrapper });
+    const { result } = renderHook(() => useMcpQuery(null), { wrapper });
 
     expect(result.current.isFetching).toBe(false);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('should fetch when question is provided', async () => {
+  it('should fetch when prompt is provided', async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse(mockResult));
 
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useInsightQuery('How many tasks?'), {
+    const { result } = renderHook(() => useMcpQuery('take a screenshot'), {
       wrapper,
     });
 
@@ -74,10 +73,10 @@ describe('useInsightQuery', () => {
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [url, init] = fetchSpy.mock.calls[0];
-    expect(url).toBe('/api/insight');
+    expect(url).toBe('/api/insight/mcp-query');
     expect(init?.method).toBe('POST');
     expect(JSON.parse(init?.body as string)).toEqual({
-      question: 'How many tasks?',
+      prompt: 'take a screenshot',
     });
   });
 
@@ -86,7 +85,7 @@ describe('useInsightQuery', () => {
 
     const { wrapper } = createWrapper();
     const { result } = renderHook(
-      () => useInsightQuery('Show system health'),
+      () => useMcpQuery('take a screenshot'),
       { wrapper },
     );
 
@@ -94,48 +93,48 @@ describe('useInsightQuery', () => {
 
     expect(result.current.data?.title).toBe('Test');
     expect(result.current.data?.summary).toBe('Test summary');
-    expect(result.current.data?.tool_calls_made).toBe(1);
+    expect(result.current.data?.tool_calls_made).toBe(3);
   });
 
   it('should not fetch for empty string', () => {
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useInsightQuery(''), { wrapper });
+    const { result } = renderHook(() => useMcpQuery(''), { wrapper });
 
     expect(result.current.isFetching).toBe(false);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
-describe('useLastInsightQuestion', () => {
+describe('useLastMcpQueryPrompt', () => {
   it('should return null when no cached queries exist', () => {
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useLastInsightQuestion(), { wrapper });
+    const { result } = renderHook(() => useLastMcpQueryPrompt(), { wrapper });
 
     expect(result.current).toBeNull();
   });
 
-  it('should return the last successful question from cache', async () => {
+  it('should return the last successful prompt from cache', async () => {
     fetchSpy.mockReset();
     vi.stubGlobal('fetch', fetchSpy);
     fetchSpy.mockResolvedValueOnce(jsonResponse(mockResult));
 
-    const { wrapper, queryClient } = createWrapper();
+    const { wrapper } = createWrapper();
 
     // First, run a query to populate the cache
     const { result: queryResult } = renderHook(
-      () => useInsightQuery('Cached question?'),
+      () => useMcpQuery('Cached prompt'),
       { wrapper },
     );
 
     await waitFor(() => expect(queryResult.current.data).toBeTruthy());
 
-    // Now check useLastInsightQuestion
+    // Now check useLastMcpQueryPrompt
     const { result: lastResult } = renderHook(
-      () => useLastInsightQuestion(),
+      () => useLastMcpQueryPrompt(),
       { wrapper },
     );
 
-    expect(lastResult.current).toBe('Cached question?');
+    expect(lastResult.current).toBe('Cached prompt');
 
     vi.restoreAllMocks();
   });

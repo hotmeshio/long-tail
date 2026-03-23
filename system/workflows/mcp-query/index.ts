@@ -1,6 +1,6 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
+import { TOOL_ROUNDS_MCP_QUERY } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
 import { MCP_QUERY_SYSTEM_PROMPT } from './prompts';
@@ -8,10 +8,9 @@ import { MCP_QUERY_SYSTEM_PROMPT } from './prompts';
 type ActivitiesType = typeof activities;
 
 const {
-  findCompiledWorkflows,
   loadTools,
   callMcpTool,
-  callLLM,
+  callQueryLLM,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
   retryPolicy: {
@@ -21,19 +20,19 @@ const {
   },
 });
 
-const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
+const MAX_TOOL_ROUNDS = TOOL_ROUNDS_MCP_QUERY;
 
 /**
  * MCP Query workflow (leaf).
  *
- * General-purpose "ask it to do anything with tools" workflow.
- * Discovers available MCP tools by tag and uses an LLM agentic
- * loop to fulfill arbitrary requests. Unlike insightQuery (DB-focused),
- * mcpQuery has access to the full tool inventory: browser automation,
- * file storage, HTTP fetch, vision, workflows, and any user-registered servers.
+ * Dynamic MCP tool orchestration via LLM agentic loop.
+ * Discovers available MCP tools by tag and uses an LLM to
+ * fulfill arbitrary requests. This workflow ONLY handles
+ * dynamic execution — compiled workflow matching is done
+ * by the mcpQueryRouter parent.
  *
- * Tool definitions are cached at the module level — only lightweight
- * IDs flow through the durable execution log.
+ * Clean execution traces from this workflow are what get
+ * compiled into deterministic YAML workflows.
  */
 export async function mcpQuery(
   envelope: LTEnvelope,
@@ -53,26 +52,17 @@ export async function mcpQuery(
     };
   }
 
-  // 1. Phase 1: Search for compiled YAML workflows that match the prompt.
-  //    These are deterministic — no LLM reasoning needed, just direct execution.
-  const compiled = await findCompiledWorkflows(prompt);
-
-  // 2. Phase 2: Load raw MCP tools (optionally filtered by tags), cached + lightweight
+  // Load raw MCP tools (no compiled workflow discovery — router handles that)
   const raw = await loadTools(tags);
+  const toolIds = raw.toolIds;
 
-  // Merge tool IDs: compiled workflows first (preferred), then raw MCP tools
-  const toolIds = [...compiled.toolIds, ...raw.toolIds];
-
-  // Build system prompt with compiled workflows highlighted
+  // Build system prompt: strategy first, then tool inventory
   let serverSection = '';
-  if (compiled.inventory) {
-    serverSection += `## Compiled Workflows (PREFERRED — deterministic, fast)\n\n${compiled.inventory}\n\n`;
-    serverSection += `## MCP Servers (use if no compiled workflow matches)\n\n${raw.inventory}`;
-  } else {
-    serverSection += `## Available MCP Servers\n\n${raw.inventory}`;
+  if (raw.strategy) {
+    serverSection += `${raw.strategy}\n\n`;
   }
+  serverSection += `## Available MCP Servers\n\n${raw.inventory}`;
 
-  // 3. Start the conversation
   const messages: any[] = [
     {
       role: 'system',
@@ -83,28 +73,32 @@ export async function mcpQuery(
 
   let toolCallCount = 0;
 
-  // 4. Agentic loop: LLM decides → execute tools → feed back → repeat
+  // Agentic loop: LLM decides → execute tools → feed back → repeat
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    // Only lightweight toolIds (string[]) flow through the durable pipe
-    const response = await callLLM(messages, toolIds);
+    const response = await callQueryLLM(messages, toolIds);
 
-    // If no tool calls, we have the final answer
     if (!response.tool_calls?.length) {
       const parsed = parseJsonResponse(response.content || '');
+      const milestones = [
+        { name: 'mcp_query', value: 'completed' },
+        { name: 'tool_calls', value: String(toolCallCount) },
+      ];
+      if (parsed.knowledge_updated?.length) {
+        milestones.push({ name: 'knowledge_updated', value: String(parsed.knowledge_updated.length) });
+      }
+      if (parsed.compilation_candidate) {
+        milestones.push({ name: 'compilation_candidate', value: 'true' });
+      }
       return {
         type: 'return',
         data: {
           ...parsed,
           tool_calls_made: toolCallCount,
         },
-        milestones: [
-          { name: 'mcp_query', value: 'completed' },
-          { name: 'tool_calls', value: String(toolCallCount) },
-        ],
+        milestones,
       };
     }
 
-    // Execute each tool call
     const fnCalls = response.tool_calls.filter(
       (tc): tc is typeof tc & { type: 'function'; function: { name: string; arguments: string } } =>
         tc.type === 'function',
@@ -135,9 +129,17 @@ export async function mcpQuery(
     }
   }
 
-  // If we exhausted rounds, ask for final synthesis
-  const finalResponse = await callLLM(messages, undefined);
+  // Exhausted rounds — ask for final synthesis
+  const finalResponse = await callQueryLLM(messages, undefined);
   const parsed = parseJsonResponse(finalResponse.content || '');
+  const finalMilestones = [
+    { name: 'mcp_query', value: 'completed' },
+    { name: 'tool_calls', value: String(toolCallCount) },
+    { name: 'rounds_exhausted', value: 'true' },
+  ];
+  if (parsed.knowledge_updated?.length) {
+    finalMilestones.push({ name: 'knowledge_updated', value: String(parsed.knowledge_updated.length) });
+  }
 
   return {
     type: 'return',
@@ -145,10 +147,7 @@ export async function mcpQuery(
       ...parsed,
       tool_calls_made: toolCallCount,
     },
-    milestones: [
-      { name: 'mcp_query', value: 'completed' },
-      { name: 'tool_calls', value: String(toolCallCount) },
-    ],
+    milestones: finalMilestones,
   };
 }
 

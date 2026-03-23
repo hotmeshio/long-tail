@@ -246,6 +246,121 @@ const PLAYWRIGHT_TOOLS = [
   { name: 'close_page', description: 'Close a browser page by ID.', inputSchema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
 ];
 
+const PLAYWRIGHT_CLI_TOOLS = [
+  {
+    name: 'login_and_capture',
+    description: 'Log into a website and capture a screenshot of the authenticated page. Handles navigation, credential entry, form submission, and post-login waiting in one call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Login page URL' },
+        username_selector: { type: 'string', description: 'CSS selector for username input' },
+        password_selector: { type: 'string', description: 'CSS selector for password input' },
+        username: { type: 'string', description: 'Username value' },
+        password: { type: 'string', description: 'Password value' },
+        submit_selector: { type: 'string', description: 'CSS selector for submit button' },
+        wait_after_login: { type: 'string', description: 'CSS selector or URL pattern to wait for after login' },
+        screenshot_path: { type: 'string', description: 'Path for post-login screenshot' },
+        full_page: { type: 'boolean' },
+        timeout: { type: 'number', description: 'Max wait time in ms (default: 15000)' },
+      },
+      required: ['url', 'username_selector', 'password_selector', 'username', 'password', 'submit_selector'],
+    },
+  },
+  {
+    name: 'capture_page',
+    description: 'Navigate to a URL and capture a full-page screenshot in one call. Optionally waits for a selector or fixed delay before capture. Pass page_id to reuse an existing authenticated session from login_and_capture.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        screenshot_path: { type: 'string' },
+        page_id: { type: 'string', description: 'Reuse an existing page to preserve session' },
+        full_page: { type: 'boolean' },
+        wait_for_selector: { type: 'string' },
+        wait_ms: { type: 'number', description: 'Fixed delay in ms before capture (default: 2000)' },
+        wait_until: { type: 'string' },
+        timeout: { type: 'number' },
+      },
+      required: ['url', 'screenshot_path'],
+    },
+  },
+  {
+    name: 'capture_authenticated_pages',
+    description: 'Log in once, then navigate to multiple URLs capturing a screenshot of each. Reuses the authenticated session across all pages. Ideal for generating documentation screenshots.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        login: {
+          type: 'object',
+          description: 'Login parameters',
+          properties: {
+            url: { type: 'string', description: 'Login page URL' },
+            username_selector: { type: 'string', description: 'CSS selector for username input' },
+            password_selector: { type: 'string', description: 'CSS selector for password input' },
+            username: { type: 'string' },
+            password: { type: 'string' },
+            submit_selector: { type: 'string', description: 'CSS selector for submit button' },
+            wait_after_login: { type: 'string', description: 'CSS selector or URL pattern to wait for after login' },
+            timeout: { type: 'number' },
+          },
+          required: ['url', 'username_selector', 'password_selector', 'username', 'password', 'submit_selector'],
+        },
+        pages: {
+          type: 'array',
+          description: 'Pages to capture after login',
+          items: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'URL to navigate to' },
+              screenshot_path: { type: 'string', description: 'Path to save screenshot' },
+              wait_for_selector: { type: 'string', description: 'Wait for this selector before capture' },
+              wait_ms: { type: 'number', description: 'Fixed delay before capture (default: 3000)' },
+              full_page: { type: 'boolean' },
+            },
+            required: ['url', 'screenshot_path'],
+          },
+        },
+      },
+      required: ['login', 'pages'],
+    },
+  },
+  {
+    name: 'extract_content',
+    description: 'Extract structured content (text, links, metadata) from a page. Navigate to a URL or pass page_id to extract from an existing authenticated session. Returns page text by default, with optional link and meta tag extraction.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL to navigate to. Omit to extract from existing page_id.' },
+        page_id: { type: 'string', description: 'Reuse an existing page (from login_and_capture)' },
+        selector: { type: 'string', description: 'CSS selector to extract text from' },
+        script: { type: 'string', description: 'Custom JS to evaluate' },
+        extract_links: { type: 'boolean' },
+        extract_metadata: { type: 'boolean' },
+        wait_for_selector: { type: 'string' },
+        wait_ms: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'submit_form',
+    description: 'Navigate to a form page, fill multiple fields, submit, and capture the result. Handles the full form lifecycle in one call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        fields: { type: 'array', description: 'Fields to fill', items: { type: 'object', properties: { selector: { type: 'string' }, value: { type: 'string' } }, required: ['selector', 'value'] } },
+        submit_selector: { type: 'string' },
+        wait_after_submit: { type: 'string', description: 'CSS selector or URL pattern to wait for' },
+        screenshot_path: { type: 'string' },
+        full_page: { type: 'boolean' },
+        timeout: { type: 'number' },
+      },
+      required: ['url', 'fields', 'submit_selector'],
+    },
+  },
+];
+
 const FILE_STORAGE_TOOLS = [
   {
     name: 'read_file',
@@ -392,12 +507,21 @@ const SEED_MCP_SERVERS = [
   },
   {
     name: 'long-tail-playwright',
-    description: 'Browser automation via Playwright. Navigate pages, take screenshots, click elements, fill forms, run JavaScript. Used for QA capture, visual regression, and documentation.',
+    description: 'Low-level browser automation via Playwright. Fine-grained control: navigate, click, fill, wait_for, evaluate, run_script. Use for complex interactions requiring precise CSS selector targeting.',
     transport_type: 'stdio',
     transport_config: { builtin: true, process: 'in-memory' },
     tool_manifest: PLAYWRIGHT_TOOLS,
-    metadata: { builtin: true, category: 'browser-automation' },
+    metadata: { builtin: true, category: 'browser-automation', level: 'low' },
     tags: ['browser-automation', 'testing', 'screenshots'],
+  },
+  {
+    name: 'long-tail-playwright-cli',
+    description: 'High-level browser automation. Intent-based tools (login_and_capture, capture_page, capture_authenticated_pages, extract_content, submit_form) that handle session management, timing, and error recovery internally. Preferred for most browser tasks — use the low-level playwright server only when fine-grained control is needed.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: PLAYWRIGHT_CLI_TOOLS,
+    metadata: { builtin: true, category: 'browser-automation', level: 'high' },
+    tags: ['browser-automation', 'screenshots', 'scraping', 'forms'],
   },
   {
     name: 'long-tail-file-storage',

@@ -22,10 +22,13 @@ function envStr(key: string, fallback: string): string {
 // ── LLM ──────────────────────────────────────────────────────────────
 
 /** Primary model for agentic/insight workflows (tool-calling capable). */
-export const LLM_MODEL_PRIMARY = envStr('LT_LLM_MODEL_PRIMARY', 'gpt-4o');
+export const LLM_MODEL_PRIMARY = envStr('LT_LLM_MODEL_PRIMARY', 'claude-sonnet-4-6');
 
 /** Lighter model for summarization, interpretation, and vision tasks. */
-export const LLM_MODEL_SECONDARY = envStr('LT_LLM_MODEL_SECONDARY', 'gpt-4o-mini');
+export const LLM_MODEL_SECONDARY = envStr('LT_LLM_MODEL_SECONDARY', 'claude-haiku-4-5-20251001');
+
+/** Base URL for OpenAI-compatible providers (Groq, Together, local). */
+export const LLM_BASE_URL = process.env.LT_LLM_BASE_URL || undefined;
 
 /** Default max_tokens when the LLM is called without tool definitions. */
 export const LLM_MAX_TOKENS_DEFAULT = envInt('LT_LLM_MAX_TOKENS_DEFAULT', 1500);
@@ -44,11 +47,11 @@ export const LLM_MAX_INPUT_CHARS = envInt('LT_LLM_MAX_INPUT_CHARS', 12_000);
 
 // ── Tool execution ───────────────────────────────────────────────────
 
-/** Max agentic loop iterations for insight workflows. */
-export const TOOL_ROUNDS_INSIGHT = envInt('LT_TOOL_ROUNDS_INSIGHT', 5);
-
 /** Max agentic loop iterations for MCP triage workflows. */
 export const TOOL_ROUNDS_TRIAGE = envInt('LT_TOOL_ROUNDS_TRIAGE', 10);
+
+/** Max agentic loop iterations for mcpQuery (higher — includes recall + discover + persist phases). */
+export const TOOL_ROUNDS_MCP_QUERY = envInt('LT_TOOL_ROUNDS_MCP_QUERY', 15);
 
 /** Cap on `limit` argument baked into generated YAML tool steps. */
 export const TOOL_ARG_LIMIT_CAP = envInt('LT_TOOL_ARG_LIMIT_CAP', 25);
@@ -57,6 +60,9 @@ export const TOOL_ARG_LIMIT_CAP = envInt('LT_TOOL_ARG_LIMIT_CAP', 25);
 
 /** Default graph expiry in seconds for generated YAML workflows. */
 export const WORKFLOW_EXPIRE_SECS = envInt('LT_WORKFLOW_EXPIRE_SECS', 120);
+
+/** Default job expiry in seconds for workflow executions (30 days). */
+export const JOB_EXPIRE_SECS = envInt('LT_JOB_EXPIRE_SECS', 30 * 24 * 60 * 60);
 
 /** Default timeout (ms) for synchronous workflow invocations. */
 export const WORKFLOW_SYNC_TIMEOUT_MS = envInt('LT_WORKFLOW_SYNC_TIMEOUT_MS', 120_000);

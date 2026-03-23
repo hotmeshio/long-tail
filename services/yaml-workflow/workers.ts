@@ -9,9 +9,29 @@ import {
   LLM_MAX_TOKENS_JSON,
   LLM_MODEL_SECONDARY,
 } from '../../modules/defaults';
+
 import { loggerRegistry } from '../logger';
-import { callDbTool, callLLM } from '../insight/activities';
 import * as mcpClient from '../mcp/client';
+import { callLLM as callLLMService } from '../llm';
+import type { ChatMessage, LLMResponse } from '../llm';
+
+interface CallLLMOptions {
+  max_tokens?: number;
+  response_format?: { type: 'json_object' | 'text' };
+}
+
+/** Call the LLM with messages and optional format options. */
+async function callWorkerLLM(
+  messages: ChatMessage[],
+  options?: CallLLMOptions,
+): Promise<LLMResponse> {
+  return callLLMService({
+    model: LLM_MODEL_SECONDARY,
+    max_tokens: options?.max_tokens ?? LLM_MAX_TOKENS_JSON,
+    messages,
+    ...(options?.response_format ? { response_format: options.response_format } : {}),
+  });
+}
 import * as yamlDb from './db';
 import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
 
@@ -86,7 +106,7 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
     }
 
     // Call the LLM with JSON mode for structured output
-    const response = await callLLM(messages as any, {
+    const response = await callWorkerLLM(messages as any, {
       max_tokens: LLM_MAX_TOKENS_JSON,
       response_format: { type: 'json_object' },
     });
@@ -113,6 +133,102 @@ function buildLlmCallback(activity: ActivityManifestEntry) {
 }
 
 /**
+ * Apply a derivation strategy to produce a computed value from a source string.
+ */
+function applyDerivation(
+  value: string,
+  spec: NonNullable<NonNullable<ActivityManifestEntry['transform_spec']>['derivations']>[string],
+): string {
+  let result = value;
+  switch (spec.strategy) {
+    case 'slugify': {
+      // Extract path from URL if it looks like a URL, otherwise use raw value
+      try {
+        const url = new URL(result);
+        result = url.pathname.replace(/^\//, '').replace(/\//g, '-') || 'home';
+      } catch {
+        result = result.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
+      if (spec.prefix) result = spec.prefix + result;
+      if (spec.suffix) result = result + spec.suffix;
+      break;
+    }
+    case 'prefix':
+      result = (spec.prefix || '') + result + (spec.suffix || '');
+      break;
+    case 'template':
+      result = (spec.template || '{value}').replace(/\{value\}/g, result);
+      break;
+    case 'passthrough':
+      break;
+  }
+  return result;
+}
+
+/**
+ * Build a transform worker callback that reshapes array data between steps.
+ * Applies field renames, defaults, and derivations.
+ */
+function buildTransformCallback(activity: ActivityManifestEntry) {
+  const spec = activity.transform_spec;
+  if (!spec) throw new Error(`Transform activity ${activity.activity_id} missing transform_spec`);
+
+  return async (data: StreamData): Promise<StreamDataResponse> => {
+    const input = (data.data || {}) as Record<string, unknown>;
+    const sourceData = input[spec.sourceField];
+
+    if (!Array.isArray(sourceData)) {
+      // Pass through non-array data unchanged
+      return {
+        metadata: { ...data.metadata },
+        data: { [spec.targetField]: sourceData, ...input },
+      };
+    }
+
+    // Resolve dynamic directory prefix from trigger inputs (e.g., screenshot_dir)
+    const dirKeys = ['screenshot_dir', 'screenshots_dir', 'output_dir'];
+    const dynamicDir = dirKeys.reduce<string | null>(
+      (found, key) => found || (input[key] ? String(input[key]) : null), null,
+    );
+
+    const reshaped = sourceData.map((item: Record<string, unknown>) => {
+      const out: Record<string, unknown> = {};
+
+      // Apply field map: target key → source key
+      for (const [targetKey, sourceKey] of Object.entries(spec.fieldMap)) {
+        if (sourceKey !== null) {
+          out[targetKey] = item[sourceKey];
+        } else if (spec.derivations?.[targetKey]) {
+          // Computed field: use dynamic dir when available for path derivations
+          const derivation = { ...spec.derivations[targetKey] };
+          if (dynamicDir && targetKey.includes('path')) {
+            derivation.prefix = dynamicDir.replace(/\/$/, '') + '/';
+          }
+          const sourceValue = String(item[derivation.sourceKey] || '');
+          out[targetKey] = applyDerivation(sourceValue, derivation);
+        }
+      }
+
+      // Apply defaults
+      if (spec.defaults) {
+        for (const [key, value] of Object.entries(spec.defaults)) {
+          if (!(key in out)) out[key] = value;
+        }
+      }
+
+      return out;
+    });
+
+    // Return reshaped data alongside any other input fields (session handles, etc.)
+    const result: Record<string, unknown> = { ...input, [spec.targetField]: reshaped };
+    return {
+      metadata: { ...data.metadata },
+      data: result,
+    };
+  };
+}
+
+/**
  * Register HotMesh workers for all activities in a YAML workflow.
  * Each worker delegates based on tool_source:
  * - 'db'  → callDbTool() (internal DB MCP server)
@@ -134,7 +250,14 @@ export async function registerWorkersForWorkflow(
 
     const toolSource = activity.tool_source || (activity.mcp_server_id === 'db' ? 'db' : 'mcp');
 
-    if (toolSource === 'llm') {
+    if (toolSource === 'transform') {
+      // Transform/reshape step — deterministic data mapping between steps
+      workerConfigs.push({
+        topic: activity.topic,
+        connection: { class: Postgres, options: postgres_options },
+        callback: buildTransformCallback(activity),
+      });
+    } else if (toolSource === 'llm') {
       // LLM interpretation step
       workerConfigs.push({
         topic: activity.topic,
@@ -144,7 +267,8 @@ export async function registerWorkersForWorkflow(
     } else if (toolSource === 'db') {
       if (!activity.mcp_tool_name) continue;
       const toolName = activity.mcp_tool_name;
-      // DB tools — route through callDbTool (internal MCP transport)
+      // DB tools — route through MCP client (same path as external tools)
+      const dbServerId = activity.mcp_server_id || 'long-tail-db';
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
@@ -153,7 +277,11 @@ export async function registerWorkersForWorkflow(
           const mergedArgs = activity.tool_arguments
             ? { ...activity.tool_arguments, ...args }
             : args;
-          const result = await callDbTool(toolName, mergedArgs);
+          const result = await mcpClient.callServerTool(
+            dbServerId,
+            toolName,
+            mergedArgs,
+          );
           return {
             metadata: { ...data.metadata },
             data: result,
@@ -173,14 +301,25 @@ export async function registerWorkersForWorkflow(
         connection: { class: Postgres, options: postgres_options },
         callback: async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
-          const mergedArgs = storedArgs
-            ? { ...storedArgs, ...args }
-            : args;
+          // Merge: stored defaults first, then runtime overrides.
+          // Skip runtime values that are undefined, null, or empty string —
+          // these indicate unwired/unresolved inputs that should not override
+          // the stored defaults from the original execution.
+          const mergedArgs = storedArgs ? { ...storedArgs } : {};
+          for (const [key, value] of Object.entries(args)) {
+            if (value !== undefined && value !== null && value !== '') {
+              mergedArgs[key] = value;
+            }
+          }
           const result = await mcpClient.callServerTool(
             serverId,
             toolName,
             mergedArgs,
           );
+          // Log errors from MCP tools so they're visible in container logs
+          if (result && typeof result === 'object' && 'error' in result) {
+            loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);
+          }
           return {
             metadata: { ...data.metadata },
             data: result,

@@ -15,6 +15,16 @@ export interface ActivityManifestEntry {
   model?: string;
 }
 
+export interface InputFieldMeta {
+  key: string;
+  type: string;
+  default?: unknown;
+  description: string;
+  classification: 'dynamic' | 'fixed' | 'wired';
+  source_step_index: number;
+  source_tool: string;
+}
+
 export interface LTYamlWorkflowRecord {
   id: string;
   name: string;
@@ -34,6 +44,7 @@ export interface LTYamlWorkflowRecord {
   deployed_content_version: number | null;
   deployed_at: string | null;
   activated_at: string | null;
+  input_field_meta: InputFieldMeta[];
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;

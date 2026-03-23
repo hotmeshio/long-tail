@@ -69,6 +69,7 @@ export function YamlWorkflowDetailPage() {
   const [yamlDraft, setYamlDraft] = useState('');
   const [inputSchemaDraft, setInputSchemaDraft] = useState('');
   const [outputSchemaDraft, setOutputSchemaDraft] = useState('');
+  const [inputFieldMetaDraft, setInputFieldMetaDraft] = useState<import('../../../api/types').InputFieldMeta[]>([]);
   const [configEditing, setConfigEditing] = useState(false);
   const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -76,7 +77,8 @@ export function YamlWorkflowDetailPage() {
     if (wf?.yaml_content) setYamlDraft(wf.yaml_content);
     if (wf?.input_schema) setInputSchemaDraft(JSON.stringify(wf.input_schema, null, 2));
     if (wf?.output_schema) setOutputSchemaDraft(JSON.stringify(wf.output_schema, null, 2));
-  }, [wf?.id, wf?.yaml_content, wf?.input_schema, wf?.output_schema]);
+    if (wf?.input_field_meta) setInputFieldMetaDraft(wf.input_field_meta);
+  }, [wf?.id, wf?.yaml_content, wf?.input_schema, wf?.output_schema, wf?.input_field_meta]);
 
   useEffect(() => {
     if (wf?.input_schema) {
@@ -300,6 +302,7 @@ export function YamlWorkflowDetailPage() {
                 showMetadata={showMetadata}
                 setShowMetadata={setShowMetadata}
                 invokeMutation={invokeMutation}
+                inputFieldMeta={wf.input_field_meta}
                 settings={settings}
                 onInvoke={handleInvoke}
                 isCollapsed={openSection !== 'invoke'}
@@ -337,6 +340,8 @@ export function YamlWorkflowDetailPage() {
               setInputSchemaDraft={setInputSchemaDraft}
               outputSchemaDraft={outputSchemaDraft}
               setOutputSchemaDraft={setOutputSchemaDraft}
+              inputFieldMetaDraft={inputFieldMetaDraft}
+              setInputFieldMetaDraft={setInputFieldMetaDraft}
               onSave={handleSaveConfig}
               onCancel={handleCancelEdit}
               updateMutation={updateMutation}

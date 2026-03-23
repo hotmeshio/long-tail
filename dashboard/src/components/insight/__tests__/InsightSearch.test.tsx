@@ -3,14 +3,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 vi.mock('../../../api/insight', () => ({
-  useInsightQuery: vi.fn(),
   useMcpQuery: vi.fn(),
-  useLastInsightQuestion: vi.fn(),
   useLastMcpQueryPrompt: vi.fn(),
 }));
 
 import { InsightSearch } from '../InsightSearch';
-import { useInsightQuery, useMcpQuery, useLastInsightQuestion, useLastMcpQueryPrompt } from '../../../api/insight';
+import { useMcpQuery, useLastMcpQueryPrompt } from '../../../api/insight';
 
 const EMPTY_QUERY = { data: undefined, isFetching: false, error: null } as any;
 
@@ -21,13 +19,11 @@ function renderWithRouter(ui: React.ReactElement) {
 describe('InsightSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useLastInsightQuestion).mockReturnValue(null);
     vi.mocked(useLastMcpQueryPrompt).mockReturnValue(null);
-    vi.mocked(useInsightQuery).mockReturnValue(EMPTY_QUERY);
     vi.mocked(useMcpQuery).mockReturnValue(EMPTY_QUERY);
   });
 
-  it('renders search input with Do mode placeholder by default', () => {
+  it('renders search input with placeholder', () => {
     renderWithRouter(<InsightSearch />);
     expect(screen.getByPlaceholderText('Do something with tools...')).toBeInTheDocument();
   });
@@ -90,7 +86,7 @@ describe('InsightSearch', () => {
     expect(screen.getByText(/Saved to/)).toBeInTheDocument();
   });
 
-  it('modal has MCP Query title in Do mode', () => {
+  it('modal has MCP Query title', () => {
     vi.mocked(useMcpQuery).mockReturnValue({
       data: {
         title: 'Screenshot taken',
@@ -107,11 +103,5 @@ describe('InsightSearch', () => {
 
     renderWithRouter(<InsightSearch />);
     expect(screen.getByText('MCP Query')).toBeInTheDocument();
-  });
-
-  it('does not render Ask/Do toggle buttons', () => {
-    renderWithRouter(<InsightSearch />);
-    expect(screen.queryByText('Ask')).not.toBeInTheDocument();
-    expect(screen.queryByText('Do')).not.toBeInTheDocument();
   });
 });

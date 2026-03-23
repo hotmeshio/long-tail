@@ -70,6 +70,7 @@ const draftWorkflow = {
   },
   output_schema: { type: 'object' },
   content_version: 2,
+  input_field_meta: [],
   source_workflow_id: 'triage-123',
   created_at: '2026-03-09T00:00:00Z',
 };

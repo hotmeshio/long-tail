@@ -146,28 +146,39 @@ async function resolveClient(serverId: string): Promise<Client | null> {
   // 1. Direct lookup (by UUID or name)
   if (clients.has(serverId)) return clients.get(serverId)!;
 
-  // 2. Check built-in server factories by name
-  for (const [name, factory] of builtinFactories) {
-    if (serverId === name || name.includes(serverId) || serverId.includes(name)) {
-      // Check if we already connected this factory under its canonical name
-      if (clients.has(name)) {
-        // Alias the serverId to the existing client so future lookups are instant
-        clients.set(serverId, clients.get(name)!);
-        return clients.get(name)!;
+  // 2. Check built-in server factories — exact match first, then fuzzy
+  let matchedName: string | null = null;
+  if (builtinFactories.has(serverId)) {
+    matchedName = serverId;
+  } else {
+    for (const [name] of builtinFactories) {
+      if (name.includes(serverId) || serverId.includes(name)) {
+        matchedName = name;
+        break;
       }
-
-      const server = await factory();
-      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-      await server.connect(serverTransport);
-
-      const client = new Client({ name: `builtin-${name}`, version: '1.0.0' });
-      await client.connect(clientTransport);
-      // Cache under both the canonical name and the requested serverId
-      clients.set(name, client);
-      if (serverId !== name) clients.set(serverId, client);
-      loggerRegistry.info(`[lt-mcp:client] auto-connected built-in server: ${name} (as '${serverId}')`);
-      return client;
     }
+  }
+
+  if (matchedName) {
+    const factory = builtinFactories.get(matchedName)!;
+    // Check if we already connected this factory under its canonical name
+    if (clients.has(matchedName)) {
+      // Alias the serverId to the existing client so future lookups are instant
+      clients.set(serverId, clients.get(matchedName)!);
+      return clients.get(matchedName)!;
+    }
+
+    const server = await factory();
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+
+    const client = new Client({ name: `builtin-${matchedName}`, version: '1.0.0' });
+    await client.connect(clientTransport);
+    // Cache under both the canonical name and the requested serverId
+    clients.set(matchedName, client);
+    if (serverId !== matchedName) clients.set(serverId, client);
+    loggerRegistry.info(`[lt-mcp:client] auto-connected built-in server: ${matchedName} (as '${serverId}')`);
+    return client;
   }
 
   // 3. Look up in DB by ID or name, then try to match a built-in factory
