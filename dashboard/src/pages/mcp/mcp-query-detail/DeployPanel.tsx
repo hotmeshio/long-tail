@@ -102,9 +102,11 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
 
   const handleDeploy = async () => {
     if (!wf) return;
-    if (wf.status === 'draft') await deployMutation.mutateAsync(wf.id);
+    // Always deploy (updates deployed_content_version), then activate
+    await deployMutation.mutateAsync(wf.id);
     await activateMutation.mutateAsync(wf.id);
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['yamlWorkflow'], refetchType: 'all' });
     refetch();
   };
 
