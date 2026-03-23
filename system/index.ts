@@ -2,20 +2,31 @@ import * as mcpTriageWorkflow from './workflows/mcp-triage';
 
 /**
  * System workers that always load with Long Tail.
- * mcp-triage is always available; mcp-query loads
- * when OPENAI_API_KEY is configured.
+ * mcp-triage is always available; mcp-query-router, mcp-query,
+ * and mcp-deterministic load when an LLM API key is configured.
  */
 export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...args: any[]) => any }> {
   const workers: Array<{ taskQueue: string; workflow: (...args: any[]) => any }> = [
     { taskQueue: 'long-tail-system', workflow: mcpTriageWorkflow.mcpTriage },
   ];
 
-  if (process.env.OPENAI_API_KEY) {
-    // Lazy-require to avoid loading OpenAI when not configured
+  const hasLLM = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+
+  if (hasLLM) {
+    try {
+      const { mcpQueryRouter } = require('./workflows/mcp-query-router');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpQueryRouter });
+    } catch { /* not available */ }
+
     try {
       const { mcpQuery } = require('./workflows/mcp-query');
       workers.push({ taskQueue: 'long-tail-system', workflow: mcpQuery });
-    } catch { /* mcp-query not available */ }
+    } catch { /* not available */ }
+
+    try {
+      const { mcpDeterministic } = require('./workflows/mcp-deterministic');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpDeterministic });
+    } catch { /* not available */ }
   }
 
   return workers;

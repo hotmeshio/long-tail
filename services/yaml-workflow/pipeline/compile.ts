@@ -320,10 +320,15 @@ Example edge with transform:
 IMPORTANT: Check EVERY array-typed data_flow edge. Compare the source step's result item keys with the consuming step's argument item keys. If they differ, add a transform. Look at the actual tool_arguments in the execution trace to determine the correct field_map, defaults, and derivations.
 
 ### Input Classification
-- **dynamic**: Values callers MUST provide: URLs, credentials, file paths, queries, search terms
-- **fixed**: Implementation details with sensible defaults: selectors, timeouts, boolean flags
+- **dynamic**: Simple values callers MUST provide: URLs, credentials, file paths, queries, search terms. These are always scalar strings, numbers, or booleans — NEVER complex objects or arrays.
+- **fixed**: Implementation details with sensible defaults: selectors, timeouts, boolean flags, AND complex structured arguments like \`steps\` arrays, \`login\` objects, or \`pages\` arrays. These are baked into stored tool_arguments.
 
-Flatten nested objects containing dynamic values. E.g., \`login: {url, username, password}\` → separate \`login_url\`, \`username\`, \`password\` fields.
+**Complex tool arguments (arrays of objects, nested structures) are ALWAYS fixed.** They represent the implementation recipe, not user input. For example:
+- A \`steps\` array describing browser actions (navigate, fill, click, screenshot) → **fixed**
+- A \`login\` object with selectors and credentials → flatten the credentials (username, password) as dynamic, but the selectors as fixed
+- A \`pages\` array of URLs to capture → **fixed** if hardcoded from the trace, or a data_flow edge if discovered at runtime
+
+Flatten nested objects containing dynamic values. E.g., \`login: {url, username, password}\` → separate \`login_url\`, \`username\`, \`password\` fields. But NEVER expose the full nested object or array as a trigger input.
 
 **Arrays that were DISCOVERED at runtime (by a prior step) are NOT inputs.** They flow between steps via data_flow edges. Only make an array a trigger input if the user explicitly provided it in their prompt. If the array was produced by a discovery step (extract_content, query, list), keep the discovery step as core and wire its output to the consuming step.
 

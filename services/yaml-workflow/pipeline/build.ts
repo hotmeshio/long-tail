@@ -276,10 +276,16 @@ function wireStepInputs(
     if (edgesForStep.length > 0) return inputMappings;
   }
 
-  // Mechanical fallback: match step argument keys against trigger inputs and prior outputs
+  // Mechanical fallback: match step argument keys against trigger inputs and prior outputs.
+  // Skip complex array/object arguments — they come from stored tool_arguments, not wiring.
   if (step.kind === 'tool') {
     for (const key of Object.keys(step.arguments)) {
       if (key === '_iteration') continue;
+      // Don't wire complex arguments (arrays, nested objects) — these are stored defaults
+      const argValue = step.arguments[key];
+      if (Array.isArray(argValue) || (argValue && typeof argValue === 'object' && !Array.isArray(argValue) && Object.keys(argValue as object).length > 2)) {
+        continue;
+      }
       if (triggerInputKeys.has(key)) {
         inputMappings[key] = `{${triggerId}.output.data.${key}}`;
       } else if (prevResult && typeof prevResult === 'object' && !Array.isArray(prevResult) &&

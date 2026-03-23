@@ -256,9 +256,40 @@ export async function resolveServerIds(steps: ExtractedStep[]): Promise<void> {
  * Extract pipeline stage: parse execution events into ordered steps.
  */
 export async function extract(ctx: PipelineContext): Promise<PipelineContext> {
-  // Extract the original prompt from the execution's start event
+  // Extract the original prompt: try start event first, then fall back to
+  // the user message in the first callQueryLLM activity (for child workflows
+  // spawned by mcpQueryRouter where input isn't in the start event).
   const startEvent = ctx.execution.events.find(e => e.event_type === 'workflow_execution_started');
-  ctx.originalPrompt = (startEvent?.attributes as any)?.input?.prompt || '';
+  let prompt = (startEvent?.attributes as any)?.input?.prompt || '';
+
+  if (!prompt) {
+    // Look for the prompt in callQueryLLM's input messages
+    for (const e of ctx.execution.events) {
+      const attrs = e.attributes as unknown as Record<string, unknown>;
+      if (attrs.activity_type === 'callQueryLLM' && e.event_type === 'activity_task_completed') {
+        const input = attrs.input as unknown[];
+        if (Array.isArray(input) && Array.isArray(input[0])) {
+          const messages = input[0] as Array<{ role: string; content: string }>;
+          const userMsg = messages.find(m => m.role === 'user');
+          if (userMsg?.content) { prompt = userMsg.content; break; }
+        }
+        break;
+      }
+    }
+  }
+
+  // Also try findCompiledWorkflows input (router child workflows)
+  if (!prompt) {
+    for (const e of ctx.execution.events) {
+      const attrs = e.attributes as unknown as Record<string, unknown>;
+      if (attrs.activity_type === 'findCompiledWorkflows' && Array.isArray(attrs.input)) {
+        const input = attrs.input as unknown[];
+        if (typeof input[0] === 'string') { prompt = input[0]; break; }
+      }
+    }
+  }
+
+  ctx.originalPrompt = prompt;
 
   // Extract ordered steps
   ctx.rawSteps = extractStepSequence(ctx.execution.events);

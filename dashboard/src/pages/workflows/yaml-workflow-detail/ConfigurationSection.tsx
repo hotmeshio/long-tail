@@ -26,6 +26,7 @@ export function ConfigurationSection({
   yamlTextareaRef,
   isCollapsed,
   onToggle,
+  schemasGrid,
 }: {
   wf: any;
   resolvedInputSchema: any;
@@ -48,6 +49,8 @@ export function ConfigurationSection({
   yamlTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
   isCollapsed: boolean;
   onToggle: (key: string) => void;
+  /** Render input/output schemas side-by-side in a 2-column grid. */
+  schemasGrid?: boolean;
 }) {
   const hasFieldMeta = inputFieldMetaDraft.length > 0;
   const [advancedMode, setAdvancedMode] = useState(false);
@@ -113,51 +116,54 @@ export function ConfigurationSection({
           <p className="text-xs text-status-error">{updateMutation.error.message}</p>
         )}
 
-        {/* Input Schema — visual editor or raw JSON */}
-        <div>
-          <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
+        {/* Input + Output Schemas */}
+        <div className={schemasGrid ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'space-y-6'}>
+          {/* Input Schema — visual editor or raw JSON */}
+          <div>
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
 
-          {configEditing && hasFieldMeta && !advancedMode ? (
-            <InputSchemaEditor
-              fields={inputFieldMetaDraft}
-              onChange={setInputFieldMetaDraft}
-              editing={configEditing}
-            />
-          ) : configEditing ? (
-            <textarea
-              value={inputSchemaDraft}
-              onChange={(e) => setInputSchemaDraft(e.target.value)}
-              className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
-              rows={Math.max(inputSchemaDraft.split('\n').length + 1, 6)}
-              style={{ fieldSizing: 'content' } as React.CSSProperties}
-              spellCheck={false}
-            />
-          ) : hasFieldMeta ? (
-            <InputSchemaEditor
-              fields={inputFieldMetaDraft}
-              onChange={() => {}}
-              editing={false}
-            />
-          ) : (
-            <JsonViewer data={resolvedInputSchema ?? {}} label="" />
-          )}
-        </div>
+            {configEditing && hasFieldMeta && !advancedMode ? (
+              <InputSchemaEditor
+                fields={inputFieldMetaDraft}
+                onChange={setInputFieldMetaDraft}
+                editing={configEditing}
+              />
+            ) : configEditing ? (
+              <textarea
+                value={inputSchemaDraft}
+                onChange={(e) => setInputSchemaDraft(e.target.value)}
+                className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                rows={Math.max(inputSchemaDraft.split('\n').length + 1, 6)}
+                style={{ fieldSizing: 'content' } as React.CSSProperties}
+                spellCheck={false}
+              />
+            ) : hasFieldMeta ? (
+              <InputSchemaEditor
+                fields={inputFieldMetaDraft}
+                onChange={() => {}}
+                editing={false}
+              />
+            ) : (
+              <JsonViewer data={resolvedInputSchema ?? {}} label="" />
+            )}
+          </div>
 
-        {/* Output Schema */}
-        <div>
-          <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
-          {configEditing ? (
-            <textarea
-              value={outputSchemaDraft}
-              onChange={(e) => setOutputSchemaDraft(e.target.value)}
-              className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
-              rows={Math.max(outputSchemaDraft.split('\n').length + 1, 6)}
-              style={{ fieldSizing: 'content' } as React.CSSProperties}
-              spellCheck={false}
-            />
-          ) : (
-            <JsonViewer data={resolvedOutputSchema ?? {}} label="" />
-          )}
+          {/* Output Schema */}
+          <div>
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
+            {configEditing ? (
+              <textarea
+                value={outputSchemaDraft}
+                onChange={(e) => setOutputSchemaDraft(e.target.value)}
+                className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                rows={Math.max(outputSchemaDraft.split('\n').length + 1, 6)}
+                style={{ fieldSizing: 'content' } as React.CSSProperties}
+                spellCheck={false}
+              />
+            ) : (
+              <JsonViewer data={resolvedOutputSchema ?? {}} label="" />
+            )}
+          </div>
         </div>
 
         {/* YAML Definition */}

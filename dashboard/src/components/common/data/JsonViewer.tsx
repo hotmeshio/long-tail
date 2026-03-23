@@ -231,17 +231,23 @@ export function JsonViewer({
   data,
   label,
   variant,
+  defaultCollapsed = false,
+  defaultMode,
 }: {
   data: unknown;
   label?: ReactNode;
   /** Optional visual variant. `panel` adds a lavender border and lighter background. */
   variant?: 'default' | 'panel';
+  /** Start with all nodes collapsed (default: false — root expanded, children collapsed). */
+  defaultCollapsed?: boolean;
+  /** Initial view mode. Defaults to 'json'. */
+  defaultMode?: ViewMode;
 }) {
-  const [mode, setMode] = useState<ViewMode>('json');
+  const [mode, setMode] = useState<ViewMode>(defaultMode ?? 'json');
   const [copied, setCopied] = useState(false);
   // Bumping generation forces all JsonNodes to re-evaluate collapse state.
   // Even (incl. 0) = collapsed, odd = fully expanded.
-  const [generation, setGeneration] = useState(0);
+  const [generation, setGeneration] = useState(defaultCollapsed ? 0 : 0);
   const isGlobalCollapsed = generation % 2 === 0;
   const toggleGlobalCollapse = useCallback(() => setGeneration((g) => g + 1), []);
 

@@ -66,9 +66,19 @@ export function classifyArgument(
     }
   }
 
-  // Large arrays are execution-specific data, not sensible defaults
-  if (Array.isArray(value) && value.length > MAX_DEFAULT_ARRAY_LENGTH) {
-    return 'dynamic';
+  // Arrays: complex instruction arrays (like browser steps) are fixed implementation details.
+  // Only flat data arrays (URLs, IDs) that are large should be dynamic.
+  if (Array.isArray(value)) {
+    if (value.length > 0 && value[0] && typeof value[0] === 'object' && !Array.isArray(value[0])) {
+      // Array of objects — check if it's an instruction array (has 'action', 'step', 'type' keys)
+      const firstItem = value[0] as Record<string, unknown>;
+      if ('action' in firstItem || 'step' in firstItem || 'type' in firstItem) {
+        return 'fixed'; // Implementation recipe — not user input
+      }
+    }
+    if (value.length > MAX_DEFAULT_ARRAY_LENGTH) {
+      return 'dynamic';
+    }
   }
 
   // Default: treat as fixed (has a default from the execution)
