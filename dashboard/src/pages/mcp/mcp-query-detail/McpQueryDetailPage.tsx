@@ -1,86 +1,27 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
-import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
-import { SimpleMarkdown } from '../../../components/common/display/SimpleMarkdown';
-import { JsonViewer } from '../../../components/common/data/JsonViewer';
-import { SwimlaneTimeline } from '../../workflows/workflow-execution/SwimlaneTimeline';
 import { useWorkflowDetailEvents } from '../../../hooks/useNatsEvents';
 import { useWizardStep } from '../../../hooks/useWizardStep';
 import { useMcpQueryExecution, useMcpQueryResult, useYamlWorkflowForSource, useDescribeMcpQuery } from '../../../api/mcp-query';
 import { useCreateYamlWorkflow, useYamlWorkflowAppIds } from '../../../api/yaml-workflows';
 import { useWorkflowExecution } from '../../../api/workflows';
 import { useTaskByWorkflowId } from '../../../api/tasks';
-import { TagInput } from '../../../components/common/form/TagInput';
+
+import { mapStatus, extractJsonFromSummary, STEP_LABELS_BASE } from './helpers';
+import type { Step } from './helpers';
+import { OriginalQueryPanel } from './OriginalQueryPanel';
+import { TimelinePanel } from './TimelinePanel';
+import { ProfilePanel } from './ProfilePanel';
 import { DeployPanel } from './DeployPanel';
 import { TestPanel } from './TestPanel';
 import { VerifyPanel } from './VerifyPanel';
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function ResultSummary({ text }: { text: string }) {
-  const parts: Array<{ type: 'text' | 'json'; content: string }> = [];
-  const jsonBlockRe = /\n?\{[\s\S]*?\n\}/g;
-  let lastIndex = 0;
-  for (const match of text.matchAll(jsonBlockRe)) {
-    try {
-      JSON.parse(match[0].trim());
-      if (match.index! > lastIndex) parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
-      parts.push({ type: 'json', content: match[0].trim() });
-      lastIndex = match.index! + match[0].length;
-    } catch { /* not JSON */ }
-  }
-  if (lastIndex < text.length) parts.push({ type: 'text', content: text.slice(lastIndex) });
-  if (!parts.length) parts.push({ type: 'text', content: text });
-  return (
-    <div className="space-y-3">
-      {parts.map((p, i) => p.type === 'json'
-        ? <JsonViewer key={i} data={JSON.parse(p.content)} defaultMode="tree" />
-        : p.content.trim() ? <SimpleMarkdown key={i} content={p.content.trim()} /> : null)}
-    </div>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 mb-3">
-      <span className="text-xs font-semibold uppercase tracking-widest text-text-tertiary">{children}</span>
-      <span className="flex-1 border-b border-surface-border" />
-    </div>
-  );
-}
-
-
-function extractJsonFromSummary(summary: string): Record<string, unknown> | null {
-  const match = summary.match(/```json\s*([\s\S]*?)```/) || summary.match(/\{[\s\S]*?\n\}/);
-  if (!match) return null;
-  try { return JSON.parse((match[1] ?? match[0]).trim()); } catch { return null; }
-}
-
-function PanelTitle({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="mb-6">
-      <h2 className="text-lg font-light text-text-primary">{title}</h2>
-      {subtitle && <p className="text-xs text-text-tertiary mt-0.5">{subtitle}</p>}
-    </div>
-  );
-}
-
-function mapStatus(exec: { status?: string } | undefined): string {
-  if (!exec) return 'pending';
-  if (exec.status === 'completed') return 'completed';
-  if (exec.status === 'failed') return 'failed';
-  return 'in_progress';
-}
-
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
-const STEP_LABELS_BASE = ['Original', 'Timeline', 'Profile', 'Deploy', 'Test', 'Verify'] as const;
 
 // ── Main component ──────────────────────────────────────────────────────────
 
@@ -200,6 +141,8 @@ export function McpQueryDetailPage() {
     setManualStep(null);
   };
 
+  // Determine the correct next step for profile panel navigation
+  const profileNextStep = compiledYaml?.status === 'active' ? 5 : 4;
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-12rem)]">
@@ -230,19 +173,19 @@ export function McpQueryDetailPage() {
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>
             <p className="text-xs text-text-primary font-mono">
-              {execution?.duration_ms != null ? `${(execution.duration_ms / 1000).toFixed(1)}s` : '—'}
+              {execution?.duration_ms != null ? `${(execution.duration_ms / 1000).toFixed(1)}s` : '\u2014'}
             </p>
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Started</p>
             <p className="text-xs text-text-primary">
-              {execution?.start_time ? <TimeAgo date={execution.start_time} /> : '—'}
+              {execution?.start_time ? <TimeAgo date={execution.start_time} /> : '\u2014'}
             </p>
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Tool Calls</p>
             <p className="text-xs text-text-primary">
-              {typeof result?.tool_calls_made === 'number' ? result.tool_calls_made : '—'}
+              {typeof result?.tool_calls_made === 'number' ? result.tool_calls_made : '\u2014'}
             </p>
           </div>
         </div>
@@ -250,222 +193,57 @@ export function McpQueryDetailPage() {
 
       <WizardSteps labels={stepLabels} current={step} maxReachable={maxReachable} onStepClick={(s) => setManualStep(s as Step)} />
 
-      {/* Panel content — flex-1 ensures WizardNav sticks to bottom */}
+      {/* Panel content */}
       <div className="flex-1">
 
-      {/* Step 1: Original Query — input/output side by side */}
       {step === 1 && (
-        <div>
-          <PanelTitle title="Original MCP Query" subtitle="Dynamic LLM-orchestrated execution with MCP tools" />
-
-          {status === 'in_progress' && events.length > 0 && <SwimlaneTimeline events={events} />}
-          {status === 'in_progress' && events.length === 0 && <p className="text-sm text-text-secondary animate-pulse">Starting query...</p>}
-
-          {status === 'completed' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left: Input */}
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input</p>
-                {originalEnvelope ? (
-                  <JsonViewer data={originalEnvelope} defaultMode="tree" />
-                ) : originalPrompt ? (
-                  <p className="text-xs text-text-primary leading-relaxed px-3 py-2 bg-surface-sunken rounded-md">{originalPrompt}</p>
-                ) : (
-                  <p className="text-xs text-text-tertiary italic">Loading...</p>
-                )}
-              </div>
-
-              {/* Right: Output */}
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output</p>
-                {originalOutput ? (
-                  <JsonViewer data={originalOutput} defaultMode="tree" />
-                ) : result?.summary ? (
-                  <ResultSummary text={result.summary as string} />
-                ) : (
-                  <p className="text-xs text-text-tertiary italic">No structured output</p>
-                )}
-                {originalExecution?.duration_ms != null && (
-                  <p className="text-[10px] text-text-tertiary mt-2">{(originalExecution.duration_ms / 1000).toFixed(1)}s</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {status === 'completed' && (
-            <WizardNav><span /><button onClick={() => setManualStep(2)} className="btn-primary text-xs">Next: Timeline</button></WizardNav>
-          )}
-        </div>
+        <OriginalQueryPanel
+          status={status}
+          events={events}
+          originalEnvelope={originalEnvelope}
+          originalPrompt={originalPrompt}
+          originalOutput={originalOutput}
+          originalDurationMs={originalExecution?.duration_ms}
+          resultSummary={result?.summary as string | undefined}
+          onNext={() => setManualStep(2)}
+        />
       )}
 
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* Step 2: MCP Timeline */}
       {step === 2 && (
-        <div>
-          <PanelTitle title="MCP Execution Timeline" subtitle="Activity swimlane showing tool calls and their durations" />
-          <SwimlaneTimeline events={events} />
-          <WizardNav>
-            <button onClick={() => setManualStep(1)} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
-            <button onClick={() => setManualStep(3)} className="btn-primary text-xs">Next: Profile</button>
-          </WizardNav>
-        </div>
+        <TimelinePanel
+          events={events}
+          onBack={() => setManualStep(1)}
+          onNext={() => setManualStep(3)}
+        />
       )}
 
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* Step 3: Compile — config form or readonly summary */}
       {step === 3 && (
-        <div>
-          {compiledYaml ? (
-            <div>
-              <PanelTitle title="Deterministic Workflow Profile" subtitle="Configuration and pipeline for the compiled MCP workflow tool" />
-
-              {/* Two-column layout: details left, pipeline+tags right */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
-                {/* Left: identity + description */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Name</p>
-                      <p className="text-sm font-mono text-text-primary">{compiledYaml.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Status</p>
-                      <StatusBadge status={compiledYaml.status} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Namespace</p>
-                      <p className="text-xs font-mono text-text-primary">{(compiledYaml as any).app_id || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Topic</p>
-                      <p className="text-xs font-mono text-text-primary">{compiledYaml.graph_topic || '—'}</p>
-                    </div>
-                  </div>
-                  {(compiledYaml as any).description && (
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Description</p>
-                      <p className="text-xs text-text-secondary leading-relaxed">{(compiledYaml as any).description}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: pipeline + tags */}
-                <div className="space-y-4">
-                  {(compiledYaml as any).activity_manifest?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Pipeline</p>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {((compiledYaml as any).activity_manifest as any[])
-                          .filter((a: any) => a.tool_source !== 'trigger')
-                          .map((a: any, i: number, arr: any[]) => (
-                            <span key={i} className="flex items-center gap-1">
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-surface-sunken font-mono text-text-primary">{a.mcp_tool_name || a.title}</span>
-                              {i < arr.length - 1 && <span className="text-text-tertiary text-[10px]">→</span>}
-                            </span>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                  {(compiledYaml as any).tags?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</p>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {((compiledYaml as any).tags as string[]).slice(0, 12).map((tag: string) => (
-                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-sunken text-text-secondary">{tag}</span>
-                        ))}
-                        {((compiledYaml as any).tags as string[]).length > 12 && (
-                          <span className="text-[10px] text-text-tertiary">+{((compiledYaml as any).tags as string[]).length - 12} more</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <WizardNav>
-                <button onClick={() => setManualStep(2)} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
-                <div className="flex gap-3">
-                  <Link to={`/mcp/workflows/${compiledYaml.id}`} className="px-3 py-1.5 text-xs border border-surface-border rounded text-text-primary hover:bg-surface-sunken transition-colors">
-                    Edit Workflow
-                  </Link>
-                  {compiledYaml.status !== 'active'
-                    ? <button onClick={() => setManualStep(4)} className="btn-primary text-xs">Next: Deploy</button>
-                    : <button onClick={() => setManualStep(5)} className="btn-primary text-xs">Next: Test</button>}
-                </div>
-              </WizardNav>
-            </div>
-          ) : (
-            <div>
-              <PanelTitle title="Create Workflow Profile" subtitle="Define the deterministic workflow tool from this execution" />
-
-              {originalPrompt && (
-                <div className="mb-6">
-                  <SectionHeading>Original Query</SectionHeading>
-                  <p className="text-xs text-text-primary leading-relaxed">{originalPrompt}</p>
-                </div>
-              )}
-
-              <SectionHeading>Workflow Configuration</SectionHeading>
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Namespace *</label>
-                  <input type="text" value={compileAppId} onChange={(e) => setCompileAppId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                    className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary" placeholder="e.g. longtail" />
-                  {allAppIds.length > 0 && (
-                    <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                      {allAppIds.map((id) => (
-                        <button key={id} type="button" onClick={() => setCompileAppId(id)}
-                          className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${compileAppId === id ? 'bg-accent/20 text-accent' : 'bg-surface-sunken text-text-tertiary hover:text-text-secondary'}`}>{id}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Name *</label>
-                  <input type="text" value={compileName} onChange={(e) => setCompileName(e.target.value)}
-                    className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary" placeholder="e.g. auth-screenshot-all-nav-pages" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Topic</label>
-                  <div className="flex items-center gap-2">
-                    <input type="text" value={derivedSubscribes} onChange={(e) => { setAutoSubscribes(false); setCompileSubscribes(e.target.value); }}
-                      className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary" placeholder="auto-derived" />
-                    {!autoSubscribes && <button type="button" onClick={() => setAutoSubscribes(true)} className="text-[10px] text-accent hover:underline shrink-0">Auto</button>}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
-                    {!compileDescription && !describeData && describePrompt && <span className="text-[10px] text-accent animate-pulse">Generating...</span>}
-                  </div>
-                  <textarea value={compileDescription} onChange={(e) => setCompileDescription(e.target.value)}
-                    placeholder="Describe what this workflow does as a reusable tool..."
-                    className="w-full min-h-[80px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent-primary" />
-                  <p className="text-[10px] text-text-tertiary mt-1">{describeData ? 'AI-generated. Edit to refine.' : 'Describe what this workflow does so future queries can find it.'}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
-                  <TagInput tags={compileTags} onChange={setCompileTags} placeholder="e.g. browser, screenshots, login" />
-                  <p className="text-[10px] text-text-tertiary mt-1">Press Enter or comma to add.</p>
-                </div>
-              </div>
-
-              <WizardNav>
-                <button onClick={() => setManualStep(2)} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
-                <button onClick={handleCompile} disabled={!compileName.trim() || !compileAppId.trim() || createYaml.isPending} className="btn-primary text-xs">
-                  {createYaml.isPending ? 'Creating...' : 'Create Profile'}
-                </button>
-              </WizardNav>
-              {createYaml.isError && <p className="mt-3 text-sm text-status-error">{createYaml.error.message}</p>}
-            </div>
-          )}
-        </div>
+        <ProfilePanel
+          compiledYaml={compiledYaml}
+          originalPrompt={originalPrompt}
+          compileAppId={compileAppId}
+          setCompileAppId={setCompileAppId}
+          compileName={compileName}
+          setCompileName={setCompileName}
+          derivedSubscribes={derivedSubscribes}
+          setCompileSubscribes={setCompileSubscribes}
+          autoSubscribes={autoSubscribes}
+          setAutoSubscribes={setAutoSubscribes}
+          compileDescription={compileDescription}
+          setCompileDescription={setCompileDescription}
+          compileTags={compileTags}
+          setCompileTags={setCompileTags}
+          describeData={describeData}
+          describePrompt={describePrompt}
+          allAppIds={allAppIds}
+          onCompile={handleCompile}
+          isCompiling={createYaml.isPending}
+          compileError={createYaml.isError ? createYaml.error.message : undefined}
+          onBack={() => setManualStep(2)}
+          onNext={() => setManualStep(profileNextStep as Step)}
+        />
       )}
 
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* Step 4: Deploy — full config editor, lifecycle, versions */}
       {step === 4 && compiledYaml && (
         <DeployPanel
           yamlId={compiledYaml.id}
@@ -474,8 +252,6 @@ export function McpQueryDetailPage() {
         />
       )}
 
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* Step 5: Test & Compare — grid-aligned inputs/outputs */}
       {step === 5 && compiledYaml && (
         <TestPanel
           yamlId={compiledYaml.id}
@@ -487,7 +263,6 @@ export function McpQueryDetailPage() {
         />
       )}
 
-      {/* Step 6: Verify — submit original prose, confirm deterministic path fires */}
       {step === 6 && compiledYaml && (
         <VerifyPanel
           originalWorkflowId={workflowId}

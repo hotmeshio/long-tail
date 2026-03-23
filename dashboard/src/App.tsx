@@ -62,10 +62,10 @@ const WorkflowsDashboard = lazy(() =>
   import('./pages/workflows/WorkflowsDashboard').then((m) => ({ default: m.WorkflowsDashboard })),
 );
 const StartWorkflowPage = lazy(() =>
-  import('./pages/workflows/StartWorkflowPage').then((m) => ({ default: m.StartWorkflowPage })),
+  import('./pages/workflows/start').then((m) => ({ default: m.StartWorkflowPage })),
 );
 const CronWorkflowsPage = lazy(() =>
-  import('./pages/workflows/CronWorkflowsPage').then((m) => ({ default: m.CronWorkflowsPage })),
+  import('./pages/workflows/cron/CronWorkflowsPage').then((m) => ({ default: m.CronWorkflowsPage })),
 );
 const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),

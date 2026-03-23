@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Modal } from './Modal';
 import { TagInput } from '../form/TagInput';
 import { useYamlWorkflowAppIds } from '../../../api/yaml-workflows';
+import { validateNamespace, sanitize, STEP_LABELS } from './convert-to-yaml-helpers';
 
 interface ConvertToYamlModalProps {
   open: boolean;
@@ -14,28 +15,6 @@ interface ConvertToYamlModalProps {
   }) => void;
   isPending?: boolean;
 }
-
-/** HotMesh appId: letters and digits only (no dashes, no underscores). Must start with a letter. */
-const NAMESPACE_RE = /^[a-z][a-z0-9]*$/;
-
-function validateNamespace(value: string): string | null {
-  if (!value) return 'Namespace is required';
-  if (value.includes('-') || value.includes('_')) return 'Only letters and numbers allowed — no dashes or underscores';
-  if (!NAMESPACE_RE.test(value)) {
-    if (!/^[a-z]/.test(value)) return 'Must start with a lowercase letter';
-    return 'Only lowercase letters and numbers allowed';
-  }
-  return null;
-}
-
-function sanitize(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-const STEP_LABELS = ['Namespace', 'Tool', 'Tags'] as const;
 
 export function ConvertToYamlModal({
   open,

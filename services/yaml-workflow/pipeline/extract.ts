@@ -14,6 +14,7 @@ import type {
   ActivityTaskCompletedAttributes,
 } from '@hotmeshio/hotmesh/build/types/exporter';
 import type { ExtractedStep, PipelineContext } from './types';
+import { EXTRACT_DEFAULT_SYSTEM_PROMPT, EXTRACT_DEFAULT_USER_TEMPLATE } from './prompts';
 
 /**
  * Parse an MCP activity type name back into server name + tool name.
@@ -94,8 +95,8 @@ function buildDefaultPrompt(priorSteps: ExtractedStep[]): Array<{ role: string; 
     : 'Analyze the provided data.';
 
   return [
-    { role: 'system', content: `You are a data analysis assistant. Interpret the provided data and return a structured JSON response with: title, summary, sections (array of {heading, content}), and metrics (array of {label, value}).` },
-    { role: 'user', content: `${dataRef}\n\nData:\n{input_data}\n\nProvide a concise analysis.` },
+    { role: 'system', content: EXTRACT_DEFAULT_SYSTEM_PROMPT },
+    { role: 'user', content: EXTRACT_DEFAULT_USER_TEMPLATE.replace('{dataRef}', dataRef) },
   ];
 }
 

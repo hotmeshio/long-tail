@@ -27,6 +27,7 @@ import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
 import { ESCALATION_COLUMNS, STATUS_COLUMN, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
+import { createBulkHandlers } from './helpers';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
@@ -83,6 +84,8 @@ export function AvailableEscalationsPage() {
     return [...roles];
   }, [escalations, selectedIds]);
 
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
   const handleClaim = () => {
     if (!claimTarget) return;
     const minutes = claimDuration === 'custom' ? customClaimMinutes : parseInt(claimDuration);
@@ -98,78 +101,24 @@ export function AvailableEscalationsPage() {
     );
   };
 
-  const handleSetPriority = (priority: 1 | 2 | 3 | 4) => {
-    setPriority.mutate(
-      { ids: [...selectedIds], priority },
-      {
-        onSuccess: (data) => {
-          addToast(`Priority updated for ${data.updated} escalation(s)`, 'success');
-          setSelectedIds(new Set());
-        },
-        onError: (err) => addToast((err as Error).message, 'error'),
-      },
-    );
-  };
-
-  const handleBulkClaim = (durationMinutes: number) => {
-    bulkClaim.mutate(
-      { ids: [...selectedIds], durationMinutes },
-      {
-        onSuccess: (data) => {
-          const msg = data.skipped
-            ? `Claimed ${data.claimed} escalation(s), ${data.skipped} skipped`
-            : `Claimed ${data.claimed} escalation(s)`;
-          addToast(msg, 'success');
-          setSelectedIds(new Set());
-        },
-        onError: (err) => addToast((err as Error).message, 'error'),
-      },
-    );
-  };
-
-  const handleBulkEscalate = (targetRole: string) => {
-    bulkEscalate.mutate(
-      { ids: [...selectedIds], targetRole },
-      {
-        onSuccess: (data) => {
-          addToast(`Escalated ${data.updated} escalation(s) to ${targetRole}`, 'success');
-          setSelectedIds(new Set());
-        },
-        onError: (err) => addToast((err as Error).message, 'error'),
-      },
-    );
-  };
-
-  const handleBulkTriage = (hint?: string) => {
-    bulkTriage.mutate(
-      { ids: [...selectedIds], hint },
-      {
-        onSuccess: (data) => {
-          addToast(`Submitted ${data.triaged} escalation(s) for triage`, 'success');
-          setSelectedIds(new Set());
-          setTriageModalOpen(false);
-        },
-        onError: (err) => addToast((err as Error).message, 'error'),
-      },
-    );
-  };
-
-  const handleBulkAssign = (targetUserId: string, durationMinutes: number) => {
-    bulkAssign.mutate(
-      { ids: [...selectedIds], targetUserId, durationMinutes },
-      {
-        onSuccess: (data) => {
-          const msg = data.skipped
-            ? `Assigned ${data.assigned} escalation(s), ${data.skipped} skipped`
-            : `Assigned ${data.assigned} escalation(s)`;
-          addToast(msg, 'success');
-          setSelectedIds(new Set());
-          setAssignModalOpen(false);
-        },
-        onError: (err) => addToast((err as Error).message, 'error'),
-      },
-    );
-  };
+  const {
+    handleSetPriority,
+    handleBulkClaim,
+    handleBulkEscalate,
+    handleBulkTriage,
+    handleBulkAssign,
+  } = createBulkHandlers({
+    selectedIds,
+    addToast,
+    clearSelection,
+    setPriority,
+    bulkClaim,
+    bulkEscalate,
+    bulkTriage,
+    bulkAssign,
+    closeTriageModal: () => setTriageModalOpen(false),
+    closeAssignModal: () => setAssignModalOpen(false),
+  });
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);

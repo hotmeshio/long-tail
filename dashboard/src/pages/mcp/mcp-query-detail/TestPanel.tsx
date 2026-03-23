@@ -11,6 +11,8 @@ import { useWorkflowExecution } from '../../../api/workflows';
 import { useTaskByWorkflowId } from '../../../api/tasks';
 import { buildSkeleton } from '../../workflows/yaml-workflow-detail/helpers';
 import type { LTJob } from '../../../api/types';
+import { extractJsonFromSummary } from './helpers';
+import { SectionHeading } from './SectionHeading';
 
 function jobLabel(job: LTJob): string {
   const date = new Date(job.created_at);
@@ -18,22 +20,6 @@ function jobLabel(job: LTJob): string {
   const day = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   const status = job.status === 'completed' || Number(job.status) === 0 ? 'completed' : job.is_live ? 'running' : 'failed';
   return `${day} ${time} — ${status}`;
-}
-
-function extractJsonFromSummary(summary: string): Record<string, unknown> | null {
-  const match = summary.match(/```json\s*([\s\S]*?)```/) || summary.match(/\{[\s\S]*?\n\}/);
-  if (!match) return null;
-  const raw = match[1] ?? match[0];
-  try { return JSON.parse(raw.trim()); } catch { return null; }
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 mb-3">
-      <span className="text-xs font-semibold uppercase tracking-widest text-text-tertiary">{children}</span>
-      <span className="flex-1 border-b border-surface-border" />
-    </div>
-  );
 }
 
 interface TestPanelProps {
