@@ -179,6 +179,7 @@ Invoke an active YAML workflow with parameters.
 
 ```json
 {
+  "job_id": "hmsh:lt-yaml:j:abc123...",
   "result": {
     "metadata": { "jid": "abc123", "tpc": "rotate_and_verify" },
     "data": { "rotated_url": "https://...", "verified": true }
@@ -222,14 +223,84 @@ Stops accepting invocations. If active, stops the engine.
 
 **Response 404:** Workflow not found.
 
+## List app IDs
+
+```
+GET /api/yaml-workflows/app-ids
+```
+
+Returns distinct `app_id` values from non-archived workflows.
+
+**Response 200:**
+
+```json
+{
+  "app_ids": ["lt-yaml", "my-custom-app"]
+}
+```
+
+## Get version history
+
+```
+GET /api/yaml-workflows/:id/versions
+```
+
+Returns version history for a YAML workflow.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | `integer` | Max results (default: 20) |
+| `offset` | `integer` | Pagination offset (default: 0) |
+
+**Response 200:** Version history records.
+
+**Response 404:** Workflow not found.
+
+## Get version snapshot
+
+```
+GET /api/yaml-workflows/:id/versions/:version
+```
+
+Returns a single version snapshot with YAML content, schemas, and activity manifest.
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `id` | Workflow UUID |
+| `version` | Version number (positive integer) |
+
+**Response 200:** Version snapshot object.
+
+**Response 400:**
+
+```json
+{ "error": "Invalid version number" }
+```
+
+**Response 404:**
+
+```json
+{ "error": "Version 3 not found" }
+```
+
 ## Get raw YAML
 
 ```
 GET /api/yaml-workflows/:id/yaml
 ```
 
-Returns the raw YAML content as `text/yaml`.
+Returns the raw YAML content as `text/yaml`. Supports an optional `version` query parameter to retrieve YAML for a specific version.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `version` | `integer` | Return YAML for this version instead of current |
 
 **Response 200:** YAML content (Content-Type: text/yaml).
 
-**Response 404:** Workflow not found.
+**Response 404:** Workflow or version not found.

@@ -227,6 +227,324 @@ Clears `assigned_to` and `assigned_until` on escalations where the claim has exp
 
 The number indicates how many escalation records were updated.
 
+## Get escalation types
+
+```
+GET /api/escalations/types
+```
+
+Returns distinct escalation type values across all escalations.
+
+**Response 200:**
+
+```json
+{
+  "types": ["review", "approval", "verification"]
+}
+```
+
+## Get escalation stats
+
+```
+GET /api/escalations/stats
+```
+
+Aggregated escalation statistics. RBAC-scoped: superadmins see all; others see only their roles.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `period` | `string` | Time period filter (e.g., `24h`, `7d`) |
+
+**Response 200:**
+
+```json
+{
+  "pending": 12,
+  "claimed": 3,
+  "created": 25,
+  "resolved": 10,
+  "by_role": [],
+  "by_type": []
+}
+```
+
+## Bulk update priority
+
+```
+PATCH /api/escalations/priority
+```
+
+Update the priority for multiple escalations at once. Requires admin or superadmin permission for the escalation roles.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | yes | Escalation UUIDs to update |
+| `priority` | `integer` | yes | New priority value (1, 2, 3, or 4) |
+
+**Example request:**
+
+```json
+{ "ids": ["esc-a1b2c3d4-...", "esc-e5f6a7b8-..."], "priority": 1 }
+```
+
+**Response 200:**
+
+```json
+{ "updated": 2 }
+```
+
+**Response 400:**
+
+```json
+{ "error": "ids must be a non-empty array" }
+```
+
+```json
+{ "error": "priority must be 1, 2, 3, or 4" }
+```
+
+**Response 403:**
+
+```json
+{ "error": "Insufficient permissions for role \"reviewer\"" }
+```
+
+## Bulk claim escalations
+
+```
+POST /api/escalations/bulk-claim
+```
+
+Claim multiple escalations for the authenticated user. Requires admin or superadmin permission for the escalation roles.
+
+**Request body:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `ids` | `string[]` | | Escalation UUIDs to claim |
+| `durationMinutes` | `integer` | 30 | How long each claim lasts |
+
+**Example request:**
+
+```json
+{ "ids": ["esc-a1b2c3d4-...", "esc-e5f6a7b8-..."], "durationMinutes": 60 }
+```
+
+**Response 200:** Result object with claim outcomes.
+
+**Response 400:**
+
+```json
+{ "error": "ids must be a non-empty array" }
+```
+
+## Bulk assign escalations
+
+```
+POST /api/escalations/bulk-assign
+```
+
+Assign multiple escalations to a specific user. Superadmins can assign anyone. Admins can only assign to users who hold the escalation's role.
+
+**Request body:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `ids` | `string[]` | | Escalation UUIDs to assign |
+| `targetUserId` | `string` | | User ID to assign the escalations to |
+| `durationMinutes` | `integer` | 30 | How long each assignment lasts |
+
+**Example request:**
+
+```json
+{ "ids": ["esc-a1b2c3d4-..."], "targetUserId": "user-x1y2z3", "durationMinutes": 60 }
+```
+
+**Response 200:** Result object with assignment outcomes.
+
+**Response 400:**
+
+```json
+{ "error": "targetUserId is required" }
+```
+
+```json
+{ "error": "Target user does not hold the \"reviewer\" role" }
+```
+
+## Bulk escalate to role
+
+```
+PATCH /api/escalations/bulk-escalate
+```
+
+Reassign multiple escalations to a different role. Requires admin or superadmin permission for the current escalation roles.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | yes | Escalation UUIDs to reassign |
+| `targetRole` | `string` | yes | Role to reassign the escalations to |
+
+**Example request:**
+
+```json
+{ "ids": ["esc-a1b2c3d4-...", "esc-e5f6a7b8-..."], "targetRole": "senior-reviewer" }
+```
+
+**Response 200:**
+
+```json
+{ "updated": 2 }
+```
+
+**Response 400:**
+
+```json
+{ "error": "targetRole is required" }
+```
+
+## Bulk triage escalations
+
+```
+POST /api/escalations/bulk-triage
+```
+
+Resolve multiple escalations and start AI triage workflows (mcpTriage) for each. Requires admin or superadmin permission for the escalation roles.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | yes | Escalation UUIDs to triage |
+| `hint` | `string` | no | Optional hint to guide the AI triage |
+
+**Example request:**
+
+```json
+{ "ids": ["esc-a1b2c3d4-..."], "hint": "Check the document orientation" }
+```
+
+**Response 200:**
+
+```json
+{
+  "triaged": 1,
+  "workflows": ["triage-esc-a1b2c3d4-...-1705312800000"]
+}
+```
+
+## Escalate to role (single)
+
+```
+PATCH /api/escalations/:id/escalate
+```
+
+Reassign a single escalation to a different role. The caller must be authorized to escalate from the current role to the target role (checked via escalation chains).
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `id` | Escalation UUID |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `targetRole` | `string` | yes | Role to reassign the escalation to |
+
+**Example request:**
+
+```json
+{ "targetRole": "senior-reviewer" }
+```
+
+**Response 200:** The updated escalation object with the new role.
+
+**Response 400:**
+
+```json
+{ "error": "targetRole is required" }
+```
+
+**Response 403:**
+
+```json
+{ "error": "Not authorized to escalate to this role" }
+```
+
+**Response 404:**
+
+```json
+{ "error": "Escalation not found" }
+```
+
+**Response 409:**
+
+```json
+{ "error": "Escalation is not pending" }
+```
+
+## Get escalations by workflow
+
+```
+GET /api/escalations/by-workflow/:workflowId
+```
+
+Returns all escalations linked to a specific workflow ID.
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `workflowId` | Workflow ID to search for |
+
+**Response 200:**
+
+```json
+{
+  "escalations": [
+    { "id": "esc-a1b2c3d4-...", "..." : "..." }
+  ]
+}
+```
+
+## Release a claim
+
+```
+POST /api/escalations/:id/release
+```
+
+Release a claimed escalation back to the available pool. Only the user who holds the current claim can release it.
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `id` | Escalation UUID |
+
+**Request body:** None.
+
+**Response 200:**
+
+```json
+{
+  "escalation": { "id": "esc-a1b2c3d4-...", "assigned_to": null, "assigned_until": null, "..." : "..." }
+}
+```
+
+**Response 409:**
+
+```json
+{ "error": "Escalation not found or not claimed by you" }
+```
+
 ## Escalation fields
 
 | Field | Type | Description |

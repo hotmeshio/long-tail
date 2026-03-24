@@ -210,9 +210,7 @@ const lt = await start({
 });
 ```
 
-Every cross-cutting concern follows the same pattern: implement a typed interface, register at startup, done. See the adapter guides:
-
-[Auth](docs/auth.md) | [Events](docs/events.md) | [Telemetry](docs/telemetry.md) | [Logging](docs/logging.md) | [MCP](docs/mcp.md) | [Maintenance](docs/maintenance.md) | [Escalation Strategies](docs/escalation-strategies.md)
+Every cross-cutting concern follows the same pattern: implement a typed interface, register at startup, done. See the [Docs](#docs) section for the full list of guides.
 
 ## Deployment
 
@@ -240,13 +238,19 @@ Both share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud
 | [Workflows](docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition, testing |
 | [Architecture](docs/architecture.md) | Project structure, conventions, built-in MCP servers, tag-based discovery |
 | [MCP](docs/mcp.md) | Server registration, tool calls, human queue, compiled workflows as tools |
+| [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, and custom escalation handlers |
 | [Cloud Deployment](docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker configurations |
 | [Data Model](docs/data.md) | Database schema and tables |
+| [QA Manual](docs/qa-manual.md) | Golden path walkthrough: setup, triage, compile, deploy, verify |
 | [Contributing](docs/contributing.md) | Development setup and guidelines |
+
+### Adapter Guides
+
+[Auth](docs/auth.md) | [Events](docs/events.md) | [Telemetry](docs/telemetry.md) | [Logging](docs/logging.md) | [Maintenance](docs/maintenance.md)
 
 ### API Reference
 
-[Workflows](docs/api/workflows.md) | [Tasks](docs/api/tasks.md) | [Escalations](docs/api/escalations.md) | [Users](docs/api/users.md) | [Roles](docs/api/roles.md) | [MCP Servers](docs/api/mcp-servers.md) | [Maintenance](docs/api/maintenance.md) | [DBA](docs/api/dba.md) | [Exports](docs/api/exports.md)
+[Workflows](docs/api/workflows.md) | [Tasks](docs/api/tasks.md) | [Escalations](docs/api/escalations.md) | [YAML Workflows](docs/api/yaml-workflows.md) | [Users](docs/api/users.md) | [Roles](docs/api/roles.md) | [MCP Servers](docs/api/mcp-servers.md) | [MCP Runs](docs/api/mcp-runs.md) | [Namespaces](docs/api/namespaces.md) | [Settings](docs/api/settings.md) | [Maintenance](docs/api/maintenance.md) | [DBA](docs/api/dba.md) | [Exports](docs/api/exports.md)
 
 ## Install
 

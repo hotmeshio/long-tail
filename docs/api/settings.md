@@ -14,8 +14,14 @@ GET /api/settings
 {
   "telemetry": {
     "traceUrl": "https://ui.honeycomb.io/pubsubdb/environments/test/datasets/long-tail/trace?trace_id={traceId}"
+  },
+  "escalation": {
+    "claimDurations": [15, 30, 60, 120, 480]
   }
 }
 ```
 
-The `traceUrl` field is a template string where `{traceId}` is replaced with the actual trace ID to build a link to the trace viewer. Returns `null` if no trace URL is configured.
+| Field | Type | Description |
+|-------|------|-------------|
+| `telemetry.traceUrl` | `string \| null` | Template string where `{traceId}` is replaced with the actual trace ID to build a link to the trace viewer. Returns `null` if no trace URL is configured. |
+| `escalation.claimDurations` | `number[]` | Available claim duration options in minutes. Used by the frontend to populate duration selectors. Configurable via the `LT_CLAIM_DURATION_OPTIONS` environment variable (JSON array). |

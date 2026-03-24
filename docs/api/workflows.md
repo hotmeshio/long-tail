@@ -479,12 +479,67 @@ const snapshot = await handle.state(true);
 
 ---
 
+## Cron Status
+
+### Get cron workflow status
+
+```
+GET /api/workflows/cron/status
+```
+
+Lists all cron-configured workflows and whether each is actively running.
+
+**Response 200:**
+
+```json
+{
+  "schedules": [
+    {
+      "workflow_type": "dailyReport",
+      "cron_schedule": "0 9 * * *",
+      "description": "Generate daily report",
+      "task_queue": "long-tail",
+      "invocable": true,
+      "active": true,
+      "envelope_schema": null
+    }
+  ]
+}
+```
+
+---
+
+## Termination
+
+### Terminate a workflow
+
+```
+POST /api/workflows/:workflowId/terminate
+```
+
+Interrupt a running workflow. The workflow is immediately terminated.
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `workflowId` | HotMesh workflow ID |
+
+**Response 200:**
+
+```json
+{ "terminated": true, "workflowId": "reviewContent-a1b2c3d4" }
+```
+
+---
+
 ## Endpoint summary
 
 ### `/api/workflows`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| `GET` | `/cron/status` | any | List cron-configured workflows and active status |
 | `GET` | `/config` | any | List all workflow configurations |
 | `GET` | `/:type/config` | any | Get a single workflow configuration |
 | `PUT` | `/:type/config` | admin | Create or replace a workflow configuration |
@@ -492,6 +547,7 @@ const snapshot = await handle.state(true);
 | `POST` | `/:type/invoke` | RBAC | Invoke a workflow (requires `invocable: true`) |
 | `GET` | `/:workflowId/status` | any | Workflow status |
 | `GET` | `/:workflowId/result` | any | Get workflow result (200 if complete, 202 if running) |
+| `POST` | `/:workflowId/terminate` | any | Terminate a running workflow |
 | `GET` | `/:workflowId/export` | any | Raw state export (convenience alias) |
 
 ### `/api/workflow-states`

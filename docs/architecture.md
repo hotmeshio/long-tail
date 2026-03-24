@@ -20,7 +20,7 @@ Long Tail organizes workflows, activities, and MCP servers into three tiers that
 system/          Always ships. The built-in tool inventory.
 ├── activities/    Vision, DB queries, HTTP fetch, file storage, ...
 ├── workflows/     mcp-triage, insightQuery, mcpQuery
-└── mcp-servers/   8 built-in MCP servers wrapping the activities
+└── mcp-servers/   9 built-in MCP servers wrapping the activities
 
 examples/        Opt-in demos. Seed with `examples: true`.
 ├── workflows/     review-content, verify-document, process-claim, ...
@@ -123,11 +123,11 @@ Tags are GIN-indexed in PostgreSQL for fast lookup. Register a new MCP server ta
 
 Engineers can register external servers — Playwright for browser automation, file storage, custom APIs. The triage agent can even recommend that engineers add a new MCP server when it encounters a capability gap. Every server's tools become available as proxy activities in deterministic workflows and as callable tools in dynamic triage.
 
-The eight built-in servers are the starting inventory.
+The nine built-in servers are the starting inventory.
 
 ## Built-in MCP Servers
 
-Long Tail ships with eight built-in servers:
+Long Tail ships with nine built-in servers:
 
 | Server | Tools | Purpose |
 |--------|-------|---------|
@@ -139,6 +139,9 @@ Long Tail ships with eight built-in servers:
 | `long-tail-playwright` | 8 | Browser automation: navigate, screenshot, click, fill, evaluate |
 | `long-tail-file-storage` | 4 | Read, write, list, and delete files in managed storage |
 | `long-tail-http-fetch` | 3 | HTTP requests, JSON fetch, text fetch for external APIs |
+| `long-tail-playwright-cli` | 5 | High-level browser automation: login_and_capture, capture_page, capture_authenticated_pages, extract_content, submit_form |
+
+Each server can provide `compile_hints` — tool-specific constraints stored in the database that guide the compilation pipeline when converting dynamic executions into deterministic workflows.
 
 For details on managing servers via the REST API or at startup, see [docs/mcp.md](mcp.md).
 
