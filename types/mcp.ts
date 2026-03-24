@@ -30,6 +30,8 @@ export interface LTMcpServerRecord {
   metadata: Record<string, any> | null;
   /** Categorization tags for efficient tool discovery (e.g., ['database', 'analytics']) */
   tags: string[];
+  /** Per-server hints injected into the YAML compilation prompt when this server's tools are used */
+  compile_hints: string | null;
   status: LTMcpServerStatus;
   last_connected_at: Date | null;
   created_at: Date;

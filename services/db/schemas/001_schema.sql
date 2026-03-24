@@ -210,6 +210,7 @@ CREATE TABLE IF NOT EXISTS lt_mcp_servers (
   last_connected_at TIMESTAMPTZ,
   metadata          JSONB,
   tags              TEXT[] NOT NULL DEFAULT '{}',
+  compile_hints     TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -247,6 +247,13 @@ function wireStepInputs(
 ): Record<string, string> {
   const inputMappings: Record<string, string> = {};
 
+  // Determine session fields for gap-fill after plan-driven wiring
+  const sessionFieldSet = new Set(
+    plan?.sessionFields?.length
+      ? plan.sessionFields
+      : ['page_id', '_handle', 'session_id'],
+  );
+
   // Plan-driven wiring: use data flow edges from the compilation plan.
   // Remap indices from collapsed-step space to core-step space.
   if (plan && plan.dataFlow.length > 0) {
@@ -272,8 +279,42 @@ function wireStepInputs(
         }
       }
     }
-    // If the plan provided wiring for this step, use it
-    if (edgesForStep.length > 0) return inputMappings;
+    // If the plan provided wiring for this step, gap-fill any missing session
+    // fields and trigger inputs before returning — the LLM may have omitted them.
+    if (edgesForStep.length > 0) {
+      // Gap-fill session fields: backward scan for any session field the plan missed
+      if (step.kind === 'tool') {
+        for (const sf of sessionFieldSet) {
+          if (inputMappings[sf]) continue; // already wired by plan
+          // Only add if the step actually uses this field (present in arguments or
+          // known to be required by the tool based on prior step outputs)
+          const stepNeedsField = sf in step.arguments ||
+            steps.slice(0, stepIdx).some(s =>
+              s.result && typeof s.result === 'object' && !Array.isArray(s.result) &&
+              sf in (s.result as Record<string, unknown>));
+          if (!stepNeedsField) continue;
+          for (let si = stepIdx - 1; si >= 0; si--) {
+            const priorResult = steps[si].result;
+            if (priorResult && typeof priorResult === 'object' && !Array.isArray(priorResult) &&
+                sf in (priorResult as Record<string, unknown>)) {
+              const priorActId = stepIndexToActivityId.get(si) || `${prefix}_a${si + 1}`;
+              inputMappings[sf] = `{${priorActId}.output.data.${sf}}`;
+              break;
+            }
+          }
+        }
+        // Gap-fill trigger inputs: if a step argument matches a trigger input but the plan
+        // didn't explicitly wire it, add the wiring
+        for (const key of Object.keys(step.arguments)) {
+          if (inputMappings[key]) continue; // already wired
+          if (key === '_iteration') continue;
+          if (triggerInputKeys.has(key)) {
+            inputMappings[key] = `{${triggerId}.output.data.${key}}`;
+          }
+        }
+      }
+      return inputMappings;
+    }
   }
 
   // Mechanical fallback: match step argument keys against trigger inputs and prior outputs.
@@ -309,6 +350,23 @@ function wireStepInputs(
     if (prevResult && typeof prevResult === 'object' && !Array.isArray(prevResult)) {
       for (const key of Object.keys(prevResult as Record<string, unknown>)) {
         inputMappings[key] = `{${prevActivityId}.output.data.${key}}`;
+      }
+    }
+  }
+
+  // Mechanical gap-fill: ensure session fields are wired even when not in step.arguments
+  // (they may be implicit inputs required by the tool but not captured in the trace args)
+  if (step.kind === 'tool') {
+    for (const sf of sessionFieldSet) {
+      if (inputMappings[sf]) continue; // already wired
+      for (let si = stepIdx - 1; si >= 0; si--) {
+        const priorResult = steps[si].result;
+        if (priorResult && typeof priorResult === 'object' && !Array.isArray(priorResult) &&
+            sf in (priorResult as Record<string, unknown>)) {
+          const priorActId = stepIndexToActivityId.get(si) || `${prefix}_a${si + 1}`;
+          inputMappings[sf] = `{${priorActId}.output.data.${sf}}`;
+          break;
+        }
       }
     }
   }
@@ -505,9 +563,17 @@ function buildIterationActivities(
           expected: true,
           actual: {
             '@pipe': [
-              [`{${pivotId}.output.data.index}`, 1],
-              ['{@math.add}'],
-              [`{${pivotId}.output.data.items}`, '{@array.length}'],
+              // Subpipe 1: compute next_index = index + 1
+              { '@pipe': [
+                [`{${pivotId}.output.data.index}`, 1],
+                ['{@math.add}'],
+              ]},
+              // Subpipe 2: compute items.length
+              { '@pipe': [
+                [`{${pivotId}.output.data.items}`],
+                ['{@array.length}'],
+              ]},
+              // Row: compare next_index < items.length
               ['{@conditional.less_than}'],
             ],
           },
@@ -700,6 +766,8 @@ export async function build(ctx: PipelineContext): Promise<PipelineContext> {
 
         // Wire transform input: source field from prior step + all trigger inputs
         // (trigger inputs needed for dynamic derivation prefixes like screenshot_dir)
+        // Also wire ALL output fields from the source step so the transform has
+        // full context (e.g., script_result, session handles) for reshaping.
         const transformInputMaps: Record<string, string> = {};
         for (const triggerKey of triggerInputKeys) {
           transformInputMaps[triggerKey] = `{${triggerId}.output.data.${triggerKey}}`;
@@ -711,6 +779,19 @@ export async function build(ctx: PipelineContext): Promise<PipelineContext> {
           const sourceActId = stepIndexToActivityId.get(remappedFrom as number);
           if (sourceActId) {
             transformInputMaps[edge.fromField] = `{${sourceActId}.output.data.${edge.fromField}}`;
+            // Wire all other output fields from the source step so the transform
+            // can access them (e.g., script_result needed for reshaping)
+            const sourceIdx = remappedFrom as number;
+            if (sourceIdx >= 0 && sourceIdx < steps.length) {
+              const sourceResult = steps[sourceIdx].result;
+              if (sourceResult && typeof sourceResult === 'object' && !Array.isArray(sourceResult)) {
+                for (const field of Object.keys(sourceResult as Record<string, unknown>)) {
+                  if (!transformInputMaps[field]) {
+                    transformInputMaps[field] = `{${sourceActId}.output.data.${field}}`;
+                  }
+                }
+              }
+            }
           }
         }
 

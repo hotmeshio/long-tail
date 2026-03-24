@@ -59,12 +59,13 @@ export const HEALTH_RECENT_ACTIVITY = `
 
 export const SEED_MCP_SERVER = `
   INSERT INTO lt_mcp_servers
-    (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, last_connected_at)
-  VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, NOW())
+    (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, last_connected_at)
+  VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, NOW())
   ON CONFLICT (name) DO UPDATE SET
     tool_manifest = EXCLUDED.tool_manifest,
     metadata = EXCLUDED.metadata,
     description = EXCLUDED.description,
     tags = EXCLUDED.tags,
+    compile_hints = EXCLUDED.compile_hints,
     status = 'connected',
     last_connected_at = NOW()`;

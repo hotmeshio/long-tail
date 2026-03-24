@@ -354,24 +354,25 @@ export async function compile(ctx: PipelineContext): Promise<PipelineContext> {
 }
 
 /**
- * Gather the full tool inventory for MCP servers used in the execution trace.
- * This lets the compile LLM substitute simpler tools for iterations.
+ * Gather the full tool inventory and compile hints for MCP servers used in the execution trace.
+ * Returns both the tool inventory (for substitution) and per-server compile hints (for context).
  */
 async function gatherServerToolInventory(
   steps: ExtractedStep[],
-): Promise<string> {
+): Promise<{ inventory: string; compileHints: string }> {
   const serverIds = new Set<string>();
   for (const step of steps) {
     if (step.mcpServerId) serverIds.add(step.mcpServerId);
   }
-  if (serverIds.size === 0) return '';
+  if (serverIds.size === 0) return { inventory: '', compileHints: '' };
 
   try {
     const mcpDbService = await import('../../mcp/db');
     const { servers } = await mcpDbService.listMcpServers({ limit: 100 });
     const relevant = servers.filter((s: any) => serverIds.has(s.name));
 
-    const lines: string[] = [];
+    const inventoryLines: string[] = [];
+    const hintLines: string[] = [];
     for (const server of relevant) {
       const tools = (server.tool_manifest || []).map((t: any) => {
         const params = t.inputSchema?.properties
@@ -381,12 +382,19 @@ async function gatherServerToolInventory(
           : '';
         return `    - ${t.name}(${params}): ${(t.description || '').slice(0, 120)}`;
       });
-      lines.push(`  ${server.name}:`);
-      lines.push(...tools);
+      inventoryLines.push(`  ${server.name}:`);
+      inventoryLines.push(...tools);
+
+      if (server.compile_hints) {
+        hintLines.push(`  **${server.name}**: ${server.compile_hints}`);
+      }
     }
-    return lines.join('\n');
+    return {
+      inventory: inventoryLines.join('\n'),
+      compileHints: hintLines.join('\n'),
+    };
   } catch {
-    return '';
+    return { inventory: '', compileHints: '' };
   }
 }
 
@@ -403,7 +411,7 @@ async function callCompilationLLM(
   if (!hasLLMApiKey(LLM_MODEL_PRIMARY)) return null;
 
   const summaries = summarizeSteps(steps);
-  const toolInventory = await gatherServerToolInventory(steps);
+  const { inventory: toolInventory, compileHints } = await gatherServerToolInventory(steps);
 
   const naiveClassification = naiveInputs.map(f => ({
     key: f.key,
@@ -429,6 +437,12 @@ async function callCompilationLLM(
     `## Naive Input Classification`,
     JSON.stringify(naiveClassification, null, 2),
     ``,
+    ...(compileHints ? [
+      `## Tool-Specific Compilation Hints`,
+      `These hints come from the MCP server definitions and describe tool-specific constraints you MUST follow:`,
+      compileHints,
+      ``,
+    ] : []),
     ...(toolInventory ? [
       `## Available Tools (full inventory from servers used in this execution)`,
       `Use these to substitute simpler tools for iterations when the executed tool is too complex.`,
