@@ -204,6 +204,7 @@ export async function callTriageLLM(
   return callLLMService({
     model: LLM_MODEL_SECONDARY,
     messages,
+    temperature: 0,
     ...(tools?.length ? { tools } : {}),
   });
 }

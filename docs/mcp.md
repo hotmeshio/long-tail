@@ -9,6 +9,7 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 - [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
 - [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
 - [External MCP Servers](#external-mcp-servers) — any server's tools as durable activities
+- [Built-in Servers](#built-in-servers) — nine servers that ship by default
 - [Configuration](#configuration)
 - [REST API](#rest-api) — server registration and management
 - [Database Schema](#database-schema)
@@ -482,6 +483,22 @@ If the process crashes between an MCP tool call and its checkpoint, HotMesh repl
 
 Server registration can happen at runtime via the REST API (shown above) or at startup via configuration.
 
+## Built-in Servers
+
+Long Tail ships with nine built-in MCP servers. For tool counts and descriptions, see the [architecture guide](architecture.md#built-in-mcp-servers).
+
+| Server | Tags |
+|--------|------|
+| `long-tail-human-queue` | escalation, human-review |
+| `long-tail-db` | database, analytics |
+| `long-tail-document-vision` | vision, document-processing |
+| `long-tail-workflow-compiler` | workflow, compilation |
+| `long-tail-mcp-workflows` | workflow |
+| `long-tail-playwright` | browser-automation, screenshots |
+| `long-tail-file-storage` | storage, files |
+| `long-tail-http-fetch` | http, api |
+| `long-tail-playwright-cli` | browser-automation, screenshots, scraping, forms |
+
 ## Configuration
 
 Pass `mcp` in the `start()` config:
@@ -573,6 +590,8 @@ CREATE TABLE IF NOT EXISTS lt_mcp_servers (
   transport_config  JSONB NOT NULL DEFAULT '{}'::JSONB,
   auto_connect      BOOLEAN NOT NULL DEFAULT false,
   tool_manifest     JSONB,         -- cached from last listTools()
+  tags              TEXT[],          -- categorization for tag-based tool discovery
+  compile_hints     TEXT,            -- per-server instructions for the compilation pipeline
   status            TEXT NOT NULL DEFAULT 'registered'
                       CHECK (status IN ('registered', 'connected', 'error', 'disconnected')),
   last_connected_at TIMESTAMPTZ,
@@ -583,6 +602,10 @@ CREATE TABLE IF NOT EXISTS lt_mcp_servers (
 ```
 
 The `tool_manifest` column caches the result of `listTools()` on each successful connection, so tools can be enumerated without a live connection.
+
+The `tags` column is a PostgreSQL text array with a GIN index, enabling fast tag-based tool discovery via `findServersByTags(tags, 'any'|'all')`. Workflows like `insightQuery` scope to `['database', 'analytics']` tags, while `mcpQuery` discovers all tools or filters by user-provided tags.
+
+The `compile_hints` column stores per-server instructions that are injected into the compilation prompt when that server's tools appear in an execution trace. This lets each server provide tool-specific constraints (e.g., timeout requirements, retry policies, ordering rules) that guide the compiler when converting dynamic executions into deterministic workflows.
 
 The schema is created automatically by `migrate()`. See `services/db/schemas/001_initial.sql`.
 

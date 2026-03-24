@@ -90,6 +90,8 @@ Session handles are critical — they maintain authenticated browser sessions, d
 ### Data Flow Transforms (CRITICAL for array reshaping)
 When a source step produces an array of objects in one format but the consuming step expects a DIFFERENT format, add a \`transform\` to the data_flow edge. Compare the source step's result structure with the consuming step's actual arguments from the trace.
 
+**Choosing the correct source field**: When a step produces multiple output fields, check the result sample to determine which field actually contains an ARRAY OF OBJECTS suitable for iteration/reshaping. Prefer structured array fields over raw/unstructured fields. Check the Tool-Specific Compilation Hints section (if present) for guidance on which fields to use for specific tools.
+
 For example: extract_content returns \`links: [{text, href}]\` but capture tool expects \`pages: [{url, screenshot_path, wait_ms, full_page}]\`.
 Add a transform with:
 - \`field_map\`: maps target keys → source keys (e.g., \`{"url": "href"}\`). Use null for keys not in the source.
@@ -143,6 +145,15 @@ Flatten nested objects containing dynamic values. E.g., \`login: {url, username,
 List all fields that represent session tokens/handles that must flow through the DAG (e.g., page_id, _handle, session_id).
 
 **Critical**: When a login/setup step produces a page_id or _handle, ALL subsequent browser/page steps must receive that session wire — including steps inside iterations. The data_flow graph must include session wire edges from the producing step to EVERY downstream step that operates on the same session, not just the immediately next one. For iterations: wire the session from the setup step directly to the iteration body step.
+
+**COMPLETENESS REQUIREMENT**: For EACH step that uses a session field (check the step's argumentKeys — if it includes page_id, _handle, or session_id), you MUST emit a data_flow edge wiring that field from its producer. If step 0 produces _handle and steps 1, 2, and 3 all use it, you need THREE edges: 0→1, 0→2, 0→3. Do NOT assume downstream steps will "inherit" session fields — each consumer needs an explicit edge.
+
+### Data Flow Completeness Check
+Before finalizing the plan, verify:
+1. Every step that has a session field in its argumentKeys has a corresponding is_session_wire edge
+2. Every step that consumes data from a prior step has a data_flow edge for that field
+3. Every dynamic trigger input is wired to at least one step via a data_flow edge from "trigger"
+4. Transform edges include the source field AND the consuming step can access all fields it needs
 
 ## Output Format
 

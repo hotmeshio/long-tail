@@ -1,8 +1,19 @@
 # Data Model
 
-Long Tail stores all state in PostgreSQL. Seven tables handle workflow tracking, escalation management, user identity, and configuration. A single migration file (`services/db/schemas/001_initial.sql`) creates the full schema; the migration runner (`services/db/migrate.ts`) tracks applied files in `lt_migrations` so migrations are idempotent.
+Long Tail stores all state in PostgreSQL. Fourteen tables handle workflow tracking, escalation management, user identity, configuration, MCP server registration, compiled workflows, and namespace isolation. A single migration file (`services/db/schemas/001_initial.sql`) creates the full schema; the migration runner (`services/db/migrate.ts`) tracks applied files in `lt_migrations` so migrations are idempotent.
 
 ## Tables
+
+### lt_roles
+
+Canonical role registry. Roles referenced by other tables are seeded here.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `role` | `TEXT` | — | Primary key |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+
+**Seeds:** `reviewer`, `engineer`, `admin`, `superadmin`.
 
 ### lt_tasks
 
@@ -22,6 +33,8 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 | `parent_workflow_id` | `TEXT NOT NULL` | — | ID of the orchestrator that started this workflow |
 | `origin_id` | `TEXT` | — | Correlation ID shared by sibling workflows under the same orchestrator |
 | `parent_id` | `TEXT` | — | Direct parent workflow ID |
+| `trace_id` | `TEXT` | — | Distributed tracing trace ID |
+| `span_id` | `TEXT` | — | Distributed tracing span ID |
 | `started_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | When the workflow began |
 | `completed_at` | `TIMESTAMPTZ` | — | When the workflow finished (null while pending) |
 | `envelope` | `TEXT NOT NULL` | — | JSON-serialized input envelope |
@@ -43,6 +56,8 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 | `idx_lt_tasks_signal` | `(signal_id)` | Look up task by HotMesh signal |
 | `idx_lt_tasks_origin` | `(origin_id, created_at DESC)` | Consumer/provider data injection — find sibling tasks sharing an origin |
 | `idx_lt_tasks_workflow_id` | `(workflow_id)` | Resolve workflow handle by workflow ID |
+| `idx_lt_tasks_origin_id` | `(origin_id)` | Look up tasks by origin ID |
+| `idx_lt_tasks_trace` | `(trace_id)` | Look up tasks by trace ID |
 
 ### lt_escalations
 
@@ -72,6 +87,8 @@ Records human intervention requests. Created when a workflow returns `type: 'esc
 | `metadata` | `JSONB` | — | Arbitrary metadata |
 | `escalation_payload` | `TEXT` | — | JSON-serialized data the workflow attached to the escalation |
 | `resolver_payload` | `TEXT` | — | JSON-serialized decision from the human reviewer |
+| `trace_id` | `TEXT` | — | Distributed tracing trace ID |
+| `span_id` | `TEXT` | — | Distributed tracing span ID |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 
@@ -96,6 +113,13 @@ WHERE status = 'pending'
 | `idx_lt_escalations_task` | `(task_id)` | Join escalations to their parent task |
 | `idx_lt_escalations_origin` | `(origin_id, created_at DESC)` | Find escalations sharing an origin |
 | `idx_lt_escalations_workflow` | `(workflow_id)` | Look up escalation by workflow ID |
+| `idx_lt_escalations_type` | `(type)` | Filter by escalation type |
+| `idx_lt_escalations_pending_sort` | `(status, priority, created_at DESC)` | Sort pending escalations by priority |
+| `idx_lt_escalations_origin_id` | `(origin_id)` | Look up escalations by origin ID |
+| `idx_lt_escalations_trace` | `(trace_id)` | Look up escalations by trace ID |
+| `idx_lt_escalations_created_desc` | `(created_at DESC)` | Sort by creation time descending |
+| `idx_lt_escalations_updated_desc` | `(updated_at DESC)` | Sort by update time descending |
+| `idx_lt_escalations_priority_desc` | `(priority DESC)` | Sort by priority descending |
 
 ### lt_users
 
@@ -107,12 +131,19 @@ User identity records. Users are created via the API and assigned roles that det
 | `external_id` | `TEXT UNIQUE NOT NULL` | — | Your application's user identifier |
 | `email` | `TEXT` | — | Email address (optional) |
 | `display_name` | `TEXT` | — | Display name (optional) |
+| `password_hash` | `TEXT` | — | Hashed password for authentication |
 | `status` | `TEXT NOT NULL` | `'active'` | `active`, `inactive`, or `suspended` |
 | `metadata` | `JSONB` | — | Arbitrary user metadata |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 
 Status is enforced by a CHECK constraint: `status IN ('active', 'inactive', 'suspended')`.
+
+**Indexes:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_lt_users_status` | `(status)` | Filter users by status |
 
 ### lt_user_roles
 
@@ -137,18 +168,24 @@ Workflow registration. Every workflow that uses the LT interceptor must have a r
 |--------|------|---------|-------------|
 | `id` | `UUID` | `gen_random_uuid()` | Primary key |
 | `workflow_type` | `TEXT UNIQUE NOT NULL` | — | Workflow function name |
-| `is_lt` | `BOOLEAN NOT NULL` | `true` | Enables the LT interceptor for this workflow |
-| `is_container` | `BOOLEAN NOT NULL` | `false` | `true` for orchestrators that coordinate child workflows |
 | `invocable` | `BOOLEAN NOT NULL` | `false` | Allow invocation via `POST /api/workflows/:type/invoke` |
 | `task_queue` | `TEXT` | — | Default task queue name |
 | `default_role` | `TEXT NOT NULL` | `'reviewer'` | Role assigned to escalations when the workflow doesn't specify one |
 | `default_modality` | `TEXT NOT NULL` | `'portal'` | Default modality |
 | `description` | `TEXT` | — | Human-readable description |
 | `consumes` | `TEXT[] NOT NULL` | `'{}'` | Array of workflow types whose completed data this workflow receives via `envelope.lt.providers` |
+| `tool_tags` | `TEXT[]` | `'{}'` | Tags for MCP tool discovery |
+| `envelope_schema` | `JSONB` | — | JSON Schema for the workflow input envelope |
+| `resolver_schema` | `JSONB` | — | JSON Schema for the escalation resolver payload |
+| `cron_schedule` | `TEXT` | — | Cron expression for scheduled execution |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 
-**Seeded rows:** The initial migration inserts four built-in workflows: `reviewContent`, `reviewContentOrchestrator`, `verifyDocument`, `verifyDocumentOrchestrator`.
+**Indexes:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_config_workflows_tool_tags` | `(tool_tags)` GIN | Tag-based workflow discovery |
 
 ### lt_config_roles
 
@@ -176,9 +213,140 @@ Roles allowed to invoke a workflow via the API. When a workflow has `invocable: 
 
 Unique constraint: `(workflow_type, role)`.
 
+### lt_mcp_servers
+
+MCP server registration. Stores connection details, cached tool manifests, and compilation hints.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `name` | `TEXT UNIQUE NOT NULL` | — | Server name |
+| `description` | `TEXT` | — | Human-readable description |
+| `transport_type` | `TEXT NOT NULL` | — | `stdio` or `sse` |
+| `transport_config` | `JSONB` | `'{}'` | Connection configuration |
+| `auto_connect` | `BOOLEAN` | `false` | Connect automatically on startup |
+| `tool_manifest` | `JSONB` | — | Cached tool manifest from the server |
+| `status` | `TEXT` | `'registered'` | `registered`, `connected`, `error`, or `disconnected` |
+| `last_connected_at` | `TIMESTAMPTZ` | — | Last successful connection time |
+| `metadata` | `JSONB` | — | Arbitrary metadata |
+| `tags` | `TEXT[]` | `'{}'` | Tags for server discovery |
+| `compile_hints` | `TEXT` | — | Hints for the workflow compiler |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+**Indexes:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_lt_mcp_servers_name` | `(name)` | Look up server by name |
+| `idx_lt_mcp_servers_status` | `(status)` | Filter by connection status |
+| `idx_lt_mcp_servers_auto_connect` | `(auto_connect) WHERE auto_connect = true` | Find servers that auto-connect |
+| `idx_lt_mcp_servers_tags` | `(tags)` GIN | Tag-based server discovery |
+
+### lt_config_role_escalations
+
+Escalation routing between roles. Defines which roles can escalate to which other roles.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `source_role` | `TEXT NOT NULL` | — | FK to `lt_roles(role)` — the originating role |
+| `target_role` | `TEXT NOT NULL` | — | FK to `lt_roles(role)` — the destination role |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+
+Primary key: `(source_role, target_role)`.
+
+**Indexes:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_config_role_escalations_source` | `(source_role)` | Find escalation targets for a role |
+
+### lt_yaml_workflows
+
+Compiled deterministic workflows. Stores DAG definitions, activity manifests, and deployment state.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `name` | `TEXT UNIQUE NOT NULL` | — | Workflow name |
+| `description` | `TEXT` | — | Human-readable description |
+| `app_id` | `TEXT NOT NULL` | — | HotMesh application ID |
+| `app_version` | `TEXT` | `'1'` | Application version |
+| `source_workflow_id` | `TEXT` | — | ID of the workflow this was compiled from |
+| `source_workflow_type` | `TEXT` | — | Type of the workflow this was compiled from |
+| `yaml_content` | `TEXT NOT NULL` | — | YAML DAG definition |
+| `graph_topic` | `TEXT NOT NULL` | — | HotMesh graph subscription topic |
+| `input_schema` | `JSONB` | `'{}'` | JSON Schema for workflow input |
+| `output_schema` | `JSONB` | `'{}'` | JSON Schema for workflow output |
+| `activity_manifest` | `JSONB` | `'[]'` | Array of activity definitions used by this workflow |
+| `status` | `TEXT` | `'draft'` | `draft`, `deployed`, `active`, or `archived` |
+| `deployed_at` | `TIMESTAMPTZ` | — | When the workflow was deployed |
+| `activated_at` | `TIMESTAMPTZ` | — | When the workflow was activated |
+| `content_version` | `INTEGER` | `1` | Current content version number |
+| `deployed_content_version` | `INTEGER` | — | Content version that is currently deployed |
+| `tags` | `TEXT[]` | `'{}'` | Tags for workflow discovery |
+| `input_field_meta` | `JSONB` | `'[]'` | Metadata about input fields |
+| `metadata` | `JSONB` | — | Arbitrary metadata |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+**Indexes:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_lt_yaml_workflows_status` | `(status)` | Filter by deployment status |
+| `idx_lt_yaml_workflows_app_id` | `(app_id)` | Look up workflows by application |
+| `idx_lt_yaml_workflows_tags` | `(tags)` GIN | Tag-based workflow discovery |
+
+### lt_yaml_workflow_versions
+
+Version history for compiled workflows. Created on each edit.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `workflow_id` | `UUID NOT NULL` | — | FK to `lt_yaml_workflows(id)`, CASCADE on delete |
+| `version` | `INTEGER NOT NULL` | — | Version number |
+| `yaml_content` | `TEXT NOT NULL` | — | YAML DAG definition for this version |
+| `activity_manifest` | `JSONB` | `'[]'` | Activity definitions for this version |
+| `input_schema` | `JSONB` | `'{}'` | Input schema for this version |
+| `output_schema` | `JSONB` | `'{}'` | Output schema for this version |
+| `input_field_meta` | `JSONB` | `'[]'` | Input field metadata for this version |
+| `change_summary` | `TEXT` | — | Description of what changed |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+
+Unique constraint: `(workflow_id, version)`.
+
+**Indexes:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_lt_yaml_workflow_versions_wf` | `(workflow_id, version DESC)` | Look up latest version for a workflow |
+
+### lt_namespaces
+
+Multi-tenant namespace registry.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `name` | `TEXT UNIQUE NOT NULL` | — | Namespace name |
+| `description` | `TEXT` | — | Human-readable description |
+| `schema_name` | `TEXT NOT NULL` | — | PostgreSQL schema name for this namespace |
+| `is_default` | `BOOLEAN` | `false` | Whether this is the default namespace |
+| `metadata` | `JSONB` | — | Arbitrary metadata |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+**Seeds:** `longtail` namespace with `is_default = true`.
+
 ## Entity-Relationship Diagram
 
 ```
+lt_roles
+  ├──< lt_config_role_escalations  (source_role → role)
+  └──< lt_config_role_escalations  (target_role → role)
+
 lt_config_workflows
   ├──< lt_config_roles              (workflow_type → workflow_type, CASCADE)
   └──< lt_config_invocation_roles   (workflow_type → workflow_type, CASCADE)
@@ -189,6 +357,11 @@ lt_users
 lt_tasks
   └──< lt_escalations         (task_id → id)
 
+lt_yaml_workflows
+  └──< lt_yaml_workflow_versions   (workflow_id → id, CASCADE)
+
+lt_mcp_servers                 (standalone — MCP server registry)
+lt_namespaces                  (standalone — namespace registry)
 lt_migrations                  (standalone — tracks applied schema files)
 ```
 
@@ -208,7 +381,7 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-This fires `BEFORE UPDATE` on `lt_tasks`, `lt_escalations`, `lt_users`, and `lt_config_workflows`.
+This fires `BEFORE UPDATE` on `lt_tasks`, `lt_escalations`, `lt_users`, `lt_config_workflows`, `lt_mcp_servers`, `lt_yaml_workflows`, and `lt_namespaces`.
 
 ## Migrations
 

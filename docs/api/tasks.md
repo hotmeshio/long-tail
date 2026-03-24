@@ -80,6 +80,66 @@ GET /api/tasks/:id
 { "error": "Task not found" }
 ```
 
+## Get process stats
+
+```
+GET /api/tasks/processes/stats
+```
+
+Aggregated process statistics with optional time period.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `period` | `string` | Time period filter (e.g., `24h`, `7d`) |
+
+**Response 200:** Aggregated statistics object.
+
+## List processes
+
+```
+GET /api/tasks/processes
+```
+
+List distinct `origin_id` values with summary stats. Each origin ID represents a process (a top-level orchestration and all its child workflows).
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `workflow_type` | `string` | Filter by workflow type |
+| `status` | `string` | Filter by status |
+| `search` | `string` | Search filter |
+| `limit` | `integer` | Max results (default: 50) |
+| `offset` | `integer` | Pagination offset (default: 0) |
+
+**Response 200:** Process list with summary stats.
+
+## Get process details
+
+```
+GET /api/tasks/processes/:originId
+```
+
+Returns all tasks and escalations for a process (identified by `origin_id`).
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `originId` | Origin ID (correlation ID shared by sibling workflows) |
+
+**Response 200:**
+
+```json
+{
+  "origin_id": "review-orch-post-456-a1b2c3d4",
+  "tasks": [],
+  "escalations": []
+}
+```
+
 ## Task fields
 
 | Field | Type | Description |

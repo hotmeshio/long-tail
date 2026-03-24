@@ -72,14 +72,13 @@ Before a workflow can run, Long Tail needs to know about it. Register a workflow
 PUT /api/workflows/reviewContent/config
 
 {
-  "is_lt": true,
   "default_role": "reviewer",
   "roles": ["reviewer"],
   "invocable": true
 }
 ```
 
-`is_lt: true` enables the interceptor. `default_role` and `roles` control escalation routing. `invocable: true` exposes the workflow for invocation via the public API.
+`default_role` and `roles` control escalation routing. `invocable: true` exposes the workflow for invocation via the public API.
 
 ### Starting a Workflow
 
@@ -148,7 +147,7 @@ If all retries are exhausted, the workflow receives the error and can escalate.
 
 With the workflow written and activities checkpointed, the next question is: what happens when the workflow returns `{ type: 'escalation' }` instead of `{ type: 'return' }`? That's where the interceptor comes in.
 
-The interceptor is the machinery that connects your workflow code to Long Tail's task tracking, escalation management, and audit trail. When `is_lt: true` is set in the workflow config, the interceptor wraps every workflow execution.
+The interceptor is the machinery that connects your workflow code to Long Tail's task tracking, escalation management, and audit trail. When a workflow is registered with a config, the interceptor wraps every execution.
 
 ### What It Does
 
@@ -325,7 +324,6 @@ Children that share an `originId` can read each other's completed data automatic
 PUT /api/workflows/validateExtraction/config
 
 {
-  "is_lt": true,
   "default_role": "reviewer",
   "roles": ["reviewer"],
   "consumes": ["extractDocument"]
@@ -355,14 +353,12 @@ Register the orchestrator as a container workflow:
 PUT /api/workflows/processDocumentOrchestrator/config
 
 {
-  "is_lt": true,
-  "is_container": true,
   "default_role": "reviewer",
   "roles": ["reviewer"]
 }
 ```
 
-`is_container: true` tells the interceptor this is an orchestrator, not a leaf workflow. The orchestrator gets its own task record and tracks the lifecycle of its children.
+The orchestrator gets its own task record and tracks the lifecycle of its children.
 
 ## Verify Document Example
 

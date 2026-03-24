@@ -468,6 +468,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: DB_QUERY_TOOLS,
     metadata: { builtin: true, category: 'database' },
     tags: ['database', 'query', 'analytics'],
+    compile_hints: 'Query tools return structured result sets. When a query result is consumed by a later step, wire the specific output field (e.g., "rows", "tasks") — not the entire result object.',
   },
   {
     name: 'long-tail-human-queue',
@@ -477,6 +478,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: HUMAN_QUEUE_TOOLS,
     metadata: { builtin: true, category: 'escalation' },
     tags: ['escalation', 'human-queue', 'routing'],
+    compile_hints: null,
   },
   {
     name: 'mcp-workflows-longtail',
@@ -486,6 +488,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: MCP_WORKFLOW_TOOLS,
     metadata: { builtin: true, category: 'workflows' },
     tags: ['workflows', 'compiled', 'deterministic'],
+    compile_hints: null,
   },
   {
     name: 'long-tail-workflow-compiler',
@@ -495,6 +498,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: WORKFLOW_COMPILER_TOOLS,
     metadata: { builtin: true, category: 'compilation' },
     tags: ['compilation', 'yaml', 'codegen'],
+    compile_hints: null,
   },
   {
     name: 'long-tail-document-vision',
@@ -504,6 +508,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: VISION_TOOLS,
     metadata: { builtin: true, category: 'document-processing' },
     tags: ['document-processing', 'vision', 'ocr', 'translation'],
+    compile_hints: 'Vision tools process one document at a time. When iterating over multiple documents, each iteration should pass a single image path or URL.',
   },
   {
     name: 'long-tail-playwright',
@@ -513,6 +518,10 @@ const SEED_MCP_SERVERS = [
     tool_manifest: PLAYWRIGHT_TOOLS,
     metadata: { builtin: true, category: 'browser-automation', level: 'low' },
     tags: ['browser-automation', 'testing', 'screenshots'],
+    compile_hints: [
+      'Session fields (_handle, page_id) MUST be threaded from the step that created them to EVERY subsequent step that operates on the browser.',
+      'run_script accepts a `steps` array — this is a fixed implementation detail, never a dynamic input.',
+    ].join(' '),
   },
   {
     name: 'long-tail-playwright-cli',
@@ -522,6 +531,12 @@ const SEED_MCP_SERVERS = [
     tool_manifest: PLAYWRIGHT_CLI_TOOLS,
     metadata: { builtin: true, category: 'browser-automation', level: 'high' },
     tags: ['browser-automation', 'screenshots', 'scraping', 'forms'],
+    compile_hints: [
+      'Session fields (_handle, page_id) MUST be threaded from the producing step to ALL subsequent browser steps.',
+      'extract_content returns both `links` (structured array of {text, href}) and `script_result` (raw JS eval output). When building a transform to reshape link data for iteration or for capture_authenticated_pages, ALWAYS use `links` as the source field — `script_result` may be null, a string, or unstructured.',
+      'capture_authenticated_pages expects a `login` object and a `pages` array. The `login` object contains nested fields (url, username, password, selectors) — flatten credentials as dynamic trigger inputs but keep the object structure in stored tool_arguments. The `pages` array should flow from a transform edge that reshapes `links` into [{url, screenshot_path, wait_ms, full_page}].',
+      'For screenshot_path derivation in transforms, use the `screenshot_dir` trigger input as a dynamic prefix (not hardcoded). Derivation strategy: slugify the href, prepend screenshot_dir + "/", append ".png".',
+    ].join(' '),
   },
   {
     name: 'long-tail-file-storage',
@@ -531,6 +546,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: FILE_STORAGE_TOOLS,
     metadata: { builtin: true, category: 'storage' },
     tags: ['storage', 'files', 'io'],
+    compile_hints: null,
   },
   {
     name: 'long-tail-http-fetch',
@@ -540,6 +556,7 @@ const SEED_MCP_SERVERS = [
     tool_manifest: HTTP_FETCH_TOOLS,
     metadata: { builtin: true, category: 'http' },
     tags: ['http', 'api', 'fetch', 'network'],
+    compile_hints: 'HTTP response bodies may be large. When wiring output to a later step, prefer specific fields from a parsed JSON response rather than the raw body.',
   },
 ];
 
@@ -561,6 +578,7 @@ export async function seedSystemMcpServers(): Promise<void> {
           JSON.stringify(srv.tool_manifest),
           JSON.stringify(srv.metadata),
           srv.tags,
+          srv.compile_hints,
         ],
       );
     } catch (err: any) {

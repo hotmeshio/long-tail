@@ -135,6 +135,7 @@ export async function evaluateWorkflowMatch(
     const response = await callLLMService({
       model: LLM_MODEL_SECONDARY,
       max_tokens: 200,
+      temperature: 0,
       messages: [
         { role: 'system', content: WORKFLOW_MATCH_PROMPT },
         { role: 'user', content: `## User Request\n${prompt}\n\n## Candidate Workflows\n${candidateText}` },
@@ -168,6 +169,7 @@ export async function extractWorkflowInputs(
     const response = await callLLMService({
       model: LLM_MODEL_SECONDARY,
       max_tokens: 500,
+      temperature: 0,
       messages: [
         { role: 'system', content: EXTRACT_INPUTS_PROMPT },
         {
@@ -350,6 +352,7 @@ export async function callQueryLLM(
   const response = await callLLMService({
     model: LLM_MODEL_PRIMARY,
     messages,
+    temperature: 0,
     ...(tools?.length ? { tools } : {}),
     ...(!tools?.length ? { max_tokens: LLM_MAX_TOKENS_DEFAULT } : {}),
   });

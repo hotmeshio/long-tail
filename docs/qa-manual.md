@@ -75,7 +75,7 @@ You'll see output like:
 [examples] roles verified (reviewer, engineer, admin, superadmin)
 [examples] seeded user (superadmin / l0ngt@1l)
 [examples] seeded user (reviewer / l0ngt@1l)
-[examples] MCP servers seeded (7 servers, 32 tools)
+[examples] MCP servers seeded (9 servers, 42 tools)
 [examples] seeded: Process 1 — Clean Review
 [examples] seeded: Process 2 — Flagged for Review
 [examples] seeded: Process 3 — Wrong Language
@@ -111,7 +111,7 @@ After logging in as superadmin:
 The dashboard shows:
 - **Processes** — The primary entry point. Each process represents a business workflow and its current state. Click into any process to see its full timeline of tasks and escalations.
 - **Escalations** — Pending human review items across all processes
-- **MCP Servers** — Connected tool servers (7 built-in)
+- **MCP Servers** — Connected tool servers (9 built-in)
 - **Process Servers** — Dynamic MCP servers generated from successful triage runs. Each namespace is a server; each compiled workflow is a tool. The system's evolving intelligence lives here.
 
 > Tasks and escalations appear in context on each process detail page, so there is no need to navigate to them independently. For advanced users, a standalone Tasks list view is also available from the navigation.
