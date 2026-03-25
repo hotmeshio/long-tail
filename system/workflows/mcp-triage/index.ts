@@ -1,7 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
-import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
+import type { LTEnvelope, LTReturn } from '../../../types';
 import * as activities from '../../activities/triage';
 import * as interceptorActivities from '../../../services/interceptor/activities';
 import { TRIAGE_SYSTEM_PROMPT, TRIAGE_REENTRY_CONTEXT, TRIAGE_EXHAUSTED_ROUNDS } from './prompts';
@@ -12,8 +12,8 @@ const {
   getUpstreamTasks,
   getEscalationHistory,
   getToolTags,
-  loadTools,
-  callTool,
+  loadTriageTools,
+  callTriageTool,
   callTriageLLM,
   notifyEngineering,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
@@ -71,7 +71,7 @@ const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
  */
 export async function mcpTriage(
   envelope: LTEnvelope,
-): Promise<LTReturn | LTEscalation> {
+): Promise<LTReturn> {
   const {
     originId,
     originalWorkflowType,
@@ -142,19 +142,27 @@ export async function mcpTriage(
 async function runTriageLLM(
   envelope: LTEnvelope,
   opts: { additionalContext: string },
-): Promise<LTReturn | LTEscalation> {
+): Promise<LTReturn> {
   const { originalWorkflowType } = envelope.data;
 
   // 1. Infer tool tags from the original workflow type (from config cache, no DB hit)
   const workflowTags = await getToolTags(originalWorkflowType);
 
-  // 2. Single activity: load scoped tools, cache definitions, return IDs + inventory
-  const { toolIds, inventory } = await loadTools(
+  // 2. Load scoped tools with strategy advisor
+  //    (Compiled workflow discovery happens in mcpTriageRouter, not here —
+  //    this leaf only runs when no compiled match was found.)
+  const raw = await loadTriageTools(
     workflowTags.length > 0 ? workflowTags : undefined,
   );
 
-  // 3. Build system prompt with scoped inventory
-  const systemPrompt = TRIAGE_SYSTEM_PROMPT(inventory);
+  // 3. Build system prompt with tool inventory
+  const toolIds = raw.toolIds;
+  const inventoryParts = [
+    raw.strategy,
+    `## Available MCP Servers\n${raw.inventory}`,
+  ].filter(Boolean).join('\n\n');
+
+  const systemPrompt = TRIAGE_SYSTEM_PROMPT(inventoryParts);
 
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
@@ -203,7 +211,7 @@ async function runTriageLLM(
       }
 
       // callTool returns errors as data so the LLM can adapt
-      const result = await callTool(toolCall.function.name, args);
+      const result = await callTriageTool(toolCall.function.name, args);
 
       messages.push({
         role: 'tool',
@@ -232,7 +240,7 @@ async function handleFinalResponse(
   content: string,
   envelope: LTEnvelope,
   toolCallCount: number,
-): Promise<LTReturn | LTEscalation> {
+): Promise<LTReturn> {
   const {
     originId,
     originalWorkflowType,
@@ -425,33 +433,33 @@ async function handleFinalResponse(
     };
   }
 
-  // LLM couldn't fix — escalate to engineer with full diagnosis + recommendations
-  const recommendation = parsed.recommendation || '';
-  const escalationMessage = [
-    `AI triage could not resolve the issue for ${originalWorkflowType} (origin: ${originId}).`,
-    `Diagnosis: ${parsed.diagnosis || 'unknown'}.`,
-    `${toolCallCount} tool call(s) made.`,
-    recommendation ? `\nRecommendation: ${recommendation}` : '',
-    `\nTo continue: install/configure any recommended MCP tools, then resolve this ` +
-    `escalation with a message like "tools ready, try again" or provide specific guidance.`,
-  ].filter(Boolean).join(' ');
-
+  // LLM couldn't fix — return with failure info so the parent router
+  // gets signaled. The router or calling code handles escalation creation.
+  // (Returning { type: 'escalation' } would create an escalation via the
+  // interceptor but would NOT signal the parent, leaving it hanging.)
   return {
-    type: 'escalation',
+    type: 'return',
     data: {
+      triaged: true,
+      exitedVortex: false,
+      hasCorrectedData: false,
+      correctedData: null,
       originId,
       originalWorkflowType,
       originalTaskQueue,
       originalTaskId: envelope.data.originalTaskId,
-      escalationPayload,
       diagnosis: parsed.diagnosis || 'AI triage could not determine a fix',
       actions_taken: parsed.actions_taken || [],
       tool_calls_made: toolCallCount,
-      recommendation,
+      recommendation: parsed.recommendation || '',
+      confidence: parsed.confidence || 0,
     },
-    message: escalationMessage,
-    role: 'engineer',
-    priority: 2,
+    milestones: [
+      { name: 'triage', value: 'completed' },
+      { name: 'triage_method', value: toolCallCount > 0 ? 'llm_with_tools' : 'llm_direct' },
+      { name: 'tool_calls', value: String(toolCallCount) },
+      { name: 'vortex', value: 'unresolved' },
+    ],
   };
 }
 

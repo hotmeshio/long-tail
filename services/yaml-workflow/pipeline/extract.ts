@@ -49,8 +49,8 @@ function extractToolArgs(attrs: Record<string, unknown>): Record<string, unknown
   const input = attrs.input as unknown[] | undefined;
   if (!input || !Array.isArray(input)) return {};
 
-  // callMcpTool / callDbTool / callVisionTool: [name, args]
-  if (['callMcpTool', 'callDbTool', 'callVisionTool'].includes(attrs.activity_type as string)) {
+  // callMcpTool / callTriageTool / callDbTool / callVisionTool: [name, args]
+  if (['callMcpTool', 'callTriageTool', 'callDbTool', 'callVisionTool'].includes(attrs.activity_type as string)) {
     const args = input[1];
     return (args && typeof args === 'object' && !Array.isArray(args))
       ? args as Record<string, unknown>
@@ -180,8 +180,8 @@ export function extractStepSequence(events: WorkflowExecutionEvent[]): Extracted
       continue;
     }
 
-    // Pattern 1c: callMcpTool — mcpQuery uses qualified names (server_slug__tool_name)
-    if (attrs.activity_type === 'callMcpTool' && pendingLlmCall) {
+    // Pattern 1c: callMcpTool/callTriageTool — uses qualified names (server_slug__tool_name)
+    if ((attrs.activity_type === 'callMcpTool' || attrs.activity_type === 'callTriageTool') && pendingLlmCall) {
       const qualifiedName = pendingLlmCall.toolName;
       const sepIdx = qualifiedName.indexOf('__');
       const serverSlug = sepIdx >= 0 ? qualifiedName.slice(0, sepIdx) : qualifiedName;
@@ -264,10 +264,11 @@ export async function extract(ctx: PipelineContext): Promise<PipelineContext> {
   let prompt = (startEvent?.attributes as any)?.input?.prompt || '';
 
   if (!prompt) {
-    // Look for the prompt in callQueryLLM's input messages
+    // Look for the prompt in the LLM call's input messages (mcpQuery or mcpTriage)
+    const llmActivityTypes = ['callQueryLLM', 'callTriageLLM'];
     for (const e of ctx.execution.events) {
       const attrs = e.attributes as unknown as Record<string, unknown>;
-      if (attrs.activity_type === 'callQueryLLM' && e.event_type === 'activity_task_completed') {
+      if (llmActivityTypes.includes(attrs.activity_type as string) && e.event_type === 'activity_task_completed') {
         const input = attrs.input as unknown[];
         if (Array.isArray(input) && Array.isArray(input[0])) {
           const messages = input[0] as Array<{ role: string; content: string }>;
@@ -279,11 +280,12 @@ export async function extract(ctx: PipelineContext): Promise<PipelineContext> {
     }
   }
 
-  // Also try findCompiledWorkflows input (router child workflows)
+  // Also try discovery activity input (router child workflows — both query and triage)
   if (!prompt) {
+    const discoveryTypes = ['findCompiledWorkflows', 'findTriageWorkflows'];
     for (const e of ctx.execution.events) {
       const attrs = e.attributes as unknown as Record<string, unknown>;
-      if (attrs.activity_type === 'findCompiledWorkflows' && Array.isArray(attrs.input)) {
+      if (discoveryTypes.includes(attrs.activity_type as string) && Array.isArray(attrs.input)) {
         const input = attrs.input as unknown[];
         if (typeof input[0] === 'string') { prompt = input[0]; break; }
       }

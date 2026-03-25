@@ -1,5 +1,6 @@
 import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../../services/llm';
 import { LLM_MODEL_PRIMARY, LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_DEFAULT } from '../../../modules/defaults';
+import { loggerRegistry } from '../../../services/logger';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
@@ -357,6 +358,6 @@ export async function callQueryLLM(
     ...(!tools?.length ? { max_tokens: LLM_MAX_TOKENS_DEFAULT } : {}),
   });
   const usage = response.usage;
-  console.log(`[mcpQuery:callLLM] ${Date.now() - t0}ms | in=${usage?.prompt_tokens} out=${usage?.completion_tokens} total=${usage?.total_tokens}`);
+  loggerRegistry.info(`[mcpQuery:callLLM] ${Date.now() - t0}ms | in=${usage?.prompt_tokens} out=${usage?.completion_tokens} total=${usage?.total_tokens}`);
   return response;
 }
