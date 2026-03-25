@@ -58,14 +58,17 @@ export const TOOL_ARG_LIMIT_CAP = envInt('LT_TOOL_ARG_LIMIT_CAP', 25);
 
 // ── Workflow execution ───────────────────────────────────────────────
 
-/** Default graph expiry in seconds for generated YAML workflows. */
-export const WORKFLOW_EXPIRE_SECS = envInt('LT_WORKFLOW_EXPIRE_SECS', 120);
+/** Default graph expiry in seconds for generated YAML workflows (5 min — must exceed longest activity chain). */
+export const WORKFLOW_EXPIRE_SECS = envInt('LT_WORKFLOW_EXPIRE_SECS', 300);
 
 /** Default job expiry in seconds for workflow executions (30 days). */
 export const JOB_EXPIRE_SECS = envInt('LT_JOB_EXPIRE_SECS', 30 * 24 * 60 * 60);
 
-/** Default timeout (ms) for synchronous workflow invocations. */
-export const WORKFLOW_SYNC_TIMEOUT_MS = envInt('LT_WORKFLOW_SYNC_TIMEOUT_MS', 120_000);
+/** Default timeout (ms) for synchronous workflow invocations (5 min — matches WORKFLOW_EXPIRE_SECS). */
+export const WORKFLOW_SYNC_TIMEOUT_MS = envInt('LT_WORKFLOW_SYNC_TIMEOUT_MS', 300_000);
+
+/** MCP tool call timeout (ms). Overrides the MCP SDK default of 60s which is too short for browser automation. */
+export const MCP_TOOL_TIMEOUT_MS = envInt('LT_MCP_TOOL_TIMEOUT_MS', 300_000);
 
 /** Config cache TTL in milliseconds. */
 export const CONFIG_CACHE_TTL_MS = envInt('LT_CONFIG_CACHE_TTL_MS', 5 * 60 * 1000);
@@ -101,6 +104,16 @@ export const CLAIM_DURATION_OPTIONS: number[] = (() => {
   } catch { /* fall through */ }
   return [15, 30, 60, 240];
 })();
+
+// ── Text processing ─────────────────────────────────────────────────
+
+/** Common stop words filtered from keyword extraction (tag derivation, FTS queries, prompt parsing). */
+export const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was',
+  'not', 'but', 'has', 'have', 'had', 'been', 'will', 'can', 'all',
+  'please', 'take', 'make', 'show', 'get', 'use', 'find', 'give',
+  'want', 'need', 'would', 'could', 'should', 'about', 'what', 'how',
+]);
 
 // ── Formatting ───────────────────────────────────────────────────────
 

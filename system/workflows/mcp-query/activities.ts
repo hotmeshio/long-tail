@@ -1,5 +1,5 @@
 import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../../services/llm';
-import { LLM_MODEL_PRIMARY, LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_DEFAULT } from '../../../modules/defaults';
+import { LLM_MODEL_PRIMARY, LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_DEFAULT, STOP_WORDS } from '../../../modules/defaults';
 import { loggerRegistry } from '../../../services/logger';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
@@ -60,10 +60,12 @@ export async function findCompiledWorkflows(
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 2 && !PROMPT_STOP_WORDS.has(w));
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 
   // Ranked discovery: FTS + tag overlap
+  loggerRegistry.debug(`[mcpQuery:findCompiledWorkflows] keywords: [${keywords.join(',')}]`);
   const workflows = await yamlDb.discoverWorkflows(prompt, keywords, undefined, 5);
+  loggerRegistry.info(`[mcpQuery:findCompiledWorkflows] ${workflows.length} candidate(s) found`);
 
   if (workflows.length === 0) {
     return { inventory: '', toolIds: [], candidates: [] };
@@ -120,6 +122,7 @@ export async function evaluateWorkflowMatch(
   prompt: string,
   candidates: WorkflowCandidate[],
 ): Promise<{ matched: boolean; workflowName: string | null; confidence: number }> {
+  loggerRegistry.debug(`[mcpQuery:evaluateWorkflowMatch] ${candidates.length} candidate(s)`);
   if (candidates.length === 0) {
     return { matched: false, workflowName: null, confidence: 0 };
   }
@@ -148,10 +151,13 @@ export async function evaluateWorkflowMatch(
     const result = JSON.parse(cleaned);
 
     if (result.match && result.confidence >= 0.7) {
+      loggerRegistry.info(`[mcpQuery:evaluateWorkflowMatch] MATCHED: ${result.workflow_name} (confidence: ${result.confidence})`);
       return { matched: true, workflowName: result.workflow_name, confidence: result.confidence };
     }
+    loggerRegistry.info(`[mcpQuery:evaluateWorkflowMatch] no match (confidence: ${result.confidence || 0})`);
     return { matched: false, workflowName: null, confidence: result.confidence || 0 };
-  } catch {
+  } catch (err: any) {
+    loggerRegistry.warn(`[mcpQuery:evaluateWorkflowMatch] error: ${err.message}`);
     return { matched: false, workflowName: null, confidence: 0 };
   }
 }
@@ -323,13 +329,6 @@ export async function callMcpTool(
 
   return { error: `Unknown tool: ${qualifiedName} (no server found)`, tool: qualifiedName };
 }
-
-const PROMPT_STOP_WORDS = new Set([
-  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was',
-  'not', 'but', 'has', 'have', 'had', 'been', 'will', 'can', 'all',
-  'please', 'take', 'make', 'show', 'get', 'use', 'find', 'give',
-  'want', 'need', 'would', 'could', 'should', 'about', 'what', 'how',
-]);
 
 /**
  * Call the LLM with messages and optional tool IDs.

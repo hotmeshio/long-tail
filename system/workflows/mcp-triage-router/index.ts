@@ -67,10 +67,17 @@ export async function mcpTriageRouter(
     const match = await evaluateTriageMatch(searchPrompt, compiled.candidates);
 
     if (match.matched && match.workflowName) {
-      // Phase 2b: Extract structured inputs from the triage context
+      // Phase 2b: Extract structured inputs from the FULL triage context
+      // (not just the search prompt — include the actual escalation data
+      // so the LLM can map real values like content text to the schema)
       const candidate = compiled.candidates.find((c) => c.name === match.workflowName);
       const inputSchema = candidate?.input_schema || { type: 'object', properties: {} };
-      const extraction = await extractTriageInputs(searchPrompt, inputSchema, match.workflowName);
+      const extractionContext = [
+        searchPrompt,
+        escalationPayload ? `\n## Escalation Data\n${JSON.stringify(escalationPayload, null, 2)}` : '',
+        resolverPayload ? `\n## Resolver Notes\n${JSON.stringify(resolverPayload, null, 2)}` : '',
+      ].filter(Boolean).join('\n');
+      const extraction = await extractTriageInputs(extractionContext, inputSchema, match.workflowName);
 
       if (extraction.extracted && extraction.inputs) {
         // Route to mcpTriageDeterministic — compiled workflow handles this

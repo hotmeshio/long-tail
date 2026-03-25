@@ -1,5 +1,5 @@
-# Build output
-build/
+# Build output (top-level only — don't ignore nested build/ directories like pipeline/build/)
+/build/
 
 # Logs
 logs
@@ -38,7 +38,7 @@ bower_components
 .lock-wscript
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
+/build/Release
 
 # Dependency directories
 node_modules/
@@ -83,7 +83,8 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+/dist
+/dashboard/dist
 
 # Gatsby files
 .cache/

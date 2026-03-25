@@ -5,6 +5,7 @@ import type { LTEnvelope, LTReturn } from '../../../types';
 import * as activities from '../../activities/triage';
 import * as interceptorActivities from '../../../services/interceptor/activities';
 import { TRIAGE_SYSTEM_PROMPT, TRIAGE_REENTRY_CONTEXT, TRIAGE_EXHAUSTED_ROUNDS } from './prompts';
+import { handleFinalResponse, type TriageResponseDeps } from './response';
 
 type ActivitiesType = typeof activities;
 
@@ -37,6 +38,15 @@ const {
 });
 
 const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
+
+/** Proxied activity refs passed to response handlers */
+const responseDeps: TriageResponseDeps = {
+  ltCreateEscalation,
+  ltGetTask,
+  ltGetWorkflowConfig,
+  ltStartWorkflow,
+  notifyEngineering,
+};
 
 // ── Workflow ─────────────────────────────────────────────────
 
@@ -184,6 +194,7 @@ async function runTriageLLM(
         response.content || '',
         envelope,
         toolCallCount,
+        responseDeps,
       );
     }
 
@@ -231,268 +242,6 @@ async function runTriageLLM(
     finalResponse.content || '',
     envelope,
     toolCallCount,
+    responseDeps,
   );
-}
-
-// ── Response handling ───────────────────────────────────────────
-
-async function handleFinalResponse(
-  content: string,
-  envelope: LTEnvelope,
-  toolCallCount: number,
-): Promise<LTReturn> {
-  const {
-    originId,
-    originalWorkflowType,
-    originalTaskQueue,
-    escalationPayload,
-  } = envelope.data;
-
-  const parsed = parseTriageResponse(content);
-
-  if (parsed.correctedData) {
-    // Success — LLM fixed the issue
-    if (parsed.recommendation) {
-      await notifyEngineering(
-        originId,
-        `Triage auto-remediation for ${originalWorkflowType}: ${parsed.diagnosis || 'issue resolved'}. ` +
-          `Recommendation: ${parsed.recommendation}`,
-        {
-          actions_taken: parsed.actions_taken,
-          tool_calls: toolCallCount,
-          confidence: parsed.confidence,
-        },
-      );
-    }
-
-    const correctedData = {
-      ...escalationPayload,
-      ...parsed.correctedData,
-    };
-    // Strip triage flags that the LLM may have echoed from context
-    delete correctedData._lt;
-    const directResolution = parsed.directResolution || false;
-    const originalTaskId = envelope.data.originalTaskId;
-
-    const triageMilestones = [
-      { name: 'triage', value: 'completed' },
-      { name: 'triage_method', value: toolCallCount > 0 ? 'llm_with_tools' : 'llm_direct' },
-      { name: 'tool_calls', value: String(toolCallCount) },
-    ];
-
-    // ── Exit vortex: route corrected data back to the original workflow ──
-    if (originalWorkflowType && originalTaskQueue && originalTaskId) {
-      const originalTask = await ltGetTask(originalTaskId);
-      const originalWfConfig = await ltGetWorkflowConfig(originalWorkflowType);
-
-      // Reconstruct the original envelope from the task record
-      let originalEnvelope: Record<string, any> = {};
-      if (originalTask?.envelope) {
-        try {
-          originalEnvelope = JSON.parse(originalTask.envelope);
-        } catch { /* use empty */ }
-      }
-
-      // Extract routing metadata — used by both resolution paths
-      const originalMeta = originalTask?.metadata as Record<string, any> | null;
-
-      // Enrich the envelope with full routing context so re-runs
-      // find the original task instead of creating orphan tasks.
-      originalEnvelope.lt = {
-        ...originalEnvelope.lt,
-        taskId: originalTaskId,
-        originId,
-        parentId: originalTask?.parent_id || originalEnvelope.lt?.parentId,
-        signalId: originalMeta?.signalId,
-        parentWorkflowId: originalMeta?.parentWorkflowId,
-        parentTaskQueue: originalMeta?.parentTaskQueue,
-        parentWorkflowType: originalMeta?.parentWorkflowType,
-      };
-
-      // Strip triage flags from the envelope so resolving this
-      // follow-on escalation does NOT re-trigger mcpTriage.
-      if (originalEnvelope.data?._lt) {
-        delete originalEnvelope.data._lt;
-      }
-
-      // ── Direct resolution: simple approval/rejection/pass-through ──
-      if (directResolution && correctedData) {
-        originalEnvelope.resolver = correctedData;
-        originalEnvelope.lt = {
-          ...originalEnvelope.lt,
-          escalationId: envelope.data.escalationId,
-          _triageDirect: true,
-        };
-
-        const rerunWorkflowId = `triage-rerun-${originalTaskId}-${Durable.guid()}`;
-        await ltStartWorkflow({
-          workflowName: originalWorkflowType,
-          taskQueue: originalTaskQueue,
-          workflowId: rerunWorkflowId,
-          args: [originalEnvelope],
-          expire: 180,
-        });
-
-        return {
-          type: 'return',
-          data: {
-            triaged: true,
-            exitedVortex: true,
-            directResolution: true,
-            targetedOriginalTask: originalTaskId,
-            hasCorrectedData: true,
-            rerunWorkflowId,
-            correctedData,
-            originalWorkflowType,
-            originalTaskQueue,
-            originId,
-            diagnosis: parsed.diagnosis,
-            actions_taken: parsed.actions_taken,
-            tool_calls_made: toolCallCount,
-            confidence: parsed.confidence,
-          },
-          milestones: [
-            ...triageMilestones,
-            { name: 'vortex', value: 'direct_resolution' },
-          ],
-        };
-      }
-
-      // ── Escalation path: tool-assisted fix or triage failure ──
-      const escalationPayloadForOriginal: Record<string, any> = correctedData
-        ? {
-            ...correctedData,
-            _triage: {
-              diagnosis: parsed.diagnosis,
-              actions_taken: parsed.actions_taken,
-              tool_calls_made: toolCallCount,
-              confidence: parsed.confidence,
-              recommendation: parsed.recommendation,
-              originalData: envelope.data.escalationPayload || {},
-            },
-          }
-        : {
-            ...(envelope.data.escalationPayload || {}),
-            _triage: {
-              diagnosis: parsed.diagnosis,
-              actions_taken: parsed.actions_taken,
-              tool_calls_made: toolCallCount,
-              confidence: parsed.confidence,
-              recommendation: parsed.recommendation,
-            },
-          };
-
-      const description = correctedData
-        ? `AI Triage — Ready for Review`
-        : `AI Triage — Needs Attention`;
-
-      await ltCreateEscalation({
-        type: originalWorkflowType,
-        subtype: originalWorkflowType,
-        modality: originalWfConfig?.modality || 'default',
-        description,
-        priority: correctedData ? 3 : 2,
-        taskId: originalTaskId,
-        originId,
-        parentId: envelope.lt?.parentId,
-        role: correctedData
-          ? (originalWfConfig?.role || 'reviewer')
-          : 'engineer',
-        envelope: JSON.stringify(originalEnvelope),
-        escalationPayload: JSON.stringify(escalationPayloadForOriginal),
-        workflowId: originalTask?.workflow_id,
-        workflowType: originalWorkflowType,
-        taskQueue: originalTaskQueue,
-      });
-    }
-
-    // Vortex complete — triage returns successfully.
-    // The interceptor will complete the triage task but will NOT
-    // signal the original parent (routing was stripped / self-referencing).
-    return {
-      type: 'return',
-      data: {
-        triaged: true,
-        exitedVortex: true,
-        directResolution: false,
-        targetedOriginalTask: envelope.data.originalTaskId || null,
-        hasCorrectedData: !!correctedData,
-        correctedData,
-        originalWorkflowType,
-        originalTaskQueue,
-        originId,
-        diagnosis: parsed.diagnosis,
-        actions_taken: parsed.actions_taken,
-        tool_calls_made: toolCallCount,
-        confidence: parsed.confidence,
-      },
-      milestones: [
-        ...triageMilestones,
-        { name: 'vortex', value: 'unwound' },
-      ],
-    };
-  }
-
-  // LLM couldn't fix — return with failure info so the parent router
-  // gets signaled. The router or calling code handles escalation creation.
-  // (Returning { type: 'escalation' } would create an escalation via the
-  // interceptor but would NOT signal the parent, leaving it hanging.)
-  return {
-    type: 'return',
-    data: {
-      triaged: true,
-      exitedVortex: false,
-      hasCorrectedData: false,
-      correctedData: null,
-      originId,
-      originalWorkflowType,
-      originalTaskQueue,
-      originalTaskId: envelope.data.originalTaskId,
-      diagnosis: parsed.diagnosis || 'AI triage could not determine a fix',
-      actions_taken: parsed.actions_taken || [],
-      tool_calls_made: toolCallCount,
-      recommendation: parsed.recommendation || '',
-      confidence: parsed.confidence || 0,
-    },
-    milestones: [
-      { name: 'triage', value: 'completed' },
-      { name: 'triage_method', value: toolCallCount > 0 ? 'llm_with_tools' : 'llm_direct' },
-      { name: 'tool_calls', value: String(toolCallCount) },
-      { name: 'vortex', value: 'unresolved' },
-    ],
-  };
-}
-
-function stripJsonComments(text: string): string {
-  return text.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-}
-
-function parseTriageResponse(content: string): Record<string, any> {
-  // Strip markdown fences if present
-  const cleaned = content
-    .replace(/^```(?:json)?\s*/m, '')
-    .replace(/\s*```$/m, '')
-    .trim();
-
-  // Try to extract JSON from the response — the LLM might include extra text.
-  // LLMs frequently produce JS-style comments in JSON; strip them before parsing.
-  const noComments = stripJsonComments(cleaned);
-  try {
-    return JSON.parse(noComments);
-  } catch {
-    // Try to find a JSON object embedded in the text
-    const jsonMatch = noComments.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch { /* fall through */ }
-    }
-
-    return {
-      diagnosis: cleaned || 'No response generated',
-      actions_taken: [],
-      correctedData: null,
-      confidence: 0,
-    };
-  }
 }

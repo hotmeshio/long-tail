@@ -4,6 +4,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../logger';
+import { MCP_TOOL_TIMEOUT_MS } from '../../modules/defaults';
 import * as mcpDbService from './db';
 import type { LTMcpServerRecord, LTMcpToolManifest } from '../../types';
 
@@ -236,7 +237,11 @@ export async function callServerTool(
   if (!client) {
     throw new Error(`MCP server ${serverId} is not connected`);
   }
-  const result = await client.callTool({ name: toolName, arguments: args });
+  const result = await client.callTool(
+    { name: toolName, arguments: args },
+    undefined,
+    { timeout: MCP_TOOL_TIMEOUT_MS },
+  );
   // Extract text content from MCP response
   if (Array.isArray(result.content)) {
     const textContent = result.content.find((c: any) => c.type === 'text');
