@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { parseVersionFromYaml } from '../services/yaml-workflow/db';
 import { compactForLlm } from '../services/yaml-workflow/workers';
 import { capToolArguments } from '../services/yaml-workflow/generator';
+import { sanitizeName } from '../services/yaml-workflow/pipeline/build';
+import { extractStepSequence } from '../services/yaml-workflow/pipeline/extract';
 import {
   TOOL_ARG_LIMIT_CAP,
   LLM_MAX_ARRAY_ITEMS,
@@ -96,5 +98,90 @@ describe('capToolArguments', () => {
 
   it('handles missing limit field', () => {
     expect(capToolArguments({ foo: 'bar' })).toEqual({ foo: 'bar' });
+  });
+});
+
+// ── sanitizeName ─────────────────────────────────────────────
+
+describe('sanitizeName', () => {
+  it('lowercases and replaces non-alphanumeric with hyphens', () => {
+    expect(sanitizeName('My Workflow Name')).toBe('my-workflow-name');
+  });
+
+  it('strips leading and trailing hyphens', () => {
+    expect(sanitizeName('--test--')).toBe('test');
+  });
+
+  it('collapses consecutive special chars into a single hyphen', () => {
+    expect(sanitizeName('a!!!b___c')).toBe('a-b-c');
+  });
+});
+
+// ── extractStepSequence ──────────────────────────────────────
+
+describe('extractStepSequence', () => {
+  function mkEvent(overrides: Record<string, unknown>) {
+    return {
+      event_type: 'activity_task_completed',
+      attributes: {
+        activity_type: 'callMcpTool',
+        input: ['server__tool', { query: 'test' }],
+        result: { data: 'ok' },
+        ...overrides,
+      },
+    } as unknown as Parameters<typeof extractStepSequence>[0][number];
+  }
+
+  it('extracts callMcpTool steps', () => {
+    const events = [
+      mkEvent({
+        activity_type: 'callQueryLLM',
+        input: [[{ role: 'system', content: 'sys' }, { role: 'user', content: 'prompt' }]],
+        result: { content: null, tool_calls: [{ id: 'tc1', type: 'function', function: { name: 'db__find_tasks', arguments: '{"status":"pending"}' } }] },
+      }),
+      mkEvent({
+        activity_type: 'callMcpTool',
+        input: ['db__find_tasks', { status: 'pending' }],
+        result: { tasks: [] },
+      }),
+    ];
+    const steps = extractStepSequence(events);
+    expect(steps.length).toBeGreaterThanOrEqual(1);
+    expect(steps.some(s => s.toolName === 'find_tasks')).toBe(true);
+  });
+
+  it('recognizes callTriageTool as an MCP tool step', () => {
+    const events = [
+      mkEvent({
+        activity_type: 'callTriageLLM',
+        input: [[{ role: 'system', content: 'sys' }, { role: 'user', content: 'triage this' }]],
+        result: { content: null, tool_calls: [{ id: 'tc1', type: 'function', function: { name: 'vision__translate_content', arguments: '{"content":"hola"}' } }] },
+      }),
+      mkEvent({
+        activity_type: 'callTriageTool',
+        input: ['vision__translate_content', { content: 'hola' }],
+        result: { translated: 'hello' },
+      }),
+    ];
+    const steps = extractStepSequence(events);
+    expect(steps.length).toBeGreaterThanOrEqual(1);
+    expect(steps.some(s => s.toolName === 'translate_content')).toBe(true);
+  });
+
+  it('recognizes callTriageLLM as an LLM step', () => {
+    const events = [
+      mkEvent({
+        activity_type: 'callTriageLLM',
+        input: [[{ role: 'system', content: 'sys' }, { role: 'user', content: 'translate' }]],
+        result: { content: '{"correctedData":{}}', tool_calls: [] },
+      }),
+    ];
+    const steps = extractStepSequence(events);
+    expect(steps.some(s => s.kind === 'llm')).toBe(true);
+  });
+
+  it('returns empty array for events with no tool calls', () => {
+    const steps = extractStepSequence([]);
+    expect(steps).toEqual([]);
   });
 });

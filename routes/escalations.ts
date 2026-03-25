@@ -627,7 +627,7 @@ router.post('/:id/resolve', async (req, res) => {
         // targeted escalation on the original task instead.
         await taskService.createTask({
           workflow_id: triageWorkflowId,
-          workflow_type: 'mcpTriage',
+          workflow_type: 'mcpTriageRouter',
           lt_type: 'mcpTriage',
           task_queue: 'long-tail-system',
           signal_id: `lt-triage-${triageWorkflowId}`,
@@ -638,12 +638,12 @@ router.post('/:id/resolve', async (req, res) => {
         });
 
         await client.workflow.start({
-          workflowName: 'mcpTriage',
+          workflowName: 'mcpTriageRouter',
           args: [directive.triageEnvelope],
           taskQueue: 'long-tail-system',
           workflowId: triageWorkflowId,
           expire: JOB_EXPIRE_SECS,
-          entity: 'mcpTriage',
+          entity: 'mcpTriageRouter',
         } as any);
 
         // Mark escalation as resolved (triage is handling it)

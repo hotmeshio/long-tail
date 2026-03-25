@@ -6,13 +6,13 @@
 # Frontend tests (fast — ~4s, 52 files, 520 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~30s, 20 files)
+# Backend: fast unit/integration tests only (~35s, 20 files, 385 tests)
 npx vitest run --exclude 'tests/workflows/**'
 
-# Backend: workflow tests only (~4-5min, 10 files)
+# Backend: workflow tests only (~4-5min, 10 files, ~72 tests)
 npx vitest run tests/workflows
 
-# Backend: all tests (~5-6min, 30 files, 448 tests)
+# Backend: all tests (~5-6min, 30 files, ~457 tests)
 npx vitest run
 ```
 
@@ -25,26 +25,42 @@ npx vitest run
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/*.test.ts` — root level)
-- **20 files, 378 tests, ~30 seconds**
-- **Recommended for iterative development** — run these first to catch regressions quickly before running the full workflow suite
-- Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, etc.
+- **20 files, 385 tests, ~35 seconds**
+- **Recommended for iterative development** — run after every code change
+- Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, YAML workflow pipeline (extract, build, compile utilities)
 - Requires: PostgreSQL (`longtail_test` database)
 - Sequential execution (`fileParallelism: false`)
 
 ### Backend Workflows (`tests/workflows/*.test.ts`)
-- **10 files, 72 tests, ~4-5 minutes**
-- Full durable workflow execution: escalation, orchestration, export, prune
+- **10 files, ~72 tests, ~4-5 minutes**
+- Full durable workflow execution: escalation, orchestration, triage, export, prune
 - Requires: PostgreSQL + HotMesh engine startup per file
-- Some tests call external APIs (OpenAI/Anthropic Vision) with long timeouts
+- Some tests call external APIs (LLM Vision) with long timeouts
 
-## Test Organization
+## What Each Fast Test Covers
 
-Tests are structured to tell a story. Each test file uses `describe` blocks that
-progress through the feature's lifecycle — an engineer reading the tests should
-understand how the service works without reading the implementation. For example,
-`escalations.test.ts` walks through: create → claim → statistics → list/filter →
-available queue. The `export.test.ts` suite progresses from raw exports through
-filtering, escalation, execution history, event classification, and data lifecycle.
+| File | Tests | What it covers |
+|------|-------|---------------|
+| `yaml-workflow-utils.test.ts` | 21 | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction (callMcpTool + callTriageTool + callTriageLLM recognition) |
+| `escalations.test.ts` | 55 | Create, claim, filter, stats, bulk operations |
+| `routes.test.ts` | 53 | HTTP API endpoints (auth, tasks, escalations, workflows, MCP) |
+| `pattern-detector.test.ts` | 47 | Iteration pattern detection, array source matching |
+| `input-analyzer.test.ts` | 37 | Input classification (dynamic/fixed/wired), schema enrichment |
+| `auth.test.ts` | 23 | JWT, middleware, role-based access |
+| `config.test.ts` | 22 | Workflow config CRUD, role management |
+| `users.test.ts` | 19 | User CRUD, role assignment |
+| `db-server.test.ts` | 18 | MCP DB server tools (find_tasks, escalation stats) |
+| `events.test.ts` | 16 | NATS event adapter, publish/subscribe |
+| `mcp.test.ts` | 14 | MCP server CRUD, tag-based discovery |
+| `invocation.test.ts` | 14 | Workflow invocation API |
+| `start.test.ts` | 12 | Startup configuration, adapter registration |
+| `hotmesh-utils.test.ts` | 10 | HotMesh utility functions |
+| `controlplane.test.ts` | 8 | Rollcall, throttle, streams |
+| `analyze-documents.test.ts` | 8 | Document analysis utilities |
+| `nats-pubsub.test.ts` | 6 | NATS pub/sub reliability |
+| `mcp-client.test.ts` | 4 | Built-in server auto-connection |
+| `vision-server.test.ts` | 3 | Vision MCP server tools |
+| `publish.test.ts` | 3 | Event publishing |
 
 ## Known Slow / Flaky Tests
 
@@ -57,7 +73,7 @@ filtering, escalation, execution history, event classification, and data lifecyc
 | `workflows/verify-document-mcp.test.ts` | Multiple Vision API calls | 60s per test |
 | `workflows/kitchen-sink.test.ts` | Durable 2s sleep built into workflow | 60s setup |
 
-These tests are **integration tests that depend on external APIs and durable workflow timing**. Occasional failures are expected (API timeouts, race conditions in scout role acquisition). Re-running a single failed file usually passes.
+These are **integration tests that depend on external APIs and durable workflow timing**. Occasional failures are expected (API timeouts, race conditions in scout role acquisition). Re-running a single failed file usually passes.
 
 ## Recommended CI Strategy
 
@@ -78,4 +94,4 @@ npx vitest run tests/workflows --retry 1
 - Frontend config: `dashboard/vitest.config.ts` — jsdom, no timeouts needed
 - Global setup clears stale HotMesh scout roles to prevent TTL deadlocks
 - Database safety: hardcoded `longtail_test` — tests refuse to run against other DBs
-- LLM abstraction: all LLM calls use `services/llm` — tests work with any configured provider (OpenAI, Anthropic, etc.)
+- LLM abstraction: all LLM calls use `services/llm` — tests work with any configured provider

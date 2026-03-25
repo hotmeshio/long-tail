@@ -1,18 +1,32 @@
-import * as mcpTriageWorkflow from './workflows/mcp-triage';
-
 /**
- * System workers that always load with Long Tail.
- * mcp-triage is always available; mcp-query-router, mcp-query,
- * and mcp-deterministic load when an LLM API key is configured.
+ * System workers and built-in MCP server factories.
+ *
+ * All MCP-powered workflows (triage, query, their routers and deterministic
+ * counterparts) require an LLM API key. They load conditionally.
  */
 export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...args: any[]) => any }> {
-  const workers: Array<{ taskQueue: string; workflow: (...args: any[]) => any }> = [
-    { taskQueue: 'long-tail-system', workflow: mcpTriageWorkflow.mcpTriage },
-  ];
+  const workers: Array<{ taskQueue: string; workflow: (...args: any[]) => any }> = [];
 
   const hasLLM = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
 
   if (hasLLM) {
+    // ── Triage pipeline (router → deterministic | dynamic) ──
+    try {
+      const { mcpTriageRouter } = require('./workflows/mcp-triage-router');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpTriageRouter });
+    } catch { /* not available */ }
+
+    try {
+      const { mcpTriageDeterministic } = require('./workflows/mcp-triage-deterministic');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpTriageDeterministic });
+    } catch { /* not available */ }
+
+    try {
+      const { mcpTriage } = require('./workflows/mcp-triage');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpTriage });
+    } catch { /* not available */ }
+
+    // ── Query pipeline (router → deterministic | dynamic) ──
     try {
       const { mcpQueryRouter } = require('./workflows/mcp-query-router');
       workers.push({ taskQueue: 'long-tail-system', workflow: mcpQueryRouter });
