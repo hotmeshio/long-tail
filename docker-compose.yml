@@ -13,7 +13,6 @@ services:
       - .:/app
       - /app/node_modules
       - /app/dashboard/node_modules
-      - ./.docker-data/files:/app/data/files
     ports:
       - "${LT_PORT:-3000}:3000"
       - "9229:9229"
@@ -37,11 +36,20 @@ services:
       - HONEYCOMB_TEAM=${HONEYCOMB_TEAM:-}
       - HONEYCOMB_ENVIRONMENT=${HONEYCOMB_ENVIRONMENT:-}
       - HMSH_XCLAIM_DELAY_MS=180000
+      - LT_STORAGE_BACKEND=s3
+      - LT_S3_BUCKET=long-tail-files
+      - LT_S3_ENDPOINT=http://minio:9000
+      - LT_S3_REGION=us-east-1
+      - LT_S3_ACCESS_KEY=minioadmin
+      - LT_S3_SECRET_KEY=minioadmin
+      - LT_S3_FORCE_PATH_STYLE=true
     depends_on:
       postgres:
         condition: service_healthy
       nats:
         condition: service_started
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -72,5 +80,23 @@ services:
       - ./nats.conf:/etc/nats/nats.conf
     command: ["-c", "/etc/nats/nats.conf", "-js"]
 
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "${LT_MINIO_PORT:-9000}:9000"
+      - "${LT_MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   pgdata:
+  miniodata:

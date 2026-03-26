@@ -1,15 +1,14 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../services/logger';
+import { getStorageBackend } from '../../services/storage';
 import {
   ensureBrowser,
   pages,
   allocatePageId,
   buildHandle,
-  resolveToStorage,
 } from './playwright';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -92,15 +91,13 @@ const submitFormSchema = z.object({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function saveScreenshot(page: import('playwright').Page, filePath: string, fullPage: boolean) {
-  const storagePath = resolveToStorage(filePath);
-  const dir = path.dirname(storagePath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return page.screenshot({ path: storagePath, fullPage }).then(() => {
-    const stats = fs.statSync(storagePath);
-    loggerRegistry.info(`[lt-mcp:playwright-cli] screenshot: ${filePath} (${stats.size} bytes)`);
-    return { path: filePath, size_bytes: stats.size };
-  });
+async function saveScreenshot(page: import('playwright').Page, filePath: string, fullPage: boolean) {
+  const backend = getStorageBackend();
+  const localPath = await backend.getLocalPath(filePath);
+  await page.screenshot({ path: localPath, fullPage });
+  const { size } = await backend.commitLocalPath(filePath, localPath);
+  loggerRegistry.info(`[lt-mcp:playwright-cli] screenshot: ${filePath} (${size} bytes)`);
+  return { path: filePath, size_bytes: size };
 }
 
 function errorResult(message: string, code: string, details?: Record<string, unknown>) {
