@@ -11,7 +11,7 @@ export default defineConfig({
     globalSetup: ['tests/setup/global.ts'],
     setupFiles: ['tests/setup/clear-roles.ts'],
     include: ['tests/**/*.test.ts'],
-    exclude: ['node_modules', 'build'],
+    exclude: ['node_modules', 'build', 'tests/integration', 'tests/functional'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
     fileParallelism: false,

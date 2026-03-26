@@ -104,47 +104,9 @@ export async function mcpTriage(
   // ── First entry: gather context and let LLM diagnose + fix ──
   const upstreamTasks = await getUpstreamTasks(originId);
   const escalationHistory = await getEscalationHistory(originId);
+  const context = buildTriageContext(envelope.data, upstreamTasks, escalationHistory);
 
-  const contextParts = [
-    `**Original Workflow**: \`${originalWorkflowType}\` (queue: \`${originalTaskQueue}\`)`,
-    `**Origin ID**: ${originId}`,
-    `**Escalation Data** (what the workflow reported when it escalated):\n\`\`\`json\n${JSON.stringify(escalationPayload, null, 2)}\n\`\`\``,
-    `**Resolver Payload** (what the human submitted):\n\`\`\`json\n${JSON.stringify(resolverPayload, null, 2)}\n\`\`\``,
-  ];
-
-  if (upstreamTasks.length > 0) {
-    contextParts.push(
-      `**Upstream Tasks** (${upstreamTasks.length}):\n\`\`\`json\n${JSON.stringify(
-        upstreamTasks.map((t) => ({
-          id: t.id,
-          type: t.workflow_type,
-          status: t.status,
-        })),
-        null,
-        2,
-      )}\n\`\`\``,
-    );
-  }
-
-  if (escalationHistory.length > 0) {
-    contextParts.push(
-      `**Escalation History** (${escalationHistory.length}):\n\`\`\`json\n${JSON.stringify(
-        escalationHistory.map((e) => ({
-          id: e.id,
-          type: e.type,
-          role: e.role,
-          status: e.status,
-          description: e.description,
-        })),
-        null,
-        2,
-      )}\n\`\`\``,
-    );
-  }
-
-  return runTriageLLM(envelope, {
-    additionalContext: contextParts.join('\n\n'),
-  });
+  return runTriageLLM(envelope, { additionalContext: context });
 }
 
 // ── LLM Agentic Loop ────────────────────────────────────────────
@@ -244,4 +206,40 @@ async function runTriageLLM(
     toolCallCount,
     responseDeps,
   );
+}
+
+// ── Context builders ─────────────────────────────────────────────
+
+/** Assemble the triage context string from workflow lineage and history. */
+function buildTriageContext(
+  data: Record<string, any>,
+  upstreamTasks: any[],
+  escalationHistory: any[],
+): string {
+  const parts = [
+    `**Original Workflow**: \`${data.originalWorkflowType}\` (queue: \`${data.originalTaskQueue}\`)`,
+    `**Origin ID**: ${data.originId}`,
+    `**Escalation Data** (what the workflow reported when it escalated):\n\`\`\`json\n${JSON.stringify(data.escalationPayload, null, 2)}\n\`\`\``,
+    `**Resolver Payload** (what the human submitted):\n\`\`\`json\n${JSON.stringify(data.resolverPayload, null, 2)}\n\`\`\``,
+  ];
+
+  if (upstreamTasks.length > 0) {
+    parts.push(
+      `**Upstream Tasks** (${upstreamTasks.length}):\n\`\`\`json\n${JSON.stringify(
+        upstreamTasks.map((t) => ({ id: t.id, type: t.workflow_type, status: t.status })),
+        null, 2,
+      )}\n\`\`\``,
+    );
+  }
+
+  if (escalationHistory.length > 0) {
+    parts.push(
+      `**Escalation History** (${escalationHistory.length}):\n\`\`\`json\n${JSON.stringify(
+        escalationHistory.map((e) => ({ id: e.id, type: e.type, role: e.role, status: e.status, description: e.description })),
+        null, 2,
+      )}\n\`\`\``,
+    );
+  }
+
+  return parts.join('\n\n');
 }

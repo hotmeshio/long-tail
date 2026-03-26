@@ -25,6 +25,10 @@
     "test:mcp": "vitest run tests/mcp.test.ts",
     "test:mcp:triage": "vitest run tests/workflows/mcp-triage.test.ts",
     "test:mcp:vision": "vitest run tests/workflows/verify-document-mcp.test.ts",
+    "test:integration": "docker compose down -v && rm -rf .docker-data/files/* && docker compose up -d --build && vitest run --config tests/integration/vitest.config.ts",
+    "test:integration:skip-reset": "vitest run --config tests/integration/vitest.config.ts",
+    "test:functional": "docker compose down -v && rm -rf .docker-data/files/* && docker compose up -d --build && npx playwright test --config tests/functional/playwright.config.ts",
+    "test:functional:skip-reset": "npx playwright test --config tests/functional/playwright.config.ts",
     "token": "ts-node scripts/token.ts",
     "process": "tsx scripts/process.ts",
     "demo": "bash scripts/demo.sh",
@@ -67,6 +71,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
