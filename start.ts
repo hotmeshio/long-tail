@@ -81,6 +81,19 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     setAuthAdapter(startConfig.auth.adapter);
   }
 
+  // Initialize OAuth providers (from startup config and/or env vars)
+  const { initializeOAuth } = await import('./services/oauth');
+  initializeOAuth(startConfig.auth?.oauth);
+
+  if (startConfig.auth?.oauth) {
+    const { setOAuthConfig } = await import('./routes/oauth');
+    setOAuthConfig({
+      autoProvision: startConfig.auth.oauth.autoProvision,
+      defaultRoleType: startConfig.auth.oauth.defaultRoleType,
+      baseUrl: startConfig.auth.oauth.baseUrl,
+    });
+  }
+
   // ── 3. Register adapters ────────────────────────────────────────────────
   // Logging (register first so subsequent log calls use it)
   if (startConfig.logging?.adapter) {

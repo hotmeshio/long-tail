@@ -558,6 +558,52 @@ const SEED_MCP_SERVERS = [
     tags: ['http', 'api', 'fetch', 'network'],
     compile_hints: 'HTTP response bodies may be large. When wiring output to a later step, prefer specific fields from a parsed JSON response rather than the raw body.',
   },
+  {
+    name: 'long-tail-oauth',
+    description: 'OAuth token management. Get fresh access tokens for external services (Google, GitHub, Slack, etc.). Handles automatic token refresh.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: [
+      {
+        name: 'get_access_token',
+        description: 'Get a fresh OAuth access token for an external service. Automatically refreshes expired tokens.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            provider: { type: 'string', description: 'OAuth provider name (google, github, microsoft, etc.)' },
+            user_id: { type: 'string', description: 'User ID to get token for' },
+          },
+          required: ['provider', 'user_id'],
+        },
+      },
+      {
+        name: 'list_connections',
+        description: 'List all OAuth providers connected for a user.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            user_id: { type: 'string', description: 'User ID to list connections for' },
+          },
+          required: ['user_id'],
+        },
+      },
+      {
+        name: 'revoke_connection',
+        description: 'Disconnect an OAuth provider for a user, removing stored tokens.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            provider: { type: 'string', description: 'OAuth provider name to disconnect' },
+            user_id: { type: 'string', description: 'User ID to revoke connection for' },
+          },
+          required: ['provider', 'user_id'],
+        },
+      },
+    ],
+    metadata: { builtin: true, category: 'authentication' },
+    tags: ['authentication', 'oauth', 'credentials'],
+    compile_hints: 'get_access_token returns a short-lived access_token string. Always call this immediately before making an authenticated API request — do not cache or reuse across workflow steps.',
+  },
 ];
 
 /**

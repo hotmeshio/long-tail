@@ -60,6 +60,7 @@
     "@opentelemetry/resources": "^2.5.1",
     "@opentelemetry/sdk-node": "^0.212.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
+    "arctic": "^3.7.0",
     "bcryptjs": "^2.4.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.3",

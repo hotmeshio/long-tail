@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { requireAuth } from '../modules/auth';
 import authRouter from './auth';
+import oauthRouter from './oauth';
 import tasksRouter from './tasks';
 import escalationsRouter from './escalations';
 import workflowsRouter from './workflows';
@@ -23,6 +24,7 @@ const router = Router();
 
 // Public routes (no auth required)
 router.use('/auth', authRouter);
+router.use('/auth/oauth', oauthRouter);
 router.use('/files', filesRouter);
 
 // Apply auth to all API routes

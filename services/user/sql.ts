@@ -15,9 +15,12 @@ export const GET_USER_BY_EXTERNAL_ID =
 // ─── User CRUD ───────────────────────────────────────────────────────────────
 
 export const INSERT_USER =
-  `INSERT INTO lt_users (external_id, email, display_name, status, metadata, password_hash)
-   VALUES ($1, $2, $3, $4, $5, $6)
+  `INSERT INTO lt_users (external_id, email, display_name, status, metadata, password_hash, oauth_provider, oauth_provider_id)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
    RETURNING *`;
+
+export const GET_USER_BY_EMAIL =
+  `SELECT * FROM lt_users WHERE email = $1 LIMIT 1`;
 
 export const INSERT_USER_ROLE_IGNORE =
   `INSERT INTO lt_user_roles (user_id, role, type) VALUES ($1, $2, $3)

@@ -6,15 +6,36 @@
 # Frontend tests (fast — ~4s, 52 files, 520 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~35s, 20 files, 385 tests)
+# Backend: fast unit/integration tests only (~35s, 23 files, 406 tests)
 npx vitest run --exclude 'tests/workflows/**'
 
 # Backend: workflow tests only (~4-5min, 10 files, ~72 tests)
 npx vitest run tests/workflows
 
-# Backend: all tests (~5-6min, 30 files, ~457 tests)
+# Backend: all tests (~5-6min, 33 files, 478 tests)
 npx vitest run
+
+# Integration tests (requires Docker — mcpQuery + mcpTriage lifecycle)
+npx vitest run --config tests/integration/vitest.config.ts
+
+# Functional tests (requires Docker — browser-based Playwright e2e)
+npx vitest run --config tests/functional/vitest.config.ts
+
+# Full integration reset (down → rebuild → run)
+npm run test:integration
 ```
+
+## Total Test Counts
+
+| Suite | Files | Tests | Duration |
+|-------|-------|-------|----------|
+| Frontend | 52 | 520 | ~4s |
+| Backend fast | 23 | 406 | ~35s |
+| Backend workflows | 10 | ~72 | ~4-5min |
+| **Backend total** | **33** | **478** | **~5-6min** |
+| Integration (Docker) | 2 | 15 | ~5min |
+| Functional (Docker) | — | — | varies |
+| **Grand total** | **87+** | **1,013+** | — |
 
 ## Test Categories
 
@@ -25,9 +46,9 @@ npx vitest run
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/*.test.ts` — root level)
-- **20 files, 385 tests, ~35 seconds**
+- **23 files, 406 tests, ~35 seconds**
 - **Recommended for iterative development** — run after every code change
-- Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, YAML workflow pipeline (extract, build, compile utilities)
+- Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, YAML workflow pipeline, OAuth (crypto, state, providers, initialization, routes)
 - Requires: PostgreSQL (`longtail_test` database)
 - Sequential execution (`fileParallelism: false`)
 
@@ -37,11 +58,23 @@ npx vitest run
 - Requires: PostgreSQL + HotMesh engine startup per file
 - Some tests call external APIs (LLM Vision) with long timeouts
 
+### Integration Tests (`tests/integration/`)
+- **2 files, 15 tests, ~5 minutes**
+- Require Docker (`docker compose up -d --build`)
+- **mcpQuery lifecycle**: dynamic → compile → deploy → deterministic → router verification
+- **mcpTriage lifecycle**: escalation → triage → remediation → re-run
+- Run with: `npx vitest run --config tests/integration/vitest.config.ts`
+
+### Functional Tests (`tests/functional/`)
+- Require Docker + running dashboard
+- Browser-based Playwright e2e through the dashboard UI
+- Run with: `npx vitest run --config tests/functional/vitest.config.ts`
+
 ## What Each Fast Test Covers
 
 | File | Tests | What it covers |
 |------|-------|---------------|
-| `yaml-workflow-utils.test.ts` | 21 | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction (callMcpTool + callTriageTool + callTriageLLM recognition) |
+| `yaml-workflow-utils.test.ts` | 21 | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction |
 | `escalations.test.ts` | 55 | Create, claim, filter, stats, bulk operations |
 | `routes.test.ts` | 53 | HTTP API endpoints (auth, tasks, escalations, workflows, MCP) |
 | `pattern-detector.test.ts` | 47 | Iteration pattern detection, array source matching |
@@ -57,8 +90,13 @@ npx vitest run
 | `hotmesh-utils.test.ts` | 10 | HotMesh utility functions |
 | `controlplane.test.ts` | 8 | Rollcall, throttle, streams |
 | `analyze-documents.test.ts` | 8 | Document analysis utilities |
+| `oauth-providers.test.ts` | 8 | OAuth provider registry, URL generation, display names |
+| `oauth-crypto.test.ts` | 6 | AES-256-GCM encrypt/decrypt, tamper detection, edge cases |
 | `nats-pubsub.test.ts` | 6 | NATS pub/sub reliability |
+| `oauth-routes.test.ts` | 6 | OAuth flow logic: state, CSRF, JWT issuance |
 | `mcp-client.test.ts` | 4 | Built-in server auto-connection |
+| `oauth-state.test.ts` | 4 | CSRF state + PKCE code verifier management |
+| `oauth-init.test.ts` | 4 | Provider auto-detection from env vars and startup config |
 | `vision-server.test.ts` | 3 | Vision MCP server tools |
 | `publish.test.ts` | 3 | Event publishing |
 
@@ -86,12 +124,17 @@ cd .. && npx vitest run --exclude 'tests/workflows/**'
 
 # Stage 3: workflow integration (run with retry)
 npx vitest run tests/workflows --retry 1
+
+# Stage 4: Docker integration (optional — slower, requires running stack)
+# docker compose up -d --build
+# npx vitest run --config tests/integration/vitest.config.ts
 ```
 
 ## Config Notes
 
 - Backend config: `vitest.config.ts` (root) — 30s test timeout, 60s hook timeout
 - Frontend config: `dashboard/vitest.config.ts` — jsdom, no timeouts needed
+- Integration config: `tests/integration/vitest.config.ts` — waits for health check
 - Global setup clears stale HotMesh scout roles to prevent TTL deadlocks
 - Database safety: hardcoded `longtail_test` — tests refuse to run against other DBs
 - LLM abstraction: all LLM calls use `services/llm` — tests work with any configured provider

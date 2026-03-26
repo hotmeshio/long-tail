@@ -1,6 +1,7 @@
 import type { LoggerOptions } from 'pino';
 
 import type { LTAuthAdapter } from './auth';
+import type { LTOAuthStartConfig } from './oauth';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
@@ -43,6 +44,8 @@ export interface LTStartConfig {
     secret?: string;
     /** Replace the built-in JWT adapter entirely. */
     adapter?: LTAuthAdapter;
+    /** OAuth/OIDC configuration for identity and resource OAuth. */
+    oauth?: LTOAuthStartConfig;
   };
 
   /** OpenTelemetry. Register before workers start. */

@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOAuthCallback } from '../../hooks/useOAuthCallback';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
 import { ProcessesSidebar } from './ProcessesSidebar';
@@ -65,6 +66,9 @@ function ShellLayout() {
 export function Shell() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
+
+  // Handle OAuth callback token in URL before checking auth
+  useOAuthCallback();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;

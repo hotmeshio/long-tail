@@ -12,6 +12,9 @@ export interface CreateUserInput {
   status?: LTUserStatus;
   metadata?: Record<string, any>;
   roles?: { role: string; type: LTRoleType }[];
+  /** OAuth identity link (set during OAuth auto-provisioning). */
+  oauth_provider?: string;
+  oauth_provider_id?: string;
 }
 
 export interface UpdateUserInput {

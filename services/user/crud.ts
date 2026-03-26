@@ -8,6 +8,7 @@ import {
   ENSURE_ROLE_EXISTS,
   GET_ROLES_BY_USER_ID,
   GET_ROLES_BY_USER_IDS,
+  GET_USER_BY_EMAIL,
   GET_USER_BY_EXTERNAL_ID,
   GET_USER_BY_ID,
   INSERT_USER,
@@ -51,6 +52,8 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
       input.status || 'active',
       input.metadata ? JSON.stringify(input.metadata) : null,
       passwordHash,
+      input.oauth_provider || null,
+      input.oauth_provider_id || null,
     ],
   );
   const user = rows[0];
@@ -76,6 +79,13 @@ export async function getUser(id: string): Promise<LTUserRecord | null> {
 export async function getUserByExternalId(externalId: string): Promise<LTUserRecord | null> {
   const pool = getPool();
   const { rows } = await pool.query(GET_USER_BY_EXTERNAL_ID, [externalId]);
+  if (!rows[0]) return null;
+  return attachRoles(rows[0]);
+}
+
+export async function getUserByEmail(email: string): Promise<LTUserRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_USER_BY_EMAIL, [email]);
   if (!rows[0]) return null;
   return attachRoles(rows[0]);
 }
