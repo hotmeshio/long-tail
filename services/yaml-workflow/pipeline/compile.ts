@@ -19,7 +19,7 @@ import type {
   DataFlowEdge,
   StepSpec,
   PipelineContext,
-} from './types';
+} from '../types';
 import { COMPILATION_PROMPT } from './prompts';
 
 // ── Step summarization for LLM context ────────────────────────────────────────
@@ -472,5 +472,5 @@ async function callCompilationLLM(
 
 // ── Re-exports for backward compatibility ─────────────────────────────────────
 
-/** @deprecated Use EnhancedCompilationPlan from pipeline/types instead. */
+/** @deprecated Use EnhancedCompilationPlan from types.ts instead. */
 export type CompilationPlan = EnhancedCompilationPlan;

@@ -19,24 +19,7 @@ import {
   DISCOVER_WORKFLOWS,
 } from './sql';
 
-export interface CreateYamlWorkflowInput {
-  name: string;
-  description?: string;
-  app_id: string;
-  app_version?: string;
-  source_workflow_id?: string;
-  source_workflow_type?: string;
-  yaml_content: string;
-  graph_topic: string;
-  input_schema?: Record<string, unknown>;
-  output_schema?: Record<string, unknown>;
-  activity_manifest?: ActivityManifestEntry[];
-  input_field_meta?: import('../../types/yaml-workflow').InputFieldMeta[];
-  original_prompt?: string;
-  category?: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-}
+import type { CreateYamlWorkflowInput } from './types';
 
 /**
  * Extract the `app.version` value from YAML content using a simple regex.

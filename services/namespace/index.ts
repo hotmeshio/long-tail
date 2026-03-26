@@ -5,17 +5,7 @@ import {
   GET_NAMESPACE_BY_NAME,
   UPSERT_NAMESPACE,
 } from './sql';
-
-export interface LTNamespace {
-  id: string;
-  name: string;
-  description: string | null;
-  schema_name: string;
-  is_default: boolean;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { LTNamespace } from './types';
 
 /**
  * List all registered namespaces, ordered by default-first then name.

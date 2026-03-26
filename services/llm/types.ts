@@ -70,3 +70,7 @@ export interface LLMResponse {
 export interface LLMProvider {
   call(options: LLMOptions): Promise<LLMResponse>;
 }
+
+// ── Provider detection ────────────────────────────────────────────────────────
+
+export type ProviderName = 'openai' | 'anthropic' | 'openai-compatible';

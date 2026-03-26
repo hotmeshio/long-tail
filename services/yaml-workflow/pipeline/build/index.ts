@@ -7,7 +7,7 @@
  */
 
 import { buildEnrichedInputSchema } from '../../input-analyzer';
-import type { PipelineContext, EnhancedCompilationPlan, ExtractedStep } from '../types';
+import type { PipelineContext, EnhancedCompilationPlan, ExtractedStep } from '../../types';
 
 import { inferSchema } from './utils';
 import { deriveCategory, deriveTagsFromSteps } from './metadata';

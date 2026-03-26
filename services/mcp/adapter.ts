@@ -7,13 +7,7 @@ import * as mcpWorkflowCompilerServer from './workflow-compiler-server';
 import * as mcpWorkflowServer from './workflow-server';
 import * as mcpDbService from './db';
 
-export interface BuiltInMcpAdapterOptions {
-  server?: {
-    enabled?: boolean;
-    name?: string;
-  };
-  autoConnect?: string[];
-}
+import type { BuiltInMcpAdapterOptions } from './types';
 
 /**
  * Built-in MCP adapter.

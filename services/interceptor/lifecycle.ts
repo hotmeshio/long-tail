@@ -8,31 +8,14 @@
 
 import type { LTEnvelope } from '../../types';
 import type { ProxiedActivities } from './state';
+import type { WorkflowIdentity, TaskContext } from './types';
 import { publishWorkflowEvent, publishTaskEvent, publishEscalationEvent } from '../events/publish';
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-/** Identity fields extracted from the HotMesh workflow context. */
-export interface WorkflowIdentity {
-  workflowId: string;
-  workflowName: string;
-  workflowTopic: string;
-  workflowTrace: string | undefined;
-  workflowSpan: string | undefined;
-}
 
 /** Result of re-run detection and escalation resolution. */
 interface ReRunContext {
   isReRun: boolean;
   task: any | null;
   metadata: Record<string, any> | null;
-}
-
-/** Result of task + routing resolution. */
-export interface TaskContext {
-  taskId: string | undefined;
-  routing: Record<string, any> | null;
-  originId: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

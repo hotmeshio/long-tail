@@ -7,15 +7,7 @@
  * the actual qualified names the LLM will see.
  */
 
-export interface ServerInfo {
-  name: string;
-  description: string | null;
-  tags: string[];
-  metadata: Record<string, any> | null;
-  toolNames: string[];
-  toolCount: number;
-  slug: string;
-}
+import type { ServerInfo } from './types';
 
 type StrategyAdvisor = (servers: ServerInfo[]) => string;
 

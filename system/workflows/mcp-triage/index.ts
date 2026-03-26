@@ -5,7 +5,8 @@ import type { LTEnvelope, LTReturn } from '../../../types';
 import * as activities from '../../activities/triage';
 import * as interceptorActivities from '../../../services/interceptor/activities';
 import { TRIAGE_SYSTEM_PROMPT, TRIAGE_REENTRY_CONTEXT, TRIAGE_EXHAUSTED_ROUNDS } from './prompts';
-import { handleFinalResponse, type TriageResponseDeps } from './response';
+import { handleFinalResponse } from './response';
+import type { TriageResponseDeps } from './types';
 
 type ActivitiesType = typeof activities;
 

@@ -8,6 +8,7 @@
 import { connect, StringCodec, type NatsConnection, type Subscription } from 'nats';
 
 import type { LTEvent } from '../../types/events';
+import type { ApiResponse } from './types';
 
 // ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -34,11 +35,6 @@ export async function waitForHealth(
 }
 
 // ── ApiClient ────────────────────────────────────────────────────────────────
-
-interface ApiResponse<T = any> {
-  status: number;
-  data: T;
-}
 
 export class ApiClient {
   private baseUrl: string;

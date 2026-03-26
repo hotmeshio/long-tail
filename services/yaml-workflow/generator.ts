@@ -16,12 +16,12 @@ import { compile } from './pipeline/compile';
 import { build } from './pipeline/build';
 import { validate } from './pipeline/validate';
 import { sanitizeName, capToolArguments } from './pipeline/build';
-import type { PipelineContext, GenerateYamlOptions, GenerateYamlResult } from './pipeline/types';
+import type { PipelineContext, GenerateYamlOptions, GenerateYamlResult } from './types';
 
 // Re-exports for backward compatibility
 export { capToolArguments } from './pipeline/build';
-export type { GenerateYamlOptions, GenerateYamlResult } from './pipeline/types';
-export type { EnhancedCompilationPlan as CompilationPlan } from './pipeline/types';
+export type { GenerateYamlOptions, GenerateYamlResult } from './types';
+export type { EnhancedCompilationPlan as CompilationPlan } from './types';
 
 /**
  * Generate a HotMesh YAML workflow from a completed execution's tool call sequence.

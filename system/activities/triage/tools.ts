@@ -3,7 +3,8 @@ import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
-import { generateStrategySection, type ServerInfo } from '../../workflows/mcp-query/strategy-advisors';
+import { generateStrategySection } from '../../workflows/mcp-query/strategy-advisors';
+import type { ServerInfo } from '../../workflows/mcp-query/types';
 import { toolServerMap, yamlWorkflowMap, toolDefCache } from './cache';
 
 /** Base tags always included — triage always needs DB for investigation + compiled workflows */

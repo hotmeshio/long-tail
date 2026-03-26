@@ -9,7 +9,7 @@ export { start } from './start';
 export { registerLT, createLTInterceptor } from './services/interceptor';
 export { createLTActivityInterceptor } from './services/interceptor/activity-interceptor';
 export { executeLT } from './services/orchestrator';
-export type { ExecuteLTOptions } from './services/orchestrator';
+export type { ExecuteLTOptions } from './services/orchestrator/types';
 export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken } from './modules/auth';
 export * from './types';
 export * as TaskService from './services/task';

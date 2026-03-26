@@ -9,7 +9,7 @@ import type { ActivityManifestEntry } from '../../../../types/yaml-workflow';
 import type {
   ExtractedStep,
   EnhancedCompilationPlan,
-} from '../types';
+} from '../../types';
 
 import { humanize } from './utils';
 

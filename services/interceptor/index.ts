@@ -16,7 +16,7 @@ import {
 } from './lifecycle';
 
 import type { LTReturn, LTEscalation } from '../../types';
-import type { InterceptorState } from './state';
+import type { InterceptorState } from './types';
 
 type ActivitiesType = typeof interceptorActivities;
 

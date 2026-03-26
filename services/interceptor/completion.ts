@@ -1,5 +1,5 @@
 import type { LTReturn, LTMilestone } from '../../types';
-import type { InterceptorState } from './state';
+import type { InterceptorState } from './types';
 import { publishMilestoneEvent, publishWorkflowEvent } from '../events/publish';
 
 /**

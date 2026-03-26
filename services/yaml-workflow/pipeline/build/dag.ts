@@ -19,26 +19,14 @@ import type {
   ExtractedStep,
   EnhancedCompilationPlan,
   IterationSpec,
-} from '../types';
+} from '../../types';
 
 import { capToolArguments, inferSchema } from './utils';
 import { wireStepInputs } from './wiring';
 import { buildIterationActivities } from './iteration';
 import { insertTransformActivities } from './transform';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-/** Mutable state accumulated while building the YAML DAG. */
-export interface DagBuilder {
-  activities: Record<string, unknown>;
-  transitions: Record<string, Array<{ to: string; conditions?: Record<string, unknown> }>>;
-  manifest: ActivityManifestEntry[];
-  stepIndexToActivityId: Map<number, string>;
-  prevActivityId: string;
-  prevResult: unknown;
-  lastPivotId: string | null;
-  triggerId: string;
-}
+import type { DagBuilder } from '../../types';
 
 // ── DAG lifecycle ────────────────────────────────────────────────────────────
 

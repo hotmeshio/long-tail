@@ -1,10 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks';
 
-export interface OrchestratorContext {
-  workflowId: string;
-  taskQueue: string;
-  workflowType: string;
-}
+import type { OrchestratorContext } from './types';
 
 const store = new AsyncLocalStorage<OrchestratorContext>();
 

@@ -17,10 +17,7 @@ import {
   COUNT_ACTIVE_ESCALATION_REFS,
 } from './sql';
 
-export interface EscalationChain {
-  source_role: string;
-  target_role: string;
-}
+import type { EscalationChain, RoleDetail } from './types';
 
 /**
  * Get the roles a given source role can escalate to.
@@ -119,13 +116,6 @@ export async function listDistinctRoles(): Promise<string[]> {
   const pool = getPool();
   const { rows } = await pool.query(LIST_ROLES);
   return rows.map((r: any) => r.role);
-}
-
-export interface RoleDetail {
-  role: string;
-  user_count: number;
-  chain_count: number;
-  workflow_count: number;
 }
 
 /**
