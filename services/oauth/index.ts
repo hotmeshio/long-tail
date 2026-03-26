@@ -21,6 +21,7 @@ const ENV_PROVIDERS: Array<{ provider: string; idVar: string; secretVar: string 
   { provider: 'google', idVar: 'OAUTH_GOOGLE_CLIENT_ID', secretVar: 'OAUTH_GOOGLE_CLIENT_SECRET' },
   { provider: 'github', idVar: 'OAUTH_GITHUB_CLIENT_ID', secretVar: 'OAUTH_GITHUB_CLIENT_SECRET' },
   { provider: 'microsoft', idVar: 'OAUTH_MICROSOFT_CLIENT_ID', secretVar: 'OAUTH_MICROSOFT_CLIENT_SECRET' },
+  { provider: 'mock', idVar: 'OAUTH_MOCK_CLIENT_ID', secretVar: 'OAUTH_MOCK_CLIENT_SECRET' },
 ];
 
 /**

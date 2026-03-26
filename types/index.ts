@@ -108,6 +108,12 @@ export type {
 } from './discovery';
 
 export type {
+  DelegationTokenPayload,
+  ToolAuthContext,
+  ServiceTokenRecord,
+} from './delegation';
+
+export type {
   LTOAuthProviderConfig,
   LTOAuthStartConfig,
   LTOAuthUserInfo,

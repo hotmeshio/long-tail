@@ -1,3 +1,5 @@
+import { createDelegationToken } from '../../../services/auth/delegation';
+import { getOrchestratorContext } from '../../../services/interceptor/context';
 import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../../services/llm';
 import { LLM_MODEL_PRIMARY, LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_DEFAULT, STOP_WORDS } from '../../../modules/defaults';
 import { loggerRegistry } from '../../../services/logger';
@@ -285,9 +287,15 @@ export async function callMcpTool(
     ? qualifiedName.slice(separatorIdx + 2)
     : qualifiedName;
 
+  // Build auth context from the orchestrator (userId propagated via envelope)
+  const orchCtx = getOrchestratorContext();
+  const authContext = orchCtx?.userId
+    ? { userId: orchCtx.userId, delegationToken: createDelegationToken(orchCtx.userId, ['mcp:tool:call']) }
+    : undefined;
+
   if (serverName) {
     try {
-      return await mcpClient.callServerTool(serverName, toolName, args);
+      return await mcpClient.callServerTool(serverName, toolName, args, authContext);
     } catch (err: any) {
       return { error: err.message, tool: qualifiedName, args };
     }
@@ -299,7 +307,7 @@ export async function callMcpTool(
     const manifest = server.tool_manifest || [];
     if (manifest.some((t: any) => t.name === toolName)) {
       try {
-        return await mcpClient.callServerTool(server.name, toolName, args);
+        return await mcpClient.callServerTool(server.name, toolName, args, authContext);
       } catch (err: any) {
         return { error: err.message, tool: qualifiedName, args };
       }

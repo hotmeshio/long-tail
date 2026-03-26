@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { AppLogo } from '../components/common/display/AppLogo';
@@ -6,35 +6,50 @@ import { OAuthIcon } from '../components/common/OAuthIcon';
 import { fetchOAuthProviders, type OAuthProvider } from '../api/oauth';
 
 export function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [launched, setLaunched] = useState(false);
-  const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // After re-login, return to the page the user was on
-  const returnTo = (location.state as { from?: string })?.from ?? '/';
+  const params = new URLSearchParams(location.search);
+  const oauthToken = params.get('token');
+  const oauthError = params.get('error');
+  const returnTo = (location.state as { from?: string })?.from
+    ?? params.get('returnTo')
+    ?? '/';
 
-  // Check for OAuth error in URL
-  const oauthError = new URLSearchParams(location.search).get('error');
+  // Process the OAuth token immediately on first render (not in an effect)
+  const oauthHandled = useRef(false);
+  if (oauthToken && !oauthHandled.current) {
+    oauthHandled.current = true;
+    login(oauthToken, undefined, {
+      displayName: params.get('displayName'),
+      username: params.get('username'),
+    });
+  }
+
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(oauthError || '');
+  const [loading, setLoading] = useState(false);
+  const [launched, setLaunched] = useState(!!oauthToken);
+  const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
 
   // Fetch available OAuth providers on mount
   useEffect(() => {
+    if (oauthToken) return; // skip fetch during OAuth callback
     fetchOAuthProviders()
       .then(setOauthProviders)
-      .catch(() => {}); // Silent — password login always works
+      .catch(() => {});
   }, []);
 
-  // Show OAuth error from callback redirect
+  // Navigate after the comet animation completes
   useEffect(() => {
-    if (oauthError) setError(oauthError);
-  }, [oauthError]);
+    if (!launched) return;
+    const timer = setTimeout(() => navigate(returnTo, { replace: true }), 1500);
+    return () => clearTimeout(timer);
+  }, [launched]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Skip the instant redirect while the launch animation is playing
+  // Already authenticated (e.g., navigated to /login while logged in) — skip animation
   if (isAuthenticated && !launched) {
     return <Navigate to={returnTo} replace />;
   }
@@ -60,14 +75,12 @@ export function LoginPage() {
         return;
       }
 
-      // Launch the comet, then navigate after animation
       setLaunched(true);
       login(
         data.token,
         { username: username.trim(), password },
         { displayName: data.user?.display_name, username: data.user?.external_id },
       );
-      setTimeout(() => navigate(returnTo, { replace: true }), 1500);
     } catch {
       setError('Unable to connect to server');
     } finally {
@@ -106,7 +119,7 @@ export function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               className="input"
               placeholder="Enter your username"
-              autoFocus
+              autoFocus={!launched}
               autoComplete="username"
             />
           </div>

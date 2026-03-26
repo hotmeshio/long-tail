@@ -43,12 +43,24 @@ services:
       - LT_S3_ACCESS_KEY=minioadmin
       - LT_S3_SECRET_KEY=minioadmin
       - LT_S3_FORCE_PATH_STYLE=true
+      - OAUTH_ENCRYPTION_KEY=${OAUTH_ENCRYPTION_KEY:-a01b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9}
+      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID:-}
+      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET:-}
+      - OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID:-}
+      - OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET:-}
+      - OAUTH_MOCK_CLIENT_ID=${OAUTH_MOCK_CLIENT_ID:-mock-client}
+      - OAUTH_MOCK_CLIENT_SECRET=${OAUTH_MOCK_CLIENT_SECRET:-mock-secret}
+      - MOCK_OAUTH_BROWSER_AUTH_URL=http://localhost:9080/authorize
+      - MOCK_OAUTH_TOKEN_URL=http://mock-oauth:9080/token
+      - MOCK_OAUTH_USERINFO_URL=http://mock-oauth:9080/userinfo
     depends_on:
       postgres:
         condition: service_healthy
       nats:
         condition: service_started
       minio:
+        condition: service_healthy
+      mock-oauth:
         condition: service_healthy
     restart: unless-stopped
 
@@ -97,6 +109,18 @@ services:
       timeout: 3s
       retries: 5
 
+  mock-oauth:
+    build: ./tests/mock-oauth
+    ports:
+      - "${LT_MOCK_OAUTH_PORT:-9080}:9080"
+    environment:
+      - PORT=9080
+      - MOCK_USERS=alice@test.local:Alice Test:test-user-1,bob@test.local:Bob Test:test-user-2
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:9080/health').then(r=>{if(!r.ok)throw 1})"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 volumes:
   pgdata:
   miniodata:

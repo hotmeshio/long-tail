@@ -1,0 +1,24 @@
+# External MCP Server — Isolated Execution Environment
+#
+# Demonstrates how a separate MCP server container authenticates to Long Tail,
+# receives delegation tokens, and fetches user-scoped OAuth credentials.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.external.yml up
+#
+# The external MCP server connects to the same network as the main stack.
+# It authenticates via a service token (LT_EXTERNAL_SERVICE_TOKEN env var)
+# and calls back to Long Tail's delegation API for user-scoped operations.
+
+services:
+  external-mcp:
+    build: ./examples/external-mcp-server
+    ports:
+      - "${LT_EXTERNAL_MCP_PORT:-9090}:9090"
+    environment:
+      - PORT=9090
+      - LT_API_URL=http://long-tail:3000
+      - LT_SERVICE_TOKEN=${LT_EXTERNAL_SERVICE_TOKEN:-}
+    depends_on:
+      long-tail:
+        condition: service_started

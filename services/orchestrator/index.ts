@@ -112,11 +112,12 @@ export async function executeLT<T = any>(
     }
   }
 
-  // 4. Inject task ID and lineage into the envelope so the interceptor
-  //    can find the task and propagate originId/parentId to escalations
+  // 4. Inject task ID, lineage, and user context into the envelope so the
+  //    interceptor can find the task and propagate identity to child workflows
   const envelope = args[0] as LTEnvelope | undefined;
   if (envelope) {
-    envelope.lt = { ...envelope.lt, taskId, originId, parentId };
+    const userId = envelope.lt?.userId || orchCtx?.userId;
+    envelope.lt = { ...envelope.lt, taskId, originId, parentId, userId };
   }
 
   // 5. Start child workflow (fire-and-forget — only the start is awaited)

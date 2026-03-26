@@ -232,13 +232,18 @@ export async function callServerTool(
   serverId: string,
   toolName: string,
   args: Record<string, any>,
+  authContext?: { userId?: string; delegationToken?: string },
 ): Promise<any> {
   const client = await resolveClient(serverId);
   if (!client) {
     throw new Error(`MCP server ${serverId} is not connected`);
   }
+  // Inject auth context as a hidden _auth argument when provided
+  const toolArgs = authContext?.userId || authContext?.delegationToken
+    ? { ...args, _auth: { userId: authContext.userId, token: authContext.delegationToken } }
+    : args;
   const result = await client.callTool(
-    { name: toolName, arguments: args },
+    { name: toolName, arguments: toolArgs },
     undefined,
     { timeout: MCP_TOOL_TIMEOUT_MS },
   );

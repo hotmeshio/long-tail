@@ -156,10 +156,16 @@ router.get('/:provider/callback', async (req, res) => {
       '24h',
     );
 
-    // Redirect to frontend with token
+    // Redirect to login page with token + user info — plays the comet animation, then navigates
     const returnTo = oauthState.returnTo || '/';
-    const separator = returnTo.includes('?') ? '&' : '?';
-    res.redirect(`${returnTo}${separator}token=${encodeURIComponent(jwt)}`);
+    const displayName = user.display_name || userInfo.displayName || '';
+    const userName = user.external_id || '';
+    res.redirect(
+      `/login?token=${encodeURIComponent(jwt)}` +
+      `&returnTo=${encodeURIComponent(returnTo)}` +
+      `&displayName=${encodeURIComponent(displayName)}` +
+      `&username=${encodeURIComponent(userName)}`,
+    );
   } catch (err: any) {
     loggerRegistry.error(`[oauth] callback error for ${provider}: ${err.message}`);
     res.redirect(`/login?error=${encodeURIComponent('OAuth login failed. Please try again.')}`);

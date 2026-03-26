@@ -12,6 +12,8 @@ export interface LTEnvelope {
     [key: string]: any;
   };
   lt?: {
+    /** Identity of the user who initiated this workflow. Set by the API route layer. */
+    userId?: string;
     modality?: string;
     escalationId?: string;
     escalationStatus?: string;

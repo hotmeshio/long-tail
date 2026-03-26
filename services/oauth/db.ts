@@ -3,6 +3,7 @@ import { encrypt, decrypt } from './crypto';
 import { getProvider, type OAuthTokens } from './providers';
 import type { LTDecryptedToken } from '../../types/oauth';
 import type { LTUserRecord } from '../../types/user';
+import { attachRoles } from '../user/crud';
 
 // ── SQL ──────────────────────────────────────────────────────────────────────
 
@@ -154,5 +155,6 @@ export async function getUserByOAuthProvider(
 ): Promise<LTUserRecord | null> {
   const pool = await getPool();
   const { rows } = await pool.query(GET_USER_BY_OAUTH, [provider, providerUserId]);
-  return rows[0] || null;
+  if (!rows[0]) return null;
+  return attachRoles(rows[0]);
 }
