@@ -8,7 +8,7 @@
 
 import * as mcpDbService from '../../../mcp/db';
 import { STOP_WORDS } from '../../../../modules/defaults';
-import type { ExtractedStep } from '../types';
+import type { ExtractedStep } from '../../types';
 
 /**
  * Load category signals from registered MCP servers.

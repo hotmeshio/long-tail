@@ -6,6 +6,7 @@ import { postgres_options } from '../../modules/config';
 import { getPool } from '../db';
 import { LIST_APPS, COUNT_PENDING, COUNT_PROCESSED_SINCE, VOLUME_BY_STREAM } from './sql';
 import { startQuorumBridge } from './quorum-bridge';
+import type { ControlPlaneApp, StreamStats } from './types';
 
 // Re-export for consumers
 export type { QuorumProfile, ThrottleOptions };
@@ -35,10 +36,6 @@ async function getEngine(appId: string): Promise<HotMesh> {
 }
 
 // ─── Application discovery ──────────────────────────────────────────────────
-
-export interface ControlPlaneApp {
-  appId: string;
-}
 
 /**
  * List all HotMesh application IDs from the `hotmesh_applications` table.
@@ -94,12 +91,6 @@ const VALID_INTERVALS: Record<string, string> = {
   '1d': '1 day',
   '7d': '7 days',
 };
-
-export interface StreamStats {
-  pending: number;
-  processed: number;
-  byStream: Array<{ stream_type: 'engine' | 'worker'; stream_name: string; count: number }>;
-}
 
 /**
  * Get stream processing statistics for a given appId schema.

@@ -3,6 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import * as interceptorActivities from '../interceptor/activities';
 import { getOrchestratorContext } from '../interceptor/context';
 import type { LTEnvelope } from '../../types';
+import type { ExecuteLTOptions } from './types';
 
 type ActivitiesType = typeof interceptorActivities;
 
@@ -11,21 +12,6 @@ type ActivitiesType = typeof interceptorActivities;
  * Must match the queue used when registering the activity worker.
  */
 const LT_ACTIVITY_QUEUE = 'lt-interceptor';
-
-export interface ExecuteLTOptions {
-  /** Name of the child workflow function to execute */
-  workflowName: string;
-  /** Arguments to pass to the child workflow */
-  args: any[];
-  /** Task queue the child workflow is registered on */
-  taskQueue: string;
-  /** Explicit child workflow ID (auto-generated if omitted) */
-  workflowId?: string;
-  /** TTL in seconds for the child workflow */
-  expire?: number;
-  /** Correlation ID for provider data lookups across sibling tasks */
-  originId?: string;
-}
 
 /**
  * Execute a Long Tail workflow with automatic task tracking.

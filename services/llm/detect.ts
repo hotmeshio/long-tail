@@ -2,7 +2,7 @@
  * Provider detection from model name strings.
  */
 
-export type ProviderName = 'openai' | 'anthropic' | 'openai-compatible';
+import type { ProviderName } from './types';
 
 /**
  * Detect the LLM provider from a model name string.

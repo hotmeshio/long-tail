@@ -6,7 +6,9 @@ import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
 import { WORKFLOW_MATCH_PROMPT, EXTRACT_INPUTS_PROMPT } from './prompts';
-import { generateStrategySection, type ServerInfo } from './strategy-advisors';
+import { generateStrategySection } from './strategy-advisors';
+import type { ServerInfo } from './types';
+import type { WorkflowCandidate } from '../../../types/discovery';
 
 // ── Tool caches (module-level, persist across proxy activity calls) ──
 
@@ -18,29 +20,6 @@ const yamlWorkflowMap = new Map<string, string>();
 
 /** Maps qualified tool name → full tool definition */
 const toolDefCache = new Map<string, ToolDefinition>();
-
-/**
- * Search for active compiled YAML workflows that match the user's prompt.
- * Extracts keywords from the prompt and searches by tags (GIN-indexed).
- * Returns a compact summary for the LLM and tool IDs.
- *
- * Full tool definitions are cached in module-level toolDefCache — only
- * lightweight IDs flow through the durable pipe.
- *
- * This is Phase 1 of tool discovery — compiled workflows are preferred
- * because they execute deterministically without LLM reasoning overhead.
- */
-/** Candidate workflow returned by ranked discovery. */
-export interface WorkflowCandidate {
-  name: string;
-  description: string | null;
-  original_prompt: string | null;
-  category: string | null;
-  tags: string[];
-  input_schema: Record<string, unknown>;
-  tool_names: string[];
-  fts_rank: number;
-}
 
 /**
  * Phase 1: Ranked discovery of compiled YAML workflows.

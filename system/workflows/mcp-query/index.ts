@@ -78,25 +78,7 @@ export async function mcpQuery(
     const response = await callQueryLLM(messages, toolIds);
 
     if (!response.tool_calls?.length) {
-      const parsed = parseJsonResponse(response.content || '');
-      const milestones = [
-        { name: 'mcp_query', value: 'completed' },
-        { name: 'tool_calls', value: String(toolCallCount) },
-      ];
-      if (parsed.knowledge_updated?.length) {
-        milestones.push({ name: 'knowledge_updated', value: String(parsed.knowledge_updated.length) });
-      }
-      if (parsed.compilation_candidate) {
-        milestones.push({ name: 'compilation_candidate', value: 'true' });
-      }
-      return {
-        type: 'return',
-        data: {
-          ...parsed,
-          tool_calls_made: toolCallCount,
-        },
-        milestones,
-      };
+      return buildQueryReturn(response.content || '', toolCallCount);
     }
 
     const fnCalls = response.tool_calls.filter(
@@ -131,23 +113,35 @@ export async function mcpQuery(
 
   // Exhausted rounds — ask for final synthesis
   const finalResponse = await callQueryLLM(messages, undefined);
-  const parsed = parseJsonResponse(finalResponse.content || '');
-  const finalMilestones = [
+  return buildQueryReturn(finalResponse.content || '', toolCallCount, [
+    { name: 'rounds_exhausted', value: 'true' },
+  ]);
+}
+
+type Milestone = { name: string; value: string };
+
+/** Build the LTReturn for a completed query, with standard + enriched milestones. */
+function buildQueryReturn(
+  content: string,
+  toolCallCount: number,
+  extraMilestones: Milestone[] = [],
+): LTReturn {
+  const parsed = parseJsonResponse(content);
+  const milestones: Milestone[] = [
     { name: 'mcp_query', value: 'completed' },
     { name: 'tool_calls', value: String(toolCallCount) },
-    { name: 'rounds_exhausted', value: 'true' },
   ];
   if (parsed.knowledge_updated?.length) {
-    finalMilestones.push({ name: 'knowledge_updated', value: String(parsed.knowledge_updated.length) });
+    milestones.push({ name: 'knowledge_updated', value: String(parsed.knowledge_updated.length) });
   }
-
+  if (parsed.compilation_candidate) {
+    milestones.push({ name: 'compilation_candidate', value: 'true' });
+  }
+  milestones.push(...extraMilestones);
   return {
     type: 'return',
-    data: {
-      ...parsed,
-      tool_calls_made: toolCallCount,
-    },
-    milestones: finalMilestones,
+    data: { ...parsed, tool_calls_made: toolCallCount },
+    milestones,
   };
 }
 

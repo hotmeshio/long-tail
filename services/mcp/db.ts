@@ -10,15 +10,7 @@ import {
   GET_AUTO_CONNECT_SERVERS,
 } from './sql';
 
-export interface CreateMcpServerInput {
-  name: string;
-  description?: string;
-  transport_type: 'stdio' | 'sse';
-  transport_config: Record<string, any>;
-  auto_connect?: boolean;
-  metadata?: Record<string, any>;
-  tags?: string[];
-}
+import type { CreateMcpServerInput } from './types';
 
 export async function createMcpServer(
   input: CreateMcpServerInput,

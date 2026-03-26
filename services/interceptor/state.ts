@@ -1,5 +1,6 @@
-import type { LTEnvelope, LTResolvedConfig } from '../../types';
+import type { LTEnvelope } from '../../types';
 import type * as interceptorActivities from './activities';
+import type { InterceptorState } from './types';
 
 /**
  * The proxied activity functions available within the interceptor's
@@ -7,27 +8,6 @@ import type * as interceptorActivities from './activities';
  * call is routed through the durable activity worker.
  */
 export type ProxiedActivities = typeof interceptorActivities;
-
-/**
- * Mutable state carried through a single interceptor execute() call.
- * Populated incrementally as context is resolved, then passed to
- * the escalation and completion submodules.
- */
-export interface InterceptorState {
-  workflowId: string;
-  workflowName: string;
-  taskQueue: string;
-  wfConfig: LTResolvedConfig | null;
-  defaultRole: string;
-  defaultModality: string;
-  taskId: string | undefined;
-  routing: Record<string, any> | null;
-  envelope: LTEnvelope | undefined;
-  isReRun: boolean;
-  activities: ProxiedActivities;
-  traceId?: string;
-  spanId?: string;
-}
 
 /**
  * Build the stored envelope that preserves routing and task identity

@@ -1,28 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope, LTReturn } from '../../../types';
-import type * as activities from '../../activities/triage';
-import type * as interceptorActivities from '../../../services/interceptor/activities';
-
-// ── Types ─────────────────────────────────────────────────────
-
-export interface TriageResponseDeps {
-  ltCreateEscalation: typeof interceptorActivities.ltCreateEscalation;
-  ltGetTask: typeof interceptorActivities.ltGetTask;
-  ltGetWorkflowConfig: typeof interceptorActivities.ltGetWorkflowConfig;
-  ltStartWorkflow: typeof interceptorActivities.ltStartWorkflow;
-  notifyEngineering: typeof activities.notifyEngineering;
-}
-
-interface TriageContext {
-  originId: string;
-  originalWorkflowType: string;
-  originalTaskQueue: string;
-  originalTaskId: string | undefined;
-  escalationPayload: Record<string, any>;
-  escalationId: string | undefined;
-  parentId: string | undefined;
-}
+import type { TriageResponseDeps, TriageContext } from './types';
 
 // ── Main handler ──────────────────────────────────────────────
 

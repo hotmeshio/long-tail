@@ -7,7 +7,7 @@
 
 import { collapseIterationPatterns, detectPatterns } from '../pattern-detector';
 import { extractSemanticInputs } from '../input-analyzer';
-import type { PipelineContext, ExtractedStep } from './types';
+import type { PipelineContext, ExtractedStep } from '../types';
 
 /**
  * Analyze pipeline stage: detect patterns and classify inputs.

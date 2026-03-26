@@ -13,7 +13,7 @@ import type { WorkflowExecutionEvent } from '../../../types';
 import type {
   ActivityTaskCompletedAttributes,
 } from '@hotmeshio/hotmesh/build/types/exporter';
-import type { ExtractedStep, PipelineContext } from './types';
+import type { ExtractedStep, PipelineContext } from '../types';
 import { EXTRACT_DEFAULT_SYSTEM_PROMPT, EXTRACT_DEFAULT_USER_TEMPLATE } from './prompts';
 
 /**

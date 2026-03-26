@@ -102,3 +102,7 @@ export type {
   ResolutionDirective,
   LTEscalationStrategy,
 } from './escalation-strategy';
+
+export type {
+  WorkflowCandidate,
+} from './discovery';

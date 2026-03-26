@@ -1,5 +1,5 @@
 import type { LTEscalation } from '../../types';
-import type { InterceptorState } from './state';
+import type { InterceptorState } from './types';
 import { buildStoredEnvelope } from './state';
 import { publishEscalationEvent, publishTaskEvent, publishWorkflowEvent } from '../events/publish';
 

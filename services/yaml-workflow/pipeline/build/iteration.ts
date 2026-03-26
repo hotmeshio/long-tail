@@ -7,7 +7,7 @@ import type {
   ExtractedStep,
   EnhancedCompilationPlan,
   IterationSpec,
-} from '../types';
+} from '../../types';
 
 import { keysRelated, humanize, inferSchema } from './utils';
 

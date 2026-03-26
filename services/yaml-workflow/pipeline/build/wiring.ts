@@ -5,7 +5,7 @@
 import type {
   ExtractedStep,
   EnhancedCompilationPlan,
-} from '../types';
+} from '../../types';
 
 import { keysRelated } from './utils';
 

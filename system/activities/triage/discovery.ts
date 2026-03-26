@@ -4,18 +4,7 @@ import { WORKFLOW_MATCH_PROMPT, EXTRACT_INPUTS_PROMPT } from '../../workflows/mc
 import { loggerRegistry } from '../../../services/logger';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import { yamlWorkflowMap, toolDefCache } from './cache';
-
-/** Candidate workflow returned by ranked discovery. */
-export interface WorkflowCandidate {
-  name: string;
-  description: string | null;
-  original_prompt: string | null;
-  category: string | null;
-  tags: string[];
-  input_schema: Record<string, unknown>;
-  tool_names: string[];
-  fts_rank: number;
-}
+import type { WorkflowCandidate } from '../../../types/discovery';
 
 /**
  * Search for active compiled YAML workflows matching a text query.

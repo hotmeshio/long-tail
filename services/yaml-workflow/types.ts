@@ -1,15 +1,50 @@
 /**
- * Pipeline types for the YAML workflow compilation pipeline.
+ * Type definitions for the YAML workflow service.
  *
- * The pipeline transforms MCP tool execution traces into deterministic
- * YAML DAG workflows through five stages: extract → analyze → compile → build → validate.
+ * Includes types for the database layer, the 5-stage compilation pipeline
+ * (extract → analyze → compile → build → validate), and the DAG builder.
  */
 
-import type { ActivityManifestEntry, InputFieldMeta } from '../../../types/yaml-workflow';
-import type { WorkflowExecution } from '../../../types';
-import type { PatternAnnotation } from '../pattern-detector';
+import type { ActivityManifestEntry, InputFieldMeta } from '../../types/yaml-workflow';
+import type { WorkflowExecution } from '../../types';
+import type { PatternAnnotation } from './pattern-detector';
 
-// ── Step types ────────────────────────────────────────────────────────────────
+// ── Database layer ───────────────────────────────────────────────────────────
+
+export interface CreateYamlWorkflowInput {
+  name: string;
+  description?: string;
+  app_id: string;
+  app_version?: string;
+  source_workflow_id?: string;
+  source_workflow_type?: string;
+  yaml_content: string;
+  graph_topic: string;
+  input_schema?: Record<string, unknown>;
+  output_schema?: Record<string, unknown>;
+  activity_manifest?: ActivityManifestEntry[];
+  input_field_meta?: InputFieldMeta[];
+  original_prompt?: string;
+  category?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+// ── Build stage ──────────────────────────────────────────────────────────────
+
+/** Mutable state accumulated while building the YAML DAG. */
+export interface DagBuilder {
+  activities: Record<string, unknown>;
+  transitions: Record<string, Array<{ to: string; conditions?: Record<string, unknown> }>>;
+  manifest: ActivityManifestEntry[];
+  stepIndexToActivityId: Map<number, string>;
+  prevActivityId: string;
+  prevResult: unknown;
+  lastPivotId: string | null;
+  triggerId: string;
+}
+
+// ── Step types ───────────────────────────────────────────────────────────────
 
 /** A step extracted from an execution's event timeline. */
 export interface ExtractedStep {
@@ -24,7 +59,7 @@ export interface ExtractedStep {
   promptMessages?: Array<{ role: string; content: string }>;
 }
 
-// ── Enhanced compilation plan ─────────────────────────────────────────────────
+// ── Enhanced compilation plan ────────────────────────────────────────────────
 
 /** Specifies how an iteration should be constructed in the YAML DAG. */
 export interface IterationSpec {
@@ -121,7 +156,7 @@ export interface EnhancedCompilationPlan {
   hasIteration: boolean;
 }
 
-// ── Pipeline context ──────────────────────────────────────────────────────────
+// ── Pipeline context ─────────────────────────────────────────────────────────
 
 /** Options for YAML workflow generation. */
 export interface GenerateYamlOptions {

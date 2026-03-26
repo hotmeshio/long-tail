@@ -8,7 +8,7 @@
 
 import { callLLM, hasLLMApiKey } from '../../llm';
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
-import type { PipelineContext } from './types';
+import type { PipelineContext } from '../types';
 import { VALIDATION_PROMPT } from './prompts';
 
 /**

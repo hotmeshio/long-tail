@@ -12,8 +12,8 @@
  *   console.log(response.content, response.tool_calls);
  */
 
-import { detectProvider, resolveApiKey, type ProviderName } from './detect';
-import type { LLMOptions, LLMResponse, LLMProvider } from './types';
+import { detectProvider, resolveApiKey } from './detect';
+import type { LLMOptions, LLMResponse, LLMProvider, ProviderName } from './types';
 
 // Re-export types for call sites
 export type {
@@ -26,6 +26,7 @@ export type {
   ContentPart,
   TextContent,
   ImageUrlContent,
+  ProviderName,
 } from './types';
 
 export { detectProvider } from './detect';
