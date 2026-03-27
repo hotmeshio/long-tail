@@ -3,6 +3,7 @@ export {
   createUser,
   getUser,
   getUserByExternalId,
+  getUserByEmail,
   updateUser,
   deleteUser,
   listUsers,

@@ -1,25 +1,9 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../services/logger';
-
-// All file output (screenshots, etc.) is routed through the managed file-storage directory
-// so files are visible to list_files / read_file tools and served via GET /api/files/*.
-const FILE_STORAGE_DIR = process.env.LT_FILE_STORAGE_DIR || './data/files';
-
-export function resolveToStorage(filePath: string): string {
-  // Strip leading slash to make it relative, then resolve against storage dir
-  const relative = filePath.replace(/^\/+/, '');
-  const resolved = path.resolve(FILE_STORAGE_DIR, relative);
-  const base = path.resolve(FILE_STORAGE_DIR);
-  if (!resolved.startsWith(base + path.sep) && resolved !== base) {
-    throw new Error(`Path traversal denied: ${filePath}`);
-  }
-  return resolved;
-}
+import { getStorageBackend } from '../../services/storage';
 
 // ── Browser lifecycle ────────────────────────────────────────────────────────
 // Shared browser instance across tool calls within a single server lifetime.
@@ -365,12 +349,9 @@ function registerTools(srv: McpServer): void {
         }
       }
 
-      // Resolve path into managed file-storage directory
-      const storagePath = resolveToStorage(args.path);
-      const dir = path.dirname(storagePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
+      // Write screenshot via storage backend (local or S3)
+      const backend = getStorageBackend();
+      const localPath = await backend.getLocalPath(args.path);
 
       if (args.selector) {
         const element = await page.$(args.selector);
@@ -383,16 +364,16 @@ function registerTools(srv: McpServer): void {
             isError: true,
           };
         }
-        await element.screenshot({ path: storagePath });
+        await element.screenshot({ path: localPath });
       } else {
         await page.screenshot({
-          path: storagePath,
+          path: localPath,
           fullPage: args.full_page ?? false,
         });
       }
 
-      const stats = fs.statSync(storagePath);
-      loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${args.path} (${stats.size} bytes)`);
+      const { size } = await backend.commitLocalPath(args.path, localPath);
+      loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${args.path} (${size} bytes)`);
 
       return {
         content: [{
@@ -400,7 +381,7 @@ function registerTools(srv: McpServer): void {
           text: JSON.stringify({
             page_id: pageId,
             path: args.path,
-            size_bytes: stats.size,
+            size_bytes: size,
             url: page.url(),
             _handle: buildHandle(pageId),
           }),
@@ -621,22 +602,21 @@ function registerTools(srv: McpServer): void {
                 isError: true,
               };
             }
-            const storagePath = resolveToStorage(step.path);
-            const dir = path.dirname(storagePath);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            const ssBackend = getStorageBackend();
+            const ssLocalPath = await ssBackend.getLocalPath(step.path);
             if (step.selector) {
               const el = await page.$(step.selector);
               if (!el) {
                 stepResults.push({ step: i, action: 'screenshot', result: { error: `Element not found: ${step.selector}`, code: RESOURCE_NOT_FOUND } });
                 continue;
               }
-              await el.screenshot({ path: storagePath });
+              await el.screenshot({ path: ssLocalPath });
             } else {
-              await page.screenshot({ path: storagePath, fullPage: step.full_page ?? false });
+              await page.screenshot({ path: ssLocalPath, fullPage: step.full_page ?? false });
             }
-            const stats = fs.statSync(storagePath);
-            loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${step.path} (${stats.size} bytes)`);
-            stepResults.push({ step: i, action: 'screenshot', result: { path: step.path, size_bytes: stats.size, url: page.url() } });
+            const { size: ssSize } = await ssBackend.commitLocalPath(step.path, ssLocalPath);
+            loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${step.path} (${ssSize} bytes)`);
+            stepResults.push({ step: i, action: 'screenshot', result: { path: step.path, size_bytes: ssSize, url: page.url() } });
             break;
           }
           case 'click': {

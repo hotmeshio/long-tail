@@ -6,6 +6,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 vi.mock('../../../api/mcp-query', () => ({
   useMcpQueryJobs: vi.fn(),
   useSubmitMcpQuery: vi.fn(),
+  useSubmitMcpQueryRouted: vi.fn(),
 }));
 
 vi.mock('../../../hooks/useNatsEvents', () => ({
@@ -13,7 +14,7 @@ vi.mock('../../../hooks/useNatsEvents', () => ({
 }));
 
 import { McpQueryPage } from '../McpQueryPage';
-import { useMcpQueryJobs, useSubmitMcpQuery } from '../../../api/mcp-query';
+import { useMcpQueryJobs, useSubmitMcpQuery, useSubmitMcpQueryRouted } from '../../../api/mcp-query';
 
 const now = new Date().toISOString();
 
@@ -21,8 +22,16 @@ const mockJobs = {
   jobs: [
     { workflow_id: 'mcp-query-1', entity: 'mcpQuery', status: 'completed', is_live: false, created_at: now, updated_at: now },
     { workflow_id: 'mcp-query-2', entity: 'mcpQuery', status: 0, is_live: true, created_at: now, updated_at: now },
+    { workflow_id: 'triage-abc', entity: 'mcpTriage', status: 'completed', is_live: false, created_at: now, updated_at: now },
   ],
-  total: 2,
+  total: 3,
+};
+
+const mockMutation = {
+  mutateAsync: vi.fn().mockResolvedValue({ workflow_id: 'new-id', status: 'started', prompt: 'test' }),
+  isPending: false,
+  isError: false,
+  error: null,
 };
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -36,12 +45,8 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   vi.mocked(useMcpQueryJobs).mockReturnValue({ data: mockJobs, isLoading: false } as any);
-  vi.mocked(useSubmitMcpQuery).mockReturnValue({
-    mutateAsync: vi.fn().mockResolvedValue({ workflow_id: 'new-id', status: 'started', prompt: 'test' }),
-    isPending: false,
-    isError: false,
-    error: null,
-  } as any);
+  vi.mocked(useSubmitMcpQuery).mockReturnValue({ ...mockMutation } as any);
+  vi.mocked(useSubmitMcpQueryRouted).mockReturnValue({ ...mockMutation } as any);
 });
 
 describe('McpQueryPage', () => {
@@ -70,10 +75,24 @@ describe('McpQueryPage', () => {
     expect(btn).not.toBeDisabled();
   });
 
-  it('renders job rows', () => {
+  it('renders job rows including triage', () => {
     render(<McpQueryPage />, { wrapper });
     expect(screen.getByText('mcp-query-1')).toBeInTheDocument();
     expect(screen.getByText('mcp-query-2')).toBeInTheDocument();
+    expect(screen.getByText('triage-abc')).toBeInTheDocument();
+  });
+
+  it('shows entity type badges', () => {
+    render(<McpQueryPage />, { wrapper });
+    expect(screen.getAllByText('Query').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Triage')).toBeInTheDocument();
+  });
+
+  it('shows Direct checkbox (default checked)', () => {
+    render(<McpQueryPage />, { wrapper });
+    const checkbox = screen.getByRole('checkbox');
+    expect(checkbox).toBeChecked();
+    expect(screen.getByText('Dynamic')).toBeInTheDocument();
   });
 
   it('shows empty state when no jobs', () => {

@@ -28,6 +28,8 @@ export interface OrchestratorContext {
   workflowId: string;
   taskQueue: string;
   workflowType: string;
+  /** Identity of the user who initiated this workflow chain. */
+  userId?: string;
 }
 
 /** Identity fields extracted from the HotMesh workflow context. */

@@ -141,7 +141,7 @@ export function createLTInterceptor(options: {
 
       try {
         const result = await runWithOrchestratorContext(
-          { workflowId: wf.workflowId, taskQueue, workflowType: wf.workflowName },
+          { workflowId: wf.workflowId, taskQueue, workflowType: wf.workflowName, userId: envelope?.lt?.userId },
           next,
         );
 

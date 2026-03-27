@@ -368,7 +368,7 @@ router.post('/bulk-triage', async (req, res) => {
           },
         },
         metadata: envelope.metadata || {},
-        lt: envelope.lt || {},
+        lt: { ...(envelope.lt || {}), userId: req.auth?.userId },
       };
 
       const routing = escalation.task_id

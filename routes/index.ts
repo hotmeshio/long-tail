@@ -2,6 +2,8 @@ import { Router } from 'express';
 
 import { requireAuth } from '../modules/auth';
 import authRouter from './auth';
+import oauthRouter from './oauth';
+import delegationRouter from './delegation';
 import tasksRouter from './tasks';
 import escalationsRouter from './escalations';
 import workflowsRouter from './workflows';
@@ -21,8 +23,10 @@ import controlplaneRouter from './controlplane';
 
 const router = Router();
 
-// Public routes (no auth required)
+// Public routes (no auth required — they handle their own auth)
 router.use('/auth', authRouter);
+router.use('/auth/oauth', oauthRouter);
+router.use('/delegation', delegationRouter);
 router.use('/files', filesRouter);
 
 // Apply auth to all API routes

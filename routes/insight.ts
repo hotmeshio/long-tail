@@ -42,6 +42,7 @@ router.post('/mcp-query', async (req, res) => {
       args: [{
         data: { prompt, tags },
         metadata: { source: 'dashboard' },
+        lt: { userId: req.auth?.userId },
       }],
       taskQueue: 'long-tail-system',
       workflowName: wfName,

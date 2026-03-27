@@ -1,3 +1,5 @@
+import { createDelegationToken } from '../../../services/auth/delegation';
+import { getOrchestratorContext } from '../../../services/interceptor/context';
 import { loggerRegistry } from '../../../services/logger';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
@@ -120,9 +122,15 @@ export async function callTriageTool(
     ? qualifiedName.slice(separatorIdx + 2)
     : qualifiedName;
 
+  // Build auth context from the orchestrator (userId propagated via envelope)
+  const orchCtx = getOrchestratorContext();
+  const authContext = orchCtx?.userId
+    ? { userId: orchCtx.userId, delegationToken: createDelegationToken(orchCtx.userId, ['mcp:tool:call']) }
+    : undefined;
+
   if (serverName) {
     try {
-      return await mcpClient.callServerTool(serverName, toolName, args);
+      return await mcpClient.callServerTool(serverName, toolName, args, authContext);
     } catch (err: any) {
       return { error: err.message, tool: qualifiedName, args };
     }
@@ -134,7 +142,7 @@ export async function callTriageTool(
     const manifest = server.tool_manifest || [];
     if (manifest.some((t: any) => t.name === toolName)) {
       try {
-        return await mcpClient.callServerTool(server.name, toolName, args);
+        return await mcpClient.callServerTool(server.name, toolName, args, authContext);
       } catch (err: any) {
         return { error: err.message, tool: qualifiedName, args };
       }

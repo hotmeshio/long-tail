@@ -47,6 +47,7 @@ export class McpEscalationStrategy implements LTEscalationStrategy {
       lt: {
         originId: originalLt.originId,
         parentId: originalLt.parentId,
+        userId: originalLt.userId,
       },
     };
 

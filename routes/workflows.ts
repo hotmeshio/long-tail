@@ -185,6 +185,7 @@ router.post('/:type/invoke', async (req, res) => {
     const envelope: LTEnvelope = {
       data,
       metadata: metadata || {},
+      lt: { userId: req.auth?.userId },
     };
 
     if (!wfConfig.task_queue) {

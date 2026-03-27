@@ -106,3 +106,17 @@ export type {
 export type {
   WorkflowCandidate,
 } from './discovery';
+
+export type {
+  DelegationTokenPayload,
+  ToolAuthContext,
+  ServiceTokenRecord,
+} from './delegation';
+
+export type {
+  LTOAuthProviderConfig,
+  LTOAuthStartConfig,
+  LTOAuthUserInfo,
+  LTDecryptedToken,
+  LTOAuthTokenRecord,
+} from './oauth';

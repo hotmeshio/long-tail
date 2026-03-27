@@ -44,8 +44,14 @@ router.get('/jobs', async (req, res) => {
     let idx = 1;
 
     if (entity) {
-      conditions.push(`j.entity = $${idx++}`);
-      values.push(entity);
+      const entities = entity.split(',').map((e) => e.trim()).filter(Boolean);
+      if (entities.length === 1) {
+        conditions.push(`j.entity = $${idx++}`);
+        values.push(entities[0]);
+      } else if (entities.length > 1) {
+        conditions.push(`j.entity = ANY($${idx++})`);
+        values.push(entities);
+      }
     }
 
     if (search) {
