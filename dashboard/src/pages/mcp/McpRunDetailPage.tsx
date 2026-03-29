@@ -1,4 +1,6 @@
 import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMcpRunExecution } from '../../api/mcp-runs';
 import { useYamlWorkflowByTopic } from '../../api/yaml-workflows';
 import { useSettings } from '../../api/settings';
@@ -8,6 +10,8 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { CopyableId } from '../../components/common/display/CopyableId';
 import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
+import { useNatsSubscription } from '../../hooks/useNats';
+import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { formatDuration } from '../../lib/format';
 
 import { SwimlaneTimeline } from '../workflows/workflow-execution/SwimlaneTimeline';
@@ -32,6 +36,7 @@ export function McpRunDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const namespace = searchParams.get('namespace') || 'longtail';
+  const queryClient = useQueryClient();
   const { data: execution, isLoading, error } = useMcpRunExecution(jobId!, namespace);
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
@@ -40,6 +45,13 @@ export function McpRunDetailPage() {
   const sourceWorkflow = yamlMatch?.workflows?.[0];
 
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
+
+  // Subscribe to activity events for this job — refetch execution on each step
+  const activityHandler = useCallback((event: any) => {
+    if (!jobId || event.workflowId !== jobId) return;
+    queryClient.invalidateQueries({ queryKey: ['mcpRunExecution', jobId] });
+  }, [jobId, queryClient]);
+  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.activity.>`, activityHandler);
 
   if (isLoading) {
     return (
@@ -168,7 +180,7 @@ export function McpRunDetailPage() {
 
         {/* Execution Timeline (swimlane) */}
         <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle}>
-          <SwimlaneTimeline events={events} />
+          <SwimlaneTimeline events={events} outline />
         </CollapsibleSection>
 
         {/* Events (table) */}

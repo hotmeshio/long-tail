@@ -156,7 +156,7 @@ export function LoginPage() {
                 <div className="flex-1 h-px bg-border" />
               </div>
               <div className="space-y-2">
-                {oauthProviders.map((p) => (
+                {oauthProviders.filter((p) => p.provider !== 'anthropic').map((p) => (
                   <a
                     key={p.provider}
                     href={`/api/auth/oauth/${p.provider}?returnTo=${encodeURIComponent(returnTo)}`}

@@ -35,13 +35,13 @@ const columns: Column<LTJob>[] = [
   {
     key: 'status',
     label: 'Status',
-    className: 'w-28',
+    className: 'w-28 whitespace-nowrap',
     render: (row) => <StatusBadge status={mapStatus(row)} />,
   },
   {
     key: 'entity',
     label: 'Type',
-    className: 'w-32',
+    className: 'w-32 whitespace-nowrap',
     render: (row) => {
       const { label, style } = entityLabel((row as any).entity);
       return (
@@ -103,7 +103,11 @@ export function McpQueryPage() {
 
     const result = await activeMutation.mutateAsync({ prompt });
     setPromptText('');
-    navigate(`/mcp/queries/${result.workflow_id}?prompt=${encodeURIComponent(prompt)}`);
+    if (direct) {
+      navigate(`/mcp/queries/${result.workflow_id}?prompt=${encodeURIComponent(prompt)}`);
+    } else {
+      navigate(`/workflows/executions/${result.workflow_id}`);
+    }
   };
 
   const jobs = data?.jobs ?? [];
@@ -121,7 +125,7 @@ export function McpQueryPage() {
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               placeholder="Describe what you want to accomplish..."
-              className="w-full min-h-[80px] max-h-[200px] px-4 py-3 bg-surface-sunken border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent-primary"
+              className="w-full min-h-[80px] max-h-[200px] px-4 py-3 bg-surface-sunken border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   handleSubmit(e);

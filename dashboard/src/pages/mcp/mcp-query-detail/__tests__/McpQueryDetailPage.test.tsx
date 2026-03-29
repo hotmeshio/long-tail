@@ -24,6 +24,12 @@ vi.mock('../../../../api/mcp-runs', () => ({
   useMcpRuns: vi.fn(),
 }));
 
+vi.mock('../../../../api/escalations', () => ({
+  useEscalationsByWorkflowId: vi.fn(() => ({ data: undefined })),
+  useClaimEscalation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useResolveEscalation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}));
+
 vi.mock('../../../../hooks/useNatsEvents', () => ({
   useWorkflowDetailEvents: vi.fn(),
 }));
@@ -82,14 +88,17 @@ describe('McpQueryDetailPage', () => {
     expect(screen.getByText('Test')).toBeInTheDocument();
   });
 
-  it('shows running state on step 1', () => {
+  it('auto-advances to step 2 (timeline) when workflow is running', () => {
     vi.mocked(useMcpQueryExecution).mockReturnValue({
       data: { status: 'running', events: [], duration_ms: null },
     } as any);
     vi.mocked(useMcpQueryResult).mockReturnValue({ data: undefined } as any);
 
     render(<McpQueryDetailPage />, { wrapper });
-    expect(screen.getByText(/starting query/i)).toBeInTheDocument();
+    // Step 2 (Timeline) should be active since autoStep is 2 for in_progress
+    const stepButtons = screen.getAllByRole('button');
+    const step2 = stepButtons.find((b) => b.textContent === '2');
+    expect(step2?.className).toContain('bg-accent');
   });
 
   it('auto-advances to step 2 (review) when result exists', () => {

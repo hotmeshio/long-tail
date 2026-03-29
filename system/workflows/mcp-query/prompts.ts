@@ -80,3 +80,17 @@ Rules:
 - Do NOT invent, guess, or use default values for fields the user didn't mention.
 - Return ONLY a JSON object whose keys match the input schema's property names.
 - Include "_extraction_failed": true if any required field is missing, or "_extraction_failed": false if all required fields are satisfied.`;
+
+// ── Rounds-exhausted diagnostic prompt ──────────────────────────────────────
+
+export const ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT = `\
+You have run out of allowed tool rounds. Summarize:
+(1) what you accomplished,
+(2) what you were unable to complete, and
+(3) what steps remain.
+
+Return a JSON object with keys:
+- title: short title for the execution
+- summary: brief narrative of what happened
+- result: partial data collected (if any), or null
+- diagnosis: string explaining what went wrong and what remains to be done`;

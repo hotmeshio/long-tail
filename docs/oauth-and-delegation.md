@@ -390,21 +390,21 @@ cd dashboard && npx vitest run
 
 ```
 ┌──────────────────────────────────────────────┐
-│  Long Tail Core (trusted)                     │
-│  - User JWTs signed with JWT_SECRET           │
-│  - Delegation tokens signed with JWT_SECRET   │
-│  - OAuth tokens encrypted with AES-256-GCM    │
-│  - Service token hashes stored with bcrypt    │
+│  Long Tail Core (trusted)                    │
+│  - User JWTs signed with JWT_SECRET          │
+│  - Delegation tokens signed with JWT_SECRET  │
+│  - OAuth tokens encrypted with AES-256-GCM   │
+│  - Service token hashes stored with bcrypt   │
 └────────────────────────┬─────────────────────┘
                          │
             Delegation API (scoped access)
                          │
 ┌────────────────────────▼─────────────────────┐
-│  External MCP Server (semi-trusted)           │
-│  - Has service token (server identity)        │
-│  - Receives delegation tokens (user scoping)  │
-│  - Can only access scoped resources           │
-│  - Cannot forge or extend token permissions   │
+│  External MCP Server (semi-trusted)          │
+│  - Has service token (server identity)       │
+│  - Receives delegation tokens (user scoping) │
+│  - Can only access scoped resources          │
+│  - Cannot forge or extend token permissions  │
 └──────────────────────────────────────────────┘
 ```
 

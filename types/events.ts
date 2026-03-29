@@ -18,6 +18,9 @@ export type LTEventType =
   | 'workflow.started'
   | 'workflow.completed'
   | 'workflow.failed'
+  | 'activity.started'
+  | 'activity.completed'
+  | 'activity.failed'
   | 'milestone';
 
 /**

@@ -16,6 +16,7 @@ import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useNatsEvents';
+import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { TriageContext } from '../../../components/escalation/TriageContext';
 import { EscalationActionBar } from './EscalationActionBar';
 import { EscalationHero } from './EscalationHero';
@@ -80,13 +81,14 @@ export function EscalationDetailPage() {
     setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
   }, [resolverSchema]);
 
-  // When triage data is present, collapse Input/Output so triage context is central
+  // When triage or rounds-exhausted data is present, collapse Input/Output so structured context is central
   const hasTriage = hasTriageData(esc?.escalation_payload);
+  const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
   useEffect(() => {
-    if (hasTriage) {
+    if (hasTriage || isRoundsExhausted) {
       setCollapsed((prev) => ({ ...prev, context: true }));
     }
-  }, [hasTriage]);
+  }, [hasTriage, isRoundsExhausted]);
 
   if (isLoading) {
     return (
@@ -142,6 +144,19 @@ export function EscalationDetailPage() {
     navigate(returnPath);
   };
 
+  const handleRetryTriage = async () => {
+    if (!claimedByMe) {
+      await claim.mutateAsync({ id: esc.id, durationMinutes: 30 });
+    }
+    const diagnosis = (payloadObj?.diagnosis as string) || esc.description || '';
+    await resolve.mutateAsync({
+      id: esc.id,
+      resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
+    });
+    addToast('Sent to AI triage', 'success');
+    navigate(returnPath);
+  };
+
   const handleRelease = async () => {
     await claim.mutateAsync({ id: esc.id, durationMinutes: 0 });
     addToast('Escalation released', 'success');
@@ -159,6 +174,19 @@ export function EscalationDetailPage() {
         isTerminal={isTerminal}
         traceUrl={traceUrl}
       />
+
+      {/* Rounds-exhausted structured context */}
+      {isRoundsExhausted && payloadObj && (
+        <div className="mt-8">
+          <RoundsExhaustedContext
+            payload={payloadObj}
+            isTerminal={isTerminal}
+            resolverPayload={resolverPayload as Record<string, unknown> | null}
+            onRetryTriage={handleRetryTriage}
+            isRetrying={claim.isPending || resolve.isPending}
+          />
+        </div>
+      )}
 
       {/* Collapsible sections */}
       <div className="mt-8 space-y-6">

@@ -325,12 +325,36 @@ function parsePlan(raw: string, stepCount: number): EnhancedCompilationPlan {
  * uses mechanical heuristics as before.
  */
 export async function compile(ctx: PipelineContext): Promise<PipelineContext> {
+  // Build retry context if this is a recompilation after a failed deployment
+  const retryHint = ctx.priorDeployError
+    ? [
+        `\n## RECOMPILATION — Prior Deployment Failed`,
+        `The previous compilation produced YAML that failed deployment with this error:`,
+        `> ${ctx.priorDeployError}`,
+        ``,
+        `You MUST produce a plan that avoids this issue. Specifically:`,
+        `- If the error mentions "Duplicate activity id", ensure all activity IDs will be unique`,
+        `  across all graphs. The build stage prefixes IDs with a sanitized graph topic — ensure`,
+        `  your plan does not produce steps that would collide after sanitization.`,
+        `- If the error mentions invalid transitions, ensure data flow edges reference valid step indices.`,
+        `- Review the failed YAML below for the specific structural issue and ensure your plan avoids it.`,
+        ...(ctx.priorFailedYaml ? [
+          ``,
+          `### Failed YAML (excerpt)`,
+          '```yaml',
+          ctx.priorFailedYaml.slice(0, 2000),
+          '```',
+        ] : []),
+      ].join('\n')
+    : undefined;
+
   // Attempt LLM compilation
   ctx.compilationPlan = await callCompilationLLM(
     ctx.collapsedSteps,
     ctx.originalPrompt,
     ctx.naiveInputs,
     ctx.patternAnnotations,
+    retryHint,
   );
 
   if (ctx.compilationPlan) {
@@ -407,6 +431,7 @@ async function callCompilationLLM(
   originalPrompt: string,
   naiveInputs: InputFieldMeta[],
   patternAnnotations: PatternAnnotation[],
+  retryHint?: string,
 ): Promise<EnhancedCompilationPlan | null> {
   if (!hasLLMApiKey(LLM_MODEL_PRIMARY)) return null;
 
@@ -448,6 +473,7 @@ async function callCompilationLLM(
       `Use these to substitute simpler tools for iterations when the executed tool is too complex.`,
       toolInventory,
     ] : []),
+    ...(retryHint ? [retryHint] : []),
   ].join('\n');
 
   try {

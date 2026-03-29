@@ -8,34 +8,46 @@ import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
+import { TryWorkflowModal } from './yaml-workflow-detail/TryWorkflowModal';
 import { groupByAppId, matchesSearch, filterTools, type ProcessServer } from './yaml-helpers';
 import type { LTYamlWorkflowRecord } from '../../api/types';
 
 // ── Tool row (individual workflow inside expanded server) ─────────────────────
 
-function ToolRow({ wf, onClick }: { wf: LTYamlWorkflowRecord; onClick: () => void }) {
+function ToolRow({ wf, onClick, onTry }: { wf: LTYamlWorkflowRecord; onClick: () => void; onTry: () => void }) {
   const stepCount = wf.activity_manifest.filter((a) => a.type === 'worker').length;
+  const canTry = wf.status === 'active';
 
   return (
     <tr onClick={onClick} className="cursor-pointer row-hover">
       <td className="pl-14 pr-6 py-2">
         <div className="min-w-0">
-          <code className="text-xs font-mono text-accent-primary">{wf.graph_topic}</code>
+          <code className="text-xs font-mono text-accent-primary truncate block">{wf.graph_topic}</code>
           {wf.description && (
             <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-1">{wf.description}</p>
           )}
         </div>
       </td>
-      <td className="px-6 py-2">
+      <td className="px-6 py-2 whitespace-nowrap">
         <span className="font-mono text-xs text-text-secondary">{wf.source_workflow_type ?? '—'}</span>
       </td>
-      <td className="px-6 py-2 text-right">
+      <td className="px-6 py-2 text-right whitespace-nowrap">
         <span className="text-xs text-text-tertiary">
           {stepCount} step{stepCount !== 1 ? 's' : ''}
         </span>
       </td>
-      <td className="px-6 py-2 w-28">
+      <td className="px-6 py-2 w-28 whitespace-nowrap">
         <StatusBadge status={wf.status} />
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-right">
+        {canTry && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onTry(); }}
+            className="text-[10px] text-accent hover:underline"
+          >
+            try
+          </button>
+        )}
       </td>
     </tr>
   );
@@ -48,12 +60,14 @@ function ServerRow({
   expanded,
   onToggle,
   onToolClick,
+  onTryTool,
   visibleTools,
 }: {
   server: ProcessServer;
   expanded: boolean;
   onToggle: () => void;
   onToolClick: (wf: LTYamlWorkflowRecord) => void;
+  onTryTool: (wf: LTYamlWorkflowRecord) => void;
   visibleTools: LTYamlWorkflowRecord[];
 }) {
   return (
@@ -75,26 +89,26 @@ function ServerRow({
         </td>
 
         {/* Status */}
-        <td className="px-6 py-3.5 w-32">
+        <td className="px-6 py-3.5 w-32 whitespace-nowrap">
           <StatusBadge status={server.status} />
         </td>
 
         {/* Tool count */}
-        <td className="px-6 py-3.5 w-24">
+        <td className="px-6 py-3.5 w-24 whitespace-nowrap">
           <span className="text-xs text-text-tertiary">
             {server.toolCount} tool{server.toolCount !== 1 ? 's' : ''}
           </span>
         </td>
 
         {/* Updated */}
-        <td className="px-6 py-3.5 w-28">
+        <td className="px-6 py-3.5 w-28 whitespace-nowrap">
           <TimeAgo date={server.updatedAt} />
         </td>
       </tr>
 
       {/* Animated tool panel */}
       <tr>
-        <td colSpan={4} className="p-0 border-0">
+        <td colSpan={5} className="p-0 border-0">
           <div
             className="grid transition-[grid-template-rows] duration-200 ease-in-out"
             style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
@@ -115,11 +129,12 @@ function ServerRow({
                     <th className="px-6 py-1.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
                       Status
                     </th>
+                    <th className="px-3 py-1.5 w-12" />
                   </tr>
                 </thead>
                 <tbody>
                   {visibleTools.map((wf) => (
-                    <ToolRow key={wf.id} wf={wf} onClick={() => onToolClick(wf)} />
+                    <ToolRow key={wf.id} wf={wf} onClick={() => onToolClick(wf)} onTry={() => onTryTool(wf)} />
                   ))}
                 </tbody>
               </table>
@@ -166,6 +181,7 @@ export function YamlWorkflowsPage() {
   }, [servers, filters.search]);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [tryWorkflow, setTryWorkflow] = useState<LTYamlWorkflowRecord | null>(null);
 
   const toggleExpand = (appId: string) => {
     setExpandedIds((prev) => {
@@ -245,6 +261,7 @@ export function YamlWorkflowsPage() {
               <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
                 Updated
               </th>
+              <th className="sticky top-[2.75rem] z-10 bg-surface w-12" />
             </tr>
           </thead>
           <tbody>
@@ -255,11 +272,20 @@ export function YamlWorkflowsPage() {
                 expanded={expandedIds.has(server.appId)}
                 onToggle={() => toggleExpand(server.appId)}
                 onToolClick={(wf) => navigate(`/mcp/workflows/${wf.id}`)}
+                onTryTool={(wf) => setTryWorkflow(wf)}
                 visibleTools={filterTools(server.workflows, filters.search)}
               />
             ))}
           </tbody>
         </table>
+      )}
+
+      {tryWorkflow && (
+        <TryWorkflowModal
+          open={!!tryWorkflow}
+          onClose={() => setTryWorkflow(null)}
+          workflow={tryWorkflow}
+        />
       )}
     </div>
   );

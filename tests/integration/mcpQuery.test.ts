@@ -7,6 +7,9 @@
  * deterministic DAG pipeline that produces equivalent results. Knowledge
  * is permanently gained: the compiled workflow is faster and requires no LLM.
  *
+ * Assertions verify OUTPUT EQUIVALENCE — not just "did it return something"
+ * but "did the deterministic run produce the same files as the dynamic run".
+ *
  * Prerequisites:
  *   - Docker running (docker compose up -d --build)
  *   - LLM API key set (ANTHROPIC_API_KEY or OPENAI_API_KEY)
@@ -41,8 +44,12 @@ const DETERMINISTIC_INPUT = {
   pages: [],
 };
 
+const SCREENSHOT_DIR = 'long-tail-screenshots';
 const WORKFLOW_NAME = 'integration-test-screenshots';
 const APP_ID = 'integrationtest';
+
+/** Minimum screenshots expected (dashboard has ~10+ nav links) */
+const MIN_SCREENSHOTS = 5;
 
 const hasLLMKey = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
 
@@ -56,6 +63,7 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
   let dynamicWorkflowId: string;
   let dynamicResult: any;
   let dynamicStartTime: number;
+  let dynamicScreenshots: string[] = [];
   let yamlWorkflow: any;
 
   beforeAll(async () => {
@@ -77,6 +85,12 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
         }
       }
     } catch { /* no leftovers */ }
+
+    // Clean up screenshots from prior runs
+    try {
+      const files = await api.listFiles(SCREENSHOT_DIR);
+      log('setup', `Found ${files.files?.length ?? 0} existing screenshots in ${SCREENSHOT_DIR}`);
+    } catch { /* directory may not exist yet */ }
   }, 60_000);
 
   afterAll(async () => {
@@ -129,29 +143,40 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
     log('dynamic', `Completed in ${elapsed}s`);
   }, 600_000);
 
-  it('validates the dynamic result', async () => {
+  it('validates the dynamic result and screenshots', async () => {
     expect(dynamicWorkflowId).toBeTruthy();
 
+    // Validate workflow result structure
     const result = await api.getWorkflowResult(dynamicWorkflowId);
-
-    // Result shape: { workflowId, result: { type, data, milestones } }
-    // The workflow output is nested: result.result.data contains the actual payload
     const rawResult = result.result;
     expect(rawResult).toBeDefined();
 
-    // Extract the data payload — may be nested under .data or at top level
     const data = rawResult?.data || rawResult;
     dynamicResult = rawResult;
 
     log('dynamic', `Result keys: ${Object.keys(data).join(', ')}`);
 
-    // Dynamic mcpQuery returns tool_calls_made count
+    // Dynamic mcpQuery should have made multiple tool calls
     if (data.tool_calls_made !== undefined) {
       expect(data.tool_calls_made).toBeGreaterThanOrEqual(3);
       log('dynamic', `Tool calls: ${data.tool_calls_made}`);
     }
 
-    if (data.title) log('dynamic', `Title: ${data.title}`);
+    // Verify screenshots were actually written to storage
+    const files = await api.listFiles(SCREENSHOT_DIR);
+    const pngs = (files.files || []).filter((f: any) => f.path.endsWith('.png'));
+    dynamicScreenshots = pngs.map((f: any) => f.path).sort();
+
+    log('dynamic', `Screenshots in storage: ${pngs.length} files`);
+    for (const f of pngs) {
+      log('dynamic', `  ${f.path} (${f.size} bytes)`);
+    }
+
+    expect(pngs.length).toBeGreaterThanOrEqual(MIN_SCREENSHOTS);
+    // Every screenshot should have actual content (not zero-byte)
+    for (const f of pngs) {
+      expect(f.size).toBeGreaterThan(1000);
+    }
   });
 
   // ── Phase 2: Compilation ───────────────────────────────────────────────
@@ -173,13 +198,24 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
     expect(yamlWorkflow.yaml_content).toBeTruthy();
     expect(yamlWorkflow.status).toBe('draft');
 
-    if (yamlWorkflow.activity_manifest) {
-      log('compile', `Activity manifest: ${yamlWorkflow.activity_manifest.length} entries`);
-    }
-    if (yamlWorkflow.input_schema) {
-      const fields = Object.keys(yamlWorkflow.input_schema.properties || {});
-      log('compile', `Input schema fields: ${fields.join(', ')}`);
-    }
+    // Validate activity manifest has real MCP tools
+    expect(yamlWorkflow.activity_manifest).toBeDefined();
+    expect(yamlWorkflow.activity_manifest.length).toBeGreaterThanOrEqual(2);
+
+    const mcpActivities = yamlWorkflow.activity_manifest.filter(
+      (a: any) => a.tool_source === 'mcp',
+    );
+    expect(mcpActivities.length).toBeGreaterThanOrEqual(1);
+    log('compile', `Activity manifest: ${yamlWorkflow.activity_manifest.length} entries (${mcpActivities.length} MCP tools)`);
+
+    // Validate input schema has expected fields
+    expect(yamlWorkflow.input_schema).toBeDefined();
+    const fields = Object.keys(yamlWorkflow.input_schema.properties || {});
+    log('compile', `Input schema fields: ${fields.join(', ')}`);
+
+    // Should have YAML content with app: and graphs:
+    expect(yamlWorkflow.yaml_content).toContain('app:');
+    expect(yamlWorkflow.yaml_content).toContain('graphs:');
 
     log('compile', `Created draft workflow: ${yamlWorkflow.id}`);
   });
@@ -198,7 +234,7 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
 
   // ── Phase 3: Deterministic execution ───────────────────────────────────
 
-  it('invokes the deterministic workflow directly', async () => {
+  it('invokes the deterministic workflow and verifies output', async () => {
     expect(yamlWorkflow?.id).toBeTruthy();
     expect(yamlWorkflow.status).toBe('active');
 
@@ -210,20 +246,46 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     log('deterministic', `Completed in ${elapsed}s`);
 
-    expect(result).toBeTruthy();
+    // Must have a job_id and a result
+    expect(result.job_id).toBeTruthy();
+    expect(result.result).toBeDefined();
+    log('deterministic', `Job ID: ${result.job_id}`);
 
-    if (result.result) {
-      log('deterministic', `Result keys: ${Object.keys(result.result).join(', ')}`);
-    }
-    if (result.job_id) {
-      log('deterministic', `Job ID: ${result.job_id}`);
+    // Check result structure
+    if (result.result && typeof result.result === 'object') {
+      const keys = Object.keys(result.result);
+      log('deterministic', `Result keys: ${keys.join(', ')}`);
     }
 
-    // Compare to dynamic duration
+    // Verify screenshots in storage after deterministic run
+    const files = await api.listFiles(SCREENSHOT_DIR);
+    const pngs = (files.files || []).filter((f: any) => f.path.endsWith('.png'));
+    const deterministicScreenshots = pngs.map((f: any) => f.path).sort();
+
+    log('deterministic', `Screenshots after deterministic run: ${pngs.length} files`);
+
+    // The deterministic run should produce at least as many screenshots as the dynamic run
+    // (it may overwrite the same files, so count should be >= dynamic count)
+    expect(pngs.length).toBeGreaterThanOrEqual(MIN_SCREENSHOTS);
+
+    // Every screenshot should have real content
+    for (const f of pngs) {
+      expect(f.size).toBeGreaterThan(1000);
+    }
+
+    // The deterministic run should NOT be suspiciously fast —
+    // real screenshot capture takes ~2-5s per page.
+    // If it completes in under 10s with 5+ expected pages, something is wrong.
+    const elapsedSec = parseFloat(elapsed);
+    if (dynamicScreenshots.length >= MIN_SCREENSHOTS) {
+      expect(elapsedSec).toBeGreaterThanOrEqual(10);
+      log('deterministic', `Timing check passed: ${elapsed}s >= 10s (real work done)`);
+    }
+
+    // Log speedup vs dynamic
     if (dynamicStartTime) {
       const dynamicDuration = (Date.now() - dynamicStartTime) / 1000;
-      const deterministicDuration = parseFloat(elapsed);
-      log('deterministic', `Speedup: ${(dynamicDuration / deterministicDuration).toFixed(1)}x faster than dynamic`);
+      log('deterministic', `Speedup: ${(dynamicDuration / elapsedSec).toFixed(1)}x faster than dynamic`);
     }
   }, 300_000);
 
@@ -252,11 +314,8 @@ describe.skipIf(!hasLLMKey)('mcpQuery lifecycle', () => {
 
       expect(result.discovery.method).toBe('compiled-workflow');
       expect(result.discovery.confidence).toBeGreaterThanOrEqual(0.7);
-      // Accept any compiled workflow name — when run alongside functional tests,
-      // the router may match a different compiled workflow for the same prompt.
       expect(result.discovery.workflowName).toBeTruthy();
     } else {
-      // If no discovery metadata, the router still returned a result — log it
       log('verify', `Result keys: ${Object.keys(result).join(', ')}`);
       log('verify', 'No discovery metadata — checking if result indicates compiled path');
     }

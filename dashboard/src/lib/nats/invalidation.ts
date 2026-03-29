@@ -41,6 +41,13 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
       }
       break;
 
+    case 'activity':
+      if (event.workflowId) {
+        keys.push(['mcpRunExecution', event.workflowId]);
+      }
+      keys.push(['mcpRuns']);
+      break;
+
     case 'milestone':
       if (event.workflowId) {
         keys.push(['workflowExecution', event.workflowId]);

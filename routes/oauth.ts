@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { signToken } from '../modules/auth';
+import { signToken, requireAuth } from '../modules/auth';
 import { loggerRegistry } from '../services/logger';
 import {
   listProviders,
@@ -102,6 +102,33 @@ router.get('/:provider/callback', async (req, res) => {
     // Fetch user info from the provider
     const userInfo = await handler.fetchUserInfo(tokens.accessToken);
 
+    // ── Credential-only providers (e.g., Anthropic) ──────────────────────
+    // These providers store API keys for an already-authenticated user.
+    // They don't create users or issue JWTs — the user must be logged in.
+    if (oauthState.connectOnly) {
+      const userId = oauthState.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Authentication required to connect a credential provider' });
+        return;
+      }
+      const label = oauthState.label || 'default';
+      await upsertOAuthToken(
+        userId,
+        provider,
+        tokens,
+        handler.config.scopes,
+        userInfo.providerUserId,
+        userInfo.email,
+        { display_name: userInfo.displayName, ...userInfo.raw },
+        label,
+      );
+      loggerRegistry.info(`[oauth] stored ${provider} credentials (label: ${label}) for user ${userId}`);
+      const returnTo = oauthState.returnTo || '/';
+      res.redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}connected=${provider}&label=${encodeURIComponent(label)}`);
+      return;
+    }
+
+    // ── Identity providers (Google, GitHub, Microsoft, etc.) ─────────────
     // Find or create the user
     let user = await getUserByOAuthProvider(provider, userInfo.providerUserId);
 
@@ -173,6 +200,47 @@ router.get('/:provider/callback', async (req, res) => {
 });
 
 /**
+ * GET /api/auth/oauth/connect/:provider
+ * Initiate a credential-only connection flow for an already-authenticated user.
+ * Unlike the login flow (GET /:provider), this stores the provider's token
+ * against the current user without issuing a new JWT or creating a user.
+ * Used for resource providers like Anthropic (API key storage).
+ */
+// Bridge for browser redirects: accept token from query param since browsers
+// can't set Authorization headers during navigation.
+router.get('/connect/:provider', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${token}`;
+  }
+  next();
+}, requireAuth, (req, res) => {
+  const userId = req.auth!.userId;
+  const provider = req.params.provider as string;
+  const handler = getProvider(provider);
+  if (!handler) {
+    res.status(404).json({ error: `OAuth provider "${provider}" not configured` });
+    return;
+  }
+
+  const returnTo = (req.query.returnTo as string) || '/';
+  const label = (req.query.label as string) || 'default';
+  const { state, codeVerifier } = createOAuthState(provider, returnTo, {
+    connectOnly: true,
+    userId,
+    label,
+  });
+
+  const baseUrl = _oauthConfig.baseUrl || `${req.protocol}://${req.get('host')}`;
+  if (!handler.config.redirectUri) {
+    handler.config.redirectUri = `${baseUrl}/api/auth/oauth/${provider}/callback`;
+  }
+
+  const url = handler.createAuthorizationURL(state, codeVerifier);
+  res.redirect(url.toString());
+});
+
+/**
  * DELETE /api/auth/oauth/connections/:provider
  * Revoke a stored OAuth connection (requires auth — applied by parent router).
  */
@@ -182,7 +250,8 @@ router.delete('/connections/:provider', async (req, res) => {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  const deleted = await deleteOAuthConnection(userId, req.params.provider);
+  const label = (req.query.label as string) || undefined;
+  const deleted = await deleteOAuthConnection(userId, req.params.provider, label);
   res.json({ deleted });
 });
 

@@ -7,6 +7,7 @@ import {
   publishTaskEvent,
   publishEscalationEvent,
   publishWorkflowEvent,
+  publishActivityEvent,
 } from '../services/events/publish';
 
 describe('event publish functions', () => {
@@ -225,6 +226,56 @@ describe('event publish functions', () => {
       });
 
       expect(adapter.events[0].data).toEqual({ error: 'something went wrong' });
+    });
+  });
+
+  // ── publishActivityEvent ───────────────────────────────────────────────
+
+  describe('publishActivityEvent', () => {
+    const activityTypes = [
+      'activity.started',
+      'activity.completed',
+      'activity.failed',
+    ] as const;
+
+    for (const type of activityTypes) {
+      it(`publishes ${type} with correct shape`, async () => {
+        await publishActivityEvent({
+          type,
+          workflowId: 'job-1',
+          workflowName: 'take-screenshots',
+          taskQueue: 'longtail',
+          activityName: 'capture_page',
+          data: { stepIndex: 2, totalSteps: 5, toolName: 'playwright_screenshot' },
+        });
+
+        expect(adapter.events).toHaveLength(1);
+        const evt = adapter.events[0];
+        expect(evt.type).toBe(type);
+        expect(evt.source).toBe('yaml-worker');
+        expect(evt.workflowId).toBe('job-1');
+        expect(evt.workflowName).toBe('take-screenshots');
+        expect(evt.taskQueue).toBe('longtail');
+        expect(evt.activityName).toBe('capture_page');
+        expect(evt.data).toEqual({ stepIndex: 2, totalSteps: 5, toolName: 'playwright_screenshot' });
+        expect(evt.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+        adapter.clear();
+      });
+    }
+
+    it('publishes without optional data', async () => {
+      await publishActivityEvent({
+        type: 'activity.completed',
+        workflowId: 'job-2',
+        workflowName: 'test-wf',
+        taskQueue: 'q',
+        activityName: 'step_1',
+      });
+
+      const evt = adapter.events[0];
+      expect(evt.activityName).toBe('step_1');
+      expect(evt.data).toBeUndefined();
     });
   });
 

@@ -15,11 +15,13 @@ import type { Segment, Lane } from './utils';
 interface SwimlaneTimelineProps {
   events: WorkflowExecutionEvent[];
   childTasks?: LTTaskRecord[];
+  /** Use outline-style bars (border + transparent fill) instead of solid fills */
+  outline?: boolean;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) {
+export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimelineProps) {
   const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set());
 
   // Filter out workflow-level events (started/completed) — they aren't operations
@@ -122,7 +124,13 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
 
   const barColor = (cat: string, pending: boolean) => {
     if (pending) return PENDING_CLASS;
+    if (outline) return CATEGORY_COLORS[cat]?.outline ?? 'border-text-tertiary bg-transparent';
     return CATEGORY_COLORS[cat]?.bar ?? 'bg-text-tertiary';
+  };
+
+  const textColor = (cat: string) => {
+    if (outline) return CATEGORY_COLORS[cat]?.text ?? 'text-text-tertiary';
+    return 'text-white';
   };
 
   return (
@@ -139,7 +147,7 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
         <div className="flex items-center gap-3 ml-auto">
           {activeCategories.map((cat) => (
             <div key={cat} className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[cat]?.bar ?? 'bg-text-tertiary'}`} />
+              <span className={`w-2 h-2 rounded-full ${outline ? `border ${CATEGORY_COLORS[cat]?.outline ?? 'border-text-tertiary'}` : CATEGORY_COLORS[cat]?.bar ?? 'bg-text-tertiary'}`} />
               <span className="text-[9px] text-text-tertiary">
                 {CATEGORY_COLORS[cat]?.label ?? cat}
               </span>
@@ -208,7 +216,7 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
                 {lane.segments.map((seg) => (
                   <div
                     key={seg.eventId}
-                    className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 ${
+                    className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 ${outline ? 'border-2' : ''} ${
                       selectedEvents.has(seg.eventId)
                         ? `${barColor(lane.category, seg.pending)} ring-2 ring-accent ring-offset-1`
                         : `${barColor(lane.category, seg.pending)} hover:opacity-80`
@@ -222,7 +230,7 @@ export function SwimlaneTimeline({ events, childTasks }: SwimlaneTimelineProps) 
                     onClick={() => toggleEvent(seg.eventId)}
                   >
                     {seg.widthPct > 8 && (
-                      <span className="absolute inset-0 flex items-center px-1.5 text-[9px] font-mono text-white truncate">
+                      <span className={`absolute inset-0 flex items-center px-1.5 text-[9px] font-mono ${textColor(lane.category)} truncate`}>
                         {seg.duration !== null ? formatDuration(seg.duration) : 'pending'}
                       </span>
                     )}

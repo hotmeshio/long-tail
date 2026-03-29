@@ -54,6 +54,20 @@ router.post('/', async (req, res) => {
       return;
     }
 
+    // Reject compilation of executions that exhausted their tool rounds —
+    // the trace is incomplete and would produce a broken workflow.
+    const task = await getTaskByWorkflowId(workflow_id);
+    if (task) {
+      const milestones = task.milestones ?? [];
+      const roundsExhausted = milestones.some((m) => m.name === 'rounds_exhausted');
+      if (roundsExhausted) {
+        res.status(422).json({
+          error: 'Cannot compile: the source execution exhausted its tool rounds without completing the task. Resolve the escalation and resubmit.',
+        });
+        return;
+      }
+    }
+
     // Generate YAML from execution
     const result = await yamlGenerator.generateYamlFromExecution({
       workflowId: workflow_id,
@@ -276,7 +290,12 @@ router.post('/:id/deploy', async (req, res) => {
       res.status(404).json({ error: 'YAML workflow not found' });
       return;
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: err.message,
+      hint: err.message.includes('Duplicate activity id')
+        ? 'Colliding activity IDs across workflows. A Claude Code repair was attempted — check server logs. You may need to archive conflicting workflows and recompile.'
+        : undefined,
+    });
   }
 });
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMcpRuns, useMcpEntities } from '../../api/mcp-runs';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
+import { useNamespaces } from '../../api/namespaces';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
@@ -76,8 +77,22 @@ export function McpRunsPage() {
   }, [searchInput, setFilter, filters.search]);
 
   const { data: appIdData } = useYamlWorkflowAppIds();
-  const firstAppId = appIdData?.app_ids?.[0] ?? '';
-  const activeNamespace = filters.namespace || firstAppId;
+  const { data: nsData } = useNamespaces();
+
+  // Build the full namespace list: YAML app_ids + registered namespaces
+  const allNamespaceNames = useMemo(() => {
+    const set = new Set(appIdData?.app_ids ?? []);
+    for (const ns of nsData?.namespaces ?? []) {
+      set.add(ns.name);
+    }
+    return [...set].sort();
+  }, [appIdData?.app_ids, nsData?.namespaces]);
+
+  // Default: URL param > 'longtail' (if exists) > first in list
+  const defaultNamespace = allNamespaceNames.includes('longtail')
+    ? 'longtail'
+    : allNamespaceNames[0] ?? '';
+  const activeNamespace = filters.namespace || defaultNamespace;
   const { data: entitiesData } = useMcpEntities(activeNamespace);
 
   const { data: runsData, isLoading } = useMcpRuns({
@@ -103,12 +118,11 @@ export function McpRunsPage() {
   }, [runsData?.jobs]);
 
   const namespaces = useMemo(() => {
-    const ids = appIdData?.app_ids ?? [];
-    const set = new Set(ids);
+    const set = new Set(allNamespaceNames);
     // Always include the active namespace so deep-linked values appear
-    set.add(activeNamespace);
+    if (activeNamespace) set.add(activeNamespace);
     return [...set].sort().map((id) => ({ value: id, label: id }));
-  }, [appIdData?.app_ids, activeNamespace]);
+  }, [allNamespaceNames, activeNamespace]);
 
   const entities = useMemo(() => {
     const known = new Set(entitiesData?.entities ?? []);

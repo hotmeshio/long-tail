@@ -122,6 +122,19 @@ async function rerunOriginalWorkflow(
   };
 
   const rerunId = `triage-rerun-${ctx.originalTaskId}-${Durable.guid()}`;
+
+  // Create a task record so the re-run is visible in the wizard
+  await deps.ltCreateTask({
+    workflowId: rerunId,
+    workflowType: ctx.originalWorkflowType,
+    ltType: ctx.originalWorkflowType,
+    taskQueue: ctx.originalTaskQueue,
+    signalId: `lt-${rerunId}`,
+    parentWorkflowId: rerunId,
+    originId: ctx.originId,
+    envelope: JSON.stringify(originalEnvelope),
+  });
+
   await deps.ltStartWorkflow({
     workflowName: ctx.originalWorkflowType,
     taskQueue: ctx.originalTaskQueue,

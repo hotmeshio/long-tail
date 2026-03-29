@@ -136,7 +136,7 @@ export function ConvertToYamlModal({
                 setShowDropdown(true);
               }}
               onFocus={() => setShowDropdown(true)}
-              className={`w-full bg-surface-sunken border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary transition-colors ${
+              className={`w-full bg-surface-sunken border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary transition-colors ${
                 nsError ? 'border-status-error' : 'border-surface-border'
               }`}
               placeholder="e.g. mydbinsights"
@@ -220,7 +220,7 @@ export function ConvertToYamlModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
                 placeholder="e.g. Show Escalated Processes"
                 autoFocus
               />
@@ -238,7 +238,7 @@ export function ConvertToYamlModal({
                     setAutoSubscribes(false);
                     setSubscribes(e.target.value);
                   }}
-                  className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                  className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
                   placeholder="e.g. show-escalated-processes"
                 />
                 {!autoSubscribes && (

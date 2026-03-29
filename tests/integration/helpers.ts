@@ -238,6 +238,17 @@ export class ApiClient {
     return data;
   }
 
+  // ── File storage (via MCP tool) ──────────────────────────────────────────
+
+  async listFiles(directory?: string, pattern?: string): Promise<{ files: Array<{ path: string; size: number; modified_at: string }> }> {
+    const { data } = await this.post(
+      '/api/mcp/servers/long-tail-file-storage/tools/list_files/call',
+      { arguments: { directory, pattern } },
+    );
+    // MCP tool responses are wrapped: { result: { files: [...] } }
+    return (data as any).result || data;
+  }
+
   // ── Internal ──────────────────────────────────────────────────────────────
 
   private headers(): Record<string, string> {

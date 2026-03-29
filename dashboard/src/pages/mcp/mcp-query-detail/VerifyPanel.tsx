@@ -121,15 +121,16 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
           <textarea
             value={testPrompt}
             onChange={(e) => setTestPrompt(e.target.value)}
-            className="w-full min-h-[160px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent-primary"
+            className="w-full min-h-[160px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
             placeholder="Type a natural language query..."
           />
           <div className="flex justify-end mt-2">
             <button
               onClick={handleSubmit}
               disabled={!testPrompt.trim() || submitQuery.isPending || !!isRunning}
-              className="btn-primary text-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent/10 text-accent rounded-md hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5v9l7.5-4.5z" /></svg>
               {submitQuery.isPending ? 'Starting...' : isRunning ? 'Running...' : verifyRunId ? 'Resubmit' : 'Submit'}
             </button>
           </div>

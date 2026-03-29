@@ -170,6 +170,10 @@ export interface GenerateYamlOptions {
   appId?: string;
   /** Graph subscribes topic. Defaults to sanitized name. */
   subscribes?: string;
+  /** Error from a prior failed deployment — triggers recompilation with this context. */
+  priorDeployError?: string;
+  /** YAML from the prior failed attempt. */
+  priorFailedYaml?: string;
 }
 
 /** Result from YAML workflow generation. */
@@ -228,4 +232,10 @@ export interface PipelineContext {
 
   // ── Validate stage outputs ──
   validationIssues: string[];
+
+  // ── Retry context (populated on recompilation after deployment failure) ──
+  /** Error message from a prior failed deployment attempt. */
+  priorDeployError?: string;
+  /** YAML that failed deployment (for reference in the retry prompt). */
+  priorFailedYaml?: string;
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -13,6 +13,7 @@ import { useMcpQueryExecution, useMcpQueryResult, useYamlWorkflowForSource, useD
 import { useCreateYamlWorkflow, useYamlWorkflowAppIds } from '../../../api/yaml-workflows';
 import { useWorkflowExecution } from '../../../api/workflows';
 import { useTaskByWorkflowId } from '../../../api/tasks';
+import { useEscalationsByWorkflowId, useClaimEscalation, useResolveEscalation } from '../../../api/escalations';
 
 import { mapStatus, extractJsonFromSummary, STEP_LABELS_BASE } from './helpers';
 import type { Step } from './helpers';
@@ -22,14 +23,27 @@ import { ProfilePanel } from './ProfilePanel';
 import { DeployPanel } from './DeployPanel';
 import { TestPanel } from './TestPanel';
 import { VerifyPanel } from './VerifyPanel';
+import { EscalationBanner } from './EscalationBanner';
 
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function McpQueryDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  // Strip ?prompt= from URL on mount (keep only step)
+  const promptFromUrl = useRef(searchParams.get('prompt'));
+  useEffect(() => {
+    if (searchParams.has('prompt')) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('prompt');
+        return next;
+      }, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [compileAppId, setCompileAppId] = useState('longtail');
   const [compileName, setCompileName] = useState('');
@@ -62,12 +76,45 @@ export function McpQueryDetailPage() {
   const discovery = (result?.discovery as Record<string, unknown>) || {};
   const events = execution?.events ?? [];
 
-  // Extract original prompt: envelope > URL param > execution events
+  // Escalation data + triage action hooks
+  const { data: escalationData } = useEscalationsByWorkflowId(workflowId);
+  const activeEscalation = escalationData?.escalations?.find((e: any) => e.status === 'pending');
+  const resolvedEscalation = escalationData?.escalations?.find((e: any) => e.status === 'resolved');
+  const displayEscalation = activeEscalation || resolvedEscalation;
+  const claimMutation = useClaimEscalation();
+  const resolveMutation = useResolveEscalation();
+
+  // Extract triage metadata from resolved escalation
+  const resolvedPayload = useMemo(() => {
+    if (!resolvedEscalation?.resolver_payload) return null;
+    try {
+      return typeof resolvedEscalation.resolver_payload === 'string'
+        ? JSON.parse(resolvedEscalation.resolver_payload)
+        : resolvedEscalation.resolver_payload;
+    } catch { return null; }
+  }, [resolvedEscalation?.resolver_payload]);
+  const triageWorkflowId = resolvedPayload?._lt?.triageWorkflowId as string | undefined;
+
+  // Fetch the triage result to discover the re-run workflow ID
+  const { data: triageResultData } = useWorkflowExecution(
+    resolvedPayload?._lt?.triaged ? (triageWorkflowId ?? '') : '',
+  );
+  const triageResult = (triageResultData?.result as any)?.data as Record<string, unknown> | undefined;
+  const rerunWorkflowId = triageResult?.rerunWorkflowId as string | undefined;
+
+  // Detect rounds_exhausted from result data OR milestones (covers old + new runs)
+  const milestones = (resultData?.result as any)?.milestones as Array<{ name: string; value: string }> | undefined;
+  const isRoundsExhausted = !!(result as any)?.rounds_exhausted ||
+    !!milestones?.some((m) => m.name === 'rounds_exhausted');
+
+  // This run is uncompilable if it failed — triage resolving doesn't make THIS run compilable
+  const isUncompilable = isRoundsExhausted || !!activeEscalation;
+
+  // Extract original prompt: envelope > URL param (captured on mount) > execution events
   const originalPrompt = useMemo(() => {
     const fromEnvelope = (originalEnvelope as any)?.data?.prompt;
     if (fromEnvelope) return fromEnvelope as string;
-    const fromUrl = searchParams.get('prompt');
-    if (fromUrl) return fromUrl;
+    if (promptFromUrl.current) return promptFromUrl.current;
     for (const e of events) {
       const attrs = e.attributes as Record<string, unknown>;
       if (attrs.activity_type === 'findCompiledWorkflows' && Array.isArray(attrs.input) && typeof (attrs.input as unknown[])[0] === 'string') {
@@ -75,7 +122,7 @@ export function McpQueryDetailPage() {
       }
     }
     return undefined;
-  }, [originalEnvelope, searchParams, events]);
+  }, [originalEnvelope, events]);
 
   // Extract structured output from original execution
   const originalOutput = useMemo(() => {
@@ -98,7 +145,8 @@ export function McpQueryDetailPage() {
   );
 
   const autoStep: Step = useMemo(() => {
-    if (status === 'in_progress' || status === 'pending') return 1;
+    if (status === 'pending') return 1;
+    if (status === 'in_progress') return 2;
     if (!result) return 1;
     if (!compiledYaml) return 2;
     if (compiledYaml.status === 'draft' || compiledYaml.status === 'deployed') return 4;
@@ -107,7 +155,32 @@ export function McpQueryDetailPage() {
 
   const [manualStep, setManualStep] = useWizardStep();
   const step = (manualStep as Step | null) ?? autoStep;
-  const maxReachable: Step = compiledYaml?.status === 'active' ? 6 : autoStep >= 3 ? autoStep : (result ? 3 : autoStep) as Step;
+
+  // Sequential unlock: each step requires the prior step to be satisfied
+  // 1 (Query) — always available
+  // 2 (Timeline) — available when workflow has started (not pending)
+  // 3 (Profile) — available when workflow completed and not uncompilable
+  // 4 (Deploy) — available when a compiled YAML exists (draft or later)
+  // 5 (Test) — available when YAML is deployed or active
+  // 6 (Verify) — available when YAML is active (deployed + tested)
+  const maxReachable: Step = (() => {
+    if (status === 'pending') return 1;
+    if (status === 'in_progress' || !result) return 2;
+    if (isUncompilable) return 2;
+    if (!compiledYaml) return 3;
+    if (compiledYaml.status === 'draft') return 4;
+    if (compiledYaml.status === 'deployed') return 5;
+    return 6; // active
+  })() as Step;
+
+  // Auto-advance from step 2 → step 3 when workflow completes
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current === 'in_progress' && status === 'completed' && manualStep === null) {
+      setManualStep(3);
+    }
+    prevStatusRef.current = status;
+  }, [status, manualStep, setManualStep]);
 
   const stepLabels = useMemo((): string[] => {
     const labels: string[] = [...STEP_LABELS_BASE];
@@ -139,6 +212,16 @@ export function McpQueryDetailPage() {
     });
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
     setManualStep(null);
+  };
+
+  const handleRetryTriage = async () => {
+    if (!activeEscalation) return;
+    await claimMutation.mutateAsync({ id: activeEscalation.id, durationMinutes: 30 });
+    const diagnosis = (result as any)?.diagnosis as string || activeEscalation.description || '';
+    await resolveMutation.mutateAsync({
+      id: activeEscalation.id,
+      resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
+    });
   };
 
   // Determine the correct next step for profile panel navigation
@@ -191,6 +274,16 @@ export function McpQueryDetailPage() {
         </div>
       </div>
 
+      {/* Escalation banner */}
+      <EscalationBanner
+        escalation={displayEscalation}
+        isRoundsExhausted={isRoundsExhausted}
+        diagnosis={(result as any)?.diagnosis as string | undefined}
+        onRetryTriage={activeEscalation ? handleRetryTriage : undefined}
+        isRetrying={claimMutation.isPending || resolveMutation.isPending}
+        rerunWorkflowId={rerunWorkflowId}
+      />
+
       <WizardSteps labels={stepLabels} current={step} maxReachable={maxReachable} onStepClick={(s) => setManualStep(s as Step)} />
 
       {/* Panel content */}
@@ -199,7 +292,6 @@ export function McpQueryDetailPage() {
       {step === 1 && (
         <OriginalQueryPanel
           status={status}
-          events={events}
           originalEnvelope={originalEnvelope}
           originalPrompt={originalPrompt}
           originalOutput={originalOutput}
@@ -239,6 +331,7 @@ export function McpQueryDetailPage() {
           onCompile={handleCompile}
           isCompiling={createYaml.isPending}
           compileError={createYaml.isError ? createYaml.error.message : undefined}
+          isUncompilable={isUncompilable}
           onBack={() => setManualStep(2)}
           onNext={() => setManualStep(profileNextStep as Step)}
         />

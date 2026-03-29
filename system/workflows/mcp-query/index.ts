@@ -3,7 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { TOOL_ROUNDS_MCP_QUERY } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
-import { MCP_QUERY_SYSTEM_PROMPT } from './prompts';
+import { MCP_QUERY_SYSTEM_PROMPT, ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT } from './prompts';
 
 type ActivitiesType = typeof activities;
 
@@ -111,11 +111,26 @@ export async function mcpQuery(
     }
   }
 
-  // Exhausted rounds — ask for final synthesis
+  // Exhausted rounds — ask LLM for diagnostic summary
+  messages.push({
+    role: 'user',
+    content: ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT,
+  });
   const finalResponse = await callQueryLLM(messages, undefined);
-  return buildQueryReturn(finalResponse.content || '', toolCallCount, [
-    { name: 'rounds_exhausted', value: 'true' },
-  ]);
+  const parsed = parseJsonResponse(finalResponse.content || '');
+  return {
+    type: 'return',
+    data: {
+      ...parsed,
+      tool_calls_made: toolCallCount,
+      rounds_exhausted: true,
+    },
+    milestones: [
+      { name: 'mcp_query', value: 'completed' },
+      { name: 'tool_calls', value: String(toolCallCount) },
+      { name: 'rounds_exhausted', value: 'true' },
+    ],
+  };
 }
 
 type Milestone = { name: string; value: string };

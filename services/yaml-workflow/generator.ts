@@ -62,6 +62,8 @@ export async function generateYamlFromExecution(
     tags: [],
     category: 'general',
     validationIssues: [],
+    priorDeployError: options.priorDeployError,
+    priorFailedYaml: options.priorFailedYaml,
   };
 
   // 3. Run pipeline stages

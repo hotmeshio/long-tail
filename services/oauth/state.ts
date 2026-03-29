@@ -5,6 +5,12 @@ interface OAuthState {
   provider: string;
   returnTo: string;
   createdAt: number;
+  /** When true, this flow connects a credential provider for an existing user (not login). */
+  connectOnly?: boolean;
+  /** User ID for connect-only flows. */
+  userId?: string;
+  /** Credential label for connect-only flows (allows multiple per provider). */
+  label?: string;
 }
 
 const stateStore = new Map<string, OAuthState>();
@@ -17,6 +23,7 @@ const STATE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export function createOAuthState(
   provider: string,
   returnTo: string = '/',
+  options?: { connectOnly?: boolean; userId?: string; label?: string },
 ): { state: string; codeVerifier: string } {
   const state = crypto.randomBytes(32).toString('hex');
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
@@ -25,6 +32,9 @@ export function createOAuthState(
     provider,
     returnTo,
     createdAt: Date.now(),
+    connectOnly: options?.connectOnly,
+    userId: options?.userId,
+    label: options?.label,
   });
   return { state, codeVerifier };
 }

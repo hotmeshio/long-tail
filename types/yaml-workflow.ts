@@ -12,7 +12,7 @@ export interface InputFieldMeta {
   source_tool: string;
 }
 
-export type LTYamlWorkflowStatus = 'draft' | 'deployed' | 'active' | 'archived';
+export type LTYamlWorkflowStatus = 'draft' | 'deployed' | 'active' | 'archived' | 'error';
 
 export interface LTYamlWorkflowRecord {
   id: string;

@@ -7,10 +7,10 @@ const LIFECYCLE_LABELS: Record<string, string> = {
   archived: 'Archived',
 };
 
-const LIFECYCLE_COLORS: Record<string, { filled: string; faded: string; line: string }> = {
-  draft:    { filled: 'bg-status-pending border-status-pending', faded: 'bg-status-pending/30 border-status-pending/50', line: 'bg-status-pending/30' },
-  active:   { filled: 'bg-status-success border-status-success', faded: 'bg-status-success/30 border-status-success/50', line: 'bg-status-success/30' },
-  archived: { filled: 'bg-text-tertiary border-text-tertiary',   faded: 'bg-text-tertiary/30 border-text-tertiary/50',   line: 'bg-text-tertiary/30' },
+const LIFECYCLE_COLORS: Record<string, { filled: string; line: string }> = {
+  draft:    { filled: 'bg-status-draft border-status-draft',     line: 'bg-status-draft/30' },
+  active:   { filled: 'bg-status-success border-status-success', line: 'bg-status-success/30' },
+  archived: { filled: 'bg-text-tertiary border-text-tertiary',   line: 'bg-text-tertiary/30' },
 };
 
 export function LifecycleSidebar({
@@ -73,11 +73,9 @@ export function LifecycleSidebar({
               <div className="flex flex-col items-center w-5 shrink-0">
                 <span
                   className={`w-3 h-3 rounded-full shrink-0 border-2 transition-colors ${
-                    isCurrent
+                    isCurrent || isDone
                       ? colors.filled
-                      : isDone
-                        ? colors.faded
-                        : 'bg-surface-sunken border-surface-border'
+                      : 'bg-surface-sunken border-surface-border'
                   }`}
                 />
                 {!isLast && (
