@@ -68,8 +68,22 @@ export async function mcpQuery(
       role: 'system',
       content: MCP_QUERY_SYSTEM_PROMPT + `\n\n${serverSection}`,
     },
-    { role: 'user', content: prompt },
   ];
+
+  // If this is a re-run after triage, inject triage learnings as context
+  const triageContext = (envelope.resolver as any)?._triageContext;
+  if (triageContext) {
+    const triageHints = [
+      `This is a re-run after a previous attempt failed and was triaged.`,
+      triageContext.diagnosis ? `Previous diagnosis: ${triageContext.diagnosis}` : '',
+      triageContext.actions_taken?.length ? `Actions already taken: ${triageContext.actions_taken.join('; ')}` : '',
+      triageContext.recommendation ? `Recommendation: ${triageContext.recommendation}` : '',
+    ].filter(Boolean).join('\n');
+    messages.push({ role: 'user', content: triageHints });
+    messages.push({ role: 'assistant', content: 'Understood. I will use these learnings to take a more targeted approach this time.' });
+  }
+
+  messages.push({ role: 'user', content: prompt });
 
   let toolCallCount = 0;
 
