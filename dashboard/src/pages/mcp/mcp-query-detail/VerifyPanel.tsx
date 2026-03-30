@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { useSubmitMcpQueryRouted, useMcpQueryExecution, useMcpQueryResult } from '../../../api/mcp-query';
 import { useTaskByWorkflowId } from '../../../api/tasks';
+import { RouterProgressTracker } from './RouterProgressTracker';
 
 interface VerifyPanelProps {
   originalWorkflowId: string | undefined;
@@ -17,10 +18,21 @@ interface VerifyPanelProps {
 
 export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, onBack, onGoToDeploy }: VerifyPanelProps) {
   const submitQuery = useSubmitMcpQueryRouted();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [testPrompt, setTestPrompt] = useState('');
-  const [verifyRunId, setVerifyRunId] = useState<string | null>(null);
   const [promptInitialized, setPromptInitialized] = useState(false);
+
+  // Persist verifyRunId in URL so it survives navigation
+  const verifyRunId = searchParams.get('verifyRun');
+  const setVerifyRunId = (id: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id) next.set('verifyRun', id);
+      else next.delete('verifyRun');
+      return next;
+    }, { replace: true });
+  };
 
   // Original prompt
   const { data: originalTask } = useTaskByWorkflowId(originalWorkflowId ?? '');
@@ -85,7 +97,7 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
           {isRunning && (
             <div className="flex items-center gap-2">
               <StatusBadge status="in_progress" />
-              <span className="text-[10px] text-text-secondary animate-pulse">Executing...</span>
+              <span className="text-[10px] text-text-secondary animate-pulse">Routing...</span>
             </div>
           )}
           {verifyStatus === 'failed' && (
@@ -145,8 +157,12 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
           )}
 
           {isRunning && (
-            <div className="flex items-center justify-center min-h-[160px]">
-              <p className="text-xs text-text-secondary animate-pulse">Executing query...</p>
+            <div className="min-h-[160px] flex items-start pt-4">
+              <RouterProgressTracker
+                events={verifyExecution?.events}
+                status={verifyStatus}
+                verifyRunId={verifyRunId}
+              />
             </div>
           )}
 

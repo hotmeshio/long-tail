@@ -82,6 +82,8 @@ export type {
   WorkflowEventAttributes,
   ExecutionExportOptions,
   ExportMode,
+  ActivityDetail,
+  JobExport,
 } from './export';
 
 export type {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { getPool } from '../services/db';
+import { getEngine } from '../services/controlplane';
 import {
   hmshTimestampToISO,
   computeDuration,
@@ -199,6 +200,27 @@ router.get('/:jobId/execution', async (req, res) => {
     // Extract activities from the dimensional hierarchy
     const activities = extractActivities(hierarchy);
 
+    // Fetch enriched activities with inputs from HotMesh export
+    let enrichedActivities: Array<{
+      name: string; type: string; dimension: string;
+      input?: Record<string, any>; output?: Record<string, any>;
+      started_at?: string; completed_at?: string; duration_ms?: number;
+      cycle_iteration?: number; error?: string | null;
+    }> = [];
+    try {
+      const engine = await getEngine(appId);
+      const enriched = await engine.export(jobId, { enrich_inputs: true });
+      enrichedActivities = enriched.activities ?? [];
+    } catch {
+      // Fallback: enrichment is best-effort; continue without inputs
+    }
+
+    // Build a lookup from activity name+dimension to enriched input
+    const inputByNameDim = new Map<string, Record<string, any>>();
+    for (const ea of enrichedActivities) {
+      inputByNameDim.set(`${ea.name}:${ea.dimension}`, ea.input ?? {});
+    }
+
     // Build execution events
     const events: Array<{
       event_id: number;
@@ -237,6 +259,9 @@ router.get('/:jobId/execution', async (req, res) => {
       const hasFailed = !!act.error;
       const timelineKey = `${act.dimensions}/${act.name}`;
 
+      // Look up enriched input for this activity
+      const actInput = inputByNameDim.get(`${act.name}:${act.dimensions}`) ?? undefined;
+
       if (act.ac) {
         events.push({
           event_id: nextId++,
@@ -248,6 +273,7 @@ router.get('/:jobId/execution', async (req, res) => {
           attributes: {
             kind: 'activity_task_scheduled',
             activity_type: act.step || act.name,
+            input: actInput,
             timeline_key: timelineKey,
             execution_index: i,
             trace_id: act.traceId,
@@ -269,6 +295,7 @@ router.get('/:jobId/execution', async (req, res) => {
             attributes: {
               kind: 'activity_task_failed',
               activity_type: act.step || act.name,
+              input: actInput,
               failure: act.error,
               result: act.data,
               timeline_key: timelineKey,
@@ -289,6 +316,7 @@ router.get('/:jobId/execution', async (req, res) => {
             attributes: {
               kind: 'activity_task_completed',
               activity_type: act.step || act.name,
+              input: actInput,
               result: act.data,
               timeline_key: timelineKey,
               execution_index: i,
@@ -367,6 +395,7 @@ router.get('/:jobId/execution', async (req, res) => {
       trace_id: jobTraceId,
       result: workflowResult,
       events,
+      activities: enrichedActivities.length > 0 ? enrichedActivities : undefined,
       summary: {
         total_events: events.length,
         activities: { total: activities.length, completed: activityCompleted, failed: activityFailed, system: triggerCount, user: workerCount },

@@ -141,12 +141,12 @@ export function McpQueryPage() {
                   className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
                 />
                 <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
-                  Dynamic
+                  Force dynamic
                 </span>
                 <span className="text-xs text-text-tertiary">
                   {direct
-                    ? '— always runs the LLM agentic loop'
-                    : '— routes to a deterministic workflow if one matches'}
+                    ? '— skip deterministic matching, always run LLM agentic loop'
+                    : '— route through query router, use compiled workflow if one matches'}
                 </span>
               </label>
               <span className="text-xs text-text-tertiary">Cmd+Enter to submit</span>

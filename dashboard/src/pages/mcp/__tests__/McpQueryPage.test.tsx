@@ -92,7 +92,7 @@ describe('McpQueryPage', () => {
     render(<McpQueryPage />, { wrapper });
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox).toBeChecked();
-    expect(screen.getByText('Dynamic')).toBeInTheDocument();
+    expect(screen.getByText('Force dynamic')).toBeInTheDocument();
   });
 
   it('shows empty state when no jobs', () => {

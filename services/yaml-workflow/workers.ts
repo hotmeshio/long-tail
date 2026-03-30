@@ -264,12 +264,20 @@ function wrapWithEvents(
       publishActivityEvent({ type: 'activity.completed', ...eventBase });
       return result;
     } catch (err: any) {
+      loggerRegistry.error(
+        `[yaml-worker] ${activity.activity_id} failed: ${err.message}`,
+      );
       publishActivityEvent({
         type: 'activity.failed',
         ...eventBase,
         data: { ...eventBase.data, error: err.message },
       });
-      throw err;
+      // Return the error as data instead of throwing — prevents HotMesh
+      // retry storms when the engine reprocesses failed stream messages.
+      return {
+        metadata: { ...data.metadata },
+        data: { error: err.message, is_error: true },
+      };
     }
   };
 }

@@ -169,7 +169,7 @@ router.get('/:workflowId/execution', async (req, res) => {
       req.params.workflowId as string,
       resolved.taskQueue,
       resolved.workflowName,
-      { exclude_system, omit_results, mode, max_depth },
+      { exclude_system, omit_results, mode, max_depth, enrich_inputs: true },
     );
 
     res.json(execution);

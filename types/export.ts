@@ -20,6 +20,8 @@ export type {
   WorkflowEventAttributes,
   ExecutionExportOptions,
   ExportMode,
+  ActivityDetail,
+  JobExport,
   // Attribute variants (discriminated union via `kind`)
   WorkflowExecutionStartedAttributes,
   WorkflowExecutionCompletedAttributes,
@@ -57,6 +59,7 @@ export interface LTExportOptions {
   allow?: LTExportField[];
   block?: LTExportField[];
   values?: boolean;
+  enrich_inputs?: boolean;
 }
 
 // ── Timeline & transitions ─────────────────────────────────────────────────
@@ -109,4 +112,6 @@ export interface LTWorkflowExport {
   timeline?: LTTimelineEntry[];
   /** Activity state transitions in chronological order. */
   transitions?: LTTransitionEntry[];
+  /** Structured per-activity details with input/output (requires enrich_inputs). */
+  activities?: import('@hotmeshio/hotmesh/build/types/exporter').ActivityDetail[];
 }

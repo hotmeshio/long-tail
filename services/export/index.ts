@@ -1,6 +1,7 @@
 import type {
   ExecutionExportOptions,
   WorkflowExecution,
+  ActivityDetail,
 } from '@hotmeshio/hotmesh/build/types/exporter';
 
 import type {
@@ -37,7 +38,7 @@ export async function exportWorkflow(
 ): Promise<LTWorkflowExport> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
-    const raw = await handle.export(options);
+    const raw = await handle.export({ ...options, enrich_inputs: true });
 
     return {
       workflow_id: workflowId,
@@ -86,7 +87,7 @@ export async function exportWorkflowExecution(
 ): Promise<WorkflowExecution> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
-    const execution = await handle.exportExecution(options);
+    const execution = await handle.exportExecution({ ...options, enrich_inputs: true });
     await enrichEventInputs(execution);
     return postProcessExecution(execution);
   } catch (err: any) {

@@ -3,16 +3,16 @@
 ## Quick Reference
 
 ```bash
-# Frontend tests (fast — ~4s, 52 files, 520 tests)
+# Frontend tests (fast — ~4s, 52 files, 526 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~35s, 23 files, 406 tests)
+# Backend: fast unit/integration tests only (~35s, 28 files, 445 tests)
 npx vitest run --exclude 'tests/workflows/**'
 
-# Backend: workflow tests only (~4-5min, 10 files, ~72 tests)
+# Backend: workflow tests only (~3min, 8 files, 65 tests)
 npx vitest run tests/workflows
 
-# Backend: all tests (~5-6min, 33 files, 478 tests)
+# Backend: all tests (~4-5min, 36 files, 510 tests)
 npx vitest run
 
 # Integration tests (requires Docker — mcpQuery + mcpTriage lifecycle)
@@ -29,31 +29,31 @@ npm run test:integration
 
 | Suite | Files | Tests | Duration |
 |-------|-------|-------|----------|
-| Frontend | 52 | 520 | ~4s |
-| Backend fast | 23 | 406 | ~35s |
-| Backend workflows | 10 | ~72 | ~4-5min |
-| **Backend total** | **33** | **478** | **~5-6min** |
+| Frontend | 52 | 526 | ~4s |
+| Backend fast | 28 | 445 | ~35s |
+| Backend workflows | 8 | 65 | ~3min |
+| **Backend total** | **36** | **510** | **~4-5min** |
 | Integration (Docker) | 2 | 15 | ~5min |
 | Functional (Docker) | — | — | varies |
-| **Grand total** | **87+** | **1,013+** | — |
+| **Grand total** | **90+** | **1,051+** | — |
 
 ## Test Categories
 
 ### Frontend (`dashboard/src/**/*.test.{ts,tsx}`)
-- **52 files, 520 tests, ~4 seconds**
+- **52 files, 526 tests, ~4 seconds**
 - Pure unit tests: components, hooks, utils, API mocks
 - Environment: jsdom, no external dependencies
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/*.test.ts` — root level)
-- **23 files, 406 tests, ~35 seconds**
+- **28 files, 445 tests, ~35 seconds**
 - **Recommended for iterative development** — run after every code change
 - Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, YAML workflow pipeline, OAuth (crypto, state, providers, initialization, routes)
 - Requires: PostgreSQL (`longtail_test` database)
 - Sequential execution (`fileParallelism: false`)
 
 ### Backend Workflows (`tests/workflows/*.test.ts`)
-- **10 files, ~72 tests, ~4-5 minutes**
+- **8 files, 65 tests, ~3 minutes**
 - Full durable workflow execution: escalation, orchestration, triage, export, prune
 - Requires: PostgreSQL + HotMesh engine startup per file
 - Some tests call external APIs (LLM Vision) with long timeouts

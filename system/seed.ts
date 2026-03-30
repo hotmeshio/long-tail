@@ -675,6 +675,8 @@ const SEED_MCP_SERVERS = [
     tags: ['development', 'coding', 'ai-agent', 'terminal', 'code-generation'],
     compile_hints:
       'execute_task runs Claude Code as a subprocess — it is itself an agentic tool. ' +
+      'The `prompt` parameter is ALWAYS a dynamic trigger input — it defines the task and must never ' +
+      'be baked as a stored default. `max_turns` and `allowed_tools` are fixed implementation details. ' +
       'Keep prompts self-contained: include all context the task needs since Claude Code ' +
       'starts with no prior conversation. For read-only analysis, restrict with ' +
       'allowed_tools: ["Read", "Grep", "Glob"]. Results may be large; extract specific ' +
