@@ -185,7 +185,7 @@ export function WorkflowConfigDetailPage() {
             <div>
               {step > 0 && (
                 <button
-                  onClick={() => setStep((s) => s - 1)}
+                  onClick={() => setStep(step - 1)}
                   className="btn-secondary text-xs"
                 >
                   Back
@@ -206,7 +206,7 @@ export function WorkflowConfigDetailPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setStep((s) => s + 1)}
+                  onClick={() => setStep(step + 1)}
                   disabled={!isStepValid(step, form)}
                   className="btn-primary text-xs"
                 >

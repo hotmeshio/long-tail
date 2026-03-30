@@ -241,7 +241,6 @@ Both share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud
 | [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, and custom escalation handlers |
 | [Cloud Deployment](docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker configurations |
 | [Data Model](docs/data.md) | Database schema and tables |
-| [QA Manual](docs/qa-manual.md) | Golden path walkthrough: setup, triage, compile, deploy, verify |
 | [Contributing](docs/contributing.md) | Development setup and guidelines |
 
 ### Adapter Guides
