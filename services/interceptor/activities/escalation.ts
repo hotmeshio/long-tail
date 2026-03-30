@@ -22,6 +22,25 @@ export async function ltResolveEscalation(input: {
 }
 
 /**
+ * Claim an escalation to a specific user. Used for auto-assignment
+ * when the system creates an advisory escalation (e.g., rounds exhausted).
+ */
+export async function ltClaimEscalation(input: {
+  escalationId: string;
+  userId: string;
+  durationMinutes: number;
+}): Promise<void> {
+  const result = await escalationService.claimEscalation(
+    input.escalationId,
+    input.userId,
+    input.durationMinutes,
+  );
+  if (!result) {
+    loggerRegistry.warn(`[ltClaimEscalation] Escalation ${input.escalationId} could not be claimed`);
+  }
+}
+
+/**
  * Create an escalation record when a workflow needs human intervention.
  */
 export async function ltCreateEscalation(input: {

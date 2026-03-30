@@ -38,7 +38,7 @@ export async function handleFinalResponse(
 
     if (parsed.directResolution) {
       // 4a. Direct resolution — re-run original workflow immediately
-      const rerunId = await rerunOriginalWorkflow(deps, ctx, originalEnvelope, correctedData);
+      const rerunId = await rerunOriginalWorkflow(deps, ctx, originalEnvelope, correctedData, parsed, toolCallCount);
       return buildDirectResolutionReturn(ctx, parsed, correctedData, rerunId, toolCallCount, milestones);
     }
 
@@ -113,8 +113,19 @@ async function rerunOriginalWorkflow(
   ctx: TriageContext,
   originalEnvelope: Record<string, any>,
   correctedData: Record<string, any>,
+  triageParsed: Record<string, any>,
+  toolCallCount: number,
 ): Promise<string> {
-  originalEnvelope.resolver = correctedData;
+  originalEnvelope.resolver = {
+    ...correctedData,
+    _triageContext: {
+      diagnosis: triageParsed.diagnosis,
+      actions_taken: triageParsed.actions_taken,
+      recommendation: triageParsed.recommendation,
+      confidence: triageParsed.confidence,
+      tool_calls_made: toolCallCount,
+    },
+  };
   originalEnvelope.lt = {
     ...originalEnvelope.lt,
     escalationId: ctx.escalationId,
@@ -122,6 +133,19 @@ async function rerunOriginalWorkflow(
   };
 
   const rerunId = `triage-rerun-${ctx.originalTaskId}-${Durable.guid()}`;
+
+  // Create a task record so the re-run is visible in the wizard
+  await deps.ltCreateTask({
+    workflowId: rerunId,
+    workflowType: ctx.originalWorkflowType,
+    ltType: ctx.originalWorkflowType,
+    taskQueue: ctx.originalTaskQueue,
+    signalId: `lt-${rerunId}`,
+    parentWorkflowId: rerunId,
+    originId: ctx.originId,
+    envelope: JSON.stringify(originalEnvelope),
+  });
+
   await deps.ltStartWorkflow({
     workflowName: ctx.originalWorkflowType,
     taskQueue: ctx.originalTaskQueue,

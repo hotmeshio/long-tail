@@ -144,7 +144,7 @@ router.get('/:workflowId', async (req, res) => {
 
 /**
  * GET /api/workflow-states/:workflowId/execution
- * Export workflow state in the Temporal-compatible execution format.
+ * Export workflow state as a structured execution event history.
  * Returns typed events, ISO timestamps, durations, and a summary.
  *
  * Query (optional):
@@ -169,7 +169,7 @@ router.get('/:workflowId/execution', async (req, res) => {
       req.params.workflowId as string,
       resolved.taskQueue,
       resolved.workflowName,
-      { exclude_system, omit_results, mode, max_depth },
+      { exclude_system, omit_results, mode, max_depth, enrich_inputs: true },
     );
 
     res.json(execution);

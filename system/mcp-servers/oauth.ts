@@ -5,8 +5,9 @@ import { loggerRegistry } from '../../services/logger';
 import * as oauth from '../activities/oauth';
 
 const getAccessTokenSchema = z.object({
-  provider: z.string().describe('OAuth provider name (google, github, microsoft, etc.)'),
+  provider: z.string().describe('OAuth provider name (google, github, microsoft, anthropic, etc.)'),
   user_id: z.string().describe('User ID to get token for'),
+  label: z.string().optional().describe('Credential label (default: "default"). Use to select among multiple credentials for the same provider.'),
 });
 
 const listConnectionsSchema = z.object({
@@ -16,6 +17,7 @@ const listConnectionsSchema = z.object({
 const revokeConnectionSchema = z.object({
   provider: z.string().describe('OAuth provider name to disconnect'),
   user_id: z.string().describe('User ID to revoke connection for'),
+  label: z.string().optional().describe('Credential label to revoke (default: "default")'),
 });
 
 /**
@@ -37,7 +39,8 @@ export async function createOAuthServer(): Promise<McpServer> {
       description:
         'Get a fresh OAuth access token for an external service (Google, GitHub, etc.). ' +
         'Automatically refreshes expired tokens. Call this immediately before making an ' +
-        'authenticated API request — do not cache or reuse across workflow steps.',
+        'authenticated API request — do not cache or reuse across workflow steps. ' +
+        'Use the label parameter to select a specific credential when multiple exist.',
       inputSchema: getAccessTokenSchema,
     },
     async (args: z.infer<typeof getAccessTokenSchema>) => {
@@ -52,7 +55,7 @@ export async function createOAuthServer(): Promise<McpServer> {
     'list_connections',
     {
       title: 'List OAuth Connections',
-      description: 'List all OAuth providers connected for a user.',
+      description: 'List all OAuth providers connected for a user. Returns provider, label, and credential type for each connection.',
       inputSchema: listConnectionsSchema,
     },
     async (args: z.infer<typeof listConnectionsSchema>) => {
@@ -67,7 +70,7 @@ export async function createOAuthServer(): Promise<McpServer> {
     'revoke_connection',
     {
       title: 'Revoke OAuth Connection',
-      description: 'Disconnect an OAuth provider for a user, removing stored tokens.',
+      description: 'Disconnect an OAuth provider for a user, removing stored tokens. Use label to target a specific credential.',
       inputSchema: revokeConnectionSchema,
     },
     async (args: z.infer<typeof revokeConnectionSchema>) => {

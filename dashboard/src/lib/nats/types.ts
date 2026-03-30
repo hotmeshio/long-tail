@@ -34,12 +34,15 @@ export type NatsLTEventType =
   | 'workflow.started'
   | 'workflow.completed'
   | 'workflow.failed'
+  | 'activity.started'
+  | 'activity.completed'
+  | 'activity.failed'
   | 'milestone';
 
 /**
  * Event type category prefixes for pattern matching.
  */
-export type NatsLTEventCategory = 'task' | 'escalation' | 'workflow' | 'milestone';
+export type NatsLTEventCategory = 'task' | 'escalation' | 'workflow' | 'activity' | 'milestone';
 
 /**
  * Callback signature for NATS event subscribers.

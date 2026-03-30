@@ -29,6 +29,7 @@ const {
 
 const {
   ltCreateEscalation,
+  ltCreateTask,
   ltGetTask,
   ltGetWorkflowConfig,
   ltStartWorkflow,
@@ -43,6 +44,7 @@ const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
 /** Proxied activity refs passed to response handlers */
 const responseDeps: TriageResponseDeps = {
   ltCreateEscalation,
+  ltCreateTask,
   ltGetTask,
   ltGetWorkflowConfig,
   ltStartWorkflow,

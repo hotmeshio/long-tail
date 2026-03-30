@@ -40,8 +40,12 @@ export function insertTransformActivities(
     e => e.toStep === collapsedIdx && e.transform && Object.keys(e.transform.fieldMap).length > 0,
   );
 
-  for (const edge of transformEdges) {
-    const transformId = `${prefix}_xf${idx + 1}`;
+  for (let ei = 0; ei < transformEdges.length; ei++) {
+    const edge = transformEdges[ei];
+    // Include edge index to avoid collisions when multiple transforms target the same step
+    const transformId = transformEdges.length === 1
+      ? `${prefix}_xf${idx + 1}`
+      : `${prefix}_xf${idx + 1}_${ei}`;
     const transformTopic = `${graphTopic}.reshape_${edge.toField}`;
 
     // Wire transform input: source field from prior step + all trigger inputs

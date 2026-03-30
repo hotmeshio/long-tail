@@ -114,9 +114,21 @@ function inferOutputSchema(steps: ExtractedStep[]): Record<string, unknown> {
 
 /**
  * Build a sanitized activity-ID prefix from the graph topic.
- * HotMesh has a max activity ID length — keep the prefix ≤ 20 chars.
+ *
+ * The prefix must be unique per graph to avoid activity ID collisions
+ * when multiple graphs are merged into one app deployment. We use the
+ * full sanitized topic (no truncation) plus a 4-char hash suffix when
+ * the topic exceeds 20 chars, ensuring uniqueness even for topics that
+ * share a long common prefix.
  */
 function buildActivityPrefix(graphTopic: string): string {
   const raw = graphTopic.replace(/[^a-z0-9]/g, '_');
-  return raw.length > 20 ? raw.slice(0, 20) : raw;
+  if (raw.length <= 20) return raw;
+  // Short hash suffix to guarantee uniqueness across similar topics
+  let hash = 0;
+  for (let i = 0; i < graphTopic.length; i++) {
+    hash = ((hash << 5) - hash + graphTopic.charCodeAt(i)) | 0;
+  }
+  const suffix = Math.abs(hash).toString(36).slice(0, 4);
+  return `${raw.slice(0, 16)}_${suffix}`;
 }

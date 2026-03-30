@@ -1,6 +1,6 @@
 /**
  * Reusable wizard step indicator — sticky at top on scroll.
- * Follows the same numbered-circle pattern as ConvertToYamlModal.
+ * Numbered-circle pattern for multi-step wizard flows.
  */
 
 interface WizardStepsProps {

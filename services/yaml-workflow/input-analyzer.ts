@@ -15,6 +15,9 @@ const MAX_DEFAULT_ARRAY_LENGTH = 3;
 /** Max JSON string length to embed as an object default. */
 const MAX_DEFAULT_OBJECT_SIZE = 200;
 
+/** Max string length to embed as a fixed default — longer strings are execution-specific content. */
+const MAX_DEFAULT_STRING_LENGTH = 500;
+
 /** Keys that represent user-provided, per-invocation values. */
 const DYNAMIC_KEYS = new Set([
   'url', 'base_url', 'site_url', 'target_url',
@@ -79,6 +82,11 @@ export function classifyArgument(
     if (value.length > MAX_DEFAULT_ARRAY_LENGTH) {
       return 'dynamic';
     }
+  }
+
+  // Long strings are execution-specific content (prompts, templates), not reusable defaults
+  if (typeof value === 'string' && value.length > MAX_DEFAULT_STRING_LENGTH) {
+    return 'dynamic';
   }
 
   // Default: treat as fixed (has a default from the execution)

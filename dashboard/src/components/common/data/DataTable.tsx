@@ -84,7 +84,7 @@ export function DataTable<T>({
               <th
                 key={col.key}
                 onClick={isSortable ? () => onSort(col.key) : undefined}
-                className={`sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary ${col.className ?? ''} ${
+                className={`sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.className ?? ''} ${
                   isSortable ? 'cursor-pointer select-none group/sorthead hover:text-text-secondary transition-colors' : ''
                 }`}
               >

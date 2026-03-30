@@ -1,6 +1,7 @@
 import type {
   ExecutionExportOptions,
   WorkflowExecution,
+  ActivityDetail,
 } from '@hotmeshio/hotmesh/build/types/exporter';
 
 import type {
@@ -11,7 +12,6 @@ import type {
 } from '../../types';
 
 import { getHandle } from './client';
-import { enrichEventInputs } from './enrichment';
 import { postProcessExecution } from './post-process';
 
 /** Error thrown when a workflow job is not found (expired or never existed). */
@@ -37,7 +37,7 @@ export async function exportWorkflow(
 ): Promise<LTWorkflowExport> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
-    const raw = await handle.export(options);
+    const raw = await handle.export({ ...options, enrich_inputs: true });
 
     return {
       workflow_id: workflowId,
@@ -72,7 +72,7 @@ export async function getWorkflowStatus(
 }
 
 /**
- * Export workflow state as a Temporal-compatible execution event history.
+ * Export workflow state as a structured execution event history.
  *
  * Delegates to HotMesh's native `handle.exportExecution()` which produces
  * typed events with ISO timestamps, durations, event cross-references,
@@ -86,8 +86,7 @@ export async function exportWorkflowExecution(
 ): Promise<WorkflowExecution> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
-    const execution = await handle.exportExecution(options);
-    await enrichEventInputs(execution);
+    const execution = await handle.exportExecution({ ...options, enrich_inputs: true });
     return postProcessExecution(execution);
   } catch (err: any) {
     if (err instanceof WorkflowNotFoundError) throw err;

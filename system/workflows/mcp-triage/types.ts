@@ -5,6 +5,7 @@ import type * as interceptorActivities from '../../../services/interceptor/activ
 
 export interface TriageResponseDeps {
   ltCreateEscalation: typeof interceptorActivities.ltCreateEscalation;
+  ltCreateTask: typeof interceptorActivities.ltCreateTask;
   ltGetTask: typeof interceptorActivities.ltGetTask;
   ltGetWorkflowConfig: typeof interceptorActivities.ltGetWorkflowConfig;
   ltStartWorkflow: typeof interceptorActivities.ltStartWorkflow;

@@ -68,7 +68,7 @@ export function InsightSearch() {
               placeholder="Do something with tools..."
               className="w-[22rem] pl-8 pr-3 py-1.5 rounded-md bg-surface-sunken border border-surface-border
                          text-[11px] text-text-primary placeholder:text-text-tertiary
-                         focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent
+                         focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/40 focus:border-accent
                          transition-colors"
             />
           </div>

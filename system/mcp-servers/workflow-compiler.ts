@@ -127,27 +127,47 @@ export async function createWorkflowCompilerServer(options?: {
       const wf = await yamlDb.getYamlWorkflow(args.yaml_workflow_id);
       if (!wf) throw new Error('YAML workflow not found');
 
-      await yamlDeployer.deployYamlWorkflow(wf.app_id, wf.yaml_content);
-      await yamlDb.updateYamlWorkflowStatus(wf.id, 'deployed');
+      try {
+        await yamlDeployer.deployYamlWorkflow(wf.app_id, wf.yaml_content);
+        await yamlDb.updateYamlWorkflowStatus(wf.id, 'deployed');
 
-      let status = 'deployed';
-      if (args.activate) {
-        await yamlDeployer.activateYamlWorkflow(wf.app_id, wf.app_version);
-        await yamlWorkers.registerWorkersForWorkflow(wf);
-        await yamlDb.updateYamlWorkflowStatus(wf.id, 'active');
-        status = 'active';
+        let status = 'deployed';
+        if (args.activate) {
+          await yamlDeployer.activateYamlWorkflow(wf.app_id, wf.app_version);
+          await yamlWorkers.registerWorkersForWorkflow(wf);
+          await yamlDb.updateYamlWorkflowStatus(wf.id, 'active');
+          status = 'active';
+        }
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              status,
+              app_id: wf.app_id,
+              graph_topic: wf.graph_topic,
+            }),
+          }],
+        };
+      } catch (err: any) {
+        // Mark workflow as failed so it doesn't block future deploys
+        await yamlDb.updateYamlWorkflowStatus(wf.id, 'error');
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: err.message,
+              status: 'error',
+              app_id: wf.app_id,
+              graph_topic: wf.graph_topic,
+              hint: err.message.includes('Duplicate activity id')
+                ? 'Two workflows have colliding activity IDs. Archive or rename one before redeploying.'
+                : 'Check server logs for the full YAML that failed validation.',
+            }),
+          }],
+          isError: true,
+        };
       }
-
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            status,
-            app_id: wf.app_id,
-            graph_topic: wf.graph_topic,
-          }),
-        }],
-      };
     },
   );
 

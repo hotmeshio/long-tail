@@ -48,14 +48,14 @@ Four categories of data are subject to maintenance:
 |---|---|
 | **Streams** | Redis-style stream messages used internally by HotMesh to coordinate activities. These are pure infrastructure; no user-facing data resides here. |
 | **Transient jobs** | Job rows where the `entity` column is `NULL`. These represent activity executions, signal deliveries, and other bookkeeping that is not tied to a named workflow entity. They serve no purpose after execution completes. |
-| **Entity jobs** | Job rows where `entity` is set. These represent actual workflow instances -- the rows that back `Durable.Client.workflow.search()` calls and Temporal-compatible exports. Deleting them removes the workflow record entirely. |
+| **Entity jobs** | Job rows where `entity` is set. These represent actual workflow instances -- the rows that back `Durable.Client.workflow.search()` calls and execution exports. Deleting them removes the workflow record entirely. |
 | **Pruned jobs** | Entity jobs that have already had their execution artifacts stripped (the `pruned_at` column is not `NULL`). These retain core data but no longer carry execution scaffolding. They can be hard-deleted after a longer retention window. |
 
 ## Prune vs. delete
 
 The two actions differ in what they leave behind:
 
-- **Prune** strips execution scaffolding -- activity state, signal payloads, transition metadata -- but preserves the core fields (`jdata`, `udata`, `jmark`, `hmark`). A pruned workflow remains searchable and exportable. Temporal-compatible exports continue to work.
+- **Prune** strips execution scaffolding -- activity state, signal payloads, transition metadata -- but preserves the core fields (`jdata`, `udata`, `jmark`, `hmark`). A pruned workflow remains searchable and exportable. Execution exports continue to work.
 - **Delete** removes the row (or stream message) entirely. The data is gone.
 
 The intended lifecycle for an entity job is: execute, then prune after a short retention period to reclaim space, then delete after a longer period once the record is no longer needed.

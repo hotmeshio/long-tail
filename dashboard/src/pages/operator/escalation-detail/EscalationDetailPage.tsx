@@ -16,6 +16,7 @@ import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useNatsEvents';
+import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { TriageContext } from '../../../components/escalation/TriageContext';
 import { EscalationActionBar } from './EscalationActionBar';
 import { EscalationHero } from './EscalationHero';
@@ -80,13 +81,14 @@ export function EscalationDetailPage() {
     setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
   }, [resolverSchema]);
 
-  // When triage data is present, collapse Input/Output so triage context is central
+  // When triage or rounds-exhausted data is present, collapse Input/Output so structured context is central
   const hasTriage = hasTriageData(esc?.escalation_payload);
+  const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
   useEffect(() => {
-    if (hasTriage) {
+    if (hasTriage || isRoundsExhausted) {
       setCollapsed((prev) => ({ ...prev, context: true }));
     }
-  }, [hasTriage]);
+  }, [hasTriage, isRoundsExhausted]);
 
   if (isLoading) {
     return (
@@ -130,9 +132,14 @@ export function EscalationDetailPage() {
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
-    await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
-    addToast('Escalation resolved', 'success');
-    navigate(returnPath);
+    const result = await resolve.mutateAsync({ id: esc.id, resolverPayload: payload }) as any;
+    if (result?.triage && result?.workflowId) {
+      addToast('AI triage started', 'success');
+      navigate(`/workflows/executions/${result.workflowId}`);
+    } else {
+      addToast('Escalation resolved', 'success');
+      navigate(returnPath);
+    }
   };
 
   const handleEscalate = async (targetRole: string) => {
@@ -140,6 +147,24 @@ export function EscalationDetailPage() {
     await escalate.mutateAsync({ id: esc.id, targetRole });
     addToast(`Escalated to ${targetRole}`, 'success');
     navigate(returnPath);
+  };
+
+  const handleRetryTriage = async () => {
+    if (!claimedByMe) {
+      await claim.mutateAsync({ id: esc.id, durationMinutes: 30 });
+    }
+    const diagnosis = (payloadObj?.diagnosis as string) || esc.description || '';
+    const result = await resolve.mutateAsync({
+      id: esc.id,
+      resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
+    }) as any;
+    if (result?.triage && result?.workflowId) {
+      addToast('AI triage started', 'success');
+      navigate(`/workflows/executions/${result.workflowId}`);
+    } else {
+      addToast('Sent to AI triage', 'success');
+      navigate(returnPath);
+    }
   };
 
   const handleRelease = async () => {
@@ -159,6 +184,19 @@ export function EscalationDetailPage() {
         isTerminal={isTerminal}
         traceUrl={traceUrl}
       />
+
+      {/* Rounds-exhausted structured context */}
+      {isRoundsExhausted && payloadObj && (
+        <div className="mt-8">
+          <RoundsExhaustedContext
+            payload={payloadObj}
+            isTerminal={isTerminal}
+            resolverPayload={resolverPayload as Record<string, unknown> | null}
+            onRetryTriage={handleRetryTriage}
+            isRetrying={claim.isPending || resolve.isPending}
+          />
+        </div>
+      )}
 
       {/* Collapsible sections */}
       <div className="mt-8 space-y-6">

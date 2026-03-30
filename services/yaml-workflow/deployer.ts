@@ -50,6 +50,28 @@ export async function buildMergedYaml(appId: string, version: string): Promise<s
     }
   }
 
+  // Pre-validate: check for duplicate activity IDs across all graphs
+  const activityIds = new Map<string, string>(); // id → graph subscribes topic
+  const duplicates: string[] = [];
+  for (const graph of allGraphs) {
+    const g = graph as { subscribes?: string; activities?: Record<string, unknown> };
+    const topic = g.subscribes || 'unknown';
+    if (g.activities) {
+      for (const id of Object.keys(g.activities)) {
+        if (activityIds.has(id)) {
+          duplicates.push(`"${id}" in both "${activityIds.get(id)}" and "${topic}"`);
+        } else {
+          activityIds.set(id, topic);
+        }
+      }
+    }
+  }
+  if (duplicates.length > 0) {
+    const msg = `Duplicate activity IDs across graphs in app "${appId}": ${duplicates.join('; ')}`;
+    loggerRegistry.error(`[yaml-workflow] ${msg}`);
+    throw new Error(msg);
+  }
+
   const merged = {
     app: {
       id: appId,
@@ -63,20 +85,111 @@ export async function buildMergedYaml(appId: string, version: string): Promise<s
 
 /**
  * Deploy all YAML workflows for an app_id as a single merged version.
+ *
+ * On failure, attempts one recompilation cycle:
+ *   1. Identifies the workflow that was most recently compiled (the trigger)
+ *   2. Re-runs the full compilation pipeline with the error as context
+ *   3. The compile stage's LLM receives the error + failed YAML to avoid the same issue
+ *   4. Stores the recompiled YAML and retries deployment
+ *
+ * If recompilation is unavailable or fails, the original error is thrown.
  */
 export async function deployAppId(
   appId: string,
   version: string,
 ): Promise<HotMeshManifest> {
-  // Auto-register the namespace so it appears in the UI
   await namespaceService.registerNamespace(appId);
 
   const mergedYaml = await buildMergedYaml(appId, version);
+  loggerRegistry.debug(`[yaml-workflow] merged YAML for ${appId} v${version}:\n${mergedYaml}`);
+
   const engine = await getEngine(appId);
-  const manifest = await engine.deploy(mergedYaml);
-  await engine.activate(version);
-  loggerRegistry.info(`[yaml-workflow] deployed+activated ${appId} v${version} (merged)`);
-  return manifest;
+  try {
+    const manifest = await engine.deploy(mergedYaml);
+    await engine.activate(version);
+    loggerRegistry.info(`[yaml-workflow] deployed+activated ${appId} v${version} (merged)`);
+    return manifest;
+  } catch (err: any) {
+    loggerRegistry.error(
+      `[yaml-workflow] deployment failed for ${appId} v${version}: ${err.message}`,
+    );
+
+    // Attempt recompilation with error context
+    const recompiled = await recompileWithContext(appId, mergedYaml, err.message);
+    if (!recompiled) throw err;
+
+    // Rebuild merged YAML with the recompiled workflow and retry
+    loggerRegistry.info(`[yaml-workflow] retrying deployment after recompilation for ${appId}`);
+    try {
+      const retriedYaml = await buildMergedYaml(appId, version);
+      const manifest = await engine.deploy(retriedYaml);
+      await engine.activate(version);
+      loggerRegistry.info(`[yaml-workflow] recompilation succeeded — deployed+activated ${appId} v${version}`);
+      return manifest;
+    } catch (retryErr: any) {
+      loggerRegistry.error(
+        `[yaml-workflow] recompilation retry also failed for ${appId}: ${retryErr.message}`,
+      );
+      throw retryErr;
+    }
+  }
+}
+
+/**
+ * Re-run the compilation pipeline for the most recently compiled workflow
+ * in the app, feeding the deployment error as context so the LLM can
+ * produce a plan that avoids the same issue.
+ *
+ * Returns true if recompilation succeeded and the DB was updated, false otherwise.
+ */
+async function recompileWithContext(
+  appId: string,
+  failedYaml: string,
+  errorMessage: string,
+): Promise<boolean> {
+  try {
+    // Find the most recently updated non-archived workflow for this app_id
+    const workflows = await yamlDb.listYamlWorkflowsByAppId(appId);
+    // Sort by updated_at desc to find the one that likely triggered the failure
+    const sorted = workflows.sort((a, b) =>
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    );
+    const target = sorted[0];
+    if (!target?.source_workflow_id) {
+      loggerRegistry.warn('[yaml-workflow] recompilation skipped: no source workflow to recompile from');
+      return false;
+    }
+
+    loggerRegistry.info(
+      `[yaml-workflow] recompiling "${target.name}" (source: ${target.source_workflow_id}) with error context`,
+    );
+
+    const { generateYamlFromExecution } = await import('./generator');
+    const result = await generateYamlFromExecution({
+      workflowId: target.source_workflow_id,
+      taskQueue: 'long-tail-system',
+      workflowName: 'mcpQuery',
+      name: target.name,
+      description: target.description || undefined,
+      appId: target.app_id,
+      subscribes: target.graph_topic,
+      priorDeployError: errorMessage,
+      priorFailedYaml: failedYaml,
+    });
+
+    // Update the workflow record with the recompiled YAML
+    await yamlDb.updateYamlWorkflow(target.id, {
+      yaml_content: result.yaml,
+      activity_manifest: result.activityManifest,
+    });
+    loggerRegistry.info(
+      `[yaml-workflow] recompilation complete for "${target.name}" (${result.yaml.length} chars)`,
+    );
+    return true;
+  } catch (err: any) {
+    loggerRegistry.warn(`[yaml-workflow] recompilation failed: ${err.message}`);
+    return false;
+  }
 }
 
 /**

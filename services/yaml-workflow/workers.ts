@@ -11,6 +11,7 @@ import {
 } from '../../modules/defaults';
 
 import { loggerRegistry } from '../logger';
+import { publishActivityEvent } from '../events/publish';
 import * as mcpClient from '../mcp/client';
 import { callLLM as callLLMService } from '../llm';
 import type { ChatMessage, LLMResponse } from '../llm';
@@ -229,6 +230,59 @@ function buildTransformCallback(activity: ActivityManifestEntry) {
 }
 
 /**
+ * Wrap a worker callback with activity lifecycle event publishing.
+ * Publishes activity.started before and activity.completed/failed after.
+ */
+function wrapWithEvents(
+  activity: ActivityManifestEntry,
+  appId: string,
+  stepIndex: number,
+  totalSteps: number,
+  callback: (data: StreamData) => Promise<StreamDataResponse>,
+): (data: StreamData) => Promise<StreamDataResponse> {
+  return async (data: StreamData): Promise<StreamDataResponse> => {
+    const meta = data.metadata as { jid?: string; wfn?: string };
+    const jid = meta?.jid || 'unknown';
+    const wfn = meta?.wfn || appId;
+    const eventBase = {
+      workflowId: jid,
+      workflowName: wfn,
+      taskQueue: appId,
+      activityName: activity.activity_id,
+      data: {
+        title: activity.title,
+        toolName: activity.mcp_tool_name,
+        toolSource: activity.tool_source,
+        stepIndex,
+        totalSteps,
+      },
+    };
+
+    publishActivityEvent({ type: 'activity.started', ...eventBase });
+    try {
+      const result = await callback(data);
+      publishActivityEvent({ type: 'activity.completed', ...eventBase });
+      return result;
+    } catch (err: any) {
+      loggerRegistry.error(
+        `[yaml-worker] ${activity.activity_id} failed: ${err.message}`,
+      );
+      publishActivityEvent({
+        type: 'activity.failed',
+        ...eventBase,
+        data: { ...eventBase.data, error: err.message },
+      });
+      // Return the error as data instead of throwing — prevents HotMesh
+      // retry storms when the engine reprocesses failed stream messages.
+      return {
+        metadata: { ...data.metadata },
+        data: { error: err.message, is_error: true },
+      };
+    }
+  };
+}
+
+/**
  * Register HotMesh workers for all activities in a YAML workflow.
  * Each worker delegates based on tool_source:
  * - 'db'  → callDbTool() (internal DB MCP server)
@@ -244,87 +298,70 @@ export async function registerWorkersForWorkflow(
     callback: (data: StreamData) => Promise<StreamDataResponse>;
   }> = [];
 
-  for (const activity of workflow.activity_manifest) {
-    if (activity.type !== 'worker') continue;
-    if (registeredTopics.has(activity.topic)) continue;
+  const workerActivities = workflow.activity_manifest.filter(
+    (a) => a.type === 'worker' && !registeredTopics.has(a.topic),
+  );
+  const totalSteps = workerActivities.length;
+  let stepIndex = 0;
 
+  for (const activity of workerActivities) {
+    const currentStep = stepIndex++;
     const toolSource = activity.tool_source || (activity.mcp_server_id === 'db' ? 'db' : 'mcp');
+    const wrap = (cb: (data: StreamData) => Promise<StreamDataResponse>) =>
+      wrapWithEvents(activity, workflow.app_id, currentStep, totalSteps, cb);
 
     if (toolSource === 'transform') {
       // Transform/reshape step — deterministic data mapping between steps
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
-        callback: buildTransformCallback(activity),
+        callback: wrap(buildTransformCallback(activity)),
       });
     } else if (toolSource === 'llm') {
       // LLM interpretation step
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
-        callback: buildLlmCallback(activity),
+        callback: wrap(buildLlmCallback(activity)),
       });
     } else if (toolSource === 'db') {
       if (!activity.mcp_tool_name) continue;
       const toolName = activity.mcp_tool_name;
-      // DB tools — route through MCP client (same path as external tools)
       const dbServerId = activity.mcp_server_id || 'long-tail-db';
+      const toolArgs = activity.tool_arguments;
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
-        callback: async (data: StreamData): Promise<StreamDataResponse> => {
+        callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
-          const mergedArgs = activity.tool_arguments
-            ? { ...activity.tool_arguments, ...args }
-            : args;
-          const result = await mcpClient.callServerTool(
-            dbServerId,
-            toolName,
-            mergedArgs,
-          );
-          return {
-            metadata: { ...data.metadata },
-            data: result,
-          };
-        },
+          const mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
+          const result = await mcpClient.callServerTool(dbServerId, toolName, mergedArgs);
+          return { metadata: { ...data.metadata }, data: result };
+        }),
       });
     } else {
-      // MCP tools — route through external MCP client
       if (!activity.mcp_tool_name) continue;
       const toolName = activity.mcp_tool_name;
       const serverId = activity.mcp_server_id;
       if (!serverId) continue;
-
       const storedArgs = activity.tool_arguments;
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
-        callback: async (data: StreamData): Promise<StreamDataResponse> => {
+        callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
-          // Merge: stored defaults first, then runtime overrides.
-          // Skip runtime values that are undefined, null, or empty string —
-          // these indicate unwired/unresolved inputs that should not override
-          // the stored defaults from the original execution.
           const mergedArgs = storedArgs ? { ...storedArgs } : {};
           for (const [key, value] of Object.entries(args)) {
             if (value !== undefined && value !== null && value !== '') {
               mergedArgs[key] = value;
             }
           }
-          const result = await mcpClient.callServerTool(
-            serverId,
-            toolName,
-            mergedArgs,
-          );
-          // Log errors from MCP tools so they're visible in container logs
+          const result = await mcpClient.callServerTool(serverId, toolName, mergedArgs);
           if (result && typeof result === 'object' && 'error' in result) {
             loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);
           }
-          return {
-            metadata: { ...data.metadata },
-            data: result,
-          };
-        },
+          return { metadata: { ...data.metadata }, data: result };
+        }),
       });
     }
 

@@ -3,7 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { TOOL_ROUNDS_MCP_QUERY } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
-import { MCP_QUERY_SYSTEM_PROMPT } from './prompts';
+import { MCP_QUERY_SYSTEM_PROMPT, ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT } from './prompts';
 
 type ActivitiesType = typeof activities;
 
@@ -68,8 +68,22 @@ export async function mcpQuery(
       role: 'system',
       content: MCP_QUERY_SYSTEM_PROMPT + `\n\n${serverSection}`,
     },
-    { role: 'user', content: prompt },
   ];
+
+  // If this is a re-run after triage, inject triage learnings as context
+  const triageContext = (envelope.resolver as any)?._triageContext;
+  if (triageContext) {
+    const triageHints = [
+      `This is a re-run after a previous attempt failed and was triaged.`,
+      triageContext.diagnosis ? `Previous diagnosis: ${triageContext.diagnosis}` : '',
+      triageContext.actions_taken?.length ? `Actions already taken: ${triageContext.actions_taken.join('; ')}` : '',
+      triageContext.recommendation ? `Recommendation: ${triageContext.recommendation}` : '',
+    ].filter(Boolean).join('\n');
+    messages.push({ role: 'user', content: triageHints });
+    messages.push({ role: 'assistant', content: 'Understood. I will use these learnings to take a more targeted approach this time.' });
+  }
+
+  messages.push({ role: 'user', content: prompt });
 
   let toolCallCount = 0;
 
@@ -111,11 +125,26 @@ export async function mcpQuery(
     }
   }
 
-  // Exhausted rounds — ask for final synthesis
+  // Exhausted rounds — ask LLM for diagnostic summary
+  messages.push({
+    role: 'user',
+    content: ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT,
+  });
   const finalResponse = await callQueryLLM(messages, undefined);
-  return buildQueryReturn(finalResponse.content || '', toolCallCount, [
-    { name: 'rounds_exhausted', value: 'true' },
-  ]);
+  const parsed = parseJsonResponse(finalResponse.content || '');
+  return {
+    type: 'return',
+    data: {
+      ...parsed,
+      tool_calls_made: toolCallCount,
+      rounds_exhausted: true,
+    },
+    milestones: [
+      { name: 'mcp_query', value: 'completed' },
+      { name: 'tool_calls', value: String(toolCallCount) },
+      { name: 'rounds_exhausted', value: 'true' },
+    ],
+  };
 }
 
 type Milestone = { name: string; value: string };

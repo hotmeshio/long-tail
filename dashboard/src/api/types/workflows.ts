@@ -82,6 +82,21 @@ export interface WorkflowExecutionSummary {
   signals: number;
 }
 
+/** Structured per-activity detail from YAML engine export (enrich_inputs). */
+export interface ActivityDetail {
+  name: string;
+  type: string;
+  dimension: string;
+  input?: Record<string, any>;
+  output?: Record<string, any>;
+  started_at?: string;
+  completed_at?: string;
+  duration_ms?: number;
+  retry_attempt?: number;
+  cycle_iteration?: number;
+  error?: string | null;
+}
+
 export interface WorkflowExecution {
   workflow_id: string;
   workflow_type: string;
@@ -95,6 +110,8 @@ export interface WorkflowExecution {
   result?: unknown;
   events: WorkflowExecutionEvent[];
   summary: WorkflowExecutionSummary;
+  /** Structured activity list with input/output (YAML engine exports). */
+  activities?: ActivityDetail[];
 }
 
 export interface LTJob {

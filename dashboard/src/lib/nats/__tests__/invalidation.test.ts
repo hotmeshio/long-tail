@@ -92,6 +92,29 @@ describe('getInvalidationKeys', () => {
     });
   });
 
+  describe('activity events', () => {
+    const activityTypes = ['activity.started', 'activity.completed', 'activity.failed'];
+
+    for (const type of activityTypes) {
+      it(`invalidates mcpRunExecution and mcpRuns for ${type}`, () => {
+        const keys = getInvalidationKeys(makeEvent({ type, workflowId: 'job-1' }));
+
+        expect(keys).toContainEqual(['mcpRunExecution', 'job-1']);
+        expect(keys).toContainEqual(['mcpRuns']);
+        // Should NOT include jobs or tasks (these are YAML worker events, not durable)
+        expect(keys).not.toContainEqual(['jobs']);
+        expect(keys).not.toContainEqual(['tasks']);
+      });
+    }
+
+    it('only invalidates mcpRuns when workflowId is empty', () => {
+      const keys = getInvalidationKeys(makeEvent({ type: 'activity.completed', workflowId: '' }));
+
+      expect(keys).toContainEqual(['mcpRuns']);
+      expect(keys).toHaveLength(1);
+    });
+  });
+
   describe('unknown events', () => {
     it('falls back to invalidating jobs and tasks for unknown event types', () => {
       const keys = getInvalidationKeys(makeEvent({ type: 'custom.something' }));

@@ -101,6 +101,30 @@ export function publishEscalationEvent(params: {
 }
 
 /**
+ * Publish an activity lifecycle event for YAML workflow steps.
+ * Lightweight — no payload data, just progress signals.
+ */
+export function publishActivityEvent(params: {
+  type: 'activity.started' | 'activity.completed' | 'activity.failed';
+  workflowId: string;
+  workflowName: string;
+  taskQueue: string;
+  activityName: string;
+  data?: Record<string, any>;
+}): Promise<void> {
+  return fireAndForget({
+    type: params.type,
+    source: 'yaml-worker',
+    workflowId: params.workflowId,
+    workflowName: params.workflowName,
+    taskQueue: params.taskQueue,
+    activityName: params.activityName,
+    data: params.data,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
  * Publish a workflow lifecycle event (started, completed, failed).
  */
 export function publishWorkflowEvent(params: {

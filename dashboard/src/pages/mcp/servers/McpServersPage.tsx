@@ -102,7 +102,7 @@ export function McpServersPage() {
   return (
     <div>
       <PageHeader
-        title="Server Tools"
+        title="Tool Servers"
         actions={
           <button
             onClick={() => {
@@ -141,27 +141,19 @@ export function McpServersPage() {
       </FilterBar>
 
       {filteredServers.length === 0 ? (
-        <EmptyState title="No MCP servers found" />
+        <EmptyState title="No tool servers found" />
       ) : (
         <table className="w-full">
           <thead>
             <tr className="border-b">
               <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-                Name
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-24">
-                Transport
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-32">
-                Status
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-20">
-                Tools
+                Server / Tool
               </th>
               <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
-                Updated
+                Status
               </th>
               <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28" />
+              <th className="sticky top-[2.75rem] z-10 bg-surface w-12" />
             </tr>
           </thead>
           <tbody>

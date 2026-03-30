@@ -453,6 +453,62 @@ const HTTP_FETCH_TOOLS = [
   },
 ];
 
+const CLAUDE_CODE_TOOLS = [
+  {
+    name: 'execute_task',
+    description:
+      'Run a task using Claude Code CLI. Claude Code is an agentic coding assistant with terminal access, ' +
+      'file I/O, code search, and editing. Returns structured output with result text, cost, and duration.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'The task prompt. Be specific and actionable.',
+        },
+        working_directory: {
+          type: 'string',
+          description: 'Working directory for the task. Defaults to server cwd.',
+        },
+        allowed_tools: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Restrict which tools Claude Code can use (e.g., ["Read", "Grep"]).',
+        },
+        max_turns: {
+          type: 'number',
+          description: 'Maximum agentic turns before stopping.',
+        },
+        model: {
+          type: 'string',
+          description: 'Override the Claude model (e.g., "claude-sonnet-4-6").',
+        },
+        system_prompt: {
+          type: 'string',
+          description: 'Additional system prompt to append.',
+        },
+        timeout_ms: {
+          type: 'number',
+          description: 'Execution timeout in ms. Default: 120000, max: 300000.',
+        },
+        credential_label: {
+          type: 'string',
+          description: 'Label of the stored Anthropic credential to use (e.g., "subscription", "api-batch"). Default: "default".',
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+  {
+    name: 'check_availability',
+    description: 'Check if Claude Code CLI is installed and an API key is available. Returns version and readiness status.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+];
+
 // ── Seed MCP servers ─────────────────────────────────────────────────────────
 //
 // Register the built-in MCP servers so the dashboard shows them immediately.
@@ -570,15 +626,16 @@ const SEED_MCP_SERVERS = [
         inputSchema: {
           type: 'object',
           properties: {
-            provider: { type: 'string', description: 'OAuth provider name (google, github, microsoft, etc.)' },
+            provider: { type: 'string', description: 'OAuth provider name (google, github, microsoft, anthropic, etc.)' },
             user_id: { type: 'string', description: 'User ID to get token for' },
+            label: { type: 'string', description: 'Credential label (default: "default"). Select among multiple credentials for the same provider.' },
           },
           required: ['provider', 'user_id'],
         },
       },
       {
         name: 'list_connections',
-        description: 'List all OAuth providers connected for a user.',
+        description: 'List all OAuth providers connected for a user. Returns provider, label, and credential type for each connection.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -589,12 +646,13 @@ const SEED_MCP_SERVERS = [
       },
       {
         name: 'revoke_connection',
-        description: 'Disconnect an OAuth provider for a user, removing stored tokens.',
+        description: 'Disconnect an OAuth provider for a user, removing stored tokens. Use label to target a specific credential.',
         inputSchema: {
           type: 'object',
           properties: {
             provider: { type: 'string', description: 'OAuth provider name to disconnect' },
             user_id: { type: 'string', description: 'User ID to revoke connection for' },
+            label: { type: 'string', description: 'Credential label to revoke (default: "default")' },
           },
           required: ['provider', 'user_id'],
         },
@@ -603,6 +661,26 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'authentication' },
     tags: ['authentication', 'oauth', 'credentials'],
     compile_hints: 'get_access_token returns a short-lived access_token string. Always call this immediately before making an authenticated API request — do not cache or reuse across workflow steps.',
+  },
+  {
+    name: 'long-tail-claude-code',
+    description:
+      'Agentic coding assistant via Claude Code CLI. Execute development tasks: code generation, refactoring, ' +
+      'file analysis, shell commands, codebase search, and multi-step development workflows. ' +
+      'Runs as a scoped subprocess with delegation-based authentication for per-user API key resolution.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: CLAUDE_CODE_TOOLS,
+    metadata: { builtin: true, category: 'development' },
+    tags: ['development', 'coding', 'ai-agent', 'terminal', 'code-generation'],
+    compile_hints:
+      'execute_task runs Claude Code as a subprocess — it is itself an agentic tool. ' +
+      'The `prompt` parameter is ALWAYS a dynamic trigger input — it defines the task and must never ' +
+      'be baked as a stored default. `max_turns` and `allowed_tools` are fixed implementation details. ' +
+      'Keep prompts self-contained: include all context the task needs since Claude Code ' +
+      'starts with no prior conversation. For read-only analysis, restrict with ' +
+      'allowed_tools: ["Read", "Grep", "Glob"]. Results may be large; extract specific ' +
+      'fields in subsequent steps rather than passing the full result.',
   },
 ];
 

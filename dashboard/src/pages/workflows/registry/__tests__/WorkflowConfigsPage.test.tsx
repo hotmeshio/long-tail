@@ -82,7 +82,7 @@ describe('WorkflowConfigsPage', () => {
 
   it('renders page header and Add Config button', () => {
     renderPage();
-    expect(screen.getByText('Registry')).toBeInTheDocument();
+    expect(screen.getByText('Registered Workflows')).toBeInTheDocument();
     expect(screen.getByText('Add Config')).toBeInTheDocument();
   });
 

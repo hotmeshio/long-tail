@@ -44,7 +44,7 @@ export interface LTOAuthUserInfo {
 }
 
 /**
- * Decrypted OAuth token set for a user+provider.
+ * Decrypted OAuth token set for a user+provider+label.
  */
 export interface LTDecryptedToken {
   accessToken: string;
@@ -52,6 +52,8 @@ export interface LTDecryptedToken {
   expiresAt: Date | null;
   scopes: string[];
   provider: string;
+  /** Label distinguishing multiple credentials for the same provider (default: 'default') */
+  label: string;
 }
 
 /**
@@ -61,6 +63,8 @@ export interface LTOAuthTokenRecord {
   id: string;
   user_id: string;
   provider: string;
+  /** Label distinguishing multiple credentials for the same provider (default: 'default') */
+  label: string;
   access_token_enc: string;
   refresh_token_enc: string | null;
   token_type: string;

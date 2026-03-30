@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -35,13 +36,13 @@ const columns: Column<LTJob>[] = [
   {
     key: 'status',
     label: 'Status',
-    className: 'w-28',
+    className: 'w-28 whitespace-nowrap',
     render: (row) => <StatusBadge status={mapStatus(row)} />,
   },
   {
     key: 'entity',
     label: 'Type',
-    className: 'w-32',
+    className: 'w-32 whitespace-nowrap',
     render: (row) => {
       const { label, style } = entityLabel((row as any).entity);
       return (
@@ -54,7 +55,6 @@ const columns: Column<LTJob>[] = [
   {
     key: 'workflow_id',
     label: 'Run ID',
-    className: 'w-64',
     render: (row) => (
       <span className="text-xs font-mono text-text-primary truncate max-w-[240px] block">
         {row.workflow_id}
@@ -64,13 +64,25 @@ const columns: Column<LTJob>[] = [
   {
     key: 'created_at',
     label: 'Started',
+    className: 'w-28 text-right',
     sortable: true,
-    render: (row) => <TimeAgo date={row.created_at} />,
+    render: (row) => <span className="block text-right"><TimeAgo date={row.created_at} /></span>,
   },
   {
     key: 'updated_at',
     label: 'Updated',
-    render: (row) => <TimeAgo date={row.updated_at} />,
+    className: 'w-28 text-right',
+    render: (row) => <span className="block text-right"><TimeAgo date={row.updated_at} /></span>,
+  },
+  {
+    key: 'actions',
+    label: '',
+    className: 'w-10',
+    render: () => (
+      <span className="opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent">
+        <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
+      </span>
+    ),
   },
 ];
 
@@ -103,7 +115,11 @@ export function McpQueryPage() {
 
     const result = await activeMutation.mutateAsync({ prompt });
     setPromptText('');
-    navigate(`/mcp/queries/${result.workflow_id}?prompt=${encodeURIComponent(prompt)}`);
+    if (direct) {
+      navigate(`/mcp/queries/${result.workflow_id}?prompt=${encodeURIComponent(prompt)}`);
+    } else {
+      navigate(`/workflows/executions/${result.workflow_id}`);
+    }
   };
 
   const jobs = data?.jobs ?? [];
@@ -111,7 +127,7 @@ export function McpQueryPage() {
 
   return (
     <>
-      <PageHeader title="Deterministic MCP" />
+      <PageHeader title="Discover & Compile" />
 
       {/* Submit form */}
       <form onSubmit={handleSubmit} className="mb-6">
@@ -121,7 +137,7 @@ export function McpQueryPage() {
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               placeholder="Describe what you want to accomplish..."
-              className="w-full min-h-[80px] max-h-[200px] px-4 py-3 bg-surface-sunken border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent-primary"
+              className="w-full min-h-[80px] max-h-[200px] px-4 py-3 bg-surface-sunken border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   handleSubmit(e);
@@ -137,12 +153,12 @@ export function McpQueryPage() {
                   className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
                 />
                 <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
-                  Dynamic
+                  Force discovery
                 </span>
                 <span className="text-xs text-text-tertiary">
                   {direct
-                    ? '— always runs the LLM agentic loop'
-                    : '— routes to a deterministic workflow if one matches'}
+                    ? '— always run dynamic LLM exploration, skip compiled pipelines'
+                    : '— use a compiled pipeline if one matches, otherwise discover dynamically'}
                 </span>
               </label>
               <span className="text-xs text-text-tertiary">Cmd+Enter to submit</span>

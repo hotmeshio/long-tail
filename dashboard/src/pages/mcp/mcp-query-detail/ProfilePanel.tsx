@@ -20,7 +20,7 @@ interface ExistingProfileViewProps {
 function ExistingProfileView({ compiledYaml, onBack, onNext }: ExistingProfileViewProps) {
   return (
     <div>
-      <PanelTitle title="Deterministic Workflow Profile" subtitle="Configuration and pipeline for the compiled MCP workflow tool" />
+      <PanelTitle title="Pipeline Profile" subtitle="Configure the compiled tool — name, tags, input schema, and deployment target" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
         {/* Left: identity + description */}
@@ -164,7 +164,7 @@ function CreateProfileForm({
         <div>
           <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Namespace *</label>
           <input type="text" value={compileAppId} onChange={(e) => setCompileAppId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary" placeholder="e.g. longtail" />
+            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. longtail" />
           {allAppIds.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {allAppIds.map((id) => (
@@ -177,13 +177,13 @@ function CreateProfileForm({
         <div>
           <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Name *</label>
           <input type="text" value={compileName} onChange={(e) => setCompileName(e.target.value)}
-            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary" placeholder="e.g. auth-screenshot-all-nav-pages" />
+            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. auth-screenshot-all-nav-pages" />
         </div>
         <div>
           <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Topic</label>
           <div className="flex items-center gap-2">
             <input type="text" value={derivedSubscribes} onChange={(e) => { setAutoSubscribes(false); setCompileSubscribes(e.target.value); }}
-              className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary" placeholder="auto-derived" />
+              className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="auto-derived" />
             {!autoSubscribes && <button type="button" onClick={() => setAutoSubscribes(true)} className="text-[10px] text-accent hover:underline shrink-0">Auto</button>}
           </div>
         </div>
@@ -194,7 +194,7 @@ function CreateProfileForm({
           </div>
           <textarea value={compileDescription} onChange={(e) => setCompileDescription(e.target.value)}
             placeholder="Describe what this workflow does as a reusable tool..."
-            className="w-full min-h-[80px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent-primary" />
+            className="w-full min-h-[80px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
           <p className="text-[10px] text-text-tertiary mt-1">{describeData ? 'AI-generated. Edit to refine.' : 'Describe what this workflow does so future queries can find it.'}</p>
         </div>
         <div>
@@ -239,12 +239,31 @@ interface ProfilePanelProps {
   onCompile: () => Promise<void>;
   isCompiling: boolean;
   compileError: string | undefined;
+  isUncompilable?: boolean;
   onBack: () => void;
   onNext: () => void;
 }
 
 export function ProfilePanel(props: ProfilePanelProps) {
-  const { compiledYaml, onBack, onNext } = props;
+  const { compiledYaml, isUncompilable, onBack, onNext } = props;
+
+  if (isUncompilable && !compiledYaml) {
+    return (
+      <div>
+        <PanelTitle title="Create Workflow Profile" subtitle="Define the deterministic workflow tool from this execution" />
+        <div className="rounded-md bg-status-warning/5 border border-status-warning/20 px-4 py-3 mb-6">
+          <p className="text-xs text-status-warning font-medium">Cannot compile this query</p>
+          <p className="text-xs text-text-secondary mt-1">
+            This query did not complete successfully. Resolve the escalation before compiling to a deterministic workflow.
+          </p>
+        </div>
+        <WizardNav>
+          <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
+          <span />
+        </WizardNav>
+      </div>
+    );
+  }
 
   if (compiledYaml) {
     return <ExistingProfileView compiledYaml={compiledYaml} onBack={onBack} onNext={onNext} />;

@@ -25,8 +25,9 @@ router.get('/oauth/:provider/token', async (req, res) => {
     const payload = validateDelegationToken(header.slice(7));
     const { provider } = req.params;
     requireScope(payload, `oauth:${provider}:read`);
+    const label = (req.query.label as string) || undefined;
 
-    const token = await getFreshAccessToken(payload.sub, provider);
+    const token = await getFreshAccessToken(payload.sub, provider, label);
     res.json({
       access_token: token.accessToken,
       expires_at: token.expiresAt?.toISOString() ?? null,

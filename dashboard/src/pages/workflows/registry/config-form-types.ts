@@ -47,7 +47,7 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
   };
 }
 
-export const STEP_LABELS = ['Basics', 'Access', 'Schemas'];
+export const STEP_LABELS = ['Identity', 'Escalation & Access', 'Schemas & Invocation'];
 
 export function jsonValid(v: string): boolean {
   if (!v.trim()) return true;

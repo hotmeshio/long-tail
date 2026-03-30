@@ -9,6 +9,7 @@ export async function fetchOAuthProviders(): Promise<OAuthProvider[]> {
   return apiFetch<OAuthProvider[]>('/auth/oauth/providers');
 }
 
-export async function disconnectOAuthProvider(provider: string): Promise<{ deleted: boolean }> {
-  return apiFetch(`/auth/oauth/connections/${provider}`, { method: 'DELETE' });
+export async function disconnectOAuthProvider(provider: string, label?: string): Promise<{ deleted: boolean }> {
+  const params = label ? `?label=${encodeURIComponent(label)}` : '';
+  return apiFetch(`/auth/oauth/connections/${provider}${params}`, { method: 'DELETE' });
 }

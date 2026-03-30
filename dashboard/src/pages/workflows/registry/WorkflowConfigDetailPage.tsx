@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useWorkflowConfigs, useUpsertWorkflowConfig, useInvokeWorkflow } from '../../../api/workflows';
 import { useToast } from '../../../hooks/useToast';
 import { StepIndicator } from '../../../components/common/layout/StepIndicator';
@@ -21,9 +21,19 @@ export function WorkflowConfigDetailPage() {
   const editing = configs?.find((c) => c.workflow_type === workflowType) ?? null;
 
   const [form, setForm] = useState<ConfigFormState>(EMPTY_FORM);
-  const [step, setStep] = useState(0);
   const [schemaError, setSchemaError] = useState('');
   const [initialized, setInitialized] = useState(false);
+
+  // Step via URL search param for browser history
+  const [searchParams, setSearchParams] = useSearchParams();
+  const step = parseInt(searchParams.get('step') || '0', 10);
+  const setStep = useCallback((s: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('step', String(s));
+      return next;
+    }, { replace: false });
+  }, [setSearchParams]);
 
   const invokeMutation = useInvokeWorkflow();
   const [invokeJson, setInvokeJson] = useState(DEFAULT_ENVELOPE);
@@ -151,7 +161,7 @@ export function WorkflowConfigDetailPage() {
 
   return (
     <div>
-      <PageHeader title={isNew ? 'New Workflow Config' : editing?.workflow_type ?? ''} />
+      <PageHeader title={isNew ? 'Register Workflow' : editing?.workflow_type ?? ''} />
 
       <div className={`grid gap-12 ${showInvokeSidebar ? 'grid-cols-1 lg:grid-cols-3' : ''}`}>
         {/* Wizard (left / full width) */}

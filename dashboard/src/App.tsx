@@ -6,6 +6,7 @@ import { ToastProvider } from './hooks/useToast';
 import { NatsProvider } from './hooks/useNats';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
+import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
 import { RequireRole } from './components/layout/RequireRole';
 
 // ---------------------------------------------------------------------------
@@ -155,6 +156,7 @@ window.addEventListener('auth:unauthorized', () => {
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/connect/anthropic', element: <ConnectAnthropicPage /> },
   {
     path: '/',
     element: <Shell />,

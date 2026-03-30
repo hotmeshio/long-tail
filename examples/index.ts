@@ -15,6 +15,7 @@ import type {
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { loggerRegistry } from '../services/logger';
 import { getUserByExternalId, createUser } from '../services/user';
+import { addUserRole, getUserRoles } from '../services/user/roles';
 import { addEscalationChain, createRole } from '../services/role';
 
 /**
@@ -59,6 +60,15 @@ const SEED_USERS = [
     password: 'l0ngt@1l',
     roles: [{ role: 'reviewer', type: 'member' as const }],
   },
+  {
+    external_id: 'mock:test-user-1',
+    display_name: 'Alice Test',
+    email: 'alice@test.local',
+    password: 'l0ngt@1l',
+    oauth_provider: 'mock',
+    oauth_provider_id: 'test-user-1',
+    roles: [{ role: 'superadmin', type: 'superadmin' as const }],
+  },
 ];
 
 const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
@@ -77,6 +87,17 @@ async function seedUsers(): Promise<void> {
     try {
       const existing = await getUserByExternalId(userDef.external_id);
       if (existing) {
+        // Ensure existing user has the expected roles
+        if (userDef.roles?.length) {
+          const currentRoles = await getUserRoles(existing.id);
+          for (const expected of userDef.roles) {
+            const has = currentRoles.some(r => r.role === expected.role && r.type === expected.type);
+            if (!has) {
+              await addUserRole(existing.id, expected.role, expected.type);
+              loggerRegistry.info(`[examples] added role ${expected.role} (${expected.type}) to ${userDef.external_id}`);
+            }
+          }
+        }
         loggerRegistry.info(`[examples] ${userDef.external_id} already exists, skipping`);
         continue;
       }

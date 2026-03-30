@@ -29,6 +29,12 @@ export function OAuthIcon({ provider, className = 'w-5 h-5' }: OAuthIconProps) {
           <path d="M12.5 12.5H21V21h-8.5z" fill="#FFB900"/>
         </svg>
       );
+    case 'anthropic':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.258 0h3.767L16.906 20.48h-3.674l-1.343-3.461H6.396l-1.34 3.461H1.5l5.07-16.96zm2.327 5.14l-2.065 5.326h4.108l-2.043-5.326z"/>
+        </svg>
+      );
     default:
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

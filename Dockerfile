@@ -14,6 +14,8 @@ COPY package*.json ./
 RUN npm ci
 # Install Playwright Chromium browser binary
 RUN npx playwright install chromium
+# Install Claude Code CLI for the claude-code MCP server
+RUN npm install -g @anthropic-ai/claude-code
 COPY . .
 
 FROM base AS development
@@ -45,6 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /app/package*.json ./
 RUN npm ci --only=production
 RUN npx playwright install chromium
+RUN npm install -g @anthropic-ai/claude-code
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/dashboard/dist ./dashboard/dist
 CMD ["node", "build/index.js"]

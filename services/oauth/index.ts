@@ -25,6 +25,15 @@ const ENV_PROVIDERS: Array<{ provider: string; idVar: string; secretVar: string 
 ];
 
 /**
+ * Credential-only providers that register unconditionally.
+ * These don't use real OAuth (no clientId/clientSecret needed) —
+ * they store user-provided API keys via a dashboard form.
+ */
+const CREDENTIAL_PROVIDERS: LTOAuthProviderConfig[] = [
+  { provider: 'anthropic', clientId: 'credential-flow', clientSecret: 'n/a', scopes: [] },
+];
+
+/**
  * Initialize the OAuth service.
  * Called from start.ts when auth.oauth is configured.
  * Also scans environment variables for provider credentials.
@@ -49,6 +58,13 @@ export function initializeOAuth(config?: LTOAuthStartConfig): void {
     const clientSecret = process.env[secretVar];
     if (clientId && clientSecret && !getProvider(provider)) {
       registerProvider({ provider, clientId, clientSecret, scopes: [] });
+    }
+  }
+
+  // Register built-in credential providers (API key paste flow, no real OAuth)
+  for (const cfg of CREDENTIAL_PROVIDERS) {
+    if (!getProvider(cfg.provider)) {
+      registerProvider(cfg);
     }
   }
 

@@ -10,6 +10,7 @@ export {
 } from './task';
 
 export {
+  ltClaimEscalation,
   ltCreateEscalation,
   ltResolveEscalation,
 } from './escalation';

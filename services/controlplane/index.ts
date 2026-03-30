@@ -21,7 +21,7 @@ const engines = new Map<string, HotMesh>();
  * The engine taps into the Postgres quorum channel for the given appId,
  * enabling rollCall and throttle without running any workflows.
  */
-async function getEngine(appId: string): Promise<HotMesh> {
+export async function getEngine(appId: string): Promise<HotMesh> {
   const cached = engines.get(appId);
   if (cached) return cached;
 

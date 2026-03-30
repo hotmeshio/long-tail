@@ -66,7 +66,7 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
           <textarea
             value={argsJson}
             onChange={(e) => setArgsJson(e.target.value)}
-            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
             rows={8}
             spellCheck={false}
           />

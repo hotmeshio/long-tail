@@ -2,6 +2,7 @@ import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../../../modules/config';
+import { JOB_EXPIRE_SECS } from '../../../modules/defaults';
 import { loggerRegistry } from '../../logger';
 
 /**
@@ -49,7 +50,7 @@ export async function ltStartWorkflow(input: {
     args: input.args,
     taskQueue: input.taskQueue,
     workflowId: input.workflowId,
-    expire: input.expire ?? 180,
+    expire: input.expire ?? JOB_EXPIRE_SECS,
   });
   loggerRegistry.info(
     `[ltStartWorkflow] started ${input.workflowName} (${input.workflowId})`,

@@ -5,6 +5,7 @@ import * as taskService from '../services/task';
 import * as userService from '../services/user';
 import * as roleService from '../services/role';
 import { escalationStrategyRegistry } from '../services/escalation-strategy';
+import { publishEscalationEvent } from '../services/events/publish';
 import { createClient, LT_TASK_QUEUE } from '../workers';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 
@@ -358,7 +359,7 @@ router.post('/bulk-triage', async (req, res) => {
       const triageEnvelope = {
         data: {
           escalationId: escalation.id,
-          originId: escalation.origin_id,
+          originId: escalation.origin_id ?? undefined,
           originalWorkflowType: escalation.workflow_type,
           originalTaskQueue: escalation.task_queue,
           originalTaskId: escalation.task_id,
@@ -652,6 +653,18 @@ router.post('/:id/resolve', async (req, res) => {
           _lt: { ...resolverPayload._lt, triaged: true, triageWorkflowId },
         });
 
+        publishEscalationEvent({
+          type: 'escalation.resolved',
+          source: 'api',
+          workflowId: escalation.workflow_id!,
+          workflowName: escalation.workflow_type!,
+          taskQueue: escalation.task_queue!,
+          taskId: escalation.task_id!,
+          escalationId: escalation.id,
+          originId: escalation.origin_id ?? undefined,
+          status: 'resolved',
+        });
+
         res.json({
           started: true,
           escalationId: escalation.id,
@@ -685,6 +698,18 @@ router.post('/:id/resolve', async (req, res) => {
       taskQueue: escalation.task_queue,
       workflowId: newWorkflowId,
       expire: 180,
+    });
+
+    publishEscalationEvent({
+      type: 'escalation.resolved',
+      source: 'api',
+      workflowId: escalation.workflow_id!,
+      workflowName: escalation.workflow_type!,
+      taskQueue: escalation.task_queue!,
+      taskId: escalation.task_id!,
+      escalationId: escalation.id,
+      originId: escalation.origin_id ?? undefined,
+      status: 'resolved',
     });
 
     res.json({ started: true, escalationId: escalation.id, workflowId: newWorkflowId });
