@@ -10,7 +10,7 @@ This guide walks through the full lifecycle.
 
 ## Submit a Dynamic Query
 
-Open the **Deterministic MCP** page and describe what you want in the prompt textarea. Press `Cmd+Enter` to submit.
+Open the **Discover & Compile** page and describe what you want in the prompt textarea. Press `Cmd+Enter` to submit.
 
 <details>
 <summary>Screenshot: prompt submission</summary>
@@ -32,7 +32,7 @@ The LLM selects which tools to use and in what order. Every tool call is checkpo
 
 ## The Dynamic Execution
 
-When the run completes, it appears in the queries list. Click into it to open the **Deterministic MCP Wizard**.
+When the run completes, it appears in the queries list. Click into it to open the **Compilation Wizard**.
 
 <details>
 <summary>Screenshot: completed query</summary>
@@ -145,7 +145,7 @@ In our test, the router matched with **0.98 confidence** — the request went di
 
 ## The Deployed Workflow
 
-The compiled workflow appears in the **Workflow Tools** registry.
+The compiled workflow appears in the **Compiled Pipelines** list.
 
 <details>
 <summary>Screenshot: workflow registry</summary>
