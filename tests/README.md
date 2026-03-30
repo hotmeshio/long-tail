@@ -29,13 +29,13 @@ npm run test:integration
 
 | Suite | Files | Tests | Duration |
 |-------|-------|-------|----------|
-| Frontend | 52 | 526 | ~4s |
+| Frontend | 51 | 510 | ~4s |
 | Backend fast | 40 | 560 | ~60s |
 | Backend workflows | 8 | 65 | ~3min |
 | **Backend total** | **48** | **625** | **~5min** |
 | Integration (Docker) | 2 | 15 | ~5min |
 | Functional (Docker) | — | — | varies |
-| **Grand total** | **102+** | **1,166+** | — |
+| **Grand total** | **102+** | **1,150+** | — |
 
 ## Test Categories
 

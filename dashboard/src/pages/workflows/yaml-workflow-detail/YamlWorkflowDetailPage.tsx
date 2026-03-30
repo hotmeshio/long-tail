@@ -240,11 +240,18 @@ export function YamlWorkflowDetailPage() {
               } />
               <Field label="Tool Calls" value={<span className="text-xs">{workerActivities.length}</span>} />
               {wf.source_workflow_id && (
-                <Field label="Compiled From Workflow" value={
-                  <Link to={`/workflows/executions/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
-                    {wf.source_workflow_id}
-                  </Link>
-                } />
+                <>
+                  <Field label="Compiled From Workflow" value={
+                    <Link to={`/workflows/executions/${wf.source_workflow_id}`} className="font-mono text-xs text-accent hover:underline">
+                      {wf.source_workflow_id}
+                    </Link>
+                  } />
+                  <Field label="" value={
+                    <Link to={`/mcp/queries/${wf.source_workflow_id}`} className="text-xs text-accent hover:underline">
+                      Open in Deterministic MCP Wizard
+                    </Link>
+                  } />
+                </>
               )}
               <Field label="Invocations" value={
                 <Link to={`/mcp/executions?entity=${encodeURIComponent(wf.graph_topic)}&namespace=${encodeURIComponent(wf.app_id)}`} className="text-xs text-accent hover:underline">

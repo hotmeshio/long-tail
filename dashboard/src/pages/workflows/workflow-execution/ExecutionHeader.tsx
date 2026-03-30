@@ -49,7 +49,7 @@ interface ExecutionHeaderProps {
   childTasks?: LTTaskRecord[];
   escalations?: LTEscalationRecord[];
   hasToolCalls?: boolean;
-  onAction?: (action: 'restart' | 'terminate' | 'convert_yaml') => void;
+  onAction?: (action: 'restart' | 'terminate') => void;
 }
 
 export function ExecutionHeader({ execution, task, escalations, hasToolCalls, onAction }: ExecutionHeaderProps) {
@@ -115,15 +115,13 @@ export function ExecutionHeader({ execution, task, escalations, hasToolCalls, on
                   </button>
                 )}
                 {hasToolCalls && (
-                  <button
-                    onClick={() => {
-                      onAction('convert_yaml');
-                      setActionsOpen(false);
-                    }}
+                  <Link
+                    to={`/mcp/queries/${execution.workflow_id}?step=3`}
                     className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
+                    onClick={() => setActionsOpen(false)}
                   >
-                    Export as Workflow Tool
-                  </button>
+                    Compile as Deterministic Workflow
+                  </Link>
                 )}
               </div>
             )}

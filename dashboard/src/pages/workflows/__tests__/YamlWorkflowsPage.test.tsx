@@ -91,10 +91,11 @@ describe('YamlWorkflowsPage', () => {
     expect(screen.getAllByText('claims-app').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows tool count per server', () => {
+  it('shows tool count badge per server', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText('2 tools')).toBeInTheDocument();
-    expect(screen.getByText('1 tool')).toBeInTheDocument();
+    // Count is shown as a number in a badge circle — may appear multiple times
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
   });
 
   it('expands server to show tool rows on click', () => {

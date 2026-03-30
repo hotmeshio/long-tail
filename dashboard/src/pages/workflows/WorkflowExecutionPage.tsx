@@ -1,15 +1,13 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useWorkflowExecution, useWorkflowState, useTerminateWorkflow } from '../../api/workflows';
 import { useWorkflowDetailEvents } from '../../hooks/useNatsEvents';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
-import { useCreateYamlWorkflow } from '../../api/yaml-workflows';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
-import { ConvertToYamlModal } from '../../components/common/modal/ConvertToYamlModal';
 
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
@@ -20,49 +18,23 @@ import { RestartPanel } from './workflow-execution/RestartPanel';
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   useWorkflowDetailEvents(workflowId);
-  const navigate = useNavigate();
   const { data: execution, isLoading, error } = useWorkflowExecution(workflowId!);
   const { data: stateData } = useWorkflowState(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
   const { data: childTasksData } = useChildTasks(workflowId!);
   const { data: escalationsData } = useEscalationsByWorkflowId(workflowId);
   const terminateMutation = useTerminateWorkflow();
-  const createYamlMutation = useCreateYamlWorkflow();
   const { isCollapsed, toggle } = useCollapsedSections('workflow-execution');
   const [restartOpen, setRestartOpen] = useState(false);
-  const [convertModalOpen, setConvertModalOpen] = useState(false);
 
-  const handleAction = (action: 'restart' | 'terminate' | 'convert_yaml') => {
+  const handleAction = (action: 'restart' | 'terminate') => {
     if (action === 'terminate') {
       if (confirm('Are you sure you want to terminate this workflow?')) {
         terminateMutation.mutate(workflowId!);
       }
     } else if (action === 'restart') {
       setRestartOpen(true);
-    } else if (action === 'convert_yaml') {
-      setConvertModalOpen(true);
     }
-  };
-
-  const handleConvertSubmit = (values: { name: string; app_id: string; subscribes: string; tags: string[] }) => {
-    if (!execution || !task) return;
-    createYamlMutation.mutate(
-      {
-        workflow_id: execution.workflow_id,
-        task_queue: task.task_queue!,
-        workflow_name: task.workflow_type,
-        name: values.name,
-        app_id: values.app_id,
-        subscribes: values.subscribes,
-        tags: values.tags,
-      },
-      {
-        onSuccess: (record) => {
-          setConvertModalOpen(false);
-          navigate(`/mcp/workflows/${record.id}`);
-        },
-      },
-    );
   };
 
   if (isLoading) {
@@ -115,8 +87,8 @@ export function WorkflowExecutionPage() {
         title="Workflow Execution"
         actions={
           hasToolCalls ? (
-            <button
-              onClick={() => handleAction('convert_yaml')}
+            <Link
+              to={`/mcp/queries/${workflowId}?step=3`}
               className="group flex items-center gap-2 text-left"
             >
               <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
@@ -126,9 +98,9 @@ export function WorkflowExecutionPage() {
               </span>
               <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
                 This execution used MCP tools.{' '}
-                <span className="text-accent group-hover:underline">Export as MCP Workflow Tool</span>
+                <span className="text-accent group-hover:underline">Compile as Deterministic Workflow</span>
               </span>
-            </button>
+            </Link>
           ) : undefined
         }
       />
@@ -149,21 +121,6 @@ export function WorkflowExecutionPage() {
           </p>
         </div>
       )}
-
-      {createYamlMutation.error && (
-        <div className="py-3 mb-6">
-          <p className="text-xs text-status-error">
-            Conversion failed: {createYamlMutation.error.message}
-          </p>
-        </div>
-      )}
-
-      <ConvertToYamlModal
-        open={convertModalOpen}
-        onClose={() => setConvertModalOpen(false)}
-        onSubmit={handleConvertSubmit}
-        isPending={createYamlMutation.isPending}
-      />
 
       <RestartPanel
         execution={execution}
