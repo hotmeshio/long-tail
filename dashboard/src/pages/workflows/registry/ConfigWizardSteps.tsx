@@ -24,7 +24,7 @@ export function BasicsStep({ form, set, editing }: BasicsStepProps) {
           className="input font-mono text-xs w-full"
         />
         <p className={hintCls}>
-          Unique identifier for this workflow. Must match the function name registered with the worker.
+          Unique identifier — must match the function name registered with the worker.
         </p>
       </div>
 
@@ -39,60 +39,17 @@ export function BasicsStep({ form, set, editing }: BasicsStepProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>Task Queue</label>
-          <input
-            type="text"
-            value={form.task_queue}
-            onChange={(e) => set('task_queue', e.target.value)}
-            placeholder="lt-review"
-            className="input font-mono text-xs w-full"
-          />
-          <p className={hintCls}>
-            Durable task queue this workflow listens on
-          </p>
-        </div>
-        <div>
-          <label className={labelCls}>Default Role</label>
-          <input
-            type="text"
-            value={form.default_role}
-            onChange={(e) => set('default_role', e.target.value)}
-            placeholder="reviewer"
-            className="input text-xs w-full"
-          />
-          <p className={hintCls}>
-            Escalations route to users with this role
-          </p>
-        </div>
-      </div>
-
       <div>
-        <label className={labelCls}>Default Modality</label>
+        <label className={labelCls}>Task Queue</label>
         <input
           type="text"
-          value={form.default_modality}
-          onChange={(e) => set('default_modality', e.target.value)}
-          placeholder="portal"
-          className="input text-xs w-full"
-        />
-        <p className={hintCls}>
-          How escalations are delivered: <span className="font-mono">portal</span>, <span className="font-mono">email</span>, or <span className="font-mono">sms</span>
-        </p>
-      </div>
-
-      <div>
-        <label className={labelCls}>Cron Schedule</label>
-        <input
-          type="text"
-          value={form.cron_schedule}
-          onChange={(e) => set('cron_schedule', e.target.value)}
-          placeholder="0 */6 * * *"
+          value={form.task_queue}
+          onChange={(e) => set('task_queue', e.target.value)}
+          placeholder="lt-review"
           className="input font-mono text-xs w-full"
         />
         <p className={hintCls}>
-          Optional cron expression for scheduled execution
+          Durable task queue this workflow listens on
         </p>
       </div>
 
@@ -108,7 +65,8 @@ export function BasicsStep({ form, set, editing }: BasicsStepProps) {
         </label>
       </div>
       <p className={hintCls}>
-        <span className="font-medium text-text-secondary">Invocable</span> = can be started from the dashboard or API.
+        Allow this workflow to be started from the dashboard or API.
+        When enabled, you can configure who can invoke it and provide an input template.
       </p>
     </div>
   );
@@ -118,11 +76,40 @@ export function AccessStep({ form, set }: StepProps) {
   return (
     <div className="space-y-5">
       <p className="text-xs text-text-secondary leading-relaxed">
-        Control which roles can interact with this workflow and its escalations.
+        Configure how escalations are routed and who can interact with this workflow.
       </p>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Default Escalation Role</label>
+          <input
+            type="text"
+            value={form.default_role}
+            onChange={(e) => set('default_role', e.target.value)}
+            placeholder="reviewer"
+            className="input text-xs w-full"
+          />
+          <p className={hintCls}>
+            When this workflow escalates, assign to users with this role
+          </p>
+        </div>
+        <div>
+          <label className={labelCls}>Delivery Modality</label>
+          <input
+            type="text"
+            value={form.default_modality}
+            onChange={(e) => set('default_modality', e.target.value)}
+            placeholder="portal"
+            className="input text-xs w-full"
+          />
+          <p className={hintCls}>
+            How escalations are delivered: <span className="font-mono">portal</span>, <span className="font-mono">email</span>, or <span className="font-mono">sms</span>
+          </p>
+        </div>
+      </div>
+
       <div>
-        <label className={labelCls}>Roles</label>
+        <label className={labelCls}>Escalation Roles</label>
         <input
           type="text"
           value={form.roles}
@@ -135,20 +122,28 @@ export function AccessStep({ form, set }: StepProps) {
         </p>
       </div>
 
-      <div>
-        <label className={labelCls}>Invocation Roles</label>
-        <input
-          type="text"
-          value={form.invocation_roles}
-          onChange={(e) => set('invocation_roles', e.target.value)}
-          placeholder="engineer, admin"
-          className="input text-xs w-full"
-        />
-        <p className={hintCls}>
-          Comma-separated. Only users with these roles can start this workflow from the dashboard.
-          Leave empty to allow all authenticated users.
-        </p>
-      </div>
+      {form.invocable ? (
+        <div>
+          <label className={labelCls}>Invocation Roles</label>
+          <input
+            type="text"
+            value={form.invocation_roles}
+            onChange={(e) => set('invocation_roles', e.target.value)}
+            placeholder="engineer, admin"
+            className="input text-xs w-full"
+          />
+          <p className={hintCls}>
+            Comma-separated. Only users with these roles can start this workflow.
+            Leave empty to allow all authenticated users.
+          </p>
+        </div>
+      ) : (
+        <div className="py-3 px-4 bg-surface-sunken/50 rounded-md">
+          <p className="text-[10px] text-text-tertiary">
+            Enable <span className="font-medium text-text-secondary">Invocable</span> in the Identity step to configure who can start this workflow.
+          </p>
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Consumes</label>
@@ -187,7 +182,7 @@ export function SchemasStep({ form, set }: StepProps) {
             spellCheck={false}
           />
           <p className={hintCls}>
-            Pre-fills the JSON editor on the <span className="font-medium text-text-secondary">Start Workflow</span> page.
+            Pre-fills the JSON editor when invoking this workflow.
             Should include <span className="font-mono">data</span> (workflow input) and optional <span className="font-mono">metadata</span> (context).
           </p>
           {form.envelope_schema.trim() && !jsonValid(form.envelope_schema) && (
@@ -200,7 +195,7 @@ export function SchemasStep({ form, set }: StepProps) {
             Envelope schema is only available for invocable workflows.
           </p>
           <p className="text-[10px] text-text-tertiary mt-1">
-            Enable <span className="font-medium">Invocable</span> on the Basics step to configure this.
+            Enable <span className="font-medium">Invocable</span> in the Identity step to configure this.
           </p>
         </div>
       )}
@@ -216,8 +211,8 @@ export function SchemasStep({ form, set }: StepProps) {
           spellCheck={false}
         />
         <p className={hintCls}>
-          Pre-fills the JSON editor when an operator resolves an escalation from this workflow.
-          Should match the shape your workflow expects in the resolver callback.
+          The shape of data a human or AI provides when resolving an escalation from this workflow.
+          Pre-fills the JSON editor in the escalation resolution form.
         </p>
         {form.resolver_schema.trim() && !jsonValid(form.resolver_schema) && (
           <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>

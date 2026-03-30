@@ -132,9 +132,14 @@ export function EscalationDetailPage() {
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
-    await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
-    addToast('Escalation resolved', 'success');
-    navigate(returnPath);
+    const result = await resolve.mutateAsync({ id: esc.id, resolverPayload: payload }) as any;
+    if (result?.triage && result?.workflowId) {
+      addToast('AI triage started', 'success');
+      navigate(`/workflows/executions/${result.workflowId}`);
+    } else {
+      addToast('Escalation resolved', 'success');
+      navigate(returnPath);
+    }
   };
 
   const handleEscalate = async (targetRole: string) => {
@@ -149,12 +154,17 @@ export function EscalationDetailPage() {
       await claim.mutateAsync({ id: esc.id, durationMinutes: 30 });
     }
     const diagnosis = (payloadObj?.diagnosis as string) || esc.description || '';
-    await resolve.mutateAsync({
+    const result = await resolve.mutateAsync({
       id: esc.id,
       resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
-    });
-    addToast('Sent to AI triage', 'success');
-    navigate(returnPath);
+    }) as any;
+    if (result?.triage && result?.workflowId) {
+      addToast('AI triage started', 'success');
+      navigate(`/workflows/executions/${result.workflowId}`);
+    } else {
+      addToast('Sent to AI triage', 'success');
+      navigate(returnPath);
+    }
   };
 
   const handleRelease = async () => {

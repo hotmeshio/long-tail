@@ -152,7 +152,7 @@ export function WorkflowConfigsPage() {
   return (
     <div>
       <PageHeader
-        title="Registry"
+        title="Registered Workflows"
         actions={
           <button
             onClick={() => navigate('/workflows/registry/new')}
