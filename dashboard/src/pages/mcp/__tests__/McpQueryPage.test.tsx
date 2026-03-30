@@ -52,7 +52,7 @@ beforeEach(() => {
 describe('McpQueryPage', () => {
   it('renders page header', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Deterministic MCP')).toBeInTheDocument();
+    expect(screen.getByText('Discover & Compile')).toBeInTheDocument();
   });
 
   it('renders submit form with textarea and button', () => {
@@ -92,7 +92,7 @@ describe('McpQueryPage', () => {
     render(<McpQueryPage />, { wrapper });
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox).toBeChecked();
-    expect(screen.getByText('Force dynamic')).toBeInTheDocument();
+    expect(screen.getByText('Force discovery')).toBeInTheDocument();
   });
 
   it('shows empty state when no jobs', () => {

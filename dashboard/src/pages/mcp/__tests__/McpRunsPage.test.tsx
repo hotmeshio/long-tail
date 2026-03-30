@@ -69,7 +69,7 @@ function findFilterSelect(labelText: string): HTMLSelectElement | null {
 describe('McpRunsPage', () => {
   it('renders page header', () => {
     render(<McpRunsPage />, { wrapper });
-    expect(screen.getByText('Executions')).toBeInTheDocument();
+    expect(screen.getByText('Pipeline Runs')).toBeInTheDocument();
   });
 
   it('renders job rows with entity', () => {

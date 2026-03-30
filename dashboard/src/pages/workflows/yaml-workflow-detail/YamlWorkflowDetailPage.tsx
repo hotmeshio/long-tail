@@ -228,8 +228,8 @@ export function YamlWorkflowDetailPage() {
             {wf.description && <p className="text-xs text-text-secondary mb-4">{wf.description}</p>}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-8">
-              <Field label="MCP Workflow Server" value={<span className="font-mono text-xs">{wf.app_id}</span>} />
-              <Field label="MCP Workflow Tool" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
+              <Field label="Tool Server" value={<span className="font-mono text-xs">{wf.app_id}</span>} />
+              <Field label="Pipeline Tool" value={<span className="font-mono text-xs">{wf.graph_topic}</span>} />
               <Field label="Version" value={
                 <span className="font-mono text-xs">
                   {wf.app_version}
@@ -248,7 +248,7 @@ export function YamlWorkflowDetailPage() {
                   } />
                   <Field label="" value={
                     <Link to={`/mcp/queries/${wf.source_workflow_id}`} className="text-xs text-accent hover:underline">
-                      Open in Deterministic MCP Wizard
+                      Open in Compilation Wizard
                     </Link>
                   } />
                 </>

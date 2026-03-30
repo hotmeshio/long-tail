@@ -120,7 +120,7 @@ export function ExecutionHeader({ execution, task, escalations, hasToolCalls, on
                     className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
                     onClick={() => setActionsOpen(false)}
                   >
-                    Compile as Deterministic Workflow
+                    Compile into Pipeline
                   </Link>
                 )}
               </div>

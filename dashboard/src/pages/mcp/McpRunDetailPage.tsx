@@ -65,7 +65,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Run" />
+        <PageHeader title="Pipeline Run" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -95,7 +95,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Run" />
+      <PageHeader title="Pipeline Run" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
@@ -108,11 +108,11 @@ export function McpRunDetailPage() {
         {/* Row 1: Namespace, Topic, Duration, Started, Completed */}
         <div className="grid grid-cols-5 gap-x-6">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">MCP Workflow Server</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Tool Server</p>
             <p className="text-xs font-mono text-text-primary truncate">{namespace}</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">MCP Workflow Tool</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Pipeline Tool</p>
             {sourceWorkflow ? (
               <Link to={`/mcp/workflows/${sourceWorkflow.id}`} className="text-xs font-mono text-accent hover:underline truncate block">
                 {execution.workflow_type}

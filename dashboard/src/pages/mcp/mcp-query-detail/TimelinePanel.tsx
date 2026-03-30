@@ -11,7 +11,7 @@ interface TimelinePanelProps {
 export function TimelinePanel({ events, onBack, onNext }: TimelinePanelProps) {
   return (
     <div>
-      <PanelTitle title="MCP Execution Timeline" subtitle="Activity swimlane showing tool calls and their durations" />
+      <PanelTitle title="Execution Timeline" subtitle="Activity swimlane showing tool calls and their durations" />
       <SwimlaneTimeline events={events} />
       <WizardNav>
         <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>

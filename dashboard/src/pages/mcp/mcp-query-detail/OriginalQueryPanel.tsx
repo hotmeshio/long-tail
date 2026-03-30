@@ -24,7 +24,7 @@ export function OriginalQueryPanel({
 }: OriginalQueryPanelProps) {
   return (
     <div>
-      <PanelTitle title="Original MCP Query" subtitle="Dynamic LLM-orchestrated execution with MCP tools" />
+      <PanelTitle title="Original Query" subtitle="Dynamic LLM-orchestrated execution — the discovery run" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Input */}

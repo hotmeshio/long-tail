@@ -81,7 +81,7 @@ beforeEach(() => {
 describe('McpServersPage', () => {
   it('renders page header', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('Server Tools')).toBeInTheDocument();
+    expect(screen.getByText('Tool Servers')).toBeInTheDocument();
   });
 
   it('renders tagline', () => {
@@ -143,7 +143,7 @@ describe('McpServersPage', () => {
       isLoading: false,
     } as any);
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('No MCP servers found')).toBeInTheDocument();
+    expect(screen.getByText('No tool servers found')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {

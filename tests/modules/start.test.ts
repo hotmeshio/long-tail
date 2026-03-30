@@ -219,7 +219,7 @@ describe('start() declarative API', () => {
       });
 
       expect(maintenanceRegistry.hasConfig).toBe(true);
-      expect(maintenanceRegistry.config?.schedule).toBe('0 2 * * *');
+      expect(maintenanceRegistry.config?.schedule).toBe('0 2 * * 0');
       expect(maintenanceRegistry.config?.rules.length).toBeGreaterThanOrEqual(4);
 
       await lt.shutdown();
@@ -236,7 +236,7 @@ describe('start() declarative API', () => {
       });
 
       expect(maintenanceRegistry.hasConfig).toBe(true);
-      expect(maintenanceRegistry.config?.schedule).toBe('0 2 * * *');
+      expect(maintenanceRegistry.config?.schedule).toBe('0 2 * * 0');
 
       await lt.shutdown();
       clearRegistries();

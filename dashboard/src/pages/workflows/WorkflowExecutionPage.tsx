@@ -98,7 +98,7 @@ export function WorkflowExecutionPage() {
               </span>
               <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
                 This execution used MCP tools.{' '}
-                <span className="text-accent group-hover:underline">Compile as Deterministic Workflow</span>
+                <span className="text-accent group-hover:underline">Compile into Pipeline</span>
               </span>
             </Link>
           ) : undefined

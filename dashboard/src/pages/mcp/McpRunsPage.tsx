@@ -132,7 +132,7 @@ export function McpRunsPage() {
 
   return (
     <div>
-      <PageHeader title="Executions" />
+      <PageHeader title="Pipeline Runs" />
 
       <FilterBar>
         <FilterSelect

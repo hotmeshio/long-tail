@@ -230,7 +230,7 @@ export function McpQueryDetailPage() {
   return (
     <div className="flex flex-col min-h-[calc(100vh-12rem)]">
       <PageHeader
-        title="Deterministic MCP Wizard"
+        title="Compilation Wizard"
         actions={
           <button onClick={() => navigate('/mcp/queries')} className="text-sm text-text-secondary hover:text-text-primary">
             Back to list

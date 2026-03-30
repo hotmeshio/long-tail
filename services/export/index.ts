@@ -12,7 +12,6 @@ import type {
 } from '../../types';
 
 import { getHandle } from './client';
-import { enrichEventInputs } from './enrichment';
 import { postProcessExecution } from './post-process';
 
 /** Error thrown when a workflow job is not found (expired or never existed). */
@@ -88,7 +87,6 @@ export async function exportWorkflowExecution(
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
     const execution = await handle.exportExecution({ ...options, enrich_inputs: true });
-    await enrichEventInputs(execution);
     return postProcessExecution(execution);
   } catch (err: any) {
     if (err instanceof WorkflowNotFoundError) throw err;

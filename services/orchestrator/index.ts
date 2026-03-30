@@ -2,6 +2,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from '../interceptor/activities';
 import { getOrchestratorContext } from '../interceptor/context';
+import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import type { LTEnvelope } from '../../types';
 import type { ExecuteLTOptions } from './types';
 
@@ -126,7 +127,7 @@ export async function executeLT<T = any>(
     args,
     taskQueue,
     workflowId: childWorkflowId,
-    expire: expire || 86_400,
+    expire: expire || JOB_EXPIRE_SECS,
     entity: workflowName,
   });
 

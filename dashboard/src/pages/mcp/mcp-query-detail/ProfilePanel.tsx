@@ -20,7 +20,7 @@ interface ExistingProfileViewProps {
 function ExistingProfileView({ compiledYaml, onBack, onNext }: ExistingProfileViewProps) {
   return (
     <div>
-      <PanelTitle title="Deterministic Workflow Profile" subtitle="Configuration and pipeline for the compiled MCP workflow tool" />
+      <PanelTitle title="Pipeline Profile" subtitle="Configure the compiled tool — name, tags, input schema, and deployment target" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
         {/* Left: identity + description */}

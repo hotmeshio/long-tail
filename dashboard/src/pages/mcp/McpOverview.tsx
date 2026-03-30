@@ -152,7 +152,7 @@ export function McpOverview() {
 
   return (
     <div>
-      <PageHeader title="MCP Tools" />
+      <PageHeader title="Discovery" />
 
       {/* ── Duration tabs + namespace ────────────────────────── */}
       <div className="flex items-center gap-4 mb-6">
@@ -253,7 +253,7 @@ export function McpOverview() {
         >
           <div className="flex items-center gap-3 mb-3">
             <Server size={16} className="text-accent shrink-0" />
-            <span className="text-sm font-medium text-text-primary">Server Tools</span>
+            <span className="text-sm font-medium text-text-primary">Tool Servers</span>
           </div>
           <p className="text-2xl font-light tabular-nums text-text-primary mb-1">
             {serversLoading ? '—' : servers.length}
@@ -272,7 +272,7 @@ export function McpOverview() {
         >
           <div className="flex items-center gap-3 mb-3">
             <Workflow size={16} className="text-purple-400 shrink-0" />
-            <span className="text-sm font-medium text-text-primary">Workflow Tools</span>
+            <span className="text-sm font-medium text-text-primary">Compiled Pipelines</span>
           </div>
           <p className="text-2xl font-light tabular-nums text-text-primary mb-1">
             {yamlLoading ? '—' : yamlWorkflows.length}
@@ -281,7 +281,7 @@ export function McpOverview() {
             </span>
           </p>
           <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
-            Compiled from triage runs. Deterministic tool-to-tool pipelines — no LLM, no token costs.
+            Compiled from discovery runs. Deterministic tool-to-tool pipelines — no LLM, no token costs.
           </p>
         </button>
       </div>

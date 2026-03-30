@@ -4,7 +4,7 @@ import { ChevronRight, Play } from 'lucide-react';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
-import { TimeAgo } from '../../components/common/display/TimeAgo';
+
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
@@ -76,10 +76,6 @@ function ServerRow({
               <ChevronRight size={14} />
             </span>
             <p className="text-sm text-text-primary font-medium font-mono">{server.appId}</p>
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-accent/30 text-[10px] font-medium text-accent">
-              {server.toolCount}
-            </span>
-            <span className="text-[9px] text-text-quaternary/60"><TimeAgo date={server.updatedAt} /></span>
           </div>
         </td>
 
@@ -88,8 +84,12 @@ function ServerRow({
           <StatusBadge status={server.status} />
         </td>
 
-        {/* Try — empty for server */}
-        <td className="w-12" />
+        {/* Tool count badge — aligned with child row hover icons */}
+        <td className="w-12 text-center">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-accent/30 text-[10px] font-medium text-accent">
+            {server.toolCount}
+          </span>
+        </td>
       </tr>
 
       {/* Expanded tool rows — no sub-header, aligned to outer columns */}
@@ -160,7 +160,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Workflow Tools" />
+        <PageHeader title="Compiled Pipelines" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -174,7 +174,7 @@ export function YamlWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="Workflow Tools" />
+      <PageHeader title="Compiled Pipelines" />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         Compiled from successful triage runs. Each workflow is a deterministic tool.

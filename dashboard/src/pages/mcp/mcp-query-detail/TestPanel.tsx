@@ -159,7 +159,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
         </div>
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Deterministic Run</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Compiled Pipeline Run</p>
             {jobs.length > 0 && selectedRunId && (
               <select
                 value={selectedRunId}
@@ -238,7 +238,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
       <Modal
         open={showInvokeModal}
         onClose={() => { if (!activeJobId) { setShowInvokeModal(false); } }}
-        title={activeJobId ? 'Executing...' : 'Test Deterministic Workflow'}
+        title={activeJobId ? 'Executing...' : 'Test Compiled Pipeline'}
         maxWidth="max-w-lg"
       >
         {activeJobId ? (

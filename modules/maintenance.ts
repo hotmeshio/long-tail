@@ -3,39 +3,43 @@ import type { LTMaintenanceConfig } from '../types/maintenance';
 /**
  * Default maintenance rules.
  *
- * Schedule: nightly at 2 AM.
+ * Schedule: weekly on Sundays at 2 AM.
  *
  * Rules (executed sequentially):
- * 1. Delete stream messages older than 7 days
- * 2. Delete transient jobs (entity IS NULL) older than 7 days
- * 3. Strip execution artifacts from entity jobs older than 7 days
+ * 1. Delete stream messages older than 30 days
+ * 2. Delete transient jobs (entity IS NULL) older than 30 days
+ * 3. Strip execution artifacts from entity jobs older than 30 days
  *    (preserves jdata, udata, jmark, hmark — exports always work)
- * 4. Hard-delete all expired jobs older than 90 days
+ * 4. Hard-delete pruned jobs older than 180 days
+ *
+ * Conservative defaults — execution artifacts (activity inputs, stream
+ * history) are needed for rich export data. Pruning too early strips
+ * inputs from the execution timeline.
  */
 export const defaultMaintenanceConfig: LTMaintenanceConfig = {
-  schedule: '0 2 * * *',
+  schedule: '0 2 * * 0',
   rules: [
     {
       target: 'streams',
       action: 'delete',
-      olderThan: '7 days',
+      olderThan: '30 days',
     },
     {
       target: 'jobs',
       action: 'delete',
-      olderThan: '7 days',
+      olderThan: '30 days',
       hasEntity: false,
     },
     {
       target: 'jobs',
       action: 'prune',
-      olderThan: '7 days',
+      olderThan: '30 days',
       hasEntity: true,
     },
     {
       target: 'jobs',
       action: 'delete',
-      olderThan: '90 days',
+      olderThan: '180 days',
       pruned: true,
     },
   ],

@@ -5,7 +5,7 @@ import {
   useDisconnectMcpServer,
 } from '../../../api/mcp';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
-import { TimeAgo } from '../../../components/common/display/TimeAgo';
+
 import type { McpServerRecord, McpToolManifest } from '../../../api/types';
 import { isBuiltIn } from './helpers';
 
@@ -49,10 +49,6 @@ export function ServerRow({
               <ChevronRight size={14} />
             </span>
             <p className="text-sm text-text-primary font-medium">{server.name}</p>
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-accent/30 text-[10px] font-medium text-accent">
-              {allTools.length}
-            </span>
-            <span className="text-[9px] text-text-quaternary/60"><TimeAgo date={server.updated_at} /></span>
           </div>
         </td>
 
@@ -93,12 +89,19 @@ export function ServerRow({
             </RowActionGroup>
           )}
         </td>
+
+        {/* Tool count badge — aligned with child row hover icons */}
+        <td className="w-12 text-center">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-accent/30 text-[10px] font-medium text-accent">
+            {allTools.length}
+          </span>
+        </td>
       </tr>
 
       {/* Expanded tool rows — description below name, aligned to outer columns */}
       {visibleTools.length > 0 && (
         <tr>
-          <td colSpan={3} className="p-0 border-0">
+          <td colSpan={4} className="p-0 border-0">
             <div
               className="grid transition-[grid-template-rows] duration-200 ease-in-out"
               style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}

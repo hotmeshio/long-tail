@@ -79,7 +79,7 @@ describe('McpQueryDetailPage', () => {
     vi.mocked(useMcpQueryResult).mockReturnValue({ data: undefined } as any);
 
     render(<McpQueryDetailPage />, { wrapper });
-    expect(screen.getByText('Deterministic MCP Wizard')).toBeInTheDocument();
+    expect(screen.getByText('Compilation Wizard')).toBeInTheDocument();
     // All 5 wizard step labels
     expect(screen.getByText('Original')).toBeInTheDocument();
     expect(screen.getByText('Timeline')).toBeInTheDocument();
