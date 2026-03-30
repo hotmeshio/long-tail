@@ -22,7 +22,7 @@ export async function deploy(): Promise<void> {
  * - `jobs` — hard-delete expired job rows older than `expire`
  * - `streams` — hard-delete expired stream messages (engine + worker) older than `expire`
  * - `attributes` — strip execution artifacts from completed jobs
- *   (preserves jdata, udata, jmark for Temporal export)
+ *   (preserves jdata, udata, jmark for execution export)
  * - `entities` — allowlist: only prune these entity types
  * - `pruneTransient` — also delete jobs where entity IS NULL
  * - `keepHmark` — preserve hmark rows during stripping

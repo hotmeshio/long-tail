@@ -6,13 +6,13 @@
 # Frontend tests (fast — ~4s, 52 files, 526 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~35s, 28 files, 445 tests)
+# Backend: fast unit/integration tests only (~60s, 40 files, 533 tests)
 npx vitest run --exclude 'tests/workflows/**'
 
 # Backend: workflow tests only (~3min, 8 files, 65 tests)
 npx vitest run tests/workflows
 
-# Backend: all tests (~4-5min, 36 files, 510 tests)
+# Backend: all tests (~5min, 48 files, 598 tests)
 npx vitest run
 
 # Integration tests (requires Docker — mcpQuery + mcpTriage lifecycle)
@@ -30,12 +30,12 @@ npm run test:integration
 | Suite | Files | Tests | Duration |
 |-------|-------|-------|----------|
 | Frontend | 52 | 526 | ~4s |
-| Backend fast | 28 | 445 | ~35s |
+| Backend fast | 40 | 560 | ~60s |
 | Backend workflows | 8 | 65 | ~3min |
-| **Backend total** | **36** | **510** | **~4-5min** |
+| **Backend total** | **48** | **625** | **~5min** |
 | Integration (Docker) | 2 | 15 | ~5min |
 | Functional (Docker) | — | — | varies |
-| **Grand total** | **90+** | **1,051+** | — |
+| **Grand total** | **102+** | **1,166+** | — |
 
 ## Test Categories
 
@@ -45,10 +45,10 @@ npm run test:integration
 - Environment: jsdom, no external dependencies
 - Always run these first — they're instant and catch most regressions
 
-### Backend Fast (`tests/*.test.ts` — root level)
-- **28 files, 445 tests, ~35 seconds**
+### Backend Fast (`tests/{modules,services,routes}/**/*.test.ts`)
+- **40 files, 560 tests, ~60 seconds**
 - **Recommended for iterative development** — run after every code change
-- Auth, config, routes, DB server, MCP client, events, users, escalations, control plane, pattern detection, input analysis, YAML workflow pipeline, OAuth (crypto, state, providers, initialization, routes)
+- Organized by layer: `tests/modules/` (auth, config, start), `tests/services/` (escalations, events, MCP, OAuth, YAML workflow, etc.), `tests/routes/` (13 files mirroring routes/)
 - Requires: PostgreSQL (`longtail_test` database)
 - Sequential execution (`fileParallelism: false`)
 
@@ -76,7 +76,7 @@ npm run test:integration
 |------|-------|---------------|
 | `yaml-workflow-utils.test.ts` | 21 | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction |
 | `escalations.test.ts` | 55 | Create, claim, filter, stats, bulk operations |
-| `routes.test.ts` | 53 | HTTP API endpoints (auth, tasks, escalations, workflows, MCP) |
+| `routes/*.test.ts` | 158 | HTTP API routes (13 files mirroring routes/ — see tests/routes/) |
 | `pattern-detector.test.ts` | 47 | Iteration pattern detection, array source matching |
 | `input-analyzer.test.ts` | 37 | Input classification (dynamic/fixed/wired), schema enrichment |
 | `auth.test.ts` | 23 | JWT, middleware, role-based access |

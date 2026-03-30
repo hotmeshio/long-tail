@@ -1,6 +1,6 @@
 # Exports API
 
-Export endpoints expose workflow state and execution history. The execution history endpoint produces Temporal-compatible typed events — useful for debugging, auditing, and migrating data. All endpoints require authentication.
+Export endpoints expose workflow state and execution history. The execution history endpoint produces structured, typed events — useful for debugging, auditing, and migrating data. All endpoints require authentication.
 
 Every endpoint resolves the workflow automatically from the `workflowId` — no additional parameters needed.
 
@@ -42,7 +42,7 @@ GET /api/workflow-states/reviewContent-a1b2c3d4?allow=data,status
 GET /api/workflow-states/:workflowId/execution
 ```
 
-Exports the workflow's execution history in a Temporal-compatible format. Events are typed (`workflow_execution_started`, `activity_task_scheduled`, `activity_task_completed`, etc.) with ISO timestamps, durations, and cross-references.
+Exports the workflow's execution history as structured, typed events (`workflow_execution_started`, `activity_task_scheduled`, `activity_task_completed`, etc.) with ISO timestamps, durations, and cross-references.
 
 **Query parameters:**
 

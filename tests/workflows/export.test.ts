@@ -28,7 +28,7 @@ const EXAMPLES = process.env.EXAMPLES === 'true';
 // A workflow runs, completes, and we export its internal state in two formats:
 //
 //   1. Raw HotMesh export — the low-level state, timeline, and transitions
-//   2. Execution event history — a Temporal-compatible event stream with
+//   2. Execution event history — a structured event stream with
 //      typed events, durations, cross-references, and system/user classification
 //
 // The tests progress from simple exports through filtering, escalation,
@@ -322,7 +322,7 @@ describe('workflow export', () => {
 
   // ── 5. Execution event history ─────────────────────────────────────────
   //
-  // The Temporal-compatible execution export translates HotMesh's internal
+  // The structured execution export translates HotMesh's internal
   // state into a typed event stream. Each event has an ISO timestamp,
   // duration, category, and system/user classification.
 

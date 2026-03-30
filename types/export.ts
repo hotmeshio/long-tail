@@ -5,7 +5,7 @@
  * naming so consumers never couple directly to the engine layer.
  *
  * Execution types are re-exported directly from HotMesh's native
- * Temporal-compatible format (added in 0.10.2).
+ * structured execution event format (added in 0.10.2).
  */
 
 // ── Re-export HotMesh native execution types ────────────────────────────────

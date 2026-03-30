@@ -73,7 +73,7 @@ export async function getWorkflowStatus(
 }
 
 /**
- * Export workflow state as a Temporal-compatible execution event history.
+ * Export workflow state as a structured execution event history.
  *
  * Delegates to HotMesh's native `handle.exportExecution()` which produces
  * typed events with ISO timestamps, durations, event cross-references,

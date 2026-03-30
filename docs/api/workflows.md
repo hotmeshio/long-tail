@@ -257,7 +257,7 @@ Returns the result if the workflow is complete, or `202` if it's still running. 
 
 ## Execution History Export
 
-Every workflow's full execution history is exportable in JSON. Two formats are available: a raw state export (HotMesh-native) and a Temporal-compatible execution event history with typed events, ISO timestamps, durations, and cross-references.
+Every workflow's full execution history is exportable in JSON. Two formats are available: a raw state export (HotMesh-native) and a structured execution event history with typed events, ISO timestamps, durations, and cross-references.
 
 Because workflows are durably executed — state is transactionally checkpointed to Postgres after every step — the export is a complete, faithful record of everything that happened. Every activity scheduled, every result returned, every signal received, every child workflow spawned. Nothing is reconstructed or approximated.
 
@@ -309,13 +309,13 @@ GET /api/workflow-states/reviewContent-a1b2c3d4?allow=data,status
 }
 ```
 
-### Temporal-compatible execution history
+### Structured execution history
 
 ```
 GET /api/workflow-states/:workflowId/execution
 ```
 
-Exports the workflow's execution as a sequence of typed events in a format compatible with Temporal's event history model. Each event has a `eventType`, an ISO timestamp, and typed attributes. Activity events include durations and cross-reference the scheduling event via `scheduledEventId`. The response ends with a `summary` that captures total event count, wall-clock duration, and final status.
+Exports the workflow's execution as a sequence of typed events. Each event has an `eventType`, an ISO timestamp, and typed attributes. Activity events include durations and cross-reference the scheduling event via `scheduledEventId`. The response ends with a `summary` that captures total event count, wall-clock duration, and final status.
 
 This is the primary export format for auditing, debugging, and building dashboards over durable workflow executions.
 
@@ -460,7 +460,7 @@ const handle = await client.workflow.getHandle(
   workflowId,
 );
 
-// Temporal-compatible execution history
+// Structured execution history
 const execution = await handle.exportExecution({
   exclude_system: true,
 });
@@ -555,6 +555,6 @@ Interrupt a running workflow. The workflow is immediately terminated.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/:workflowId` | any | Raw state export with facet filtering |
-| `GET` | `/:workflowId/execution` | any | Temporal-compatible execution history |
+| `GET` | `/:workflowId/execution` | any | Structured execution history |
 | `GET` | `/:workflowId/status` | any | Status semaphore |
 | `GET` | `/:workflowId/state` | any | Current workflow state snapshot |
