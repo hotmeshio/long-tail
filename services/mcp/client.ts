@@ -5,6 +5,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../logger';
 import { MCP_TOOL_TIMEOUT_MS } from '../../modules/defaults';
+import { getToolContext } from '../iam/context';
 import * as mcpDbService from './db';
 import type { LTMcpServerRecord, LTMcpToolManifest } from '../../types';
 
@@ -225,6 +226,19 @@ async function resolveClient(serverId: string): Promise<Client | null> {
 }
 
 /**
+ * Derive auth context from the ambient ToolContext (AsyncLocalStorage).
+ * Returns undefined when no ToolContext is active (e.g., direct CLI calls).
+ */
+function deriveAuthFromToolContext(): { userId?: string; delegationToken?: string } | undefined {
+  const ctx = getToolContext();
+  if (!ctx?.principal.id) return undefined;
+  return {
+    userId: ctx.principal.id,
+    delegationToken: ctx.credentials.delegationToken,
+  };
+}
+
+/**
  * Call a tool on a connected server.
  * Resolves the server by ID or name, auto-connecting built-in servers.
  */
@@ -238,10 +252,20 @@ export async function callServerTool(
   if (!client) {
     throw new Error(`MCP server ${serverId} is not connected`);
   }
-  // Inject auth context as a hidden _auth argument when provided
-  const toolArgs = authContext?.userId || authContext?.delegationToken
-    ? { ...args, _auth: { userId: authContext.userId, token: authContext.delegationToken } }
+  // Resolve auth: explicit authContext > ambient ToolContext > none
+  const resolvedAuth = authContext ?? deriveAuthFromToolContext();
+  // Inject auth context as a hidden _auth argument when available
+  const toolArgs = resolvedAuth?.userId || resolvedAuth?.delegationToken
+    ? { ...args, _auth: { userId: resolvedAuth.userId, token: resolvedAuth.delegationToken } }
     : args;
+  // Audit: log tool invocation with principal identity
+  const ctx = getToolContext();
+  if (ctx?.principal.id) {
+    loggerRegistry.debug(
+      `[lt-mcp:audit] ${toolName} on ${serverId} by ${ctx.principal.type}:${ctx.principal.id}`,
+    );
+  }
+
   const result = await client.callTool(
     { name: toolName, arguments: toolArgs },
     undefined,

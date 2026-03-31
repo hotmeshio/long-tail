@@ -116,6 +116,13 @@ export type {
 } from './delegation';
 
 export type {
+  ToolContext,
+  ToolPrincipal,
+  ToolCredentials,
+  ToolTrace,
+} from './tool-context';
+
+export type {
   LTOAuthProviderConfig,
   LTOAuthStartConfig,
   LTOAuthUserInfo,

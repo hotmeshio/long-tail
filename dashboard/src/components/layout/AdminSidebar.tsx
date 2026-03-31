@@ -1,5 +1,6 @@
 import {
   Users,
+  Bot,
   Wrench,
   Tag,
   Activity,
@@ -8,6 +9,7 @@ import { SidebarNav, type NavEntry } from './SidebarNav';
 
 const entries: NavEntry[] = [
   { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/bots', label: 'Bots', icon: Bot },
   { to: '/admin/roles', label: 'Roles', icon: Tag },
   { to: '/admin/maintenance', label: 'DB Maintenance', icon: Wrench },
   { to: '/admin/controlplane', label: 'Task Queues', icon: Activity },

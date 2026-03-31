@@ -1,6 +1,8 @@
 # Users API
 
-Users represent the humans (or agents) who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication.
+Users represent the humans who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication.
+
+For service identities (CI bots, schedulers, automated agents), use the [Bot Accounts API](bot-accounts.md) instead. Bot accounts share the same RBAC system but authenticate with API keys rather than passwords or OAuth.
 
 ## List users
 

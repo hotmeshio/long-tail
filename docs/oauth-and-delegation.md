@@ -113,18 +113,37 @@ The `lt_oauth_tokens` table stores one token set per user per provider. Tokens a
 
 ## User Context Propagation
 
-When a workflow is started via the API, the authenticated user's ID is injected into the envelope:
+When a workflow is started via the API, the authenticated user's ID is injected into the envelope and propagated through two layers of `AsyncLocalStorage`:
 
 ```
 HTTP request (req.auth.userId)
     → LTEnvelope.lt.userId
-        → OrchestratorContext.userId
-            → Activities read via getOrchestratorContext()
+        → OrchestratorContext.userId    (for executeLT routing)
+        → ToolContext.principal.id      (for universal identity access)
+            → Activities read via getToolContext()
 ```
 
-This happens automatically. The interceptor reads `envelope.lt.userId` and makes it available to all activities in the workflow chain via `AsyncLocalStorage`. Child workflows spawned by `executeLT()` inherit the parent's `userId`.
+The interceptor wraps every workflow in both `runWithOrchestratorContext` and `runWithToolContext`. The `ToolContext` resolves the user's roles from the database, mints a delegation token, and makes the full identity available to any activity — regardless of whether it was invoked as a proxy activity, an MCP server tool, or a YAML workflow worker.
 
 For cron-triggered workflows (no HTTP request), `userId` is `undefined`. Activities that require user context should check for this and fail gracefully.
+
+### ToolContext
+
+The `ToolContext` is the universal identity object. Activities call `getToolContext()` to access identity without knowing how they were invoked:
+
+```typescript
+import { getToolContext } from './services/iam/context';
+
+const ctx = getToolContext();
+if (ctx) {
+  console.log(ctx.principal.id);       // user or bot UUID
+  console.log(ctx.principal.type);     // 'user' or 'bot'
+  console.log(ctx.principal.roles);    // ['reviewer', 'engineer']
+  console.log(ctx.credentials.delegationToken); // scoped JWT
+}
+```
+
+The MCP client (`callServerTool`) also reads `ToolContext` automatically. When no explicit `authContext` is passed, it derives `_auth` from the ambient context. This closes the identity gap for YAML workflow workers, which previously had no auth propagation.
 
 ## Delegation Tokens
 
@@ -382,6 +401,7 @@ cd dashboard && npx vitest run
 | Token Type | Lifetime | Scope | Who Creates | Who Consumes |
 |---|---|---|---|---|
 | User JWT | 24 hours | Full API access | Login endpoint | Dashboard, API routes |
+| Bot API key | Long-lived | Full API access (RBAC-scoped) | Admin | Programmatic clients, CI/CD |
 | Delegation token | 5 minutes | Specific scopes (e.g., `oauth:google:read`) | Workflow activities | MCP tools, delegation API |
 | Service token | Long-lived | Server-specific (e.g., `delegation:validate`) | Admin | External MCP servers |
 | OAuth access token | Provider-set (~1hr) | Provider scopes (e.g., `email`, `profile`) | OAuth flow | External APIs |
@@ -422,7 +442,11 @@ cd dashboard && npx vitest run
 |---|---|
 | `lt_oauth_tokens` | Encrypted per-user, per-provider OAuth tokens |
 | `lt_service_tokens` | Hashed service tokens for external MCP servers |
+| `lt_bot_api_keys` | Hashed API keys for bot accounts |
+| `lt_users.account_type` | Distinguishes `'user'` from `'bot'` accounts |
 | `lt_users.oauth_provider` | Identity link: which OAuth provider the user signed up with |
+| `lt_tasks.initiated_by` | Audit: which user or bot initiated the task (FK to `lt_users`) |
+| `lt_tasks.principal_type` | Audit: `'user'` or `'bot'` |
 | `lt_escalations.created_by` | Audit: which user initiated the escalation |
 | `lt_mcp_servers.required_scopes` | Declares what scopes a server needs from delegation tokens |
 

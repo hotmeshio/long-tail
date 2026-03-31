@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { getToken } from '../../api/client';
 import { NatsStatus } from '../common/display/NatsStatus';
 import { AppLogo } from '../common/display/AppLogo';
 
@@ -44,12 +43,13 @@ export function Header() {
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-50">
-                <a
-                  href={`/api/auth/oauth/connect/anthropic?token=${encodeURIComponent(getToken() || '')}&returnTo=/`}
+                <Link
+                  to="/connections"
+                  onClick={() => setMenuOpen(false)}
                   className="block px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
                 >
-                  Connect Anthropic
-                </a>
+                  Connections
+                </Link>
                 <button
                   onClick={() => { setMenuOpen(false); logout(); }}
                   className="block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"

@@ -35,6 +35,8 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 | `parent_id` | `TEXT` | — | Direct parent workflow ID |
 | `trace_id` | `TEXT` | — | Distributed tracing trace ID |
 | `span_id` | `TEXT` | — | Distributed tracing span ID |
+| `initiated_by` | `UUID` | — | FK to `lt_users(id)` — user or bot that started this task |
+| `principal_type` | `TEXT` | `'user'` | `user` or `bot` (for audit filtering) |
 | `started_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | When the workflow began |
 | `completed_at` | `TIMESTAMPTZ` | — | When the workflow finished (null while pending) |
 | `envelope` | `TEXT NOT NULL` | — | JSON-serialized input envelope |
@@ -123,7 +125,7 @@ WHERE status = 'pending'
 
 ### lt_users
 
-User identity records. Users are created via the API and assigned roles that determine which escalations they can claim.
+User and bot identity records. Users are created via the API and assigned roles that determine which escalations they can claim. Bot accounts (`account_type = 'bot'`) are service identities that authenticate with API keys.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -132,12 +134,13 @@ User identity records. Users are created via the API and assigned roles that det
 | `email` | `TEXT` | — | Email address (optional) |
 | `display_name` | `TEXT` | — | Display name (optional) |
 | `password_hash` | `TEXT` | — | Hashed password for authentication |
+| `account_type` | `TEXT NOT NULL` | `'user'` | `user` or `bot` |
 | `status` | `TEXT NOT NULL` | `'active'` | `active`, `inactive`, or `suspended` |
 | `metadata` | `JSONB` | — | Arbitrary user metadata |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 
-Status is enforced by a CHECK constraint: `status IN ('active', 'inactive', 'suspended')`.
+Status is enforced by a CHECK constraint: `status IN ('active', 'inactive', 'suspended')`. Account type is enforced by: `account_type IN ('user', 'bot')`.
 
 **Indexes:**
 
@@ -159,6 +162,24 @@ Maps users to roles. Each user can hold multiple roles with different permission
 Primary key: `(user_id, role)` — a user can hold each role at most once.
 
 Type is enforced by a CHECK constraint: `type IN ('superadmin', 'admin', 'member')`.
+
+### lt_bot_api_keys
+
+API keys for bot accounts. Each key is bcrypt-hashed — the raw key is returned once at creation and never stored.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `name` | `TEXT NOT NULL` | — | Human-readable key name |
+| `user_id` | `UUID NOT NULL` | — | FK to `lt_users(id)`, CASCADE on delete |
+| `key_hash` | `TEXT NOT NULL` | — | bcrypt hash of the raw API key |
+| `scopes` | `TEXT[] NOT NULL` | `'{}'` | Allowed scopes (e.g., `mcp:tool:call`) |
+| `expires_at` | `TIMESTAMPTZ` | — | Optional expiry (null = no expiry) |
+| `last_used_at` | `TIMESTAMPTZ` | — | Updated on each successful validation |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+Unique constraint: `(user_id, name)` — each bot can have at most one key per name.
 
 ### lt_config_workflows
 
@@ -352,7 +373,10 @@ lt_config_workflows
   └──< lt_config_invocation_roles   (workflow_type → workflow_type, CASCADE)
 
 lt_users
-  └──< lt_user_roles          (user_id → id, CASCADE)
+  ├──< lt_user_roles          (user_id → id, CASCADE)
+  ├──< lt_bot_api_keys        (user_id → id, CASCADE)
+  ├──< lt_oauth_tokens        (user_id → id, CASCADE)
+  └──< lt_tasks.initiated_by  (initiated_by → id, SET NULL)
 
 lt_tasks
   └──< lt_escalations         (task_id → id)

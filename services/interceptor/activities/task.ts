@@ -19,6 +19,8 @@ export async function ltCreateTask(input: {
   metadata?: Record<string, any>;
   traceId?: string;
   spanId?: string;
+  initiatedBy?: string;
+  principalType?: string;
 }): Promise<string> {
   const task = await taskService.createTask({
     workflow_id: input.workflowId,
@@ -34,6 +36,8 @@ export async function ltCreateTask(input: {
     metadata: input.metadata,
     trace_id: input.traceId,
     span_id: input.spanId,
+    initiated_by: input.initiatedBy,
+    principal_type: input.principalType,
   });
 
   publishTaskEvent({

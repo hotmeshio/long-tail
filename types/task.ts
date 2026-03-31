@@ -42,6 +42,12 @@ export interface LTTaskRecord {
   trace_id: string | null;
   span_id: string | null;
 
+  // audit
+  /** User or bot that initiated this task. */
+  initiated_by: string | null;
+  /** Principal type: 'user' or 'bot'. */
+  principal_type: string | null;
+
   created_at: Date;
   updated_at: Date;
 }

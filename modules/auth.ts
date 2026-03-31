@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 
 import { config } from './config';
 import { isSuperAdmin } from '../services/user';
+import { validateBotApiKey } from '../services/auth/bot-api-key';
 import type { AuthPayload, LTAuthAdapter } from '../types';
 
 // Re-export types for convenience
@@ -29,19 +30,36 @@ export class JwtAuthAdapter implements LTAuthAdapter {
     this.explicitSecret = secret;
   }
 
-  authenticate(req: Request): AuthPayload | null {
-    // Use explicit secret if provided, otherwise read config lazily
-    const secret = this.explicitSecret ?? config.JWT_SECRET;
+  authenticate(req: Request): AuthPayload | null | Promise<AuthPayload | null> {
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) return null;
+    const token = header.slice(7);
+
+    // Bot API key authentication (async path)
+    if (token.startsWith('lt_bot_')) {
+      return this.authenticateBotApiKey(token);
+    }
+
+    // JWT authentication (sync path)
+    const secret = this.explicitSecret ?? config.JWT_SECRET;
     if (!secret) return null;
     try {
-      return jwt.verify(header.slice(7), secret) as AuthPayload;
+      return jwt.verify(token, secret) as AuthPayload;
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         // Tag the request so the middleware can return a specific message
         (req as any)._authError = 'expired';
       }
+      return null;
+    }
+  }
+
+  private async authenticateBotApiKey(rawKey: string): Promise<AuthPayload | null> {
+    try {
+      const keyRecord = await validateBotApiKey(rawKey);
+      if (!keyRecord) return null;
+      return { userId: keyRecord.user_id, role: 'member' };
+    } catch {
       return null;
     }
   }

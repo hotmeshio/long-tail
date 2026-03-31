@@ -20,6 +20,7 @@ import mcpRunsRouter from './mcp-runs';
 import namespacesRouter from './namespaces';
 import filesRouter from './files';
 import controlplaneRouter from './controlplane';
+import botAccountsRouter from './bot-accounts';
 
 const router = Router();
 
@@ -47,5 +48,6 @@ router.use('/settings', settingsRouter);
 router.use('/mcp-runs', mcpRunsRouter);
 router.use('/namespaces', namespacesRouter);
 router.use('/controlplane', controlplaneRouter);
+router.use('/bot-accounts', botAccountsRouter);
 
 export default router;

@@ -94,6 +94,7 @@ export async function executeLT<T = any>(
       : { signalId },
     traceId: ctx.workflowTrace || undefined,
     spanId: ctx.workflowSpan || undefined,
+    initiatedBy: orchCtx?.userId || envelope0?.lt?.userId,
   });
 
   await ltStartTask(taskId);

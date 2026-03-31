@@ -20,6 +20,10 @@ export interface CreateTaskInput {
   priority?: number;
   trace_id?: string;
   span_id?: string;
+  /** User or bot ID that initiated this task (for audit trail). */
+  initiated_by?: string;
+  /** Principal type: 'user' or 'bot'. */
+  principal_type?: string;
 }
 
 export interface UpdateTaskInput {

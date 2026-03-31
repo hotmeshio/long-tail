@@ -109,6 +109,12 @@ const MaintenancePage = lazy(() =>
 const ControlPlanePage = lazy(() =>
   import('./pages/admin/controlplane').then((m) => ({ default: m.ControlPlanePage })),
 );
+const BotsPage = lazy(() =>
+  import('./pages/admin/bots').then((m) => ({ default: m.BotsPage })),
+);
+const ConnectionsPage = lazy(() =>
+  import('./pages/settings/ConnectionsPage').then((m) => ({ default: m.ConnectionsPage })),
+);
 
 // ---------------------------------------------------------------------------
 // Suspense fallback
@@ -168,6 +174,9 @@ const router = createBrowserRouter([
       { path: 'processes/all', element: <Lazy><ProcessesListPage /></Lazy> },
       { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
 
+      // Connections (all authenticated users)
+      { path: 'connections', element: <Lazy><ConnectionsPage /></Lazy> },
+
       // Escalation section (all authenticated users)
       { path: 'escalations', element: <Lazy><EscalationsOverview /></Lazy> },
       { path: 'escalations/available', element: <Lazy><AvailableEscalationsPage /></Lazy> },
@@ -213,6 +222,7 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
+          { path: 'admin/bots', element: <Lazy><BotsPage /></Lazy> },
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },

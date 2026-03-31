@@ -14,6 +14,8 @@ import {
   publishStartedEvents,
   completePlainResult,
 } from './lifecycle';
+import { runWithToolContext } from '../iam/context';
+import { resolveToolContext } from '../iam/resolve';
 
 import type { LTReturn, LTEscalation } from '../../types';
 import type { InterceptorState } from './types';
@@ -140,9 +142,26 @@ export function createLTInterceptor(options: {
       };
 
       try {
+        const orchCtx = { workflowId: wf.workflowId, taskQueue, workflowType: wf.workflowName, userId: envelope?.lt?.userId };
+
+        // Resolve ToolContext (non-blocking: falls back to minimal principal on error)
+        const toolCtx = await resolveToolContext({
+          userId: envelope?.lt?.userId,
+          envelope,
+          orchestratorContext: orchCtx,
+          traceId: wf.workflowTrace,
+          spanId: wf.workflowSpan,
+        });
+
+        // Nest both contexts: OrchestratorContext (for executeLT routing)
+        // and ToolContext (for universal identity access in activities)
+        const wrappedNext = toolCtx
+          ? () => runWithToolContext(toolCtx, next)
+          : next;
+
         const result = await runWithOrchestratorContext(
-          { workflowId: wf.workflowId, taskQueue, workflowType: wf.workflowName, userId: envelope?.lt?.userId },
-          next,
+          orchCtx,
+          wrappedNext,
         );
 
         if (result?.type === 'escalation') {

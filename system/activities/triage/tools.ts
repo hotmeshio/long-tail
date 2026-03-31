@@ -1,5 +1,4 @@
-import { createDelegationToken } from '../../../services/auth/delegation';
-import { getOrchestratorContext } from '../../../services/interceptor/context';
+import { getToolContext } from '../../../services/iam/context';
 import { loggerRegistry } from '../../../services/logger';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
@@ -122,10 +121,10 @@ export async function callTriageTool(
     ? qualifiedName.slice(separatorIdx + 2)
     : qualifiedName;
 
-  // Build auth context from the orchestrator (userId propagated via envelope)
-  const orchCtx = getOrchestratorContext();
-  const authContext = orchCtx?.userId
-    ? { userId: orchCtx.userId, delegationToken: createDelegationToken(orchCtx.userId, ['mcp:tool:call']) }
+  // Build auth context from ToolContext (set by interceptor via IAM service)
+  const toolCtx = getToolContext();
+  const authContext = toolCtx?.principal.id
+    ? { userId: toolCtx.principal.id, delegationToken: toolCtx.credentials.delegationToken }
     : undefined;
 
   if (serverName) {
