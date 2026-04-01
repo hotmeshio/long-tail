@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Settings } from 'lucide-react';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
@@ -6,7 +6,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
-import { StatusBadge } from '../../components/common/display/StatusBadge';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
@@ -14,10 +13,18 @@ import { StickyPagination } from '../../components/common/data/StickyPagination'
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
+export type ExecutionsTier = 'all' | 'registered' | 'unregistered';
+
 const jobStatusMap: Record<string, string> = {
   running: 'in_progress',
   completed: 'completed',
   failed: 'failed',
+};
+
+const STATUS_DOT: Record<string, string> = {
+  in_progress: 'bg-status-active',
+  completed: 'bg-status-success',
+  failed: 'bg-status-error',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,24 +41,25 @@ function buildColumns(
 ): Column<LTJob>[] {
   return [
     {
-      key: 'status',
-      label: 'Status',
-      render: (row) => <StatusBadge status={jobStatusMap[row.status] ?? row.status} />,
-      className: 'w-40',
+      key: 'workflow_id',
+      label: 'Workflow ID',
+      render: (row) => {
+        const dotClass = STATUS_DOT[jobStatusMap[row.status] ?? row.status] ?? 'bg-status-pending';
+        const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
+        return (
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <span className={`w-2 h-2 shrink-0 rounded-full ${dotClass}${pulseClass}`} title={row.status} />
+            <span className="font-mono text-xs text-text-secondary truncate">
+              {row.workflow_id}
+            </span>
+          </span>
+        );
+      },
     },
     {
       key: 'entity',
       label: 'Workflow Type',
       render: (row) => <WorkflowPill type={row.entity} />,
-    },
-    {
-      key: 'workflow_id',
-      label: 'Workflow ID',
-      render: (row) => (
-        <span className="font-mono text-xs text-text-secondary truncate max-w-[240px] block">
-          {row.workflow_id}
-        </span>
-      ),
     },
     {
       key: 'created_at',
@@ -108,15 +116,28 @@ function buildColumns(
   ];
 }
 
-export function WorkflowsDashboard() {
+export function WorkflowsDashboard({ tier = 'all' }: { tier?: ExecutionsTier }) {
   useWorkflowListEvents();
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
+
+  // Map tier to server-side registered filter
+  const registeredFilter = tier === 'registered' ? 'true'
+    : tier === 'unregistered' ? 'false'
+    : undefined;
+
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { search: '', entity: '', status: '' },
   });
 
-  const columns = buildColumns((entity) => setFilter('entity', entity), (status) => setFilter('status', status), isSuperAdmin, navigate);
+  const { data: configs } = useWorkflowConfigs();
+
+  const columns = buildColumns(
+    (entity) => setFilter('entity', entity),
+    (status) => setFilter('status', status),
+    isSuperAdmin,
+    navigate,
+  );
   const [searchInput, setSearchInput] = useState(filters.search);
 
   useEffect(() => {
@@ -133,17 +154,31 @@ export function WorkflowsDashboard() {
     status: filters.status || undefined,
     sort_by: sort.sort_by || undefined,
     order: sort.sort_by ? sort.order : undefined,
+    registered: registeredFilter,
   });
-  const { data: configs } = useWorkflowConfigs();
 
   const total = jobsData?.total ?? 0;
   const jobs = jobsData?.jobs ?? [];
 
-  const entities = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
+  const entities = useMemo(() => {
+    return [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
+  }, [configs]);
+
+  const pageTitle = tier === 'registered'
+    ? 'Unbreakable Executions'
+    : tier === 'unregistered'
+      ? 'Durable Executions'
+      : 'Executions';
+
+  const emptyMessage = tier === 'registered'
+    ? 'No unbreakable workflow executions found'
+    : tier === 'unregistered'
+      ? 'No durable workflow executions found'
+      : 'No workflow jobs found';
 
   return (
     <div>
-      <PageHeader title="Executions" />
+      <PageHeader title={pageTitle} />
 
       <FilterBar>
         <input
@@ -175,9 +210,13 @@ export function WorkflowsDashboard() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/workflows/executions/${row.workflow_id}`)}
+        onRowClick={(row) => navigate(
+          tier === 'unregistered'
+            ? `/workflows/durable/executions/${row.workflow_id}`
+            : `/workflows/executions/${row.workflow_id}`,
+        )}
         isLoading={isLoading}
-        emptyMessage="No workflow jobs found"
+        emptyMessage={emptyMessage}
         sort={sort}
         onSort={setSort}
       />

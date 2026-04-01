@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { KeyRound } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToast } from '../../../hooks/useToast';
 import {
@@ -195,6 +196,27 @@ export function EscalationDetailPage() {
             onRetryTriage={handleRetryTriage}
             isRetrying={claim.isPending || resolve.isPending}
           />
+        </div>
+      )}
+
+      {/* Missing credential context */}
+      {payloadObj?.category === 'missing_credential' && (
+        <div className="mt-8 bg-status-warning/10 border border-status-warning/30 rounded-md px-5 py-4 flex items-start gap-3">
+          <KeyRound size={20} className="text-status-warning mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-text-primary mb-1">Missing Credential</p>
+            <p className="text-xs text-text-secondary mb-3">
+              This workflow requires a <span className="font-medium capitalize">{String(payloadObj.provider)}</span> credential
+              to continue. Register one and then resolve this escalation to retry.
+            </p>
+            <Link
+              to="/credentials"
+              className="btn-primary text-xs inline-flex items-center gap-1.5"
+            >
+              <KeyRound size={12} />
+              Go to Credentials
+            </Link>
+          </div>
         </div>
       )}
 

@@ -37,11 +37,23 @@ router.get('/jobs', async (req, res) => {
     const status = (req.query.status as string) || undefined;
     const sortBy = (req.query.sort_by as string) || undefined;
     const order = (req.query.order as string) || undefined;
+    const registered = (req.query.registered as string) || undefined;
 
     const pool = getPool();
     const conditions = ['j.entity IS NOT NULL'];
     const values: any[] = [];
     let idx = 1;
+
+    // Server-side filter: registered (has lt_config_workflows entry) vs unregistered
+    if (registered === 'true') {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM lt_config_workflows c WHERE c.workflow_type = j.entity)`,
+      );
+    } else if (registered === 'false') {
+      conditions.push(
+        `NOT EXISTS (SELECT 1 FROM lt_config_workflows c WHERE c.workflow_type = j.entity)`,
+      );
+    }
 
     if (entity) {
       const entities = entity.split(',').map((e) => e.trim()).filter(Boolean);

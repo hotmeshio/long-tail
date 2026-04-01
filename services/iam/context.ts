@@ -1,13 +1,22 @@
 /**
- * AsyncLocalStorage-based ToolContext propagation.
+ * ToolContext access for activities and workflow-scoped code.
  *
- * The interceptor calls `runWithToolContext()` to make identity
- * available to all activities in the workflow execution scope.
- * Activities call `getToolContext()` regardless of invocation path.
+ * Two paths, checked in order:
+ *
+ * 1. **argumentMetadata** (production-safe, distributed):
+ *    The activity interceptor injects `principal` + `scopes` into
+ *    `argumentMetadata`, which HotMesh delivers to the activity worker
+ *    via `Durable.activity.getContext()`. Works across process boundaries.
+ *
+ * 2. **AsyncLocalStorage** (workflow-local, single-process):
+ *    The workflow interceptor wraps `next()` with `runWithToolContext()`
+ *    for code running in the workflow's own async scope (e.g., MCP server
+ *    tools called directly, not via proxy activities).
  */
 import { AsyncLocalStorage } from 'async_hooks';
+import { Durable } from '@hotmeshio/hotmesh';
 
-import type { ToolContext } from '../../types/tool-context';
+import type { ToolContext, ToolPrincipal } from '../../types/tool-context';
 
 const store = new AsyncLocalStorage<ToolContext>();
 
@@ -23,10 +32,31 @@ export function runWithToolContext<T>(
 }
 
 /**
- * Retrieve the ToolContext set by the interceptor.
- * Returns undefined when called outside a workflow execution scope
- * (e.g., direct route handler without interceptor wrapping).
+ * Retrieve the ToolContext for the current execution scope.
+ *
+ * Activities: reads from argumentMetadata (injected by activity interceptor).
+ * Workflow scope: reads from AsyncLocalStorage (set by workflow interceptor).
+ * Returns undefined when no identity is available.
  */
 export function getToolContext(): ToolContext | undefined {
+  // 1. Try argumentMetadata (activity worker — works distributed)
+  try {
+    const actCtx = Durable.activity.getContext();
+    const meta = actCtx?.argumentMetadata;
+    if (meta?.principal) {
+      const principal = meta.principal as ToolPrincipal;
+      return {
+        principal,
+        credentials: {
+          scopes: (meta.scopes as string[]) ?? [],
+        },
+        trace: {},
+      };
+    }
+  } catch {
+    // Not inside an activity execution — fall through
+  }
+
+  // 2. Fallback: AsyncLocalStorage (workflow-local scope)
   return store.getStore();
 }

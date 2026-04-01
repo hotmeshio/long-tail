@@ -7,7 +7,6 @@ function makeEsc(overrides: Partial<LTEscalationRecord> = {}): LTEscalationRecor
     id: '1',
     type: 'review',
     subtype: 'content',
-    modality: 'portal',
     description: null,
     status: 'pending',
     priority: 2,

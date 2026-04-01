@@ -15,7 +15,6 @@ export interface LTTaskRecord {
   workflow_type: string;
   lt_type: string;
   task_queue: string | null;
-  modality: string | null;
 
   // state
   status: LTTaskStatus;

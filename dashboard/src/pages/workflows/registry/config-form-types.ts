@@ -5,7 +5,6 @@ export interface ConfigFormState {
   description: string;
   task_queue: string;
   default_role: string;
-  default_modality: string;
   invocable: boolean;
   roles: string;
   invocation_roles: string;
@@ -20,7 +19,6 @@ export const EMPTY_FORM: ConfigFormState = {
   description: '',
   task_queue: '',
   default_role: 'reviewer',
-  default_modality: 'portal',
   invocable: false,
   roles: '',
   invocation_roles: '',
@@ -36,7 +34,6 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     description: c.description ?? '',
     task_queue: c.task_queue ?? '',
     default_role: c.default_role,
-    default_modality: c.default_modality,
     invocable: c.invocable,
     roles: (c.roles ?? []).join(', '),
     invocation_roles: (c.invocation_roles ?? []).join(', '),
@@ -47,7 +44,7 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
   };
 }
 
-export const STEP_LABELS = ['Identity', 'Escalation & Access', 'Schemas & Invocation'];
+export const STEP_LABELS = ['Identity', 'Escalation', 'Invocation & Schemas'];
 
 export function jsonValid(v: string): boolean {
   if (!v.trim()) return true;
@@ -55,8 +52,8 @@ export function jsonValid(v: string): boolean {
 }
 
 export function isStepValid(step: number, form: ConfigFormState): boolean {
-  if (step === 0) return !!form.workflow_type.trim();
-  if (step === 2) return jsonValid(form.envelope_schema) && jsonValid(form.resolver_schema);
+  if (step === 1) return !!form.workflow_type.trim();
+  if (step === 3) return jsonValid(form.envelope_schema) && jsonValid(form.resolver_schema);
   return true;
 }
 

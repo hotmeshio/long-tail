@@ -11,6 +11,7 @@ export function matchesSearch(server: McpServerRecord, search: string): boolean 
   const q = search.toLowerCase();
   if (server.name.toLowerCase().includes(q)) return true;
   if (server.description?.toLowerCase().includes(q)) return true;
+  if ((server.tags ?? []).some((t) => t.toLowerCase().includes(q))) return true;
   const tools = (server.tool_manifest ?? []) as McpToolManifest[];
   return tools.some(
     (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),

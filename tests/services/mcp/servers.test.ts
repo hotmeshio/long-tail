@@ -443,7 +443,6 @@ describe('MCP integration', () => {
       const dbRecord = await escalationService.getEscalation(parsed.escalation_id);
       expect(dbRecord).toBeTruthy();
       expect(dbRecord!.description).toBe('MCP protocol test escalation');
-      expect(dbRecord!.modality).toBe('mcp');
     });
 
     it('should check escalation status via check_resolution', async () => {

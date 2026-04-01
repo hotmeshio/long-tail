@@ -86,7 +86,6 @@ export async function kitchenSink(envelope: LTEnvelope): Promise<any> {
       data: { greeting, result },
       message: `Kitchen sink workflow needs approval (name: ${name})`,
       role: 'reviewer',
-      modality: 'default',
     };
   }
 

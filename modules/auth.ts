@@ -142,11 +142,13 @@ export const requireAdmin: RequestHandler = async (
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    if (await isSuperAdmin(req.auth.userId)) {
+    // Fast path: trust the JWT role claim for admin/superadmin
+    if (req.auth.role === 'admin' || req.auth.role === 'superadmin') {
       next();
       return;
     }
-    if (req.auth.role === 'admin') {
+    // Slow path: check database for superadmin role type
+    if (await isSuperAdmin(req.auth.userId)) {
       next();
       return;
     }

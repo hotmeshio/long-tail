@@ -46,7 +46,6 @@ export async function ltClaimEscalation(input: {
 export async function ltCreateEscalation(input: {
   type: string;
   subtype: string;
-  modality: string;
   description?: string;
   priority?: number;
   taskId?: string;
@@ -65,7 +64,6 @@ export async function ltCreateEscalation(input: {
   const escalation = await escalationService.createEscalation({
     type: input.type,
     subtype: input.subtype,
-    modality: input.modality,
     description: input.description,
     priority: input.priority,
     task_id: input.taskId,

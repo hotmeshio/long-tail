@@ -17,6 +17,7 @@ export function WorkflowSelector({
         {configs.map((config) => {
           const isSelected = selectedType === config.workflow_type;
           const hasTemplate = !!config.envelope_schema;
+          const isDurable = !config.envelope_schema && !config.description;
           return (
             <button
               key={config.workflow_type}
@@ -34,6 +35,11 @@ export function WorkflowSelector({
                 {hasTemplate && (
                   <span className="px-1.5 py-0.5 text-[9px] bg-accent/10 text-accent rounded">
                     template
+                  </span>
+                )}
+                {isDurable && (
+                  <span className="px-1.5 py-0.5 text-[9px] bg-status-success/10 text-status-success rounded">
+                    durable
                   </span>
                 )}
               </div>

@@ -12,6 +12,7 @@ export type {
   VerifyDocumentEnvelopeData,
   ProcessClaimEnvelopeData,
   KitchenSinkEnvelopeData,
+  BasicEchoEnvelopeData,
   WorkflowEnvelopeMap,
   InvocableWorkflowType,
 } from './envelopes';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { useWorkflowExecution, useWorkflowState, useTerminateWorkflow } from '../../api/workflows';
 import { useWorkflowDetailEvents } from '../../hooks/useNatsEvents';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
@@ -17,7 +17,12 @@ import { RestartPanel } from './workflow-execution/RestartPanel';
 
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
+  const { pathname } = useLocation();
   useWorkflowDetailEvents(workflowId);
+
+  const executionTitle = pathname.startsWith('/workflows/durable/')
+    ? 'Durable Execution'
+    : 'Unbreakable Execution';
   const { data: execution, isLoading, error } = useWorkflowExecution(workflowId!);
   const { data: stateData } = useWorkflowState(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
@@ -84,7 +89,7 @@ export function WorkflowExecutionPage() {
   return (
     <div>
       <PageHeader
-        title="Workflow Execution"
+        title={executionTitle}
         actions={
           hasToolCalls ? (
             <Link
@@ -125,15 +130,13 @@ export function WorkflowExecutionPage() {
       <RestartPanel
         execution={execution}
         state={stateData?.state}
-        envelope={task?.envelope}
-        workflowType={task?.workflow_type}
         forceOpen={restartOpen}
         onClose={() => setRestartOpen(false)}
       />
 
       <div className="space-y-6">
         <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle} contentClassName="mt-4 ml-9">
-          <ExecutionInputResult execution={execution} envelope={task?.envelope} />
+          <ExecutionInputResult execution={execution} />
         </CollapsibleSection>
 
         <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle} contentClassName="mt-4 ml-9">

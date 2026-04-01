@@ -10,6 +10,7 @@ vi.mock('../../../../api/mcp', () => ({
   useDeleteMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useCreateMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useUpdateMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+  useCredentialStatus: vi.fn(() => ({ data: null })),
 }));
 
 import { McpServersPage } from '../McpServersPage';
@@ -81,12 +82,13 @@ beforeEach(() => {
 describe('McpServersPage', () => {
   it('renders page header', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('Tool Servers')).toBeInTheDocument();
+    expect(screen.getByText('Servers & Tools')).toBeInTheDocument();
   });
 
-  it('renders tagline', () => {
+  it('renders filter bar', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText(/Built-in, user-registered, and external MCP servers/)).toBeInTheDocument();
+    expect(screen.getByText('Search')).toBeInTheDocument();
+    expect(screen.getByText('Tag')).toBeInTheDocument();
   });
 
   it('renders all server rows', () => {
@@ -106,7 +108,7 @@ describe('McpServersPage', () => {
 
   it('renders search input', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByPlaceholderText('Server or tool name…')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Server or tool name...')).toBeInTheDocument();
   });
 
   it('renders status filter with MCP status options', () => {
@@ -143,7 +145,7 @@ describe('McpServersPage', () => {
       isLoading: false,
     } as any);
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('No tool servers found')).toBeInTheDocument();
+    expect(screen.getByText('No servers found')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {

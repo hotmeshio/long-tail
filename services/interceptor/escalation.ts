@@ -2,6 +2,7 @@ import type { LTEscalation } from '../../types';
 import type { InterceptorState } from './types';
 import { buildStoredEnvelope } from './state';
 import { publishEscalationEvent, publishTaskEvent, publishWorkflowEvent } from '../events/publish';
+import { MissingCredentialError } from '../iam/credentials';
 
 /**
  * Handle a workflow that returned { type: 'escalation' }.
@@ -19,7 +20,7 @@ export async function handleEscalation(
   state: InterceptorState,
   result: LTEscalation,
 ): Promise<LTEscalation> {
-  const { activities, wfConfig, defaultModality, defaultRole } = state;
+  const { activities, wfConfig, defaultRole } = state;
 
   const storedEnvelope = buildStoredEnvelope(state);
 
@@ -31,7 +32,6 @@ export async function handleEscalation(
   const escalationId = await activities.ltCreateEscalation({
     type: state.workflowName,
     subtype: state.workflowName,
-    modality: result.modality || wfConfig?.modality || defaultModality,
     description: result.message,
     priority: result.priority,
     taskId: state.taskId,
@@ -80,13 +80,17 @@ export async function handleEscalation(
  * Same flow as handleEscalation, but constructs the LTEscalation
  * from the error — capturing the message and stack trace so the
  * resolver has full context.
+ *
+ * For MissingCredentialError, produces a categorized escalation with
+ * `category: 'missing_credential'` so the UI can render actionable guidance.
  */
 export async function handleErrorEscalation(
   state: InterceptorState,
   err: Error,
 ): Promise<LTEscalation> {
-  const { activities, wfConfig, defaultModality, defaultRole } = state;
+  const { activities, wfConfig, defaultRole } = state;
 
+  const isMissingCred = err instanceof MissingCredentialError || err.name === 'MissingCredentialError';
   const storedEnvelope = buildStoredEnvelope(state);
 
   // Mark the task as needing intervention
@@ -94,17 +98,28 @@ export async function handleErrorEscalation(
     await activities.ltEscalateTask(state.taskId);
   }
 
+  const escalationPayload = isMissingCred
+    ? {
+        category: 'missing_credential',
+        provider: (err as MissingCredentialError).provider,
+        error: err.message,
+      }
+    : { error: err.message, stack: err.stack };
+
+  const description = isMissingCred
+    ? `Missing credential: ${(err as MissingCredentialError).provider}. Register one at Credentials and retry.`
+    : `Unhandled error: ${err.message || String(err)}`;
+
   const errorEscalationId = await activities.ltCreateEscalation({
     type: state.workflowName,
-    subtype: state.workflowName,
-    modality: wfConfig?.modality || defaultModality,
-    description: `Unhandled error: ${err.message || String(err)}`,
+    subtype: isMissingCred ? 'missing_credential' : state.workflowName,
+    description,
     taskId: state.taskId,
     originId: state.envelope?.lt?.originId,
     parentId: state.envelope?.lt?.parentId,
     role: wfConfig?.role || defaultRole,
     envelope: JSON.stringify(storedEnvelope),
-    escalationPayload: JSON.stringify({ error: err.message, stack: err.stack }),
+    escalationPayload: JSON.stringify(escalationPayload),
     workflowId: state.workflowId,
     taskQueue: state.taskQueue,
     workflowType: state.workflowName,
@@ -150,7 +165,7 @@ export async function handleErrorEscalation(
 
   return {
     type: 'escalation',
-    data: { error: err.message },
-    message: `Unhandled error: ${err.message || String(err)}`,
+    data: escalationPayload,
+    message: description,
   };
 }

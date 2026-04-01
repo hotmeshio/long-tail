@@ -74,7 +74,6 @@ describe('escalation service', () => {
         const esc = await escalationService.createEscalation({
           type: 'document',
           subtype: 'verify',
-          modality: 'portal',
           role: 'reviewer',
           envelope: JSON.stringify({ data: { idx: i } }),
           priority: i === 0 ? 1 : 2,
@@ -87,7 +86,6 @@ describe('escalation service', () => {
         const esc = await escalationService.createEscalation({
           type: 'content',
           subtype: 'review',
-          modality: 'default',
           role: 'engineer',
           envelope: JSON.stringify({ data: {} }),
         });
@@ -98,7 +96,6 @@ describe('escalation service', () => {
       const resolved = await escalationService.createEscalation({
         type: 'document',
         subtype: 'verify',
-        modality: 'portal',
         role: 'reviewer',
         envelope: JSON.stringify({ data: {} }),
       });

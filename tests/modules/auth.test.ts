@@ -6,6 +6,7 @@ import {
   JwtAuthAdapter,
   createAuthMiddleware,
   requireAuth,
+  requireAdmin,
   signToken,
 } from '../../modules/auth';
 import type { AuthPayload, LTAuthAdapter } from '../../types';
@@ -200,6 +201,46 @@ describe('Pluggable auth system', () => {
       await requireAuth(req, res, next);
       expect(res.statusCode).toBe(401);
       expect(wasNextCalled()).toBe(false);
+    });
+  });
+
+  // ── requireAdmin ─────────────────────────────────────────────────────
+
+  describe('requireAdmin (JWT role fallback)', () => {
+    it('should allow role=admin via JWT claim', async () => {
+      const token = signToken({ userId: 'admin-user', role: 'admin' });
+      const { req, res, next, wasNextCalled } = mockReqRes(`Bearer ${token}`);
+      // First pass through requireAuth to set req.auth
+      await requireAuth(req, res, next);
+      expect(wasNextCalled()).toBe(true);
+
+      // Now test requireAdmin
+      let adminNextCalled = false;
+      await requireAdmin(req, res, () => { adminNextCalled = true; });
+      expect(adminNextCalled).toBe(true);
+    });
+
+    it('should allow role=superadmin via JWT claim', async () => {
+      const token = signToken({ userId: 'sa-user', role: 'superadmin' });
+      const { req, res, next, wasNextCalled } = mockReqRes(`Bearer ${token}`);
+      await requireAuth(req, res, next);
+      expect(wasNextCalled()).toBe(true);
+
+      let adminNextCalled = false;
+      await requireAdmin(req, res, () => { adminNextCalled = true; });
+      expect(adminNextCalled).toBe(true);
+    });
+
+    it('should reject role=reviewer via JWT claim', async () => {
+      const token = signToken({ userId: 'rev-user', role: 'reviewer' });
+      const { req, res, next, wasNextCalled } = mockReqRes(`Bearer ${token}`);
+      await requireAuth(req, res, next);
+      expect(wasNextCalled()).toBe(true);
+
+      let adminNextCalled = false;
+      await requireAdmin(req, res, () => { adminNextCalled = true; });
+      expect(adminNextCalled).toBe(false);
+      expect(res.statusCode).toBe(403);
     });
   });
 

@@ -32,6 +32,8 @@ export interface LTMcpServerRecord {
   tags: string[];
   /** Per-server hints injected into the YAML compilation prompt when this server's tools are used */
   compile_hints: string | null;
+  /** Credential providers required by this server's tools (e.g., ['anthropic']) */
+  credential_providers: string[];
   status: LTMcpServerStatus;
   last_connected_at: Date | null;
   created_at: Date;
@@ -69,7 +71,7 @@ export interface LTMcpAdapter {
   /** List tools from a connected server */
   listTools(serverId: string): Promise<LTMcpToolManifest[]>;
   /** Call a tool on a connected server */
-  callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<any>;
+  callTool(serverId: string, toolName: string, args: Record<string, any>, authContext?: { userId?: string; delegationToken?: string }): Promise<any>;
   /**
    * Return an object of tool functions suitable for
    * Durable.workflow.proxyActivities(). Each key is a tool name

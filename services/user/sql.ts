@@ -29,6 +29,15 @@ export const INSERT_USER_ROLE_IGNORE =
 export const GET_USER_BY_ID =
   'SELECT * FROM lt_users WHERE id = $1';
 
+/** Fetch user + roles in a single query. Returns one row per role (or one row with nulls if no roles). */
+export const GET_USER_WITH_ROLES =
+  `SELECT u.id, u.external_id, u.display_name, u.status, u.metadata,
+          r.role, r.type AS role_type
+   FROM lt_users u
+   LEFT JOIN lt_user_roles r ON r.user_id = u.id
+   WHERE u.external_id = $1
+   ORDER BY r.created_at`;
+
 export const DELETE_USER_BY_ID =
   'DELETE FROM lt_users WHERE id = $1';
 

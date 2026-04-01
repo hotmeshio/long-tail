@@ -3,11 +3,12 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
-import { ProcessesSidebar } from './ProcessesSidebar';
 import { AdminSidebar } from './AdminSidebar';
 import { EngineerSidebar } from './EngineerSidebar';
-import { McpSidebar } from './McpSidebar';
+import { UnbreakableSidebar } from './UnbreakableSidebar';
 import { OperatorSidebar } from './OperatorSidebar';
+import { McpSidebar } from './McpSidebar';
+import { McpServersSidebar } from './McpServersSidebar';
 
 function ShellLayout() {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
@@ -28,10 +29,11 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ProcessesSidebar />
             <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <UnbreakableSidebar />}
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpServersSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
 

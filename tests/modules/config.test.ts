@@ -59,7 +59,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'test-queue',
         default_role: 'reviewer',
-        default_modality: 'portal',
         description: 'Test workflow',
         roles: ['reviewer', 'admin'],
         invocation_roles: [],
@@ -71,7 +70,6 @@ describe('workflow configuration', () => {
 
       expect(result.task_queue).toBe('test-queue');
       expect(result.default_role).toBe('reviewer');
-      expect(result.default_modality).toBe('portal');
       expect(result.roles).toEqual(['admin', 'reviewer']); // sorted
       expect(result.consumes).toEqual(['fetchUserProfile']);
     });
@@ -96,7 +94,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'container-queue',
         default_role: 'reviewer',
-        default_modality: 'default',
         description: null,
         roles: [],
         invocation_roles: [],
@@ -118,7 +115,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'updated-queue',
         default_role: 'senior-reviewer',
-        default_modality: 'fax',
         description: 'Updated description',
         roles: ['senior-reviewer'],
         invocation_roles: [],
@@ -128,7 +124,6 @@ describe('workflow configuration', () => {
 
       expect(updated.task_queue).toBe('updated-queue');
       expect(updated.default_role).toBe('senior-reviewer');
-      expect(updated.default_modality).toBe('fax');
       expect(updated.roles).toEqual(['senior-reviewer']);
       expect(updated.consumes).toHaveLength(0);
     });
@@ -158,7 +153,6 @@ describe('workflow configuration', () => {
       const resolved = map.get('testWorkflow');
       expect(resolved).toBeTruthy();
       expect(resolved!.role).toBe('senior-reviewer');
-      expect(resolved!.modality).toBe('fax');
     });
 
     it('getTargetEscalationRole should return configured role', async () => {
@@ -171,10 +165,6 @@ describe('workflow configuration', () => {
 
     it('getAllowedEscalationRoles should return configured roles', async () => {
       expect(await ltConfig.getAllowedEscalationRoles('testWorkflow')).toEqual(['senior-reviewer']);
-    });
-
-    it('getDefaultModality should return configured modality', async () => {
-      expect(await ltConfig.getDefaultModality('testWorkflow')).toBe('fax');
     });
 
     it('getProviders should return empty for no consumers', async () => {
@@ -199,7 +189,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'moderator',
-        default_modality: 'phone',
         description: null,
         roles: ['moderator'],
         invocation_roles: [],
@@ -249,7 +238,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'supervisor',
-        default_modality: 'phone',
         description: null,
         roles: ['supervisor'],
         invocation_roles: [],
@@ -273,7 +261,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'moderator',
-        default_modality: 'phone',
         description: null,
         roles: ['moderator'],
         invocation_roles: [],

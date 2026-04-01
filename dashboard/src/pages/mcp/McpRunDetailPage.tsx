@@ -65,7 +65,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Pipeline Run" />
+        <PageHeader title="Pipeline Execution" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -95,7 +95,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Run" />
+      <PageHeader title="Pipeline Execution" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">

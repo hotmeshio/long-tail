@@ -93,6 +93,5 @@ export async function processClaim(
       `Claim ${claimId} needs review — document quality insufficient ` +
       `(confidence: ${analysis.confidence}, flags: ${analysis.flags.join(', ')})`,
     role: 'reviewer',
-    modality: 'default',
   };
 }

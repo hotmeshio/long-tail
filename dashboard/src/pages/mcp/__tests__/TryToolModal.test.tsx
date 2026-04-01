@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TryToolModal } from '../TryToolModal';
@@ -16,7 +17,9 @@ const queryClient = new QueryClient({
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -157,5 +160,39 @@ describe('TryToolModal', () => {
     );
     fireEvent.click(screen.getByText('Close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('renders credential error with link to Credentials page', () => {
+    vi.mocked(useCallMcpTool).mockReturnValue({
+      mutate: mutateFn,
+      reset: resetFn,
+      data: null,
+      error: new Error('No credential found for provider "anthropic". Register one at Credentials.'),
+      isPending: false,
+    } as any);
+
+    renderWithProviders(
+      <TryToolModal open serverId="s1" serverName="my-server" tool={baseTool} onClose={vi.fn()} />,
+    );
+    expect(screen.getByText('Credential required')).toBeInTheDocument();
+    expect(screen.getByText('Go to Credentials')).toBeInTheDocument();
+    const link = screen.getByText('Go to Credentials').closest('a');
+    expect(link?.getAttribute('href')).toBe('/credentials');
+  });
+
+  it('renders generic error for non-credential errors', () => {
+    vi.mocked(useCallMcpTool).mockReturnValue({
+      mutate: mutateFn,
+      reset: resetFn,
+      data: null,
+      error: new Error('Connection refused'),
+      isPending: false,
+    } as any);
+
+    renderWithProviders(
+      <TryToolModal open serverId="s1" serverName="my-server" tool={baseTool} onClose={vi.fn()} />,
+    );
+    expect(screen.getByText('Connection refused')).toBeInTheDocument();
+    expect(screen.queryByText('Credential required')).not.toBeInTheDocument();
   });
 });

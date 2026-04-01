@@ -9,7 +9,6 @@ function makeEscalation(overrides: Partial<LTEscalationRecord> = {}): LTEscalati
     id: 'esc-1',
     type: 'review-content',
     subtype: 'review-content',
-    modality: 'dashboard',
     description: 'Test escalation',
     priority: 2,
     status: 'pending',

@@ -65,6 +65,19 @@ class LTCronRegistry {
     if (!defaultEnvelope.metadata) defaultEnvelope.metadata = {};
     defaultEnvelope.metadata.source = 'cron';
 
+    // Attach system principal for IAM context
+    if (!defaultEnvelope.lt) defaultEnvelope.lt = {};
+    if (!defaultEnvelope.lt.principal) {
+      defaultEnvelope.lt.principal = {
+        id: 'system:cron',
+        type: 'bot',
+        displayName: 'Cron Scheduler',
+        roles: ['system'],
+        roleType: 'superadmin',
+      };
+      defaultEnvelope.lt.scopes = ['workflow:cron'];
+    }
+
     const workflowType = config.workflow_type;
     const taskQueue = config.task_queue;
 

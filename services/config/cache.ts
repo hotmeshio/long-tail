@@ -10,7 +10,6 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       invocable: c.invocable,
       taskQueue: c.task_queue,
       role: c.default_role,
-      modality: c.default_modality,
       roles: c.roles,
       invocationRoles: c.invocation_roles,
       consumes: c.consumes,

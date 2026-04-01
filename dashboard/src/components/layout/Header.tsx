@@ -44,11 +44,11 @@ export function Header() {
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-50">
                 <Link
-                  to="/connections"
+                  to="/credentials"
                   onClick={() => setMenuOpen(false)}
                   className="block px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
                 >
-                  Connections
+                  Credentials
                 </Link>
                 <button
                   onClick={() => { setMenuOpen(false); logout(); }}

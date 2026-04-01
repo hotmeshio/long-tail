@@ -69,7 +69,7 @@ export function DataTable<T>({
   }
 
   if (!data.length) {
-    return <EmptyState title={emptyMessage} />;
+    return emptyMessage ? <EmptyState title={emptyMessage} /> : null;
   }
 
   return (

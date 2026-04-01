@@ -14,7 +14,6 @@ export interface InterceptorState {
   taskQueue: string;
   wfConfig: LTResolvedConfig | null;
   defaultRole: string;
-  defaultModality: string;
   taskId: string | undefined;
   routing: Record<string, any> | null;
   envelope: LTEnvelope | undefined;

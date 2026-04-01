@@ -52,7 +52,7 @@ beforeEach(() => {
 describe('McpQueryPage', () => {
   it('renders page header', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Discover & Compile')).toBeInTheDocument();
+    expect(screen.getByText('Invoke MCP Discovery Flow')).toBeInTheDocument();
   });
 
   it('renders submit form with textarea and button', () => {

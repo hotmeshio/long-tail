@@ -1,4 +1,16 @@
 /**
+ * Authenticated principal resolved at the front door (API route, cron, escalation).
+ * Travels with the envelope so workflows and activities never re-query the DB.
+ */
+export interface LTEnvelopePrincipal {
+  id: string;
+  type: 'user' | 'bot';
+  displayName?: string;
+  roles: string[];
+  roleType?: string;
+}
+
+/**
  * The standard envelope passed to every Long Tail workflow.
  *
  * - `data`: Business inputs — domain data the workflow processes.
@@ -14,7 +26,10 @@ export interface LTEnvelope {
   lt?: {
     /** Identity of the user who initiated this workflow. Set by the API route layer. */
     userId?: string;
-    modality?: string;
+    /** Resolved principal — set at the front door, never re-queried. */
+    principal?: LTEnvelopePrincipal;
+    /** Authorization scopes for this invocation. */
+    scopes?: string[];
     escalationId?: string;
     escalationStatus?: string;
     originId?: string;

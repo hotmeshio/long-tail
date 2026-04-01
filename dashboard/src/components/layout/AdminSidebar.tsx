@@ -16,5 +16,5 @@ const entries: NavEntry[] = [
 ];
 
 export function AdminSidebar() {
-  return <SidebarNav heading="Admin" headingTo="/admin" entries={entries} />;
+  return <SidebarNav heading="Admin" entries={entries} />;
 }

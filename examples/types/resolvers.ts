@@ -46,7 +46,7 @@ export interface ProcessClaimResolverPayload extends BaseResolverPayload {
   };
 }
 
-// ── verifyDocument / verifyDocumentMcp ──────────────────────────
+// ── verifyDocument ──────────────────────────────────────────────
 
 /** Resolver payload when a reviewer resolves a document escalation. */
 export interface VerifyDocumentResolverPayload extends BaseResolverPayload {

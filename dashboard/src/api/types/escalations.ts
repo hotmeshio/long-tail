@@ -5,7 +5,6 @@ export interface LTEscalationRecord {
   id: string;
   type: string;
   subtype: string;
-  modality: string;
   description: string | null;
   status: LTEscalationStatus;
   priority: LTEscalationPriority;

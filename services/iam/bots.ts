@@ -180,6 +180,32 @@ export { addUserRole as addBotRole };
 export { removeUserRole as removeBotRole };
 export { getUserRoles as getBotRoles };
 
+// ── System bot ─────────────────────────────────────────────────────────────
+
+const SYSTEM_BOT_NAME = 'lt-system';
+
+/**
+ * Ensure the system bot account exists.
+ * Called at startup so cron and system-initiated workflows
+ * always have a principal (the `lt-system` bot).
+ */
+export async function ensureSystemBot(): Promise<string> {
+  const pool = await getPool();
+  const { rows } = await pool.query(
+    'SELECT id FROM lt_users WHERE external_id = $1',
+    [SYSTEM_BOT_NAME],
+  );
+  if (rows.length > 0) return rows[0].id;
+
+  const bot = await createBot({
+    name: SYSTEM_BOT_NAME,
+    display_name: 'System',
+    description: 'System bot for cron and system-initiated workflows',
+    roles: [{ role: 'system', type: 'admin' }],
+  });
+  return bot.id;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function toBotRecord(

@@ -9,10 +9,99 @@ import { requireAdmin } from '../modules/auth';
 import { ltConfig } from '../modules/ltconfig';
 import { cronRegistry } from '../services/cron';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
+import { getPool } from '../services/db';
+import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../services/workers/registry';
 import { resolveHandle } from './resolve';
+import { resolvePrincipal } from '../services/iam/principal';
 import type { LTEnvelope } from '../types';
 
 const router = Router();
+
+// ── Active workers ───────────────────────────────────────────────────────────
+
+/**
+ * GET /api/workflows/workers
+ * Returns in-memory active workers with their registration status.
+ * System workflows excluded unless ?include_system=true.
+ */
+router.get('/workers', async (req, res) => {
+  try {
+    const includeSystem = req.query.include_system === 'true';
+    const activeWorkers = getRegisteredWorkers();
+    const configs = await configService.listWorkflowConfigs();
+    const registeredTypes = new Set(configs.map((c) => c.workflow_type));
+
+    const workers = [...activeWorkers.entries()]
+      .filter(([name]) => includeSystem || !SYSTEM_WORKFLOWS.has(name))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, { taskQueue }]) => ({
+        name,
+        task_queue: taskQueue,
+        registered: registeredTypes.has(name),
+        system: SYSTEM_WORKFLOWS.has(name),
+      }));
+
+    res.json({ workers });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Discovered workflows ─────────────────────────────────────────────────────
+
+/**
+ * GET /api/workflows/discovered
+ * Merges active workers, historical entities, and registered configs
+ * into a unified list. System workflows excluded unless ?include_system=true.
+ */
+router.get('/discovered', async (req, res) => {
+  try {
+    const includeSystem = req.query.include_system === 'true';
+
+    // 1. Active workers from in-memory registry
+    const activeWorkers = getRegisteredWorkers();
+
+    // 2. Historical entities from durable.jobs
+    const pool = getPool();
+    const { rows: entityRows } = await pool.query<{ entity: string }>(
+      `SELECT DISTINCT entity FROM durable.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`,
+    );
+    const historicalEntities = new Set(entityRows.map((r) => r.entity));
+
+    // 3. Registered configs
+    const configs = await configService.listWorkflowConfigs();
+    const configMap = new Map(configs.map((c) => [c.workflow_type, c]));
+
+    // Build unified set of all workflow types
+    const allTypes = new Set<string>();
+    for (const [name] of activeWorkers) allTypes.add(name);
+    for (const entity of historicalEntities) allTypes.add(entity);
+    for (const c of configs) allTypes.add(c.workflow_type);
+
+    const workflows = [...allTypes]
+      .filter((t) => includeSystem || !SYSTEM_WORKFLOWS.has(t))
+      .sort()
+      .map((workflowType) => {
+        const config = configMap.get(workflowType);
+        const worker = activeWorkers.get(workflowType);
+        return {
+          workflow_type: workflowType,
+          task_queue: config?.task_queue ?? worker?.taskQueue ?? null,
+          registered: !!config,
+          active: !!worker,
+          invocable: config?.invocable ?? !!worker,
+          system: SYSTEM_WORKFLOWS.has(workflowType),
+          description: config?.description ?? null,
+          roles: config?.roles ?? [],
+          invocation_roles: config?.invocation_roles ?? [],
+        };
+      });
+
+    res.json({ workflows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── Cron status ─────────────────────────────────────────────────────────────
 
@@ -86,7 +175,6 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
       invocable: req.body.invocable ?? false,
       task_queue: req.body.task_queue ?? null,
       default_role: req.body.default_role ?? 'reviewer',
-      default_modality: req.body.default_modality ?? 'portal',
       description: req.body.description ?? null,
       roles: req.body.roles ?? [],
       invocation_roles: req.body.invocation_roles ?? [],
@@ -143,62 +231,77 @@ router.post('/:type/invoke', async (req, res) => {
 
     // 1. Look up workflow config
     const wfConfig = await configService.getWorkflowConfig(workflowType);
-    if (!wfConfig) {
-      res.status(404).json({ error: 'Workflow not found' });
-      return;
-    }
 
-    // 2. Check invocable flag
-    if (!wfConfig.invocable) {
-      res.status(403).json({ error: 'Workflow is not invocable' });
-      return;
-    }
+    let taskQueue: string;
 
-    // 3. Check invocation roles (if configured)
-    if (wfConfig.invocation_roles.length > 0) {
-      const userId = req.auth!.userId;
-      const user = await userService.getUserByExternalId(userId);
-      if (!user) {
-        res.status(403).json({ error: 'User not registered' });
+    if (wfConfig) {
+      // 2a. Registered workflow — check invocable flag and roles
+      if (!wfConfig.invocable) {
+        res.status(403).json({ error: 'Workflow is not invocable' });
         return;
       }
-      const userRoles = user.roles.map((r) => r.role);
-      const hasInvocationRole = wfConfig.invocation_roles.some((r) =>
-        userRoles.includes(r),
-      );
-      if (!hasInvocationRole) {
-        const isSuperAdmin = user.roles.some((r) => r.type === 'superadmin');
-        if (!isSuperAdmin) {
-          res.status(403).json({ error: 'Insufficient role for invocation' });
+
+      if (wfConfig.invocation_roles.length > 0) {
+        const userId = req.auth!.userId;
+        const user = await userService.getUserByExternalId(userId);
+        if (!user) {
+          res.status(403).json({ error: 'User not registered' });
           return;
         }
+        const userRoles = user.roles.map((r) => r.role);
+        const hasInvocationRole = wfConfig.invocation_roles.some((r) =>
+          userRoles.includes(r),
+        );
+        if (!hasInvocationRole) {
+          const isSuperAdmin = user.roles.some((r) => r.type === 'superadmin');
+          if (!isSuperAdmin) {
+            res.status(403).json({ error: 'Insufficient role for invocation' });
+            return;
+          }
+        }
       }
+
+      if (!wfConfig.task_queue) {
+        res.status(400).json({ error: 'Workflow has no task_queue configured' });
+        return;
+      }
+      taskQueue = wfConfig.task_queue;
+    } else {
+      // 2b. No config — fall back to active worker registry
+      const worker = getRegisteredWorkers().get(workflowType);
+      if (!worker) {
+        res.status(404).json({ error: 'Workflow not found (no config and no active worker)' });
+        return;
+      }
+      taskQueue = worker.taskQueue;
     }
 
-    // 4. Build envelope and start workflow
+    // 3. Build envelope and start workflow
     const { data, metadata } = req.body || {};
     if (!data || typeof data !== 'object') {
       res.status(400).json({ error: 'Request body must include a data object' });
       return;
     }
 
+    const userId = req.auth?.userId;
+    const principal = userId ? await resolvePrincipal(userId) : undefined;
+
     const envelope: LTEnvelope = {
       data,
       metadata: metadata || {},
-      lt: { userId: req.auth?.userId },
+      lt: {
+        userId,
+        principal: principal ?? undefined,
+        scopes: ['workflow:invoke'],
+      },
     };
-
-    if (!wfConfig.task_queue) {
-      res.status(400).json({ error: 'Workflow has no task_queue configured' });
-      return;
-    }
 
     const client = createClient();
     const workflowId = `${workflowType}-${Durable.guid()}`;
 
     const handle = await client.workflow.start({
       args: [envelope],
-      taskQueue: wfConfig.task_queue,
+      taskQueue,
       workflowName: workflowType,
       workflowId,
       expire: JOB_EXPIRE_SECS,

@@ -8,6 +8,7 @@ import { config, postgres_options } from './modules/config';
 import { setAuthAdapter } from './modules/auth';
 import { migrate } from './services/db/migrate';
 import { registerLT } from './services/interceptor';
+import { registerWorker } from './services/workers/registry';
 import { loggerRegistry } from './services/logger';
 import { PinoLoggerAdapter } from './services/logger/pino';
 import { telemetryRegistry } from './services/telemetry';
@@ -177,7 +178,6 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     // Register LT interceptors
     await registerLT(connection, {
       defaultRole: startConfig.interceptor?.defaultRole ?? 'reviewer',
-      defaultModality: startConfig.interceptor?.defaultModality ?? 'default',
     });
 
     // Start each worker
@@ -188,6 +188,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
         workflow: w.workflow,
       });
       await worker.run();
+      registerWorker(w.workflow.name, w.taskQueue);
     }
 
     loggerRegistry.info(
@@ -230,6 +231,12 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   const { seedSystemMcpServers } = await import('./system/seed');
   await seedSystemMcpServers();
 
+  // Ensure system bot account exists for cron/system-initiated workflows
+  const { ensureSystemBot } = await import('./services/iam/bots');
+  await ensureSystemBot().catch((err: any) =>
+    loggerRegistry.warn(`[long-tail] system bot seed error: ${err.message}`),
+  );
+
   if (startConfig.examples) {
     const { seedExamples } = await import('./examples');
     const seedClient = new Durable.Client({ connection });
@@ -244,6 +251,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   // ── 6. Start embedded server (if enabled) ──────────────────────────────
   if (serverEnabled) {
     const app = express();
+    if (process.env.NODE_ENV !== 'production') {
+      app.disable('etag');
+    }
     app.use(express.json());
 
     app.get('/health', (_req, res) => {

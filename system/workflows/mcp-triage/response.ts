@@ -170,7 +170,6 @@ async function createReviewEscalation(
   await deps.ltCreateEscalation({
     type: ctx.originalWorkflowType,
     subtype: ctx.originalWorkflowType,
-    modality: wfConfig?.modality || 'default',
     description: 'AI Triage — Ready for Review',
     priority: 3,
     taskId: ctx.originalTaskId,

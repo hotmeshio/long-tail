@@ -1,4 +1,5 @@
 import { getPool } from '../db';
+import { getRegisteredWorkers } from '../workers/registry';
 import type { ResolvedHandle } from './types';
 import {
   RESOLVE_TASK_BY_WORKFLOW_ID,
@@ -51,6 +52,8 @@ export async function resolveWorkflowHandle(
 
   if (jobRows.length > 0 && jobRows[0].entity) {
     const entity = jobRows[0].entity;
+
+    // 2a. Try lt_config_workflows for task_queue
     const { rows: configRows } = await pool.query(
       RESOLVE_CONFIG_TASK_QUEUE,
       [entity],
@@ -58,6 +61,12 @@ export async function resolveWorkflowHandle(
 
     if (configRows.length > 0 && configRows[0].task_queue) {
       return { taskQueue: configRows[0].task_queue, workflowName: entity };
+    }
+
+    // 2b. Fall back to in-memory worker registry (unregistered durable workers)
+    const worker = getRegisteredWorkers().get(entity);
+    if (worker) {
+      return { taskQueue: worker.taskQueue, workflowName: entity };
     }
   }
 

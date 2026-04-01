@@ -10,7 +10,6 @@ export interface CreateTaskInput {
   workflow_type: string;
   lt_type: string;
   task_queue?: string;
-  modality?: string;
   signal_id: string;
   parent_workflow_id: string;
   origin_id?: string;

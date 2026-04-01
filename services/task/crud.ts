@@ -18,7 +18,6 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
       input.workflow_type,
       input.lt_type,
       input.task_queue || null,
-      input.modality || null,
       input.signal_id,
       input.parent_workflow_id,
       input.origin_id || null,

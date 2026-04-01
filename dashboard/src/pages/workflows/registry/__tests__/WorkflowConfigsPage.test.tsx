@@ -4,57 +4,59 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../api/workflows', () => ({
-  useWorkflowConfigs: vi.fn(),
+  useDiscoveredWorkflows: vi.fn(),
   useDeleteWorkflowConfig: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
 }));
 
 import { WorkflowConfigsPage } from '../WorkflowConfigsPage';
-import { useWorkflowConfigs } from '../../../../api/workflows';
-import type { LTWorkflowConfig } from '../../../../api/types';
+import { useDiscoveredWorkflows } from '../../../../api/workflows';
+import type { DiscoveredWorkflow } from '../../../../api/types';
 
-function makeConfig(overrides: Partial<LTWorkflowConfig> = {}): LTWorkflowConfig {
+function makeWorkflow(overrides: Partial<DiscoveredWorkflow> = {}): DiscoveredWorkflow {
   return {
     workflow_type: 'review-content',
     description: null,
-
-    invocable: true,
     task_queue: 'default',
-    default_role: 'reviewer',
-    default_modality: 'portal',
+    registered: true,
+    invocable: true,
+    system: false,
     roles: ['reviewer'],
     invocation_roles: [],
-    consumes: [],
-    envelope_schema: null,
-    resolver_schema: null,
-    cron_schedule: null,
     ...overrides,
   };
 }
 
-const CONFIGS: LTWorkflowConfig[] = [
-  makeConfig({
+const WORKFLOWS: DiscoveredWorkflow[] = [
+  makeWorkflow({
     workflow_type: 'review-content',
     description: 'Content review workflow',
-
+    registered: true,
     invocable: true,
     task_queue: 'default',
     roles: ['reviewer', 'admin'],
   }),
-  makeConfig({
+  makeWorkflow({
     workflow_type: 'process-claim-orchestrator',
     description: 'Insurance claim orchestrator',
-
+    registered: true,
     invocable: true,
     task_queue: 'claims',
     roles: ['claims-adjuster'],
   }),
-  makeConfig({
+  makeWorkflow({
     workflow_type: 'verify-document',
-
+    registered: true,
     invocable: false,
     task_queue: 'default',
     roles: ['reviewer'],
-    cron_schedule: '*/5 * * * *',
+  }),
+  makeWorkflow({
+    workflow_type: 'unregistered-flow',
+    description: 'Discovered but not registered',
+    registered: false,
+    invocable: false,
+    task_queue: 'user-queue',
+    roles: [],
   }),
 ];
 
@@ -72,37 +74,38 @@ function renderPage(initialPath = '/workflows/registry') {
 describe('WorkflowConfigsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
-      data: CONFIGS,
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: WORKFLOWS,
       isLoading: false,
     } as any);
   });
 
   // ── Rendering ──
 
-  it('renders page header and Add Config button', () => {
+  it('renders page header and Register Workflow button', () => {
     renderPage();
-    expect(screen.getByText('Registered Workflows')).toBeInTheDocument();
-    expect(screen.getByText('Add Config')).toBeInTheDocument();
+    expect(screen.getByText('Worker Registry')).toBeInTheDocument();
+    expect(screen.getByText('Register Workflow')).toBeInTheDocument();
   });
 
-  it('renders all configs when no filters applied', () => {
+  it('renders all workflows when no filters applied', () => {
     renderPage();
     expect(screen.getByText('review-content')).toBeInTheDocument();
     expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
     expect(screen.getByText('verify-document')).toBeInTheDocument();
+    expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
   });
 
-  it('renders filter bar with search, queue, kind, and role controls', () => {
+  it('renders filter bar with search, queue, tier, and role controls', () => {
     renderPage();
     expect(screen.getByPlaceholderText('Search workflow type...')).toBeInTheDocument();
-    expect(screen.getByText('Queue')).toBeInTheDocument();
-    expect(screen.getByText('Kind')).toBeInTheDocument();
-    expect(screen.getByText('Role')).toBeInTheDocument();
+    expect(screen.getAllByText('Queue').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Tier').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Role').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders loading skeleton when loading', () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: undefined,
       isLoading: true,
     } as any);
@@ -110,13 +113,22 @@ describe('WorkflowConfigsPage', () => {
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
-  it('renders empty state when no configs', () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
+  it('renders empty state when no workflows', () => {
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: [],
       isLoading: false,
     } as any);
     renderPage();
-    expect(screen.getByText('No workflow configurations found')).toBeInTheDocument();
+    expect(screen.getByText('No workflows found')).toBeInTheDocument();
+  });
+
+  // ── Tier column ──
+
+  it('renders tier pills for registered and unregistered workflows', () => {
+    renderPage();
+    // 3 in table + 1 in filter dropdown option = 4
+    expect(screen.getAllByText('Registered').length).toBe(4);
+    expect(screen.getAllByText('Durable').length).toBe(1);
   });
 
   // ── Filter: Queue ──
@@ -131,22 +143,22 @@ describe('WorkflowConfigsPage', () => {
     expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
   });
 
-  // ── Filter: Kind ──
+  // ── Filter: Tier ──
 
-  it('filters by kind=invocable', () => {
+  it('filters by tier (registered)', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'invocable' } });
+    // Tier is the second select (Queue, Tier, Role)
+    fireEvent.change(selects[1], { target: { value: 'registered' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
+    expect(screen.queryByText('unregistered-flow')).not.toBeInTheDocument();
   });
 
-  it('filters by kind=cron', () => {
+  it('filters by tier (unregistered)', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'cron' } });
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
+    fireEvent.change(selects[1], { target: { value: 'unregistered' } });
+    expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
   });
 
@@ -188,14 +200,14 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Combined filters ──
 
-  it('combines queue + kind filters', () => {
+  it('combines queue + role filters', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'default' } });
-    fireEvent.change(selects[1], { target: { value: 'invocable' } });
-    // Only review-content is in default queue AND invocable
+    fireEvent.change(selects[2], { target: { value: 'reviewer' } });
+    // review-content and verify-document are in default queue with reviewer role
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
+    expect(screen.getByText('verify-document')).toBeInTheDocument();
     expect(screen.queryByText('process-claim-orchestrator')).not.toBeInTheDocument();
   });
 
@@ -228,7 +240,7 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Column rendering ──
 
-  it('renders role pills', () => {
+  it('renders role pills for registered workflows', () => {
     renderPage();
     // reviewer appears in multiple configs + filter dropdown
     expect(screen.getAllByText('reviewer').length).toBeGreaterThanOrEqual(1);
@@ -236,16 +248,22 @@ describe('WorkflowConfigsPage', () => {
     expect(screen.getAllByText('claims-adjuster').length).toBeGreaterThanOrEqual(1);
   });
 
-  // ── Delete ──
+  // ── Actions ──
 
-  it('shows delete icon on row hover', () => {
+  it('shows delete icon for registered workflows', () => {
     renderPage();
     const deleteButtons = screen.getAllByTitle('Delete config');
     expect(deleteButtons.length).toBe(3);
   });
+
+  it('shows register icon for unregistered workflows', () => {
+    renderPage();
+    const registerButtons = screen.getAllByTitle('Register workflow');
+    expect(registerButtons.length).toBe(1);
+  });
 });
 
-// ── matchesSearch / matchesKind unit tests (tested via rendering) ──
+// ── matchesSearch unit tests (tested via rendering) ──
 
 describe('filter helpers (via rendering)', () => {
   beforeEach(() => {
@@ -253,8 +271,8 @@ describe('filter helpers (via rendering)', () => {
   });
 
   it('search is case-insensitive', async () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
-      data: CONFIGS,
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: WORKFLOWS,
       isLoading: false,
     } as any);
     vi.useFakeTimers();
@@ -267,8 +285,8 @@ describe('filter helpers (via rendering)', () => {
   });
 
   it('clearing filter restores all results', () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
-      data: CONFIGS,
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: WORKFLOWS,
       isLoading: false,
     } as any);
     renderPage();

@@ -4,7 +4,6 @@ export interface LTWorkflowConfig {
   invocable: boolean;
   task_queue: string;
   default_role: string;
-  default_modality: string;
   roles: string[];
   invocation_roles: string[];
   consumes: string[];
@@ -39,6 +38,8 @@ export interface McpServerRecord {
   status: 'registered' | 'connected' | 'error' | 'disconnected';
   tool_manifest: McpToolManifest[] | null;
   metadata: Record<string, unknown> | null;
+  tags: string[];
+  credential_providers: string[];
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +113,25 @@ export interface WorkflowExecution {
   summary: WorkflowExecutionSummary;
   /** Structured activity list with input/output (YAML engine exports). */
   activities?: ActivityDetail[];
+}
+
+export interface DiscoveredWorkflow {
+  workflow_type: string;
+  task_queue: string | null;
+  registered: boolean;
+  active?: boolean;
+  invocable: boolean;
+  system: boolean;
+  description: string | null;
+  roles: string[];
+  invocation_roles: string[];
+}
+
+export interface ActiveWorker {
+  name: string;
+  task_queue: string;
+  registered: boolean;
+  system: boolean;
 }
 
 export interface LTJob {

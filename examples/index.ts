@@ -2,15 +2,16 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import * as reviewContentWorkflow from './workflows/review-content';
 import * as verifyDocumentWorkflow from './workflows/verify-document';
-import * as verifyDocumentMcpWorkflow from './workflows/verify-document-mcp';
 import * as processClaimWorkflow from './workflows/process-claim';
 import * as kitchenSinkWorkflow from './workflows/kitchen-sink';
+import * as basicEchoWorkflow from './workflows/basic-echo';
 
 import type { LTEnvelope } from '../types';
 import type {
   ReviewContentEnvelopeData,
   ProcessClaimEnvelopeData,
   KitchenSinkEnvelopeData,
+  BasicEchoEnvelopeData,
 } from './types';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { loggerRegistry } from '../services/logger';
@@ -26,9 +27,9 @@ import { addEscalationChain, createRole } from '../services/role';
 export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: reviewContentWorkflow.reviewContent },
   { taskQueue: 'long-tail-examples', workflow: verifyDocumentWorkflow.verifyDocument },
-  { taskQueue: 'long-tail-examples', workflow: verifyDocumentMcpWorkflow.verifyDocumentMcp },
   { taskQueue: 'long-tail-examples', workflow: processClaimWorkflow.processClaim },
   { taskQueue: 'long-tail-examples', workflow: kitchenSinkWorkflow.kitchenSink },
+  { taskQueue: 'long-tail-examples', workflow: basicEchoWorkflow.basicEcho },
 ];
 
 const SEED_USERS = [
@@ -134,7 +135,7 @@ async function seedUsers(): Promise<void> {
 //   Kitchen-sink workflow creates a standard escalation.
 //   As reviewer, check "Request AI Triage" to trigger dynamic triage.
 
-type SeedWorkflowName = 'reviewContent' | 'processClaim' | 'kitchenSink';
+type SeedWorkflowName = 'reviewContent' | 'processClaim' | 'kitchenSink' | 'basicEcho';
 
 const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -237,6 +238,24 @@ const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'dynamic-triage',
         description: 'As reviewer, check "Request AI Triage" and write: "This looks fine, just approve it."',
+      },
+    },
+  },
+
+  // ── Process 6: Basic Echo ──────────────────────────────────
+  {
+    label: 'Process 6 — Basic Echo',
+    workflowName: 'basicEcho',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: {
+        message: 'Hello from the seed!',
+        sleepSeconds: 2,
+      } satisfies BasicEchoEnvelopeData,
+      metadata: {
+        source: 'seed',
+        process: 'basic-echo',
+        description: 'Minimal durable workflow — echoes a message and reveals IAM context.',
       },
     },
   },

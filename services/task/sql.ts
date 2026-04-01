@@ -6,10 +6,10 @@
 
 export const CREATE_TASK = `
   INSERT INTO lt_tasks
-    (workflow_id, workflow_type, lt_type, task_queue, modality, signal_id,
+    (workflow_id, workflow_type, lt_type, task_queue, signal_id,
      parent_workflow_id, origin_id, parent_id, envelope, metadata, priority,
      trace_id, span_id, initiated_by, principal_type)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
   RETURNING *`;
 
 export const APPEND_MILESTONES = `

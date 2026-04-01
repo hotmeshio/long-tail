@@ -7,25 +7,24 @@ import type { WorkflowExecution } from '../../../api/types';
 interface RestartPanelProps {
   execution: WorkflowExecution;
   state?: Record<string, unknown>;
-  envelope?: string | null;
-  /** LT workflow type from task record (e.g., "reviewContent"), preferred over execution.workflow_type which may be HotMesh-prefixed. */
-  workflowType?: string | null;
   /** Controlled open state from parent (e.g., via Actions menu) */
   forceOpen?: boolean;
   /** Called when the panel is closed */
   onClose?: () => void;
 }
 
-function parseEnvelope(raw: string | null | undefined): Record<string, unknown> | null {
-  if (!raw) return null;
-  try {
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
-  } catch {
-    return null;
-  }
+/**
+ * Extract the workflow input envelope from the workflow_execution_started event.
+ */
+function extractInput(execution: WorkflowExecution): Record<string, unknown> | null {
+  const startEvent = execution.events.find(
+    (e) => e.event_type === 'workflow_execution_started',
+  );
+  const input = (startEvent?.attributes as any)?.input;
+  return input && typeof input === 'object' ? input : null;
 }
 
-export function RestartPanel({ execution, envelope, workflowType, forceOpen, onClose }: RestartPanelProps) {
+export function RestartPanel({ execution, forceOpen, onClose }: RestartPanelProps) {
   const navigate = useNavigate();
   const invokeMutation = useInvokeWorkflow();
   const [open, setOpen] = useState(false);
@@ -36,18 +35,18 @@ export function RestartPanel({ execution, envelope, workflowType, forceOpen, onC
     if (forceOpen) setOpen(true);
   }, [forceOpen]);
 
-  // Use the task envelope (original LT input) — not the HotMesh job output
-  const originalInput = parseEnvelope(envelope) ?? {};
+  const originalInput = extractInput(execution) ?? {};
+  const workflowType = execution.workflow_name ?? execution.workflow_type;
 
   const [jsonInput, setJsonInput] = useState(() =>
     JSON.stringify(originalInput, null, 2),
   );
 
-  // Update when envelope arrives asynchronously from task query
+  // Update when execution data changes
   useEffect(() => {
-    const parsed = parseEnvelope(envelope);
-    if (parsed) setJsonInput(JSON.stringify(parsed, null, 2));
-  }, [envelope]);
+    const input = extractInput(execution);
+    if (input) setJsonInput(JSON.stringify(input, null, 2));
+  }, [execution]);
 
   const handleClose = () => {
     setOpen(false);
@@ -68,12 +67,9 @@ export function RestartPanel({ execution, envelope, workflowType, forceOpen, onC
     delete envelope.lt;
     delete envelope.resolver;
 
-    // Prefer the LT task workflow type; fall back to execution (HotMesh) type
-    const resolvedType = workflowType || execution.workflow_type;
-
     try {
       const result = await invokeMutation.mutateAsync({
-        workflowType: resolvedType,
+        workflowType,
         data: (envelope.data ?? envelope) as Record<string, unknown>,
         metadata: (envelope.metadata ?? {}) as Record<string, unknown>,
       });
@@ -102,7 +98,7 @@ export function RestartPanel({ execution, envelope, workflowType, forceOpen, onC
                 Workflow Type
               </p>
               <p className="text-xs font-mono text-text-primary">
-                {workflowType || execution.workflow_type}
+                {workflowType}
               </p>
             </div>
             <div>

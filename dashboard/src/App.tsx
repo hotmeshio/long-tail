@@ -14,9 +14,6 @@ import { RequireRole } from './components/layout/RequireRole';
 // ---------------------------------------------------------------------------
 
 // Process pages (all authenticated users)
-const ProcessesOverview = lazy(() =>
-  import('./pages/processes/ProcessesOverview').then((m) => ({ default: m.ProcessesOverview })),
-);
 const ProcessesListPage = lazy(() =>
   import('./pages/processes/ProcessesListPage').then((m) => ({ default: m.ProcessesListPage })),
 );
@@ -59,14 +56,21 @@ const EscalationDetailPage = lazy(() =>
 const WorkflowsOverview = lazy(() =>
   import('./pages/workflows/WorkflowsOverview').then((m) => ({ default: m.WorkflowsOverview })),
 );
-const WorkflowsDashboard = lazy(() =>
-  import('./pages/workflows/WorkflowsDashboard').then((m) => ({ default: m.WorkflowsDashboard })),
-);
 const StartWorkflowPage = lazy(() =>
   import('./pages/workflows/start').then((m) => ({ default: m.StartWorkflowPage })),
 );
-const CronWorkflowsPage = lazy(() =>
-  import('./pages/workflows/cron/CronWorkflowsPage').then((m) => ({ default: m.CronWorkflowsPage })),
+const DurableInvokePage = lazy(() =>
+  import('./pages/workflows/start').then((m) => ({ default: m.DurableInvokePage })),
+);
+const DurableExecutionsPage = lazy(() =>
+  import('./pages/workflows/WorkflowsDashboard').then((m) => ({
+    default: () => m.WorkflowsDashboard({ tier: 'unregistered' }),
+  })),
+);
+const UnbreakableExecutionsPage = lazy(() =>
+  import('./pages/workflows/WorkflowsDashboard').then((m) => ({
+    default: () => m.WorkflowsDashboard({ tier: 'registered' }),
+  })),
 );
 const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
@@ -87,6 +91,9 @@ const WorkflowExecutionPage = lazy(() =>
 // Admin pages (admin or superadmin)
 const AdminDashboard = lazy(() =>
   import('./pages/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard })),
+);
+const WorkersPage = lazy(() =>
+  import('./pages/workflows/workers').then((m) => ({ default: m.WorkersPage })),
 );
 const WorkflowConfigsPage = lazy(() =>
   import('./pages/workflows/registry').then((m) => ({ default: m.WorkflowConfigsPage })),
@@ -112,8 +119,8 @@ const ControlPlanePage = lazy(() =>
 const BotsPage = lazy(() =>
   import('./pages/admin/bots').then((m) => ({ default: m.BotsPage })),
 );
-const ConnectionsPage = lazy(() =>
-  import('./pages/settings/ConnectionsPage').then((m) => ({ default: m.ConnectionsPage })),
+const CredentialsPage = lazy(() =>
+  import('./pages/settings/CredentialsPage').then((m) => ({ default: m.CredentialsPage })),
 );
 
 // ---------------------------------------------------------------------------
@@ -154,28 +161,37 @@ const queryClient = new QueryClient({
   },
 });
 
-// Clear cached query data on logout so stale results from a
-// previous session don't appear as empty lists on the next login.
+// Force immediate redirect on auth failure — don't wait for React state batching.
+// This prevents the "empty pages" scenario where queries error silently and
+// components render `data?.items ?? []` as empty arrays before logout propagates.
 window.addEventListener('auth:unauthorized', () => {
   queryClient.clear();
+  sessionStorage.removeItem('lt_token');
+  sessionStorage.removeItem('lt_credentials');
+  sessionStorage.removeItem('lt_user_info');
+  if (window.location.pathname !== '/login') {
+    window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+  }
 });
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/connect/anthropic', element: <ConnectAnthropicPage /> },
+  { path: '/connect/:provider', element: <ConnectAnthropicPage /> },
   {
     path: '/',
     element: <Shell />,
     children: [
       // Default -> processes overview (home page)
-      { index: true, element: <Lazy><ProcessesOverview /></Lazy> },
+      { index: true, element: <Lazy><ProcessesListPage /></Lazy> },
 
       // Processes section (all authenticated users)
       { path: 'processes/all', element: <Lazy><ProcessesListPage /></Lazy> },
       { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
 
-      // Connections (all authenticated users)
-      { path: 'connections', element: <Lazy><ConnectionsPage /></Lazy> },
+      // Credentials (all authenticated users) — legacy path redirects
+      { path: 'credentials', element: <Lazy><CredentialsPage /></Lazy> },
+      { path: 'connections', element: <Navigate to="/credentials" replace /> },
 
       // Escalation section (all authenticated users)
       { path: 'escalations', element: <Lazy><EscalationsOverview /></Lazy> },
@@ -188,12 +204,16 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
-          { path: 'workflows/executions', element: <Lazy><WorkflowsDashboard /></Lazy> },
+          { path: 'workflows/executions', element: <Lazy><UnbreakableExecutionsPage /></Lazy> },
+          { path: 'workflows/durable/executions', element: <Lazy><DurableExecutionsPage /></Lazy> },
+          { path: 'workflows/durable/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
           { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
           { path: 'workflows/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
-          { path: 'workflows/cron', element: <Lazy><CronWorkflowsPage /></Lazy> },
+          { path: 'workflows/durable/invoke', element: <Lazy><DurableInvokePage /></Lazy> },
+          { path: 'workflows/cron', element: <Navigate to="/workflows/start?mode=schedule" replace /> },
+          { path: 'workflows/workers', element: <Lazy><WorkersPage /></Lazy> },
           { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
           { path: 'workflows/registry/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
           { path: 'workflows/registry/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },

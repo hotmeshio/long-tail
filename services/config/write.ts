@@ -36,7 +36,6 @@ export async function upsertWorkflowConfig(
         config.invocable,
         config.task_queue,
         config.default_role,
-        config.default_modality,
         config.description,
         config.consumes,
         config.envelope_schema ?? null,

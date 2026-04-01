@@ -29,7 +29,6 @@ export async function createEscalation(
     [
       input.type,
       input.subtype,
-      input.modality,
       input.description || null,
       input.priority || 2,
       input.task_id || null,

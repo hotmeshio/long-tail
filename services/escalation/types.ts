@@ -3,7 +3,6 @@ import type { LTEscalationRecord } from '../../types';
 export interface CreateEscalationInput {
   type: string;
   subtype: string;
-  modality: string;
   description?: string;
   priority?: number;
   task_id?: string;

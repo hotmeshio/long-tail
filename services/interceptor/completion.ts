@@ -103,7 +103,7 @@ async function createAdvisoryEscalation(
   state: InterceptorState,
   result: LTReturn,
 ): Promise<void> {
-  const { activities, wfConfig, defaultModality, defaultRole } = state;
+  const { activities, wfConfig, defaultRole } = state;
 
   const storedEnvelope = buildStoredEnvelope(state);
   const diagnosis = (result.data as any)?.diagnosis as string | undefined;
@@ -118,7 +118,6 @@ async function createAdvisoryEscalation(
   const escalationId = await activities.ltCreateEscalation({
     type: state.workflowName,
     subtype: 'rounds_exhausted',
-    modality: wfConfig?.modality || defaultModality,
     description,
     priority: 2,
     taskId: state.taskId,

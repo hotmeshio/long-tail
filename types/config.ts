@@ -7,7 +7,6 @@ export interface LTWorkflowConfig {
   invocable: boolean;
   task_queue: string | null;
   default_role: string;
-  default_modality: string;
   description: string | null;
   roles: string[];
   invocation_roles: string[];
@@ -26,7 +25,6 @@ export interface LTResolvedConfig {
   invocable: boolean;
   taskQueue: string | null;
   role: string;
-  modality: string;
   roles: string[];
   invocationRoles: string[];
   consumes: string[];

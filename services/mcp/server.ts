@@ -66,7 +66,6 @@ export async function createHumanQueueServer(options?: {
       const escalation = await escalationService.createEscalation({
         type: args.type || 'mcp',
         subtype: args.subtype || 'tool_call',
-        modality: 'mcp',
         description: args.message,
         priority: args.priority,
         role: args.role,

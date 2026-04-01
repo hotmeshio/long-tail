@@ -525,6 +525,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'database' },
     tags: ['database', 'query', 'analytics'],
     compile_hints: 'Query tools return structured result sets. When a query result is consumed by a later step, wire the specific output field (e.g., "rows", "tasks") — not the entire result object.',
+    credential_providers: [],
   },
   {
     name: 'long-tail-human-queue',
@@ -535,6 +536,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'escalation' },
     tags: ['escalation', 'human-queue', 'routing'],
     compile_hints: null,
+    credential_providers: [],
   },
   {
     name: 'mcp-workflows-longtail',
@@ -545,6 +547,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'workflows' },
     tags: ['workflows', 'compiled', 'deterministic'],
     compile_hints: null,
+    credential_providers: [],
   },
   {
     name: 'long-tail-workflow-compiler',
@@ -555,6 +558,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'compilation' },
     tags: ['compilation', 'yaml', 'codegen'],
     compile_hints: null,
+    credential_providers: [],
   },
   {
     name: 'long-tail-document-vision',
@@ -565,6 +569,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'document-processing' },
     tags: ['document-processing', 'vision', 'ocr', 'translation'],
     compile_hints: 'Vision tools process one document at a time. When iterating over multiple documents, each iteration should pass a single image path or URL.',
+    credential_providers: ['anthropic'],
   },
   {
     name: 'long-tail-playwright',
@@ -578,6 +583,7 @@ const SEED_MCP_SERVERS = [
       'Session fields (_handle, page_id) MUST be threaded from the step that created them to EVERY subsequent step that operates on the browser.',
       'run_script accepts a `steps` array — this is a fixed implementation detail, never a dynamic input.',
     ].join(' '),
+    credential_providers: [],
   },
   {
     name: 'long-tail-playwright-cli',
@@ -593,6 +599,7 @@ const SEED_MCP_SERVERS = [
       'capture_authenticated_pages expects a `login` object and a `pages` array. The `login` object contains nested fields (url, username, password, selectors) — flatten credentials as dynamic trigger inputs but keep the object structure in stored tool_arguments. The `pages` array should flow from a transform edge that reshapes `links` into [{url, screenshot_path, wait_ms, full_page}].',
       'For screenshot_path derivation in transforms, use the `screenshot_dir` trigger input as a dynamic prefix (not hardcoded). Derivation strategy: slugify the href, prepend screenshot_dir + "/", append ".png".',
     ].join(' '),
+    credential_providers: [],
   },
   {
     name: 'long-tail-file-storage',
@@ -603,6 +610,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'storage' },
     tags: ['storage', 'files', 'io'],
     compile_hints: null,
+    credential_providers: [],
   },
   {
     name: 'long-tail-http-fetch',
@@ -613,6 +621,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'http' },
     tags: ['http', 'api', 'fetch', 'network'],
     compile_hints: 'HTTP response bodies may be large. When wiring output to a later step, prefer specific fields from a parsed JSON response rather than the raw body.',
+    credential_providers: [],
   },
   {
     name: 'long-tail-oauth',
@@ -661,6 +670,7 @@ const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'authentication' },
     tags: ['authentication', 'oauth', 'credentials'],
     compile_hints: 'get_access_token returns a short-lived access_token string. Always call this immediately before making an authenticated API request — do not cache or reuse across workflow steps.',
+    credential_providers: [],
   },
   {
     name: 'long-tail-claude-code',
@@ -681,6 +691,7 @@ const SEED_MCP_SERVERS = [
       'starts with no prior conversation. For read-only analysis, restrict with ' +
       'allowed_tools: ["Read", "Grep", "Glob"]. Results may be large; extract specific ' +
       'fields in subsequent steps rather than passing the full result.',
+    credential_providers: ['anthropic'],
   },
 ];
 
@@ -703,6 +714,7 @@ export async function seedSystemMcpServers(): Promise<void> {
           JSON.stringify(srv.metadata),
           srv.tags,
           srv.compile_hints,
+          srv.credential_providers || [],
         ],
       );
     } catch (err: any) {

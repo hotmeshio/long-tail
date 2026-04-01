@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useWorkflowConfigs, useUpsertWorkflowConfig, useInvokeWorkflow } from '../../../api/workflows';
+import { useWorkflowConfigs, useUpsertWorkflowConfig, useInvokeWorkflow, useJobs } from '../../../api/workflows';
 import { useToast } from '../../../hooks/useToast';
 import { StepIndicator } from '../../../components/common/layout/StepIndicator';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
@@ -20,13 +20,43 @@ export function WorkflowConfigDetailPage() {
 
   const editing = configs?.find((c) => c.workflow_type === workflowType) ?? null;
 
-  const [form, setForm] = useState<ConfigFormState>(EMPTY_FORM);
-  const [schemaError, setSchemaError] = useState('');
-  const [initialized, setInitialized] = useState(false);
+  // Fetch known workflow types from jobs to build the pick-list.
+  // System workflows (triage, query, routing pipelines) are excluded —
+  // they serve the discovery/compilation layer, not user-authored flows.
+  const SYSTEM_WORKFLOWS = new Set([
+    'mcpQuery',
+    'mcpDeterministic',
+    'mcpQueryRouter',
+    'mcpTriage',
+    'mcpTriageRouter',
+    'mcpTriageDeterministic',
+    'insightQuery',
+  ]);
+  const { data: jobsData } = useJobs({ limit: 500 });
+  const unregisteredTypes = useMemo(() => {
+    const registeredSet = new Set((configs ?? []).map((c) => c.workflow_type));
+    const allEntities = new Set((jobsData?.jobs ?? []).map((j) => j.entity));
+    return [...allEntities]
+      .filter((e) => !registeredSet.has(e) && !SYSTEM_WORKFLOWS.has(e))
+      .sort();
+  }, [configs, jobsData]);
 
   // Step via URL search param for browser history
   const [searchParams, setSearchParams] = useSearchParams();
-  const step = parseInt(searchParams.get('step') || '0', 10);
+
+  // Pre-fill from URL search params when creating new
+  const prefillForm = useMemo((): ConfigFormState => {
+    if (!isNew) return EMPTY_FORM;
+    const prefillType = searchParams.get('workflow_type') ?? '';
+    const prefillQueue = searchParams.get('task_queue') ?? '';
+    if (!prefillType && !prefillQueue) return EMPTY_FORM;
+    return { ...EMPTY_FORM, workflow_type: prefillType, task_queue: prefillQueue };
+  }, [isNew, searchParams]);
+
+  const [form, setForm] = useState<ConfigFormState>(prefillForm);
+  const [schemaError, setSchemaError] = useState('');
+  const [initialized, setInitialized] = useState(false);
+  const step = parseInt(searchParams.get('step') || '1', 10);
   const setStep = useCallback((s: number) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -41,12 +71,16 @@ export function WorkflowConfigDetailPage() {
 
   useEffect(() => {
     if (initialized) return;
-    if (isNew) { setInitialized(true); return; }
+    if (isNew) {
+      setForm(prefillForm);
+      setInitialized(true);
+      return;
+    }
     if (editing) {
       setForm(configToForm(editing));
       setInitialized(true);
     }
-  }, [editing, isNew, initialized]);
+  }, [editing, isNew, initialized, prefillForm]);
 
   useEffect(() => {
     if (!editing) return;
@@ -88,7 +122,6 @@ export function WorkflowConfigDetailPage() {
         description: form.description.trim() || null,
         task_queue: form.task_queue.trim() || null,
         default_role: form.default_role.trim() || 'reviewer',
-        default_modality: form.default_modality.trim() || 'portal',
         invocable: form.invocable,
         roles: splitCsv(form.roles),
         invocation_roles: splitCsv(form.invocation_roles),
@@ -156,7 +189,7 @@ export function WorkflowConfigDetailPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────
 
-  const isLast = step === STEP_LABELS.length - 1;
+  const isLast = step === STEP_LABELS.length;
   const showInvokeSidebar = !isNew && form.invocable;
 
   return (
@@ -166,12 +199,12 @@ export function WorkflowConfigDetailPage() {
       <div className={`grid gap-12 ${showInvokeSidebar ? 'grid-cols-1 lg:grid-cols-3' : ''}`}>
         {/* Wizard (left / full width) */}
         <div className={showInvokeSidebar ? 'lg:col-span-2' : 'max-w-3xl'}>
-          <StepIndicator steps={STEP_LABELS} currentStep={step} onStepClick={setStep} />
+          <StepIndicator steps={STEP_LABELS} currentStep={step - 1} onStepClick={(i) => setStep(i + 1)} />
 
           <div className="min-h-[360px] py-2">
-            {step === 0 && <BasicsStep form={form} set={set} editing={!!editing} />}
-            {step === 1 && <AccessStep form={form} set={set} />}
-            {step === 2 && <SchemasStep form={form} set={set} />}
+            {step === 1 && <BasicsStep form={form} set={set} editing={!!editing} durableTypes={unregisteredTypes} />}
+            {step === 2 && <AccessStep form={form} set={set} />}
+            {step === 3 && <SchemasStep form={form} set={set} />}
           </div>
 
           {(schemaError || upsert.error) && (
@@ -183,7 +216,7 @@ export function WorkflowConfigDetailPage() {
           {/* Navigation */}
           <div className="flex justify-between items-center pt-4 border-t border-surface-border mt-4">
             <div>
-              {step > 0 && (
+              {step > 1 && (
                 <button
                   onClick={() => setStep(step - 1)}
                   className="btn-secondary text-xs"

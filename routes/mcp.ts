@@ -13,11 +13,13 @@ const router = Router();
  */
 router.get('/servers', async (req, res) => {
   try {
+    const tagsParam = req.query.tags as string | undefined;
     const result = await mcpDbService.listMcpServers({
       status: req.query.status as any,
       auto_connect: req.query.auto_connect === 'true' ? true :
                     req.query.auto_connect === 'false' ? false : undefined,
       search: req.query.search as string | undefined,
+      tags: tagsParam ? tagsParam.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });
@@ -147,6 +149,43 @@ router.post('/servers/:id/disconnect', async (req, res) => {
   }
 });
 
+// ── Credential status ────────────────────────────────────────────────
+
+/**
+ * GET /api/mcp/servers/:id/credential-status
+ * Check which credential providers are required and which the user has.
+ */
+router.get('/servers/:id/credential-status', async (req, res) => {
+  try {
+    const server = await mcpDbService.getMcpServer(req.params.id);
+    if (!server) {
+      res.status(404).json({ error: 'MCP server not found' });
+      return;
+    }
+    const required: string[] = server.credential_providers ?? [];
+    const registered: string[] = [];
+    const missing: string[] = [];
+
+    if (req.auth?.userId && required.length > 0) {
+      const { resolveCredential } = await import('../services/iam/credentials');
+      for (const provider of required) {
+        const cred = await resolveCredential(
+          { id: req.auth.userId, type: 'user', roles: [] },
+          provider,
+        );
+        if (cred) registered.push(provider);
+        else missing.push(provider);
+      }
+    } else {
+      missing.push(...required);
+    }
+
+    res.json({ required, registered, missing });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Tool operations ───────────────────────────────────────────────────
 
 /**
@@ -179,13 +218,25 @@ router.post('/servers/:id/tools/:toolName/call', async (req, res) => {
       res.status(400).json({ error: 'MCP adapter not registered' });
       return;
     }
+    const authContext = req.auth?.userId
+      ? { userId: req.auth.userId }
+      : undefined;
     const result = await adapter.callTool(
       req.params.id,
       req.params.toolName,
       req.body.arguments || {},
+      authContext,
     );
     res.json({ result });
   } catch (err: any) {
+    if (err.name === 'MissingCredentialError') {
+      res.status(422).json({
+        error: 'missing_credential',
+        provider: err.provider,
+        message: err.message,
+      });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });

@@ -35,7 +35,6 @@ export interface LTStartConfig {
   /** Interceptor defaults applied when a workflow escalates. */
   interceptor?: {
     defaultRole?: string;
-    defaultModality?: string;
   };
 
   /** Authentication. Defaults to the built-in JWT adapter using JWT_SECRET. */

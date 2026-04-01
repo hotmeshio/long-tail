@@ -10,6 +10,19 @@ import type { ToolPrincipal } from '../../types/tool-context';
 import { getFreshAccessToken } from '../oauth';
 import { loggerRegistry } from '../logger';
 
+/**
+ * Thrown when credential resolution finds no credential for a provider.
+ * Caught by route handlers to return structured 422 responses.
+ */
+export class MissingCredentialError extends Error {
+  provider: string;
+  constructor(provider: string) {
+    super(`No credential found for provider "${provider}". Register one at Credentials.`);
+    this.name = 'MissingCredentialError';
+    this.provider = provider;
+  }
+}
+
 /** Well-known provider → env var mappings. */
 const SYSTEM_ENV_VARS: Record<string, string[]> = {
   anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'],

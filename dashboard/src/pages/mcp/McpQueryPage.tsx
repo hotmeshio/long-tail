@@ -127,7 +127,7 @@ export function McpQueryPage() {
 
   return (
     <>
-      <PageHeader title="Discover & Compile" />
+      <PageHeader title="Invoke MCP Discovery Flow" />
 
       {/* Submit form */}
       <form onSubmit={handleSubmit} className="mb-6">
@@ -198,6 +198,7 @@ export function McpQueryPage() {
         keyFn={(row) => row.workflow_id}
         onRowClick={(row) => navigate(`/mcp/queries/${row.workflow_id}`)}
         isLoading={isLoading}
+        emptyMessage=""
         sort={sort}
         onSort={setSort}
       />

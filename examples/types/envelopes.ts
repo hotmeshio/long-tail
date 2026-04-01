@@ -14,7 +14,7 @@ export interface ReviewContentEnvelopeData {
   contentType?: string;
 }
 
-// ── verifyDocument / verifyDocumentMcp ──────────────────────────
+// ── verifyDocument ──────────────────────────────────────────────
 
 /** Document to verify — image-based identity or membership document. */
 export interface VerifyDocumentEnvelopeData {
@@ -45,15 +45,25 @@ export interface KitchenSinkEnvelopeData {
   mode?: 'full' | 'quick';
 }
 
+// ── basicEcho ─────────────────────────────────────────────────
+
+/** Basic echo — minimal durable workflow with IAM context. */
+export interface BasicEchoEnvelopeData {
+  /** Message to echo back. */
+  message?: string;
+  /** Duration to sleep before echoing (seconds). */
+  sleepSeconds?: number;
+}
+
 // ── Workflow envelope map ───────────────────────────────────────
 
 /** Map of invocable workflow type → its typed envelope data shape. */
 export type WorkflowEnvelopeMap = {
   reviewContent: ReviewContentEnvelopeData;
   verifyDocument: VerifyDocumentEnvelopeData;
-  verifyDocumentMcp: VerifyDocumentEnvelopeData;
   processClaim: ProcessClaimEnvelopeData;
   kitchenSink: KitchenSinkEnvelopeData;
+  basicEcho: BasicEchoEnvelopeData;
 };
 
 /** All invocable workflow type names. */
