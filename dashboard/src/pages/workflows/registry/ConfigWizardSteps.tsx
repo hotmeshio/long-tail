@@ -2,6 +2,7 @@ import { labelCls, hintCls, jsonCls, jsonValid } from './config-form-types';
 import type { ConfigFormState } from './config-form-types';
 import { RolePicker } from '../../../components/common/form/RolePicker';
 import { WorkflowPicker } from '../../../components/common/form/WorkflowPicker';
+import { BotPicker } from '../../../components/common/form/BotPicker';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { splitCsv } from '../../../lib/parse';
 
@@ -191,6 +192,19 @@ export function SchemasStep({ form, set }: StepProps) {
 
       {form.invocable && (
         <>
+          {/* Run As */}
+          <div>
+            <label className={labelCls}>Run As</label>
+            <BotPicker
+              selected={form.execute_as}
+              onChange={(botId) => set('execute_as', botId)}
+            />
+            <p className={hintCls}>
+              Choose a bot to execute this workflow under its identity and credentials.
+              Default runs as the invoking user.
+            </p>
+          </div>
+
           {/* Invocation roles */}
           <div>
             <label className={labelCls}>Invocation Roles</label>

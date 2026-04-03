@@ -15,6 +15,8 @@ export interface LTWorkflowConfig {
   envelope_schema?: Record<string, any> | null;
   resolver_schema?: Record<string, any> | null;
   cron_schedule?: string | null;
+  /** Bot external_id to run as. When set, workflows use this bot's identity. */
+  execute_as?: string | null;
 }
 
 /**
@@ -32,6 +34,7 @@ export interface LTResolvedConfig {
   envelopeSchema: Record<string, any> | null;
   resolverSchema: Record<string, any> | null;
   cronSchedule: string | null;
+  executeAs: string | null;
 }
 
 /**

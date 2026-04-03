@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import type { LTWorkflowConfig } from '../../../api/types';
 
@@ -40,6 +41,12 @@ export function WorkflowSelector({
                 {isDurable && (
                   <span className="px-1.5 py-0.5 text-[9px] bg-status-success/10 text-status-success rounded">
                     durable
+                  </span>
+                )}
+                {config.execute_as && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] bg-accent/10 text-accent rounded">
+                    <Bot className="w-2.5 h-2.5" />
+                    {config.execute_as}
                   </span>
                 )}
               </div>

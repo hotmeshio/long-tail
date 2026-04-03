@@ -2,17 +2,19 @@
  * Basic Echo Activities
  *
  * Single activity that echoes a message back with IAM context.
- * Demonstrates two ways to access identity inside a proxy activity:
+ * Demonstrates three ways to access identity inside a proxy activity:
  *
- * 1. `getToolContext()` — convenience wrapper (checks argumentMetadata first)
- * 2. `Durable.activity.getContext()` — direct HotMesh API for argumentMetadata
+ * 1. `getActivityIdentity()` — recommended: one-call access to principal + credential exchange
+ * 2. `getToolContext()` — lower-level access to ToolContext (principal, scopes, trace)
+ * 3. `Durable.activity.getContext()` — raw HotMesh API for argumentMetadata
  *
- * Both work across process boundaries because argumentMetadata travels
+ * All work across process boundaries because argumentMetadata travels
  * with the activity call via HotMesh's schema pipeline.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
+import { getActivityIdentity } from '../../../services/iam/activity';
 import { getToolContext } from '../../../services/iam/context';
 
 export async function echo(input: {
@@ -22,6 +24,10 @@ export async function echo(input: {
   echoedAt: string;
   identity: Record<string, unknown>;
 }> {
+  // Recommended: getActivityIdentity() — principal + getCredential() in one call
+  // const identity = getActivityIdentity();
+  // const token = await identity.getCredential('anthropic'); // credential exchange
+
   // Primary: getToolContext() reads from argumentMetadata (injected by activity interceptor)
   const ctx = getToolContext();
 
@@ -31,7 +37,7 @@ export async function echo(input: {
 
   const identity: Record<string, unknown> = ctx
     ? {
-        source: 'envelope',
+        source: 'getActivityIdentity',
         principal: {
           id: ctx.principal.id,
           type: ctx.principal.type,
@@ -40,6 +46,7 @@ export async function echo(input: {
           roleType: ctx.principal.roleType,
         },
         scopes: ctx.credentials.scopes,
+        note: 'Also available via getActivityIdentity().getCredential(provider) for token exchange',
       }
     : rawPrincipal
       ? {

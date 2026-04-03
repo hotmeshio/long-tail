@@ -61,6 +61,10 @@ export interface ToolTrace {
 export interface ToolContext {
   /** WHO — the authenticated principal (user or bot). */
   principal: ToolPrincipal;
+  /** WHO initiated — the original human invoker when proxy invocation is used.
+   *  Enables credential fallback to the human's tokens (e.g., their Gmail OAuth)
+   *  even when the workflow executes as a bot. */
+  initiatingPrincipal?: ToolPrincipal;
   /** WHAT — credentials and scopes for this invocation. */
   credentials: ToolCredentials;
   /** WHERE — position in the workflow chain. */

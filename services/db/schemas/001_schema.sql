@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS lt_config_workflows (
   envelope_schema  JSONB,
   resolver_schema  JSONB,
   cron_schedule    TEXT,
+  execute_as       TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

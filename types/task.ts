@@ -46,6 +46,8 @@ export interface LTTaskRecord {
   initiated_by: string | null;
   /** Principal type: 'user' or 'bot'. */
   principal_type: string | null;
+  /** Executing principal (bot external_id) when proxy invocation is used. */
+  executing_as: string | null;
 
   created_at: Date;
   updated_at: Date;

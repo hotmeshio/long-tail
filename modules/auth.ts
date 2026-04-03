@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { config } from './config';
 import { isSuperAdmin } from '../services/user';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
+import { resolvePrincipal } from '../services/iam/principal';
 import type { AuthPayload, LTAuthAdapter } from '../types';
 
 // Re-export types for convenience
@@ -58,7 +59,17 @@ export class JwtAuthAdapter implements LTAuthAdapter {
     try {
       const keyRecord = await validateBotApiKey(rawKey);
       if (!keyRecord) return null;
-      return { userId: keyRecord.user_id, role: 'member' };
+
+      // Resolve bot's actual roles (single JOIN query) instead of hardcoding 'member'
+      const principal = await resolvePrincipal(keyRecord.user_id);
+      const role = principal?.roleType ?? 'member';
+
+      return {
+        userId: keyRecord.user_id,
+        role,
+        scopes: keyRecord.scopes ?? [],
+        principalType: 'bot',
+      };
     } catch {
       return null;
     }

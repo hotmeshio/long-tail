@@ -284,10 +284,71 @@ describe('workflow configuration', () => {
     });
   });
 
+  // ── 5. execute_as (proxy invocation) ────────────────────────────────
+
+  describe('execute_as (proxy invocation)', () => {
+    it('should create a config with execute_as', async () => {
+      const result = await configService.upsertWorkflowConfig({
+        workflow_type: 'proxyWorkflow',
+        invocable: true,
+        task_queue: 'proxy-queue',
+        default_role: 'reviewer',
+        description: 'Runs as a bot',
+        roles: ['reviewer'],
+        invocation_roles: [],
+        consumes: [],
+        execute_as: 'lt-system',
+      });
+      expect(result.execute_as).toBe('lt-system');
+    });
+
+    it('should read execute_as from config', async () => {
+      const config = await configService.getWorkflowConfig('proxyWorkflow');
+      expect(config).toBeTruthy();
+      expect(config!.execute_as).toBe('lt-system');
+    });
+
+    it('should include execute_as in list', async () => {
+      const configs = await configService.listWorkflowConfigs();
+      const proxy = configs.find(c => c.workflow_type === 'proxyWorkflow');
+      expect(proxy).toBeTruthy();
+      expect(proxy!.execute_as).toBe('lt-system');
+    });
+
+    it('should resolve execute_as in cache', async () => {
+      ltConfig.invalidate();
+      const resolved = await ltConfig.getResolvedConfig('proxyWorkflow');
+      expect(resolved).toBeTruthy();
+      expect(resolved!.executeAs).toBe('lt-system');
+    });
+
+    it('should clear execute_as via upsert', async () => {
+      const updated = await configService.upsertWorkflowConfig({
+        workflow_type: 'proxyWorkflow',
+        invocable: true,
+        task_queue: 'proxy-queue',
+        default_role: 'reviewer',
+        description: null,
+        roles: ['reviewer'],
+        invocation_roles: [],
+        consumes: [],
+        execute_as: null,
+      });
+      expect(updated.execute_as).toBeNull();
+    });
+
+    it('should default execute_as to null when not provided', async () => {
+      const config = await configService.getWorkflowConfig('testWorkflow');
+      expect(config).toBeTruthy();
+      expect(config!.execute_as).toBeNull();
+    });
+  });
+
   // ── Cleanup ────────────────────────────────────────────────────────────
 
   it('should clean up test configs', async () => {
     await configService.deleteWorkflowConfig('testWorkflow');
+    await configService.deleteWorkflowConfig('proxyWorkflow');
     ltConfig.invalidate();
   });
 });

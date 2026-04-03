@@ -47,6 +47,9 @@ export function getToolContext(): ToolContext | undefined {
       const principal = meta.principal as ToolPrincipal;
       return {
         principal,
+        ...(meta.initiatingPrincipal
+          ? { initiatingPrincipal: meta.initiatingPrincipal as ToolPrincipal }
+          : {}),
         credentials: {
           scopes: (meta.scopes as string[]) ?? [],
         },

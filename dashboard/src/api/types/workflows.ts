@@ -10,6 +10,7 @@ export interface LTWorkflowConfig {
   envelope_schema: Record<string, unknown> | null;
   resolver_schema: Record<string, unknown> | null;
   cron_schedule: string | null;
+  execute_as: string | null;
 }
 
 export interface CronScheduleEntry {
@@ -125,6 +126,7 @@ export interface DiscoveredWorkflow {
   description: string | null;
   roles: string[];
   invocation_roles: string[];
+  execute_as: string | null;
 }
 
 export interface ActiveWorker {

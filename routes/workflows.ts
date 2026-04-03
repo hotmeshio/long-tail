@@ -94,6 +94,7 @@ router.get('/discovered', async (req, res) => {
           description: config?.description ?? null,
           roles: config?.roles ?? [],
           invocation_roles: config?.invocation_roles ?? [],
+          execute_as: config?.execute_as ?? null,
         };
       });
 
@@ -176,6 +177,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
       task_queue: req.body.task_queue ?? null,
       default_role: req.body.default_role ?? 'reviewer',
       description: req.body.description ?? null,
+      execute_as: req.body.execute_as ?? null,
       roles: req.body.roles ?? [],
       invocation_roles: req.body.invocation_roles ?? [],
       consumes: req.body.consumes ?? [],
@@ -276,23 +278,60 @@ router.post('/:type/invoke', async (req, res) => {
       taskQueue = worker.taskQueue;
     }
 
-    // 3. Build envelope and start workflow
-    const { data, metadata } = req.body || {};
+    // 3. Enforce bot API key scopes (if the key carries scopes)
+    const authScopes: string[] = (req.auth as any)?.scopes ?? [];
+    if (authScopes.length > 0 && !authScopes.includes('workflow:invoke')) {
+      res.status(403).json({ error: 'API key scope does not include workflow:invoke' });
+      return;
+    }
+
+    // 4. Build envelope and start workflow
+    const { data, metadata, execute_as: executeAsOverride } = req.body || {};
     if (!data || typeof data !== 'object') {
       res.status(400).json({ error: 'Request body must include a data object' });
       return;
     }
 
+    // Per-request execute_as override (admin-only)
+    if (executeAsOverride && req.auth?.role !== 'admin' && req.auth?.role !== 'superadmin') {
+      res.status(403).json({ error: 'execute_as override requires admin role' });
+      return;
+    }
+
     const userId = req.auth?.userId;
-    const principal = userId ? await resolvePrincipal(userId) : undefined;
+
+    // Proxy invocation priority: request override > config > invoking user
+    const executeAs = executeAsOverride ?? wfConfig?.execute_as;
+    let principal: Awaited<ReturnType<typeof resolvePrincipal>> | undefined;
+    let initiatingPrincipal: Awaited<ReturnType<typeof resolvePrincipal>> | undefined;
+    if (executeAs) {
+      // Resolve both: bot principal (executor) and user principal (initiator)
+      const [botP, userP] = await Promise.all([
+        resolvePrincipal(executeAs),
+        userId ? resolvePrincipal(userId) : Promise.resolve(null),
+      ]);
+      principal = botP ?? undefined;
+      initiatingPrincipal = userP ?? undefined;
+    } else if (userId) {
+      principal = await resolvePrincipal(userId) ?? undefined;
+    }
+
+    // Use the resolved principal's id (external_id) as the canonical userId,
+    // falling back to the raw JWT userId if principal resolution failed.
+    const resolvedUserId = principal?.id ?? userId;
+    const resolvedInitiatorId = initiatingPrincipal?.id ?? userId;
 
     const envelope: LTEnvelope = {
       data,
       metadata: metadata || {},
       lt: {
-        userId,
+        userId: executeAs ? principal?.id ?? executeAs : resolvedUserId,
         principal: principal ?? undefined,
         scopes: ['workflow:invoke'],
+        ...(executeAs && userId ? {
+          initiatedBy: resolvedInitiatorId,
+          initiatingPrincipal: initiatingPrincipal ?? undefined,
+        } : {}),
       },
     };
 

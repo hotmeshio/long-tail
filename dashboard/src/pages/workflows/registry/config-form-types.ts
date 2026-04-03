@@ -12,6 +12,7 @@ export interface ConfigFormState {
   envelope_schema: string;
   resolver_schema: string;
   cron_schedule: string;
+  execute_as: string;
 }
 
 export const EMPTY_FORM: ConfigFormState = {
@@ -26,6 +27,7 @@ export const EMPTY_FORM: ConfigFormState = {
   envelope_schema: '',
   resolver_schema: '',
   cron_schedule: '',
+  execute_as: '',
 };
 
 export function configToForm(c: LTWorkflowConfig): ConfigFormState {
@@ -41,6 +43,7 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     envelope_schema: c.envelope_schema ? JSON.stringify(c.envelope_schema, null, 2) : '',
     resolver_schema: c.resolver_schema ? JSON.stringify(c.resolver_schema, null, 2) : '',
     cron_schedule: c.cron_schedule ?? '',
+    execute_as: c.execute_as ?? '',
   };
 }
 

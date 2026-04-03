@@ -211,7 +211,7 @@ export function McpQueryDetailPage() {
       app_id: compileAppId.trim(), subscribes: derivedSubscribes, tags: compileTags,
     });
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
-    setManualStep(null);
+    setManualStep(4);
   };
 
   const handleRetryTriage = async () => {

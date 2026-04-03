@@ -22,6 +22,7 @@ function makeWorkflow(overrides: Partial<DiscoveredWorkflow> = {}): DiscoveredWo
     system: false,
     roles: ['reviewer'],
     invocation_roles: [],
+    execute_as: null,
     ...overrides,
   };
 }

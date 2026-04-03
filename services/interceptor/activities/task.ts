@@ -20,6 +20,7 @@ export async function ltCreateTask(input: {
   spanId?: string;
   initiatedBy?: string;
   principalType?: string;
+  executingAs?: string;
 }): Promise<string> {
   const task = await taskService.createTask({
     workflow_id: input.workflowId,
@@ -36,6 +37,7 @@ export async function ltCreateTask(input: {
     span_id: input.spanId,
     initiated_by: input.initiatedBy,
     principal_type: input.principalType,
+    executing_as: input.executingAs,
   });
 
   publishTaskEvent({

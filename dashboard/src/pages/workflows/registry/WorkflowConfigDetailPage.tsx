@@ -129,6 +129,7 @@ export function WorkflowConfigDetailPage() {
         envelope_schema,
         resolver_schema,
         cron_schedule: form.cron_schedule.trim() || null,
+        execute_as: form.execute_as.trim() || null,
       },
       {
         onSuccess: () => {

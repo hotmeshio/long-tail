@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Clock } from 'lucide-react';
+import { Play, Clock, Bot, UserCircle } from 'lucide-react';
 import { useWorkflowConfigs, useDiscoveredWorkflows, useInvokeWorkflow, useCronStatus, useSetCronSchedule, useJobs } from '../../../api/workflows';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import { Pill } from '../../../components/common/display/Pill';
 import { DataTable } from '../../../components/common/data/DataTable';
+import { BotPicker } from '../../../components/common/form/BotPicker';
+import { useAuth } from '../../../hooks/useAuth';
 import type { LTWorkflowConfig } from '../../../api/types';
 import {
   DEFAULT_ENVELOPE,
@@ -41,6 +43,62 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
     <div className="flex gap-1 p-0.5 bg-surface-sunken rounded-lg w-fit">
       {btn('now', <Play className="w-3.5 h-3.5" />, 'Start Now')}
       {btn('schedule', <Clock className="w-3.5 h-3.5" />, 'Schedule')}
+    </div>
+  );
+}
+
+// ── Identity summary ────────────────────────────────────────────────────────
+
+function IdentitySummary({
+  config,
+  overrideBot,
+  onOverrideChange,
+  showOverride,
+}: {
+  config: LTWorkflowConfig;
+  overrideBot?: string;
+  onOverrideChange?: (botExternalId: string) => void;
+  showOverride?: boolean;
+}) {
+  const { user } = useAuth();
+  const effectiveBot = overrideBot || config.execute_as;
+
+  return (
+    <div className="bg-surface-sunken rounded-lg px-4 py-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium">Running as</span>
+        {effectiveBot && !overrideBot && (
+          <span className="text-[9px] text-text-tertiary">configured default</span>
+        )}
+        {overrideBot && (
+          <span className="text-[9px] text-accent">admin override</span>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5">
+        {effectiveBot ? (
+          <>
+            <Bot className="w-3.5 h-3.5 text-accent/70" />
+            <span className="text-xs text-text-primary font-mono">{effectiveBot}</span>
+          </>
+        ) : (
+          <>
+            <UserCircle className="w-3.5 h-3.5 text-text-tertiary" />
+            <span className="text-xs text-text-primary">
+              {user?.displayName || user?.username || 'you'}
+            </span>
+          </>
+        )}
+      </div>
+      {showOverride && onOverrideChange && (
+        <div className="pt-1 border-t border-surface-border">
+          <label className="text-[10px] text-text-tertiary mb-1 block">Override identity</label>
+          <BotPicker
+            selected={overrideBot ?? ''}
+            onChange={onOverrideChange}
+            placeholder={config.execute_as ? `Default: ${config.execute_as}` : 'Invoking user (default)'}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -155,6 +213,20 @@ function SchedulePanel({
             {selected.description}
           </p>
         )}
+      </div>
+
+      {/* Cron execution identity */}
+      <div className="bg-surface-sunken rounded-lg px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-2">Cron runs as</span>
+          <Bot className="w-3.5 h-3.5 text-accent/70" />
+          <span className="text-xs text-text-primary font-mono">
+            {selected.execute_as ?? 'lt-system'}
+          </span>
+          {!selected.execute_as && (
+            <span className="text-[9px] text-text-tertiary ml-1">system bot</span>
+          )}
+        </div>
       </div>
 
       {/* Cron editor */}
@@ -278,11 +350,14 @@ function SchedulePanel({
 
 function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfig; executionsPath: string }) {
   const navigate = useNavigate();
+  const { isSuperAdmin, hasRoleType } = useAuth();
+  const isAdmin = isSuperAdmin || hasRoleType('admin');
   const invokeMutation = useInvokeWorkflow();
   const [jsonInput, setJsonInput] = useState(DEFAULT_ENVELOPE);
   const [parseError, setParseError] = useState('');
   const [formFields, setFormFields] = useState<Record<string, unknown>>({});
   const [isJsonMode, setIsJsonMode] = useState(false);
+  const [overrideBot, setOverrideBot] = useState('');
 
   const dataFields = useMemo(
     () => extractDataFields(selected.envelope_schema ?? null),
@@ -309,6 +384,7 @@ function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfi
       setFormFields({});
     }
     setIsJsonMode(!extractDataFields(selected.envelope_schema ?? null).length);
+    setOverrideBot('');
   }, [selected.workflow_type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleMode = () => {
@@ -351,6 +427,7 @@ function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfi
         workflowType: selected.workflow_type,
         data: data as Record<string, unknown>,
         metadata: (metadata as Record<string, unknown>) ?? undefined,
+        ...(overrideBot ? { execute_as: overrideBot } : {}),
       });
       navigate(executionsPath);
     } catch { /* error via mutation */ }
@@ -373,6 +450,13 @@ function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfi
           </p>
         )}
       </div>
+
+      <IdentitySummary
+        config={selected}
+        overrideBot={overrideBot}
+        onOverrideChange={setOverrideBot}
+        showOverride={isAdmin}
+      />
 
       <EnvelopeEditor
         selectedConfig={selected}
@@ -434,6 +518,7 @@ export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier 
         envelope_schema: null,
         resolver_schema: null,
         cron_schedule: null,
+        execute_as: null,
       } satisfies LTWorkflowConfig));
   }, [tier, configs, discoveredData]);
 

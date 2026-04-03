@@ -29,6 +29,9 @@ export function buildToolContextFromEnvelope(
 
   return {
     principal,
+    ...(envelope.lt?.initiatingPrincipal
+      ? { initiatingPrincipal: envelope.lt.initiatingPrincipal }
+      : {}),
     credentials: { delegationToken, scopes },
     trace: {
       originId: envelope.lt?.originId,

@@ -38,6 +38,7 @@ describe('Workflow invocation config and RBAC', () => {
     await configService.deleteWorkflowConfig('invocableWorkflow');
     await configService.deleteWorkflowConfig('privateWorkflow');
     await configService.deleteWorkflowConfig('rbacWorkflow');
+    await configService.deleteWorkflowConfig('botProxyWorkflow');
     ltConfig.invalidate();
     await Durable.shutdown();
     await disconnectTelemetry();
@@ -253,6 +254,32 @@ describe('Workflow invocation config and RBAC', () => {
     expect(hasAccess).toBe(false);
 
     await userService.deleteUser(user.id);
+  });
+
+  // ── execute_as: proxy invocation ────────────────────────────────────
+
+  it('should create a config with execute_as', async () => {
+    const result = await configService.upsertWorkflowConfig({
+      workflow_type: 'botProxyWorkflow',
+      invocable: true,
+      task_queue: 'proxy-queue',
+      default_role: 'reviewer',
+      description: 'Workflow that runs as a bot',
+      roles: ['reviewer'],
+      invocation_roles: [],
+      consumes: [],
+      execute_as: 'lt-system',
+    });
+    expect(result.execute_as).toBe('lt-system');
+    expect(result.invocable).toBe(true);
+  });
+
+  it('should resolve execute_as in cache as executeAs', async () => {
+    ltConfig.invalidate();
+    const resolved = await ltConfig.getResolvedConfig('botProxyWorkflow');
+    expect(resolved).toBeTruthy();
+    expect(resolved!.executeAs).toBe('lt-system');
+    expect(resolved!.invocable).toBe(true);
   });
 
   it('should allow superadmin to bypass invocation role check', async () => {

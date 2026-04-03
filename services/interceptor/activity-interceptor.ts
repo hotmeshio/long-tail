@@ -49,6 +49,9 @@ export function createLTActivityInterceptor(_options?: {
                 ...(activityCtx.options?.argumentMetadata ?? {}),
                 principal,
                 scopes: envelope.lt?.scopes,
+                ...(envelope.lt?.initiatingPrincipal
+                  ? { initiatingPrincipal: envelope.lt.initiatingPrincipal }
+                  : {}),
               },
             };
           }

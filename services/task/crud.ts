@@ -29,6 +29,7 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
       input.span_id || null,
       input.initiated_by || null,
       input.principal_type || null,
+      input.executing_as || null,
     ],
   );
   return rows[0];

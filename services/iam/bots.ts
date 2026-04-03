@@ -201,7 +201,7 @@ export async function ensureSystemBot(): Promise<string> {
     name: SYSTEM_BOT_NAME,
     display_name: 'System',
     description: 'System bot for cron and system-initiated workflows',
-    roles: [{ role: 'system', type: 'admin' }],
+    roles: [{ role: 'system', type: 'superadmin' as const }],
   });
   return bot.id;
 }

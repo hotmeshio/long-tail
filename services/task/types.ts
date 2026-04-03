@@ -23,6 +23,8 @@ export interface CreateTaskInput {
   initiated_by?: string;
   /** Principal type: 'user' or 'bot'. */
   principal_type?: string;
+  /** Executing principal (bot external_id) when proxy invocation is used. */
+  executing_as?: string;
 }
 
 export interface UpdateTaskInput {

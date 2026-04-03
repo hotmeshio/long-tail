@@ -115,6 +115,7 @@ export function useUpsertWorkflowConfig() {
       envelope_schema?: Record<string, unknown> | null;
       resolver_schema?: Record<string, unknown> | null;
       cron_schedule?: string | null;
+      execute_as?: string | null;
     }
   >({
     mutationFn: ({ workflow_type, ...body }) =>
@@ -169,12 +170,12 @@ export function useInvokeWorkflow() {
   return useMutation<
     { workflowId: string; message: string },
     Error,
-    { workflowType: string; data: Record<string, unknown>; metadata?: Record<string, unknown> }
+    { workflowType: string; data: Record<string, unknown>; metadata?: Record<string, unknown>; execute_as?: string }
   >({
-    mutationFn: ({ workflowType, data, metadata }) =>
+    mutationFn: ({ workflowType, data, metadata, execute_as }) =>
       apiFetch(`/workflows/${workflowType}/invoke`, {
         method: 'POST',
-        body: JSON.stringify({ data, metadata }),
+        body: JSON.stringify({ data, metadata, ...(execute_as ? { execute_as } : {}) }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'], refetchType: 'all' });

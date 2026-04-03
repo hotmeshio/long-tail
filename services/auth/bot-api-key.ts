@@ -22,13 +22,13 @@ const INSERT_KEY = `
   VALUES ($1, $2, $3, $4, $5) RETURNING id`;
 
 const GET_KEYS_BY_USER = `
-  SELECT id, name, user_id, key_hash
+  SELECT id, name, user_id, key_hash, scopes
   FROM lt_bot_api_keys
   WHERE user_id = $1
     AND (expires_at IS NULL OR expires_at > NOW())`;
 
 const GET_ALL_ACTIVE_KEYS = `
-  SELECT id, name, user_id, key_hash
+  SELECT id, name, user_id, key_hash, scopes
   FROM lt_bot_api_keys
   WHERE (expires_at IS NULL OR expires_at > NOW())`;
 

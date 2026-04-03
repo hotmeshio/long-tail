@@ -9,6 +9,8 @@
  * - Direct route handlers
  */
 export { runWithToolContext, getToolContext } from './context';
+export { getActivityIdentity } from './activity';
+export type { ActivityIdentity } from './activity';
 export { resolveToolContext } from './resolve';
 export type { ToolContextSource } from './resolve';
 export { resolveCredential, MissingCredentialError } from './credentials';

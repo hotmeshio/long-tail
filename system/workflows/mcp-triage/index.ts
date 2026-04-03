@@ -148,8 +148,19 @@ async function runTriageLLM(
   ];
 
   let toolCallCount = 0;
+  const BUDGET_WARNING_THRESHOLD = 3;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const remaining = MAX_TOOL_ROUNDS - round;
+
+    // Inject budget warning when approaching the limit
+    if (remaining <= BUDGET_WARNING_THRESHOLD && remaining < MAX_TOOL_ROUNDS) {
+      messages.push({
+        role: 'user',
+        content: `[Rounds: ${remaining} remaining] Wrap up: consolidate your diagnosis and return your final JSON response.`,
+      });
+    }
+
     // Only lightweight toolIds (string[]) flow through the durable pipe
     const response = await callTriageLLM(messages, toolIds);
 
