@@ -1,4 +1,5 @@
 import { getToolContext } from '../../../services/iam/context';
+import { exchangeTokensInArgs } from '../../../services/iam/ephemeral';
 import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../../services/llm';
 import { LLM_MODEL_PRIMARY, LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_DEFAULT, STOP_WORDS } from '../../../modules/defaults';
 import { loggerRegistry } from '../../../services/logger';
@@ -266,10 +267,22 @@ export async function callMcpTool(
       if (!wf || wf.status !== 'active') {
         return { error: `Compiled workflow "${yamlWorkflowName}" is not active` };
       }
+      // Inject _scope from the current ToolContext so YAML workers get IAM
+      const toolCtx = getToolContext();
+      const scopedArgs = toolCtx?.principal.id
+        ? {
+            ...args,
+            _scope: {
+              principal: toolCtx.principal,
+              ...(toolCtx.initiatingPrincipal ? { initiatingPrincipal: toolCtx.initiatingPrincipal } : {}),
+              scopes: toolCtx.credentials.scopes,
+            },
+          }
+        : args;
       const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
-        args,
+        scopedArgs,
         undefined,
         wf.graph_topic,
       );
@@ -278,6 +291,10 @@ export async function callMcpTool(
       return { error: err.message, tool: qualifiedName, args };
     }
   }
+
+  // Exchange ephemeral credential tokens (eph:v1:...) right before the MCP call.
+  // This is the latest possible moment — the LLM only ever sees opaque tokens.
+  args = await exchangeTokensInArgs(args);
 
   // Standard MCP tool routing
   const serverName = toolServerMap.get(qualifiedName);

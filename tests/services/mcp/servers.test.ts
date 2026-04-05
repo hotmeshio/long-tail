@@ -417,7 +417,8 @@ describe('MCP integration', () => {
       expect(names).toContain('check_resolution');
       expect(names).toContain('get_available_work');
       expect(names).toContain('claim_and_resolve');
-      expect(tools).toHaveLength(4);
+      expect(names).toContain('escalate_and_wait');
+      expect(tools).toHaveLength(5);
     });
 
     it('should create a real escalation via escalate_to_human', async () => {

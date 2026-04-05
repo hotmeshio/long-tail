@@ -12,6 +12,7 @@ export {
 export {
   ltClaimEscalation,
   ltCreateEscalation,
+  ltEnrichEscalationRouting,
   ltResolveEscalation,
 } from './escalation';
 

@@ -21,6 +21,7 @@ export function ResolverForm({ value, onChange }: {
 }) {
   const [data, setData] = useState<Record<string, JsonValue>>({});
   const [hidden, setHidden] = useState<Record<string, JsonValue>>({});
+  const [formSchema, setFormSchema] = useState<Record<string, any> | null>(null);
   const [parseError, setParseError] = useState(false);
 
   // Parse incoming JSON
@@ -39,6 +40,11 @@ export function ResolverForm({ value, onChange }: {
         }
         setData(visible);
         setHidden(internal);
+        setFormSchema(
+          internal._form_schema && typeof internal._form_schema === 'object'
+            ? internal._form_schema as Record<string, any>
+            : null,
+        );
         setParseError(false);
       }
     } catch {
@@ -75,7 +81,13 @@ export function ResolverForm({ value, onChange }: {
   return (
     <div className="space-y-4">
       {entries.map(([key, val]) => (
-        <FieldRow key={key} fieldKey={key} value={val} onChange={(v) => updateField(key, v)} />
+        <FieldRow
+          key={key}
+          fieldKey={key}
+          value={val}
+          onChange={(v) => updateField(key, v)}
+          schema={formSchema}
+        />
       ))}
     </div>
   );
@@ -85,12 +97,14 @@ export function ResolverForm({ value, onChange }: {
 // Field row — renders appropriate input per type
 // ---------------------------------------------------------------------------
 
-function FieldRow({ fieldKey, value, onChange }: {
+function FieldRow({ fieldKey, value, onChange, schema }: {
   fieldKey: string;
   value: JsonValue;
   onChange: (v: JsonValue) => void;
+  schema?: Record<string, any> | null;
 }) {
   const label = fieldKey.replace(/[_-]/g, ' ');
+  const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
 
   // Boolean → checkbox
   if (typeof value === 'boolean') {
@@ -127,10 +141,49 @@ function FieldRow({ fieldKey, value, onChange }: {
 
   // String
   if (typeof value === 'string') {
+    const isPassword = fieldSchema?.format === 'password';
+    const enumValues = fieldSchema?.enum as string[] | undefined;
+    const helperText = fieldSchema?.description as string | undefined;
+
+    if (enumValues?.length) {
+      return (
+        <div>
+          <FieldLabel>{label}</FieldLabel>
+          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="input text-sm w-full mt-1"
+          >
+            {enumValues.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+
+    if (isPassword) {
+      return (
+        <div>
+          <FieldLabel>{label}</FieldLabel>
+          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+          <input
+            type="password"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="input text-sm w-full mt-1"
+            autoComplete="off"
+          />
+        </div>
+      );
+    }
+
     if (value.length > 80) {
       return (
         <div>
           <FieldLabel>{label}</FieldLabel>
+          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -143,6 +196,7 @@ function FieldRow({ fieldKey, value, onChange }: {
     return (
       <div>
         <FieldLabel>{label}</FieldLabel>
+        {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
         <input
           type="text"
           value={value}

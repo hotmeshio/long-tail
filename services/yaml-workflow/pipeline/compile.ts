@@ -26,7 +26,7 @@ import { COMPILATION_PROMPT } from './prompts';
 
 interface StepSummary {
   index: number;
-  kind: 'tool' | 'llm';
+  kind: 'tool' | 'llm' | 'signal';
   toolName: string;
   server?: string;
   argumentKeys: string[];

@@ -36,6 +36,7 @@ export interface CreateYamlWorkflowInput {
 export interface DagBuilder {
   activities: Record<string, unknown>;
   transitions: Record<string, Array<{ to: string; conditions?: Record<string, unknown> }>>;
+  hooks: Record<string, Array<{ to: string; conditions?: Record<string, unknown> }>>;
   manifest: ActivityManifestEntry[];
   stepIndexToActivityId: Map<number, string>;
   prevActivityId: string;
@@ -48,15 +49,17 @@ export interface DagBuilder {
 
 /** A step extracted from an execution's event timeline. */
 export interface ExtractedStep {
-  /** Step kind: 'tool' for DB/MCP tool calls, 'llm' for LLM interpretation */
-  kind: 'tool' | 'llm';
+  /** Step kind: 'tool' for DB/MCP tool calls, 'llm' for LLM interpretation, 'signal' for waitFor pause/resume */
+  kind: 'tool' | 'llm' | 'signal';
   toolName: string;
   arguments: Record<string, unknown>;
   result: unknown;
-  source: 'db' | 'mcp' | 'llm';
+  source: 'db' | 'mcp' | 'llm' | 'signal';
   mcpServerId?: string;
   /** For LLM steps: the system/user messages that produced this response */
   promptMessages?: Array<{ role: string; content: string }>;
+  /** For signal steps: the JSON Schema describing the expected signal payload */
+  signalSchema?: Record<string, unknown>;
 }
 
 // ── Enhanced compilation plan ────────────────────────────────────────────────

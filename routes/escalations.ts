@@ -6,6 +6,8 @@ import * as userService from '../services/user';
 import * as roleService from '../services/role';
 import { escalationStrategyRegistry } from '../services/escalation-strategy';
 import { publishEscalationEvent } from '../services/events/publish';
+import { storeEphemeral, formatEphemeralToken } from '../services/iam/ephemeral';
+import { getEngine as getYamlEngine } from '../services/yaml-workflow/deployer';
 import { createClient, LT_TASK_QUEUE } from '../workers';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 
@@ -586,7 +588,64 @@ router.post('/:id/resolve', async (req, res) => {
       return;
     }
 
-    // 2. Reconstruct the original envelope from the escalation or task
+    // 2. waitFor signal escalation — signal the paused workflow directly
+    const signalRouting = (escalation.metadata as any)?.signal_routing;
+    if (signalRouting?.signalId) {
+      // Replace password fields with ephemeral tokens so plaintext never enters the signal store
+      let signalPayload = resolverPayload;
+      const formSchema = (escalation.metadata as any)?.form_schema;
+      if (formSchema?.properties) {
+        signalPayload = { ...resolverPayload };
+        for (const [key, def] of Object.entries(formSchema.properties)) {
+          if ((def as any)?.format === 'password' && typeof signalPayload[key] === 'string') {
+            const uuid = await storeEphemeral(signalPayload[key], {
+              ttlSeconds: 900,
+              label: key,
+            });
+            signalPayload[key] = formatEphemeralToken(uuid, key);
+          }
+        }
+      }
+
+      if (signalRouting.engine === 'yaml' && signalRouting.hookTopic && signalRouting.appId) {
+        // YAML workflow: signal the HotMesh engine directly via hook topic.
+        // Include job_id for hook match condition ({$job.metadata.jid} === {$self.hook.data.job_id}).
+        const engine = await getYamlEngine(signalRouting.appId);
+        await engine.signal(signalRouting.hookTopic, {
+          ...signalPayload,
+          escalationId: escalation.id,
+          job_id: signalRouting.jobId,
+        });
+      } else if (signalRouting.workflowId) {
+        // Durable workflow: signal via workflow handle
+        const client = createClient();
+        const handle = await client.workflow.getHandle(
+          signalRouting.taskQueue,
+          signalRouting.workflowType,
+          signalRouting.workflowId,
+        );
+        await handle.signal(signalRouting.signalId, signalPayload);
+      }
+
+      await escalationService.resolveEscalation(escalation.id, resolverPayload);
+
+      publishEscalationEvent({
+        type: 'escalation.resolved',
+        source: 'api',
+        workflowId: escalation.workflow_id || signalRouting.workflowId,
+        workflowName: escalation.workflow_type || signalRouting.workflowType,
+        taskQueue: escalation.task_queue || signalRouting.taskQueue || signalRouting.appId,
+        taskId: escalation.task_id!,
+        escalationId: escalation.id,
+        originId: escalation.origin_id ?? undefined,
+        status: 'resolved',
+      });
+
+      res.json({ signaled: true, escalationId: escalation.id, workflowId: signalRouting.workflowId || signalRouting.appId });
+      return;
+    }
+
+    // 3. Reconstruct the original envelope from the escalation or task
     let envelope: Record<string, any> = {};
     if (escalation.envelope) {
       try {
@@ -601,7 +660,7 @@ router.post('/:id/resolve', async (req, res) => {
       }
     }
 
-    // 3. Check escalation strategy for triage routing
+    // 4. Check escalation strategy for triage routing
     const strategy = escalationStrategyRegistry.current;
     if (strategy) {
       const directive = await strategy.onResolution({
@@ -675,14 +734,14 @@ router.post('/:id/resolve', async (req, res) => {
       }
     }
 
-    // 4. If no workflow_type, this is a notification-only escalation — acknowledge and close
+    // 5. If no workflow_type, this is a notification-only escalation — acknowledge and close
     if (!escalation.workflow_type || !escalation.task_queue) {
       await escalationService.resolveEscalation(escalation.id, resolverPayload);
       res.json({ acknowledged: true, escalationId: escalation.id });
       return;
     }
 
-    // 5. Standard re-run: inject resolver data and start original workflow
+    // 6. Standard re-run: inject resolver data and start original workflow
     envelope.resolver = resolverPayload;
     envelope.lt = {
       ...envelope.lt,

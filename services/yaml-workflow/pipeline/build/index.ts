@@ -16,6 +16,7 @@ import {
   initializeDag,
   appendIterationStep,
   appendNormalStep,
+  appendSignalStep,
   serializeToYaml,
 } from './dag';
 
@@ -46,8 +47,16 @@ export async function build(ctx: PipelineContext): Promise<PipelineContext> {
   // 2. Initialize DAG with trigger
   const dag = initializeDag(prefix, options.subscribes, inputSchema);
 
-  // 3. Build each step — iteration or normal
+  // 3. Build each step — iteration, signal, or normal
   steps.forEach((step, idx) => {
+    if (step.kind === 'signal') {
+      appendSignalStep(
+        dag, idx, step, prefix, options.subscribes,
+        plan, steps, triggerInputKeys, collapsedToCoreIndex,
+      );
+      return;
+    }
+
     const iterSpec = findIterationSpec(idx, plan, step, collapsedToCoreIndex);
 
     if (iterSpec) {

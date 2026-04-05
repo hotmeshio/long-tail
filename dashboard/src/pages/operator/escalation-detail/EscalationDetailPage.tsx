@@ -78,18 +78,38 @@ export function EscalationDetailPage() {
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
   const resolverSchema = wfConfig?.resolver_schema ?? null;
+  const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
+  const effectiveSchema = metadataFormSchema ?? resolverSchema;
   useEffect(() => {
-    setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
-  }, [resolverSchema]);
+    if (metadataFormSchema) {
+      // waitFor escalation: build initial form from form_schema and include _form_schema for ResolverForm
+      const initial: Record<string, any> = { _form_schema: metadataFormSchema };
+      const props = metadataFormSchema.properties;
+      if (props && typeof props === 'object') {
+        for (const [key, def] of Object.entries(props)) {
+          const fieldDef = def as Record<string, any>;
+          initial[key] = fieldDef.default ?? '';
+        }
+      }
+      setJson(JSON.stringify(initial, null, 2));
+    } else {
+      setJson(effectiveSchema ? JSON.stringify(effectiveSchema, null, 2) : '{}');
+    }
+  }, [effectiveSchema, metadataFormSchema]);
 
   // When triage or rounds-exhausted data is present, collapse Input/Output so structured context is central
   const hasTriage = hasTriageData(esc?.escalation_payload);
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
+  const isWaitForHuman = esc?.subtype === 'wait_for_human';
   useEffect(() => {
     if (hasTriage || isRoundsExhausted) {
       setCollapsed((prev) => ({ ...prev, context: true }));
     }
-  }, [hasTriage, isRoundsExhausted]);
+    // waitFor escalations: auto-expand resolver, collapse context
+    if (isWaitForHuman && metadataFormSchema) {
+      setCollapsed((prev) => ({ ...prev, context: true, resolver: false }));
+    }
+  }, [hasTriage, isRoundsExhausted, isWaitForHuman, metadataFormSchema]);
 
   if (isLoading) {
     return (
@@ -134,7 +154,10 @@ export function EscalationDetailPage() {
 
   const handleResolve = async (payload: Record<string, unknown>) => {
     const result = await resolve.mutateAsync({ id: esc.id, resolverPayload: payload }) as any;
-    if (result?.triage && result?.workflowId) {
+    if (result?.signaled && result?.workflowId) {
+      addToast('Response sent — workflow resuming', 'success');
+      navigate(`/workflows/executions/${result.workflowId}`);
+    } else if (result?.triage && result?.workflowId) {
       addToast('AI triage started', 'success');
       navigate(`/workflows/executions/${result.workflowId}`);
     } else {
@@ -267,7 +290,7 @@ export function EscalationDetailPage() {
         )}
 
         {/* Resolver form — when claimed and resolving */}
-        {!isTerminal && claimedByMe && activeView === 'resolve' && esc.workflow_type && (
+        {!isTerminal && claimedByMe && activeView === 'resolve' && (esc.workflow_type || metadataFormSchema) && (
           <CollapsibleSection
             title="Submit Your Resolution"
             sectionKey="resolver"

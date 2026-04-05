@@ -41,6 +41,48 @@ export async function ltClaimEscalation(input: {
 }
 
 /**
+ * Enrich an escalation record with signal routing metadata and workflow
+ * context so the resolution API can signal the paused workflow directly
+ * and the dashboard can display full context. Optionally auto-claims
+ * the escalation to the initiating user.
+ */
+export async function ltEnrichEscalationRouting(input: {
+  escalationId: string;
+  signalRouting: {
+    taskQueue: string;
+    workflowType: string;
+    workflowId: string;
+    signalId: string;
+  };
+  taskId?: string;
+  claimForUserId?: string;
+}): Promise<void> {
+  const result = await escalationService.enrichEscalationRouting(
+    input.escalationId,
+    { signal_routing: { ...input.signalRouting, engine: 'durable' } },
+    {
+      workflowType: input.signalRouting.workflowType,
+      workflowId: input.signalRouting.workflowId,
+      taskQueue: input.signalRouting.taskQueue,
+      taskId: input.taskId,
+    },
+  );
+  if (!result) {
+    loggerRegistry.warn(`[ltEnrichEscalationRouting] Escalation ${input.escalationId} not found`);
+    return;
+  }
+
+  // Auto-claim to the initiating user with a long window (4 hours)
+  if (input.claimForUserId) {
+    await escalationService.claimEscalation(
+      input.escalationId,
+      input.claimForUserId,
+      240,
+    );
+  }
+}
+
+/**
  * Create an escalation record when a workflow needs human intervention.
  */
 export async function ltCreateEscalation(input: {

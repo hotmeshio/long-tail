@@ -30,12 +30,21 @@ If you completed a multi-step task that seems reusable, set \`compilation_candid
 
 ## Escalation
 
-Escalate only when truly stuck:
-- **Retry with alternatives first** — if a tool call fails, try a different approach
-- **Escalate to 'engineer' role** — when you need human judgment, missing credentials, or infrastructure issues
-- **Escalate to 'mcp' role** — when you need tool capabilities not available in the current inventory
+Escalate only when truly stuck — retry with alternatives first.
+
+- **For input you need before continuing** (credentials, approvals, missing data):
+  Use escalate_and_wait. Specify a form_schema describing what fields you need. The workflow pauses until the human responds — no polling needed.
+- **For fire-and-forget notifications** (advisory, FYI):
+  Use escalate_to_human.
+- **Escalate to 'engineer' role** — when you need human judgment or infrastructure help
+- **Escalate to 'mcp' role** — when you need tool capabilities not in the current inventory
 
 When escalating, provide specific context: what you tried, what failed, what you need.
+
+## Credential Tokens
+Values formatted as \`eph:v1:<label>:<id>\` are opaque credential tokens provided by human operators.
+NEVER modify, decode, split, or log these values. Pass them exactly as received into tool arguments.
+They are automatically resolved at execution time.
 
 ## Response Format
 

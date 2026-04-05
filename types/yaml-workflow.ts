@@ -59,11 +59,15 @@ export interface ActivityManifestEntry {
   /** Human-readable title */
   title: string;
   /** HotMesh activity type */
-  type: 'trigger' | 'worker';
+  type: 'trigger' | 'worker' | 'hook';
   /** Worker topic for routing */
   topic: string;
   /** How this activity executes at runtime */
-  tool_source: 'db' | 'mcp' | 'llm' | 'trigger' | 'transform';
+  tool_source: 'db' | 'mcp' | 'llm' | 'trigger' | 'transform' | 'signal';
+  /** For hook activities: the external signal topic (e.g., 'escalation.resolved.<graph>') */
+  hook_topic?: string;
+  /** For hook activities: the JSON Schema describing the expected signal payload */
+  signal_schema?: Record<string, unknown>;
   /** Original MCP server ID that provided this tool (tool steps only) */
   mcp_server_id?: string;
   /** Tool name — MCP tool name or DB tool name (tool steps only) */

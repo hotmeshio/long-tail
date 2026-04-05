@@ -58,6 +58,24 @@ const HUMAN_QUEUE_TOOLS = [
       required: ['escalation_id', 'resolver_id', 'payload'],
     },
   },
+  {
+    name: 'escalate_and_wait',
+    description: 'Create an escalation and pause the workflow until a human responds. Returns a signal ID that the workflow uses to wait durably. Preferred over escalate_to_human + check_resolution polling.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'Target role for the escalation (e.g., "reviewer")' },
+        message: { type: 'string', description: 'Description of what input is needed from the human' },
+        form_schema: { type: 'object', description: 'JSON Schema for the resolver form. Use format:"password" for sensitive fields.' },
+        data: { type: 'object', description: 'Contextual data for the reviewer' },
+        assigned_to: { type: 'string', description: 'Auto-assign to a specific user' },
+        type: { type: 'string', description: 'Escalation type classification', default: 'mcp' },
+        subtype: { type: 'string', description: 'Escalation subtype', default: 'wait_for_human' },
+        priority: { type: 'number', description: 'Priority: 1 (highest) to 4 (lowest)', default: 1 },
+      },
+      required: ['role', 'message'],
+    },
+  },
 ];
 
 const VISION_TOOLS = [
@@ -535,7 +553,13 @@ const SEED_MCP_SERVERS = [
     tool_manifest: HUMAN_QUEUE_TOOLS,
     metadata: { builtin: true, category: 'escalation' },
     tags: ['escalation', 'human-queue', 'routing'],
-    compile_hints: null,
+    compile_hints: [
+      'escalate_and_wait creates a durable pause point.',
+      'The step AFTER escalate_and_wait is always a signal step (kind: "signal") that receives the human response.',
+      'Fields from the signal step output (e.g., password) must be wired via data_flow edges to ALL downstream steps that need them.',
+      'When a downstream tool (e.g., run_script, login_and_capture) needs a credential from the signal, wire the signal step output field to the specific tool argument.',
+      'For tools with complex stored arguments (like run_script steps arrays), the credential value should be wired to the specific nested field that needs it — use a data_flow edge from the signal step to the consuming step.',
+    ].join(' '),
     credential_providers: [],
   },
   {
@@ -582,6 +606,8 @@ const SEED_MCP_SERVERS = [
     compile_hints: [
       'Session fields (_handle, page_id) MUST be threaded from the step that created them to EVERY subsequent step that operates on the browser.',
       'run_script accepts a `steps` array — this is a fixed implementation detail, never a dynamic input.',
+      'When run_script follows a signal hook (human input), dynamic values like passwords must be wired from the hook output into the stored steps array.',
+      'The `steps` array should be stored as fixed tool_arguments, but individual values within it (url, username, password) that come from trigger inputs or signal hooks should be wired via data_flow edges to their specific argument keys (e.g., to_field: "password").',
     ].join(' '),
     credential_providers: [],
   },
@@ -598,6 +624,7 @@ const SEED_MCP_SERVERS = [
       'extract_content returns both `links` (structured array of {text, href}) and `script_result` (raw JS eval output). When building a transform to reshape link data for iteration or for capture_authenticated_pages, ALWAYS use `links` as the source field — `script_result` may be null, a string, or unstructured.',
       'capture_authenticated_pages expects a `login` object and a `pages` array. The `login` object contains nested fields (url, username, password, selectors) — flatten credentials as dynamic trigger inputs but keep the object structure in stored tool_arguments. The `pages` array should flow from a transform edge that reshapes `links` into [{url, screenshot_path, wait_ms, full_page}].',
       'For screenshot_path derivation in transforms, use the `screenshot_dir` trigger input as a dynamic prefix (not hardcoded). Derivation strategy: slugify the href, prepend screenshot_dir + "/", append ".png".',
+      'When login_and_capture follows a signal hook (human input), wire the password from the hook output to the `password` argument. Wire `url` and `username` from trigger inputs.',
     ].join(' '),
     credential_providers: [],
   },

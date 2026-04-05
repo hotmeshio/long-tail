@@ -108,6 +108,19 @@ export function extractStepSequence(events: WorkflowExecutionEvent[]): Extracted
   let pendingLlmCall: { toolName: string; arguments: Record<string, unknown> } | null = null;
   const pendingQueue: Array<{ toolName: string; arguments: Record<string, unknown> }> = [];
 
+  // Pre-index signaled events for pairing with escalate_and_wait tool calls
+  const signaledEvents = new Map<string, Record<string, unknown>>();
+  for (const evt of events) {
+    if (evt.event_type === 'workflow_execution_signaled') {
+      const attrs = evt.attributes as unknown as Record<string, unknown>;
+      const signalName = attrs.signal_name as string;
+      const input = attrs.input as Record<string, unknown>;
+      if (signalName && input) {
+        signaledEvents.set(signalName, input);
+      }
+    }
+  }
+
   for (const evt of events) {
     if (evt.event_type !== 'activity_task_completed') continue;
     const attrs = evt.attributes as ActivityTaskCompletedAttributes & { input?: unknown };
@@ -206,6 +219,30 @@ export function extractStepSequence(events: WorkflowExecutionEvent[]): Extracted
         source: 'mcp',
         mcpServerId: serverSlug,
       });
+
+      // Detect escalate_and_wait → waitFor pattern: emit a signal step
+      if (result?.type === 'waitFor' && result?.signalId) {
+        const signalId = result.signalId as string;
+        const signalData = signaledEvents.get(signalId) || {};
+        const formSchema = (args as Record<string, unknown>).form_schema as Record<string, unknown> | undefined;
+
+        steps.push({
+          kind: 'signal',
+          toolName: 'wait_for_human',
+          arguments: {},
+          result: signalData,
+          source: 'signal',
+          signalSchema: formSchema || {
+            type: 'object',
+            properties: signalData
+              ? Object.fromEntries(
+                  Object.keys(signalData).map(k => [k, { type: 'string' }]),
+                )
+              : {},
+          },
+        });
+      }
+
       pendingLlmCall = pendingQueue.shift() || null;
       continue;
     }

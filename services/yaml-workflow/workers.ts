@@ -12,9 +12,48 @@ import {
 
 import { loggerRegistry } from '../logger';
 import { publishActivityEvent } from '../events/publish';
+import { runWithToolContext } from '../iam/context';
+import { exchangeTokensInArgs } from '../iam/ephemeral';
+import type { ToolContext, ToolPrincipal } from '../../types/tool-context';
 import * as mcpClient from '../mcp/client';
 import { callLLM as callLLMService } from '../llm';
 import type { ChatMessage, LLMResponse } from '../llm';
+
+/**
+ * Build a ToolContext from the `_scope` input parameter.
+ * YAML activities receive `_scope` threaded from the trigger through every step.
+ */
+function buildToolContextFromScope(scope: Record<string, any>): ToolContext {
+  return {
+    principal: scope.principal as ToolPrincipal,
+    ...(scope.initiatingPrincipal
+      ? { initiatingPrincipal: scope.initiatingPrincipal as ToolPrincipal }
+      : {}),
+    credentials: {
+      scopes: scope.scopes ?? [],
+    },
+    trace: {},
+  };
+}
+
+/**
+ * Wrap a worker callback with scope injection via AsyncLocalStorage.
+ * If `_scope` is present in the input data, builds a ToolContext and
+ * wraps the callback so `getToolContext()` works inside tool code.
+ */
+function wrapWithScope(
+  callback: (data: StreamData) => Promise<StreamDataResponse>,
+): (data: StreamData) => Promise<StreamDataResponse> {
+  return async (data: StreamData): Promise<StreamDataResponse> => {
+    const input = (data.data || {}) as Record<string, unknown>;
+    const scope = input._scope as Record<string, any> | undefined;
+    if (scope?.principal) {
+      const ctx = buildToolContextFromScope(scope);
+      return runWithToolContext(ctx, () => callback(data));
+    }
+    return callback(data);
+  };
+}
 
 interface CallLLMOptions {
   max_tokens?: number;
@@ -298,6 +337,26 @@ export async function registerWorkersForWorkflow(
     callback: (data: StreamData) => Promise<StreamDataResponse>;
   }> = [];
 
+  // Clear previously registered topics for this workflow so redeployments
+  // pick up updated manifests (e.g., new hook_topic bindings).
+  for (const a of workflow.activity_manifest) {
+    if (a.type === 'worker') registeredTopics.delete(a.topic);
+  }
+
+  // Build lookup: for escalate_and_wait workers, find the following hook's topic
+  const hookTopicByEscalationTool = new Map<string, string>();
+  for (const hookAct of workflow.activity_manifest.filter(a => a.type === 'hook' && a.hook_topic)) {
+    // Find the worker that transitions TO this hook — it's the escalation tool
+    // Convention: the escalation worker's activity_id precedes the hook in sequence
+    const hookIdx = workflow.activity_manifest.indexOf(hookAct);
+    if (hookIdx > 0) {
+      const preceding = workflow.activity_manifest[hookIdx - 1];
+      if (preceding.mcp_tool_name === 'escalate_and_wait') {
+        hookTopicByEscalationTool.set(preceding.activity_id, hookAct.hook_topic!);
+      }
+    }
+  }
+
   const workerActivities = workflow.activity_manifest.filter(
     (a) => a.type === 'worker' && !registeredTopics.has(a.topic),
   );
@@ -308,7 +367,7 @@ export async function registerWorkersForWorkflow(
     const currentStep = stepIndex++;
     const toolSource = activity.tool_source || (activity.mcp_server_id === 'db' ? 'db' : 'mcp');
     const wrap = (cb: (data: StreamData) => Promise<StreamDataResponse>) =>
-      wrapWithEvents(activity, workflow.app_id, currentStep, totalSteps, cb);
+      wrapWithEvents(activity, workflow.app_id, currentStep, totalSteps, wrapWithScope(cb));
 
     if (toolSource === 'transform') {
       // Transform/reshape step — deterministic data mapping between steps
@@ -334,7 +393,9 @@ export async function registerWorkersForWorkflow(
         connection: { class: Postgres, options: postgres_options },
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
-          const mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
+          let mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
+          delete mergedArgs._scope;
+          mergedArgs = await exchangeTokensInArgs(mergedArgs);
           const result = await mcpClient.callServerTool(dbServerId, toolName, mergedArgs);
           return { metadata: { ...data.metadata }, data: result };
         }),
@@ -345,6 +406,10 @@ export async function registerWorkersForWorkflow(
       const serverId = activity.mcp_server_id;
       if (!serverId) continue;
       const storedArgs = activity.tool_arguments;
+      const yamlHookTopic = hookTopicByEscalationTool.get(activity.activity_id);
+      if (toolName === 'escalate_and_wait') {
+        loggerRegistry.info(`[yaml-workflow] escalate_and_wait worker: activityId=${activity.activity_id}, hookTopic=${yamlHookTopic || 'NONE'}, mapKeys=[${[...hookTopicByEscalationTool.keys()].join(',')}]`);
+      }
       workerConfigs.push({
         topic: activity.topic,
         connection: { class: Postgres, options: postgres_options },
@@ -352,11 +417,27 @@ export async function registerWorkersForWorkflow(
           const args = (data.data || {}) as Record<string, unknown>;
           const mergedArgs = storedArgs ? { ...storedArgs } : {};
           for (const [key, value] of Object.entries(args)) {
+            if (key === '_scope') continue;
             if (value !== undefined && value !== null && value !== '') {
               mergedArgs[key] = value;
             }
           }
-          const result = await mcpClient.callServerTool(serverId, toolName, mergedArgs);
+          // For escalate_and_wait: inject YAML signal routing so the MCP tool
+          // stores engine:'yaml' + hookTopic + jobId in the escalation metadata
+          if (yamlHookTopic) {
+            const jid = (data.metadata as any)?.jid;
+            mergedArgs._yaml_signal_routing = {
+              engine: 'yaml',
+              appId: workflow.app_id,
+              hookTopic: yamlHookTopic,
+              jobId: jid,
+              workflowType: workflow.graph_topic,
+              workflowId: jid,
+              taskQueue: workflow.app_id,
+            };
+          }
+          const exchangedArgs = await exchangeTokensInArgs(mergedArgs);
+          const result = await mcpClient.callServerTool(serverId, toolName, exchangedArgs);
           if (result && typeof result === 'object' && 'error' in result) {
             loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);
           }

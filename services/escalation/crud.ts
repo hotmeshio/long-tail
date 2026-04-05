@@ -7,6 +7,8 @@ import {
   CREATE_ESCALATION,
   CLAIM_ESCALATION,
   RESOLVE_ESCALATION,
+  UPDATE_ESCALATION_METADATA,
+  ENRICH_ESCALATION_ROUTING,
   UPDATE_ESCALATIONS_PRIORITY,
   GET_ESCALATION_ROLES,
   RELEASE_ESCALATION,
@@ -180,6 +182,43 @@ export async function getEscalationsByWorkflowId(
   const pool = getPool();
   const { rows } = await pool.query(GET_ESCALATIONS_BY_WORKFLOW_ID, [workflowId]);
   return rows;
+}
+
+export async function updateEscalationMetadata(
+  id: string,
+  patch: Record<string, any>,
+): Promise<LTEscalationRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    UPDATE_ESCALATION_METADATA,
+    [id, JSON.stringify(patch)],
+  );
+  return rows[0] || null;
+}
+
+export async function enrichEscalationRouting(
+  id: string,
+  metadataPatch: Record<string, any>,
+  workflowFields: {
+    workflowType?: string;
+    workflowId?: string;
+    taskQueue?: string;
+    taskId?: string;
+  },
+): Promise<LTEscalationRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    ENRICH_ESCALATION_ROUTING,
+    [
+      id,
+      JSON.stringify(metadataPatch),
+      workflowFields.workflowType || null,
+      workflowFields.workflowId || null,
+      workflowFields.taskQueue || null,
+      workflowFields.taskId || null,
+    ],
+  );
+  return rows[0] || null;
 }
 
 export async function getEscalationsByOriginId(

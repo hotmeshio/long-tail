@@ -141,5 +141,23 @@ RETURNING *`;
 
 // --- Query helpers ---------------------------------------------------------
 
+export const UPDATE_ESCALATION_METADATA = `\
+UPDATE lt_escalations
+SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *`;
+
+export const ENRICH_ESCALATION_ROUTING = `\
+UPDATE lt_escalations
+SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+    workflow_type = COALESCE(workflow_type, $3),
+    workflow_id = COALESCE(workflow_id, $4),
+    task_queue = COALESCE(task_queue, $5),
+    task_id = COALESCE(task_id, $6),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *`;
+
 export const LIST_DISTINCT_TYPES =
   'SELECT DISTINCT type FROM lt_escalations ORDER BY type';

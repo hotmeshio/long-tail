@@ -153,6 +153,9 @@ export function buildIterationActivities(
     }
   }
 
+  // Thread _scope from trigger for IAM context
+  workerInputMaps._scope = `{${triggerId}.output.data._scope}`;
+
   const resultSchema = step.result ? inferSchema(step.result) : { type: 'object' };
 
   activities[workerId] = {
