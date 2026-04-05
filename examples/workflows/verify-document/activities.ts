@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { callLLM, hasLLMApiKey } from '../../../services/llm';
+import { loggerRegistry } from '../../../services/logger';
 import { LLM_MODEL_SECONDARY } from '../../../modules/defaults';
 import type { MemberInfo } from './types';
 import { EXTRACT_MEMBER_INFO_PROMPT } from './prompts';
@@ -93,7 +94,7 @@ export async function extractMemberInfo(
     }
     return parsed as MemberInfo;
   } catch {
-    console.warn(`[verify-document] Failed to parse vision response for page ${pageNumber}:`, raw);
+    loggerRegistry.warn(`[verify-document] Failed to parse vision response for page ${pageNumber}`, { raw });
     return null;
   }
 }

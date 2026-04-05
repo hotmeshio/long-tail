@@ -52,10 +52,9 @@ router.get('/discovered', async (req, res) => {
     const activeWorkers = getRegisteredWorkers();
 
     // 2. Historical entities from durable.jobs
+    const DISTINCT_ENTITIES = `SELECT DISTINCT entity FROM durable.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`;
     const pool = getPool();
-    const { rows: entityRows } = await pool.query<{ entity: string }>(
-      `SELECT DISTINCT entity FROM durable.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`,
-    );
+    const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES);
     const historicalEntities = new Set(entityRows.map((r) => r.entity));
 
     // 3. Registered configs
