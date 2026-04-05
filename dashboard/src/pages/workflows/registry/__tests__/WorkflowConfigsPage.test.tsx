@@ -85,7 +85,7 @@ describe('WorkflowConfigsPage', () => {
 
   it('renders page header and Register Workflow button', () => {
     renderPage();
-    expect(screen.getByText('Worker Registry')).toBeInTheDocument();
+    expect(screen.getByText('Workflow Registry')).toBeInTheDocument();
     expect(screen.getByText('Register Workflow')).toBeInTheDocument();
   });
 
@@ -125,11 +125,12 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Tier column ──
 
-  it('renders tier pills for registered and unregistered workflows', () => {
+  it('renders tier pills for certified and durable workflows', () => {
     renderPage();
-    // 3 in table + 1 in filter dropdown option = 4
-    expect(screen.getAllByText('Registered').length).toBe(4);
-    expect(screen.getAllByText('Durable').length).toBe(1);
+    // 3 in table + 1 in filter dropdown option
+    expect(screen.getAllByText('Certified').length).toBe(4);
+    // 1 in table + 1 in filter dropdown option
+    expect(screen.getAllByText('Durable').length).toBe(2);
   });
 
   // ── Filter: Queue ──
@@ -146,19 +147,19 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Filter: Tier ──
 
-  it('filters by tier (registered)', () => {
+  it('filters by tier (certified)', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     // Tier is the second select (Queue, Tier, Role)
-    fireEvent.change(selects[1], { target: { value: 'registered' } });
+    fireEvent.change(selects[1], { target: { value: 'certified' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
     expect(screen.queryByText('unregistered-flow')).not.toBeInTheDocument();
   });
 
-  it('filters by tier (unregistered)', () => {
+  it('filters by tier (durable)', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'unregistered' } });
+    fireEvent.change(selects[1], { target: { value: 'durable' } });
     expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
   });
@@ -251,16 +252,16 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Actions ──
 
-  it('shows delete icon for registered workflows', () => {
+  it('shows de-certify icon for certified workflows', () => {
     renderPage();
-    const deleteButtons = screen.getAllByTitle('Delete config');
-    expect(deleteButtons.length).toBe(3);
+    const decertifyButtons = screen.getAllByTitle('De-certify workflow');
+    expect(decertifyButtons.length).toBe(3);
   });
 
-  it('shows register icon for unregistered workflows', () => {
+  it('shows certify icon for uncertified workflows', () => {
     renderPage();
-    const registerButtons = screen.getAllByTitle('Register workflow');
-    expect(registerButtons.length).toBe(1);
+    const certifyButtons = screen.getAllByTitle('Certify workflow');
+    expect(certifyButtons.length).toBe(1);
   });
 });
 

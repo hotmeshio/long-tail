@@ -13,7 +13,7 @@ import { StickyPagination } from '../../components/common/data/StickyPagination'
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
-export type ExecutionsTier = 'all' | 'registered' | 'unregistered';
+export type ExecutionsTier = 'all' | 'certified' | 'durable';
 
 const jobStatusMap: Record<string, string> = {
   running: 'in_progress',
@@ -38,6 +38,7 @@ function buildColumns(
   onFilterStatus: (status: string) => void,
   isSuperAdmin: boolean,
   navigate: (path: string) => void,
+  certifiedTypes: Set<string>,
 ): Column<LTJob>[] {
   return [
     {
@@ -59,7 +60,7 @@ function buildColumns(
     {
       key: 'entity',
       label: 'Workflow Type',
-      render: (row) => <WorkflowPill type={row.entity} />,
+      render: (row) => <WorkflowPill type={row.entity} certified={certifiedTypes.has(row.entity)} />,
     },
     {
       key: 'created_at',
@@ -116,27 +117,35 @@ function buildColumns(
   ];
 }
 
-export function WorkflowsDashboard({ tier = 'all' }: { tier?: ExecutionsTier }) {
+export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: ExecutionsTier }) {
   useWorkflowListEvents();
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
 
-  // Map tier to server-side registered filter
-  const registeredFilter = tier === 'registered' ? 'true'
-    : tier === 'unregistered' ? 'false'
-    : undefined;
-
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { search: '', entity: '', status: '' },
+    filters: { search: '', entity: '', status: '', tier: initialTier },
   });
 
+  const activeTier = (filters.tier || 'all') as ExecutionsTier;
+
+  // Map tier to server-side registered filter
+  const registeredFilter = activeTier === 'certified' ? 'true'
+    : activeTier === 'durable' ? 'false'
+    : undefined;
+
   const { data: configs } = useWorkflowConfigs();
+
+  const certifiedTypes = useMemo(
+    () => new Set((configs ?? []).map((c) => c.workflow_type)),
+    [configs],
+  );
 
   const columns = buildColumns(
     (entity) => setFilter('entity', entity),
     (status) => setFilter('status', status),
     isSuperAdmin,
     navigate,
+    certifiedTypes,
   );
   const [searchInput, setSearchInput] = useState(filters.search);
 
@@ -164,17 +173,13 @@ export function WorkflowsDashboard({ tier = 'all' }: { tier?: ExecutionsTier }) 
     return [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
   }, [configs]);
 
-  const pageTitle = tier === 'registered'
-    ? 'Unbreakable Executions'
-    : tier === 'unregistered'
-      ? 'Durable Executions'
-      : 'Executions';
+  const pageTitle = 'Durable Executions';
 
-  const emptyMessage = tier === 'registered'
-    ? 'No unbreakable workflow executions found'
-    : tier === 'unregistered'
+  const emptyMessage = activeTier === 'certified'
+    ? 'No certified workflow executions found'
+    : activeTier === 'durable'
       ? 'No durable workflow executions found'
-      : 'No workflow jobs found';
+      : 'No workflow executions found';
 
   return (
     <div>
@@ -204,17 +209,22 @@ export function WorkflowsDashboard({ tier = 'all' }: { tier?: ExecutionsTier }) 
             { value: 'failed', label: 'Failed' },
           ]}
         />
+        <FilterSelect
+          label="Tier"
+          value={filters.tier === 'all' ? '' : filters.tier}
+          onChange={(v) => setFilter('tier', v || 'all')}
+          options={[
+            { value: 'certified', label: 'Certified' },
+            { value: 'durable', label: 'Durable' },
+          ]}
+        />
       </FilterBar>
 
       <DataTable
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(
-          tier === 'unregistered'
-            ? `/workflows/durable/executions/${row.workflow_id}`
-            : `/workflows/executions/${row.workflow_id}`,
-        )}
+        onRowClick={(row) => navigate(`/workflows/executions/${row.workflow_id}`)}
         isLoading={isLoading}
         emptyMessage={emptyMessage}
         sort={sort}

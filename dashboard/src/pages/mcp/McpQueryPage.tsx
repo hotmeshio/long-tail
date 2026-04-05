@@ -127,7 +127,7 @@ export function McpQueryPage() {
 
   return (
     <>
-      <PageHeader title="Invoke MCP Discovery Flow" />
+      <PageHeader title="Pipeline Designer" />
 
       {/* Submit form */}
       <form onSubmit={handleSubmit} className="mb-6">

@@ -293,7 +293,7 @@ function RolesSection({ bot }: { bot: BotRecord }) {
 
 // ── Bots Page ────────────────────────────────────────────────────
 
-export function BotsPage() {
+export function BotsPage({ embedded = false }: { embedded?: boolean }) {
   const { pagination } = useFilterParams({ filters: {} });
   const deleteBot = useDeleteBot();
 
@@ -387,14 +387,22 @@ export function BotsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Bots"
-        actions={
+      {embedded ? (
+        <div className="flex justify-end mb-4">
           <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
             Add Bot
           </button>
-        }
-      />
+        </div>
+      ) : (
+        <PageHeader
+          title="Service Accounts"
+          actions={
+            <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
+              Add Bot
+            </button>
+          }
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         <div>

@@ -160,7 +160,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Pipeline Registry" />
+        <PageHeader title="MCP Pipeline Tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -174,7 +174,7 @@ export function YamlWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Registry" />
+      <PageHeader title="MCP Pipeline Tools" />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         Compiled from successful triage runs. Each workflow is a deterministic tool.

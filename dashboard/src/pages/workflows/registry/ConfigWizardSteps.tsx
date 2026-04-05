@@ -38,7 +38,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
         {showPickList && !form.workflow_type ? (
           <div className="space-y-2">
             <p className="text-xs text-text-secondary">
-              Select a durable workflow to register as unbreakable:
+              Select a durable workflow to register as certified:
             </p>
             <div className="grid gap-1">
               {durableTypes.map((type) => (
@@ -82,7 +82,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
           </>
         )}
         <p className={hintCls}>
-          Registering a durable workflow makes it unbreakable — the interceptor wraps every execution so failures escalate instead of throwing.
+          Registering a durable workflow makes it certified — the interceptor wraps every execution so failures escalate instead of throwing.
         </p>
       </div>
 

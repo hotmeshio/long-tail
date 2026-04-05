@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, ShieldCheck } from 'lucide-react';
 import { useActiveWorkers } from '../../../api/workflows';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
@@ -61,8 +61,8 @@ export function WorkersPage() {
       key: 'registered',
       label: 'Status',
       render: (row) => row.registered
-        ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">Registered</span>
-        : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Unregistered</span>,
+        ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>
+        : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Durable</span>,
       className: 'whitespace-nowrap',
     },
     {
@@ -99,7 +99,7 @@ export function WorkersPage() {
 
   return (
     <div>
-      <PageHeader title="All Workers" />
+      <PageHeader title="Workers" />
 
       <FilterBar>
         <input

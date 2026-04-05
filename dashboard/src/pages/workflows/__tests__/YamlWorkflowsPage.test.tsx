@@ -76,7 +76,7 @@ beforeEach(() => {
 describe('YamlWorkflowsPage', () => {
   it('renders page header', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByRole('heading', { name: 'Pipeline Registry' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'MCP Pipeline Tools' })).toBeInTheDocument();
   });
 
   it('renders description text', () => {

@@ -1,26 +1,31 @@
+import { Radio } from 'lucide-react';
 import { useNatsStatus } from '../../../hooks/useNats';
 
 interface NatsStatusProps {
   className?: string;
+  onClick?: () => void;
 }
 
 /**
- * Small indicator showing the NATS WebSocket connection status.
- * Displays a colored dot with "Live" or "Offline" text.
+ * Icon indicator showing the NATS WebSocket connection status.
+ * Displays a Radio icon with a green/gray status dot.
  */
-export function NatsStatus({ className = '' }: NatsStatusProps) {
+export function NatsStatus({ className = '', onClick }: NatsStatusProps) {
   const { connected } = useNatsStatus();
 
   return (
-    <span
-      className={`flex items-center gap-1.5 text-[10px] text-text-tertiary ${className}`}
-      title={connected ? 'Live updates connected' : 'Live updates disconnected'}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative text-text-tertiary hover:text-accent transition-colors ${className}`}
+      title={connected ? 'Live events enabled' : 'Live events disconnected'}
+      aria-label={connected ? 'Live events enabled' : 'Live events disconnected'}
     >
+      <Radio className="w-4 h-4" strokeWidth={1.5} />
       <span
-        className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-text-tertiary'}`}
+        className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-text-tertiary'}`}
         data-testid="nats-status-dot"
       />
-      {connected ? 'Live' : 'Offline'}
-    </span>
+    </button>
   );
 }

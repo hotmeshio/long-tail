@@ -22,7 +22,7 @@ export function WorkflowExecutionPage() {
 
   const executionTitle = pathname.startsWith('/workflows/durable/')
     ? 'Durable Execution'
-    : 'Unbreakable Execution';
+    : 'Certified Execution';
   const { data: execution, isLoading, error } = useWorkflowExecution(workflowId!);
   const { data: stateData } = useWorkflowState(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);

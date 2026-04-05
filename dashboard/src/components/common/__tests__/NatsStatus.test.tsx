@@ -11,22 +11,20 @@ import { useNatsStatus } from '../../../hooks/useNats';
 const mockUseNatsStatus = useNatsStatus as ReturnType<typeof vi.fn>;
 
 describe('NatsStatus', () => {
-  it('renders "Live" with green dot when connected', () => {
+  it('renders green dot when connected', () => {
     mockUseNatsStatus.mockReturnValue({ connected: true });
 
     render(<NatsStatus />);
 
-    expect(screen.getByText('Live')).toBeInTheDocument();
     const dot = screen.getByTestId('nats-status-dot');
     expect(dot.className).toContain('bg-emerald-500');
   });
 
-  it('renders "Offline" with gray dot when disconnected', () => {
+  it('renders gray dot when disconnected', () => {
     mockUseNatsStatus.mockReturnValue({ connected: false });
 
     render(<NatsStatus />);
 
-    expect(screen.getByText('Offline')).toBeInTheDocument();
     const dot = screen.getByTestId('nats-status-dot');
     expect(dot.className).toContain('bg-text-tertiary');
   });
@@ -36,7 +34,7 @@ describe('NatsStatus', () => {
 
     render(<NatsStatus />);
 
-    expect(screen.getByTitle('Live updates connected')).toBeInTheDocument();
+    expect(screen.getByTitle('Live events enabled')).toBeInTheDocument();
   });
 
   it('sets correct title attribute when disconnected', () => {
@@ -44,7 +42,7 @@ describe('NatsStatus', () => {
 
     render(<NatsStatus />);
 
-    expect(screen.getByTitle('Live updates disconnected')).toBeInTheDocument();
+    expect(screen.getByTitle('Live events disconnected')).toBeInTheDocument();
   });
 
   it('applies custom className', () => {
@@ -52,7 +50,7 @@ describe('NatsStatus', () => {
 
     const { container } = render(<NatsStatus className="ml-4" />);
 
-    const span = container.firstElementChild;
-    expect(span?.className).toContain('ml-4');
+    const button = container.firstElementChild;
+    expect(button?.className).toContain('ml-4');
   });
 });

@@ -15,6 +15,8 @@ export type LTEventType =
   | 'task.failed'
   | 'escalation.created'
   | 'escalation.resolved'
+  | 'escalation.claimed'
+  | 'escalation.released'
   | 'workflow.started'
   | 'workflow.completed'
   | 'workflow.failed'

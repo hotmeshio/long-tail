@@ -64,12 +64,12 @@ const DurableInvokePage = lazy(() =>
 );
 const DurableExecutionsPage = lazy(() =>
   import('./pages/workflows/WorkflowsDashboard').then((m) => ({
-    default: () => m.WorkflowsDashboard({ tier: 'unregistered' }),
+    default: () => m.WorkflowsDashboard({ tier: 'durable' }),
   })),
 );
-const UnbreakableExecutionsPage = lazy(() =>
+const CertifiedExecutionsPage = lazy(() =>
   import('./pages/workflows/WorkflowsDashboard').then((m) => ({
-    default: () => m.WorkflowsDashboard({ tier: 'registered' }),
+    default: () => m.WorkflowsDashboard({ tier: 'all' }),
   })),
 );
 const YamlWorkflowsPage = lazy(() =>
@@ -116,9 +116,7 @@ const MaintenancePage = lazy(() =>
 const ControlPlanePage = lazy(() =>
   import('./pages/admin/controlplane').then((m) => ({ default: m.ControlPlanePage })),
 );
-const BotsPage = lazy(() =>
-  import('./pages/admin/bots').then((m) => ({ default: m.BotsPage })),
-);
+// BotsPage is now embedded in the unified Accounts page (UsersPage)
 const CredentialsPage = lazy(() =>
   import('./pages/settings/CredentialsPage').then((m) => ({ default: m.CredentialsPage })),
 );
@@ -204,7 +202,7 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
-          { path: 'workflows/executions', element: <Lazy><UnbreakableExecutionsPage /></Lazy> },
+          { path: 'workflows/executions', element: <Lazy><CertifiedExecutionsPage /></Lazy> },
           { path: 'workflows/durable/executions', element: <Lazy><DurableExecutionsPage /></Lazy> },
           { path: 'workflows/durable/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
@@ -242,7 +240,7 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
-          { path: 'admin/bots', element: <Lazy><BotsPage /></Lazy> },
+          { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },

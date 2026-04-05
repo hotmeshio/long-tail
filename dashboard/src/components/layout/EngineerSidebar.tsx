@@ -1,10 +1,11 @@
-import { GitBranch, Play, Server } from 'lucide-react';
+import { ListChecks, Play, Settings, UserCheck } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 const entries: NavEntry[] = [
-  { to: '/workflows/workers', label: 'All Workers', icon: Server },
-  { to: '/workflows/durable/invoke', label: 'Invoke', icon: Play },
-  { to: '/workflows/durable/executions', label: 'Executions', icon: GitBranch },
+  { to: '/workflows/registry', label: 'Workflow Registry', icon: Settings },
+  { to: '/workflows/start', label: 'Invoke Workflow', icon: Play },
+  { to: '/escalations/available', label: 'Escalations', icon: UserCheck },
+  { to: '/workflows/executions', label: 'Durable Executions', icon: ListChecks },
 ];
 
 export function EngineerSidebar() {

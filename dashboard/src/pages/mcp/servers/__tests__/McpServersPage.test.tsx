@@ -82,7 +82,7 @@ beforeEach(() => {
 describe('McpServersPage', () => {
   it('renders page header', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('Servers & Tools')).toBeInTheDocument();
+    expect(screen.getByText('MCP Server Tools')).toBeInTheDocument();
   });
 
   it('renders filter bar', () => {

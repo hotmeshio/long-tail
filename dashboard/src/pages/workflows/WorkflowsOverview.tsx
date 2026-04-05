@@ -132,7 +132,7 @@ export function WorkflowsOverview() {
         title="Workflows"
         actions={
           <span className="text-xs text-text-tertiary">
-            {registered} registered type{registered !== 1 ? 's' : ''}
+            {registered} certified type{registered !== 1 ? 's' : ''}
           </span>
         }
       />

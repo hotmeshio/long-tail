@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -5,19 +6,29 @@ import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
 import { AdminSidebar } from './AdminSidebar';
 import { EngineerSidebar } from './EngineerSidebar';
-import { UnbreakableSidebar } from './UnbreakableSidebar';
-import { OperatorSidebar } from './OperatorSidebar';
 import { McpSidebar } from './McpSidebar';
-import { McpServersSidebar } from './McpServersSidebar';
+import { EventFeed } from './EventFeed';
 
 function ShellLayout() {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
   const { collapsed, toggle } = useSidebar();
+  const [feedOpen, setFeedOpen] = useState(false);
+  const location = useLocation();
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Cross-fade on route change
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.classList.remove('animate-page-in');
+    void el.offsetWidth;
+    el.classList.add('animate-page-in');
+  }, [location.pathname]);
 
   return (
-    <div className="h-screen bg-surface flex flex-col">
+    <div className="h-screen bg-surface flex flex-col" style={{ '--feed-height': feedOpen ? '224px' : '32px' } as React.CSSProperties}>
       {/* Full-width header */}
-      <Header />
+      <Header onToggleEventFeed={() => setFeedOpen((v) => !v)} />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -29,11 +40,8 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <OperatorSidebar />
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <UnbreakableSidebar />}
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpServersSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
 
@@ -55,11 +63,14 @@ function ShellLayout() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-dashboard mx-auto px-10 py-10">
+          <div ref={contentRef} className={`max-w-dashboard mx-auto px-10 py-10 animate-page-in ${feedOpen ? 'pb-60' : 'pb-16'}`}>
             <Outlet />
           </div>
         </main>
       </div>
+
+      {/* Global event feed */}
+      <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import * as taskService from '../../services/task';
 import * as userService from '../../services/user';
 import { createClient, LT_TASK_QUEUE } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
+import { publishEscalationEvent } from '../../services/events/publish';
 
 export function registerBulkRoutes(router: Router): void {
   /**
@@ -95,6 +96,21 @@ export function registerBulkRoutes(router: Router): void {
         durationMinutes ?? 30,
       );
       res.json(result);
+
+      if (result.claimed > 0) {
+        for (const id of ids) {
+          publishEscalationEvent({
+            type: 'escalation.claimed',
+            source: 'api',
+            workflowId: '',
+            workflowName: '',
+            taskQueue: '',
+            escalationId: id,
+            status: 'claimed',
+            data: { assigned_to: userId, bulk: true },
+          });
+        }
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -148,6 +164,21 @@ export function registerBulkRoutes(router: Router): void {
         durationMinutes ?? 30,
       );
       res.json(result);
+
+      if (result.assigned > 0) {
+        for (const id of ids) {
+          publishEscalationEvent({
+            type: 'escalation.claimed',
+            source: 'api',
+            workflowId: '',
+            workflowName: '',
+            taskQueue: '',
+            escalationId: id,
+            status: 'claimed',
+            data: { assigned_to: targetUserId, bulk: true },
+          });
+        }
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

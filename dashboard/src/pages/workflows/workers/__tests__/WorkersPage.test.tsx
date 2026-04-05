@@ -52,7 +52,7 @@ describe('WorkersPage', () => {
 
   it('renders page header', () => {
     renderPage();
-    expect(screen.getByText('All Workers')).toBeInTheDocument();
+    expect(screen.getByText('Workers')).toBeInTheDocument();
   });
 
   it('renders all workers', () => {
@@ -65,10 +65,10 @@ describe('WorkersPage', () => {
 
   // ── Status badges ──
 
-  it('renders Registered and Unregistered badges', () => {
+  it('renders Certified and Durable badges', () => {
     renderPage();
-    expect(screen.getAllByText('Registered').length).toBe(2);
-    expect(screen.getAllByText('Unregistered').length).toBe(2);
+    expect(screen.getAllByText('Certified').length).toBe(2);
+    expect(screen.getAllByText('Durable').length).toBe(2);
   });
 
   // ── Actions ──

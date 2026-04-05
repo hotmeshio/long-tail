@@ -52,7 +52,7 @@ beforeEach(() => {
 describe('McpQueryPage', () => {
   it('renders page header', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Invoke MCP Discovery Flow')).toBeInTheDocument();
+    expect(screen.getByText('Pipeline Designer')).toBeInTheDocument();
   });
 
   it('renders submit form with textarea and button', () => {

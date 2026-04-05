@@ -1,12 +1,13 @@
-import { Workflow, GitBranch, Wand2 } from 'lucide-react';
+import { Server, Workflow, ListChecks, Wand2 } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 const entries: NavEntry[] = [
-  { to: '/mcp/workflows', label: 'Pipeline Registry', icon: Workflow },
-  { to: '/mcp/queries', label: 'Invoke', icon: Wand2 },
-  { to: '/mcp/executions', label: 'Executions', icon: GitBranch },
+  { to: '/mcp/servers', label: 'MCP Server Tools', icon: Server },
+  { to: '/mcp/workflows', label: 'MCP Pipeline Tools', icon: Workflow },
+  { to: '/mcp/queries', label: 'Pipeline Designer', icon: Wand2 },
+  { to: '/mcp/executions', label: 'Pipeline Executions', icon: ListChecks },
 ];
 
 export function McpSidebar() {
-  return <SidebarNav heading="Discover Workflows" entries={entries} />;
+  return <SidebarNav heading="MCP Workflows" entries={entries} />;
 }

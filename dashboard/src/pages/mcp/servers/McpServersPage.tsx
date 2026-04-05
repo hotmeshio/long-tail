@@ -99,7 +99,7 @@ export function McpServersPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Servers & Tools" />
+        <PageHeader title="MCP Server Tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -114,7 +114,7 @@ export function McpServersPage() {
   return (
     <div>
       <PageHeader
-        title="Servers & Tools"
+        title="MCP Server Tools"
         actions={
           <button
             onClick={() => {

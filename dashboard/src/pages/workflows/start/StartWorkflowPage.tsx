@@ -19,7 +19,7 @@ import { describeCron, COMMON_PATTERNS, extractFormFields, jobColumns } from '..
 import { WorkflowSelector } from './WorkflowSelector';
 import { EnvelopeEditor } from './EnvelopeEditor';
 
-export type InvokeTier = 'unbreakable' | 'durable';
+export type InvokeTier = 'certified' | 'durable';
 type Mode = 'now' | 'schedule';
 
 // ── Mode toggle ─────────────────────────────────────────────────────────────
@@ -484,7 +484,7 @@ function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfi
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier }) {
+export function StartWorkflowPage({ tier: _tier }: { tier?: InvokeTier }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: configsData, isLoading } = useWorkflowConfigs();
   const { data: discoveredData, isLoading: discoveredLoading } = useDiscoveredWorkflows();
@@ -495,16 +495,18 @@ export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier 
 
   const configs: LTWorkflowConfig[] = configsData ?? [];
 
-  // Build the workflow list based on tier
+  // Certified = has config with invocable: true
+  const certifiedTypes = useMemo(
+    () => new Set(configs.filter((c) => c.invocable).map((c) => c.workflow_type)),
+    [configs],
+  );
+
+  // Build unified workflow list: certified configs + active durable workers
   const invocableConfigs = useMemo(() => {
-    if (tier === 'unbreakable') {
-      // Registered configs with invocable: true
-      return configs.filter((c) => c.invocable);
-    }
-    // Durable: active workers that have NO config entry
+    const certified = configs.filter((c) => c.invocable);
     const registeredTypes = new Set(configs.map((c) => c.workflow_type));
     const discovered = discoveredData ?? [];
-    return discovered
+    const durable = discovered
       .filter((dw) => dw.active && !registeredTypes.has(dw.workflow_type))
       .map((dw) => ({
         workflow_type: dw.workflow_type,
@@ -520,7 +522,8 @@ export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier 
         cron_schedule: null,
         execute_as: null,
       } satisfies LTWorkflowConfig));
-  }, [tier, configs, discoveredData]);
+    return [...certified, ...durable];
+  }, [configs, discoveredData]);
 
   const selectedConfig = invocableConfigs.find((c) => c.workflow_type === selectedType);
 
@@ -528,9 +531,7 @@ export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier 
     (cronEntries ?? []).filter((e) => e.active).map((e) => e.workflow_type),
   );
 
-  const executionsPath = tier === 'durable'
-    ? '/workflows/durable/executions'
-    : '/workflows/executions';
+  const executionsPath = '/workflows/executions';
 
   // Auto-select first workflow if only one exists
   useEffect(() => {
@@ -558,24 +559,17 @@ export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier 
     );
   }
 
-  const emptyTitle = tier === 'durable'
-    ? 'No active durable workers'
-    : 'No invocable workflows';
-  const emptyHint = tier === 'durable'
-    ? 'Start the server with examples: true to load example durable workers.'
-    : 'Mark workflows as invocable in the registry to enable them here.';
-
   return (
     <div>
       <PageHeader
-        title={tier === 'durable' ? 'Invoke Durable Workflow' : 'Invoke Unbreakable Workflow'}
-        actions={tier === 'unbreakable' ? <ModeToggle mode={mode} onChange={setMode} /> : undefined}
+        title="Invoke Workflow"
+        actions={<ModeToggle mode={mode} onChange={setMode} />}
       />
 
       {invocableConfigs.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-sm text-text-primary mb-1">{emptyTitle}</p>
-          <p className="text-xs text-text-tertiary">{emptyHint}</p>
+          <p className="text-sm text-text-primary mb-1">No invocable workflows</p>
+          <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -583,11 +577,12 @@ export function StartWorkflowPage({ tier = 'unbreakable' }: { tier?: InvokeTier 
             configs={invocableConfigs}
             selectedType={selectedType}
             onSelect={handleSelect}
+            certifiedTypes={certifiedTypes}
           />
 
           <div className="lg:col-span-2">
             {selectedType && selectedConfig ? (
-              mode === 'now' || tier === 'durable' ? (
+              mode === 'now' ? (
                 <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
               ) : (
                 <SchedulePanel selected={selectedConfig} activeTypes={activeTypes} />

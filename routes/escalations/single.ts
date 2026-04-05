@@ -3,6 +3,7 @@ import { Router } from 'express';
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 import * as roleService from '../../services/role';
+import { publishEscalationEvent } from '../../services/events/publish';
 
 export function registerSingleRoutes(router: Router): void {
   /**
@@ -132,6 +133,17 @@ export function registerSingleRoutes(router: Router): void {
       }
 
       res.json(result);
+
+      publishEscalationEvent({
+        type: 'escalation.claimed',
+        source: 'api',
+        workflowId: escalation.workflow_id || '',
+        workflowName: escalation.workflow_type || '',
+        taskQueue: escalation.task_queue || '',
+        escalationId: req.params.id,
+        status: 'claimed',
+        data: { assigned_to: userId },
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -153,6 +165,17 @@ export function registerSingleRoutes(router: Router): void {
       }
 
       res.json({ escalation: result });
+
+      publishEscalationEvent({
+        type: 'escalation.released',
+        source: 'api',
+        workflowId: result.workflow_id || '',
+        workflowName: result.workflow_type || '',
+        taskQueue: result.task_queue || '',
+        escalationId: req.params.id,
+        status: 'released',
+        data: { released_by: userId },
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

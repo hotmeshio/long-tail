@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Inbox } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useMyEscalationCount } from '../../hooks/useMyEscalationCount';
 import { NatsStatus } from '../common/display/NatsStatus';
 import { AppLogo } from '../common/display/AppLogo';
 
-export function Header() {
+export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }) {
   const { user, logout } = useAuth();
+  const pendingCount = useMyEscalationCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -27,9 +30,20 @@ export function Header() {
         <AppLogo />
       </Link>
 
-      {/* Right: NATS indicator + user menu */}
+      {/* Right: inbox, NATS indicator + user menu */}
       <div className="flex items-center gap-4">
-        <NatsStatus />
+        <Link
+          to="/escalations/queue"
+          className="relative text-text-tertiary hover:text-accent transition-colors"
+          aria-label="Escalation inbox"
+          title="Escalation inbox"
+        >
+          <Inbox className="w-4 h-4" strokeWidth={1.5} />
+          {pendingCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-status-error" />
+          )}
+        </Link>
+        <NatsStatus onClick={onToggleEventFeed} />
         {user && (
           <div className="relative" ref={menuRef}>
             <button

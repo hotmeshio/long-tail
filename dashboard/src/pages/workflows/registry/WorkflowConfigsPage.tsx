@@ -4,7 +4,7 @@ import {
   useDiscoveredWorkflows,
   useDeleteWorkflowConfig,
 } from '../../../api/workflows';
-import { Trash2, Play, Plus } from 'lucide-react';
+import { Play, ShieldCheck, ShieldPlus, ShieldOff } from 'lucide-react';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
@@ -64,10 +64,8 @@ export function WorkflowConfigsPage() {
     if (filters.search) result = result.filter((w) => matchesSearch(w, filters.search));
     if (filters.queue) result = result.filter((w) => w.task_queue === filters.queue);
     if (filters.role) result = result.filter((w) => (w.roles ?? []).includes(filters.role));
-    if (filters.tier === 'registered') result = result.filter((w) => w.registered);
-    if (filters.tier === 'unregistered') result = result.filter((w) => !w.registered);
+    if (filters.tier === 'certified') result = result.filter((w) => w.registered);
     if (filters.tier === 'durable') result = result.filter((w) => !w.registered);
-    if (filters.tier === 'unbreakable') result = result.filter((w) => w.registered);
     return result;
   }, [allWorkflows, filters]);
 
@@ -99,7 +97,7 @@ export function WorkflowConfigsPage() {
       key: 'registered',
       label: 'Tier',
       render: (row) => row.registered
-        ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">Registered</span>
+        ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>
         : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Durable</span>,
       className: 'whitespace-nowrap',
     },
@@ -124,17 +122,17 @@ export function WorkflowConfigsPage() {
         <RowActionGroup>
           {row.registered ? (
             <RowAction
-              icon={Trash2}
-              title="Delete config"
+              icon={ShieldOff}
+              title="De-certify workflow"
               onClick={() => setConfirmDelete(row.workflow_type)}
-              colorClass="text-text-tertiary hover:text-status-error"
+              colorClass="text-text-tertiary hover:text-status-warning"
             />
           ) : (
             <RowAction
-              icon={Plus}
-              title="Register workflow"
+              icon={ShieldPlus}
+              title="Certify workflow"
               onClick={() => navigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(row.workflow_type)}&task_queue=${encodeURIComponent(row.task_queue ?? '')}`)}
-              colorClass="text-text-tertiary hover:text-accent"
+              colorClass="text-text-tertiary hover:text-status-success"
             />
           )}
         </RowActionGroup>
@@ -161,7 +159,7 @@ export function WorkflowConfigsPage() {
   return (
     <div>
       <PageHeader
-        title="Worker Registry"
+        title="Workflow Registry"
         actions={
           <button
             onClick={() => navigate('/workflows/registry/new')}
@@ -191,8 +189,8 @@ export function WorkflowConfigsPage() {
           value={filters.tier}
           onChange={(v) => setFilter('tier', v)}
           options={[
-            { value: 'registered', label: 'Registered' },
-            { value: 'unregistered', label: 'Unregistered' },
+            { value: 'certified', label: 'Certified' },
+            { value: 'durable', label: 'Durable' },
           ]}
         />
         <FilterSelect
@@ -217,8 +215,8 @@ export function WorkflowConfigsPage() {
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
-        title="Delete Workflow Config"
-        description={<>Delete <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This will cascade-delete associated roles and invocation roles.</>}
+        title="De-certify Workflow"
+        description={<>Remove certification from <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This removes interceptor guarantees, escalation chains, and invocation role constraints. The workflow will continue running as a standard durable workflow.</>}
         isPending={deleteConfig.isPending}
         error={deleteConfig.error as Error | null}
       />

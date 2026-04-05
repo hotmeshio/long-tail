@@ -185,7 +185,7 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="Available Escalations" />
+      <PageHeader title="Escalations" />
 
       <EscalationFilterBar
         filters={filters}
