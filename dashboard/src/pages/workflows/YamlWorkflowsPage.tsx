@@ -174,7 +174,14 @@ export function YamlWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="MCP Pipeline Tools" />
+      <PageHeader
+        title="MCP Pipeline Tools"
+        actions={
+          <button onClick={() => navigate('/mcp/queries')} className="btn-primary text-xs">
+            Design Pipeline
+          </button>
+        }
+      />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         Compiled from successful triage runs. Each workflow is a deterministic tool.

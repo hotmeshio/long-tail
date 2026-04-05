@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Wand2, Zap, Layers } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -129,69 +129,98 @@ export function McpQueryPage() {
     <>
       <PageHeader title="Pipeline Designer" />
 
-      {/* Submit form */}
-      <form onSubmit={handleSubmit} className="mb-6">
-        <div className="flex gap-3">
-          <div className="flex-1 flex flex-col gap-2">
-            <textarea
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-              placeholder="Describe what you want to accomplish..."
-              className="w-full min-h-[80px] max-h-[200px] px-4 py-3 bg-surface-sunken border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  handleSubmit(e);
-                }
-              }}
-            />
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer select-none group">
-                <input
-                  type="checkbox"
-                  checked={direct}
-                  onChange={(e) => setDirect(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
-                />
-                <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
-                  Force discovery
-                </span>
-                <span className="text-xs text-text-tertiary">
-                  {direct
-                    ? '— always run dynamic LLM exploration, skip compiled pipelines'
-                    : '— use a compiled pipeline if one matches, otherwise discover dynamically'}
-                </span>
-              </label>
-              <span className="text-xs text-text-tertiary">Cmd+Enter to submit</span>
+      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
+        Describe a task and MCP discovers the right tools, executes the workflow, and compiles the result into a reusable pipeline.
+      </p>
+
+      {/* Design lifecycle steps */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="flex items-start gap-3 p-3 rounded-lg border border-surface-border bg-surface-raised/50">
+          <Wand2 className="w-4 h-4 mt-0.5 text-accent shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-text-primary">1. Describe</p>
+            <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">Write a specific prompt. Mention tools, URLs, credentials, and expected outputs.</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 p-3 rounded-lg border border-surface-border bg-surface-raised/50">
+          <Zap className="w-4 h-4 mt-0.5 text-status-warning shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-text-primary">2. Discover</p>
+            <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">MCP selects servers, calls tools, and chains results. You review the execution.</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 p-3 rounded-lg border border-surface-border bg-surface-raised/50">
+          <Layers className="w-4 h-4 mt-0.5 text-status-success shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-text-primary">3. Compile</p>
+            <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">Successful runs compile into deterministic pipelines. No LLM needed at runtime.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Prompt input */}
+      <form onSubmit={handleSubmit} className="mb-8">
+        <div className="rounded-lg border border-surface-border bg-surface-raised overflow-hidden">
+          <textarea
+            value={promptText}
+            onChange={(e) => setPromptText(e.target.value)}
+            placeholder="Describe what you want to accomplish. Be specific about which tools to use, what data to capture, and how results should be structured..."
+            className="w-full min-h-[100px] max-h-[200px] px-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none border-none"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                handleSubmit(e);
+              }
+            }}
+          />
+          <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
+            <label className="flex items-center gap-2 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={direct}
+                onChange={(e) => setDirect(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
+              />
+              <span className="text-[10px] text-text-secondary group-hover:text-text-primary transition-colors">
+                Force discovery
+              </span>
+              <span className="text-[10px] text-text-tertiary">
+                {direct ? '— skip compiled pipelines' : '— prefer compiled pipelines'}
+              </span>
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-text-tertiary">Cmd+Enter</span>
+              <button
+                type="submit"
+                disabled={!promptText.trim() || activeMutation.isPending}
+                className="px-4 py-1.5 bg-accent-primary text-white text-xs font-medium rounded-md hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {activeMutation.isPending ? 'Starting...' : 'Design Pipeline'}
+              </button>
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={!promptText.trim() || activeMutation.isPending}
-            className="self-start px-6 py-3 bg-accent-primary text-white text-sm font-medium rounded-lg hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {activeMutation.isPending ? 'Starting...' : 'Run'}
-          </button>
         </div>
         {activeMutation.isError && (
           <p className="mt-2 text-sm text-status-error">{activeMutation.error.message}</p>
         )}
       </form>
 
-      {/* Filters */}
-      <FilterBar>
-        <FilterSelect
-          label="Status"
-          value={filters.status}
-          onChange={(v) => setFilter('status', v)}
-          options={[
-            { value: 'completed', label: 'Completed' },
-            { value: 'running', label: 'Running' },
-            { value: 'failed', label: 'Failed' },
-          ]}
-        />
-      </FilterBar>
+      {/* Recent runs */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Recent Runs</p>
+        <FilterBar>
+          <FilterSelect
+            label="Status"
+            value={filters.status}
+            onChange={(v) => setFilter('status', v)}
+            options={[
+              { value: 'completed', label: 'Completed' },
+              { value: 'running', label: 'Running' },
+              { value: 'failed', label: 'Failed' },
+            ]}
+          />
+        </FilterBar>
+      </div>
 
-      {/* Table */}
       <DataTable
         columns={columns}
         data={jobs}
@@ -204,7 +233,7 @@ export function McpQueryPage() {
       />
 
       {!isLoading && jobs.length === 0 && (
-        <EmptyState title="No queries yet" description="Submit a prompt above to get started" />
+        <EmptyState title="No pipeline runs yet" description="Describe a task above to start designing" />
       )}
 
       <StickyPagination

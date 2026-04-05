@@ -58,20 +58,20 @@ describe('McpQueryPage', () => {
   it('renders submit form with textarea and button', () => {
     render(<McpQueryPage />, { wrapper });
     expect(screen.getByPlaceholderText(/describe what you want/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /run/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /design pipeline/i })).toBeInTheDocument();
   });
 
-  it('disables Run button when textarea is empty', () => {
+  it('disables button when textarea is empty', () => {
     render(<McpQueryPage />, { wrapper });
-    const btn = screen.getByRole('button', { name: /run/i });
+    const btn = screen.getByRole('button', { name: /design pipeline/i });
     expect(btn).toBeDisabled();
   });
 
-  it('enables Run button when textarea has content', () => {
+  it('enables button when textarea has content', () => {
     render(<McpQueryPage />, { wrapper });
     const textarea = screen.getByPlaceholderText(/describe what you want/i);
     fireEvent.change(textarea, { target: { value: 'test prompt' } });
-    const btn = screen.getByRole('button', { name: /run/i });
+    const btn = screen.getByRole('button', { name: /design pipeline/i });
     expect(btn).not.toBeDisabled();
   });
 
@@ -98,7 +98,7 @@ describe('McpQueryPage', () => {
   it('shows empty state when no jobs', () => {
     vi.mocked(useMcpQueryJobs).mockReturnValue({ data: { jobs: [], total: 0 }, isLoading: false } as any);
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('No queries yet')).toBeInTheDocument();
+    expect(screen.getByText('No pipeline runs yet')).toBeInTheDocument();
   });
 
   it('renders status filter', () => {
