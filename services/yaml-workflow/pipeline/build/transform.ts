@@ -46,7 +46,8 @@ export function insertTransformActivities(
     const transformId = transformEdges.length === 1
       ? `${prefix}_xf${idx + 1}`
       : `${prefix}_xf${idx + 1}_${ei}`;
-    const transformTopic = `${graphTopic}.reshape_${edge.toField}`;
+    const transformTopic = graphTopic;
+    const transformWorkflowName = `reshape_${edge.toField}`;
 
     // Wire transform input: source field from prior step + all trigger inputs
     // (trigger inputs needed for dynamic derivation prefixes like screenshot_dir)
@@ -79,6 +80,9 @@ export function insertTransformActivities(
       }
     }
 
+    // Set workflowName for singleton consumer dispatch routing
+    transformInputMaps.workflowName = transformWorkflowName;
+
     activities[transformId] = {
       title: `Reshape ${humanize(edge.toField)}`,
       type: 'worker',
@@ -96,6 +100,7 @@ export function insertTransformActivities(
       type: 'worker',
       tool_source: 'transform',
       topic: transformTopic,
+      workflow_name: transformWorkflowName,
       input_mappings: transformInputMaps,
       output_fields: [edge.toField],
       transform_spec: {

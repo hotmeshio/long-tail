@@ -193,6 +193,8 @@ export interface GenerateYamlResult {
   category: string;
   /** LLM compilation plan (null if LLM unavailable or skipped). */
   compilationPlan: EnhancedCompilationPlan | null;
+  /** Validation issues found after compilation (empty = clean). */
+  validationIssues: string[];
 }
 
 /** Shared context accumulated through pipeline stages. */

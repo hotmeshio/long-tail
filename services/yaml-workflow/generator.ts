@@ -73,7 +73,15 @@ export async function generateYamlFromExecution(
   ctx = await build(ctx);
   ctx = await validate(ctx);
 
-  // 4. Return result
+  // 4. Log validation warnings (informational — do not recompile)
+  if (ctx.validationIssues.length > 0) {
+    const { loggerRegistry } = await import('../logger');
+    loggerRegistry.warn(
+      `[yaml-workflow] Validation warnings (${ctx.validationIssues.length}): ${ctx.validationIssues.join('; ')}`,
+    );
+  }
+
+  // 5. Return result
   return {
     yaml: ctx.yaml,
     inputSchema: ctx.inputSchema,
@@ -86,5 +94,6 @@ export async function generateYamlFromExecution(
     originalPrompt: ctx.originalPrompt,
     category: ctx.category,
     compilationPlan: ctx.compilationPlan,
+    validationIssues: ctx.validationIssues,
   };
 }

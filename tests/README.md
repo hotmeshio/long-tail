@@ -120,7 +120,6 @@ When Docker has build or startup issues:
 ```bash
 # Full reset: stop, clean volumes, rebuild
 docker compose down -v
-rm -rf .docker-data/files/*
 docker compose up -d --build
 
 # Verify server starts (wait ~10s for seeding)

@@ -42,7 +42,7 @@ export async function build(ctx: PipelineContext): Promise<PipelineContext> {
   const sessionFields = resolveSessionFields(plan);
   const collapsedToCoreIndex = buildCoreStepIndexMap(plan, ctx.collapsedSteps);
   const outputSchema = inferOutputSchema(steps);
-  const prefix = buildActivityPrefix(options.subscribes);
+  const prefix = buildActivityPrefix(options.name);
 
   // 2. Initialize DAG with trigger
   const dag = initializeDag(prefix, options.subscribes, inputSchema);

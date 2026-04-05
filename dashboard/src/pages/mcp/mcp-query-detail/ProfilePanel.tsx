@@ -109,15 +109,11 @@ interface CreateProfileFormProps {
   setCompileAppId: (v: string) => void;
   compileName: string;
   setCompileName: (v: string) => void;
-  derivedSubscribes: string;
-  setCompileSubscribes: (v: string) => void;
-  autoSubscribes: boolean;
-  setAutoSubscribes: (v: boolean) => void;
   compileDescription: string;
   setCompileDescription: (v: string) => void;
   compileTags: string[];
   setCompileTags: (v: string[]) => void;
-  describeData: { description: string; tags: string[] } | undefined;
+  describeData: { tool_name?: string; description: string; tags: string[] } | undefined;
   describePrompt: string | undefined;
   allAppIds: string[];
   onCompile: () => Promise<void>;
@@ -132,10 +128,6 @@ function CreateProfileForm({
   setCompileAppId,
   compileName,
   setCompileName,
-  derivedSubscribes,
-  setCompileSubscribes,
-  autoSubscribes,
-  setAutoSubscribes,
   compileDescription,
   setCompileDescription,
   compileTags,
@@ -180,14 +172,6 @@ function CreateProfileForm({
             className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. auth-screenshot-all-nav-pages" />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Topic</label>
-          <div className="flex items-center gap-2">
-            <input type="text" value={derivedSubscribes} onChange={(e) => { setAutoSubscribes(false); setCompileSubscribes(e.target.value); }}
-              className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="auto-derived" />
-            {!autoSubscribes && <button type="button" onClick={() => setAutoSubscribes(true)} className="text-[10px] text-accent hover:underline shrink-0">Auto</button>}
-          </div>
-        </div>
-        <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
             {!compileDescription && !describeData && describePrompt && <span className="text-[10px] text-accent animate-pulse">Generating...</span>}
@@ -225,15 +209,11 @@ interface ProfilePanelProps {
   setCompileAppId: (v: string) => void;
   compileName: string;
   setCompileName: (v: string) => void;
-  derivedSubscribes: string;
-  setCompileSubscribes: (v: string) => void;
-  autoSubscribes: boolean;
-  setAutoSubscribes: (v: boolean) => void;
   compileDescription: string;
   setCompileDescription: (v: string) => void;
   compileTags: string[];
   setCompileTags: (v: string[]) => void;
-  describeData: { description: string; tags: string[] } | undefined;
+  describeData: { tool_name?: string; description: string; tags: string[] } | undefined;
   describePrompt: string | undefined;
   allAppIds: string[];
   onCompile: () => Promise<void>;
@@ -276,10 +256,6 @@ export function ProfilePanel(props: ProfilePanelProps) {
       setCompileAppId={props.setCompileAppId}
       compileName={props.compileName}
       setCompileName={props.setCompileName}
-      derivedSubscribes={props.derivedSubscribes}
-      setCompileSubscribes={props.setCompileSubscribes}
-      autoSubscribes={props.autoSubscribes}
-      setAutoSubscribes={props.setAutoSubscribes}
       compileDescription={props.compileDescription}
       setCompileDescription={props.setCompileDescription}
       compileTags={props.compileTags}

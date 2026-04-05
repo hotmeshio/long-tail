@@ -97,7 +97,10 @@ router.post('/', async (req, res) => {
       source_workflow_type: workflow_name,
       original_prompt: result.originalPrompt || undefined,
       category: result.category || undefined,
-      metadata: { input_field_meta: result.inputFieldMeta },
+      metadata: {
+        input_field_meta: result.inputFieldMeta,
+        ...(result.validationIssues?.length ? { validation_warnings: result.validationIssues } : {}),
+      },
     });
 
     res.status(201).json(record);

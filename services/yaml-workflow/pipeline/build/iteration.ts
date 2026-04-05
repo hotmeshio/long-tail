@@ -41,7 +41,7 @@ export function buildIterationActivities(
   const cycleId = `${prefix}_cycle${idx + 1}`;
   const doneId = `${prefix}_done${idx + 1}`;
   const originalTool = spec.toolName;
-  const workerTopic = `${graphTopic}.${originalTool}`;
+  const workerTopic = graphTopic;
 
   // Determine the array source reference
   const sourceActId = stepIndexToActivityId.get(spec.sourceStepIndex);
@@ -155,6 +155,8 @@ export function buildIterationActivities(
 
   // Thread _scope from trigger for IAM context
   workerInputMaps._scope = `{${triggerId}.output.data._scope}`;
+  // Set workflowName for singleton consumer dispatch routing
+  workerInputMaps.workflowName = originalTool;
 
   const resultSchema = step.result ? inferSchema(step.result) : { type: 'object' };
 
@@ -226,7 +228,7 @@ export function buildIterationActivities(
   // Manifest entries
   const manifest: ActivityManifestEntry[] = [
     { activity_id: pivotId, title: `Iterate ${humanize(originalTool)}`, type: 'worker' as const, tool_source: 'trigger', topic: graphTopic, input_mappings: {}, output_fields: ['index', 'items'] },
-    { activity_id: workerId, title: humanize(originalTool), type: 'worker' as const, tool_source: step.source, topic: workerTopic, mcp_server_id: spec.serverId, mcp_tool_name: originalTool, input_mappings: workerInputMaps as Record<string, string>, output_fields: [] },
+    { activity_id: workerId, title: humanize(originalTool), type: 'worker' as const, tool_source: step.source, topic: workerTopic, workflow_name: originalTool, mcp_server_id: spec.serverId, mcp_tool_name: originalTool, input_mappings: workerInputMaps as Record<string, string>, output_fields: [] },
     { activity_id: cycleId, title: 'Next Item', type: 'worker' as const, tool_source: 'trigger', topic: graphTopic, input_mappings: {}, output_fields: [] },
     { activity_id: doneId, title: 'Iteration Complete', type: 'worker' as const, tool_source: 'trigger', topic: graphTopic, input_mappings: {}, output_fields: [] },
   ];

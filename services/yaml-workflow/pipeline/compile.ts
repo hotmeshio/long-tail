@@ -325,17 +325,19 @@ function parsePlan(raw: string, stepCount: number): EnhancedCompilationPlan {
  * uses mechanical heuristics as before.
  */
 export async function compile(ctx: PipelineContext): Promise<PipelineContext> {
-  // Build retry context if this is a recompilation after a failed deployment
+  // Build retry context if this is a recompilation after a failed deployment or validation
   const retryHint = ctx.priorDeployError
     ? [
-        `\n## RECOMPILATION — Prior Deployment Failed`,
-        `The previous compilation produced YAML that failed deployment with this error:`,
+        `\n## RECOMPILATION — Prior Attempt Failed`,
+        `The previous compilation produced YAML that failed with this error:`,
         `> ${ctx.priorDeployError}`,
         ``,
         `You MUST produce a plan that avoids this issue. Specifically:`,
-        `- If the error mentions "Duplicate activity id", ensure all activity IDs will be unique`,
-        `  across all graphs. The build stage prefixes IDs with a sanitized graph topic — ensure`,
-        `  your plan does not produce steps that would collide after sanitization.`,
+        `- If the error mentions input key mismatches (e.g., 'login.url' vs 'url'), ensure your`,
+        `  dataFlow edges use the exact field names each tool expects as inputs.`,
+        `- If the error mentions missing input wiring or session handles, ensure all data dependencies`,
+        `  (including _handle, page_id, and other session fields) are explicitly wired in dataFlow edges.`,
+        `- If the error mentions "Duplicate activity id", ensure all activity IDs will be unique.`,
         `- If the error mentions invalid transitions, ensure data flow edges reference valid step indices.`,
         `- Review the failed YAML below for the specific structural issue and ensure your plan avoids it.`,
         ...(ctx.priorFailedYaml ? [

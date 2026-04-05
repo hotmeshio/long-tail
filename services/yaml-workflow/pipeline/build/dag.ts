@@ -119,8 +119,8 @@ export function appendNormalStep(
   dag.stepIndexToActivityId.set(idx, actId);
   dag.lastPivotId = null;
 
-  const topicSuffix = step.kind === 'llm' ? 'interpret' : step.toolName;
-  const topic = `${graphTopic}.${topicSuffix}`;
+  const workflowName = step.kind === 'llm' ? 'interpret' : step.toolName;
+  const topic = graphTopic;
   const title = step.kind === 'llm'
     ? 'LLM Interpret'
     : step.toolName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -149,6 +149,8 @@ export function appendNormalStep(
 
   // Thread _scope from trigger through every activity for IAM context
   inputMappings._scope = `{${dag.triggerId}.output.data._scope}`;
+  // Set workflowName for singleton consumer dispatch routing
+  inputMappings.workflowName = workflowName;
 
   dag.activities[actId] = {
     title,
@@ -163,7 +165,7 @@ export function appendNormalStep(
   };
 
   // Build manifest entry
-  dag.manifest.push(buildManifestEntry(actId, title, step, topic, inputMappings, outputFields));
+  dag.manifest.push(buildManifestEntry(actId, title, step, topic, workflowName, inputMappings, outputFields));
 
   // Transition from previous step
   dag.transitions[dag.prevActivityId] = [{ to: actId }];
@@ -336,6 +338,7 @@ function buildManifestEntry(
   title: string,
   step: ExtractedStep,
   topic: string,
+  workflowName: string,
   inputMappings: Record<string, string>,
   outputFields: string[],
 ): ActivityManifestEntry {
@@ -349,6 +352,7 @@ function buildManifestEntry(
     type: 'worker',
     tool_source: step.source,
     topic,
+    workflow_name: workflowName,
     ...(step.kind === 'tool' ? {
       mcp_server_id: step.source === 'mcp' ? step.mcpServerId : 'db',
       mcp_tool_name: step.toolName,

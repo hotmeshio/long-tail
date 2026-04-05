@@ -211,6 +211,10 @@ Check for:
 5. Iteration array source: verify the referenced items field in a cycle hook actually exists in the source activity's output fields
 6. Trigger completeness: every dynamic input in the trigger schema should be referenced by at least one activity's input maps
 
+IGNORE these internal fields — they are injected by the build system and are always correct:
+- "workflowName" in input maps: internal dispatch routing field, always a literal string — NOT a hardcoded value bug
+- "_scope" in input maps: internal IAM context field, always wired from trigger — NOT a missing trigger input
+
 Return a JSON object:
 {
   "issues": ["description of issue 1", "description of issue 2"],

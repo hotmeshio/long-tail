@@ -60,8 +60,10 @@ export interface ActivityManifestEntry {
   title: string;
   /** HotMesh activity type */
   type: 'trigger' | 'worker' | 'hook';
-  /** Worker topic for routing */
+  /** Worker topic for routing (coarse stream grouping) */
   topic: string;
+  /** Workflow name for dispatch routing within a shared topic stream */
+  workflow_name?: string;
   /** How this activity executes at runtime */
   tool_source: 'db' | 'mcp' | 'llm' | 'trigger' | 'transform' | 'signal';
   /** For hook activities: the external signal topic (e.g., 'escalation.resolved.<graph>') */

@@ -47,8 +47,6 @@ export function McpQueryDetailPage() {
 
   const [compileAppId, setCompileAppId] = useState('longtail');
   const [compileName, setCompileName] = useState('');
-  const [compileSubscribes, setCompileSubscribes] = useState('');
-  const [autoSubscribes, setAutoSubscribes] = useState(true);
   const [compileDescription, setCompileDescription] = useState('');
   const [compileTags, setCompileTags] = useState<string[]>([]);
   const [compileInitialized, setCompileInitialized] = useState(false);
@@ -193,14 +191,11 @@ export function McpQueryDetailPage() {
     setCompileInitialized(true);
     if (!compileDescription) setCompileDescription(describeData.description);
     if (compileTags.length === 0 && describeData.tags.length > 0) setCompileTags(describeData.tags);
-  }
-  if (result && !compileName) {
-    const title = (result.title as string) || '';
-    const slug = title.replace(/[—–]/g, '-').replace(/[^a-zA-Z0-9\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 60);
-    if (slug) { setCompileName(slug); if (autoSubscribes) setCompileSubscribes(slug); }
+    if (!compileName && describeData.tool_name) setCompileName(describeData.tool_name);
   }
 
-  const derivedSubscribes = autoSubscribes ? compileName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : compileSubscribes;
+  // Topic always derives from namespace
+  const derivedSubscribes = compileAppId.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const allAppIds = useMemo(() => appIdData?.app_ids ?? [], [appIdData?.app_ids]);
 
   const handleCompile = async () => {
@@ -317,10 +312,6 @@ export function McpQueryDetailPage() {
           setCompileAppId={setCompileAppId}
           compileName={compileName}
           setCompileName={setCompileName}
-          derivedSubscribes={derivedSubscribes}
-          setCompileSubscribes={setCompileSubscribes}
-          autoSubscribes={autoSubscribes}
-          setAutoSubscribes={setAutoSubscribes}
           compileDescription={compileDescription}
           setCompileDescription={setCompileDescription}
           compileTags={compileTags}

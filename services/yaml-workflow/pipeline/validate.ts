@@ -36,7 +36,7 @@ export async function validate(ctx: PipelineContext): Promise<PipelineContext> {
         id: a.activity_id,
         tool: a.mcp_tool_name || a.title,
         server: a.mcp_server_id,
-        inputs: Object.keys(a.input_mappings),
+        inputs: Object.keys(a.input_mappings).filter(k => k !== 'workflowName' && k !== '_scope'),
         outputs: a.output_fields,
       }));
 

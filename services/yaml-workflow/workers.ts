@@ -333,14 +333,18 @@ export async function registerWorkersForWorkflow(
 ): Promise<void> {
   const workerConfigs: Array<{
     topic: string;
+    workflowName?: string;
     connection: { class: typeof Postgres; options: typeof postgres_options };
     callback: (data: StreamData) => Promise<StreamDataResponse>;
   }> = [];
 
-  // Clear previously registered topics for this workflow so redeployments
+  // Clear previously registered workers for this workflow so redeployments
   // pick up updated manifests (e.g., new hook_topic bindings).
   for (const a of workflow.activity_manifest) {
-    if (a.type === 'worker') registeredTopics.delete(a.topic);
+    if (a.type === 'worker') {
+      const key = a.workflow_name ? `${a.topic}:${a.workflow_name}` : a.topic;
+      registeredTopics.delete(key);
+    }
   }
 
   // Build lookup: for escalate_and_wait workers, find the following hook's topic
@@ -358,7 +362,11 @@ export async function registerWorkersForWorkflow(
   }
 
   const workerActivities = workflow.activity_manifest.filter(
-    (a) => a.type === 'worker' && !registeredTopics.has(a.topic),
+    (a) => {
+      if (a.type !== 'worker') return false;
+      const key = a.workflow_name ? `${a.topic}:${a.workflow_name}` : a.topic;
+      return !registeredTopics.has(key);
+    },
   );
   const totalSteps = workerActivities.length;
   let stepIndex = 0;
@@ -373,6 +381,7 @@ export async function registerWorkersForWorkflow(
       // Transform/reshape step — deterministic data mapping between steps
       workerConfigs.push({
         topic: activity.topic,
+        workflowName: activity.workflow_name,
         connection: { class: Postgres, options: postgres_options },
         callback: wrap(buildTransformCallback(activity)),
       });
@@ -380,6 +389,7 @@ export async function registerWorkersForWorkflow(
       // LLM interpretation step
       workerConfigs.push({
         topic: activity.topic,
+        workflowName: activity.workflow_name,
         connection: { class: Postgres, options: postgres_options },
         callback: wrap(buildLlmCallback(activity)),
       });
@@ -390,11 +400,13 @@ export async function registerWorkersForWorkflow(
       const toolArgs = activity.tool_arguments;
       workerConfigs.push({
         topic: activity.topic,
+        workflowName: activity.workflow_name,
         connection: { class: Postgres, options: postgres_options },
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
           let mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
           delete mergedArgs._scope;
+          delete mergedArgs.workflowName;
           mergedArgs = await exchangeTokensInArgs(mergedArgs);
           const result = await mcpClient.callServerTool(dbServerId, toolName, mergedArgs);
           return { metadata: { ...data.metadata }, data: result };
@@ -412,12 +424,13 @@ export async function registerWorkersForWorkflow(
       }
       workerConfigs.push({
         topic: activity.topic,
+        workflowName: activity.workflow_name,
         connection: { class: Postgres, options: postgres_options },
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
           const mergedArgs = storedArgs ? { ...storedArgs } : {};
           for (const [key, value] of Object.entries(args)) {
-            if (key === '_scope') continue;
+            if (key === '_scope' || key === 'workflowName') continue;
             if (value !== undefined && value !== null && value !== '') {
               mergedArgs[key] = value;
             }
@@ -446,7 +459,8 @@ export async function registerWorkersForWorkflow(
       });
     }
 
-    registeredTopics.add(activity.topic);
+    const regKey = activity.workflow_name ? `${activity.topic}:${activity.workflow_name}` : activity.topic;
+    registeredTopics.add(regKey);
   }
 
   if (workerConfigs.length === 0) return;

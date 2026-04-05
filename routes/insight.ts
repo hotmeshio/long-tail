@@ -101,14 +101,15 @@ router.post('/mcp-query/describe', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You generate concise workflow descriptions and discovery tags.
+          content: `You generate concise workflow descriptions, tool names, and discovery tags.
 
 Given a user's original query and the execution result, produce:
-1. A clear, reusable description of what this workflow does (not what the user asked, but what the workflow accomplishes as a reusable tool). Write it as if describing a tool in a catalog. 2-3 sentences max.
-2. Discovery tags — lowercase keywords that help find this workflow when similar future queries are made.
+1. A short, descriptive tool name as a lowercase kebab-case slug (e.g. "screenshot-all-nav-pages", "fetch-order-status", "translate-content"). The name should describe what the workflow does, not be generic like "query-complete".
+2. A clear, reusable description of what this workflow does (not what the user asked, but what the workflow accomplishes as a reusable tool). Write it as if describing a tool in a catalog. 2-3 sentences max.
+3. Discovery tags — lowercase keywords that help find this workflow when similar future queries are made.
 
 Return ONLY a JSON object:
-{ "description": "...", "tags": ["tag1", "tag2", ...] }`,
+{ "tool_name": "...", "description": "...", "tags": ["tag1", "tag2", ...] }`,
         },
         {
           role: 'user',
@@ -125,7 +126,14 @@ Return ONLY a JSON object:
     const cleaned = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
     const parsed = JSON.parse(cleaned);
 
+    const toolName = (parsed.tool_name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60);
+
     res.json({
+      tool_name: toolName || undefined,
       description: parsed.description || prompt,
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
     });
