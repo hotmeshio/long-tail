@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { requireAdmin } from '../modules/auth';
 import * as dbaService from '../services/dba';
 
 const router = Router();
@@ -19,7 +20,7 @@ const router = Router();
  *
  * Returns: { jobs, streams, attributes, transient, marked }
  */
-router.post('/prune', async (req, res) => {
+router.post('/prune', requireAdmin, async (req, res) => {
   try {
     const result = await dbaService.prune({
       expire: req.body.expire,
@@ -42,7 +43,7 @@ router.post('/prune', async (req, res) => {
  * Deploy the server-side prune function and run migrations.
  * Idempotent — safe to call on startup or from CI/CD.
  */
-router.post('/deploy', async (req, res) => {
+router.post('/deploy', requireAdmin, async (req, res) => {
   try {
     await dbaService.deploy();
     res.json({ ok: true });

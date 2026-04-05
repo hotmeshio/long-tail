@@ -10,9 +10,11 @@ import type {
   LTTimelineEntry,
   LTTransitionEntry,
 } from '../../types';
+import { getPool } from '../db';
 
 import { getHandle } from './client';
 import { postProcessExecution } from './post-process';
+import type { JobListParams, JobListResult, JobRow } from './types';
 
 /** Error thrown when a workflow job is not found (expired or never existed). */
 class WorkflowNotFoundError extends Error {
@@ -110,4 +112,90 @@ export async function getWorkflowState(
   } catch {
     throw new WorkflowNotFoundError(workflowId);
   }
+}
+
+const JOB_SORTABLE_COLUMNS = new Set(['created_at', 'updated_at', 'entity', 'status']);
+
+function buildJobOrderBy(sortBy?: string, order?: string): string {
+  if (!sortBy || !JOB_SORTABLE_COLUMNS.has(sortBy)) {
+    return '(CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC';
+  }
+  const dir = order === 'asc' ? 'ASC' : 'DESC';
+  return `j.${sortBy} ${dir}`;
+}
+
+/**
+ * List workflow jobs from durable.jobs where entity IS NOT NULL.
+ * Returns paginated results sorted by active first, then created_at DESC.
+ */
+export async function listJobs(params: JobListParams): Promise<JobListResult> {
+  const limit = Math.min(params.limit ?? 20, 100);
+  const offset = params.offset ?? 0;
+
+  const pool = getPool();
+  const conditions = ['j.entity IS NOT NULL'];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (params.registered === 'true') {
+    conditions.push(
+      `EXISTS (SELECT 1 FROM lt_config_workflows c WHERE c.workflow_type = j.entity)`,
+    );
+  } else if (params.registered === 'false') {
+    conditions.push(
+      `NOT EXISTS (SELECT 1 FROM lt_config_workflows c WHERE c.workflow_type = j.entity)`,
+    );
+  }
+
+  if (params.entity) {
+    const entities = params.entity.split(',').map((e) => e.trim()).filter(Boolean);
+    if (entities.length === 1) {
+      conditions.push(`j.entity = $${idx++}`);
+      values.push(entities[0]);
+    } else if (entities.length > 1) {
+      conditions.push(`j.entity = ANY($${idx++})`);
+      values.push(entities);
+    }
+  }
+
+  if (params.search) {
+    conditions.push(`j.key ILIKE $${idx++}`);
+    values.push(`%${params.search}%`);
+  }
+
+  if (params.status === 'running') {
+    conditions.push('j.status > 0');
+  } else if (params.status === 'completed') {
+    conditions.push('j.status = 0');
+  } else if (params.status === 'failed') {
+    conditions.push('j.status < 0');
+  }
+
+  const where = conditions.join(' AND ');
+
+  const [countResult, dataResult] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*) FROM durable.jobs j WHERE ${where}`,
+      values,
+    ),
+    pool.query(
+      `SELECT j.key, j.entity, j.status, j.is_live, j.created_at, j.updated_at
+       FROM durable.jobs j
+       WHERE ${where}
+       ORDER BY ${buildJobOrderBy(params.sort_by, params.order)}
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...values, limit, offset],
+    ),
+  ]);
+
+  const jobs = dataResult.rows.map((row: any) => ({
+    workflow_id: row.key.replace('hmsh:durable:j:', ''),
+    entity: row.entity,
+    status: (row.status > 0 ? 'running' : row.status === 0 ? 'completed' : 'failed') as JobRow['status'],
+    is_live: row.is_live,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+
+  return { jobs, total: parseInt(countResult.rows[0].count, 10) };
 }
