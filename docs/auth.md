@@ -136,26 +136,26 @@ await start({
 
 This adapter grants admin access to every request. Restrict its use to local environments.
 
-## Bot Account Authentication
+## Service Account Authentication
 
-Bot accounts are service identities that authenticate with API keys instead of passwords or OAuth. They share the same RBAC system as human users — same roles, same delegation tokens, same credential storage.
+Service accounts are named identities that authenticate with API keys instead of passwords or OAuth. They share the same RBAC system as human users — same roles, same delegation tokens, same credential storage.
 
 ### How It Works
 
-Bot API keys are prefixed with `lt_bot_` and validated via bcrypt comparison, following the same pattern as service tokens. The built-in `JwtAuthAdapter` detects the prefix automatically:
+Service account API keys are prefixed with `lt_bot_` and validated via bcrypt comparison, following the same pattern as service tokens. The built-in `JwtAuthAdapter` detects the prefix automatically:
 
 ```
 Authorization: Bearer lt_bot_a1b2c3d4e5f6...
 ```
 
-When a bot API key is validated, the adapter returns an `AuthPayload` with the bot's `userId` (from the `lt_users` table). From that point forward, the request is indistinguishable from a human user's — the same middleware, RBAC checks, and identity propagation apply.
+When a service account API key is validated, the adapter returns an `AuthPayload` with the account's `userId` (from the `lt_users` table). From that point forward, the request is indistinguishable from a human user's — the same middleware, RBAC checks, and identity propagation apply.
 
-### Creating a Bot Account
+### Creating a Service Account
 
-Bot accounts are managed via the `/api/bot-accounts` endpoints (admin-only). See the [Bot Accounts API](api/bot-accounts.md) for full documentation.
+Service accounts are managed via the `/api/bot-accounts` endpoints (admin-only). See the [Service Accounts API](api/service-accounts.md) for full documentation.
 
 ```bash
-# Create a bot
+# Create a service account
 curl -X POST http://localhost:3000/api/bot-accounts \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
@@ -170,7 +170,7 @@ curl -X POST http://localhost:3000/api/bot-accounts/$BOT_ID/api-keys \
 
 ### Identity in Workflows
 
-When a bot starts a workflow, its `userId` flows through the same envelope and `ToolContext` path as a human user. Activities that call `getToolContext()` receive a `ToolPrincipal` with `type: 'bot'`, and the task record's `initiated_by` column stores the bot's user ID for audit.
+When a service account starts a workflow, its `userId` flows through the same envelope and `ToolContext` path as a human user. Activities that call `getToolContext()` receive a `ToolPrincipal` with `type: 'bot'`, and the task record's `initiated_by` column stores the account's user ID for audit.
 
 ## Environment Variables
 

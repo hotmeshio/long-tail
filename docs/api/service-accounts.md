@@ -1,8 +1,8 @@
-# Bot Accounts API
+# Service Accounts API
 
-Bot accounts are named service identities that authenticate with API keys instead of passwords. They share the same role-based access control as human users. All endpoints require admin access.
+Service accounts are named identities that authenticate with API keys instead of passwords. They share the same role-based access control as human users. All endpoints require admin access.
 
-## List bots
+## List service accounts
 
 ```
 GET /api/bot-accounts
@@ -38,13 +38,13 @@ GET /api/bot-accounts
 }
 ```
 
-## Get bot details
+## Get service account details
 
 ```
 GET /api/bot-accounts/:id
 ```
 
-**Response 200:** A single bot object.
+**Response 200:** A single service account object.
 
 **Response 404:**
 
@@ -52,7 +52,7 @@ GET /api/bot-accounts/:id
 { "error": "Bot not found" }
 ```
 
-## Create bot
+## Create service account
 
 ```
 POST /api/bot-accounts
@@ -64,10 +64,10 @@ POST /api/bot-accounts
 |-------|------|----------|-------------|
 | `name` | `string` | yes | Unique identifier (used as `external_id`) |
 | `display_name` | `string` | no | Human-readable name |
-| `description` | `string` | no | Purpose of this bot |
+| `description` | `string` | no | Purpose of this service account |
 | `roles` | `array` | no | Initial role assignments: `[{ role, type }]` |
 
-**Response 201:** The created bot object.
+**Response 201:** The created service account object.
 
 **Response 409:**
 
@@ -75,7 +75,7 @@ POST /api/bot-accounts
 { "error": "Bot with this name already exists" }
 ```
 
-## Update bot
+## Update service account
 
 ```
 PUT /api/bot-accounts/:id
@@ -89,15 +89,15 @@ PUT /api/bot-accounts/:id
 | `description` | `string` | New description |
 | `status` | `string` | `active`, `inactive`, or `suspended` |
 
-**Response 200:** The updated bot object.
+**Response 200:** The updated service account object.
 
-## Delete bot
+## Delete service account
 
 ```
 DELETE /api/bot-accounts/:id
 ```
 
-Deletes the bot and all its API keys (cascade).
+Deletes the service account and all its API keys (cascade).
 
 **Response 200:**
 
@@ -105,7 +105,7 @@ Deletes the bot and all its API keys (cascade).
 { "deleted": true }
 ```
 
-## Bot roles
+## Service account roles
 
 Roles work identically to user roles.
 
@@ -127,7 +127,7 @@ POST /api/bot-accounts/:id/api-keys
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | `string` | yes | Key name (unique per bot) |
+| `name` | `string` | yes | Key name (unique per service account) |
 | `scopes` | `string[]` | no | Allowed scopes (default: `[]`) |
 | `expires_at` | `string` | no | ISO 8601 expiry date |
 
@@ -176,7 +176,7 @@ DELETE /api/bot-accounts/:id/api-keys/:keyId
 { "revoked": true }
 ```
 
-## Using a bot API key
+## Using a service account API key
 
 Include the raw key as a Bearer token in any API request:
 
@@ -185,4 +185,4 @@ curl -H "Authorization: Bearer lt_bot_a1b2c3d4e5f6..." \
   http://localhost:3000/api/tasks
 ```
 
-The bot authenticates through the same middleware as human users. RBAC checks use the bot's assigned roles.
+The service account authenticates through the same middleware as human users. RBAC checks use the account's assigned roles.

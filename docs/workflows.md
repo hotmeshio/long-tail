@@ -2,6 +2,41 @@
 
 Write a function. If AI is confident, the task completes. If not, it escalates — durably, with full context — to whoever should handle it next. This guide covers how to build, compose, and test durable workflows with human-in-the-loop escalation.
 
+## Durable vs Certified Workflows
+
+Not all workflows are equal. Long Tail distinguishes two tiers based on how much infrastructure wraps the execution.
+
+### Durable
+
+Any function registered as a HotMesh worker is durable. This is the baseline tier and it provides:
+
+- **Checkpointed execution** — activity results are persisted in PostgreSQL; crashes resume from the last checkpoint, not the beginning.
+- **Automatic retries** — failed activities retry according to their retry policy.
+- **IAM context** — the caller's identity propagates through the execution envelope.
+
+A durable workflow is a plain async function. No config entry, no interceptor involvement. Register a worker, start the workflow, get a result.
+
+### Certified
+
+A certified workflow is durable plus the full Long Tail control plane. It has an entry in the `lt_config_workflows` table, which activates:
+
+- **Interceptor wrapping** — every execution is tracked as a task in `lt_tasks` with full audit trail.
+- **Escalation chains** — returning `{ type: 'escalation' }` creates a reviewable record, routes to the correct role, and triggers re-runs on resolution.
+- **Never-fail guarantee** — unhandled errors are caught and surfaced as error escalations. Nothing disappears silently.
+- **Invocation controls** — `invocable: true` exposes the workflow for external invocation via the API and dashboard.
+- **Execution identity** — roles, default assignees, and `execute_as` overrides are defined in the config.
+
+In the dashboard, certified workflows display a shield icon. Durable workflows display a durable badge. Both are invocable from the same page; the distinction is how much operational infrastructure backs them.
+
+To certify a workflow, create a config entry:
+
+```
+PUT /api/workflows/myWorkflow/config
+{ "default_role": "reviewer", "roles": ["reviewer"], "invocable": true }
+```
+
+To de-certify, delete the config. The workflow remains durable — it just loses interceptor tracking.
+
 ## Contents
 
 - [Anatomy of a Workflow](#anatomy-of-a-workflow)
