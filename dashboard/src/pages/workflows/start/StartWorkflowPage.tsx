@@ -374,6 +374,22 @@ function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfi
   useEffect(() => {
     setParseError('');
     invokeMutation.reset();
+
+    // Check for prefilled input from restart (sessionStorage)
+    const prefill = sessionStorage.getItem('lt:invoke:prefill');
+    if (prefill) {
+      sessionStorage.removeItem('lt:invoke:prefill');
+      setJsonInput(prefill);
+      try {
+        const parsed = JSON.parse(prefill);
+        const data = parsed?.data ?? parsed;
+        if (data && typeof data === 'object') setFormFields(dataToFields(data));
+      } catch { /* use as-is */ }
+      setIsJsonMode(true);
+      setOverrideBot('');
+      return;
+    }
+
     const json = selected.envelope_schema
       ? JSON.stringify(selected.envelope_schema, null, 2)
       : DEFAULT_ENVELOPE;

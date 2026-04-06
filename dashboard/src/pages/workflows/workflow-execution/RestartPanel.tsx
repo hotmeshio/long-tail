@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInvokeWorkflow } from '../../../api/workflows';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
+import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 import type { WorkflowExecution } from '../../../api/types';
 
 interface RestartPanelProps {
@@ -36,7 +37,9 @@ export function RestartPanel({ execution, forceOpen, onClose }: RestartPanelProp
   }, [forceOpen]);
 
   const originalInput = extractInput(execution) ?? {};
-  const workflowType = execution.workflow_name ?? execution.workflow_type;
+  // Derive entity from workflow_id (format: {entity}-{guid})
+  // The workflow_type field contains the HotMesh topic, not the invocable entity name
+  const workflowType = execution.workflow_id.replace(/-[A-Za-z0-9_-]{20,}$/, '');
 
   const [jsonInput, setJsonInput] = useState(() =>
     JSON.stringify(originalInput, null, 2),
@@ -97,9 +100,7 @@ export function RestartPanel({ execution, forceOpen, onClose }: RestartPanelProp
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                 Workflow Type
               </p>
-              <p className="text-xs font-mono text-text-primary">
-                {workflowType}
-              </p>
+              <WorkflowPill type={workflowType} size="md" />
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">

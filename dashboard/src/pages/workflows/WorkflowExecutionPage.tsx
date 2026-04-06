@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { useParams, useLocation, Link } from 'react-router-dom';
-import { useWorkflowExecution, useWorkflowState, useTerminateWorkflow } from '../../api/workflows';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
+import { useWorkflowExecution, useTerminateWorkflow } from '../../api/workflows';
 import { useWorkflowDetailEvents } from '../../hooks/useNatsEvents';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
@@ -13,8 +12,6 @@ import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
 import { EventTable } from './workflow-execution/EventTable';
-import { RestartPanel } from './workflow-execution/RestartPanel';
-
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const { pathname } = useLocation();
@@ -24,21 +21,28 @@ export function WorkflowExecutionPage() {
     ? 'Durable Execution'
     : 'Certified Execution';
   const { data: execution, isLoading, error } = useWorkflowExecution(workflowId!);
-  const { data: stateData } = useWorkflowState(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
   const { data: childTasksData } = useChildTasks(workflowId!);
   const { data: escalationsData } = useEscalationsByWorkflowId(workflowId);
+  const navigate = useNavigate();
   const terminateMutation = useTerminateWorkflow();
   const { isCollapsed, toggle } = useCollapsedSections('workflow-execution');
-  const [restartOpen, setRestartOpen] = useState(false);
 
   const handleAction = (action: 'restart' | 'terminate') => {
     if (action === 'terminate') {
       if (confirm('Are you sure you want to terminate this workflow?')) {
         terminateMutation.mutate(workflowId!);
       }
-    } else if (action === 'restart') {
-      setRestartOpen(true);
+    } else if (action === 'restart' && execution) {
+      // Extract entity from workflow_id (format: {entity}-{guid})
+      const entity = execution.workflow_id.replace(/-[A-Za-z0-9_-]{20,}$/, '');
+      // Extract original input from the started event
+      const startEvent = execution.events.find((e) => e.event_type === 'workflow_execution_started');
+      const input = (startEvent?.attributes as any)?.input;
+      if (input) {
+        sessionStorage.setItem('lt:invoke:prefill', JSON.stringify(input));
+      }
+      navigate(`/workflows/start?type=${encodeURIComponent(entity)}&mode=now`);
     }
   };
 
@@ -127,12 +131,6 @@ export function WorkflowExecutionPage() {
         </div>
       )}
 
-      <RestartPanel
-        execution={execution}
-        state={stateData?.state}
-        forceOpen={restartOpen}
-        onClose={() => setRestartOpen(false)}
-      />
 
       <div className="space-y-6">
         <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle} contentClassName="mt-4 ml-9">
