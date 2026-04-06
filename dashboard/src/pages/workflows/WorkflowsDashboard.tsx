@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Settings } from 'lucide-react';
+import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
@@ -43,45 +44,37 @@ function buildColumns(
   return [
     {
       key: 'workflow_id',
-      label: 'Workflow ID',
+      label: 'Workflow',
       render: (row) => {
         const dotClass = STATUS_DOT[jobStatusMap[row.status] ?? row.status] ?? 'bg-status-pending';
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
-          <span className="inline-flex items-center gap-2 min-w-0">
-            <span className={`w-2 h-2 shrink-0 rounded-full ${dotClass}${pulseClass}`} title={row.status} />
-            <span className="font-mono text-xs text-text-secondary truncate">
-              {row.workflow_id}
-            </span>
-          </span>
+          <div className="flex items-start gap-2 min-w-0">
+            <span className={`w-2 h-2 shrink-0 rounded-full mt-1.5 ${dotClass}${pulseClass}`} title={row.status} />
+            <div className="min-w-0">
+              <span className="font-mono text-xs text-text-secondary truncate block">
+                {row.workflow_id}
+              </span>
+              <div className="mt-0.5">
+                <WorkflowPill type={row.entity} certified={certifiedTypes.has(row.entity)} />
+              </div>
+            </div>
+          </div>
         );
       },
     },
     {
-      key: 'entity',
-      label: 'Workflow Type',
-      render: (row) => <WorkflowPill type={row.entity} certified={certifiedTypes.has(row.entity)} />,
-    },
-    {
       key: 'created_at',
       label: 'Created',
-      render: (row) => (
-        <span className="text-xs text-text-secondary font-mono">
-          {new Date(row.created_at).toISOString().replace('T', ' ').slice(0, 23)}
-        </span>
-      ),
-      className: 'w-52',
+      render: (row) => <TimestampCell date={row.created_at} />,
+      className: 'w-40',
       sortable: true,
     },
     {
       key: 'updated_at',
       label: 'Updated',
-      render: (row) => (
-        <span className="text-xs text-text-secondary font-mono">
-          {new Date(row.updated_at).toISOString().replace('T', ' ').slice(0, 23)}
-        </span>
-      ),
-      className: 'w-52',
+      render: (row) => <TimestampCell date={row.updated_at} />,
+      className: 'w-40',
       sortable: true,
     },
     {

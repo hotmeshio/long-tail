@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown, Eraser } from 'lucide-react';
-import { useNatsSubscription } from '../../hooks/useNats';
+import { useEventSubscription } from '../../hooks/useEventContext';
 import { JsonViewer } from '../common/data/JsonViewer';
 import { Collapsible } from '../common/layout/Collapsible';
 
@@ -74,7 +74,7 @@ export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => v
   const scrollRef = useRef<HTMLDivElement>(null);
   const recentRef = useRef<Map<string, number>>(new Map());
 
-  useNatsSubscription('lt.events.>', useCallback((raw: any) => {
+  useEventSubscription('lt.events.>', useCallback((raw: any) => {
     const type = String(raw.type || 'unknown');
     if (type.startsWith('mesh.')) return;
 

@@ -20,6 +20,7 @@ export { ltConfig } from './modules/ltconfig';
 export { eventRegistry } from './services/events';
 export { NatsEventAdapter } from './services/events/nats';
 export { InMemoryEventAdapter } from './services/events/memory';
+export { SocketIOEventAdapter } from './services/events/socketio';
 export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishWorkflowEvent } from './services/events/publish';
 export { telemetryRegistry } from './services/telemetry';
 export { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
@@ -64,7 +65,9 @@ async function main() {
       strategy: 'mcp',
     },
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
-    events: { nats: { url: config.NATS_URL, token: process.env.NATS_TOKEN || 'dev_api_secret' } },
+    events: process.env.NATS_URL
+      ? { nats: { url: config.NATS_URL, token: process.env.NATS_TOKEN || 'dev_api_secret' } }
+      : undefined,
   });
 }
 

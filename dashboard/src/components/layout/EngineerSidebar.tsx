@@ -4,7 +4,7 @@ import { SidebarNav, type NavEntry } from './SidebarNav';
 const entries: NavEntry[] = [
   { to: '/workflows/registry', label: 'Workflow Registry', icon: Settings },
   { to: '/workflows/start', label: 'Invoke Workflow', icon: Play },
-  { to: '/escalations/available', label: 'Escalations', icon: UserCheck },
+  { to: '/escalations/available', label: 'All Escalations', icon: UserCheck },
   { to: '/workflows/executions', label: 'Durable Executions', icon: ListChecks },
 ];
 

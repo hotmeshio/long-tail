@@ -1,38 +1,35 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
-import { useNatsSubscription } from './useNats';
+import { useEscalations } from '../api/escalations';
+import { useEventSubscription } from './useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 
-interface EscalationCountResponse {
-  escalations: unknown[];
-  total: number;
-}
-
 /**
- * Returns the number of pending escalations assigned to the current user.
- * Stays live via NATS escalation events that invalidate the query.
+ * Returns the number of active (non-expired) escalations assigned to the current user.
+ * Mirrors the queue page's filtering: excludes claims where assigned_until has passed.
+ * Stays live via escalation events that invalidate the query.
  */
 export function useMyEscalationCount(): number {
   const { user } = useAuth();
   const userId = user?.userId;
   const qc = useQueryClient();
 
-  const { data } = useQuery<EscalationCountResponse>({
-    queryKey: ['myEscalationCount', userId],
-    queryFn: () =>
-      apiFetch(
-        `/escalations?assigned_to=${encodeURIComponent(userId!)}&status=pending&limit=0`,
-      ),
-    enabled: !!userId,
-    staleTime: 60_000,
+  const { data } = useEscalations({
+    assigned_to: userId,
+    status: 'pending',
   });
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
     if (userId) {
-      qc.invalidateQueries({ queryKey: ['myEscalationCount', userId] });
+      qc.invalidateQueries({ queryKey: ['escalations'] });
     }
   });
 
-  return data?.total ?? 0;
+  // Exclude expired claims — same filter as the queue page
+  const now = new Date();
+  const active = (data?.escalations ?? []).filter(
+    (e) => e.assigned_until && new Date(e.assigned_until) > now,
+  );
+
+  return active.length;
 }

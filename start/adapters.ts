@@ -4,6 +4,7 @@ import { telemetryRegistry } from '../services/telemetry';
 import { HoneycombTelemetryAdapter } from '../services/telemetry/honeycomb';
 import { eventRegistry } from '../services/events';
 import { NatsEventAdapter } from '../services/events/nats';
+import { SocketIOEventAdapter } from '../services/events/socketio';
 import { maintenanceRegistry } from '../services/maintenance';
 import { defaultMaintenanceConfig } from '../modules/maintenance';
 import { mcpRegistry } from '../services/mcp';
@@ -33,13 +34,17 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     telemetryRegistry.register(new HoneycombTelemetryAdapter(startConfig.telemetry.honeycomb));
   }
 
-  // Events
+  // Events — always register socket.io (zero-cost until HTTP server attaches).
+  // NATS is additive: when configured, events publish to both transports.
   if (startConfig.events?.adapters) {
     for (const adapter of startConfig.events.adapters) {
       eventRegistry.register(adapter);
     }
-  } else if (startConfig.events?.nats) {
-    eventRegistry.register(new NatsEventAdapter(startConfig.events.nats));
+  } else {
+    if (startConfig.events?.nats) {
+      eventRegistry.register(new NatsEventAdapter(startConfig.events.nats));
+    }
+    eventRegistry.register(new SocketIOEventAdapter());
   }
 
   // Maintenance

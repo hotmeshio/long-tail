@@ -12,6 +12,7 @@ import { applyDatabaseConfig, applyServerAuthConfig } from './config';
 import { registerAdapters } from './adapters';
 import { buildConnection, collectWorkers, startWorkers } from './workers';
 import { startServer } from './server';
+import { SocketIOEventAdapter } from '../services/events/socketio';
 
 import type { LTStartConfig, LTInstance } from '../types/startup';
 
@@ -54,6 +55,13 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   let httpServer: ReturnType<typeof startServer> | null = null;
   if (serverEnabled) {
     httpServer = startServer();
+
+    // Attach socket.io adapter to the HTTP server (if registered)
+    const socketAdapter = eventRegistry.getAdapter(SocketIOEventAdapter);
+    if (socketAdapter && httpServer) {
+      socketAdapter.attachServer(httpServer);
+      await socketAdapter.connect();
+    }
   }
 
   // 7. Return instance

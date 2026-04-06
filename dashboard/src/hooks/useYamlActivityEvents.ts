@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNatsSubscription } from './useNats';
+import { useEventSubscription } from './useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 
 export interface ActivityStep {
@@ -63,7 +63,7 @@ export function useYamlActivityEvents(jobId: string | null): {
     });
   }, [jobId]);
 
-  useNatsSubscription(
+  useEventSubscription(
     jobId ? `${NATS_SUBJECT_PREFIX}.activity.>` : '',
     handler,
   );

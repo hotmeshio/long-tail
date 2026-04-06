@@ -11,6 +11,8 @@ import { connect, type NatsConnection, type Subscription, StringCodec } from 'na
 
 import { NATS_WS_URL, NATS_TOKEN } from '../lib/nats/config';
 import type { NatsLTEvent, NatsEventHandler } from '../lib/nats/types';
+import { subjectMatchesPattern } from '../lib/events/matching';
+import { EventContext } from './useEventContext';
 
 // ── Context ─────────────────────────────────────────────────────────────────
 
@@ -187,34 +189,12 @@ export function NatsProvider({ children }: { children: ReactNode }) {
 
   return (
     <NatsContext.Provider value={{ connected, subscribe }}>
-      {children}
+      <EventContext.Provider value={{ connected, subscribe }}>
+        {children}
+      </EventContext.Provider>
     </NatsContext.Provider>
   );
 }
 
-// ── Subject matching ────────────────────────────────────────────────────────
-
-/**
- * Match a NATS subject against a pattern with `>` (match-rest) and `*` (single-token) wildcards.
- *
- * Examples:
- * - `lt.events.task.created` matches `lt.events.>`
- * - `lt.events.task.created` matches `lt.events.task.*`
- * - `lt.events.task.created` matches `lt.events.task.created`
- * - `lt.events.task.created` does NOT match `lt.events.escalation.*`
- */
-export function subjectMatchesPattern(subject: string, pattern: string): boolean {
-  const subjectTokens = subject.split('.');
-  const patternTokens = pattern.split('.');
-
-  for (let i = 0; i < patternTokens.length; i++) {
-    const pt = patternTokens[i];
-
-    if (pt === '>') return true; // match-rest: everything from here matches
-    if (i >= subjectTokens.length) return false; // pattern longer than subject
-    if (pt !== '*' && pt !== subjectTokens[i]) return false; // literal mismatch
-  }
-
-  // Pattern consumed — subject must also be fully consumed
-  return subjectTokens.length === patternTokens.length;
-}
+// Re-export subject matching from shared util so existing imports continue to work
+export { subjectMatchesPattern };

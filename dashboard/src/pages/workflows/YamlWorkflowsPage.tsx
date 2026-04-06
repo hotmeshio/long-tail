@@ -216,7 +216,7 @@ export function YamlWorkflowsPage() {
       </FilterBar>
 
       {filteredServers.length === 0 ? (
-        <EmptyState title="No workflow tools found" />
+        <EmptyState title="No pipelines yet" description="Use the Pipeline Designer to create your first MCP pipeline." />
       ) : (
         <table className="w-full">
           <thead>

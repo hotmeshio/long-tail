@@ -29,6 +29,7 @@ router.use('/auth', authRouter);
 router.use('/auth/oauth', oauthRouter);
 router.use('/delegation', delegationRouter);
 router.use('/files', filesRouter);
+router.use('/settings', settingsRouter);
 
 // Apply auth to all API routes
 router.use(requireAuth);
@@ -44,7 +45,6 @@ router.use('/dba', dbaRouter);
 router.use('/mcp', mcpRouter);
 router.use('/insight', insightRouter);
 router.use('/yaml-workflows', yamlWorkflowsRouter);
-router.use('/settings', settingsRouter);
 router.use('/mcp-runs', mcpRunsRouter);
 router.use('/namespaces', namespacesRouter);
 router.use('/controlplane', controlplaneRouter);

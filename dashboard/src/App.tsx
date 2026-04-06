@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
-import { NatsProvider } from './hooks/useNats';
+import { EventTransportProvider } from './hooks/useEventTransport';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
@@ -254,13 +254,13 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <NatsProvider>
+      <EventTransportProvider>
         <AuthProvider>
           <ToastProvider>
             <RouterProvider router={router} />
           </ToastProvider>
         </AuthProvider>
-      </NatsProvider>
+      </EventTransportProvider>
     </QueryClientProvider>
   );
 }

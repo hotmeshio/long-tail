@@ -39,9 +39,8 @@ export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }
           title="Escalation inbox"
         >
           <Inbox className="w-4 h-4" strokeWidth={1.5} />
-          {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-status-error" />
-          )}
+          <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${pendingCount > 0 ? 'bg-status-warning' : 'bg-text-tertiary'}`} />
+          <span className={`absolute -top-2.5 -right-3 text-[8px] font-bold tabular-nums ${pendingCount > 0 ? 'text-status-warning' : 'text-text-tertiary'}`}>{pendingCount}</span>
         </Link>
         <NatsStatus onClick={onToggleEventFeed} />
         {user && (

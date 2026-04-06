@@ -43,24 +43,24 @@ export function EscalationHero({
         </p>
       )}
 
-      {/* Meta bar — labeled sections with spacing */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-4 mb-2">
+      {/* Meta bar — labeled sections, baseline-aligned values */}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3 mt-4 mb-2">
         {/* Status */}
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Status</p>
-          <StatusBadge status={esc.status} />
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Status</p>
+          <span className="inline-flex items-center h-5"><StatusBadge status={esc.status} /></span>
         </div>
 
         {/* Role */}
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Role</p>
-          <RolePill role={esc.role} size="md" />
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Role</p>
+          <span className="inline-flex items-center h-5"><RolePill role={esc.role} size="md" /></span>
         </div>
 
         {/* Created */}
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
-          <span className="text-xs text-text-secondary">
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Created</p>
+          <span className="inline-flex items-center h-5 text-xs text-text-secondary">
             <TimeAgo date={esc.created_at} />
           </span>
         </div>
@@ -68,8 +68,8 @@ export function EscalationHero({
         {/* Claimed by */}
         {esc.assigned_to && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Claimed by</p>
-            <span className="text-xs font-medium text-text-primary">
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Claimed by</p>
+            <span className="inline-flex items-center h-5 text-xs font-medium text-text-primary">
               {claimedByMe ? 'You' : <UserName userId={esc.assigned_to} />}
             </span>
           </div>
@@ -78,26 +78,26 @@ export function EscalationHero({
         {/* Time left */}
         {claimed && !isTerminal && esc.assigned_until && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Time left</p>
-            <CountdownTimer until={esc.assigned_until} />
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Time left</p>
+            <span className="inline-flex items-center h-5"><CountdownTimer until={esc.assigned_until} /></span>
           </div>
         )}
 
         {/* Resolved */}
         {esc.resolved_at && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Resolved</p>
-            <span className="text-xs text-text-secondary">
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Resolved</p>
+            <span className="inline-flex items-center h-5 text-xs text-text-secondary">
               <TimeAgo date={esc.resolved_at} />
             </span>
           </div>
         )}
 
         {/* Details toggle */}
-        <div className="flex items-end">
+        <div>
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-1 text-xs text-text-tertiary hover:text-accent transition-colors mt-3"
+            className="inline-flex items-center gap-1 h-5 text-xs text-text-tertiary hover:text-accent transition-colors"
           >
             Details
             <svg

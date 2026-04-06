@@ -1,5 +1,5 @@
 import { Radio } from 'lucide-react';
-import { useNatsStatus } from '../../../hooks/useNats';
+import { useEventStatus } from '../../../hooks/useEventContext';
 
 interface NatsStatusProps {
   className?: string;
@@ -11,7 +11,7 @@ interface NatsStatusProps {
  * Displays a Radio icon with a green/gray status dot.
  */
 export function NatsStatus({ className = '', onClick }: NatsStatusProps) {
-  const { connected } = useNatsStatus();
+  const { connected } = useEventStatus();
 
   return (
     <button

@@ -17,8 +17,8 @@ import {
 type Handler = (event: any) => void;
 const subscriptions: Array<{ pattern: string; handler: Handler }> = [];
 
-vi.mock('../useNats', () => ({
-  useNatsSubscription: (pattern: string, handler: Handler) => {
+vi.mock('../useEventContext', () => ({
+  useEventSubscription: (pattern: string, handler: Handler) => {
     subscriptions.push({ pattern, handler });
   },
 }));

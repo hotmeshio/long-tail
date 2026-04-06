@@ -2,17 +2,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NatsStatus } from '../display/NatsStatus';
 
-// Mock the useNats hook so we can control the connected state
-vi.mock('../../../hooks/useNats', () => ({
-  useNatsStatus: vi.fn(),
+vi.mock('../../../hooks/useEventContext', () => ({
+  useEventStatus: vi.fn(),
 }));
 
-import { useNatsStatus } from '../../../hooks/useNats';
-const mockUseNatsStatus = useNatsStatus as ReturnType<typeof vi.fn>;
+import { useEventStatus } from '../../../hooks/useEventContext';
+const mockUseEventStatus = useEventStatus as ReturnType<typeof vi.fn>;
 
 describe('NatsStatus', () => {
   it('renders green dot when connected', () => {
-    mockUseNatsStatus.mockReturnValue({ connected: true });
+    mockUseEventStatus.mockReturnValue({ connected: true });
 
     render(<NatsStatus />);
 
@@ -21,7 +20,7 @@ describe('NatsStatus', () => {
   });
 
   it('renders gray dot when disconnected', () => {
-    mockUseNatsStatus.mockReturnValue({ connected: false });
+    mockUseEventStatus.mockReturnValue({ connected: false });
 
     render(<NatsStatus />);
 
@@ -30,7 +29,7 @@ describe('NatsStatus', () => {
   });
 
   it('sets correct title attribute when connected', () => {
-    mockUseNatsStatus.mockReturnValue({ connected: true });
+    mockUseEventStatus.mockReturnValue({ connected: true });
 
     render(<NatsStatus />);
 
@@ -38,7 +37,7 @@ describe('NatsStatus', () => {
   });
 
   it('sets correct title attribute when disconnected', () => {
-    mockUseNatsStatus.mockReturnValue({ connected: false });
+    mockUseEventStatus.mockReturnValue({ connected: false });
 
     render(<NatsStatus />);
 
@@ -46,7 +45,7 @@ describe('NatsStatus', () => {
   });
 
   it('applies custom className', () => {
-    mockUseNatsStatus.mockReturnValue({ connected: true });
+    mockUseEventStatus.mockReturnValue({ connected: true });
 
     const { container } = render(<NatsStatus className="ml-4" />);
 

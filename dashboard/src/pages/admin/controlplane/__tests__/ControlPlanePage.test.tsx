@@ -44,8 +44,8 @@ vi.mock('../../../../api/controlplane', () => ({
   useSubscribeMesh: () => ({ mutate: vi.fn() }),
 }));
 
-vi.mock('../../../../hooks/useNats', () => ({
-  useNatsSubscription: vi.fn(),
+vi.mock('../../../../hooks/useEventContext', () => ({
+  useEventSubscription: vi.fn(),
 }));
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

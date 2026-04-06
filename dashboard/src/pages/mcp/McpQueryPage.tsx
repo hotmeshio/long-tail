@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2, Zap, Layers } from 'lucide-react';
+import { ArrowRight, Wand2, Zap, Layers, Circle } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
-import { StatusBadge } from '../../components/common/display/StatusBadge';
-import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { TimestampCell } from '../../components/common/display/TimestampCell';
+import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
@@ -21,58 +21,46 @@ function mapStatus(job: LTJob): string {
   return 'failed';
 }
 
-function entityLabel(entity: string | undefined): { label: string; style: string } {
-  switch (entity) {
-    case 'mcpQuery':
-      return { label: 'Query', style: 'bg-accent-primary/10 text-accent-primary' };
-    case 'mcpTriage':
-      return { label: 'Triage', style: 'bg-status-warning/10 text-status-warning' };
-    default:
-      return { label: entity || '—', style: 'bg-surface-sunken text-text-tertiary' };
-  }
-}
 
 const columns: Column<LTJob>[] = [
   {
-    key: 'status',
-    label: 'Status',
-    className: 'w-28 whitespace-nowrap',
-    render: (row) => <StatusBadge status={mapStatus(row)} />,
-  },
-  {
     key: 'entity',
-    label: 'Type',
-    className: 'w-32 whitespace-nowrap',
+    label: 'Workflow Type',
+    className: 'whitespace-nowrap',
     render: (row) => {
-      const { label, style } = entityLabel((row as any).entity);
+      const s = mapStatus(row);
+      const dotColor = s === 'completed' ? 'fill-status-success text-status-success'
+        : s === 'in_progress' ? 'fill-status-active text-status-active animate-pulse'
+        : 'fill-status-error text-status-error';
       return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${style}`}>
-          {label}
+        <span className="inline-flex items-center gap-2">
+          <Circle className={`w-2.5 h-2.5 shrink-0 ${dotColor}`} />
+          <WorkflowPill type={(row as any).entity || 'unknown'} />
         </span>
       );
     },
   },
   {
     key: 'workflow_id',
-    label: 'Run ID',
+    label: 'Workflow ID',
     render: (row) => (
-      <span className="text-xs font-mono text-text-primary truncate max-w-[240px] block">
+      <span className="text-xs font-mono text-text-primary truncate block">
         {row.workflow_id}
       </span>
     ),
   },
   {
     key: 'created_at',
-    label: 'Started',
-    className: 'w-28 text-right',
+    label: 'Created',
+    className: 'w-36',
     sortable: true,
-    render: (row) => <span className="block text-right"><TimeAgo date={row.created_at} /></span>,
+    render: (row) => <TimestampCell date={row.created_at} />,
   },
   {
     key: 'updated_at',
     label: 'Updated',
-    className: 'w-28 text-right',
-    render: (row) => <span className="block text-right"><TimeAgo date={row.updated_at} /></span>,
+    className: 'w-36',
+    render: (row) => <TimestampCell date={row.updated_at} />,
   },
   {
     key: 'actions',
@@ -192,7 +180,7 @@ export function McpQueryPage() {
               <button
                 type="submit"
                 disabled={!promptText.trim() || activeMutation.isPending}
-                className="px-4 py-1.5 bg-accent-primary text-white text-xs font-medium rounded-md hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-1.5 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {activeMutation.isPending ? 'Starting...' : 'Design Pipeline'}
               </button>
