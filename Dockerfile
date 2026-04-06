@@ -1,4 +1,4 @@
-FROM node:20-slim AS base
+FROM node:22-slim AS base
 WORKDIR /app
 
 # System deps for Playwright Chromium + general build tools
