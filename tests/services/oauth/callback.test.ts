@@ -27,7 +27,7 @@ describe('OAuth callback flow', () => {
   });
 
   describe('state → authorization URL → callback validation', () => {
-    it('should create state, generate auth URL, and validate callback', () => {
+    it('should create state, generate auth URL, and validate callback', async () => {
       // 1. Initiate flow (what GET /api/auth/oauth/:provider does)
       if (!getProvider('google')) {
         registerProvider({
@@ -42,7 +42,7 @@ describe('OAuth callback flow', () => {
       const { state, codeVerifier } = createOAuthState('google', '/dashboard');
 
       // 2. Generate auth URL (what the browser redirects to)
-      const url = handler.createAuthorizationURL(state, codeVerifier);
+      const url = await handler.createAuthorizationURL(state, codeVerifier);
       expect(url.searchParams.get('state')).toBe(state);
       expect(url.searchParams.get('client_id')).toBe('test-id');
 

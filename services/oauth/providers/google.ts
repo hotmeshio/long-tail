@@ -1,19 +1,26 @@
-import { Google } from 'arctic';
-
 import type { LTOAuthProviderConfig } from '../../../types/oauth';
 
 import type { ProviderHandler } from './types';
 
 export function createGoogleHandler(cfg: LTOAuthProviderConfig): ProviderHandler {
   const redirectUri = cfg.redirectUri || '';
-  const google = new Google(cfg.clientId, cfg.clientSecret, redirectUri);
+  let _google: any;
+  async function getClient() {
+    if (!_google) {
+      const { Google } = await import('arctic');
+      _google = new Google(cfg.clientId, cfg.clientSecret, redirectUri);
+    }
+    return _google;
+  }
   return {
     config: cfg,
-    createAuthorizationURL(state, codeVerifier) {
+    async createAuthorizationURL(state, codeVerifier) {
+      const google = await getClient();
       const scopes = cfg.scopes.length > 0 ? cfg.scopes : ['openid', 'email', 'profile'];
       return google.createAuthorizationURL(state, codeVerifier, scopes);
     },
     async validateAuthorizationCode(code, codeVerifier) {
+      const google = await getClient();
       const tokens = await google.validateAuthorizationCode(code, codeVerifier);
       return {
         accessToken: tokens.accessToken(),
@@ -22,6 +29,7 @@ export function createGoogleHandler(cfg: LTOAuthProviderConfig): ProviderHandler
       };
     },
     async refreshAccessToken(refreshToken) {
+      const google = await getClient();
       const tokens = await google.refreshAccessToken(refreshToken);
       return {
         accessToken: tokens.accessToken(),

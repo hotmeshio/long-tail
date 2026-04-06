@@ -70,22 +70,22 @@ describe('OAuth provider registry', () => {
     expect(names).toContain('microsoft');
   });
 
-  it('should generate authorization URLs', () => {
+  it('should generate authorization URLs', async () => {
     const google = getProvider('google')!;
-    const url = google.createAuthorizationURL('test-state', 'test-verifier');
+    const url = await google.createAuthorizationURL('test-state', 'test-verifier');
     expect(url).toBeInstanceOf(URL);
     expect(url.hostname).toBe('accounts.google.com');
     expect(url.searchParams.get('state')).toBe('test-state');
     expect(url.searchParams.get('client_id')).toBe('test-google-id');
 
     const github = getProvider('github')!;
-    const ghUrl = github.createAuthorizationURL('gh-state', 'unused-verifier');
+    const ghUrl = await github.createAuthorizationURL('gh-state', 'unused-verifier');
     expect(ghUrl).toBeInstanceOf(URL);
     expect(ghUrl.hostname).toBe('github.com');
     expect(ghUrl.searchParams.get('state')).toBe('gh-state');
 
     const ms = getProvider('microsoft')!;
-    const msUrl = ms.createAuthorizationURL('ms-state', 'ms-verifier');
+    const msUrl = await ms.createAuthorizationURL('ms-state', 'ms-verifier');
     expect(msUrl).toBeInstanceOf(URL);
     expect(msUrl.searchParams.get('state')).toBe('ms-state');
   });

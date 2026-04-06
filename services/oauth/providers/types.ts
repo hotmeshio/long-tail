@@ -8,7 +8,7 @@ export interface OAuthTokens {
 
 export interface ProviderHandler {
   config: LTOAuthProviderConfig;
-  createAuthorizationURL(state: string, codeVerifier: string): URL;
+  createAuthorizationURL(state: string, codeVerifier: string): URL | Promise<URL>;
   validateAuthorizationCode(code: string, codeVerifier: string): Promise<OAuthTokens>;
   refreshAccessToken(refreshToken: string): Promise<OAuthTokens>;
   fetchUserInfo(accessToken: string): Promise<LTOAuthUserInfo>;

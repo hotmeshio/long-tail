@@ -42,10 +42,10 @@ describe('OAuth route logic', () => {
   });
 
   describe('authorization URL generation', () => {
-    it('should generate valid authorization URL for Google', () => {
+    it('should generate valid authorization URL for Google', async () => {
       const handler = getProvider('google')!;
       const { state, codeVerifier } = createOAuthState('google', '/dashboard');
-      const url = handler.createAuthorizationURL(state, codeVerifier);
+      const url = await handler.createAuthorizationURL(state, codeVerifier);
 
       expect(url.protocol).toBe('https:');
       expect(url.hostname).toBe('accounts.google.com');
