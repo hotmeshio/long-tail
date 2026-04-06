@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
@@ -109,17 +110,15 @@ interface CreateProfileFormProps {
   setCompileAppId: (v: string) => void;
   compileName: string;
   setCompileName: (v: string) => void;
-  derivedSubscribes: string;
-  setCompileSubscribes: (v: string) => void;
-  autoSubscribes: boolean;
-  setAutoSubscribes: (v: boolean) => void;
   compileDescription: string;
   setCompileDescription: (v: string) => void;
   compileTags: string[];
   setCompileTags: (v: string[]) => void;
-  describeData: { description: string; tags: string[] } | undefined;
+  describeData: { tool_name?: string; description: string; tags: string[] } | undefined;
   describePrompt: string | undefined;
   allAppIds: string[];
+  compileFeedback: string;
+  setCompileFeedback: (v: string) => void;
   onCompile: () => Promise<void>;
   isCompiling: boolean;
   compileError: string | undefined;
@@ -132,10 +131,6 @@ function CreateProfileForm({
   setCompileAppId,
   compileName,
   setCompileName,
-  derivedSubscribes,
-  setCompileSubscribes,
-  autoSubscribes,
-  setAutoSubscribes,
   compileDescription,
   setCompileDescription,
   compileTags,
@@ -143,11 +138,14 @@ function CreateProfileForm({
   describeData,
   describePrompt,
   allAppIds,
+  compileFeedback,
+  setCompileFeedback,
   onCompile,
   isCompiling,
   compileError,
   onBack,
 }: CreateProfileFormProps) {
+  const [showFeedback, setShowFeedback] = useState(!!compileFeedback);
   return (
     <div>
       <PanelTitle title="Create Workflow Profile" subtitle="Define the deterministic workflow tool from this execution" />
@@ -180,14 +178,6 @@ function CreateProfileForm({
             className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. auth-screenshot-all-nav-pages" />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Topic</label>
-          <div className="flex items-center gap-2">
-            <input type="text" value={derivedSubscribes} onChange={(e) => { setAutoSubscribes(false); setCompileSubscribes(e.target.value); }}
-              className="flex-1 bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="auto-derived" />
-            {!autoSubscribes && <button type="button" onClick={() => setAutoSubscribes(true)} className="text-[10px] text-accent hover:underline shrink-0">Auto</button>}
-          </div>
-        </div>
-        <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
             {!compileDescription && !describeData && describePrompt && <span className="text-[10px] text-accent animate-pulse">Generating...</span>}
@@ -202,6 +192,21 @@ function CreateProfileForm({
           <TagInput tags={compileTags} onChange={setCompileTags} placeholder="e.g. browser, screenshots, login" />
           <p className="text-[10px] text-text-tertiary mt-1">Press Enter or comma to add.</p>
         </div>
+      </div>
+
+      <div className="mt-5">
+        <button type="button" onClick={() => setShowFeedback(!showFeedback)}
+          className="text-xs text-accent hover:text-accent/80 transition-colors">
+          {showFeedback ? 'Hide refinement feedback' : 'Refine compilation'}
+        </button>
+        {showFeedback && (
+          <div className="mt-2">
+            <textarea value={compileFeedback} onChange={(e) => setCompileFeedback(e.target.value)}
+              placeholder="Describe what should change. E.g.: 'Only url, username, password, and screenshot_dir should be dynamic inputs. The steps array is an implementation detail.'"
+              className="w-full min-h-[80px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
+            <p className="text-[10px] text-text-tertiary mt-1">This feedback is sent to the compiler so it can adjust inputs, outputs, and step selection.</p>
+          </div>
+        )}
       </div>
 
       <WizardNav>
@@ -225,17 +230,15 @@ interface ProfilePanelProps {
   setCompileAppId: (v: string) => void;
   compileName: string;
   setCompileName: (v: string) => void;
-  derivedSubscribes: string;
-  setCompileSubscribes: (v: string) => void;
-  autoSubscribes: boolean;
-  setAutoSubscribes: (v: boolean) => void;
   compileDescription: string;
   setCompileDescription: (v: string) => void;
   compileTags: string[];
   setCompileTags: (v: string[]) => void;
-  describeData: { description: string; tags: string[] } | undefined;
+  describeData: { tool_name?: string; description: string; tags: string[] } | undefined;
   describePrompt: string | undefined;
   allAppIds: string[];
+  compileFeedback: string;
+  setCompileFeedback: (v: string) => void;
   onCompile: () => Promise<void>;
   isCompiling: boolean;
   compileError: string | undefined;
@@ -276,10 +279,6 @@ export function ProfilePanel(props: ProfilePanelProps) {
       setCompileAppId={props.setCompileAppId}
       compileName={props.compileName}
       setCompileName={props.setCompileName}
-      derivedSubscribes={props.derivedSubscribes}
-      setCompileSubscribes={props.setCompileSubscribes}
-      autoSubscribes={props.autoSubscribes}
-      setAutoSubscribes={props.setAutoSubscribes}
       compileDescription={props.compileDescription}
       setCompileDescription={props.setCompileDescription}
       compileTags={props.compileTags}
@@ -287,6 +286,8 @@ export function ProfilePanel(props: ProfilePanelProps) {
       describeData={props.describeData}
       describePrompt={props.describePrompt}
       allAppIds={props.allAppIds}
+      compileFeedback={props.compileFeedback}
+      setCompileFeedback={props.setCompileFeedback}
       onCompile={props.onCompile}
       isCompiling={props.isCompiling}
       compileError={props.compileError}

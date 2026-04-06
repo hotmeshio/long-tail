@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -33,14 +34,28 @@ const claimAndResolveSchema = z.object({
   payload: z.record(z.any()).describe('Resolution payload data'),
 });
 
+const escalateAndWaitSchema = z.object({
+  role: z.string().describe('Target role for the escalation (e.g., "reviewer")'),
+  message: z.string().describe('Description of what input is needed from the human'),
+  form_schema: z.record(z.any()).optional()
+    .describe('JSON Schema for the resolver form. Use format:"password" for sensitive fields.'),
+  data: z.record(z.any()).optional().describe('Contextual data for the reviewer'),
+  assigned_to: z.string().optional().describe('Auto-assign to a specific user'),
+  type: z.string().optional().default('mcp').describe('Escalation type classification'),
+  subtype: z.string().optional().default('wait_for_human').describe('Escalation subtype'),
+  priority: z.number().min(1).max(4).optional().default(1)
+    .describe('Priority: 1 (highest) to 4 (lowest)'),
+}).passthrough();
+
 /**
  * Create the Long Tail Human Queue MCP server.
  *
- * Registers four tools that expose the escalation API:
- * - escalate_to_human — create a new escalation
+ * Registers five tools that expose the escalation API:
+ * - escalate_to_human — create a new escalation (fire-and-forget)
  * - check_resolution — check escalation status
  * - get_available_work — list available escalations by role
  * - claim_and_resolve — claim + resolve in one step
+ * - escalate_and_wait — create escalation and return signal for durable wait
  *
  * The server is created with tools registered but no transport
  * auto-connected. Callers connect a transport programmatically
@@ -66,7 +81,6 @@ export async function createHumanQueueServer(options?: {
       const escalation = await escalationService.createEscalation({
         type: args.type || 'mcp',
         subtype: args.subtype || 'tool_call',
-        modality: 'mcp',
         description: args.message,
         priority: args.priority,
         role: args.role,
@@ -204,7 +218,65 @@ export async function createHumanQueueServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:server] ${name} ready (4 tools registered)`);
+  // ── escalate_and_wait ──────────────────────────────────────────────
+  (server as any).registerTool(
+    'escalate_and_wait',
+    {
+      title: 'Escalate and Wait',
+      description:
+        'Create an escalation and pause the workflow until a human responds. ' +
+        'Returns a signal ID that the workflow uses to wait. ' +
+        'Preferred over escalate_to_human + check_resolution polling.',
+      inputSchema: escalateAndWaitSchema,
+    },
+    async (args: z.infer<typeof escalateAndWaitSchema> & { _yaml_signal_routing?: Record<string, any> }) => {
+      const signalId = `wait-for-human-${crypto.randomUUID()}`;
+
+      // YAML workflows inject _yaml_signal_routing to override Durable's signalId-based routing
+      const yamlRouting = args._yaml_signal_routing;
+      const signalRouting = yamlRouting
+        ? { ...yamlRouting, signalId }
+        : { signalId };
+
+      const metadata: Record<string, any> = {
+        source: 'mcp_server',
+        signal_routing: signalRouting,
+      };
+      if (args.form_schema) {
+        metadata.form_schema = args.form_schema;
+      }
+
+      const escalation = await escalationService.createEscalation({
+        type: args.type || 'mcp',
+        subtype: args.subtype || 'wait_for_human',
+        description: args.message,
+        priority: args.priority,
+        role: args.role,
+        envelope: JSON.stringify(args.data || {}),
+        metadata,
+        workflow_type: yamlRouting?.workflowType,
+        workflow_id: yamlRouting?.workflowId,
+        task_queue: yamlRouting?.taskQueue,
+      });
+
+      if (args.assigned_to) {
+        await escalationService.claimEscalation(escalation.id, args.assigned_to, 240);
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            type: 'waitFor',
+            signalId,
+            escalationId: escalation.id,
+          }),
+        }],
+      };
+    },
+  );
+
+  loggerRegistry.info(`[lt-mcp:server] ${name} ready (5 tools registered)`);
   return server;
 }
 

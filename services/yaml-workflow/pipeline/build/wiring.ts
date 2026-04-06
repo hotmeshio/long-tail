@@ -85,10 +85,16 @@ export function wireStepInputs(
           }
         }
         // Gap-fill trigger inputs: if a step argument matches a trigger input but the plan
-        // didn't explicitly wire it, add the wiring
+        // didn't explicitly wire it, add the wiring.
+        // Skip complex arguments (arrays, nested objects with >2 keys) — they are stored
+        // defaults in tool_arguments and must not be overridden by flat trigger mappings.
         for (const key of Object.keys(step.arguments)) {
           if (inputMappings[key]) continue; // already wired
           if (key === '_iteration') continue;
+          const argValue = step.arguments[key];
+          if (Array.isArray(argValue) || (argValue && typeof argValue === 'object' && !Array.isArray(argValue) && Object.keys(argValue as object).length > 2)) {
+            continue;
+          }
           if (triggerInputKeys.has(key)) {
             inputMappings[key] = `{${triggerId}.output.data.${key}}`;
           }

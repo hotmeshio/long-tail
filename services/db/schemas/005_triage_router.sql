@@ -11,18 +11,18 @@ WHERE workflow_type = 'mcpTriage';
 
 -- Add mcpTriageRouter (orchestrator — the new entry point for triage)
 INSERT INTO lt_config_workflows
-  (workflow_type, task_queue, default_role, default_modality, invocable, description, tool_tags)
+  (workflow_type, task_queue, default_role, invocable, description, tool_tags)
 VALUES
-  ('mcpTriageRouter', 'long-tail-system', 'engineer', 'default', false,
+  ('mcpTriageRouter', 'long-tail-system', 'engineer', false,
    'Triage router — discovers compiled workflows for remediation, routes to deterministic or dynamic triage',
    '{}')
 ON CONFLICT (workflow_type) DO NOTHING;
 
 -- Add mcpTriageDeterministic (leaf — invokes compiled triage workflows)
 INSERT INTO lt_config_workflows
-  (workflow_type, task_queue, default_role, default_modality, invocable, description, tool_tags)
+  (workflow_type, task_queue, default_role, invocable, description, tool_tags)
 VALUES
-  ('mcpTriageDeterministic', 'long-tail-system', 'engineer', 'default', false,
+  ('mcpTriageDeterministic', 'long-tail-system', 'engineer', false,
    'Deterministic triage — invokes matched compiled workflows for escalation remediation',
    '{}')
 ON CONFLICT (workflow_type) DO NOTHING;

@@ -36,13 +36,13 @@ export async function upsertWorkflowConfig(
         config.invocable,
         config.task_queue,
         config.default_role,
-        config.default_modality,
         config.description,
         config.consumes,
         config.envelope_schema ?? null,
         config.resolver_schema ?? null,
         config.cron_schedule ?? null,
         config.tool_tags || [],
+        config.execute_as ?? null,
       ],
     );
 

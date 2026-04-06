@@ -10,7 +10,7 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { CopyableId } from '../../components/common/display/CopyableId';
 import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
-import { useNatsSubscription } from '../../hooks/useNats';
+import { useEventSubscription } from '../../hooks/useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { formatDuration } from '../../lib/format';
 
@@ -51,7 +51,7 @@ export function McpRunDetailPage() {
     if (!jobId || event.workflowId !== jobId) return;
     queryClient.invalidateQueries({ queryKey: ['mcpRunExecution', jobId] });
   }, [jobId, queryClient]);
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.activity.>`, activityHandler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.activity.>`, activityHandler);
 
   if (isLoading) {
     return (
@@ -65,7 +65,7 @@ export function McpRunDetailPage() {
   if (error || !execution) {
     return (
       <div>
-        <PageHeader title="Pipeline Run" />
+        <PageHeader title="Pipeline Execution" />
         <div className="mt-4 text-center py-8">
           <p className="text-sm text-text-primary mb-1">
             {(error as Error)?.message?.includes('expired')
@@ -95,7 +95,7 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Run" />
+      <PageHeader title="Pipeline Execution" />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">

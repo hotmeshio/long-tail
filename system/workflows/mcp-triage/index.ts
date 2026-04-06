@@ -33,6 +33,7 @@ const {
   ltGetTask,
   ltGetWorkflowConfig,
   ltStartWorkflow,
+  ltEnrichEscalationRouting,
 } = Durable.workflow.proxyActivities<typeof interceptorActivities>({
   activities: interceptorActivities,
   taskQueue: 'lt-interceptor',
@@ -148,8 +149,19 @@ async function runTriageLLM(
   ];
 
   let toolCallCount = 0;
+  const BUDGET_WARNING_THRESHOLD = 3;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const remaining = MAX_TOOL_ROUNDS - round;
+
+    // Inject budget warning when approaching the limit
+    if (remaining <= BUDGET_WARNING_THRESHOLD && remaining < MAX_TOOL_ROUNDS) {
+      messages.push({
+        role: 'user',
+        content: `[Rounds: ${remaining} remaining] Wrap up: consolidate your diagnosis and return your final JSON response.`,
+      });
+    }
+
     // Only lightweight toolIds (string[]) flow through the durable pipe
     const response = await callTriageLLM(messages, toolIds);
 
@@ -188,6 +200,29 @@ async function runTriageLLM(
 
       // callTool returns errors as data so the LLM can adapt
       const result = await callTriageTool(toolCall.function.name, args);
+
+      // Durable waitFor: if the tool returns a signal, pause until human responds
+      if (result?.type === 'waitFor' && result?.signalId) {
+        const ctx = Durable.workflow.getContext();
+        const workflowType = ctx.workflowTopic.replace(`${ctx.taskQueue}-`, '');
+        await ltEnrichEscalationRouting({
+          escalationId: result.escalationId,
+          signalRouting: {
+            taskQueue: ctx.taskQueue,
+            workflowType,
+            workflowId: ctx.workflowId,
+            signalId: result.signalId,
+          },
+          claimForUserId: envelope.lt?.userId,
+        });
+        const signalData = await Durable.workflow.waitFor<Record<string, any>>(result.signalId);
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(signalData),
+        });
+        continue;
+      }
 
       messages.push({
         role: 'tool',

@@ -80,6 +80,25 @@ These are individual primitives requiring manual session management. Using these
 }
 
 /**
+ * Detects the human-queue server and emits guidance to use escalate_and_wait
+ * instead of escalate_to_human + check_resolution polling.
+ */
+function humanQueueAdvisor(servers: ServerInfo[]): string {
+  const hq = servers.find(
+    (s) => s.toolNames.includes('escalate_and_wait') && s.toolNames.includes('escalate_to_human'),
+  );
+  if (!hq) return '';
+
+  const slug = hq.slug;
+  return (
+`## Human Queue — Tool Selection
+When you need input from a human before continuing (credentials, approval, data):
+USE: ${slug}__escalate_and_wait — pauses the workflow until the human responds. Specify a form_schema describing what fields you need (use format:"password" for sensitive values).
+AVOID: ${slug}__escalate_to_human + ${slug}__check_resolution polling loop — burns tool rounds and may exhaust your budget.`
+  );
+}
+
+/**
  * Scans for batch-capable tools (accepting array inputs) and notes them
  * as preferred over repeated single-item calls.
  */
@@ -94,6 +113,7 @@ function batchPreferenceAdvisor(servers: ServerInfo[]): string {
 
 const advisors: StrategyAdvisor[] = [
   overlappingCategoryAdvisor,
+  humanQueueAdvisor,
   batchPreferenceAdvisor,
 ];
 

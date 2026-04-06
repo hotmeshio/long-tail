@@ -15,7 +15,6 @@ export interface LTTaskRecord {
   workflow_type: string;
   lt_type: string;
   task_queue: string | null;
-  modality: string | null;
 
   // state
   status: LTTaskStatus;
@@ -41,6 +40,14 @@ export interface LTTaskRecord {
   // telemetry
   trace_id: string | null;
   span_id: string | null;
+
+  // audit
+  /** User or bot that initiated this task. */
+  initiated_by: string | null;
+  /** Principal type: 'user' or 'bot'. */
+  principal_type: string | null;
+  /** Executing principal (bot external_id) when proxy invocation is used. */
+  executing_as: string | null;
 
   created_at: Date;
   updated_at: Date;

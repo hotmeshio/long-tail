@@ -65,7 +65,7 @@ function scheduledEvent(
     is_system: act.type === 'trigger',
     attributes: {
       kind: 'activity_task_scheduled',
-      activity_type: act.step || act.name,
+      activity_type: input?.workflowName || act.step || act.name,
       input,
       timeline_key: timelineKey,
       execution_index: index,
@@ -89,7 +89,7 @@ function completionEvent(
     is_system: act.type === 'trigger',
     attributes: {
       kind: failed ? 'activity_task_failed' : 'activity_task_completed',
-      activity_type: act.step || act.name,
+      activity_type: input?.workflowName || act.step || act.name,
       input,
       ...(failed ? { failure: act.error } : {}),
       result: act.data,

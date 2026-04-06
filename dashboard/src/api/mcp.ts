@@ -10,12 +10,14 @@ interface McpServerListResponse {
 interface McpServerFilters {
   status?: string;
   search?: string;
+  tags?: string;
 }
 
 export function useMcpServers(filters: McpServerFilters = {}) {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.search) params.set('search', filters.search);
+  if (filters.tags) params.set('tags', filters.tags);
   const qs = params.toString();
 
   return useQuery<McpServerListResponse>({
@@ -116,6 +118,21 @@ export function useMcpTools(serverId: string) {
     queryKey: ['mcpTools', serverId],
     queryFn: () => apiFetch(`/mcp/servers/${serverId}/tools`),
     enabled: !!serverId,
+  });
+}
+
+export interface CredentialStatus {
+  required: string[];
+  registered: string[];
+  missing: string[];
+}
+
+export function useCredentialStatus(serverId: string) {
+  return useQuery<CredentialStatus>({
+    queryKey: ['mcpCredentialStatus', serverId],
+    queryFn: () => apiFetch(`/mcp/servers/${serverId}/credential-status`),
+    enabled: !!serverId,
+    staleTime: 30_000,
   });
 }
 

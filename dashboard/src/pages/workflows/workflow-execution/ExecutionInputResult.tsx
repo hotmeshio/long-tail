@@ -3,20 +3,23 @@ import type { WorkflowExecution } from '../../../api/types';
 
 interface ExecutionInputResultProps {
   execution: WorkflowExecution;
-  envelope?: string | null;
 }
 
-function parseEnvelope(raw: string | null | undefined): Record<string, unknown> | null {
-  if (!raw) return null;
-  try {
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
-  } catch {
-    return null;
-  }
+/**
+ * Extract the workflow input envelope from the workflow_execution_started event.
+ * HotMesh 0.13.0+ includes the actual trigger arguments (the envelope passed
+ * to startWorkflow) in the start event's `input` attribute.
+ */
+function extractInput(execution: WorkflowExecution): Record<string, unknown> | null {
+  const startEvent = execution.events.find(
+    (e) => e.event_type === 'workflow_execution_started',
+  );
+  const input = (startEvent?.attributes as any)?.input;
+  return input && typeof input === 'object' ? input : null;
 }
 
-export function ExecutionInputResult({ execution, envelope }: ExecutionInputResultProps) {
-  const input = parseEnvelope(envelope);
+export function ExecutionInputResult({ execution }: ExecutionInputResultProps) {
+  const input = extractInput(execution);
 
   // Result: unwrap the workflow return — the `data` field is what LT users care about
   const rawResult = execution.result as Record<string, unknown> | null | undefined;

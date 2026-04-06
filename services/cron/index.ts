@@ -5,7 +5,9 @@ import { postgres_options } from '../../modules/config';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
 import * as configService from '../config';
+import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig } from '../../types';
+import type { LTEnvelopePrincipal } from '../../types/envelope';
 
 const CRON_TOPIC_PREFIX = 'lt.cron';
 const CRON_ID_PREFIX = 'lt-cron';
@@ -22,6 +24,7 @@ const CRON_ID_PREFIX = 'lt-cron';
 class LTCronRegistry {
   private activeCrons = new Map<string, string>(); // workflowType -> cronId
   private connected = false;
+  private systemPrincipal: LTEnvelopePrincipal | null = null;
 
   /**
    * Load all workflow configs with a cron_schedule and start Virtual.cron for each.
@@ -29,6 +32,9 @@ class LTCronRegistry {
    */
   async connect(): Promise<void> {
     if (this.connected) return;
+
+    // Resolve the real system bot principal (ensured at startup)
+    this.systemPrincipal = await resolvePrincipal('lt-system');
 
     const configs = await configService.listWorkflowConfigs();
     const cronConfigs = configs.filter(
@@ -64,6 +70,21 @@ class LTCronRegistry {
     // Ensure metadata.source identifies the cron
     if (!defaultEnvelope.metadata) defaultEnvelope.metadata = {};
     defaultEnvelope.metadata.source = 'cron';
+
+    // Resolve executing principal: per-config execute_as, or system bot fallback
+    if (!defaultEnvelope.lt) defaultEnvelope.lt = {};
+    if (!defaultEnvelope.lt.principal) {
+      let cronPrincipal = this.systemPrincipal;
+      if (config.execute_as) {
+        const botPrincipal = await resolvePrincipal(config.execute_as);
+        if (botPrincipal) cronPrincipal = botPrincipal;
+      }
+      if (cronPrincipal) {
+        defaultEnvelope.lt.userId = cronPrincipal.id;
+        defaultEnvelope.lt.principal = cronPrincipal;
+      }
+      defaultEnvelope.lt.scopes = ['workflow:cron'];
+    }
 
     const workflowType = config.workflow_type;
     const taskQueue = config.task_queue;

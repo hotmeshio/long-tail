@@ -24,7 +24,6 @@ export type NavEntry = NavItem | NavGroup;
 
 interface SidebarNavProps {
   heading: string;
-  headingTo?: string;
   entries: NavEntry[];
 }
 
@@ -111,38 +110,47 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return entry.kind === 'group';
 }
 
-export function SidebarNav({ heading, headingTo, entries }: SidebarNavProps) {
+/**
+ * Query-param-aware nav link. When `to` contains a query string,
+ * active state requires both the pathname and query params to match.
+ */
+function NavItemLink({ entry, collapsed }: { entry: NavItem; collapsed: boolean }) {
+  const { pathname, search } = useLocation();
+  const hasQuery = entry.to.includes('?');
+
+  if (hasQuery) {
+    const [entryPath, entrySearch] = entry.to.split('?');
+    const isActive = pathname === entryPath && search === `?${entrySearch}`;
+    const cls = getLinkClass(collapsed)({ isActive });
+
+    return (
+      <NavLink to={entry.to} className={cls} title={collapsed ? entry.label : undefined}>
+        {entry.icon && <entry.icon className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} />}
+        {!collapsed && <span>{entry.label}</span>}
+      </NavLink>
+    );
+  }
+
+  return (
+    <NavLink
+      to={entry.to}
+      end={entry.end}
+      className={getLinkClass(collapsed)}
+      title={collapsed ? entry.label : undefined}
+    >
+      {entry.icon && <entry.icon className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} />}
+      {!collapsed && <span>{entry.label}</span>}
+    </NavLink>
+  );
+}
+
+export function SidebarNav({ heading, entries }: SidebarNavProps) {
   const { collapsed } = useSidebar();
 
   return (
     <div className="space-y-1">
       {collapsed ? (
-        headingTo ? (
-          <NavLink
-            to={headingTo}
-            end
-            className={({ isActive }) =>
-              `block h-px mx-3 my-2 transition-colors duration-150 ${
-                isActive ? 'bg-accent' : 'bg-surface-border hover:bg-text-tertiary'
-              }`
-            }
-            title={heading}
-          />
-        ) : (
-          <div className="h-px bg-surface-border mx-3 my-2" />
-        )
-      ) : headingTo ? (
-        <NavLink
-          to={headingTo}
-          end
-          className={({ isActive }) =>
-            `block px-4 py-2 text-[10px] font-semibold uppercase tracking-widest transition-colors duration-150 ${
-              isActive ? 'text-accent' : 'text-text-tertiary hover:text-text-secondary'
-            }`
-          }
-        >
-          {heading}
-        </NavLink>
+        <div className="h-px bg-surface-border mx-3 my-2" title={heading} />
       ) : (
         <p className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
           {heading}
@@ -152,16 +160,7 @@ export function SidebarNav({ heading, headingTo, entries }: SidebarNavProps) {
         isGroup(entry) ? (
           <NavGroupSection key={entry.label} group={entry} collapsed={collapsed} />
         ) : (
-          <NavLink
-            key={entry.to}
-            to={entry.to}
-            end={entry.end}
-            className={getLinkClass(collapsed)}
-            title={collapsed ? entry.label : undefined}
-          >
-            {entry.icon && <entry.icon className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} />}
-            {!collapsed && <span>{entry.label}</span>}
-          </NavLink>
+          <NavItemLink key={entry.to} entry={entry} collapsed={collapsed} />
         ),
       )}
     </div>

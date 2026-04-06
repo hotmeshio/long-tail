@@ -11,10 +11,10 @@ export const ENSURE_ROLE_EXISTS =
 
 export const CREATE_ESCALATION = `\
 INSERT INTO lt_escalations
-  (type, subtype, modality, description, priority, task_id,
+  (type, subtype, description, priority, task_id,
    origin_id, parent_id, role, envelope, metadata, escalation_payload,
    workflow_id, task_queue, workflow_type, trace_id, span_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING *`;
 
 export const CLAIM_ESCALATION = `\
@@ -140,6 +140,24 @@ WHERE id = ANY($2::uuid[])
 RETURNING *`;
 
 // --- Query helpers ---------------------------------------------------------
+
+export const UPDATE_ESCALATION_METADATA = `\
+UPDATE lt_escalations
+SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *`;
+
+export const ENRICH_ESCALATION_ROUTING = `\
+UPDATE lt_escalations
+SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+    workflow_type = COALESCE(workflow_type, $3),
+    workflow_id = COALESCE(workflow_id, $4),
+    task_queue = COALESCE(task_queue, $5),
+    task_id = COALESCE(task_id, $6),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *`;
 
 export const LIST_DISTINCT_TYPES =
   'SELECT DISTINCT type FROM lt_escalations ORDER BY type';

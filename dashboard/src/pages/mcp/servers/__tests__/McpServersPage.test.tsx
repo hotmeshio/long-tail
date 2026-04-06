@@ -10,6 +10,7 @@ vi.mock('../../../../api/mcp', () => ({
   useDeleteMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useCreateMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useUpdateMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+  useCredentialStatus: vi.fn(() => ({ data: null })),
 }));
 
 import { McpServersPage } from '../McpServersPage';
@@ -26,7 +27,7 @@ const mockServers = {
       auto_connect: true,
       status: 'connected',
       tool_manifest: [
-        { name: 'extract_member_info', description: 'Extract member info from document', inputSchema: { properties: { doc_id: {} } } },
+        { name: 'list_document_pages', description: 'List available document pages', inputSchema: { properties: {} } },
         { name: 'rotate_page', description: 'Rotate a document page', inputSchema: { properties: { page_id: {}, angle: {} } } },
       ],
       metadata: { builtin: true },
@@ -81,12 +82,13 @@ beforeEach(() => {
 describe('McpServersPage', () => {
   it('renders page header', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('Tool Servers')).toBeInTheDocument();
+    expect(screen.getByText('MCP Server Tools')).toBeInTheDocument();
   });
 
-  it('renders tagline', () => {
+  it('renders filter bar', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText(/Built-in, user-registered, and external MCP servers/)).toBeInTheDocument();
+    expect(screen.getByText('Search')).toBeInTheDocument();
+    expect(screen.getByText('Tag')).toBeInTheDocument();
   });
 
   it('renders all server rows', () => {
@@ -106,7 +108,7 @@ describe('McpServersPage', () => {
 
   it('renders search input', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByPlaceholderText('Server or tool name…')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Server or tool name...')).toBeInTheDocument();
   });
 
   it('renders status filter with MCP status options', () => {
@@ -119,14 +121,14 @@ describe('McpServersPage', () => {
     render(<McpServersPage />, { wrapper });
     const serverRow = screen.getByText('long-tail-document-vision').closest('tr')!;
     fireEvent.click(serverRow);
-    expect(screen.getByText('extract_member_info')).toBeInTheDocument();
+    expect(screen.getByText('list_document_pages')).toBeInTheDocument();
     expect(screen.getByText('rotate_page')).toBeInTheDocument();
   });
 
   it('renders tool descriptions in the DOM', () => {
     render(<McpServersPage />, { wrapper });
     // Tool descriptions are in the DOM (inside collapsed panels)
-    expect(screen.getByText('Extract member info from document')).toBeInTheDocument();
+    expect(screen.getByText('List available document pages')).toBeInTheDocument();
     expect(screen.getByText('Fetch data from API')).toBeInTheDocument();
   });
 
@@ -143,7 +145,7 @@ describe('McpServersPage', () => {
       isLoading: false,
     } as any);
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('No tool servers found')).toBeInTheDocument();
+    expect(screen.getByText('No servers found')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {

@@ -18,7 +18,6 @@ export interface LTEscalation {
   type: 'escalation';
   data: Record<string, any>;
   message: string;
-  modality?: string;
   role?: string;
   priority?: 1 | 2 | 3 | 4;
 }

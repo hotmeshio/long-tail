@@ -74,6 +74,5 @@ export async function reviewContent(
     } satisfies ReviewContentEscalationData,
     message: `Content review needed (confidence: ${analysis.confidence}, flags: ${analysis.flags.join(', ') || 'none'})`,
     role: 'reviewer',
-    modality: 'default',
   };
 }

@@ -5,9 +5,9 @@ const ctx = setupRouteTest(4622);
 
 describe('Settings routes', () => {
   describe('GET /api/settings', () => {
-    it('returns 401 without auth', async () => {
+    it('returns 200 without auth (public endpoint for transport detection)', async () => {
       const res = await fetch(`${ctx.BASE}/settings`);
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(200);
     });
 
     it('returns telemetry and escalation config', async () => {

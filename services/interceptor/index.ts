@@ -14,6 +14,8 @@ import {
   publishStartedEvents,
   completePlainResult,
 } from './lifecycle';
+import { runWithToolContext } from '../iam/context';
+import { buildToolContextFromEnvelope } from '../iam/envelope';
 
 import type { LTReturn, LTEscalation } from '../../types';
 import type { InterceptorState } from './types';
@@ -35,7 +37,6 @@ export async function registerLT(
   options?: {
     taskQueue?: string;
     defaultRole?: string;
-    defaultModality?: string;
   },
 ): Promise<void> {
   const taskQueue = options?.taskQueue ?? DEFAULT_ACTIVITY_QUEUE;
@@ -49,7 +50,6 @@ export async function registerLT(
   Durable.registerInterceptor(createLTInterceptor({
     activityTaskQueue: taskQueue,
     defaultRole: options?.defaultRole,
-    defaultModality: options?.defaultModality,
   }));
 
   Durable.registerActivityInterceptor(createLTActivityInterceptor());
@@ -82,12 +82,10 @@ export async function registerLT(
 export function createLTInterceptor(options: {
   activityTaskQueue: string;
   defaultRole?: string;
-  defaultModality?: string;
 }) {
   const {
     activityTaskQueue,
     defaultRole = 'reviewer',
-    defaultModality = 'default',
   } = options;
 
   const interceptor = {
@@ -103,9 +101,15 @@ export function createLTInterceptor(options: {
         retryPolicy: { maximumAttempts: 3 },
       });
 
-      // 2. Load config — pass through unregistered workflows
+      // 2. Load config — unregistered workflows still get ToolContext
       const wfConfig = await activities.ltGetWorkflowConfig(wf.workflowName);
-      if (!wfConfig) return next();
+      if (!wfConfig) {
+        const envelope = extractEnvelope(ctx);
+        const toolCtx = buildToolContextFromEnvelope(
+          envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
+        );
+        return toolCtx ? runWithToolContext(toolCtx, next) : next();
+      }
 
       const envelope = extractEnvelope(ctx);
       const taskQueue = deriveTaskQueue(wf);
@@ -129,7 +133,6 @@ export function createLTInterceptor(options: {
         taskQueue,
         wfConfig,
         defaultRole,
-        defaultModality,
         taskId,
         routing,
         envelope,
@@ -140,9 +143,22 @@ export function createLTInterceptor(options: {
       };
 
       try {
+        const orchCtx = { workflowId: wf.workflowId, taskQueue, workflowType: wf.workflowName, userId: envelope?.lt?.userId };
+
+        // Build ToolContext from envelope principal (no DB call — resolved at front door)
+        const toolCtx = buildToolContextFromEnvelope(
+          envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
+        );
+
+        // Nest both contexts: OrchestratorContext (for executeLT routing)
+        // and ToolContext (for universal identity access in activities)
+        const wrappedNext = toolCtx
+          ? () => runWithToolContext(toolCtx, next)
+          : next;
+
         const result = await runWithOrchestratorContext(
-          { workflowId: wf.workflowId, taskQueue, workflowType: wf.workflowName, userId: envelope?.lt?.userId },
-          next,
+          orchCtx,
+          wrappedNext,
         );
 
         if (result?.type === 'escalation') {

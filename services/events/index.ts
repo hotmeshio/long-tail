@@ -60,6 +60,13 @@ class LTEventRegistry {
   get hasAdapters(): boolean {
     return this.adapters.length > 0;
   }
+
+  /**
+   * Return the first registered adapter that matches the given type.
+   */
+  getAdapter<T extends LTEventAdapter>(ctor: new (...args: any[]) => T): T | undefined {
+    return this.adapters.find((a): a is T => a instanceof ctor);
+  }
 }
 
 /** Singleton event registry */

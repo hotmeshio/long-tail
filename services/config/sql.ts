@@ -29,19 +29,19 @@ INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING`;
 
 export const UPSERT_WORKFLOW = `\
 INSERT INTO lt_config_workflows
-  (workflow_type, invocable, task_queue, default_role, default_modality, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags)
+  (workflow_type, invocable, task_queue, default_role, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags, execute_as)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (workflow_type) DO UPDATE SET
   invocable = EXCLUDED.invocable,
   task_queue = EXCLUDED.task_queue,
   default_role = EXCLUDED.default_role,
-  default_modality = EXCLUDED.default_modality,
   description = EXCLUDED.description,
   consumes = EXCLUDED.consumes,
   envelope_schema = EXCLUDED.envelope_schema,
   resolver_schema = EXCLUDED.resolver_schema,
   cron_schedule = EXCLUDED.cron_schedule,
-  tool_tags = EXCLUDED.tool_tags`;
+  tool_tags = EXCLUDED.tool_tags,
+  execute_as = EXCLUDED.execute_as`;
 
 export const DELETE_CONFIG_ROLES = `\
 DELETE FROM lt_config_roles WHERE workflow_type = $1`;

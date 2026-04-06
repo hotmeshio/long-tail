@@ -116,7 +116,7 @@ export function UserRolesPage() {
 
   return (
     <div>
-      <PageHeader title="User Roles" />
+      <PageHeader title="Roles & Permissions" />
 
       <DataTable
         columns={columns}

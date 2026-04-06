@@ -38,7 +38,6 @@ describe('direct workflow invocation with LT treatment', () => {
       invocable: false,
       task_queue: LEAF_QUEUE,
       default_role: 'reviewer',
-      default_modality: 'default',
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],

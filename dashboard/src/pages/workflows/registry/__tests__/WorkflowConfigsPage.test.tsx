@@ -4,57 +4,60 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../api/workflows', () => ({
-  useWorkflowConfigs: vi.fn(),
+  useDiscoveredWorkflows: vi.fn(),
   useDeleteWorkflowConfig: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
 }));
 
 import { WorkflowConfigsPage } from '../WorkflowConfigsPage';
-import { useWorkflowConfigs } from '../../../../api/workflows';
-import type { LTWorkflowConfig } from '../../../../api/types';
+import { useDiscoveredWorkflows } from '../../../../api/workflows';
+import type { DiscoveredWorkflow } from '../../../../api/types';
 
-function makeConfig(overrides: Partial<LTWorkflowConfig> = {}): LTWorkflowConfig {
+function makeWorkflow(overrides: Partial<DiscoveredWorkflow> = {}): DiscoveredWorkflow {
   return {
     workflow_type: 'review-content',
     description: null,
-
-    invocable: true,
     task_queue: 'default',
-    default_role: 'reviewer',
-    default_modality: 'portal',
+    registered: true,
+    invocable: true,
+    system: false,
     roles: ['reviewer'],
     invocation_roles: [],
-    consumes: [],
-    envelope_schema: null,
-    resolver_schema: null,
-    cron_schedule: null,
+    execute_as: null,
     ...overrides,
   };
 }
 
-const CONFIGS: LTWorkflowConfig[] = [
-  makeConfig({
+const WORKFLOWS: DiscoveredWorkflow[] = [
+  makeWorkflow({
     workflow_type: 'review-content',
     description: 'Content review workflow',
-
+    registered: true,
     invocable: true,
     task_queue: 'default',
     roles: ['reviewer', 'admin'],
   }),
-  makeConfig({
-    workflow_type: 'process-claim-orchestrator',
-    description: 'Insurance claim orchestrator',
-
+  makeWorkflow({
+    workflow_type: 'kitchen-sink',
+    description: 'Kitchen sink demo workflow',
+    registered: true,
     invocable: true,
-    task_queue: 'claims',
-    roles: ['claims-adjuster'],
+    task_queue: 'examples',
+    roles: ['reviewer'],
   }),
-  makeConfig({
-    workflow_type: 'verify-document',
-
+  makeWorkflow({
+    workflow_type: 'basic-echo',
+    registered: true,
     invocable: false,
     task_queue: 'default',
     roles: ['reviewer'],
-    cron_schedule: '*/5 * * * *',
+  }),
+  makeWorkflow({
+    workflow_type: 'unregistered-flow',
+    description: 'Discovered but not registered',
+    registered: false,
+    invocable: false,
+    task_queue: 'user-queue',
+    roles: [],
   }),
 ];
 
@@ -72,37 +75,38 @@ function renderPage(initialPath = '/workflows/registry') {
 describe('WorkflowConfigsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
-      data: CONFIGS,
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: WORKFLOWS,
       isLoading: false,
     } as any);
   });
 
   // ── Rendering ──
 
-  it('renders page header and Add Config button', () => {
+  it('renders page header and Register Workflow button', () => {
     renderPage();
-    expect(screen.getByText('Registered Workflows')).toBeInTheDocument();
-    expect(screen.getByText('Add Config')).toBeInTheDocument();
+    expect(screen.getByText('Workflow Registry')).toBeInTheDocument();
+    expect(screen.getByText('Register Workflow')).toBeInTheDocument();
   });
 
-  it('renders all configs when no filters applied', () => {
+  it('renders all workflows when no filters applied', () => {
     renderPage();
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
+    expect(screen.getByText('basic-echo')).toBeInTheDocument();
+    expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
   });
 
-  it('renders filter bar with search, queue, kind, and role controls', () => {
+  it('renders filter bar with search, queue, tier, and role controls', () => {
     renderPage();
     expect(screen.getByPlaceholderText('Search workflow type...')).toBeInTheDocument();
-    expect(screen.getByText('Queue')).toBeInTheDocument();
-    expect(screen.getByText('Kind')).toBeInTheDocument();
-    expect(screen.getByText('Role')).toBeInTheDocument();
+    expect(screen.getAllByText('Queue').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Tier').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Role').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders loading skeleton when loading', () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: undefined,
       isLoading: true,
     } as any);
@@ -110,13 +114,23 @@ describe('WorkflowConfigsPage', () => {
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
-  it('renders empty state when no configs', () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
+  it('renders empty state when no workflows', () => {
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: [],
       isLoading: false,
     } as any);
     renderPage();
-    expect(screen.getByText('No workflow configurations found')).toBeInTheDocument();
+    expect(screen.getByText('No workflows found')).toBeInTheDocument();
+  });
+
+  // ── Tier column ──
+
+  it('renders tier pills for certified and durable workflows', () => {
+    renderPage();
+    // 3 in table + 1 in filter dropdown option
+    expect(screen.getAllByText('Certified').length).toBe(4);
+    // 1 in table + 1 in filter dropdown option
+    expect(screen.getAllByText('Durable').length).toBe(2);
   });
 
   // ── Filter: Queue ──
@@ -125,28 +139,28 @@ describe('WorkflowConfigsPage', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     // Queue is the first select
-    fireEvent.change(selects[0], { target: { value: 'claims' } });
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    fireEvent.change(selects[0], { target: { value: 'examples' } });
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-    expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
+    expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
   });
 
-  // ── Filter: Kind ──
+  // ── Filter: Tier ──
 
-  it('filters by kind=invocable', () => {
+  it('filters by tier (certified)', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'invocable' } });
+    // Tier is the second select (Queue, Tier, Role)
+    fireEvent.change(selects[1], { target: { value: 'certified' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
+    expect(screen.queryByText('unregistered-flow')).not.toBeInTheDocument();
   });
 
-  it('filters by kind=cron', () => {
+  it('filters by tier (durable)', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'cron' } });
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
+    fireEvent.change(selects[1], { target: { value: 'durable' } });
+    expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
   });
 
@@ -156,9 +170,9 @@ describe('WorkflowConfigsPage', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     // Role is the third select
-    fireEvent.change(selects[2], { target: { value: 'claims-adjuster' } });
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.queryByText('review-content')).not.toBeInTheDocument();
+    fireEvent.change(selects[2], { target: { value: 'admin' } });
+    expect(screen.getByText('review-content')).toBeInTheDocument();
+    expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
   });
 
   // ── Filter: Search ──
@@ -167,10 +181,10 @@ describe('WorkflowConfigsPage', () => {
     vi.useFakeTimers();
     renderPage();
     const input = screen.getByPlaceholderText('Search workflow type...');
-    fireEvent.change(input, { target: { value: 'claim' } });
+    fireEvent.change(input, { target: { value: 'kitchen' } });
     // Debounce fires after 300ms
     await act(() => vi.advanceTimersByTime(300));
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     vi.useRealTimers();
   });
@@ -179,24 +193,24 @@ describe('WorkflowConfigsPage', () => {
     vi.useFakeTimers();
     renderPage();
     const input = screen.getByPlaceholderText('Search workflow type...');
-    fireEvent.change(input, { target: { value: 'insurance' } });
+    fireEvent.change(input, { target: { value: 'demo' } });
     await act(() => vi.advanceTimersByTime(300));
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     vi.useRealTimers();
   });
 
   // ── Combined filters ──
 
-  it('combines queue + kind filters', () => {
+  it('combines queue + role filters', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'default' } });
-    fireEvent.change(selects[1], { target: { value: 'invocable' } });
-    // Only review-content is in default queue AND invocable
+    fireEvent.change(selects[2], { target: { value: 'reviewer' } });
+    // review-content and basic-echo are in default queue with reviewer role
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
-    expect(screen.queryByText('process-claim-orchestrator')).not.toBeInTheDocument();
+    expect(screen.getByText('basic-echo')).toBeInTheDocument();
+    expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
   });
 
   // ── Facet options ──
@@ -210,7 +224,7 @@ describe('WorkflowConfigsPage', () => {
     );
     expect(options).toContain('All');
     expect(options).toContain('default');
-    expect(options).toContain('claims');
+    expect(options).toContain('examples');
   });
 
   it('derives role options from data', () => {
@@ -223,29 +237,34 @@ describe('WorkflowConfigsPage', () => {
     expect(options).toContain('All');
     expect(options).toContain('reviewer');
     expect(options).toContain('admin');
-    expect(options).toContain('claims-adjuster');
   });
 
   // ── Column rendering ──
 
-  it('renders role pills', () => {
+  it('renders role pills for registered workflows', () => {
     renderPage();
     // reviewer appears in multiple configs + filter dropdown
     expect(screen.getAllByText('reviewer').length).toBeGreaterThanOrEqual(1);
-    // claims-adjuster appears in both the table pill and the filter dropdown
-    expect(screen.getAllByText('claims-adjuster').length).toBeGreaterThanOrEqual(1);
+    // admin appears in both the table pill and the filter dropdown
+    expect(screen.getAllByText('admin').length).toBeGreaterThanOrEqual(1);
   });
 
-  // ── Delete ──
+  // ── Actions ──
 
-  it('shows delete icon on row hover', () => {
+  it('shows de-certify icon for certified workflows', () => {
     renderPage();
-    const deleteButtons = screen.getAllByTitle('Delete config');
-    expect(deleteButtons.length).toBe(3);
+    const decertifyButtons = screen.getAllByTitle('De-certify workflow');
+    expect(decertifyButtons.length).toBe(3);
+  });
+
+  it('shows certify icon for uncertified workflows', () => {
+    renderPage();
+    const certifyButtons = screen.getAllByTitle('Certify workflow');
+    expect(certifyButtons.length).toBe(1);
   });
 });
 
-// ── matchesSearch / matchesKind unit tests (tested via rendering) ──
+// ── matchesSearch unit tests (tested via rendering) ──
 
 describe('filter helpers (via rendering)', () => {
   beforeEach(() => {
@@ -253,8 +272,8 @@ describe('filter helpers (via rendering)', () => {
   });
 
   it('search is case-insensitive', async () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
-      data: CONFIGS,
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: WORKFLOWS,
       isLoading: false,
     } as any);
     vi.useFakeTimers();
@@ -267,18 +286,18 @@ describe('filter helpers (via rendering)', () => {
   });
 
   it('clearing filter restores all results', () => {
-    vi.mocked(useWorkflowConfigs).mockReturnValue({
-      data: CONFIGS,
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: WORKFLOWS,
       isLoading: false,
     } as any);
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    // Filter to claims queue
-    fireEvent.change(selects[0], { target: { value: 'claims' } });
+    // Filter to examples queue
+    fireEvent.change(selects[0], { target: { value: 'examples' } });
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     // Clear filter
     fireEvent.change(selects[0], { target: { value: '' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
   });
 });

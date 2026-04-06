@@ -70,7 +70,7 @@ describe('McpOverview', () => {
 
   it('renders header and duration tabs', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Discovery' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Discovered' })).toBeInTheDocument();
     expect(screen.getByText('1h')).toBeInTheDocument();
     expect(screen.getByText('24h')).toBeInTheDocument();
     expect(screen.getByText('7d')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('McpOverview', () => {
   it('shows server tools and workflow tools cards', () => {
     renderPage();
     expect(screen.getByText('Tool Servers')).toBeInTheDocument();
-    expect(screen.getByText('Compiled Pipelines')).toBeInTheDocument();
+    expect(screen.getByText('Pipeline Registry')).toBeInTheDocument();
     expect(screen.getByText(/2 tools/)).toBeInTheDocument();
   });
 

@@ -1,6 +1,18 @@
 import * as taskService from '../../task';
 import { publishMilestoneEvent, publishTaskEvent } from '../../events/publish';
+import { getPool } from '../../db';
 import type { LTMilestone, LTTaskRecord } from '../../../types';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Resolve an external_id to a UUID. Returns null if not found or already a UUID. */
+async function resolveUserUuid(identifier: string | undefined): Promise<string | undefined> {
+  if (!identifier) return undefined;
+  if (UUID_RE.test(identifier)) return identifier;
+  const pool = getPool();
+  const { rows } = await pool.query('SELECT id FROM lt_users WHERE external_id = $1 LIMIT 1', [identifier]);
+  return rows[0]?.id ?? undefined;
+}
 
 /**
  * Create a task record when a Long Tail workflow starts.
@@ -10,7 +22,6 @@ export async function ltCreateTask(input: {
   workflowType: string;
   ltType: string;
   taskQueue?: string;
-  modality?: string;
   signalId: string;
   parentWorkflowId: string;
   originId?: string;
@@ -19,13 +30,17 @@ export async function ltCreateTask(input: {
   metadata?: Record<string, any>;
   traceId?: string;
   spanId?: string;
+  initiatedBy?: string;
+  principalType?: string;
+  executingAs?: string;
 }): Promise<string> {
+  const initiatedByUuid = await resolveUserUuid(input.initiatedBy);
+
   const task = await taskService.createTask({
     workflow_id: input.workflowId,
     workflow_type: input.workflowType,
     lt_type: input.ltType,
     task_queue: input.taskQueue,
-    modality: input.modality,
     signal_id: input.signalId,
     parent_workflow_id: input.parentWorkflowId,
     origin_id: input.originId,
@@ -34,6 +49,9 @@ export async function ltCreateTask(input: {
     metadata: input.metadata,
     trace_id: input.traceId,
     span_id: input.spanId,
+    initiated_by: initiatedByUuid,
+    principal_type: input.principalType,
+    executing_as: input.executingAs,
   });
 
   publishTaskEvent({

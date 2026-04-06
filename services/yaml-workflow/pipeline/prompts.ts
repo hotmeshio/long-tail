@@ -49,6 +49,13 @@ The compiled workflow MUST keep BOTH steps: A produces the array, B consumes it.
   - Any step whose result is not consumed by a subsequent core step
   - **NEVER mark a discovery step as exploratory if its output was used to build arguments for a later step**
 
+### Signal Steps (Human-in-the-Loop)
+Steps with kind "signal" represent a durable pause where the workflow waits for human input (e.g., credentials, approval). These are ALWAYS core — they are essential to the workflow's data flow. The signal step receives data from a human and makes it available to subsequent steps. Do NOT mark signal steps as exploratory. The escalation tool call (escalate_and_wait) that precedes a signal step is also always core.
+
+**Signal data flow**: The signal step result contains the human response fields (e.g., password). These MUST be wired via data_flow edges to every downstream step that needs them. Add a data_flow edge from the signal step index to the consuming step with the matching field name.
+
+**Credentials from signals**: When the signal provides a credential (format: password in the schema), downstream tools that need it should receive it as a separate named input argument. The runtime exchanges ephemeral credential tokens automatically. For tools with complex stored arguments (like run_script steps arrays), wire the credential as a top-level argument name — the runtime merges it with stored defaults.
+
 ### Iteration Specifications
 When the execution shows repeated tool calls with varying arguments (the pattern detector may have already collapsed these):
 - Identify the SOURCE: which prior step's result contains the array being iterated. This is the step that PRODUCED the list of items — look for a step whose result contains an array field with items matching the iteration's varying values. For example, if the iteration visits multiple URLs, find the step that returned those URLs (e.g., extract_content with links).
@@ -192,6 +199,34 @@ Return a JSON object (no markdown fences):
   "session_fields": ["page_id", "_handle"]
 }`;
 
+// ── Recompilation hint (compile stage retry) ──────────────────────────────────
+
+/**
+ * Build the retry hint injected into the compile stage when
+ * user feedback or a prior deployment error triggers recompilation.
+ */
+export function buildRecompilationHint(feedback: string, priorYaml?: string): string {
+  return [
+    `\n## RECOMPILATION — User Feedback`,
+    `The user reviewed the compiled output and provided this feedback:`,
+    `> ${feedback}`,
+    ``,
+    `You MUST produce a plan that addresses this feedback. Key rules:`,
+    `- Complex tool arguments (steps arrays, script strings, selector objects) are ALWAYS fixed — never dynamic inputs.`,
+    `- Only simple scalar values (URLs, credentials, file paths) should be dynamic trigger inputs.`,
+    `- If the feedback says certain fields should not be inputs, classify them as "fixed" with their default values from the execution trace.`,
+    `- If the feedback mentions input key mismatches, ensure dataFlow edges use the exact field names each tool expects.`,
+    `- Session fields (_handle, page_id) must be threaded through ALL subsequent steps via dataFlow edges.`,
+    ...(priorYaml ? [
+      ``,
+      `### Previous YAML (to improve upon)`,
+      '```yaml',
+      priorYaml.slice(0, 2000),
+      '```',
+    ] : []),
+  ].join('\n');
+}
+
 // ── Validate stage ────────────────────────────────────────────────────────────
 
 export const VALIDATION_PROMPT = `You are a YAML workflow validator. Given a workflow intent, activity manifest, and generated YAML DAG, identify data flow issues.
@@ -203,6 +238,10 @@ Check for:
 4. Unparameterized hardcoded values: URLs, credentials, or paths that should be dynamic inputs but are baked in
 5. Iteration array source: verify the referenced items field in a cycle hook actually exists in the source activity's output fields
 6. Trigger completeness: every dynamic input in the trigger schema should be referenced by at least one activity's input maps
+
+IGNORE these internal fields — they are injected by the build system and are always correct:
+- "workflowName" in input maps: internal dispatch routing field, always a literal string — NOT a hardcoded value bug
+- "_scope" in input maps: internal IAM context field, always wired from trigger — NOT a missing trigger input
 
 Return a JSON object:
 {

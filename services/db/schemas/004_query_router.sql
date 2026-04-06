@@ -11,9 +11,9 @@ WHERE workflow_type = 'mcpQuery';
 
 -- Add mcpQueryRouter (orchestrator — the new entry point)
 INSERT INTO lt_config_workflows
-  (workflow_type, task_queue, default_role, default_modality, invocable, description, tool_tags, envelope_schema)
+  (workflow_type, task_queue, default_role, invocable, description, tool_tags, envelope_schema)
 VALUES
-  ('mcpQueryRouter', 'long-tail-system', 'engineer', 'default', true,
+  ('mcpQueryRouter', 'long-tail-system', 'engineer', true,
    'Do anything with tools — browser automation, file operations, HTTP requests, database queries, document processing, and more',
    '{}',
    '{"data": {"prompt": "Describe what you want to accomplish using available tools..."}, "metadata": {"source": "dashboard"}}'::jsonb)
@@ -21,9 +21,9 @@ ON CONFLICT (workflow_type) DO NOTHING;
 
 -- Add mcpDeterministic (leaf — invokes compiled YAML workflows)
 INSERT INTO lt_config_workflows
-  (workflow_type, task_queue, default_role, default_modality, invocable, description, tool_tags)
+  (workflow_type, task_queue, default_role, invocable, description, tool_tags)
 VALUES
-  ('mcpDeterministic', 'long-tail-system', 'engineer', 'default', false,
+  ('mcpDeterministic', 'long-tail-system', 'engineer', false,
    'Deterministic execution — invokes matched compiled YAML workflows with extracted inputs',
    '{}')
 ON CONFLICT (workflow_type) DO NOTHING;

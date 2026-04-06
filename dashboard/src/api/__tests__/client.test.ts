@@ -160,6 +160,46 @@ describe('apiFetch', () => {
     });
   });
 
+  describe('403 handling', () => {
+    it('attempts silent refresh on 403 when token exists', async () => {
+      setToken(validToken());
+      sessionStorage.setItem(
+        'lt_credentials',
+        JSON.stringify({ username: 'alice', password: 'secret' }),
+      );
+
+      const newToken = validToken();
+      // First call returns 403 (stale user, admin route)
+      fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Forbidden' }, 403));
+      // Refresh call → success
+      fetchSpy.mockResolvedValueOnce(
+        jsonResponse({ token: newToken, user: { id: 'u1' } }),
+      );
+      // Retry with new token → success
+      fetchSpy.mockResolvedValueOnce(jsonResponse({ apps: ['durable'] }));
+
+      const result = await apiFetch('/controlplane/apps');
+
+      expect(result).toEqual({ apps: ['durable'] });
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it('dispatches auth:unauthorized on 403 when refresh fails', async () => {
+      setToken(validToken());
+      // No stored credentials — refresh returns null
+      // First call returns 403
+      fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Forbidden' }, 403));
+
+      const handler = vi.fn();
+      window.addEventListener('auth:unauthorized', handler);
+
+      await expect(apiFetch('/controlplane/apps')).rejects.toThrow('Session expired');
+      expect(handler).toHaveBeenCalledOnce();
+
+      window.removeEventListener('auth:unauthorized', handler);
+    });
+  });
+
   describe('setToken / getToken', () => {
     it('starts null', () => {
       expect(getToken()).toBeNull();

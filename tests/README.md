@@ -3,16 +3,16 @@
 ## Quick Reference
 
 ```bash
-# Frontend tests (fast — ~4s, 52 files, 526 tests)
+# Frontend tests (fast — ~4s, 52 files, 517 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~60s, 40 files, 533 tests)
+# Backend: fast unit/integration tests only (~60s, 47 files, 614 tests)
 npx vitest run --exclude 'tests/workflows/**'
 
 # Backend: workflow tests only (~3min, 8 files, 65 tests)
 npx vitest run tests/workflows
 
-# Backend: all tests (~5min, 48 files, 598 tests)
+# Backend: all tests (~5min, 55 files, 679 tests)
 npx vitest run
 
 # Integration tests (requires Docker — mcpQuery + mcpTriage lifecycle)
@@ -29,24 +29,24 @@ npm run test:integration
 
 | Suite | Files | Tests | Duration |
 |-------|-------|-------|----------|
-| Frontend | 51 | 510 | ~4s |
-| Backend fast | 40 | 560 | ~60s |
+| Frontend | 52 | 517 | ~4s |
+| Backend fast | 47 | 614 | ~60s |
 | Backend workflows | 8 | 65 | ~3min |
-| **Backend total** | **48** | **625** | **~5min** |
+| **Backend total** | **55** | **679** | **~5min** |
 | Integration (Docker) | 2 | 15 | ~5min |
 | Functional (Docker) | — | — | varies |
-| **Grand total** | **102+** | **1,150+** | — |
+| **Grand total** | **109+** | **1,211+** | — |
 
 ## Test Categories
 
 ### Frontend (`dashboard/src/**/*.test.{ts,tsx}`)
-- **52 files, 526 tests, ~4 seconds**
+- **52 files, 517 tests, ~4 seconds**
 - Pure unit tests: components, hooks, utils, API mocks
 - Environment: jsdom, no external dependencies
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/{modules,services,routes}/**/*.test.ts`)
-- **40 files, 560 tests, ~60 seconds**
+- **47 files, 614 tests, ~60 seconds**
 - **Recommended for iterative development** — run after every code change
 - Organized by layer: `tests/modules/` (auth, config, start), `tests/services/` (escalations, events, MCP, OAuth, YAML workflow, etc.), `tests/routes/` (13 files mirroring routes/)
 - Requires: PostgreSQL (`longtail_test` database)
@@ -112,6 +112,19 @@ npm run test:integration
 | `workflows/kitchen-sink.test.ts` | Durable 2s sleep built into workflow | 60s setup |
 
 These are **integration tests that depend on external APIs and durable workflow timing**. Occasional failures are expected (API timeouts, race conditions in scout role acquisition). Re-running a single failed file usually passes.
+
+## Docker Reset Procedure
+
+When Docker has build or startup issues:
+
+```bash
+# Full reset: stop, clean volumes, rebuild
+docker compose down -v
+docker compose up -d --build
+
+# Verify server starts (wait ~10s for seeding)
+docker compose logs --tail=20 long-tail
+```
 
 ## Recommended CI Strategy
 

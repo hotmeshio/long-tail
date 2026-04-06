@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Radio, Settings, Eraser, Code } from 'lucide-react';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
-import { useNatsSubscription } from '../../../hooks/useNats';
+import { useEventSubscription } from '../../../hooks/useEventContext';
 import {
   EVENT_TYPE_COLORS,
   QUORUM_CHANNELS,
@@ -137,7 +137,7 @@ export function QuorumFeed({ bridgeActive, onEventsActive }: QuorumFeedProps) {
   };
 
   // Subscribe to NATS and filter on intake (before buffer)
-  useNatsSubscription('lt.events.mesh.>', useCallback((raw: any) => {
+  useEventSubscription('lt.events.mesh.>', useCallback((raw: any) => {
     const type = raw.type?.replace('mesh.', '') || 'unknown';
 
     // Channel filter: drop events for unchecked channels at intake

@@ -24,58 +24,34 @@ INSERT INTO lt_config_role_escalations (source_role, target_role) VALUES
   ('admin',     'superadmin')
 ON CONFLICT DO NOTHING;
 
--- ─── System workflows ───────────────────────────────────────────────────────
-
-INSERT INTO lt_config_workflows
-  (workflow_type, task_queue, default_role, default_modality, invocable, description, tool_tags, envelope_schema)
-VALUES
-  ('mcpTriage', 'long-tail-system', 'engineer', 'default', false,
-   'MCP triage — remediates stalled workflows using MCP tools and engineer guidance',
-   '{}', NULL),
-  ('mcpQuery', 'long-tail-system', 'engineer', 'default', true,
-   'Do anything with tools — browser automation, file operations, HTTP requests, database queries, document processing, and more',
-   '{}',
-   '{"data": {"prompt": "Describe what you want to accomplish using available tools..."}, "metadata": {"source": "dashboard"}}'::jsonb),
-  ('insightQuery', 'long-tail-system', 'admin', 'default', false,
-   'AI-powered insight query — answers natural language questions about system state using DB tools',
-   '{}', NULL)
-ON CONFLICT (workflow_type) DO NOTHING;
-
 -- ─── Example workflows (all directly invocable) ────────────────────────────
 
 INSERT INTO lt_config_workflows
-  (workflow_type, task_queue, default_role, default_modality, invocable, description, tool_tags, envelope_schema, resolver_schema)
+  (workflow_type, task_queue, default_role, invocable, description, tool_tags, envelope_schema, resolver_schema)
 VALUES
   -- Review content
-  ('reviewContent', 'long-tail-examples', 'reviewer', 'default', true,
+  ('reviewContent', 'long-tail-examples', 'reviewer', true,
    'Content review — AI-powered moderation with human escalation for low-confidence results',
    ARRAY['document-processing', 'vision', 'ocr', 'translation'],
    '{"data": {"contentId": "article-001", "content": "Content to review...", "contentType": "article"}, "metadata": {"source": "dashboard"}}'::jsonb,
    '{"approved": true, "analysis": {"confidence": 0.95, "flags": [], "summary": "Manually reviewed and approved."}}'::jsonb),
 
   -- Verify document
-  ('verifyDocument', 'long-tail-examples', 'reviewer', 'default', false,
+  ('verifyDocument', 'long-tail-examples', 'reviewer', true,
    'Document verification — AI Vision analyzes identity documents',
    ARRAY['document-processing', 'vision', 'ocr', 'translation'],
    '{"data": {"documentId": "doc-001", "documentUrl": "https://example.com/doc.jpg", "documentType": "drivers_license", "memberId": "member-12345"}, "metadata": {"source": "dashboard"}}'::jsonb,
    '{"memberId": "", "extractedInfo": {}, "validationResult": "match", "confidence": 1.0}'::jsonb),
 
-  -- Verify document MCP
-  ('verifyDocumentMcp', 'long-tail-examples', 'reviewer', 'default', false,
-   'MCP-powered document verification — uses MCP tools for document analysis',
-   ARRAY['document-processing', 'vision', 'ocr', 'translation'],
-   '{"data": {"documentId": "doc-001", "documentUrl": "https://example.com/doc.jpg", "documentType": "drivers_license", "memberId": "member-12345"}, "metadata": {"source": "dashboard"}}'::jsonb,
-   '{"memberId": "", "extractedInfo": {}, "validationResult": "match", "confidence": 1.0}'::jsonb),
-
   -- Process claim
-  ('processClaim', 'long-tail-examples', 'reviewer', 'default', true,
+  ('processClaim', 'long-tail-examples', 'reviewer', true,
    'Insurance claim processing — document analysis, validation, and human review',
    ARRAY['document-processing', 'vision', 'database', 'query'],
    '{"data": {"claimId": "CLM-2024-001", "claimantId": "POL-5551234", "claimType": "auto_collision", "amount": 12500, "documents": ["incident_report.pdf", "photo_evidence.jpg"]}, "metadata": {"source": "dashboard"}}'::jsonb,
    '{"approved": true, "analysis": {"confidence": 0.92, "flags": [], "summary": "Documents reviewed and verified."}, "status": "resolved"}'::jsonb),
 
   -- Kitchen sink
-  ('kitchenSink', 'long-tail-examples', 'reviewer', 'default', true,
+  ('kitchenSink', 'long-tail-examples', 'reviewer', true,
    'Kitchen sink — demonstrates sleep, signals, parallel activities, escalation, and every durable primitive',
    '{}',
    '{"data": {"name": "World", "mode": "full"}, "metadata": {"source": "dashboard"}}'::jsonb,
@@ -89,7 +65,3 @@ SELECT workflow_type, unnest(ARRAY['reviewer', 'engineer', 'admin'])
 FROM lt_config_workflows
 ON CONFLICT (workflow_type, role) DO NOTHING;
 
--- insightQuery gets a different role set
-INSERT INTO lt_config_roles (workflow_type, role)
-SELECT 'insightQuery', unnest(ARRAY['superadmin'])
-ON CONFLICT (workflow_type, role) DO NOTHING;

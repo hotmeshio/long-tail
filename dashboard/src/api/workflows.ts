@@ -1,6 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { CronScheduleEntry, LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
+import type { ActiveWorker, CronScheduleEntry, DiscoveredWorkflow, LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
+
+export function useActiveWorkers() {
+  return useQuery<ActiveWorker[]>({
+    queryKey: ['activeWorkers'],
+    queryFn: async () => {
+      const res = await apiFetch<{ workers: ActiveWorker[] }>('/workflows/workers');
+      return res.workers;
+    },
+  });
+}
+
+export function useDiscoveredWorkflows() {
+  return useQuery<DiscoveredWorkflow[]>({
+    queryKey: ['discoveredWorkflows'],
+    queryFn: async () => {
+      const res = await apiFetch<{ workflows: DiscoveredWorkflow[] }>('/workflows/discovered');
+      return res.workflows;
+    },
+  });
+}
 
 export function useWorkflowConfigs() {
   return useQuery<LTWorkflowConfig[]>({
@@ -47,6 +67,7 @@ export function useJobs(filters: {
   status?: string;
   sort_by?: string;
   order?: string;
+  registered?: string;
 }) {
   const params = new URLSearchParams();
   if (filters.limit) params.set('limit', String(filters.limit));
@@ -56,6 +77,7 @@ export function useJobs(filters: {
   if (filters.status) params.set('status', filters.status);
   if (filters.sort_by) params.set('sort_by', filters.sort_by);
   if (filters.order) params.set('order', filters.order);
+  if (filters.registered) params.set('registered', filters.registered);
 
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['jobs', filters],
@@ -87,13 +109,13 @@ export function useUpsertWorkflowConfig() {
       invocable?: boolean;
       task_queue?: string | null;
       default_role?: string;
-      default_modality?: string;
       roles?: string[];
       invocation_roles?: string[];
       consumes?: string[];
       envelope_schema?: Record<string, unknown> | null;
       resolver_schema?: Record<string, unknown> | null;
       cron_schedule?: string | null;
+      execute_as?: string | null;
     }
   >({
     mutationFn: ({ workflow_type, ...body }) =>
@@ -148,12 +170,12 @@ export function useInvokeWorkflow() {
   return useMutation<
     { workflowId: string; message: string },
     Error,
-    { workflowType: string; data: Record<string, unknown>; metadata?: Record<string, unknown> }
+    { workflowType: string; data: Record<string, unknown>; metadata?: Record<string, unknown>; execute_as?: string }
   >({
-    mutationFn: ({ workflowType, data, metadata }) =>
+    mutationFn: ({ workflowType, data, metadata, execute_as }) =>
       apiFetch(`/workflows/${workflowType}/invoke`, {
         method: 'POST',
-        body: JSON.stringify({ data, metadata }),
+        body: JSON.stringify({ data, metadata, ...(execute_as ? { execute_as } : {}) }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'], refetchType: 'all' });

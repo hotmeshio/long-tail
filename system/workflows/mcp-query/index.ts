@@ -3,6 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { TOOL_ROUNDS_MCP_QUERY } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
+import * as interceptorActivities from '../../../services/interceptor/activities';
 import { MCP_QUERY_SYSTEM_PROMPT, ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT } from './prompts';
 
 type ActivitiesType = typeof activities;
@@ -18,6 +19,14 @@ const {
     backoffCoefficient: 2,
     maximumInterval: '10 seconds',
   },
+});
+
+const {
+  ltEnrichEscalationRouting,
+} = Durable.workflow.proxyActivities<typeof interceptorActivities>({
+  activities: interceptorActivities,
+  taskQueue: 'lt-interceptor',
+  retryPolicy: { maximumAttempts: 3 },
 });
 
 const MAX_TOOL_ROUNDS = TOOL_ROUNDS_MCP_QUERY;
@@ -88,7 +97,19 @@ export async function mcpQuery(
   let toolCallCount = 0;
 
   // Agentic loop: LLM decides → execute tools → feed back → repeat
+  const BUDGET_WARNING_THRESHOLD = 3;
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const remaining = MAX_TOOL_ROUNDS - round;
+
+    // Inject budget warning when approaching the limit
+    if (remaining <= BUDGET_WARNING_THRESHOLD && remaining < MAX_TOOL_ROUNDS) {
+      messages.push({
+        role: 'user',
+        content: `[Rounds: ${remaining} remaining] Wrap up: consolidate results and return your final JSON response. Do not start new multi-step work.`,
+      });
+    }
+
     const response = await callQueryLLM(messages, toolIds);
 
     if (!response.tool_calls?.length) {
@@ -116,6 +137,29 @@ export async function mcpQuery(
       }
 
       const result = await callMcpTool(toolCall.function.name, args);
+
+      // Durable waitFor: if the tool returns a signal, pause until human responds
+      if (result?.type === 'waitFor' && result?.signalId) {
+        const ctx = Durable.workflow.getContext();
+        const workflowType = ctx.workflowTopic.replace(`${ctx.taskQueue}-`, '');
+        await ltEnrichEscalationRouting({
+          escalationId: result.escalationId,
+          signalRouting: {
+            taskQueue: ctx.taskQueue,
+            workflowType,
+            workflowId: ctx.workflowId,
+            signalId: result.signalId,
+          },
+          claimForUserId: envelope.lt?.userId,
+        });
+        const signalData = await Durable.workflow.waitFor<Record<string, any>>(result.signalId);
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(signalData),
+        });
+        continue;
+      }
 
       messages.push({
         role: 'tool',

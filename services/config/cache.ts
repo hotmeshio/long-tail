@@ -10,7 +10,6 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       invocable: c.invocable,
       taskQueue: c.task_queue,
       role: c.default_role,
-      modality: c.default_modality,
       roles: c.roles,
       invocationRoles: c.invocation_roles,
       consumes: c.consumes,
@@ -18,6 +17,7 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       envelopeSchema: c.envelope_schema ?? null,
       resolverSchema: c.resolver_schema ?? null,
       cronSchedule: c.cron_schedule ?? null,
+      executeAs: c.execute_as ?? null,
     });
   }
 

@@ -3,11 +3,25 @@ import { RowAction, RowActionGroup } from '../../../components/common/layout/Row
 import {
   useConnectMcpServer,
   useDisconnectMcpServer,
+  useCredentialStatus,
 } from '../../../api/mcp';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 
 import type { McpServerRecord, McpToolManifest } from '../../../api/types';
 import { isBuiltIn } from './helpers';
+
+function CredentialDot({ serverId, credentialProviders }: { serverId: string; credentialProviders: string[] }) {
+  const { data } = useCredentialStatus(serverId);
+  if (credentialProviders.length === 0) return null;
+  if (!data) return null;
+  const ok = data.missing.length === 0;
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full shrink-0 ${ok ? 'bg-status-success' : 'bg-status-warning'}`}
+      title={ok ? 'All credentials registered' : `Missing: ${data.missing.join(', ')}`}
+    />
+  );
+}
 
 export function ServerRow({
   server,
@@ -42,19 +56,36 @@ export function ServerRow({
           allTools.length > 0 ? 'cursor-pointer row-hover' : ''
         }`}
       >
-        {/* Name + badge + timestamp */}
+        {/* Name + tags */}
         <td className="px-6 py-3.5">
           <div className="flex items-center gap-2">
             <span className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''} ${allTools.length === 0 ? 'opacity-0' : 'text-text-tertiary'}`}>
               <ChevronRight size={14} />
             </span>
-            <p className="text-sm text-text-primary font-medium">{server.name}</p>
+            <div className="min-w-0">
+              <p className="text-sm text-text-primary font-medium">{server.name}</p>
+              {(server.tags ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {server.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-block px-1.5 py-0 text-[9px] font-medium text-text-tertiary bg-surface-sunken rounded"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </td>
 
         {/* Status */}
         <td className="px-6 py-3.5 w-28">
-          <StatusBadge status={server.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={server.status} />
+            <CredentialDot serverId={server.id} credentialProviders={server.credential_providers ?? []} />
+          </div>
         </td>
 
         {/* Actions */}

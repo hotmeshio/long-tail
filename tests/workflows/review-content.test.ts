@@ -37,7 +37,6 @@ describe('reviewContent workflow', () => {
       invocable: false,
       task_queue: TASK_QUEUE,
       default_role: 'reviewer',
-      default_modality: 'default',
       description: null,
       roles: ['reviewer'],
       invocation_roles: [],

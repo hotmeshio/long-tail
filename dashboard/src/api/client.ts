@@ -77,8 +77,8 @@ export async function apiFetch<T>(
     headers,
   });
 
-  // On 401, try a silent token refresh and retry once
-  if (res.status === 401 && authToken) {
+  // On 401/403, try a silent token refresh and retry once
+  if ((res.status === 401 || res.status === 403) && authToken) {
     if (!refreshPromise) {
       refreshPromise = tryRefresh().finally(() => { refreshPromise = null; });
     }
@@ -92,8 +92,8 @@ export async function apiFetch<T>(
       res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
     }
 
-    if (res.status === 401) {
-      // Refresh failed or retry still 401 — force logout
+    if (res.status === 401 || res.status === 403) {
+      // Refresh failed or retry still unauthorized — force logout
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       throw new Error('Session expired');
     }
@@ -104,7 +104,7 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || res.statusText);
+    throw new Error(body.message || body.error || res.statusText);
   }
 
   return res.json();

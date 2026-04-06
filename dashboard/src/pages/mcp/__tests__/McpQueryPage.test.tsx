@@ -52,26 +52,26 @@ beforeEach(() => {
 describe('McpQueryPage', () => {
   it('renders page header', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Discover & Compile')).toBeInTheDocument();
+    expect(screen.getByText('Pipeline Designer')).toBeInTheDocument();
   });
 
   it('renders submit form with textarea and button', () => {
     render(<McpQueryPage />, { wrapper });
     expect(screen.getByPlaceholderText(/describe what you want/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /run/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /design pipeline/i })).toBeInTheDocument();
   });
 
-  it('disables Run button when textarea is empty', () => {
+  it('disables button when textarea is empty', () => {
     render(<McpQueryPage />, { wrapper });
-    const btn = screen.getByRole('button', { name: /run/i });
+    const btn = screen.getByRole('button', { name: /design pipeline/i });
     expect(btn).toBeDisabled();
   });
 
-  it('enables Run button when textarea has content', () => {
+  it('enables button when textarea has content', () => {
     render(<McpQueryPage />, { wrapper });
     const textarea = screen.getByPlaceholderText(/describe what you want/i);
     fireEvent.change(textarea, { target: { value: 'test prompt' } });
-    const btn = screen.getByRole('button', { name: /run/i });
+    const btn = screen.getByRole('button', { name: /design pipeline/i });
     expect(btn).not.toBeDisabled();
   });
 
@@ -82,10 +82,10 @@ describe('McpQueryPage', () => {
     expect(screen.getByText('triage-abc')).toBeInTheDocument();
   });
 
-  it('shows entity type badges', () => {
+  it('shows workflow type pills', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getAllByText('Query').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Triage')).toBeInTheDocument();
+    expect(screen.getAllByText('mcpQuery').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('mcpTriage')).toBeInTheDocument();
   });
 
   it('shows Direct checkbox (default checked)', () => {
@@ -98,7 +98,7 @@ describe('McpQueryPage', () => {
   it('shows empty state when no jobs', () => {
     vi.mocked(useMcpQueryJobs).mockReturnValue({ data: { jobs: [], total: 0 }, isLoading: false } as any);
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('No queries yet')).toBeInTheDocument();
+    expect(screen.getByText('No pipeline runs yet')).toBeInTheDocument();
   });
 
   it('renders status filter', () => {

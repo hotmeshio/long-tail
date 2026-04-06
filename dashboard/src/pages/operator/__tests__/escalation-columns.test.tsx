@@ -9,7 +9,6 @@ function makeEscalation(overrides: Partial<LTEscalationRecord> = {}): LTEscalati
     id: 'esc-1',
     type: 'review-content',
     subtype: 'review-content',
-    modality: 'dashboard',
     description: 'Test escalation',
     priority: 2,
     status: 'pending',
@@ -44,11 +43,12 @@ function renderColumn(colKey: string, row: LTEscalationRecord) {
 }
 
 describe('ESCALATION_COLUMNS', () => {
-  // ── Type column ──
-  it('renders type and subtype', () => {
-    renderColumn('type', makeEscalation({ type: 'verify-document', subtype: 'id-check' }));
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
-    expect(screen.getByText('id-check')).toBeInTheDocument();
+  // ── Summary column (status dot + description + type) ──
+  it('renders description with type pill', () => {
+    renderColumn('description', makeEscalation({ type: 'review-content', subtype: 'quality-check', description: 'Content needs review' }));
+    expect(screen.getByText('Content needs review')).toBeInTheDocument();
+    expect(screen.getByText('review-content')).toBeInTheDocument();
+    expect(screen.getByText('quality-check')).toBeInTheDocument();
   });
 
   // ── Task column ──
@@ -59,7 +59,7 @@ describe('ESCALATION_COLUMNS', () => {
 
   it('renders truncated task_id as link', () => {
     renderColumn('task_id', makeEscalation({ task_id: 'abcdef12-3456-7890-abcd-ef1234567890' }));
-    const link = screen.getByText('abcdef12…');
+    const link = screen.getByText('abcdef12-345…');
     expect(link).toBeInTheDocument();
     expect(link.closest('a')).toHaveAttribute('href', '/workflows/tasks/detail/abcdef12-3456-7890-abcd-ef1234567890');
   });
@@ -74,17 +74,6 @@ describe('ESCALATION_COLUMNS', () => {
   it('renders priority badge', () => {
     renderColumn('priority', makeEscalation({ priority: 1 }));
     expect(screen.getByText('P1')).toBeInTheDocument();
-  });
-
-  // ── Workflow column ──
-  it('renders workflow type', () => {
-    renderColumn('workflow_type', makeEscalation({ workflow_type: 'review-content' }));
-    expect(screen.getByText('review-content')).toBeInTheDocument();
-  });
-
-  it('renders dash when no workflow_type', () => {
-    renderColumn('workflow_type', makeEscalation({ workflow_type: null as any }));
-    expect(screen.getByText('—')).toBeInTheDocument();
   });
 
   // ── Created column ──
@@ -116,7 +105,7 @@ describe('EscalationFilterBar', () => {
         filters={{ role: '', type: '', priority: '' }}
         setFilter={vi.fn()}
         roles={['reviewer', 'engineer']}
-        types={['review-content', 'verify-document']}
+        types={['review-content', 'kitchen-sink']}
       />,
     );
     expect(screen.getByText('Role')).toBeInTheDocument();

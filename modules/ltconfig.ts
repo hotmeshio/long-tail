@@ -56,11 +56,6 @@ class LTConfigCache {
     return config?.roles ?? [];
   }
 
-  async getDefaultModality(name: string): Promise<string> {
-    const config = await this.get(name);
-    return config?.modality ?? 'default';
-  }
-
   async getToolTags(name: string): Promise<string[]> {
     const config = await this.get(name);
     return config?.toolTags ?? [];

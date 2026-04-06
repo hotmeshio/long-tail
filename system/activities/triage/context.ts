@@ -42,7 +42,6 @@ export async function notifyEngineering(
   await escalationService.createEscalation({
     type: 'triage_recommendation',
     subtype: 'pipeline_fix',
-    modality: 'async',
     description,
     priority: 3,
     origin_id: originId,

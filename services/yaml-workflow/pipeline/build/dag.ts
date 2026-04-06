@@ -61,6 +61,7 @@ export function initializeDag(
   return {
     activities,
     transitions,
+    hooks: {},
     manifest,
     stepIndexToActivityId: new Map(),
     prevActivityId: triggerId,
@@ -118,8 +119,8 @@ export function appendNormalStep(
   dag.stepIndexToActivityId.set(idx, actId);
   dag.lastPivotId = null;
 
-  const topicSuffix = step.kind === 'llm' ? 'interpret' : step.toolName;
-  const topic = `${graphTopic}.${topicSuffix}`;
+  const workflowName = step.kind === 'llm' ? 'interpret' : step.toolName;
+  const topic = graphTopic;
   const title = step.kind === 'llm'
     ? 'LLM Interpret'
     : step.toolName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -146,6 +147,11 @@ export function appendNormalStep(
   const outputFields = extractOutputFields(step);
   const jobMaps = buildJobMaps(idx, steps.length, outputFields);
 
+  // Thread _scope from trigger through every activity for IAM context
+  inputMappings._scope = `{${dag.triggerId}.output.data._scope}`;
+  // Set workflowName for singleton consumer dispatch routing
+  inputMappings.workflowName = workflowName;
+
   dag.activities[actId] = {
     title,
     type: 'worker',
@@ -159,11 +165,111 @@ export function appendNormalStep(
   };
 
   // Build manifest entry
-  dag.manifest.push(buildManifestEntry(actId, title, step, topic, inputMappings, outputFields));
+  dag.manifest.push(buildManifestEntry(actId, title, step, topic, workflowName, inputMappings, outputFields));
 
   // Transition from previous step
   dag.transitions[dag.prevActivityId] = [{ to: actId }];
   dag.prevActivityId = actId;
+  dag.prevResult = step.result;
+}
+
+/**
+ * Append a signal step pair (escalation worker + hook) to the DAG.
+ *
+ * The escalation worker creates the escalation via the human-queue MCP tool.
+ * The hook pauses until the escalation is resolved and a signal arrives.
+ * A hooks section entry routes the external signal to the waiting hook.
+ */
+export function appendSignalStep(
+  dag: DagBuilder,
+  idx: number,
+  step: ExtractedStep,
+  prefix: string,
+  graphTopic: string,
+  plan: EnhancedCompilationPlan | null,
+  steps: ExtractedStep[],
+  triggerInputKeys: Set<string>,
+  collapsedToCoreIndex: Map<number, number>,
+): void {
+  // The step before this signal step is the escalation tool call.
+  // The signal step itself represents the pause/resume point.
+  const hookId = `${prefix}_wait${idx + 1}`;
+  dag.stepIndexToActivityId.set(idx, hookId);
+  dag.lastPivotId = null;
+
+  const signalSchema = step.signalSchema || { type: 'object', properties: {} };
+  const outputFields = signalSchema.properties
+    ? Object.keys(signalSchema.properties as Record<string, unknown>)
+    : [];
+
+  // Build job maps: map each signal field from hook data to job state
+  const jobMaps: Record<string, string> = {};
+  for (const field of outputFields) {
+    jobMaps[field] = `{$self.hook.data.${field}}`;
+  }
+
+  // Hook topic: scoped per graph, per activity for multiple hooks
+  const hookTopic = `escalation.resolved.${graphTopic}.${hookId}`;
+
+  // The hook activity — pauses until signal arrives
+  dag.activities[hookId] = {
+    title: 'Wait for Human Input',
+    type: 'hook',
+    hook: signalSchema,
+    output: {
+      schema: signalSchema,
+    },
+    ...(Object.keys(jobMaps).length > 0 ? { job: { maps: jobMaps } } : {}),
+  };
+
+  // Find the escalation worker that precedes this signal step.
+  // It's the previous activity in the DAG — its output.data.escalationId
+  // is used as the match condition for routing signals.
+  const escalationActId = dag.prevActivityId;
+
+  // Patch the preceding escalation worker to persist escalationId to the job hash.
+  // Without job.maps, the hook's match condition can't resolve {a1.output.data.escalationId}.
+  const prevActivity = dag.activities[escalationActId] as Record<string, any>;
+  if (prevActivity && prevActivity.type === 'worker') {
+    prevActivity.job = {
+      ...(prevActivity.job || {}),
+      maps: {
+        ...(prevActivity.job?.maps || {}),
+        escalationId: '{$self.output.data.escalationId}',
+        signalId: '{$self.output.data.signalId}',
+      },
+    };
+  }
+
+  // Hook rules: route signals to this hook with job ID match.
+  // Use {$job.metadata.jid} (always available) as the match key.
+  // The signal must include the job_id in its payload for routing.
+  dag.hooks[hookTopic] = [{
+    to: hookId,
+    conditions: {
+      match: [{
+        expected: '{$job.metadata.jid}',
+        actual: '{$self.hook.data.job_id}',
+      }],
+    },
+  }];
+
+  // Manifest entry
+  dag.manifest.push({
+    activity_id: hookId,
+    title: 'Wait for Human Input',
+    type: 'hook',
+    tool_source: 'signal',
+    topic: graphTopic,
+    hook_topic: hookTopic,
+    signal_schema: signalSchema,
+    input_mappings: {},
+    output_fields: outputFields,
+  });
+
+  // Transition from previous step (the escalation worker) to the hook
+  dag.transitions[dag.prevActivityId] = [{ to: hookId }];
+  dag.prevActivityId = hookId;
   dag.prevResult = step.result;
 }
 
@@ -177,18 +283,25 @@ export function serializeToYaml(
   outputSchema: Record<string, unknown>,
   dag: DagBuilder,
 ): string {
+  const graph: Record<string, unknown> = {
+    subscribes: graphTopic,
+    expire: WORKFLOW_EXPIRE_SECS,
+    input: { schema: inputSchema },
+    output: { schema: outputSchema },
+    activities: dag.activities,
+    transitions: dag.transitions,
+  };
+
+  // Include hooks section when signal steps are present
+  if (Object.keys(dag.hooks).length > 0) {
+    graph.hooks = dag.hooks;
+  }
+
   const graphDef = {
     app: {
       id: appId,
       version: '1',
-      graphs: [{
-        subscribes: graphTopic,
-        expire: WORKFLOW_EXPIRE_SECS,
-        input: { schema: inputSchema },
-        output: { schema: outputSchema },
-        activities: dag.activities,
-        transitions: dag.transitions,
-      }],
+      graphs: [graph],
     },
   };
 
@@ -225,6 +338,7 @@ function buildManifestEntry(
   title: string,
   step: ExtractedStep,
   topic: string,
+  workflowName: string,
   inputMappings: Record<string, string>,
   outputFields: string[],
 ): ActivityManifestEntry {
@@ -238,6 +352,7 @@ function buildManifestEntry(
     type: 'worker',
     tool_source: step.source,
     topic,
+    workflow_name: workflowName,
     ...(step.kind === 'tool' ? {
       mcp_server_id: step.source === 'mcp' ? step.mcpServerId : 'db',
       mcp_tool_name: step.toolName,

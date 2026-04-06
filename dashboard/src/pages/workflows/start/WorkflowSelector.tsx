@@ -1,3 +1,4 @@
+import { Bot, ShieldCheck, Workflow } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import type { LTWorkflowConfig } from '../../../api/types';
 
@@ -5,10 +6,12 @@ export function WorkflowSelector({
   configs,
   selectedType,
   onSelect,
+  certifiedTypes,
 }: {
   configs: LTWorkflowConfig[];
   selectedType: string;
   onSelect: (config: LTWorkflowConfig) => void;
+  certifiedTypes: Set<string>;
 }) {
   return (
     <div>
@@ -16,7 +19,7 @@ export function WorkflowSelector({
       <div>
         {configs.map((config) => {
           const isSelected = selectedType === config.workflow_type;
-          const hasTemplate = !!config.envelope_schema;
+          const isCertified = certifiedTypes.has(config.workflow_type);
           return (
             <button
               key={config.workflow_type}
@@ -28,12 +31,16 @@ export function WorkflowSelector({
               }`}
             >
               <div className="flex items-center gap-2">
+                {isCertified
+                  ? <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-status-success" />
+                  : <Workflow className="w-3.5 h-3.5 shrink-0 text-accent/75" />}
                 <p className={`text-sm font-mono ${isSelected ? 'font-medium text-accent' : 'text-text-secondary'}`}>
                   {config.workflow_type}
                 </p>
-                {hasTemplate && (
-                  <span className="px-1.5 py-0.5 text-[9px] bg-accent/10 text-accent rounded">
-                    template
+                {config.execute_as && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] bg-accent/10 text-accent rounded">
+                    <Bot className="w-2.5 h-2.5" />
+                    {config.execute_as}
                   </span>
                 )}
               </div>

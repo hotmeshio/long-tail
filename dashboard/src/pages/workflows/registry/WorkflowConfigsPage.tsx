@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  useWorkflowConfigs,
+  useDiscoveredWorkflows,
   useDeleteWorkflowConfig,
 } from '../../../api/workflows';
-import { Trash2 } from 'lucide-react';
+import { ShieldCheck, ShieldPlus, ShieldOff } from 'lucide-react';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import { useFilterParams } from '../../../hooks/useFilterParams';
-import type { LTWorkflowConfig } from '../../../api/types';
+import type { DiscoveredWorkflow } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { TaskQueuePill } from '../../../components/common/display/TaskQueuePill';
@@ -18,34 +18,22 @@ import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function matchesSearch(config: LTWorkflowConfig, search: string): boolean {
+function matchesSearch(wf: DiscoveredWorkflow, search: string): boolean {
   const q = search.toLowerCase();
   return (
-    config.workflow_type.toLowerCase().includes(q) ||
-    (config.description ?? '').toLowerCase().includes(q)
+    wf.workflow_type.toLowerCase().includes(q) ||
+    (wf.description ?? '').toLowerCase().includes(q)
   );
 }
-
-function matchesKind(config: LTWorkflowConfig, kind: string): boolean {
-  if (!kind) return true;
-  if (kind === 'invocable') return config.invocable;
-  if (kind === 'cron') return !!config.cron_schedule;
-  return true;
-}
-
-const KIND_OPTIONS = [
-  { value: 'invocable', label: 'Invocable' },
-  { value: 'cron', label: 'Cron' },
-];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function WorkflowConfigsPage() {
   const navigate = useNavigate();
-  const { data, isLoading } = useWorkflowConfigs();
+  const { data, isLoading } = useDiscoveredWorkflows();
   const deleteConfig = useDeleteWorkflowConfig();
   const { filters, setFilter } = useFilterParams({
-    filters: { search: '', queue: '', kind: '', role: '' },
+    filters: { search: '', queue: '', role: '', tier: '' },
   });
 
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -58,71 +46,68 @@ export function WorkflowConfigsPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 
-  const allConfigs = data ?? [];
+  const allWorkflows = data ?? [];
 
   // Derive facet options from data
   const queues = useMemo(
-    () => [...new Set(allConfigs.map((c) => c.task_queue))].sort(),
-    [allConfigs],
+    () => [...new Set(allWorkflows.map((w) => w.task_queue).filter(Boolean) as string[])].sort(),
+    [allWorkflows],
   );
   const roles = useMemo(
-    () => [...new Set(allConfigs.flatMap((c) => c.roles ?? []))].sort(),
-    [allConfigs],
+    () => [...new Set(allWorkflows.flatMap((w) => w.roles ?? []))].sort(),
+    [allWorkflows],
   );
 
   // Apply client-side filters
-  const configs = useMemo(() => {
-    let result = allConfigs;
-    if (filters.search) result = result.filter((c) => matchesSearch(c, filters.search));
-    if (filters.queue) result = result.filter((c) => c.task_queue === filters.queue);
-    if (filters.kind) result = result.filter((c) => matchesKind(c, filters.kind));
-    if (filters.role) result = result.filter((c) => (c.roles ?? []).includes(filters.role));
+  const workflows = useMemo(() => {
+    let result = allWorkflows;
+    if (filters.search) result = result.filter((w) => matchesSearch(w, filters.search));
+    if (filters.queue) result = result.filter((w) => w.task_queue === filters.queue);
+    if (filters.role) result = result.filter((w) => (w.roles ?? []).includes(filters.role));
+    if (filters.tier === 'certified') result = result.filter((w) => w.registered);
+    if (filters.tier === 'durable') result = result.filter((w) => !w.registered);
     return result;
-  }, [allConfigs, filters]);
+  }, [allWorkflows, filters]);
 
-  const columns: Column<LTWorkflowConfig>[] = [
+  const columns: Column<DiscoveredWorkflow>[] = [
     {
       key: 'workflow_type',
-      label: 'Workflow Type',
+      label: 'Workflow',
       render: (row) => (
-        <div>
+        <div className="min-w-0">
           <WorkflowPill type={row.workflow_type} />
           {row.description && (
-            <p className="text-[10px] text-text-tertiary mt-0.5">{row.description}</p>
+            <p className="text-[10px] text-text-tertiary mt-0.5 truncate">{row.description}</p>
           )}
         </div>
       ),
-      className: 'w-64',
     },
     {
       key: 'task_queue',
-      label: 'Task Queue',
+      label: 'Queue',
       render: (row) => row.task_queue ? <TaskQueuePill queue={row.task_queue} /> : <span className="text-xs text-text-tertiary">—</span>,
+      className: 'whitespace-nowrap',
     },
     {
-      key: 'invocable',
-      label: 'Invocable',
-      render: (row) => (
-        <span className={`text-xs ${row.invocable ? 'text-text-primary' : 'text-text-tertiary'}`}>
-          {row.invocable ? 'Yes' : '—'}
-        </span>
-      ),
-      className: 'w-20',
-    },
-    {
-      key: 'default_role',
-      label: 'Default Role',
-      render: (row) => <RolePill role={row.default_role} />,
+      key: 'registered',
+      label: 'Tier',
+      render: (row) => row.registered
+        ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>
+        : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Durable</span>,
+      className: 'whitespace-nowrap',
     },
     {
       key: 'roles',
       label: 'Roles',
-      render: (row) => (
+      render: (row) => row.registered ? (
         <div className="flex gap-1 flex-wrap">
           {(row.roles ?? []).map((r) => (
             <RolePill key={r} role={r} />
           ))}
+          {(!row.roles || row.roles.length === 0) && <span className="text-xs text-text-tertiary">—</span>}
         </div>
+      ) : (
+        <span className="text-xs text-text-tertiary">—</span>
       ),
     },
     {
@@ -130,12 +115,21 @@ export function WorkflowConfigsPage() {
       label: '',
       render: (row) => (
         <RowActionGroup>
-          <RowAction
-            icon={Trash2}
-            title="Delete config"
-            onClick={() => setConfirmDelete(row.workflow_type)}
-            colorClass="text-text-tertiary hover:text-status-error"
-          />
+          {row.registered ? (
+            <RowAction
+              icon={ShieldOff}
+              title="De-certify workflow"
+              onClick={() => setConfirmDelete(row.workflow_type)}
+              colorClass="text-text-tertiary hover:text-status-warning"
+            />
+          ) : (
+            <RowAction
+              icon={ShieldPlus}
+              title="Certify workflow"
+              onClick={() => navigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(row.workflow_type)}&task_queue=${encodeURIComponent(row.task_queue ?? '')}`)}
+              colorClass="text-text-tertiary hover:text-status-success"
+            />
+          )}
         </RowActionGroup>
       ),
       className: 'w-16 text-right',
@@ -149,16 +143,24 @@ export function WorkflowConfigsPage() {
     });
   };
 
+  const handleRowClick = (row: DiscoveredWorkflow) => {
+    if (row.registered) {
+      navigate(`/workflows/registry/${encodeURIComponent(row.workflow_type)}`);
+    } else {
+      navigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(row.workflow_type)}&task_queue=${encodeURIComponent(row.task_queue ?? '')}`);
+    }
+  };
+
   return (
     <div>
       <PageHeader
-        title="Registered Workflows"
+        title="Workflow Registry"
         actions={
           <button
             onClick={() => navigate('/workflows/registry/new')}
             className="btn-primary text-xs"
           >
-            Add Config
+            Register Workflow
           </button>
         }
       />
@@ -178,10 +180,13 @@ export function WorkflowConfigsPage() {
           options={queues.map((q) => ({ value: q, label: q }))}
         />
         <FilterSelect
-          label="Kind"
-          value={filters.kind}
-          onChange={(v) => setFilter('kind', v)}
-          options={KIND_OPTIONS}
+          label="Tier"
+          value={filters.tier}
+          onChange={(v) => setFilter('tier', v)}
+          options={[
+            { value: 'certified', label: 'Certified' },
+            { value: 'durable', label: 'Durable' },
+          ]}
         />
         <FilterSelect
           label="Role"
@@ -193,11 +198,11 @@ export function WorkflowConfigsPage() {
 
       <DataTable
         columns={columns}
-        data={configs}
+        data={workflows}
         keyFn={(row) => row.workflow_type}
-        onRowClick={(row) => navigate(`/workflows/registry/${encodeURIComponent(row.workflow_type)}`)}
+        onRowClick={handleRowClick}
         isLoading={isLoading}
-        emptyMessage="No workflow configurations found"
+        emptyMessage="No workflows found"
       />
 
       {/* Delete confirmation modal */}
@@ -205,8 +210,8 @@ export function WorkflowConfigsPage() {
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
-        title="Delete Workflow Config"
-        description={<>Delete <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This will cascade-delete associated roles and invocation roles.</>}
+        title="De-certify Workflow"
+        description={<>Remove certification from <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This removes interceptor guarantees, escalation chains, and invocation role constraints. The workflow will continue running as a standard durable workflow.</>}
         isPending={deleteConfig.isPending}
         error={deleteConfig.error as Error | null}
       />

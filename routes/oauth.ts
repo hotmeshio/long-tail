@@ -10,6 +10,7 @@ import {
   upsertOAuthToken,
   getUserByOAuthProvider,
   deleteOAuthConnection,
+  listOAuthConnections,
 } from '../services/oauth';
 import { getUserByEmail, createUser } from '../services/user';
 
@@ -39,6 +40,25 @@ export function setOAuthConfig(cfg: {
  */
 router.get('/providers', (_req, res) => {
   res.json(listProviders());
+});
+
+/**
+ * GET /api/auth/oauth/connections
+ * List all OAuth connections for the authenticated user.
+ * Must be registered BEFORE /:provider to avoid catch-all match.
+ */
+router.get('/connections', requireAuth, async (req, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  try {
+    const connections = await listOAuthConnections(userId);
+    res.json({ connections });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**

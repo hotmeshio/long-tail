@@ -37,7 +37,6 @@ describe('workflow configuration', () => {
 
     // Clear seeded configs from migration so tests start clean
     await configService.deleteWorkflowConfig('reviewContent');
-    await configService.deleteWorkflowConfig('verifyDocument');
     ltConfig.invalidate();
   }, 30_000);
 
@@ -59,7 +58,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'test-queue',
         default_role: 'reviewer',
-        default_modality: 'portal',
         description: 'Test workflow',
         roles: ['reviewer', 'admin'],
         invocation_roles: [],
@@ -71,7 +69,6 @@ describe('workflow configuration', () => {
 
       expect(result.task_queue).toBe('test-queue');
       expect(result.default_role).toBe('reviewer');
-      expect(result.default_modality).toBe('portal');
       expect(result.roles).toEqual(['admin', 'reviewer']); // sorted
       expect(result.consumes).toEqual(['fetchUserProfile']);
     });
@@ -96,7 +93,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'container-queue',
         default_role: 'reviewer',
-        default_modality: 'default',
         description: null,
         roles: [],
         invocation_roles: [],
@@ -118,7 +114,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'updated-queue',
         default_role: 'senior-reviewer',
-        default_modality: 'fax',
         description: 'Updated description',
         roles: ['senior-reviewer'],
         invocation_roles: [],
@@ -128,7 +123,6 @@ describe('workflow configuration', () => {
 
       expect(updated.task_queue).toBe('updated-queue');
       expect(updated.default_role).toBe('senior-reviewer');
-      expect(updated.default_modality).toBe('fax');
       expect(updated.roles).toEqual(['senior-reviewer']);
       expect(updated.consumes).toHaveLength(0);
     });
@@ -158,7 +152,6 @@ describe('workflow configuration', () => {
       const resolved = map.get('testWorkflow');
       expect(resolved).toBeTruthy();
       expect(resolved!.role).toBe('senior-reviewer');
-      expect(resolved!.modality).toBe('fax');
     });
 
     it('getTargetEscalationRole should return configured role', async () => {
@@ -171,10 +164,6 @@ describe('workflow configuration', () => {
 
     it('getAllowedEscalationRoles should return configured roles', async () => {
       expect(await ltConfig.getAllowedEscalationRoles('testWorkflow')).toEqual(['senior-reviewer']);
-    });
-
-    it('getDefaultModality should return configured modality', async () => {
-      expect(await ltConfig.getDefaultModality('testWorkflow')).toBe('fax');
     });
 
     it('getProviders should return empty for no consumers', async () => {
@@ -199,7 +188,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'moderator',
-        default_modality: 'phone',
         description: null,
         roles: ['moderator'],
         invocation_roles: [],
@@ -249,7 +237,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'supervisor',
-        default_modality: 'phone',
         description: null,
         roles: ['supervisor'],
         invocation_roles: [],
@@ -273,7 +260,6 @@ describe('workflow configuration', () => {
         invocable: false,
         task_queue: 'final-queue',
         default_role: 'moderator',
-        default_modality: 'phone',
         description: null,
         roles: ['moderator'],
         invocation_roles: [],
@@ -297,10 +283,71 @@ describe('workflow configuration', () => {
     });
   });
 
+  // ── 5. execute_as (proxy invocation) ────────────────────────────────
+
+  describe('execute_as (proxy invocation)', () => {
+    it('should create a config with execute_as', async () => {
+      const result = await configService.upsertWorkflowConfig({
+        workflow_type: 'proxyWorkflow',
+        invocable: true,
+        task_queue: 'proxy-queue',
+        default_role: 'reviewer',
+        description: 'Runs as a bot',
+        roles: ['reviewer'],
+        invocation_roles: [],
+        consumes: [],
+        execute_as: 'lt-system',
+      });
+      expect(result.execute_as).toBe('lt-system');
+    });
+
+    it('should read execute_as from config', async () => {
+      const config = await configService.getWorkflowConfig('proxyWorkflow');
+      expect(config).toBeTruthy();
+      expect(config!.execute_as).toBe('lt-system');
+    });
+
+    it('should include execute_as in list', async () => {
+      const configs = await configService.listWorkflowConfigs();
+      const proxy = configs.find(c => c.workflow_type === 'proxyWorkflow');
+      expect(proxy).toBeTruthy();
+      expect(proxy!.execute_as).toBe('lt-system');
+    });
+
+    it('should resolve execute_as in cache', async () => {
+      ltConfig.invalidate();
+      const resolved = await ltConfig.getResolvedConfig('proxyWorkflow');
+      expect(resolved).toBeTruthy();
+      expect(resolved!.executeAs).toBe('lt-system');
+    });
+
+    it('should clear execute_as via upsert', async () => {
+      const updated = await configService.upsertWorkflowConfig({
+        workflow_type: 'proxyWorkflow',
+        invocable: true,
+        task_queue: 'proxy-queue',
+        default_role: 'reviewer',
+        description: null,
+        roles: ['reviewer'],
+        invocation_roles: [],
+        consumes: [],
+        execute_as: null,
+      });
+      expect(updated.execute_as).toBeNull();
+    });
+
+    it('should default execute_as to null when not provided', async () => {
+      const config = await configService.getWorkflowConfig('testWorkflow');
+      expect(config).toBeTruthy();
+      expect(config!.execute_as).toBeNull();
+    });
+  });
+
   // ── Cleanup ────────────────────────────────────────────────────────────
 
   it('should clean up test configs', async () => {
     await configService.deleteWorkflowConfig('testWorkflow');
+    await configService.deleteWorkflowConfig('proxyWorkflow');
     ltConfig.invalidate();
   });
 });

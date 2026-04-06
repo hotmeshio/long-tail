@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Pencil, Trash2, User, Bot } from 'lucide-react';
 import { useUsers, useDeleteUser, useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import { useRoles } from '../../../api/roles';
 import { useFilterParams } from '../../../hooks/useFilterParams';
@@ -14,6 +15,7 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
+import { BotsPage } from '../bots/BotsPage';
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
@@ -141,9 +143,62 @@ function RolePanel({ user }: { user: LTUserRecord | null }) {
   );
 }
 
-// ── Users Page ─────────────────────────────────────────────────
+// ── Tab toggle ─────────────────────────────────────────────────
+
+type AccountTab = 'users' | 'service-accounts';
+
+function AccountTabToggle({ active, onChange }: { active: AccountTab; onChange: (t: AccountTab) => void }) {
+  const btn = (tab: AccountTab, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => onChange(tab)}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+        active === tab
+          ? 'bg-accent/10 text-accent font-medium'
+          : 'text-text-tertiary hover:text-text-secondary hover:bg-surface-hover'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="flex gap-1 p-0.5 bg-surface-sunken rounded-lg w-fit">
+      {btn('users', <User className="w-3.5 h-3.5" />, 'User Accounts')}
+      {btn('service-accounts', <Bot className="w-3.5 h-3.5" />, 'Service Accounts')}
+    </div>
+  );
+}
+
+// ── Accounts Page (wrapper) ────────────────────────────────────
 
 export function UsersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab: AccountTab = tabParam === 'service-accounts' ? 'service-accounts' : 'users';
+
+  const handleTabChange = (tab: AccountTab) => {
+    if (tab === 'users') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ tab });
+    }
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title="Accounts"
+        actions={<AccountTabToggle active={activeTab} onChange={handleTabChange} />}
+      />
+      {activeTab === 'users' ? <UserAccountsPanel /> : <BotsPage embedded />}
+    </div>
+  );
+}
+
+// ── User Accounts Panel ────────────────────────────────────────
+
+function UserAccountsPanel() {
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { status: '' },
   });
@@ -238,14 +293,11 @@ export function UsersPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Users"
-        actions={
-          <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
-            Add User
-          </button>
-        }
-      />
+      <div className="flex justify-end mb-4">
+        <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
+          Add User
+        </button>
+      </div>
 
       <FilterBar>
         <FilterSelect

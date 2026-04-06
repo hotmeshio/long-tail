@@ -33,7 +33,6 @@ export async function getWorkflowConfig(
     invocable: wf.invocable,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
-    default_modality: wf.default_modality,
     description: wf.description,
     roles: rolesResult.rows.map((r: any) => r.role),
     invocation_roles: invocationRolesResult.rows.map((r: any) => r.role),
@@ -42,6 +41,7 @@ export async function getWorkflowConfig(
     envelope_schema: wf.envelope_schema ?? null,
     resolver_schema: wf.resolver_schema ?? null,
     cron_schedule: wf.cron_schedule ?? null,
+    execute_as: wf.execute_as ?? null,
   };
 }
 
@@ -75,7 +75,6 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     invocable: wf.invocable,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
-    default_modality: wf.default_modality,
     description: wf.description,
     roles: rolesMap.get(wf.workflow_type) || [],
     invocation_roles: invocationRolesMap.get(wf.workflow_type) || [],
@@ -84,5 +83,6 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     envelope_schema: wf.envelope_schema ?? null,
     resolver_schema: wf.resolver_schema ?? null,
     cron_schedule: wf.cron_schedule ?? null,
+    execute_as: wf.execute_as ?? null,
   }));
 }

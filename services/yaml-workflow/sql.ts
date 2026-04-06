@@ -84,3 +84,20 @@ export const DISCOVER_WORKFLOWS = `
 export const GET_VERSION_SNAPSHOT = `
   SELECT * FROM lt_yaml_workflow_versions
   WHERE workflow_id = $1 AND version = $2`;
+
+// ─── Status updates ─────────────────────────────────────────────────────────
+
+export const UPDATE_STATUS_BASE = `UPDATE lt_yaml_workflows SET status = $2`;
+export const UPDATE_STATUS_SUFFIX = ` WHERE id = $1 RETURNING *`;
+
+// ─── Tag-based lookup ────────────────────────────────────────────────────────
+
+export const FIND_BY_TAGS_ANY = `
+  SELECT * FROM lt_yaml_workflows
+  WHERE status = 'active' AND tags && $1::text[]
+  ORDER BY name`;
+
+export const FIND_BY_TAGS_ALL = `
+  SELECT * FROM lt_yaml_workflows
+  WHERE status = 'active' AND tags @> $1::text[]
+  ORDER BY name`;

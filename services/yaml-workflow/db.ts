@@ -1,6 +1,6 @@
 import { getPool } from '../db';
-import { YAML_LIST_LIMIT, YAML_VERSION_LIMIT } from '../../modules/defaults';
-import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus, LTYamlWorkflowVersionRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
+import { YAML_VERSION_LIMIT } from '../../modules/defaults';
+import type { LTYamlWorkflowRecord, LTYamlWorkflowVersionRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
 import {
   CREATE_YAML_WORKFLOW,
   GET_YAML_WORKFLOW,
@@ -18,29 +18,16 @@ import {
   GET_VERSION_SNAPSHOT,
   DISCOVER_WORKFLOWS,
 } from './sql';
-
 import type { CreateYamlWorkflowInput } from './types';
+import { parseVersionFromYaml } from './db-utils';
 
-/**
- * Extract the `app.version` value from YAML content using a simple regex.
- * Returns null if not found.
- */
-export function parseVersionFromYaml(yaml: string): string | null {
-  const match = yaml.match(/^app:\s*\n(?:.*\n)*?\s+version:\s*['"]?(\S+?)['"]?\s*$/m);
-  if (match) return match[1];
-  // Fallback: look for version anywhere under app block
-  const lines = yaml.split('\n');
-  let inApp = false;
-  for (const line of lines) {
-    if (/^app:\s*$/.test(line)) { inApp = true; continue; }
-    if (inApp && /^\S/.test(line)) break; // left app block
-    if (inApp) {
-      const vm = line.match(/^\s+version:\s*['"]?(.+?)['"]?\s*$/);
-      if (vm) return vm[1];
-    }
-  }
-  return null;
-}
+// Re-export functions from db-utils
+export {
+  parseVersionFromYaml,
+  updateYamlWorkflowStatus,
+  listYamlWorkflows,
+  findYamlWorkflowsByTags,
+} from './db-utils';
 
 export async function createYamlWorkflow(
   input: CreateYamlWorkflowInput,
@@ -69,7 +56,6 @@ export async function createYamlWorkflow(
   );
   const record = rows[0];
 
-  // Seed initial version snapshot
   await createVersionSnapshot(record.id, 1, record.yaml_content,
     input.activity_manifest || [], input.input_schema || {}, input.output_schema || {},
     input.input_field_meta || [], 'Initial version');
@@ -85,24 +71,7 @@ export async function getYamlWorkflow(id: string): Promise<LTYamlWorkflowRecord 
 
 export async function getYamlWorkflowByName(name: string): Promise<LTYamlWorkflowRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(GET_YAML_WORKFLOW_BY_NAME, [name],
-  );
-  return rows[0] || null;
-}
-
-export async function updateYamlWorkflowStatus(
-  id: string,
-  status: LTYamlWorkflowStatus,
-): Promise<LTYamlWorkflowRecord | null> {
-  const pool = getPool();
-  const timestampField =
-    status === 'deployed' ? ', deployed_at = NOW()' :
-    status === 'active' ? ', activated_at = NOW()' : '';
-
-  const { rows } = await pool.query(
-    `UPDATE lt_yaml_workflows SET status = $2${timestampField} WHERE id = $1 RETURNING *`,
-    [id, status],
-  );
+  const { rows } = await pool.query(GET_YAML_WORKFLOW_BY_NAME, [name]);
   return rows[0] || null;
 }
 
@@ -135,7 +104,6 @@ export async function updateYamlWorkflow(
   if (updates.tags !== undefined) { sets.push(`tags = $${idx++}`); values.push(updates.tags); }
   if (updates.metadata !== undefined) { sets.push(`metadata = $${idx++}`); values.push(JSON.stringify(updates.metadata)); }
 
-  // When YAML content changes, bump the content_version and sync app_version from YAML
   if (yamlChanging) {
     sets.push(`content_version = content_version + 1`);
     const parsedVersion = parseVersionFromYaml(updates.yaml_content!);
@@ -154,7 +122,6 @@ export async function updateYamlWorkflow(
   );
   const record = rows[0] || null;
 
-  // Create a version snapshot when YAML content changes
   if (record && yamlChanging) {
     await createVersionSnapshot(
       record.id,
@@ -176,74 +143,9 @@ export async function deleteYamlWorkflow(id: string): Promise<boolean> {
   return (rowCount || 0) > 0;
 }
 
-export async function listYamlWorkflows(filters: {
-  status?: LTYamlWorkflowStatus;
-  graph_topic?: string;
-  app_id?: string;
-  tags?: string[];
-  search?: string;
-  source_workflow_id?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<{ workflows: LTYamlWorkflowRecord[]; total: number }> {
-  const pool = getPool();
-  const conditions: string[] = [];
-  const values: unknown[] = [];
-  let idx = 1;
-
-  if (filters.status) {
-    conditions.push(`status = $${idx++}`);
-    values.push(filters.status);
-  }
-
-  if (filters.graph_topic) {
-    conditions.push(`graph_topic = $${idx++}`);
-    values.push(filters.graph_topic);
-  }
-
-  if (filters.app_id) {
-    conditions.push(`app_id = $${idx++}`);
-    values.push(filters.app_id);
-  }
-
-  if (filters.tags?.length) {
-    conditions.push(`tags && $${idx++}::text[]`);
-    values.push(filters.tags);
-  }
-
-  if (filters.search) {
-    conditions.push(`(name ILIKE $${idx} OR graph_topic ILIKE $${idx} OR description ILIKE $${idx} OR app_id ILIKE $${idx})`);
-    values.push(`%${filters.search}%`);
-    idx++;
-  }
-
-  if (filters.source_workflow_id) {
-    conditions.push(`source_workflow_id = $${idx++}`);
-    values.push(filters.source_workflow_id);
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = filters.limit || YAML_LIST_LIMIT;
-  const offset = filters.offset || 0;
-
-  const [countResult, dataResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM lt_yaml_workflows ${where}`, values),
-    pool.query(
-      `SELECT * FROM lt_yaml_workflows ${where} ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
-      [...values, limit, offset],
-    ),
-  ]);
-
-  return {
-    workflows: dataResult.rows,
-    total: parseInt(countResult.rows[0].count, 10),
-  };
-}
-
 /**
  * Ranked discovery: find active workflows matching the user's prompt
  * via full-text search (tsvector) + tag overlap + optional category filter.
- * Returns results ordered by relevance score.
  */
 export async function discoverWorkflows(
   prompt: string,
@@ -259,25 +161,6 @@ export async function discoverWorkflows(
   return rows;
 }
 
-/**
- * Find active YAML workflows matching any of the given tags.
- * Uses GIN index on tags column for efficient lookup.
- */
-export async function findYamlWorkflowsByTags(
-  tags: string[],
-  match: 'any' | 'all' = 'any',
-): Promise<LTYamlWorkflowRecord[]> {
-  const pool = getPool();
-  const operator = match === 'all' ? '@>' : '&&';
-  const { rows } = await pool.query(
-    `SELECT * FROM lt_yaml_workflows
-     WHERE status = 'active' AND tags ${operator} $1::text[]
-     ORDER BY name`,
-    [tags],
-  );
-  return rows;
-}
-
 export async function getActiveYamlWorkflows(): Promise<LTYamlWorkflowRecord[]> {
   const pool = getPool();
   const { rows } = await pool.query(GET_ACTIVE_YAML_WORKFLOWS);
@@ -286,8 +169,7 @@ export async function getActiveYamlWorkflows(): Promise<LTYamlWorkflowRecord[]> 
 
 export async function listYamlWorkflowsByAppId(appId: string): Promise<LTYamlWorkflowRecord[]> {
   const pool = getPool();
-  const { rows } = await pool.query(LIST_BY_APP_ID, [appId],
-  );
+  const { rows } = await pool.query(LIST_BY_APP_ID, [appId]);
   return rows;
 }
 
@@ -297,7 +179,7 @@ export async function getDistinctAppIds(): Promise<string[]> {
   return rows.map((r: { app_id: string }) => r.app_id);
 }
 
-// ── Version history ────────────────────────────────────────────
+// -- Version history ---------------------------------------------------------
 
 export async function createVersionSnapshot(
   workflowId: string,
@@ -345,8 +227,7 @@ export async function getVersionSnapshot(
   version: number,
 ): Promise<LTYamlWorkflowVersionRecord | null> {
   const pool = getPool();
-  const { rows } = await pool.query(GET_VERSION_SNAPSHOT, [workflowId, version],
-  );
+  const { rows } = await pool.query(GET_VERSION_SNAPSHOT, [workflowId, version]);
   return rows[0] || null;
 }
 

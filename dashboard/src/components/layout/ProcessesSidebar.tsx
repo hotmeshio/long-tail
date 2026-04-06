@@ -6,5 +6,5 @@ const entries: NavEntry[] = [
 ];
 
 export function ProcessesSidebar() {
-  return <SidebarNav heading="Processes" headingTo="/" entries={entries} />;
+  return <SidebarNav heading="Processes" entries={entries} />;
 }

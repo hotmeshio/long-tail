@@ -29,7 +29,7 @@ To reset: `docker compose down -v && docker compose up -d --build`
 
 A **workflow** is a deterministic function. It receives an envelope, makes decisions, and returns a result. If the process crashes mid-execution, the workflow replays from its last checkpoint — no work is lost, no step runs twice.
 
-Register it with Long Tail and the workflow becomes unbreakable. The interceptor wraps every execution in a never-fail vortex: sub-workflows that would normally throw instead escalate, humans and AI collaborate to resolve, and the original workflow resumes with the answer. Nothing is lost.
+Register it with Long Tail and it becomes a **certified workflow**. The interceptor wraps every execution in an escalation chain: sub-workflows that would normally throw instead escalate, humans and AI collaborate to resolve, and the original workflow resumes with the answer. A certified workflow cannot silently fail — every error is either handled or surfaced.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -202,7 +202,7 @@ const lt = await start({
   examples: true,                                          // seed demo workflows
   mcp: { server: { enabled: true } },                     // MCP server + clients
   escalation: { strategy: 'mcp' },                        // AI triage on escalation
-  auth: { secret: process.env.JWT_SECRET },                // JWT auth
+  auth: { secret: process.env.JWT_SECRET },                // JWT auth + IAM identity context
   telemetry: { honeycomb: { apiKey: process.env.HNY } },   // OpenTelemetry
   events: { nats: { url: 'nats://localhost:4222' } },      // real-time events
   logging: { pino: { level: 'info' } },                    // structured logging
@@ -210,7 +210,7 @@ const lt = await start({
 });
 ```
 
-Every cross-cutting concern follows the same pattern: implement a typed interface, register at startup, done. See the [Docs](#docs) section for the full list of guides.
+Every cross-cutting concern follows the same pattern: implement a typed interface, register at startup, done. Every workflow executes with identity context — who initiated the request, which user or bot it runs as, and what credentials it holds. Escalations carry the same context, so reviewers see exactly who triggered the work and what permissions were in play. See the [Docs](#docs) section for the full list of guides.
 
 ## Deployment
 

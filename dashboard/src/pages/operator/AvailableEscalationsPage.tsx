@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalationListEvents } from '../../hooks/useNatsEvents';
-import { useToast } from '../../hooks/useToast';
 import {
   useEscalations,
   useEscalationTypes,
@@ -25,7 +24,7 @@ import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
 import { CustomDurationPicker } from '../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
-import { ESCALATION_COLUMNS, STATUS_COLUMN, EscalationFilterBar } from './escalation-columns';
+import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { createBulkHandlers } from './helpers';
 import type { LTEscalationRecord } from '../../api/types';
@@ -34,9 +33,8 @@ export function AvailableEscalationsPage() {
   useEscalationListEvents();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
-  const { addToast } = useToast();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { role: '', type: '', priority: '', status: 'pending' },
+    filters: { role: '', type: '', priority: '', status: 'available' },
   });
   const claimDurations = useClaimDurations();
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
@@ -61,8 +59,15 @@ export function AvailableEscalationsPage() {
     setSelectedIds(new Set());
   }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
+  // Map the UI status filter to the API status parameter
+  const statusFilter = filters.status || '';
+  const apiStatus = statusFilter === 'available' ? 'pending'
+    : statusFilter === 'claimed' ? 'pending'
+    : statusFilter === 'resolved' ? 'resolved'
+    : undefined; // '' (All) → no filter
+
   const { data, isLoading, error: queryError } = useEscalations({
-    status: filters.status || undefined,
+    status: apiStatus,
     role: filters.role || undefined,
     type: filters.type || undefined,
     priority: filters.priority ? parseInt(filters.priority) : undefined,
@@ -72,8 +77,17 @@ export function AvailableEscalationsPage() {
     order: sort.sort_by ? sort.order : undefined,
   });
 
-  const escalations = data?.escalations ?? [];
-  const total = data?.total ?? 0;
+  // Client-side filter for available/claimed based on claim expiry
+  const now = new Date();
+  const rawEscalations = data?.escalations ?? [];
+  const escalations = statusFilter === 'available'
+    ? rawEscalations.filter((e) => !e.assigned_to || !e.assigned_until || new Date(e.assigned_until) <= now)
+    : statusFilter === 'claimed'
+    ? rawEscalations.filter((e) => e.assigned_to && e.assigned_until && new Date(e.assigned_until) > now)
+    : rawEscalations;
+  const total = statusFilter === 'available' || statusFilter === 'claimed'
+    ? escalations.length
+    : data?.total ?? 0;
   const canBulkManage = isSuperAdmin || user?.roles.some((r) => r.type === 'admin');
 
   const selectedRoles = useMemo(() => {
@@ -109,7 +123,6 @@ export function AvailableEscalationsPage() {
     handleBulkAssign,
   } = createBulkHandlers({
     selectedIds,
-    addToast,
     clearSelection,
     setPriority,
     bulkClaim,
@@ -135,10 +148,8 @@ export function AvailableEscalationsPage() {
     }
   };
 
-  const columns: Column<LTEscalationRecord>[] = [];
-
-  if (canBulkManage) {
-    columns.push({
+  const columns: Column<LTEscalationRecord>[] = [
+    canBulkManage ? {
       key: 'select',
       label: (
         <input
@@ -148,7 +159,7 @@ export function AvailableEscalationsPage() {
           className="rounded"
         />
       ) as any,
-      render: (row) => (
+      render: (row: LTEscalationRecord) => (
         <input
           type="checkbox"
           checked={selectedIds.has(row.id)}
@@ -161,11 +172,12 @@ export function AvailableEscalationsPage() {
         />
       ),
       className: 'w-10',
-    });
-  }
-
-  columns.push(
-    STATUS_COLUMN,
+    } : {
+      key: 'spacer',
+      label: '',
+      render: () => null,
+      className: 'w-10',
+    },
     ...ESCALATION_COLUMNS,
     {
       key: 'actions',
@@ -181,11 +193,11 @@ export function AvailableEscalationsPage() {
       ),
       className: 'w-16 text-right',
     },
-  );
+  ];
 
   return (
     <div>
-      <PageHeader title="Available Escalations" />
+      <PageHeader title="All Escalations" />
 
       <EscalationFilterBar
         filters={filters}

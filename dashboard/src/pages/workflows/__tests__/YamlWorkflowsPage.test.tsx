@@ -76,7 +76,7 @@ beforeEach(() => {
 describe('YamlWorkflowsPage', () => {
   it('renders page header', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByRole('heading', { name: 'Compiled Pipelines' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'MCP Pipeline Tools' })).toBeInTheDocument();
   });
 
   it('renders description text', () => {
@@ -115,7 +115,7 @@ describe('YamlWorkflowsPage', () => {
       isLoading: false,
     } as any);
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText('No workflow tools found')).toBeInTheDocument();
+    expect(screen.getByText('No pipelines yet')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {

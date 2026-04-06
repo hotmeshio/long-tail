@@ -11,7 +11,6 @@ export interface LTEscalationRecord {
   // classification
   type: string;
   subtype: string;
-  modality: string;
   description: string | null;
 
   // state

@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import type { LTWorkflowConfig } from '../../../api/types';
 
@@ -23,6 +24,15 @@ export function InvokeSidebar({
   return (
     <div className="lg:border-l lg:border-surface-border lg:pl-12">
       <SectionLabel className="mb-6">Invoke</SectionLabel>
+
+      {editing.execute_as && (
+        <div className="flex items-center gap-1.5 px-3 py-2 mb-4 rounded-md bg-accent/[0.06] border border-accent/20">
+          <Bot className="w-3.5 h-3.5 text-accent/75 shrink-0" />
+          <span className="text-[11px] text-text-secondary">
+            Running as <span className="font-medium text-accent">{editing.execute_as}</span>
+          </span>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div>

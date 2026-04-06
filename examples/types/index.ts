@@ -9,9 +9,8 @@
 // ── Envelope types (API input contracts) ────────────────────────
 export type {
   ReviewContentEnvelopeData,
-  VerifyDocumentEnvelopeData,
-  ProcessClaimEnvelopeData,
   KitchenSinkEnvelopeData,
+  BasicEchoEnvelopeData,
   WorkflowEnvelopeMap,
   InvocableWorkflowType,
 } from './envelopes';
@@ -21,8 +20,6 @@ export type {
   ResolverLTBlock,
   BaseResolverPayload,
   ReviewContentResolverPayload,
-  ProcessClaimResolverPayload,
-  VerifyDocumentResolverPayload,
 } from './resolvers';
 
 // ── Per-workflow types (re-exported for convenience) ────────────
@@ -34,19 +31,3 @@ export type {
   ReviewContentEscalationData,
   ReviewContentEscalation,
 } from '../workflows/review-content/types';
-
-export type {
-  ClaimAnalysis,
-  ProcessClaimReturnData,
-  ProcessClaimReturn,
-  ProcessClaimEscalationData,
-  ProcessClaimEscalation,
-} from '../workflows/process-claim/types';
-
-export type {
-  MemberInfo,
-  VerifyDocumentReturnData,
-  VerifyDocumentReturn,
-  VerifyDocumentEscalationData,
-  VerifyDocumentEscalation,
-} from '../workflows/verify-document/types';

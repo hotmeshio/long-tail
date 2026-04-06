@@ -13,7 +13,7 @@ export function StickyPagination(props: StickyPaginationProps) {
   if (props.total === 0) return null;
 
   return (
-    <div className="sticky bottom-0 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 py-2">
+    <div className="sticky bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 pt-2 pb-4" style={{ bottom: 'calc(var(--feed-height, 0px) - 8px)' }}>
       <Pagination {...props} />
     </div>
   );

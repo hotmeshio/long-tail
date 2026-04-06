@@ -10,7 +10,6 @@ export interface CreateTaskInput {
   workflow_type: string;
   lt_type: string;
   task_queue?: string;
-  modality?: string;
   signal_id: string;
   parent_workflow_id: string;
   origin_id?: string;
@@ -20,6 +19,12 @@ export interface CreateTaskInput {
   priority?: number;
   trace_id?: string;
   span_id?: string;
+  /** User or bot ID that initiated this task (for audit trail). */
+  initiated_by?: string;
+  /** Principal type: 'user' or 'bot'. */
+  principal_type?: string;
+  /** Executing principal (bot external_id) when proxy invocation is used. */
+  executing_as?: string;
 }
 
 export interface UpdateTaskInput {

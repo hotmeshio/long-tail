@@ -66,7 +66,6 @@ describe('DB MCP server', () => {
       invocable: true,
       task_queue: 'lt-db-test',
       default_role: 'reviewer',
-      default_modality: 'system',
       description: 'Test workflow for db-server tests',
       roles: [],
       invocation_roles: [],
@@ -106,7 +105,6 @@ describe('DB MCP server', () => {
     const esc = await escalationService.createEscalation({
       type: 'test',
       subtype: 'db-server-test',
-      modality: 'system',
       role: 'reviewer',
       envelope: JSON.stringify({ data: { test: true } }),
       trace_id: 'trace-esc-test-001',

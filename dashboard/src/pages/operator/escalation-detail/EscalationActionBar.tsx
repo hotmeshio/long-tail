@@ -109,7 +109,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     `text-xs transition-colors ${active ? 'text-accent font-medium' : 'text-text-tertiary hover:text-accent'}`;
 
   return (
-    <div className="sticky bottom-0 h-[72px] bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 py-3 z-10" data-testid="escalation-action-bar">
+    <div className="sticky h-[80px] bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 pt-3 pb-5 z-10" style={{ bottom: 'calc(var(--feed-height, 0px) - 8px)' }} data-testid="escalation-action-bar">
 
         {/* ── Available: claim ── */}
         {mode === 'available' && (

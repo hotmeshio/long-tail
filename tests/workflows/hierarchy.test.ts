@@ -140,7 +140,6 @@ const ALL_TYPES = ['topLevelOrch', ...SUB_ORCH_TYPES, ...LEAF_TYPES];
 const defaultConfig = {
   invocable: false as const,
   default_role: 'reviewer',
-  default_modality: 'default',
   description: null,
   roles: ['reviewer'],
   invocation_roles: [] as string[],

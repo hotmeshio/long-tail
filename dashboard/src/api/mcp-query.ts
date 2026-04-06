@@ -117,10 +117,10 @@ export function useDescribeMcpQuery(params: {
   resultTitle: string | undefined;
   resultSummary: string | undefined;
 }) {
-  return useQuery<{ description: string; tags: string[] }>({
+  return useQuery<{ tool_name?: string; description: string; tags: string[] }>({
     queryKey: ['mcpQueryDescribe', params.prompt],
     queryFn: () =>
-      apiFetch<{ description: string; tags: string[] }>('/insight/mcp-query/describe', {
+      apiFetch<{ tool_name?: string; description: string; tags: string[] }>('/insight/mcp-query/describe', {
         method: 'POST',
         body: JSON.stringify({
           prompt: params.prompt,

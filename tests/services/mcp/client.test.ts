@@ -34,9 +34,7 @@ describe('MCP Client — built-in server resolution', () => {
     expect(isConnected('vision')).toBe(true);
 
     // Second call reuses — no "already connected" error
-    const result = await callServerTool('vision', 'validate_member', {
-      member_info: { memberId: 'MBR-2024-001', name: 'John Smith' },
-    });
+    const result = await callServerTool('vision', 'list_document_pages', {});
     expect(result).toBeDefined();
   });
 

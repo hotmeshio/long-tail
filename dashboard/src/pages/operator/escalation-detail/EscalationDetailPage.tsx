@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { KeyRound } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useToast } from '../../../hooks/useToast';
 import {
   useEscalation,
   useClaimEscalation,
@@ -53,7 +53,6 @@ export function EscalationDetailPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { addToast } = useToast();
   const { data: esc, isLoading } = useEscalation(id!);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
@@ -77,18 +76,38 @@ export function EscalationDetailPage() {
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
   const resolverSchema = wfConfig?.resolver_schema ?? null;
+  const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
+  const effectiveSchema = metadataFormSchema ?? resolverSchema;
   useEffect(() => {
-    setJson(resolverSchema ? JSON.stringify(resolverSchema, null, 2) : '{}');
-  }, [resolverSchema]);
+    if (metadataFormSchema) {
+      // waitFor escalation: build initial form from form_schema and include _form_schema for ResolverForm
+      const initial: Record<string, any> = { _form_schema: metadataFormSchema };
+      const props = metadataFormSchema.properties;
+      if (props && typeof props === 'object') {
+        for (const [key, def] of Object.entries(props)) {
+          const fieldDef = def as Record<string, any>;
+          initial[key] = fieldDef.default ?? '';
+        }
+      }
+      setJson(JSON.stringify(initial, null, 2));
+    } else {
+      setJson(effectiveSchema ? JSON.stringify(effectiveSchema, null, 2) : '{}');
+    }
+  }, [effectiveSchema, metadataFormSchema]);
 
   // When triage or rounds-exhausted data is present, collapse Input/Output so structured context is central
   const hasTriage = hasTriageData(esc?.escalation_payload);
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
+  const isWaitForHuman = esc?.subtype === 'wait_for_human';
   useEffect(() => {
     if (hasTriage || isRoundsExhausted) {
       setCollapsed((prev) => ({ ...prev, context: true }));
     }
-  }, [hasTriage, isRoundsExhausted]);
+    // waitFor escalations: auto-expand resolver, collapse context
+    if (isWaitForHuman && metadataFormSchema) {
+      setCollapsed((prev) => ({ ...prev, context: true, resolver: false }));
+    }
+  }, [hasTriage, isRoundsExhausted, isWaitForHuman, metadataFormSchema]);
 
   if (isLoading) {
     return (
@@ -133,11 +152,11 @@ export function EscalationDetailPage() {
 
   const handleResolve = async (payload: Record<string, unknown>) => {
     const result = await resolve.mutateAsync({ id: esc.id, resolverPayload: payload }) as any;
-    if (result?.triage && result?.workflowId) {
-      addToast('AI triage started', 'success');
+    if (result?.signaled && result?.workflowId) {
+      navigate(`/workflows/executions/${result.workflowId}`);
+    } else if (result?.triage && result?.workflowId) {
       navigate(`/workflows/executions/${result.workflowId}`);
     } else {
-      addToast('Escalation resolved', 'success');
       navigate(returnPath);
     }
   };
@@ -145,7 +164,6 @@ export function EscalationDetailPage() {
   const handleEscalate = async (targetRole: string) => {
     if (!targetRole) return;
     await escalate.mutateAsync({ id: esc.id, targetRole });
-    addToast(`Escalated to ${targetRole}`, 'success');
     navigate(returnPath);
   };
 
@@ -159,17 +177,14 @@ export function EscalationDetailPage() {
       resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
     }) as any;
     if (result?.triage && result?.workflowId) {
-      addToast('AI triage started', 'success');
       navigate(`/workflows/executions/${result.workflowId}`);
     } else {
-      addToast('Sent to AI triage', 'success');
       navigate(returnPath);
     }
   };
 
   const handleRelease = async () => {
     await claim.mutateAsync({ id: esc.id, durationMinutes: 0 });
-    addToast('Escalation released', 'success');
     navigate(returnPath);
   };
 
@@ -195,6 +210,27 @@ export function EscalationDetailPage() {
             onRetryTriage={handleRetryTriage}
             isRetrying={claim.isPending || resolve.isPending}
           />
+        </div>
+      )}
+
+      {/* Missing credential context */}
+      {payloadObj?.category === 'missing_credential' && (
+        <div className="mt-8 bg-status-warning/10 border border-status-warning/30 rounded-md px-5 py-4 flex items-start gap-3">
+          <KeyRound size={20} className="text-status-warning mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-text-primary mb-1">Missing Credential</p>
+            <p className="text-xs text-text-secondary mb-3">
+              This workflow requires a <span className="font-medium capitalize">{String(payloadObj.provider)}</span> credential
+              to continue. Register one and then resolve this escalation to retry.
+            </p>
+            <Link
+              to="/credentials"
+              className="btn-primary text-xs inline-flex items-center gap-1.5"
+            >
+              <KeyRound size={12} />
+              Go to Credentials
+            </Link>
+          </div>
         </div>
       )}
 
@@ -245,7 +281,7 @@ export function EscalationDetailPage() {
         )}
 
         {/* Resolver form — when claimed and resolving */}
-        {!isTerminal && claimedByMe && activeView === 'resolve' && esc.workflow_type && (
+        {!isTerminal && claimedByMe && activeView === 'resolve' && (esc.workflow_type || metadataFormSchema) && (
           <CollapsibleSection
             title="Submit Your Resolution"
             sectionKey="resolver"

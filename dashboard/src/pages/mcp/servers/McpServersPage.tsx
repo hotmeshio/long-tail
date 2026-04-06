@@ -10,6 +10,7 @@ import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDele
 import type { McpServerRecord, McpToolManifest } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
+import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { ServerFormModal } from './ServerFormModal';
 import { TryToolModal } from '../../mcp/TryToolModal';
@@ -17,13 +18,14 @@ import { matchesSearch, filterTools } from './helpers';
 import { ServerRow } from './ServerRow';
 
 export function McpServersPage() {
-  const { filters, setFilter } = useFilterParams({
-    filters: { status: '', search: '' },
+  const { filters, setFilter, pagination } = useFilterParams({
+    filters: { status: '', search: '', tag: '' },
   });
 
   const { data, isLoading } = useMcpServers({
     status: filters.status || undefined,
     search: filters.search || undefined,
+    tags: filters.tag || undefined,
   });
   const connect = useConnectMcpServer();
   const disconnect = useDisconnectMcpServer();
@@ -40,6 +42,16 @@ export function McpServersPage() {
   } | null>(null);
 
   const servers = data?.servers ?? [];
+  const total = data?.total ?? 0;
+
+  // Derive unique tags from current result set for the filter dropdown
+  const tagOptions = useMemo(() => {
+    const allTags = new Set<string>();
+    for (const s of servers) {
+      for (const t of s.tags ?? []) allTags.add(t);
+    }
+    return [...allTags].sort().map((t) => ({ value: t, label: t }));
+  }, [servers]);
 
   // Client-side search filtering for tool-level matches within expanded rows
   const filteredServers = useMemo(() => {
@@ -87,7 +99,7 @@ export function McpServersPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Server Tools" />
+        <PageHeader title="MCP Server Tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -102,7 +114,7 @@ export function McpServersPage() {
   return (
     <div>
       <PageHeader
-        title="Tool Servers"
+        title="MCP Server Tools"
         actions={
           <button
             onClick={() => {
@@ -117,7 +129,7 @@ export function McpServersPage() {
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Built-in, user-registered, and external MCP servers.
+        Registered MCP servers and their available tools. Each server exposes tools that can be used by the Pipeline Designer.
       </p>
 
       <FilterBar>
@@ -125,7 +137,13 @@ export function McpServersPage() {
           label="Search"
           value={filters.search}
           onChange={(v) => setFilter('search', v)}
-          placeholder="Server or tool name…"
+          placeholder="Server or tool name..."
+        />
+        <FilterSelect
+          label="Tag"
+          value={filters.tag}
+          onChange={(v) => setFilter('tag', v)}
+          options={tagOptions}
         />
         <FilterSelect
           label="Status"
@@ -141,7 +159,7 @@ export function McpServersPage() {
       </FilterBar>
 
       {filteredServers.length === 0 ? (
-        <EmptyState title="No tool servers found" />
+        <EmptyState title="No servers found" />
       ) : (
         <table className="w-full">
           <thead>
@@ -186,6 +204,15 @@ export function McpServersPage() {
           </tbody>
         </table>
       )}
+
+      <StickyPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages(total)}
+        onPageChange={pagination.setPage}
+        total={total}
+        pageSize={pagination.pageSize}
+        onPageSizeChange={pagination.setPageSize}
+      />
 
       {/* Create / Edit modal */}
       <ServerFormModal

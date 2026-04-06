@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RotateCcw, Play, ExternalLink } from 'lucide-react';
+import { RotateCcw, Play, ExternalLink, KeyRound } from 'lucide-react';
 import { useCallMcpTool } from '../../api/mcp';
 import { Modal } from '../../components/common/modal/Modal';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
@@ -102,11 +102,33 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
         {callTool.error ? (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
-            <div className="bg-status-error/10 border border-status-error/20 rounded-md px-3 py-2">
-              <p className="text-xs text-status-error">
-                {callTool.error instanceof Error ? callTool.error.message : 'Tool call failed'}
-              </p>
-            </div>
+            {(() => {
+              const msg = callTool.error instanceof Error ? callTool.error.message : '';
+              const isMissingCred = msg.startsWith('No credential found for provider');
+              if (isMissingCred) {
+                return (
+                  <div className="bg-status-warning/10 border border-status-warning/30 rounded-md px-4 py-3 flex items-start gap-3">
+                    <KeyRound size={16} className="text-status-warning mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-text-primary mb-1">Credential required</p>
+                      <p className="text-xs text-text-secondary mb-2">{msg}</p>
+                      <Link
+                        to="/credentials"
+                        className="text-xs text-accent hover:underline inline-flex items-center gap-1"
+                      >
+                        Go to Credentials
+                        <ExternalLink size={10} />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="bg-status-error/10 border border-status-error/20 rounded-md px-3 py-2">
+                  <p className="text-xs text-status-error">{msg || 'Tool call failed'}</p>
+                </div>
+              );
+            })()}
           </div>
         ) : null}
 

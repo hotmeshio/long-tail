@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNatsSubscription } from './useNats';
+import { useEventSubscription } from './useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 
 /**
@@ -35,11 +35,11 @@ function useDebouncedInvalidation(delayMs = 500) {
 export function useWorkflowListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, () => {
     invalidate([['jobs']]);
   });
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, () => {
     invalidate([['jobs']]);
   });
 }
@@ -58,7 +58,7 @@ export function useWorkflowListEvents(): void {
 export function useWorkflowDetailEvents(workflowId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(400);
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
     if (!workflowId) return;
 
     // Child workflow IDs contain the parent orchestrator ID as a substring,
@@ -88,7 +88,7 @@ export function useWorkflowDetailEvents(workflowId: string | undefined): void {
 export function useEscalationStatsEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
     invalidate([['escalationStats']]);
   });
 }
@@ -99,7 +99,7 @@ export function useEscalationStatsEvents(): void {
 export function useEscalationListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
     invalidate([['escalations']]);
   });
 }
@@ -110,7 +110,7 @@ export function useEscalationListEvents(): void {
 export function useEscalationDetailEvents(escalationId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, (event) => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, (event) => {
     if (!escalationId) return;
     if (event.escalationId === escalationId) {
       invalidate([['escalations', escalationId], ['escalations'], ['escalationStats']]);
@@ -124,11 +124,11 @@ export function useEscalationDetailEvents(escalationId: string | undefined): voi
 export function useProcessListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, () => {
     invalidate([['processes']]);
   });
 
-  useNatsSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, () => {
     invalidate([['processes']]);
   });
 }

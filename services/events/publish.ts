@@ -74,7 +74,7 @@ export function publishTaskEvent(params: {
  * Publish an escalation lifecycle event (created, resolved).
  */
 export function publishEscalationEvent(params: {
-  type: 'escalation.created' | 'escalation.resolved';
+  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released';
   source: string;
   workflowId: string;
   workflowName: string;

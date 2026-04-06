@@ -87,8 +87,13 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
     return mcpClient.listServerTools(serverId);
   }
 
-  async callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<any> {
-    return mcpClient.callServerTool(serverId, toolName, args);
+  async callTool(
+    serverId: string,
+    toolName: string,
+    args: Record<string, any>,
+    authContext?: { userId?: string; delegationToken?: string },
+  ): Promise<any> {
+    return mcpClient.callServerTool(serverId, toolName, args, authContext);
   }
 
   async toolActivities(serverId: string): Promise<Record<string, (...args: any[]) => Promise<any>>> {

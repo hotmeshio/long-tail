@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { MessageSquarePlus, Pencil } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { WizardNav } from '../../../components/common/layout/WizardNav';
@@ -27,6 +28,8 @@ interface DeployPanelProps {
 export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
   const queryClient = useQueryClient();
   const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const { data: wf, refetch } = useYamlWorkflow(yamlId);
   const { data: versionsData } = useYamlWorkflowVersions(yamlId);
@@ -111,7 +114,12 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
   };
 
   const handleRegenerate = async () => {
-    await regenerateMutation.mutateAsync({ id: yamlId });
+    await regenerateMutation.mutateAsync({
+      id: yamlId,
+      compilation_feedback: feedbackText.trim() || undefined,
+    });
+    setFeedbackText('');
+    setShowFeedback(false);
     refetch();
   };
 
@@ -123,12 +131,43 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-8">
       {/* Left: config */}
       <div>
-        <div className="mb-6">
-          <h2 className="text-lg font-light text-text-primary">
-            {wf.status === 'active' ? 'Redeploy' : 'Deploy'} Workflow
-          </h2>
-          <p className="text-xs text-text-tertiary mt-0.5">Edit configuration, input/output schemas, and YAML definition</p>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-light text-text-primary">
+              {wf.status === 'active' ? 'Redeploy' : 'Deploy'} Workflow
+            </h2>
+            <p className="text-xs text-text-tertiary mt-0.5">Review configuration, input/output schemas, and YAML definition</p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button type="button" onClick={() => { setShowFeedback(!showFeedback); setConfigEditing(false); }}
+              className={`inline-flex items-center gap-1 text-xs transition-colors hover:underline ${showFeedback ? 'text-accent font-medium' : 'text-accent/70 hover:text-accent'}`}>
+              <MessageSquarePlus className="w-3 h-3" />
+              Recompile with Feedback
+            </button>
+            <span className="text-text-tertiary/30">|</span>
+            <button type="button" onClick={() => { setConfigEditing(!configEditing); setShowFeedback(false); }}
+              className={`inline-flex items-center gap-1 text-xs transition-colors hover:underline ${configEditing ? 'text-accent font-medium' : 'text-accent/70 hover:text-accent'}`}>
+              <Pencil className="w-3 h-3" />
+              Manual Edit
+            </button>
+          </div>
         </div>
+
+        {/* Recompile feedback panel */}
+        {showFeedback && (
+          <div className="mb-4 p-4 bg-surface-sunken border border-surface-border rounded-lg">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">What should change?</p>
+            <textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="E.g.: 'Only url, username, password, and screenshot_dir should be dynamic inputs. The steps array and script are implementation details.'"
+              className="w-full min-h-[80px] px-3 py-2 bg-surface border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-[10px] text-text-tertiary">This feedback guides the compiler. The current YAML will be replaced.</p>
+              <button onClick={handleRegenerate} disabled={!feedbackText.trim() || regenerateMutation.isPending} className="btn-primary text-xs shrink-0 ml-4">
+              {regenerateMutation.isPending ? 'Recompiling...' : 'Recompile Pipeline'}
+            </button>
+            </div>
+          </div>
+        )}
 
         {/* Version history banner */}
         {isViewingHistory && (
@@ -166,8 +205,8 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
         <WizardNav>
           <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
           {wf.status === 'active'
-            ? <button onClick={onAdvance} className="btn-primary text-xs">Next: Test</button>
-            : <button onClick={handleDeploy} disabled={isPending} className="btn-primary text-xs">{isPending ? 'Deploying...' : 'Deploy & Activate'}</button>
+            ? <button onClick={onAdvance} disabled={showFeedback} className="btn-primary text-xs">Next: Test</button>
+            : <button onClick={handleDeploy} disabled={isPending || showFeedback} className="btn-primary text-xs">{isPending ? 'Deploying...' : 'Deploy & Activate'}</button>
           }
         </WizardNav>
       </div>

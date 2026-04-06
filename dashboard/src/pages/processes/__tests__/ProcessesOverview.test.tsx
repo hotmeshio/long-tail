@@ -21,7 +21,7 @@ const mockStats = {
   escalated: 3,
   by_workflow_type: [
     { workflow_type: 'reviewContent', total: 15, active: 6, completed: 8, escalated: 1 },
-    { workflow_type: 'processClaim', total: 10, active: 4, completed: 4, escalated: 2 },
+    { workflow_type: 'kitchenSink', total: 10, active: 4, completed: 4, escalated: 2 },
   ],
 };
 
@@ -91,7 +91,7 @@ describe('ProcessesOverview', () => {
     renderPage();
     expect(screen.getByText('Workflow Type')).toBeInTheDocument();
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
-    expect(screen.getByText('processClaim')).toBeInTheDocument();
+    expect(screen.getByText('kitchenSink')).toBeInTheDocument();
     expect(screen.getByText('15')).toBeInTheDocument();
     expect(screen.getByText('6')).toBeInTheDocument();
   });

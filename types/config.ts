@@ -7,7 +7,6 @@ export interface LTWorkflowConfig {
   invocable: boolean;
   task_queue: string | null;
   default_role: string;
-  default_modality: string;
   description: string | null;
   roles: string[];
   invocation_roles: string[];
@@ -16,6 +15,8 @@ export interface LTWorkflowConfig {
   envelope_schema?: Record<string, any> | null;
   resolver_schema?: Record<string, any> | null;
   cron_schedule?: string | null;
+  /** Bot external_id to run as. When set, workflows use this bot's identity. */
+  execute_as?: string | null;
 }
 
 /**
@@ -26,7 +27,6 @@ export interface LTResolvedConfig {
   invocable: boolean;
   taskQueue: string | null;
   role: string;
-  modality: string;
   roles: string[];
   invocationRoles: string[];
   consumes: string[];
@@ -34,6 +34,7 @@ export interface LTResolvedConfig {
   envelopeSchema: Record<string, any> | null;
   resolverSchema: Record<string, any> | null;
   cronSchedule: string | null;
+  executeAs: string | null;
 }
 
 /**

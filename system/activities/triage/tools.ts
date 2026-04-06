@@ -1,5 +1,5 @@
-import { createDelegationToken } from '../../../services/auth/delegation';
-import { getOrchestratorContext } from '../../../services/interceptor/context';
+import { getToolContext } from '../../../services/iam/context';
+import { exchangeTokensInArgs } from '../../../services/iam/ephemeral';
 import { loggerRegistry } from '../../../services/logger';
 import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
@@ -102,10 +102,22 @@ export async function callTriageTool(
       if (!wf || wf.status !== 'active') {
         return { error: `Compiled workflow "${yamlWorkflowName}" is not active` };
       }
+      // Inject _scope from the current ToolContext so YAML workers get IAM
+      const toolCtx = getToolContext();
+      const scopedArgs = toolCtx?.principal.id
+        ? {
+            ...args,
+            _scope: {
+              principal: toolCtx.principal,
+              ...(toolCtx.initiatingPrincipal ? { initiatingPrincipal: toolCtx.initiatingPrincipal } : {}),
+              scopes: toolCtx.credentials.scopes,
+            },
+          }
+        : args;
       const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
-        args,
+        scopedArgs,
         undefined,
         wf.graph_topic,
       );
@@ -115,6 +127,9 @@ export async function callTriageTool(
     }
   }
 
+  // Exchange ephemeral credential tokens (eph:v1:...) right before the MCP call
+  args = await exchangeTokensInArgs(args);
+
   // Standard MCP tool routing
   const serverName = toolServerMap.get(qualifiedName);
   const separatorIdx = qualifiedName.indexOf('__');
@@ -122,10 +137,10 @@ export async function callTriageTool(
     ? qualifiedName.slice(separatorIdx + 2)
     : qualifiedName;
 
-  // Build auth context from the orchestrator (userId propagated via envelope)
-  const orchCtx = getOrchestratorContext();
-  const authContext = orchCtx?.userId
-    ? { userId: orchCtx.userId, delegationToken: createDelegationToken(orchCtx.userId, ['mcp:tool:call']) }
+  // Build auth context from ToolContext (set by interceptor via IAM service)
+  const toolCtx = getToolContext();
+  const authContext = toolCtx?.principal.id
+    ? { userId: toolCtx.principal.id, delegationToken: toolCtx.credentials.delegationToken }
     : undefined;
 
   if (serverName) {

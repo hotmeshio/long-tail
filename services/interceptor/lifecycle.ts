@@ -149,6 +149,8 @@ export async function ensureTaskWithRouting(
       envelope: JSON.stringify(envelope || {}),
       traceId: wf.workflowTrace,
       spanId: wf.workflowSpan,
+      initiatedBy: envelope?.lt?.initiatedBy ?? envelope?.lt?.userId,
+      executingAs: envelope?.lt?.initiatedBy ? envelope?.lt?.userId : undefined,
     });
     await activities.ltStartTask(taskId);
   } else if (existingTask?.status === 'pending') {
