@@ -27,7 +27,7 @@ const mockServers = {
       auto_connect: true,
       status: 'connected',
       tool_manifest: [
-        { name: 'extract_member_info', description: 'Extract member info from document', inputSchema: { properties: { doc_id: {} } } },
+        { name: 'list_document_pages', description: 'List available document pages', inputSchema: { properties: {} } },
         { name: 'rotate_page', description: 'Rotate a document page', inputSchema: { properties: { page_id: {}, angle: {} } } },
       ],
       metadata: { builtin: true },
@@ -121,14 +121,14 @@ describe('McpServersPage', () => {
     render(<McpServersPage />, { wrapper });
     const serverRow = screen.getByText('long-tail-document-vision').closest('tr')!;
     fireEvent.click(serverRow);
-    expect(screen.getByText('extract_member_info')).toBeInTheDocument();
+    expect(screen.getByText('list_document_pages')).toBeInTheDocument();
     expect(screen.getByText('rotate_page')).toBeInTheDocument();
   });
 
   it('renders tool descriptions in the DOM', () => {
     render(<McpServersPage />, { wrapper });
     // Tool descriptions are in the DOM (inside collapsed panels)
-    expect(screen.getByText('Extract member info from document')).toBeInTheDocument();
+    expect(screen.getByText('List available document pages')).toBeInTheDocument();
     expect(screen.getByText('Fetch data from API')).toBeInTheDocument();
   });
 

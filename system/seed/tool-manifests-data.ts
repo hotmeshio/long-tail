@@ -7,29 +7,6 @@ export const VISION_TOOLS = [
     inputSchema: { type: 'object', properties: {} },
   },
   {
-    name: 'extract_member_info',
-    description: 'Extract member information from a document page image using AI Vision. Returns structured MemberInfo or null.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        image_ref: { type: 'string', description: 'Storage reference to the document page image' },
-        page_number: { type: 'integer', description: '1-based page number' },
-      },
-      required: ['image_ref', 'page_number'],
-    },
-  },
-  {
-    name: 'validate_member',
-    description: 'Validate extracted member information against the member database. Returns match, mismatch, or not_found.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        member_info: { type: 'object', description: 'Extracted member information to validate' },
-      },
-      required: ['member_info'],
-    },
-  },
-  {
     name: 'rotate_page',
     description: 'Rotate a document page image by the given degrees. Deletes the original by default and returns the new image reference. Use the exact rotated_ref in correctedData.',
     inputSchema: {

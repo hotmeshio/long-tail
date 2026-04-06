@@ -177,6 +177,8 @@ export interface GenerateYamlOptions {
   priorDeployError?: string;
   /** YAML from the prior failed attempt. */
   priorFailedYaml?: string;
+  /** User feedback describing issues with a prior compilation (wrong inputs, leaked details, etc.). */
+  compilationFeedback?: string;
 }
 
 /** Result from YAML workflow generation. */

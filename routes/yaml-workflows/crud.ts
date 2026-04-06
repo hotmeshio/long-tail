@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { workflow_id, task_queue, workflow_name, name, description, app_id, subscribes, tags: userTags } = req.body;
+    const { workflow_id, task_queue, workflow_name, name, description, app_id, subscribes, tags: userTags, compilation_feedback } = req.body;
     if (!workflow_id || !task_queue || !workflow_name || !name) {
       res.status(400).json({
         error: 'workflow_id, task_queue, workflow_name, and name are required',
@@ -71,6 +71,7 @@ router.post('/', async (req, res) => {
       description,
       appId: app_id,
       subscribes,
+      compilationFeedback: compilation_feedback,
     });
 
     // Merge auto-derived tags with user-provided tags
@@ -192,6 +193,7 @@ router.post('/:id/regenerate', async (req, res) => {
       taskQueue = sourceTask?.task_queue || 'v1';
     }
 
+    const feedback = req.body.compilation_feedback;
     const result = await yamlGenerator.generateYamlFromExecution({
       workflowId: wf.source_workflow_id,
       taskQueue,
@@ -199,6 +201,8 @@ router.post('/:id/regenerate', async (req, res) => {
       name: wf.name,
       description: wf.description || undefined,
       appId: wf.app_id,
+      compilationFeedback: feedback || undefined,
+      priorFailedYaml: feedback ? wf.yaml_content : undefined,
     });
 
     const updated = await yamlDb.updateYamlWorkflow(wf.id, {

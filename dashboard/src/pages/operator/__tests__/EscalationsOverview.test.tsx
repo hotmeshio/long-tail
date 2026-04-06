@@ -25,7 +25,7 @@ const mockStats = {
   ],
   by_type: [
     { type: 'review-content', pending: 6, claimed: 1, resolved: 10 },
-    { type: 'verify-document', pending: 3, claimed: 2, resolved: 5 },
+    { type: 'kitchen-sink', pending: 3, claimed: 2, resolved: 5 },
   ],
 };
 
@@ -114,7 +114,7 @@ describe('EscalationsOverview', () => {
     renderPage();
     expect(screen.getByText('Type')).toBeInTheDocument();
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
   });
 
   it('hides by-type table when empty', () => {

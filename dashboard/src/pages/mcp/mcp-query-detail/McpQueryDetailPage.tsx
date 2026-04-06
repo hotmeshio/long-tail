@@ -50,6 +50,7 @@ export function McpQueryDetailPage() {
   const [compileDescription, setCompileDescription] = useState('');
   const [compileTags, setCompileTags] = useState<string[]>([]);
   const [compileInitialized, setCompileInitialized] = useState(false);
+  const [compileFeedback, setCompileFeedback] = useState('');
 
   const { data: execution } = useMcpQueryExecution(workflowId);
   const { data: resultData } = useMcpQueryResult(workflowId);
@@ -204,6 +205,7 @@ export function McpQueryDetailPage() {
       workflow_id: workflowId, task_queue: 'long-tail-system', workflow_name: 'mcpQuery',
       name: compileName.trim(), description: compileDescription.trim() || undefined,
       app_id: compileAppId.trim(), subscribes: derivedSubscribes, tags: compileTags,
+      compilation_feedback: compileFeedback.trim() || undefined,
     });
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
     setManualStep(4);
@@ -319,6 +321,8 @@ export function McpQueryDetailPage() {
           describeData={describeData}
           describePrompt={describePrompt}
           allAppIds={allAppIds}
+          compileFeedback={compileFeedback}
+          setCompileFeedback={setCompileFeedback}
           onCompile={handleCompile}
           isCompiling={createYaml.isPending}
           compileError={createYaml.isError ? createYaml.error.message : undefined}

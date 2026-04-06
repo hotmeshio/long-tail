@@ -4,7 +4,7 @@ import {
   useDiscoveredWorkflows,
   useDeleteWorkflowConfig,
 } from '../../../api/workflows';
-import { Play, ShieldCheck, ShieldPlus, ShieldOff } from 'lucide-react';
+import { ShieldCheck, ShieldPlus, ShieldOff } from 'lucide-react';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
@@ -75,12 +75,7 @@ export function WorkflowConfigsPage() {
       label: 'Workflow',
       render: (row) => (
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <WorkflowPill type={row.workflow_type} />
-            {row.invocable && (
-              <Play className="w-3 h-3 shrink-0 text-accent/60" strokeWidth={2} aria-label="Invocable" />
-            )}
-          </div>
+          <WorkflowPill type={row.workflow_type} />
           {row.description && (
             <p className="text-[10px] text-text-tertiary mt-0.5 truncate">{row.description}</p>
           )}

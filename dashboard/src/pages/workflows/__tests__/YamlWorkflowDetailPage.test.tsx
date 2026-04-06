@@ -56,7 +56,7 @@ const draftWorkflow = {
     },
     {
       activity_id: 'a1', title: 'Extract Info', type: 'worker',
-      tool_source: 'mcp', mcp_server_id: 'vision', mcp_tool_name: 'extract_member_info',
+      tool_source: 'mcp', mcp_server_id: 'vision', mcp_tool_name: 'translate_content',
       topic: 'rotate_and_verify-a1', input_mappings: { image_ref: '$a0.rotated_path' },
       output_fields: ['member_id', 'name'],
     },
@@ -189,7 +189,7 @@ describe('YamlWorkflowDetailPage', () => {
   it('shows step detail when clicking a pipeline step', () => {
     renderPage();
     fireEvent.click(screen.getByText('Extract Info'));
-    expect(screen.getByText('vision/extract_member_info')).toBeInTheDocument();
+    expect(screen.getByText('vision/translate_content')).toBeInTheDocument();
   });
 
   // ── Configuration section ──

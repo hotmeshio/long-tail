@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { callLLM } from '../llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../logger';
-import * as verifyActivities from '../../examples/workflows/verify-document/activities';
 import { TRANSLATE_SYSTEM_PROMPT } from '../../system/mcp-servers/prompts';
 
 // ── Resolve fixtures directory ──────────────────────────────────────────────
@@ -26,11 +25,6 @@ function fixturesDir(): string {
 
 const listDocumentPagesSchema = z.object({});
 
-const extractMemberInfoSchema = z.object({
-  image_ref: z.string().describe('Storage reference to the document page image'),
-  page_number: z.number().int().min(1).describe('1-based page number'),
-});
-
 const rotatePageSchema = z.object({
   image_ref: z.string().describe('Storage reference to the image to rotate'),
   degrees: z.number().int().describe('Rotation degrees (90, 180, 270)'),
@@ -41,28 +35,18 @@ const translateContentSchema = z.object({
   target_language: z.string().describe('Target language code (e.g. "en", "es")'),
 });
 
-const validateMemberSchema = z.object({
-  member_info: z.object({
-    memberId: z.string().optional(),
-    name: z.string().optional(),
-    address: z.object({
-      street: z.string(),
-      city: z.string(),
-      state: z.string(),
-      zip: z.string(),
-    }).optional(),
-    phone: z.string().optional(),
-    email: z.string().optional(),
-    emergencyContact: z.object({
-      name: z.string(),
-      phone: z.string(),
-    }).optional(),
-    isPartialInfo: z.boolean().optional(),
-  }).describe('Extracted member information to validate against the member database'),
-});
+/**
+ * List available document page images from storage.
+ */
+async function listDocumentPages(): Promise<string[]> {
+  const dir = fixturesDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter(f => f.endsWith('.png') || f.endsWith('.jpg'));
+}
 
 /**
- * Register all five vision tools on an McpServer instance.
+ * Register all three vision tools on an McpServer instance.
  */
 function registerTools(srv: McpServer): void {
   // ── list_document_pages ─────────────────────────────────────────
@@ -74,44 +58,9 @@ function registerTools(srv: McpServer): void {
       inputSchema: listDocumentPagesSchema,
     },
     async (_args: z.infer<typeof listDocumentPagesSchema>) => {
-      const pages = await verifyActivities.listDocumentPages();
+      const pages = await listDocumentPages();
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({ pages }) }],
-      };
-    },
-  );
-
-  // ── extract_member_info ─────────────────────────────────────────
-  (srv as any).registerTool(
-    'extract_member_info',
-    {
-      title: 'Extract Member Info',
-      description: 'Extract member information from a document page image using OpenAI Vision (gpt-4o-mini). Returns structured MemberInfo or null if the image is unreadable (e.g. upside down or blurry).',
-      inputSchema: extractMemberInfoSchema,
-    },
-    async (args: z.infer<typeof extractMemberInfoSchema>) => {
-      const info = await verifyActivities.extractMemberInfo(
-        args.image_ref,
-        args.page_number,
-      );
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ member_info: info }) }],
-      };
-    },
-  );
-
-  // ── validate_member ─────────────────────────────────────────────
-  (srv as any).registerTool(
-    'validate_member',
-    {
-      title: 'Validate Member',
-      description: 'Validate extracted member information against the member database. Returns match, mismatch, or not_found with optional database record.',
-      inputSchema: validateMemberSchema,
-    },
-    async (args: z.infer<typeof validateMemberSchema>) => {
-      const result = await verifyActivities.validateMember(args.member_info);
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
     },
   );
@@ -243,7 +192,7 @@ export async function createVisionServer(options?: {
   const name = options?.name || 'long-tail-document-vision';
   const instance = new McpServer({ name, version: '1.0.0' });
   registerTools(instance);
-  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (5 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:vision-server] ${name} ready (3 tools registered)`);
   return instance;
 }
 

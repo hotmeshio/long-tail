@@ -24,8 +24,8 @@ function makeWorker(overrides: Partial<ActiveWorker> = {}): ActiveWorker {
 const WORKERS: ActiveWorker[] = [
   makeWorker({ name: 'reviewContent', task_queue: 'long-tail-examples', registered: true }),
   makeWorker({ name: 'kitchenSink', task_queue: 'long-tail-examples', registered: true }),
-  makeWorker({ name: 'verifyDocument', task_queue: 'long-tail-examples', registered: false }),
-  makeWorker({ name: 'processClaim', task_queue: 'claims-queue', registered: false }),
+  makeWorker({ name: 'basicEcho', task_queue: 'long-tail-examples', registered: false }),
+  makeWorker({ name: 'customFlow', task_queue: 'user-queue', registered: false }),
 ];
 
 function renderPage(initialPath = '/workflows/workers') {
@@ -59,8 +59,8 @@ describe('WorkersPage', () => {
     renderPage();
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
     expect(screen.getByText('kitchenSink')).toBeInTheDocument();
-    expect(screen.getByText('verifyDocument')).toBeInTheDocument();
-    expect(screen.getByText('processClaim')).toBeInTheDocument();
+    expect(screen.getByText('basicEcho')).toBeInTheDocument();
+    expect(screen.getByText('customFlow')).toBeInTheDocument();
   });
 
   // ── Status badges ──
@@ -135,8 +135,8 @@ describe('WorkersPage', () => {
   it('filters by queue', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[0], { target: { value: 'claims-queue' } });
-    expect(screen.getByText('processClaim')).toBeInTheDocument();
+    fireEvent.change(selects[0], { target: { value: 'user-queue' } });
+    expect(screen.getByText('customFlow')).toBeInTheDocument();
     expect(screen.queryByText('reviewContent')).not.toBeInTheDocument();
   });
 
@@ -146,16 +146,16 @@ describe('WorkersPage', () => {
     const options = Array.from(selects[0].querySelectorAll('option')).map((o) => o.textContent);
     expect(options).toContain('All');
     expect(options).toContain('long-tail-examples');
-    expect(options).toContain('claims-queue');
+    expect(options).toContain('user-queue');
   });
 
   it('clearing queue filter restores all results', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[0], { target: { value: 'claims-queue' } });
+    fireEvent.change(selects[0], { target: { value: 'user-queue' } });
     expect(screen.queryByText('reviewContent')).not.toBeInTheDocument();
     fireEvent.change(selects[0], { target: { value: '' } });
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
-    expect(screen.getByText('processClaim')).toBeInTheDocument();
+    expect(screen.getByText('customFlow')).toBeInTheDocument();
   });
 });

@@ -45,10 +45,10 @@ function renderColumn(colKey: string, row: LTEscalationRecord) {
 describe('ESCALATION_COLUMNS', () => {
   // ── Summary column (status dot + description + type) ──
   it('renders description with type pill', () => {
-    renderColumn('description', makeEscalation({ type: 'verify-document', subtype: 'id-check', description: 'Document needs review' }));
-    expect(screen.getByText('Document needs review')).toBeInTheDocument();
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
-    expect(screen.getByText('id-check')).toBeInTheDocument();
+    renderColumn('description', makeEscalation({ type: 'review-content', subtype: 'quality-check', description: 'Content needs review' }));
+    expect(screen.getByText('Content needs review')).toBeInTheDocument();
+    expect(screen.getByText('review-content')).toBeInTheDocument();
+    expect(screen.getByText('quality-check')).toBeInTheDocument();
   });
 
   // ── Task column ──
@@ -105,7 +105,7 @@ describe('EscalationFilterBar', () => {
         filters={{ role: '', type: '', priority: '' }}
         setFilter={vi.fn()}
         roles={['reviewer', 'engineer']}
-        types={['review-content', 'verify-document']}
+        types={['review-content', 'kitchen-sink']}
       />,
     );
     expect(screen.getByText('Role')).toBeInTheDocument();

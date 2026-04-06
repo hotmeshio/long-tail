@@ -37,15 +37,15 @@ const WORKFLOWS: DiscoveredWorkflow[] = [
     roles: ['reviewer', 'admin'],
   }),
   makeWorkflow({
-    workflow_type: 'process-claim-orchestrator',
-    description: 'Insurance claim orchestrator',
+    workflow_type: 'kitchen-sink',
+    description: 'Kitchen sink demo workflow',
     registered: true,
     invocable: true,
-    task_queue: 'claims',
-    roles: ['claims-adjuster'],
+    task_queue: 'examples',
+    roles: ['reviewer'],
   }),
   makeWorkflow({
-    workflow_type: 'verify-document',
+    workflow_type: 'basic-echo',
     registered: true,
     invocable: false,
     task_queue: 'default',
@@ -92,8 +92,8 @@ describe('WorkflowConfigsPage', () => {
   it('renders all workflows when no filters applied', () => {
     renderPage();
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
+    expect(screen.getByText('basic-echo')).toBeInTheDocument();
     expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
   });
 
@@ -139,10 +139,10 @@ describe('WorkflowConfigsPage', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     // Queue is the first select
-    fireEvent.change(selects[0], { target: { value: 'claims' } });
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    fireEvent.change(selects[0], { target: { value: 'examples' } });
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-    expect(screen.queryByText('verify-document')).not.toBeInTheDocument();
+    expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
   });
 
   // ── Filter: Tier ──
@@ -170,9 +170,9 @@ describe('WorkflowConfigsPage', () => {
     renderPage();
     const selects = screen.getAllByRole('combobox');
     // Role is the third select
-    fireEvent.change(selects[2], { target: { value: 'claims-adjuster' } });
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
-    expect(screen.queryByText('review-content')).not.toBeInTheDocument();
+    fireEvent.change(selects[2], { target: { value: 'admin' } });
+    expect(screen.getByText('review-content')).toBeInTheDocument();
+    expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
   });
 
   // ── Filter: Search ──
@@ -181,10 +181,10 @@ describe('WorkflowConfigsPage', () => {
     vi.useFakeTimers();
     renderPage();
     const input = screen.getByPlaceholderText('Search workflow type...');
-    fireEvent.change(input, { target: { value: 'claim' } });
+    fireEvent.change(input, { target: { value: 'kitchen' } });
     // Debounce fires after 300ms
     await act(() => vi.advanceTimersByTime(300));
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     vi.useRealTimers();
   });
@@ -193,9 +193,9 @@ describe('WorkflowConfigsPage', () => {
     vi.useFakeTimers();
     renderPage();
     const input = screen.getByPlaceholderText('Search workflow type...');
-    fireEvent.change(input, { target: { value: 'insurance' } });
+    fireEvent.change(input, { target: { value: 'demo' } });
     await act(() => vi.advanceTimersByTime(300));
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     vi.useRealTimers();
   });
@@ -207,10 +207,10 @@ describe('WorkflowConfigsPage', () => {
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'default' } });
     fireEvent.change(selects[2], { target: { value: 'reviewer' } });
-    // review-content and verify-document are in default queue with reviewer role
+    // review-content and basic-echo are in default queue with reviewer role
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('verify-document')).toBeInTheDocument();
-    expect(screen.queryByText('process-claim-orchestrator')).not.toBeInTheDocument();
+    expect(screen.getByText('basic-echo')).toBeInTheDocument();
+    expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
   });
 
   // ── Facet options ──
@@ -224,7 +224,7 @@ describe('WorkflowConfigsPage', () => {
     );
     expect(options).toContain('All');
     expect(options).toContain('default');
-    expect(options).toContain('claims');
+    expect(options).toContain('examples');
   });
 
   it('derives role options from data', () => {
@@ -237,7 +237,6 @@ describe('WorkflowConfigsPage', () => {
     expect(options).toContain('All');
     expect(options).toContain('reviewer');
     expect(options).toContain('admin');
-    expect(options).toContain('claims-adjuster');
   });
 
   // ── Column rendering ──
@@ -246,8 +245,8 @@ describe('WorkflowConfigsPage', () => {
     renderPage();
     // reviewer appears in multiple configs + filter dropdown
     expect(screen.getAllByText('reviewer').length).toBeGreaterThanOrEqual(1);
-    // claims-adjuster appears in both the table pill and the filter dropdown
-    expect(screen.getAllByText('claims-adjuster').length).toBeGreaterThanOrEqual(1);
+    // admin appears in both the table pill and the filter dropdown
+    expect(screen.getAllByText('admin').length).toBeGreaterThanOrEqual(1);
   });
 
   // ── Actions ──
@@ -293,12 +292,12 @@ describe('filter helpers (via rendering)', () => {
     } as any);
     renderPage();
     const selects = screen.getAllByRole('combobox');
-    // Filter to claims queue
-    fireEvent.change(selects[0], { target: { value: 'claims' } });
+    // Filter to examples queue
+    fireEvent.change(selects[0], { target: { value: 'examples' } });
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     // Clear filter
     fireEvent.change(selects[0], { target: { value: '' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('process-claim-orchestrator')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
   });
 });

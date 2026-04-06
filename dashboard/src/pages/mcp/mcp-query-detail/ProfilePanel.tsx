@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
@@ -116,6 +117,8 @@ interface CreateProfileFormProps {
   describeData: { tool_name?: string; description: string; tags: string[] } | undefined;
   describePrompt: string | undefined;
   allAppIds: string[];
+  compileFeedback: string;
+  setCompileFeedback: (v: string) => void;
   onCompile: () => Promise<void>;
   isCompiling: boolean;
   compileError: string | undefined;
@@ -135,11 +138,14 @@ function CreateProfileForm({
   describeData,
   describePrompt,
   allAppIds,
+  compileFeedback,
+  setCompileFeedback,
   onCompile,
   isCompiling,
   compileError,
   onBack,
 }: CreateProfileFormProps) {
+  const [showFeedback, setShowFeedback] = useState(!!compileFeedback);
   return (
     <div>
       <PanelTitle title="Create Workflow Profile" subtitle="Define the deterministic workflow tool from this execution" />
@@ -188,6 +194,21 @@ function CreateProfileForm({
         </div>
       </div>
 
+      <div className="mt-5">
+        <button type="button" onClick={() => setShowFeedback(!showFeedback)}
+          className="text-xs text-accent hover:text-accent/80 transition-colors">
+          {showFeedback ? 'Hide refinement feedback' : 'Refine compilation'}
+        </button>
+        {showFeedback && (
+          <div className="mt-2">
+            <textarea value={compileFeedback} onChange={(e) => setCompileFeedback(e.target.value)}
+              placeholder="Describe what should change. E.g.: 'Only url, username, password, and screenshot_dir should be dynamic inputs. The steps array is an implementation detail.'"
+              className="w-full min-h-[80px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
+            <p className="text-[10px] text-text-tertiary mt-1">This feedback is sent to the compiler so it can adjust inputs, outputs, and step selection.</p>
+          </div>
+        )}
+      </div>
+
       <WizardNav>
         <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
         <button onClick={onCompile} disabled={!compileName.trim() || !compileAppId.trim() || isCompiling} className="btn-primary text-xs">
@@ -216,6 +237,8 @@ interface ProfilePanelProps {
   describeData: { tool_name?: string; description: string; tags: string[] } | undefined;
   describePrompt: string | undefined;
   allAppIds: string[];
+  compileFeedback: string;
+  setCompileFeedback: (v: string) => void;
   onCompile: () => Promise<void>;
   isCompiling: boolean;
   compileError: string | undefined;
@@ -263,6 +286,8 @@ export function ProfilePanel(props: ProfilePanelProps) {
       describeData={props.describeData}
       describePrompt={props.describePrompt}
       allAppIds={props.allAppIds}
+      compileFeedback={props.compileFeedback}
+      setCompileFeedback={props.setCompileFeedback}
       onCompile={props.onCompile}
       isCompiling={props.isCompiling}
       compileError={props.compileError}

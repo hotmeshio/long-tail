@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, User, Bot } from 'lucide-react';
 import { useUsers, useDeleteUser, useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import { useRoles } from '../../../api/roles';
 import { useFilterParams } from '../../../hooks/useFilterParams';
@@ -148,21 +148,24 @@ function RolePanel({ user }: { user: LTUserRecord | null }) {
 type AccountTab = 'users' | 'service-accounts';
 
 function AccountTabToggle({ active, onChange }: { active: AccountTab; onChange: (t: AccountTab) => void }) {
-  const tabClass = (tab: AccountTab) =>
-    `px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-      active === tab
-        ? 'bg-accent/10 text-accent'
-        : 'text-text-tertiary hover:text-text-secondary'
-    }`;
+  const btn = (tab: AccountTab, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => onChange(tab)}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+        active === tab
+          ? 'bg-accent/10 text-accent font-medium'
+          : 'text-text-tertiary hover:text-text-secondary hover:bg-surface-hover'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 
   return (
-    <div className="inline-flex items-center gap-1 bg-surface-sunken rounded-lg p-0.5 mb-6">
-      <button className={tabClass('users')} onClick={() => onChange('users')}>
-        User Accounts
-      </button>
-      <button className={tabClass('service-accounts')} onClick={() => onChange('service-accounts')}>
-        Service Accounts
-      </button>
+    <div className="flex gap-1 p-0.5 bg-surface-sunken rounded-lg w-fit">
+      {btn('users', <User className="w-3.5 h-3.5" />, 'User Accounts')}
+      {btn('service-accounts', <Bot className="w-3.5 h-3.5" />, 'Service Accounts')}
     </div>
   );
 }
@@ -184,8 +187,10 @@ export function UsersPage() {
 
   return (
     <div>
-      <PageHeader title="Accounts" />
-      <AccountTabToggle active={activeTab} onChange={handleTabChange} />
+      <PageHeader
+        title="Accounts"
+        actions={<AccountTabToggle active={activeTab} onChange={handleTabChange} />}
+      />
       {activeTab === 'users' ? <UserAccountsPanel /> : <BotsPage embedded />}
     </div>
   );

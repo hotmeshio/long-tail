@@ -35,18 +35,16 @@ afterEach(async () => {
 });
 
 describe('Vision MCP Server', () => {
-  it('should register 5 tools', async () => {
+  it('should register 3 tools', async () => {
     const client = await connectClient();
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(5);
+    expect(tools.length).toBe(3);
 
     const names = tools.map(t => t.name).sort();
     expect(names).toEqual([
-      'extract_member_info',
       'list_document_pages',
       'rotate_page',
       'translate_content',
-      'validate_member',
     ]);
     await client.close();
   });
@@ -71,7 +69,7 @@ describe('Vision MCP Server', () => {
     const client = await connectClient();
     const result = await client.callTool({
       name: 'rotate_page',
-      arguments: { image_ref: 'page1_upside_down.png', degrees: 180, replace_original: false },
+      arguments: { image_ref: 'page1_upside_down.png', degrees: 180 },
     });
     const data = parseMcpResult(result);
     expect(data.rotated_ref).toBe('page1_upside_down_rotated.png');
@@ -100,90 +98,6 @@ describe('Vision MCP Server', () => {
     await client.close();
   });
 
-  it('should validate a matching member against the database', async () => {
-    const client = await connectClient();
-    const result = await client.callTool({
-      name: 'validate_member',
-      arguments: {
-        member_info: {
-          memberId: 'MBR-2024-001',
-          name: 'John Smith',
-          address: {
-            street: '123 Main Street',
-            city: 'Springfield',
-            state: 'IL',
-            zip: '62701',
-          },
-        },
-      },
-    });
-    const data = parseMcpResult(result);
-    expect(data.result).toBe('match');
-    expect(data.databaseRecord).toBeDefined();
-    await client.close();
-  });
-
-  it('should return not_found for unknown member', async () => {
-    const client = await connectClient();
-    const result = await client.callTool({
-      name: 'validate_member',
-      arguments: {
-        member_info: {
-          memberId: 'UNKNOWN-999',
-          name: 'Nobody',
-        },
-      },
-    });
-    const data = parseMcpResult(result);
-    expect(data.result).toBe('not_found');
-    await client.close();
-  });
-
-  it('should return mismatch for address discrepancy', async () => {
-    const client = await connectClient();
-    const result = await client.callTool({
-      name: 'validate_member',
-      arguments: {
-        member_info: {
-          memberId: 'MBR-2024-001',
-          name: 'John Smith',
-          address: {
-            street: '456 Elm Street',
-            city: 'Rivertown',
-            state: 'CA',
-            zip: '90210',
-          },
-        },
-      },
-    });
-    const data = parseMcpResult(result);
-    expect(data.result).toBe('mismatch');
-    expect(data.databaseRecord).toBeDefined();
-    await client.close();
-  });
-
-  it('should return mismatch for expired member', async () => {
-    const client = await connectClient();
-    const result = await client.callTool({
-      name: 'validate_member',
-      arguments: {
-        member_info: {
-          memberId: 'MBR-2024-002',
-          name: 'Jane Doe',
-          address: {
-            street: '456 Oak Avenue',
-            city: 'Springfield',
-            state: 'IL',
-            zip: '62702',
-          },
-        },
-      },
-    });
-    const data = parseMcpResult(result);
-    expect(data.result).toBe('mismatch');
-    await client.close();
-  });
-
   // Multiple independent instances can be created and connected
   it('should allow multiple independent server instances', async () => {
     const server1 = await createVisionServer({ name: 'test-vision-1' });
@@ -204,8 +118,8 @@ describe('Vision MCP Server', () => {
     // Both work independently
     const r1 = await client1.listTools();
     const r2 = await client2.listTools();
-    expect(r1.tools.length).toBe(5);
-    expect(r2.tools.length).toBe(5);
+    expect(r1.tools.length).toBe(3);
+    expect(r2.tools.length).toBe(3);
 
     await client1.close();
     await client2.close();

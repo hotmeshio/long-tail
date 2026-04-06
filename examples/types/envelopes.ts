@@ -14,27 +14,6 @@ export interface ReviewContentEnvelopeData {
   contentType?: string;
 }
 
-// ── verifyDocument ──────────────────────────────────────────────
-
-/** Document to verify — image-based identity or membership document. */
-export interface VerifyDocumentEnvelopeData {
-  documentId: string;
-  documentUrl: string;
-  documentType?: string;
-  memberId?: string;
-}
-
-// ── processClaim ────────────────────────────────────────────────
-
-/** Insurance claim with document images to process. */
-export interface ProcessClaimEnvelopeData {
-  claimId: string;
-  claimantId: string;
-  claimType: string;
-  amount: number;
-  documents: string[];
-}
-
 // ── kitchenSink ─────────────────────────────────────────────────
 
 /** Kitchen sink — showcases every Durable primitive. */
@@ -60,8 +39,6 @@ export interface BasicEchoEnvelopeData {
 /** Map of invocable workflow type → its typed envelope data shape. */
 export type WorkflowEnvelopeMap = {
   reviewContent: ReviewContentEnvelopeData;
-  verifyDocument: VerifyDocumentEnvelopeData;
-  processClaim: ProcessClaimEnvelopeData;
   kitchenSink: KitchenSinkEnvelopeData;
   basicEcho: BasicEchoEnvelopeData;
 };

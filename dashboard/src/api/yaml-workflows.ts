@@ -70,6 +70,7 @@ export function useCreateYamlWorkflow() {
       app_id?: string;
       subscribes?: string;
       tags?: string[];
+      compilation_feedback?: string;
     }) =>
       apiFetch<LTYamlWorkflowRecord>('/yaml-workflows', {
         method: 'POST',
@@ -124,10 +125,10 @@ export function useInvokeYamlWorkflow() {
 export function useRegenerateYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, task_queue }: { id: string; task_queue?: string }) =>
+    mutationFn: ({ id, task_queue, compilation_feedback }: { id: string; task_queue?: string; compilation_feedback?: string }) =>
       apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}/regenerate`, {
         method: 'POST',
-        body: JSON.stringify({ task_queue }),
+        body: JSON.stringify({ task_queue, compilation_feedback }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });

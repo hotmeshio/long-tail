@@ -3,7 +3,6 @@ import { Durable } from '@hotmeshio/hotmesh';
 import type { LTEnvelope } from '../types';
 import type {
   ReviewContentEnvelopeData,
-  ProcessClaimEnvelopeData,
   KitchenSinkEnvelopeData,
   BasicEchoEnvelopeData,
 } from './types';
@@ -59,7 +58,7 @@ const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 
 // ── Seed processes ───────────────────────────────────────────────────────────
 //
-// Six processes that tell the LongTail story. Each workflow is invocable
+// Five processes that tell the LongTail story. Each workflow is invocable
 // directly -- no orchestrator wrappers needed.
 //
 // Process 1 -- "Clean Review"
@@ -73,19 +72,14 @@ const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 //   Walk the escalation chain: reviewer -> admin -> engineer.
 //   As engineer, check "Request AI Triage" to trigger MCP remediation.
 //
-// Process 4 -- "Damaged Claim -> MCP Triage (Image Orientation)"
-//   Insurance claim with upside-down document images.
-//   AI Vision detects low confidence -> escalates.
-//   As reviewer, check "Request AI Triage" to trigger MCP remediation.
-//
-// Process 5 -- "Dynamic Triage (Kitchen Sink)"
+// Process 4 -- "Dynamic Triage (Kitchen Sink)"
 //   Kitchen-sink workflow creates a standard escalation.
 //   As reviewer, check "Request AI Triage" to trigger dynamic triage.
 //
-// Process 6 -- "Basic Echo"
+// Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-type SeedWorkflowName = 'reviewContent' | 'processClaim' | 'kitchenSink' | 'basicEcho';
+type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho';
 
 const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -150,33 +144,9 @@ const SEED_ENVELOPES: Array<{
     },
   },
 
-  // -- Process 4: Damaged Claim -> MCP Triage
+  // -- Process 4: Kitchen Sink -> Dynamic Triage
   {
-    label: 'Process 4 — Damaged Claim',
-    workflowName: 'processClaim',
-    taskQueue: 'long-tail-examples',
-    envelope: {
-      data: {
-        claimId: 'CLM-2024-042',
-        claimantId: 'MBR-2024-001',
-        claimType: 'auto_collision',
-        amount: 12500,
-        documents: [
-          'page1_upside_down.png',
-          'page2.png',
-        ],
-      } satisfies ProcessClaimEnvelopeData,
-      metadata: {
-        source: 'seed',
-        process: 'damaged-claim',
-        description: 'Insurance claim with upside-down document. As reviewer, check "Request AI Triage" and describe: "Page 1 appears to be scanned upside down."',
-      },
-    },
-  },
-
-  // -- Process 5: Kitchen Sink -> Dynamic Triage
-  {
-    label: 'Process 5 — Dynamic Triage',
+    label: 'Process 4 — Dynamic Triage',
     workflowName: 'kitchenSink',
     taskQueue: 'long-tail-examples',
     envelope: {
@@ -192,9 +162,9 @@ const SEED_ENVELOPES: Array<{
     },
   },
 
-  // -- Process 6: Basic Echo
+  // -- Process 5: Basic Echo
   {
-    label: 'Process 6 — Basic Echo',
+    label: 'Process 5 — Basic Echo',
     workflowName: 'basicEcho',
     taskQueue: 'long-tail-examples',
     envelope: {

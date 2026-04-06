@@ -44,15 +44,15 @@ function buildColumns(
   return [
     {
       key: 'workflow_id',
-      label: 'Workflow',
+      label: 'Workflow ID / Type',
       render: (row) => {
         const dotClass = STATUS_DOT[jobStatusMap[row.status] ?? row.status] ?? 'bg-status-pending';
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
           <div className="flex items-start gap-2 min-w-0">
-            <span className={`w-2 h-2 shrink-0 rounded-full mt-1.5 ${dotClass}${pulseClass}`} title={row.status} />
+            <span className={`w-[9px] h-[9px] shrink-0 rounded-full mt-1 ${dotClass}${pulseClass}`} title={row.status} />
             <div className="min-w-0">
-              <span className="font-mono text-xs text-text-secondary truncate block">
+              <span className="font-mono text-xs text-text-primary truncate block">
                 {row.workflow_id}
               </span>
               <div className="mt-0.5">

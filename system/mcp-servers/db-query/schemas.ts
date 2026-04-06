@@ -7,7 +7,7 @@ import { QUERY_LIMIT_DEFAULT, QUERY_LIMIT_MAX } from '../../../modules/defaults'
 export const findTasksSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'needs_intervention', 'completed', 'failed'])
     .optional().describe('Filter by task status'),
-  workflow_type: z.string().optional().describe('Filter by workflow type (e.g. "processClaim")'),
+  workflow_type: z.string().optional().describe('Filter by workflow type (e.g. "reviewContent")'),
   workflow_id: z.string().optional().describe('Filter by workflow execution ID'),
   origin_id: z.string().optional().describe('Filter by origin/process ID to see all tasks in a process'),
   limit: z.number().int().min(1).max(QUERY_LIMIT_MAX).optional().default(QUERY_LIMIT_DEFAULT)

@@ -9,6 +9,7 @@
 import type { InputFieldMeta } from '../../../../types/yaml-workflow';
 import type { EnhancedCompilationPlan, PipelineContext } from '../../types';
 import { callCompilationLLM } from './llm-call';
+import { buildRecompilationHint } from '../prompts';
 
 /**
  * Apply a compilation plan to override the naive input field metadata.
@@ -42,29 +43,9 @@ function applyInputOverrides(
  * uses mechanical heuristics as before.
  */
 export async function compile(ctx: PipelineContext): Promise<PipelineContext> {
-  // Build retry context if this is a recompilation after a failed deployment or validation
+  // Build retry context — either user feedback or deployment error
   const retryHint = ctx.priorDeployError
-    ? [
-        `\n## RECOMPILATION — Prior Attempt Failed`,
-        `The previous compilation produced YAML that failed with this error:`,
-        `> ${ctx.priorDeployError}`,
-        ``,
-        `You MUST produce a plan that avoids this issue. Specifically:`,
-        `- If the error mentions input key mismatches (e.g., 'login.url' vs 'url'), ensure your`,
-        `  dataFlow edges use the exact field names each tool expects as inputs.`,
-        `- If the error mentions missing input wiring or session handles, ensure all data dependencies`,
-        `  (including _handle, page_id, and other session fields) are explicitly wired in dataFlow edges.`,
-        `- If the error mentions "Duplicate activity id", ensure all activity IDs will be unique.`,
-        `- If the error mentions invalid transitions, ensure data flow edges reference valid step indices.`,
-        `- Review the failed YAML below for the specific structural issue and ensure your plan avoids it.`,
-        ...(ctx.priorFailedYaml ? [
-          ``,
-          `### Failed YAML (excerpt)`,
-          '```yaml',
-          ctx.priorFailedYaml.slice(0, 2000),
-          '```',
-        ] : []),
-      ].join('\n')
+    ? buildRecompilationHint(ctx.priorDeployError, ctx.priorFailedYaml)
     : undefined;
 
   // Attempt LLM compilation

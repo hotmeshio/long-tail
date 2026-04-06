@@ -62,7 +62,7 @@ export async function generateYamlFromExecution(
     tags: [],
     category: 'general',
     validationIssues: [],
-    priorDeployError: options.priorDeployError,
+    priorDeployError: options.compilationFeedback || options.priorDeployError,
     priorFailedYaml: options.priorFailedYaml,
   };
 
