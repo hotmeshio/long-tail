@@ -1,5 +1,16 @@
-# Dashboard (source, config, node_modules)
-dashboard/
+# Dashboard (source, config, node_modules — but keep dist for embedded server)
+dashboard/src/
+dashboard/node_modules/
+dashboard/package.json
+dashboard/package-lock.json
+dashboard/tsconfig.json
+dashboard/tsconfig.node.json
+dashboard/vite.config.ts
+dashboard/tailwind.config.js
+dashboard/postcss.config.js
+dashboard/index.html
+dashboard/.eslintrc*
+dashboard/tests/
 
 # Tests
 tests/

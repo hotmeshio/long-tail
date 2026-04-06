@@ -8,6 +8,12 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "build/",
+    "dashboard/dist/",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "clean": "rimraf ./build",
     "build": "tsc --build tsconfig.json",
@@ -21,7 +27,7 @@
     "test:watch": "vitest",
     "test:workflows": "vitest run tests/workflows",
     "test:export": "vitest run tests/workflows/export.test.ts",
-    "test:vision": "vitest run tests/workflows/verify-document.test.ts",
+    "test:vision": "vitest run tests/services/mcp/vision-server.test.ts",
     "test:mcp": "vitest run tests/mcp.test.ts",
     "test:mcp:triage": "vitest run tests/workflows/mcp-triage.test.ts",
     "test:integration": "docker compose down -v && rm -rf .docker-data/files/* && docker compose up -d --build && vitest run --config tests/integration/vitest.config.ts",
