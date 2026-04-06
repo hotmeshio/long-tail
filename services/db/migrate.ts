@@ -4,7 +4,12 @@ import * as path from 'path';
 import { getPool, closePool } from './index';
 import { loggerRegistry } from '../logger';
 
-const SCHEMAS_DIR = path.join(__dirname, 'schemas');
+// In dev: __dirname = services/db → schemas is ./schemas
+// In built/published: __dirname = build/services/db → schemas is ../../../services/db/schemas
+const devPath = path.join(__dirname, 'schemas');
+const SCHEMAS_DIR = fs.existsSync(devPath)
+  ? devPath
+  : path.join(__dirname, '..', '..', '..', 'services', 'db', 'schemas');
 
 export async function migrate(): Promise<void> {
   const pool = getPool();
