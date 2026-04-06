@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalationListEvents } from '../../hooks/useNatsEvents';
-import { useToast } from '../../hooks/useToast';
 import {
   useEscalations,
   useEscalationTypes,
@@ -34,7 +33,6 @@ export function AvailableEscalationsPage() {
   useEscalationListEvents();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
-  const { addToast } = useToast();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available' },
   });
@@ -61,12 +59,12 @@ export function AvailableEscalationsPage() {
     setSelectedIds(new Set());
   }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
-  // Map the status filter to the correct API endpoint
-  const statusFilter = filters.status || 'available';
+  // Map the UI status filter to the API status parameter
+  const statusFilter = filters.status || '';
   const apiStatus = statusFilter === 'available' ? 'pending'
     : statusFilter === 'claimed' ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
-    : undefined;
+    : undefined; // '' (All) → no filter
 
   const { data, isLoading, error: queryError } = useEscalations({
     status: apiStatus,
@@ -125,7 +123,6 @@ export function AvailableEscalationsPage() {
     handleBulkAssign,
   } = createBulkHandlers({
     selectedIds,
-    addToast,
     clearSelection,
     setPriority,
     bulkClaim,

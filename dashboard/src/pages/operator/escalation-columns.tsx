@@ -19,10 +19,14 @@ function StatusDot({ row }: { row: LTEscalationRecord }) {
   if (row.status === 'resolved') {
     return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-success text-status-success" />;
   }
+  if (row.status === 'cancelled') {
+    return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-error text-status-error" />;
+  }
   if (isEffectivelyClaimed(row)) {
     return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-warning text-status-warning" />;
   }
-  return <Circle className="w-2.5 h-2.5 shrink-0 fill-text-tertiary text-text-tertiary" />;
+  // pending (unclaimed)
+  return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-active text-status-active" />;
 }
 
 /** Base columns shared by all escalation list pages. */

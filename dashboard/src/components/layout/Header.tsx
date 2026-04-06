@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox } from 'lucide-react';
+import { Inbox, User } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyEscalationCount } from '../../hooks/useMyEscalationCount';
 import { NatsStatus } from '../common/display/NatsStatus';
@@ -49,6 +49,7 @@ export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }
               onClick={() => setMenuOpen((o) => !o)}
               className="btn-ghost text-xs flex items-center gap-1"
             >
+              <User className="w-3.5 h-3.5 text-accent/75" strokeWidth={1.5} />
               {user.displayName || user.username || user.userId}
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

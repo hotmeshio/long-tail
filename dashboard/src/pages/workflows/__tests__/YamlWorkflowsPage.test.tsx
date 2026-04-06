@@ -115,7 +115,7 @@ describe('YamlWorkflowsPage', () => {
       isLoading: false,
     } as any);
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText('No workflow tools found')).toBeInTheDocument();
+    expect(screen.getByText('No pipelines yet')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {

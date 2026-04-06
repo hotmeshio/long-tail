@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
-import { ToastProvider } from './hooks/useToast';
 import { EventTransportProvider } from './hooks/useEventTransport';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
@@ -256,9 +255,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <EventTransportProvider>
         <AuthProvider>
-          <ToastProvider>
-            <RouterProvider router={router} />
-          </ToastProvider>
+          <RouterProvider router={router} />
         </AuthProvider>
       </EventTransportProvider>
     </QueryClientProvider>

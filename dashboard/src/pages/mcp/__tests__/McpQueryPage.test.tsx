@@ -82,10 +82,10 @@ describe('McpQueryPage', () => {
     expect(screen.getByText('triage-abc')).toBeInTheDocument();
   });
 
-  it('shows entity type badges', () => {
+  it('shows workflow type pills', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getAllByText('Query').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Triage')).toBeInTheDocument();
+    expect(screen.getAllByText('mcpQuery').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('mcpTriage')).toBeInTheDocument();
   });
 
   it('shows Direct checkbox (default checked)', () => {

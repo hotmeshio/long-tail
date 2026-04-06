@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useToast } from '../../../hooks/useToast';
 import {
   useEscalation,
   useClaimEscalation,
@@ -54,7 +53,6 @@ export function EscalationDetailPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { addToast } = useToast();
   const { data: esc, isLoading } = useEscalation(id!);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
@@ -155,13 +153,10 @@ export function EscalationDetailPage() {
   const handleResolve = async (payload: Record<string, unknown>) => {
     const result = await resolve.mutateAsync({ id: esc.id, resolverPayload: payload }) as any;
     if (result?.signaled && result?.workflowId) {
-      addToast('Response sent — workflow resuming', 'success');
       navigate(`/workflows/executions/${result.workflowId}`);
     } else if (result?.triage && result?.workflowId) {
-      addToast('AI triage started', 'success');
       navigate(`/workflows/executions/${result.workflowId}`);
     } else {
-      addToast('Escalation resolved', 'success');
       navigate(returnPath);
     }
   };
@@ -169,7 +164,6 @@ export function EscalationDetailPage() {
   const handleEscalate = async (targetRole: string) => {
     if (!targetRole) return;
     await escalate.mutateAsync({ id: esc.id, targetRole });
-    addToast(`Escalated to ${targetRole}`, 'success');
     navigate(returnPath);
   };
 
@@ -183,17 +177,14 @@ export function EscalationDetailPage() {
       resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
     }) as any;
     if (result?.triage && result?.workflowId) {
-      addToast('AI triage started', 'success');
       navigate(`/workflows/executions/${result.workflowId}`);
     } else {
-      addToast('Sent to AI triage', 'success');
       navigate(returnPath);
     }
   };
 
   const handleRelease = async () => {
     await claim.mutateAsync({ id: esc.id, durationMinutes: 0 });
-    addToast('Escalation released', 'success');
     navigate(returnPath);
   };
 

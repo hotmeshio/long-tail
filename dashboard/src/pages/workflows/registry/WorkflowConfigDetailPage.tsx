@@ -1,20 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useWorkflowConfigs, useUpsertWorkflowConfig, useInvokeWorkflow, useJobs } from '../../../api/workflows';
-import { useToast } from '../../../hooks/useToast';
+import { useWorkflowConfigs, useUpsertWorkflowConfig, useJobs } from '../../../api/workflows';
 import { StepIndicator } from '../../../components/common/layout/StepIndicator';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { splitCsv } from '../../../lib/parse';
-import { EMPTY_FORM, configToForm, STEP_LABELS, isStepValid, DEFAULT_ENVELOPE } from './config-form-types';
+import { EMPTY_FORM, configToForm, STEP_LABELS, isStepValid } from './config-form-types';
 import type { ConfigFormState } from './config-form-types';
 import { BasicsStep, AccessStep, SchemasStep } from './ConfigWizardSteps';
-import { InvokeSidebar } from './InvokeSidebar';
 
 export function WorkflowConfigDetailPage() {
   const { workflowType } = useParams<{ workflowType: string }>();
   const isNew = !workflowType;
   const navigate = useNavigate();
-  const { addToast } = useToast();
   const { data: configs, isLoading } = useWorkflowConfigs();
   const upsert = useUpsertWorkflowConfig();
 
@@ -65,9 +62,6 @@ export function WorkflowConfigDetailPage() {
     }, { replace: false });
   }, [setSearchParams]);
 
-  const invokeMutation = useInvokeWorkflow();
-  const [invokeJson, setInvokeJson] = useState(DEFAULT_ENVELOPE);
-  const [invokeParseError, setInvokeParseError] = useState('');
 
   useEffect(() => {
     if (initialized) return;
@@ -81,15 +75,6 @@ export function WorkflowConfigDetailPage() {
       setInitialized(true);
     }
   }, [editing, isNew, initialized, prefillForm]);
-
-  useEffect(() => {
-    if (!editing) return;
-    setInvokeJson(
-      editing.envelope_schema
-        ? JSON.stringify(editing.envelope_schema, null, 2)
-        : DEFAULT_ENVELOPE,
-    );
-  }, [editing]);
 
   const set = (field: keyof ConfigFormState, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -133,7 +118,6 @@ export function WorkflowConfigDetailPage() {
       },
       {
         onSuccess: () => {
-          addToast(isNew ? 'Config created' : 'Config saved', 'success');
           navigate('/workflows/registry');
         },
       },
@@ -155,51 +139,14 @@ export function WorkflowConfigDetailPage() {
     return <p className="text-sm text-text-secondary">Config not found.</p>;
   }
 
-  // ── Invoke sidebar ──────────────────────────────────────────────────────
-
-  const handleInvoke = async () => {
-    const wfType = form.workflow_type.trim();
-    if (!wfType) return;
-
-    setInvokeParseError('');
-    let envelope: Record<string, unknown>;
-    try {
-      envelope = JSON.parse(invokeJson);
-    } catch {
-      setInvokeParseError('Invalid JSON');
-      return;
-    }
-
-    const { data, metadata } = envelope;
-    if (!data || typeof data !== 'object') {
-      setInvokeParseError('Envelope must include a "data" object');
-      return;
-    }
-
-    try {
-      await invokeMutation.mutateAsync({
-        workflowType: wfType,
-        data: data as Record<string, unknown>,
-        metadata: (metadata as Record<string, unknown>) ?? undefined,
-      });
-      navigate('/workflows/executions');
-    } catch {
-      // Error available via invokeMutation.error
-    }
-  };
-
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isLast = step === STEP_LABELS.length;
-  const showInvokeSidebar = !isNew && form.invocable;
-
   return (
     <div>
       <PageHeader title={isNew ? 'Register Workflow' : editing?.workflow_type ?? ''} />
 
-      <div className={`grid gap-12 ${showInvokeSidebar ? 'grid-cols-1 lg:grid-cols-3' : ''}`}>
-        {/* Wizard (left / full width) */}
-        <div className={showInvokeSidebar ? 'lg:col-span-2' : 'max-w-3xl'}>
+      <div className="max-w-3xl">
           <StepIndicator steps={STEP_LABELS} currentStep={step - 1} onStepClick={(i) => setStep(i + 1)} />
 
           <div className="min-h-[360px] py-2">
@@ -249,20 +196,7 @@ export function WorkflowConfigDetailPage() {
               )}
             </div>
           </div>
-        </div>
 
-        {/* Invoke sidebar (right) */}
-        {showInvokeSidebar && editing && (
-          <InvokeSidebar
-            invokeJson={invokeJson}
-            setInvokeJson={setInvokeJson}
-            invokeParseError={invokeParseError}
-            setInvokeParseError={setInvokeParseError}
-            invokeMutation={invokeMutation}
-            onInvoke={handleInvoke}
-            editing={editing}
-          />
-        )}
       </div>
     </div>
   );

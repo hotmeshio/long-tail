@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, User } from 'lucide-react';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
@@ -12,7 +12,7 @@ import type { LTEscalationRecord } from '../../../api/types';
 
 export function EscalationHero({
   esc,
-  claimedByMe,
+  claimedByMe: _claimedByMe,
   claimed,
   isTerminal,
   traceUrl,
@@ -48,19 +48,19 @@ export function EscalationHero({
         {/* Status */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Status</p>
-          <span className="inline-flex items-center h-5"><StatusBadge status={esc.status} /></span>
+          <span className="mb-1 inline-block"><StatusBadge status={esc.status} /></span>
         </div>
 
         {/* Role */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Role</p>
-          <span className="inline-flex items-center h-5"><RolePill role={esc.role} size="md" /></span>
+          <RolePill role={esc.role} size="md" />
         </div>
 
         {/* Created */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Created</p>
-          <span className="inline-flex items-center h-5 text-xs text-text-secondary">
+          <span className="inline-flex items-center mb-1 text-xs text-text-secondary">
             <TimeAgo date={esc.created_at} />
           </span>
         </div>
@@ -69,8 +69,9 @@ export function EscalationHero({
         {esc.assigned_to && (
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Claimed by</p>
-            <span className="inline-flex items-center h-5 text-xs font-medium text-text-primary">
-              {claimedByMe ? 'You' : <UserName userId={esc.assigned_to} />}
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-primary">
+              <User className="w-3 h-3 shrink-0 text-accent/75" />
+              <UserName userId={esc.assigned_to} />
             </span>
           </div>
         )}
