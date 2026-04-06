@@ -109,12 +109,16 @@ export async function startWorkers(
       loggerRegistry.info('[long-tail] MCP adapter connected');
     }
 
-    // Register built-in MCP server factories from system/
+    // Register MCP server factories: built-in (from system/) + user-provided
     const { registerBuiltinServer } = await import('../services/mcp/client');
-    for (const [name, factory] of Object.entries(builtinMcpServerFactories)) {
+    const allFactories = {
+      ...builtinMcpServerFactories,
+      ...(startConfig.mcp?.serverFactories ?? {}),
+    };
+    for (const [name, factory] of Object.entries(allFactories)) {
       registerBuiltinServer(name, factory);
     }
-    loggerRegistry.info(`[long-tail] ${Object.keys(builtinMcpServerFactories).length} MCP server factories registered`);
+    loggerRegistry.info(`[long-tail] ${Object.keys(allFactories).length} MCP server factories registered`);
 
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();

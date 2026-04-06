@@ -102,6 +102,11 @@ export interface LTStartConfig {
     };
     /** MCP server IDs to auto-connect on startup. */
     autoConnect?: string[];
+    /**
+     * Custom MCP server factories to register alongside the built-in ones.
+     * Key = server name, value = factory function returning an McpServer instance.
+     */
+    serverFactories?: Record<string, () => any>;
     /** Replace the built-in MCP adapter entirely. */
     adapter?: LTMcpAdapter;
   };
