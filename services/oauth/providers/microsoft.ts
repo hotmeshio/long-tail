@@ -1,5 +1,3 @@
-import { MicrosoftEntraId } from 'arctic';
-
 import type { LTOAuthProviderConfig } from '../../../types/oauth';
 
 import type { ProviderHandler } from './types';
@@ -7,14 +5,23 @@ import type { ProviderHandler } from './types';
 export function createMicrosoftHandler(cfg: LTOAuthProviderConfig): ProviderHandler {
   const redirectUri = cfg.redirectUri || '';
   const tenantId = process.env.OAUTH_MICROSOFT_TENANT_ID || 'common';
-  const ms = new MicrosoftEntraId(tenantId, cfg.clientId, cfg.clientSecret, redirectUri);
+  let _ms: any;
+  async function getClient() {
+    if (!_ms) {
+      const { MicrosoftEntraId } = await import('arctic');
+      _ms = new MicrosoftEntraId(tenantId, cfg.clientId, cfg.clientSecret, redirectUri);
+    }
+    return _ms;
+  }
   return {
     config: cfg,
-    createAuthorizationURL(state, codeVerifier) {
+    async createAuthorizationURL(state, codeVerifier) {
+      const ms = await getClient();
       const scopes = cfg.scopes.length > 0 ? cfg.scopes : ['openid', 'email', 'profile'];
       return ms.createAuthorizationURL(state, codeVerifier, scopes);
     },
     async validateAuthorizationCode(code, codeVerifier) {
+      const ms = await getClient();
       const tokens = await ms.validateAuthorizationCode(code, codeVerifier);
       return {
         accessToken: tokens.accessToken(),
@@ -23,6 +30,7 @@ export function createMicrosoftHandler(cfg: LTOAuthProviderConfig): ProviderHand
       };
     },
     async refreshAccessToken(refreshToken) {
+      const ms = await getClient();
       const scopes = cfg.scopes.length > 0 ? cfg.scopes : ['openid', 'email', 'profile'];
       const tokens = await ms.refreshAccessToken(refreshToken, scopes);
       return {

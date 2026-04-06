@@ -65,7 +65,7 @@ router.get('/connections', requireAuth, async (req, res) => {
  * GET /api/auth/oauth/:provider
  * Initiate the OAuth flow — redirects the browser to the provider.
  */
-router.get('/:provider', (req, res) => {
+router.get('/:provider', async (req, res) => {
   const { provider } = req.params;
   const handler = getProvider(provider);
   if (!handler) {
@@ -82,7 +82,7 @@ router.get('/:provider', (req, res) => {
     handler.config.redirectUri = `${baseUrl}/api/auth/oauth/${provider}/callback`;
   }
 
-  const url = handler.createAuthorizationURL(state, codeVerifier);
+  const url = await handler.createAuthorizationURL(state, codeVerifier);
   res.redirect(url.toString());
 });
 
@@ -234,7 +234,7 @@ router.get('/connect/:provider', (req, res, next) => {
     req.headers.authorization = `Bearer ${token}`;
   }
   next();
-}, requireAuth, (req, res) => {
+}, requireAuth, async (req, res) => {
   const userId = req.auth!.userId;
   const provider = req.params.provider as string;
   const handler = getProvider(provider);
@@ -256,7 +256,7 @@ router.get('/connect/:provider', (req, res, next) => {
     handler.config.redirectUri = `${baseUrl}/api/auth/oauth/${provider}/callback`;
   }
 
-  const url = handler.createAuthorizationURL(state, codeVerifier);
+  const url = await handler.createAuthorizationURL(state, codeVerifier);
   res.redirect(url.toString());
 });
 

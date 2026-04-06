@@ -1,19 +1,26 @@
-import { GitHub } from 'arctic';
-
 import type { LTOAuthProviderConfig } from '../../../types/oauth';
 
 import type { ProviderHandler } from './types';
 
 export function createGitHubHandler(cfg: LTOAuthProviderConfig): ProviderHandler {
   const redirectUri = cfg.redirectUri || null;
-  const github = new GitHub(cfg.clientId, cfg.clientSecret, redirectUri);
+  let _github: any;
+  async function getClient() {
+    if (!_github) {
+      const { GitHub } = await import('arctic');
+      _github = new GitHub(cfg.clientId, cfg.clientSecret, redirectUri);
+    }
+    return _github;
+  }
   return {
     config: cfg,
-    createAuthorizationURL(state, _codeVerifier) {
+    async createAuthorizationURL(state, _codeVerifier) {
+      const github = await getClient();
       const scopes = cfg.scopes.length > 0 ? cfg.scopes : ['read:user', 'user:email'];
       return github.createAuthorizationURL(state, scopes);
     },
     async validateAuthorizationCode(code, _codeVerifier) {
+      const github = await getClient();
       const tokens = await github.validateAuthorizationCode(code);
       return {
         accessToken: tokens.accessToken(),
