@@ -93,8 +93,8 @@ describe('TIME_LEFT_COLUMN', () => {
   it('renders countdown when assigned_until is set', () => {
     const future = new Date(Date.now() + 300_000).toISOString();
     render(<MemoryRouter>{TIME_LEFT_COLUMN.render(makeEscalation({ assigned_until: future }), 0)}</MemoryRouter>);
-    // CountdownTimer renders e.g. "4m 59s"
-    expect(screen.getByText(/\d+m\s+\d+s/)).toBeInTheDocument();
+    // CountdownTimer renders e.g. "4m 59s" or "5m"
+    expect(screen.getByText(/\d+m(\s+\d+s)?/)).toBeInTheDocument();
   });
 });
 

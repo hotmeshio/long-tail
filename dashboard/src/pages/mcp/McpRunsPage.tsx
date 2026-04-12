@@ -6,9 +6,11 @@ import { useNamespaces } from '../../api/namespaces';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { DateValue } from '../../components/common/display/DateValue';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import type { LTJob } from '../../api/types';
 
 const statusMap: Record<string, string> = {
@@ -43,21 +45,13 @@ const columns: Column<LTJob>[] = [
   {
     key: 'created_at',
     label: 'Started',
-    render: (row) => (
-      <span className="text-xs text-text-secondary font-mono">
-        {new Date(row.created_at).toISOString().replace('T', ' ').slice(0, 23)}
-      </span>
-    ),
+    render: (row) => <DateValue date={row.created_at} format="datetime" className="font-mono text-text-secondary" />,
     className: 'w-52',
   },
   {
     key: 'updated_at',
     label: 'Updated',
-    render: (row) => (
-      <span className="text-xs text-text-secondary font-mono">
-        {new Date(row.updated_at).toISOString().replace('T', ' ').slice(0, 23)}
-      </span>
-    ),
+    render: (row) => <DateValue date={row.updated_at} format="relative" className="text-text-secondary" />,
     className: 'w-52',
   },
 ];
@@ -95,7 +89,7 @@ export function McpRunsPage() {
   const activeNamespace = filters.namespace || defaultNamespace;
   const { data: entitiesData } = useMcpEntities(activeNamespace);
 
-  const { data: runsData, isLoading } = useMcpRuns({
+  const { data: runsData, isLoading, refetch, isFetching } = useMcpRuns({
     app_id: activeNamespace,
     limit: pagination.pageSize,
     offset: pagination.offset,
@@ -134,7 +128,7 @@ export function McpRunsPage() {
     <div>
       <PageHeader title="Pipeline Executions" />
 
-      <FilterBar>
+      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
         <FilterSelect
           label="Namespace"
           value={activeNamespace}

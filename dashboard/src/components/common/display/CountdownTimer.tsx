@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { format as fnsFormat } from 'date-fns';
 import { formatRemaining } from '../../../lib/format';
+import { DateTooltip } from './DateTooltip';
 
-/** Countdown thresholds in milliseconds with corresponding color classes. */
 const COUNTDOWN_THRESHOLDS = [
-  { maxMs: 0,              color: 'text-status-error' },    // expired
-  { maxMs: 5 * 60 * 1000,  color: 'text-status-error' },    // < 5 min — red
-  { maxMs: 15 * 60 * 1000, color: 'text-status-warning' },  // < 15 min — orange
-  { maxMs: Infinity,        color: 'text-accent' },          // plenty of time — blue
+  { maxMs: 0,              color: 'text-status-error' },
+  { maxMs: 5 * 60 * 1000,  color: 'text-status-error' },
+  { maxMs: 15 * 60 * 1000, color: 'text-status-warning' },
+  { maxMs: Infinity,        color: 'text-accent' },
 ] as const;
 
 function countdownColor(remainingMs: number): string {
@@ -27,9 +28,20 @@ export function CountdownTimer({ until }: { until: string }) {
     return () => clearInterval(interval);
   }, [until]);
 
+  const options = useMemo(() => {
+    const d = new Date(until);
+    return [
+      { label: 'ms', value: String(Math.max(0, remaining)) },
+      { label: 'until', value: d.toISOString() },
+      { label: 'local', value: fnsFormat(d, 'MMM d, yyyy h:mm:ss a') },
+    ];
+  }, [until, remaining]);
+
   return (
-    <span className={`text-xs font-mono ${countdownColor(remaining)}`}>
-      {formatRemaining(remaining)}
-    </span>
+    <DateTooltip options={options}>
+      <span className={`text-xs font-mono ${countdownColor(remaining)}`}>
+        {formatRemaining(remaining)}
+      </span>
+    </DateTooltip>
   );
 }

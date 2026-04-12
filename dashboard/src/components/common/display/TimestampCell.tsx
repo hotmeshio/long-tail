@@ -1,4 +1,4 @@
-import { TimeAgo } from './TimeAgo';
+import { DateValue } from './DateValue';
 
 interface TimestampCellProps {
   date: string;
@@ -11,7 +11,7 @@ interface TimestampCellProps {
 export function TimestampCell({ date }: TimestampCellProps) {
   return (
     <div>
-      <TimeAgo date={date} />
+      <DateValue date={date} format="relative" />
       <p className="text-[9px] font-mono text-text-secondary mt-0.5 whitespace-nowrap">
         {new Date(date).toISOString().replace('T', ' ').slice(0, 19)} UTC
       </p>

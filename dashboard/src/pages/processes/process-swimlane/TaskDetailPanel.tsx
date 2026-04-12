@@ -1,12 +1,11 @@
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
-import { TimeAgo } from '../../../components/common/display/TimeAgo';
-import { formatDuration } from '../../../lib/format';
+import { TimestampCell } from '../../../components/common/display/TimestampCell';
+import { DurationValue } from '../../../components/common/display/DurationValue';
 import type { LTTaskRecord } from '../../../api/types';
 import { MetricCell } from './MetricCell';
 import { TraceLink } from './TraceLink';
-import { formatAbsoluteTime } from './helpers';
 
 export function TaskDetailPanel({
   task,
@@ -30,27 +29,19 @@ export function TaskDetailPanel({
 
         <div className="grid grid-cols-3 gap-4">
           <MetricCell label="Started">
-            <span className="font-mono">{formatAbsoluteTime(task.created_at)}</span>
-            <p className="text-[10px] text-text-tertiary mt-0.5">
-              <TimeAgo date={task.created_at} />
-            </p>
+            <TimestampCell date={task.created_at} />
           </MetricCell>
 
           <MetricCell label="Completed">
             {task.completed_at ? (
-              <>
-                <span className="font-mono">{formatAbsoluteTime(task.completed_at)}</span>
-                <p className="text-[10px] text-text-tertiary mt-0.5">
-                  <TimeAgo date={task.completed_at} />
-                </p>
-              </>
+              <TimestampCell date={task.completed_at} />
             ) : (
-              <span className="text-text-tertiary italic">In progress</span>
+              <span className="text-text-tertiary italic text-xs">In progress</span>
             )}
           </MetricCell>
 
           <MetricCell label="Duration">
-            <span className="font-mono text-sm">{formatDuration(elapsed)}</span>
+            <DurationValue ms={elapsed} className="font-mono text-sm" />
           </MetricCell>
         </div>
 

@@ -2,20 +2,10 @@ import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProcessDetail } from '../../api/tasks';
 import { useSettings } from '../../api/settings';
-import { PageHeader } from '../../components/common/layout/PageHeader';
+import { PageHeaderWithStats, type InlineStat } from '../../components/common/layout/PageHeaderWithStats';
 import { SectionLabel } from '../../components/common/layout/SectionLabel';
-import { StatCard } from '../../components/common/data/StatCard';
 import { ProcessSwimlaneTimeline } from './process-swimlane/ProcessSwimlaneTimeline';
-
-function formatElapsed(startIso: string, endIso?: string | null): string {
-  const start = new Date(startIso).getTime();
-  const end = endIso ? new Date(endIso).getTime() : Date.now();
-  const ms = end - start;
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  if (ms < 3_600_000) return `${(ms / 60_000).toFixed(1)}m`;
-  return `${(ms / 3_600_000).toFixed(1)}h`;
-}
+import { formatElapsed } from '../../lib/format';
 
 export function ProcessDetailPage() {
   const { originId } = useParams<{ originId: string }>();
@@ -53,6 +43,22 @@ export function ProcessDetailPage() {
     return { startIso, endIso, isFinished, elapsed: formatElapsed(startIso, endIso) };
   }, [tasks, escalations]);
 
+  const inlineStats = useMemo<InlineStat[]>(() => {
+    const items: InlineStat[] = [];
+    if (duration) {
+      items.push({
+        label: duration.isFinished ? 'Completed' : 'Running',
+        value: duration.elapsed,
+        dotClass: duration.isFinished ? 'bg-status-success' : 'bg-status-pending animate-pulse',
+      });
+    }
+    items.push(
+      { label: 'Tasks', value: `${stats.completed}/${stats.tasks}` },
+      { label: 'Escalations', value: `${stats.resolved}/${stats.escalations}` },
+    );
+    return items;
+  }, [duration, stats]);
+
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -64,29 +70,11 @@ export function ProcessDetailPage() {
 
   return (
     <div>
-      <PageHeader
+      <PageHeaderWithStats
         title="Process Detail"
-        actions={
-          duration && (
-            <span className="text-xs text-text-tertiary">
-              {duration.isFinished ? 'Completed' : 'Running'} &middot; {duration.elapsed}
-            </span>
-          )
-        }
+        subtitle={originId}
+        stats={inlineStats}
       />
-
-      <div className="mb-8">
-        <SectionLabel className="mb-1">Origin ID</SectionLabel>
-        <p className="text-sm font-mono text-text-primary break-all">{originId}</p>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-4 mb-10">
-        <StatCard label="Tasks" value={stats.tasks} />
-        <StatCard label="Completed" value={stats.completed} colorClass="text-status-success" />
-        <StatCard label="Escalations" value={stats.escalations} colorClass="text-status-pending" />
-        <StatCard label="Resolved" value={stats.resolved} colorClass="text-status-success" />
-      </div>
 
       <SectionLabel className="mb-6">Timeline</SectionLabel>
 

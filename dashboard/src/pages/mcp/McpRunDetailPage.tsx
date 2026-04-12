@@ -12,7 +12,9 @@ import { CollapsibleSection } from '../../components/common/layout/CollapsibleSe
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useEventSubscription } from '../../hooks/useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
-import { formatDuration } from '../../lib/format';
+import { DateValue } from '../../components/common/display/DateValue';
+import { DurationValue } from '../../components/common/display/DurationValue';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 
 import { SwimlaneTimeline } from '../workflows/workflow-execution/SwimlaneTimeline';
 import { EventTable } from '../workflows/workflow-execution/EventTable';
@@ -25,11 +27,6 @@ const statusMap: Record<string, string> = {
   failed: 'failed',
 };
 
-function formatTimestamp(iso: string | null): string {
-  if (!iso) return '—';
-  return iso.replace('T', ' ').replace('Z', '').slice(0, 23);
-}
-
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function McpRunDetailPage() {
@@ -37,7 +34,7 @@ export function McpRunDetailPage() {
   const [searchParams] = useSearchParams();
   const namespace = searchParams.get('namespace') || 'longtail';
   const queryClient = useQueryClient();
-  const { data: execution, isLoading, error } = useMcpRunExecution(jobId!, namespace);
+  const { data: execution, isLoading, error, refetch, isFetching } = useMcpRunExecution(jobId!, namespace);
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
   const workflowTopic = execution?.workflow_name || execution?.workflow_type;
@@ -95,7 +92,10 @@ export function McpRunDetailPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Execution" />
+      <PageHeader
+        title="Pipeline Execution"
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+      />
 
       {/* ── Header card ─────────────────────────────────── */}
       <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
@@ -123,15 +123,19 @@ export function McpRunDetailPage() {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>
-            <p className="text-xs font-mono text-text-primary">{formatDuration(execution.duration_ms)}</p>
+            <DurationValue ms={execution.duration_ms} className="font-mono text-text-primary" />
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Started</p>
-            <p className="text-xs font-mono text-text-primary">{formatTimestamp(execution.start_time)}</p>
+            {execution.start_time
+              ? <DateValue date={execution.start_time} format="datetime" className="font-mono text-text-primary" />
+              : <span className="text-xs text-text-tertiary">--</span>}
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Completed</p>
-            <p className="text-xs font-mono text-text-primary">{formatTimestamp(execution.close_time)}</p>
+            {execution.close_time
+              ? <DateValue date={execution.close_time} format="datetime" className="font-mono text-text-primary" />
+              : <span className="text-xs text-text-tertiary">--</span>}
           </div>
         </div>
 

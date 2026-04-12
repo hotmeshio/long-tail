@@ -11,6 +11,7 @@ import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
@@ -148,7 +149,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 
-  const { data: jobsData, isLoading } = useJobs({
+  const { data: jobsData, isLoading, refetch, isFetching } = useJobs({
     limit: pagination.pageSize,
     offset: pagination.offset,
     entity: filters.entity || undefined,
@@ -178,7 +179,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     <div>
       <PageHeader title={pageTitle} />
 
-      <FilterBar>
+      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
         <input
           type="text"
           placeholder="Search workflow ID..."

@@ -20,6 +20,10 @@ export interface PruneOptions {
   expire?: string;
   jobs?: boolean;
   streams?: boolean;
+  engineStreams?: boolean;
+  engineStreamsExpire?: string;
+  workerStreams?: boolean;
+  workerStreamsExpire?: string;
   attributes?: boolean;
   entities?: string[];
   pruneTransient?: boolean;
@@ -29,6 +33,8 @@ export interface PruneOptions {
 export interface PruneResult {
   jobs?: number;
   streams?: number;
+  engineStreams?: number;
+  workerStreams?: number;
   attributes?: number;
   transient?: number;
   marked?: number;

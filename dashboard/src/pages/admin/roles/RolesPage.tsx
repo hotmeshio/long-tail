@@ -8,11 +8,13 @@ import {
   useRemoveEscalationChain,
   type RoleDetail,
 } from '../../../api/roles';
+import { Trash2 } from 'lucide-react';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { Modal } from '../../../components/common/modal/Modal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
+import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 
 // ── Create Role Modal ─────────────────────────────────────────
 
@@ -256,25 +258,19 @@ export function RolesPage() {
       label: '',
       render: (row) => {
         const inUse = row.user_count > 0 || row.chain_count > 0 || row.workflow_count > 0;
+        if (inUse) return null;
         return (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmDelete(row);
-            }}
-            disabled={inUse}
-            className={`text-xs ${
-              inUse
-                ? 'text-text-tertiary cursor-not-allowed'
-                : 'text-status-error hover:underline'
-            }`}
-            title={inUse ? 'Cannot delete a role that is in use' : 'Delete role'}
-          >
-            Delete
-          </button>
+          <RowActionGroup>
+            <RowAction
+              icon={Trash2}
+              title="Delete role"
+              onClick={() => setConfirmDelete(row)}
+              colorClass="text-text-tertiary hover:text-status-error"
+            />
+          </RowActionGroup>
         );
       },
-      className: 'w-24 text-right',
+      className: 'w-16 text-right',
     },
   ];
 

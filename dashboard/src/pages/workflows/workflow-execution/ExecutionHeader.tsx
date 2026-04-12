@@ -2,30 +2,36 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import type { WorkflowExecution, LTTaskRecord, LTEscalationRecord } from '../../../api/types';
-import { formatDuration, formatDateTime } from './utils';
+import { formatDuration } from './utils';
+import { DateValue } from '../../../components/common/display/DateValue';
+import { DurationValue } from '../../../components/common/display/DurationValue';
 
 function MetadataField({
   label,
   value,
   mono,
   truncate,
+  children,
 }: {
   label: string;
-  value: string;
+  value?: string;
   mono?: boolean;
   truncate?: boolean;
+  children?: React.ReactNode;
 }) {
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
         {label}
       </p>
-      <p
-        className={`text-xs text-text-primary ${mono ? 'font-mono' : ''} ${truncate ? 'truncate' : ''}`}
-        title={truncate ? value : undefined}
-      >
-        {value}
-      </p>
+      {children || (
+        <p
+          className={`text-xs text-text-primary ${mono ? 'font-mono' : ''} ${truncate ? 'truncate' : ''}`}
+          title={truncate ? value : undefined}
+        >
+          {value}
+        </p>
+      )}
     </div>
   );
 }
@@ -132,13 +138,19 @@ export function ExecutionHeader({ execution, task, escalations, hasToolCalls, on
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-8">
         <MetadataField label="Workflow Type" value={workflowType} mono />
         <MetadataField label="Task Queue" value={taskQueue} mono />
-        <MetadataField label="Start Time" value={formatDateTime(execution.start_time)} />
-        <MetadataField label="End Time" value={formatDateTime(execution.close_time)} />
-        <MetadataField
-          label="Duration"
-          value={formatDuration(execution.duration_ms)}
-          mono
-        />
+        <MetadataField label="Start Time">
+          {execution.start_time
+            ? <DateValue date={execution.start_time} format="datetime" className="text-text-primary" />
+            : <span className="text-xs text-text-tertiary">--</span>}
+        </MetadataField>
+        <MetadataField label="End Time">
+          {execution.close_time
+            ? <DateValue date={execution.close_time} format="datetime" className="text-text-primary" />
+            : <span className="text-xs text-text-tertiary">--</span>}
+        </MetadataField>
+        <MetadataField label="Duration">
+          <DurationValue ms={execution.duration_ms} className="font-mono text-text-primary" />
+        </MetadataField>
         <MetadataField
           label="History Size"
           value={`${execution.summary.total_events} events`}

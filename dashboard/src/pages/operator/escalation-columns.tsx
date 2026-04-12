@@ -157,15 +157,17 @@ export function EscalationFilterBar({
   roles,
   types,
   showStatus = false,
+  actions,
 }: {
   filters: { role: string; type: string; priority: string; status?: string };
   setFilter: (key: any, value: string) => void;
   roles: string[];
   types: string[];
   showStatus?: boolean;
+  actions?: React.ReactNode;
 }) {
   return (
-    <FilterBar>
+    <FilterBar actions={actions}>
       {showStatus && (
         <FilterSelect
           label="Status"

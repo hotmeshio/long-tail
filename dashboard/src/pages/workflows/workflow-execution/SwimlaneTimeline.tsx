@@ -241,10 +241,11 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
 
             {/* Inline detail panels */}
             {lane.segments.map((seg) => {
-              const evt = expandedEvts.find((e) => e.event_id === seg.eventId);
+              const isOpen = selectedEvents.has(seg.eventId);
+              const evt = displayEvents.find((e) => e.event_id === seg.eventId);
               return (
-                <Collapsible key={seg.eventId} open={!!evt}>
-                  {evt ? (
+                <Collapsible key={seg.eventId} open={isOpen}>
+                  {evt && (
                     <div className="py-3">
                       <EventDetailPanel
                         event={evt}
@@ -253,7 +254,7 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
                         onClose={() => toggleEvent(evt.event_id)}
                       />
                     </div>
-                  ) : null}
+                  )}
                 </Collapsible>
               );
             })}

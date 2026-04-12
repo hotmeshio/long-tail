@@ -5,10 +5,11 @@ import { useProcessListEvents } from '../../hooks/useNatsEvents';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
-import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { PageHeader } from '../../components/common/layout/PageHeader';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 
 const STATUS_OPTIONS = [
@@ -65,14 +66,14 @@ const columns: Column<ProcessSummary>[] = [
   {
     key: 'started_at',
     label: 'Started',
-    render: (row) => <TimeAgo date={row.started_at} />,
-    className: 'w-32',
+    render: (row) => <TimestampCell date={row.started_at} />,
+    className: 'w-44',
   },
   {
     key: 'last_activity',
     label: 'Last Activity',
-    render: (row) => <TimeAgo date={row.last_activity} />,
-    className: 'w-32',
+    render: (row) => <TimestampCell date={row.last_activity} />,
+    className: 'w-44',
   },
 ];
 
@@ -88,7 +89,7 @@ export function ProcessesListPage() {
   const { data: configs } = useWorkflowConfigs();
   const workflowTypes = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
 
-  const { data, isLoading } = useProcesses({
+  const { data, isLoading, refetch, isFetching } = useProcesses({
     workflow_type: filters.workflow_type || undefined,
     status: filters.status || undefined,
     search: debouncedSearch || undefined,
@@ -102,7 +103,7 @@ export function ProcessesListPage() {
     <div>
       <PageHeader title="All Processes" />
 
-      <FilterBar>
+      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
         <FilterInput
           label="Search"
           value={filters.search}

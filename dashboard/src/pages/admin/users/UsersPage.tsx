@@ -7,7 +7,7 @@ import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
-import { TimeAgo } from '../../../components/common/display/TimeAgo';
+import { TimestampCell } from '../../../components/common/display/TimestampCell';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
@@ -259,8 +259,8 @@ function UserAccountsPanel() {
     {
       key: 'created_at',
       label: 'Created',
-      render: (row) => <TimeAgo date={row.created_at} />,
-      className: 'w-28',
+      render: (row) => <TimestampCell date={row.created_at} />,
+      className: 'w-44',
     },
     {
       key: 'actions',
@@ -310,7 +310,7 @@ function UserAccountsPanel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* Left — users table */}
-        <div>
+        <div className="overflow-x-clip">
           <DataTable
             columns={columns}
             data={users}

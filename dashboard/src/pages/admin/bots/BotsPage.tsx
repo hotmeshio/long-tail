@@ -18,6 +18,7 @@ import { RowAction, RowActionGroup } from '../../../components/common/layout/Row
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
+import { TimestampCell } from '../../../components/common/display/TimestampCell';
 import type { BotRecord, BotApiKeyRecord, LTRoleType } from '../../../api/types';
 import { CreateBotModal } from './CreateBotModal';
 import { EditBotModal } from './EditBotModal';
@@ -350,8 +351,8 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
     {
       key: 'created_at',
       label: 'Created',
-      render: (row) => <TimeAgo date={row.created_at} />,
-      className: 'w-28',
+      render: (row) => <TimestampCell date={row.created_at} />,
+      className: 'w-44',
     },
     {
       key: 'actions',
@@ -405,7 +406,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <div>
+        <div className="overflow-x-clip">
           <DataTable
             columns={columns}
             data={bots}
