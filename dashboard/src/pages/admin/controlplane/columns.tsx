@@ -14,35 +14,6 @@ interface ColumnOptions {
   onBulkThrottle?: () => void;
 }
 
-function selectColumn(
-  profiles: QuorumProfile[],
-  selectedIds: Set<string>,
-  toggleAll: () => void,
-  toggleCheckbox: (p: QuorumProfile) => void,
-): Column<QuorumProfile> {
-  return {
-    key: 'select',
-    label: (
-      <input
-        type="checkbox"
-        checked={profiles.length > 0 && selectedIds.size === profiles.length}
-        onChange={toggleAll}
-        className="rounded"
-      />
-    ) as any,
-    render: (row) => (
-      <input
-        type="checkbox"
-        checked={selectedIds.has(rowKey(row))}
-        onChange={(e) => { e.stopPropagation(); toggleCheckbox(row); }}
-        onClick={(e) => e.stopPropagation()}
-        className="rounded"
-      />
-    ),
-    className: 'w-10',
-  };
-}
-
 function throttleColumn(): Column<QuorumProfile> {
   return {
     key: 'throttle',

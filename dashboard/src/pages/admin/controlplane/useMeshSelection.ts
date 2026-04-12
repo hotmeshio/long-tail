@@ -61,7 +61,6 @@ export function useMeshSelection({
 
     const engines = selected.filter((p) => !isWorker(p));
     const workers = selected.filter(isWorker);
-    const allEngines = allProfiles.filter((p) => !isWorker(p));
     const targets: ThrottleTarget[] = [];
 
     // Engines — always guid-per-engine (each engine subscribes to its own guid channel)

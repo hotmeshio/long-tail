@@ -106,7 +106,6 @@ export function ControlPlanePage() {
     selectedIds,
     setSelectedIds,
     toggleCheckbox,
-    toggleAll,
     throttleModalOpen,
     throttleTargets,
     selectedThrottleTargets,
@@ -287,6 +286,8 @@ export function ControlPlanePage() {
                       onResumeThrottle={handleResumeThrottle}
                       onQueueThrottle={handleQueueThrottle}
                       onResumeQueue={handleResumeQueue}
+                      byStream={streamStats?.byStream ?? []}
+                      activeDuration={activeDuration}
                     />
                   ))}
               </>
