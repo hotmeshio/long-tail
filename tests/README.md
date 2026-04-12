@@ -3,10 +3,10 @@
 ## Quick Reference
 
 ```bash
-# Frontend tests (fast — ~4s, 52 files, 517 tests)
+# Frontend tests (fast — ~4s, 62 files, 676 tests)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~60s, 47 files, 614 tests)
+# Backend: fast unit/integration tests only (~75s, 45 files, 606 tests)
 npx vitest run --exclude 'tests/workflows/**'
 
 # Backend: workflow tests only (~3min, 8 files, 65 tests)
@@ -29,24 +29,24 @@ npm run test:integration
 
 | Suite | Files | Tests | Duration |
 |-------|-------|-------|----------|
-| Frontend | 52 | 517 | ~4s |
-| Backend fast | 47 | 614 | ~60s |
+| Frontend | 62 | 676 | ~4s |
+| Backend fast | 45 | 606 | ~75s |
 | Backend workflows | 8 | 65 | ~3min |
-| **Backend total** | **55** | **679** | **~5min** |
+| **Backend total** | **53** | **671** | **~5min** |
 | Integration (Docker) | 2 | 15 | ~5min |
 | Functional (Docker) | — | — | varies |
-| **Grand total** | **109+** | **1,211+** | — |
+| **Grand total** | **117+** | **1,362+** | — |
 
 ## Test Categories
 
 ### Frontend (`dashboard/src/**/*.test.{ts,tsx}`)
-- **52 files, 517 tests, ~4 seconds**
+- **62 files, 676 tests, ~4 seconds**
 - Pure unit tests: components, hooks, utils, API mocks
 - Environment: jsdom, no external dependencies
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/{modules,services,routes}/**/*.test.ts`)
-- **47 files, 614 tests, ~60 seconds**
+- **45 files, 606 tests, ~75 seconds**
 - **Recommended for iterative development** — run after every code change
 - Organized by layer: `tests/modules/` (auth, config, start), `tests/services/` (escalations, events, MCP, OAuth, YAML workflow, etc.), `tests/routes/` (13 files mirroring routes/)
 - Requires: PostgreSQL (`longtail_test` database)
