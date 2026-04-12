@@ -64,18 +64,12 @@ export function useMeshSelection({
     const allEngines = allProfiles.filter((p) => !isWorker(p));
     const targets: ThrottleTarget[] = [];
 
-    // Engines
-    if (engines.length > 0) {
-      if (engines.length === allEngines.length) {
-        targets.push({ label: 'All Engines', topic: engines[0].stream || '' });
-      } else {
-        for (const e of engines) {
-          targets.push({ label: `Engine ${e.engine_id.slice(0, 10)}...`, guid: e.engine_id });
-        }
-      }
+    // Engines — always guid-per-engine (each engine subscribes to its own guid channel)
+    for (const e of engines) {
+      targets.push({ label: `Engine ${e.engine_id}`, guid: e.engine_id });
     }
 
-    // Workers — group by queue, then decide per-queue
+    // Workers — topic targets the queue; guid targets a single instance
     const queues = new Map<string, QuorumProfile[]>();
     for (const w of workers) {
       const q = w.worker_topic!;
@@ -88,7 +82,7 @@ export function useMeshSelection({
         targets.push({ label: queue, topic: queue });
       } else {
         for (const w of members) {
-          targets.push({ label: `${queue} ${w.engine_id.slice(0, 10)}...`, guid: w.engine_id });
+          targets.push({ label: `${queue} ${w.engine_id}`, guid: w.engine_id });
         }
       }
     }
@@ -113,14 +107,29 @@ export function useMeshSelection({
 
   const handleRowClick = (profile: QuorumProfile) => {
     const label = isWorker(profile)
-      ? `${profile.worker_topic} ${profile.engine_id.slice(0, 10)}...`
-      : `Engine ${profile.engine_id.slice(0, 10)}...`;
+      ? `${profile.worker_topic} ${profile.engine_id}`
+      : `Engine ${profile.engine_id}`;
+    // guid-only: workers and engines both subscribe to their own guid channel
     setThrottleTargets([{ label, guid: profile.engine_id }]);
     setThrottleModalOpen(true);
   };
 
   const handleBulkThrottleOpen = () => {
     setThrottleTargets(selectedThrottleTargets);
+    setThrottleModalOpen(true);
+  };
+
+  const handleResumeThrottle = (profile: QuorumProfile) => {
+    // guid-only: both engines and workers subscribe to their own guid channel
+    throttleMutation.mutate({ appId: activeAppId, throttle: 0, guid: profile.engine_id });
+  };
+
+  const handleResumeQueue = (queueName: string) => {
+    throttleMutation.mutate({ appId: activeAppId, throttle: 0, topic: queueName });
+  };
+
+  const handleQueueThrottle = (queueName: string) => {
+    setThrottleTargets([{ label: queueName, topic: queueName }]);
     setThrottleModalOpen(true);
   };
 
@@ -141,6 +150,9 @@ export function useMeshSelection({
     handleBulkThrottle,
     handleRowClick,
     handleBulkThrottleOpen,
+    handleResumeThrottle,
+    handleResumeQueue,
+    handleQueueThrottle,
     closeThrottleModal,
   };
 }

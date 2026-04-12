@@ -1,5 +1,5 @@
 import { Collapsible } from '../../../components/common/layout/Collapsible';
-import { formatDuration, formatDurationCompact } from '../../../lib/format';
+import { formatDuration } from '../../../lib/format';
 import {
   taskStatusColor,
   escStatusColor,

@@ -23,8 +23,8 @@ export function DateTooltip({ options, children, className = '' }: DateTooltipPr
   const [copied, setCopied] = useState<string | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
-  const timeout = useRef<ReturnType<typeof setTimeout>>();
-  const closeTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const closeTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;

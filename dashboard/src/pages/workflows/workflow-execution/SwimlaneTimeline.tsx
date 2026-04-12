@@ -114,13 +114,7 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
     }
   };
 
-  /** Find all selected events that live in this lane */
-  const selectedEvtsForLane = (lane: Lane): WorkflowExecutionEvent[] => {
-    return lane.segments
-      .filter((s) => selectedEvents.has(s.eventId))
-      .map((s) => displayEvents.find((e) => e.event_id === s.eventId)!)
-      .filter(Boolean);
-  };
+
 
   const barColor = (cat: string, pending: boolean) => {
     if (pending) return PENDING_CLASS;
@@ -180,7 +174,6 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
 
       {/* Lanes */}
       {lanes.map((lane) => {
-        const expandedEvts = selectedEvtsForLane(lane);
         const catColor = CATEGORY_COLORS[lane.category];
 
         return (

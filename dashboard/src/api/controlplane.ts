@@ -91,7 +91,10 @@ export function useThrottle() {
   return useMutation({
     mutationFn: postThrottle,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['controlplane', 'rollcall'] });
+      // Delay refetch so mesh members have time to process the throttle message
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['controlplane', 'rollcall'] });
+      }, 1500);
     },
   });
 }

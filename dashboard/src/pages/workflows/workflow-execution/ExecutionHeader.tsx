@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import type { WorkflowExecution, LTTaskRecord, LTEscalationRecord } from '../../../api/types';
-import { formatDuration } from './utils';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { DurationValue } from '../../../components/common/display/DurationValue';
 

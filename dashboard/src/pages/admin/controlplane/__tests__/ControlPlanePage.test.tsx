@@ -21,6 +21,8 @@ const mockProfiles = {
       engine_id: 'Hworker1234567890',
       worker_topic: 'long-tail-system-mcpTriage',
       throttle: 0,
+      counts: { '200': 100, '500': 2 },
+      stream_depth: 5,
     },
     {
       namespace: 'durable',
@@ -28,6 +30,7 @@ const mockProfiles = {
       engine_id: 'Hworker2345678901',
       worker_topic: 'long-tail-examples-reviewContent',
       throttle: -1,
+      counts: { '200': 50 },
     },
   ],
 };
@@ -70,46 +73,43 @@ describe('ControlPlanePage', () => {
     vi.clearAllMocks();
   });
 
-  it('renders page header', () => {
+  it('renders page header with stats', () => {
     renderPage();
     expect(screen.getByText('Task Queues')).toBeInTheDocument();
-  });
-
-  it('renders summary stat cards', () => {
-    renderPage();
-    // "Engines" and "Workers" appear in both stat cards and filter dropdown
+    // Inline stats
     expect(screen.getAllByText('Engines').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Workers').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Pending')).toBeInTheDocument();
-    expect(screen.getByText('Engine Msgs (1h)')).toBeInTheDocument();
-    expect(screen.getByText('Worker Msgs (1h)')).toBeInTheDocument();
+    expect(screen.getAllByText('Queues').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows engine and worker counts from profiles', () => {
+  it('shows engine and worker counts in header stats', () => {
     renderPage();
-    // 1 engine, 2 workers from mockProfiles
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    // 1 engine, 2 workers, 2 queues
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders engine and worker processed counts from stream stats', () => {
+  it('renders emergency controls', () => {
     renderPage();
-    // Engine: 900 appears in both stat card and chart bar
-    expect(screen.getAllByText('900').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('334').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Pause All')).toBeInTheDocument();
+    expect(screen.getByText('Resume All')).toBeInTheDocument();
   });
 
-  it('renders mesh nodes table with profiles', () => {
+  it('renders Worker Queues collapsible section with queue cards', () => {
     renderPage();
-    expect(screen.getByText(/Mesh Nodes/)).toBeInTheDocument();
-    expect(screen.getAllByText('Worker').length).toBe(2);
-    // "Engine" appears in both the table badge and the chart section header
-    expect(screen.getAllByText('Engine').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Worker Queues')).toBeInTheDocument();
+    // Queue names shown via TaskQueuePill
+    expect(screen.getByText('long-tail-system-mcpTriage')).toBeInTheDocument();
+    expect(screen.getByText('long-tail-examples-reviewContent')).toBeInTheDocument();
   });
 
-  it('shows throttled status for paused workers', () => {
+  it('renders Engines collapsible section', () => {
     renderPage();
-    expect(screen.getByText('Paused')).toBeInTheDocument();
+    expect(screen.getAllByText('Engines').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows throttled indicator when workers are throttled', () => {
+    renderPage();
+    expect(screen.getByText('Throttled')).toBeInTheDocument();
   });
 
   it('renders duration tabs', () => {
@@ -119,18 +119,14 @@ describe('ControlPlanePage', () => {
     expect(screen.getByText('7d')).toBeInTheDocument();
   });
 
-  it('renders application and nodes filters', () => {
+  it('renders application filter', () => {
     renderPage();
     expect(screen.getByText('Application')).toBeInTheDocument();
-    expect(screen.getByText('Nodes')).toBeInTheDocument();
   });
 
-  it('renders stream volume section with engine/worker grouping', () => {
+  it('renders stream volume section', () => {
     renderPage();
-    // Engine stream label in chart
-    expect(screen.getByText('(engine)')).toBeInTheDocument();
-    // Chart section header
-    expect(screen.getByText('Engine Queue')).toBeInTheDocument();
+    expect(screen.getByText(/Stream Volume/)).toBeInTheDocument();
   });
 
   it('renders quorum feed panel', () => {
@@ -141,12 +137,5 @@ describe('ControlPlanePage', () => {
   it('renders roll call button', () => {
     renderPage();
     expect(screen.getByText('Roll Call')).toBeInTheDocument();
-  });
-
-  it('renders checkboxes for each profile row', () => {
-    renderPage();
-    // 3 profile rows + 1 header checkbox = 4
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes.length).toBe(4);
   });
 });
