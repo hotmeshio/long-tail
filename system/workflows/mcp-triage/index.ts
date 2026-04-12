@@ -62,8 +62,8 @@ const responseDeps: TriageResponseDeps = {
  * MCP tools scoped by tag affinity.
  *
  * Tool ecosystem grows over time:
- * - Built-in servers: document-vision, mcp-workflows, human-queue,
- *   workflow-compiler, db, telemetry
+ * - Built-in servers: translation, vision, mcp-workflows, human-queue,
+ *   workflow-compiler, db, http-fetch, file-storage, oauth, claude-code
  * - User-registered external MCP servers
  * - Compiled YAML workflows from past triage executions
  *

@@ -28,26 +28,19 @@ Tool names in function calls are prefixed with the server slug: \`server_slug__t
 
 ## Tool Categories
 
-**Compiled Workflows** (\`long_tail_mcp_workflows__*\`):
-Deterministic pipelines hardened from past triage successes. ALWAYS check these first — if a compiled workflow matches the problem, invoke it directly. This is the most efficient path.
+**Compiled workflows**: Deterministic pipelines hardened from past triage successes. ALWAYS check these first — if a compiled workflow matches the problem, invoke it directly. This is the most efficient path.
 
-**Document Processing** (\`long_tail_document_vision__*\`):
-Image rotation, member info extraction, content translation, member validation. Use for document-related issues.
+**Data & analytics**: Read-only queries against tasks, escalations, processes, workflow types, and system health. Use to investigate context.
 
-**Human Queue** (\`long_tail_human_queue__*\`):
-Create escalations within the triage vortex when you need human help (e.g., asking an engineer to install tools). Note: you can also escalate simply by returning \`correctedData: null\` — the orchestrator will create an engineer escalation automatically. Using human-queue tools gives you more control over routing but is usually unnecessary.
+**Text processing**: Content translation and language detection. Use for language-related issues.
 
-**Database Query** (\`long_tail_db__*\`):
-Read-only queries against tasks, escalations, processes, workflow types, system health. Use to investigate context.
+**Vision & image analysis**: Analyze images and extract structured data, text, or descriptions. Use for image-related issues.
 
-**Workflow Compiler** (\`long_tail_workflow_compiler__*\`):
-Convert this triage execution into a compiled YAML workflow after solving the problem.
+**Escalation management**: Create escalations within the triage vortex when you need human help. Note: you can also escalate simply by returning \`correctedData: null\` — the orchestrator will create an engineer escalation automatically.
 
-**HTTP Fetch** (\`long_tail_http_fetch__*\`):
-Fetch external data needed during investigation. Not for delivering results — your JSON response handles that.
+**Workflow compilation**: Convert this triage execution into a compiled YAML workflow after solving the problem.
 
-**Telemetry** (\`long_tail_telemetry__*\`):
-Honeycomb trace links for debugging.
+**Network & HTTP**: Fetch external data needed during investigation. Not for delivering results — your JSON response handles that.
 
 **External servers**: Any user-registered MCP servers also appear in the tool list.
 

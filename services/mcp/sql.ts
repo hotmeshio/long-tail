@@ -55,6 +55,39 @@ export const HEALTH_RECENT_ACTIVITY = `
     COUNT(*) FILTER (WHERE completed_at > NOW() - INTERVAL '24 hours')::int AS tasks_completed_24h
   FROM lt_tasks`;
 
+export const HEALTH_MCP_SERVERS = `
+  SELECT
+    COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE status = 'connected')::int AS connected,
+    SUM(jsonb_array_length(COALESCE(tool_manifest::jsonb, '[]'::jsonb)))::int AS total_tools
+  FROM lt_mcp_servers`;
+
+export const HEALTH_MCP_SERVER_LIST = `
+  SELECT name, status, tags,
+    jsonb_array_length(COALESCE(tool_manifest::jsonb, '[]'::jsonb))::int AS tool_count
+  FROM lt_mcp_servers ORDER BY name`;
+
+export const HEALTH_COMPILED_WORKFLOWS = `
+  SELECT
+    COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE status = 'active')::int AS active
+  FROM lt_yaml_workflows`;
+
+export const HEALTH_WORKFLOW_CONFIGS = `
+  SELECT workflow_type, task_queue, description
+  FROM lt_config_workflows ORDER BY workflow_type`;
+
+export const HEALTH_DURABLE_WORKFLOWS = `
+  SELECT
+    COALESCE(entity, '_internal') AS entity,
+    COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE status = 0)::int AS active,
+    COUNT(*) FILTER (WHERE status = 1)::int AS completed
+  FROM durable.jobs
+  WHERE entity IS NOT NULL AND entity != ''
+  GROUP BY entity
+  ORDER BY entity`;
+
 // ─── Seed (used by system/seed.ts) ──────────────────────────────────────────
 
 export const SEED_MCP_SERVER = `

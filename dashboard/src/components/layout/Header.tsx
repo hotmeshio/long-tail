@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMyEscalationCount } from '../../hooks/useMyEscalationCount';
 import { NatsStatus } from '../common/display/NatsStatus';
 import { AppLogo } from '../common/display/AppLogo';
+import { QuickQuery } from './QuickQuery';
 
 export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }) {
   const { user, logout } = useAuth();
@@ -26,9 +27,12 @@ export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }
 
   return (
     <header className="h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between px-5 relative z-30">
-      <Link to="/" aria-label="Home">
-        <AppLogo />
-      </Link>
+      <div className="flex items-center gap-4">
+        <Link to="/" aria-label="Home">
+          <AppLogo />
+        </Link>
+        <QuickQuery />
+      </div>
 
       {/* Right: inbox, NATS indicator + user menu */}
       <div className="flex items-center gap-4">

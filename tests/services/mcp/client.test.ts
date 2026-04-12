@@ -6,7 +6,7 @@ import {
   isConnected,
   clear,
 } from '../../../services/mcp/client';
-import { createVisionServer } from '../../../services/mcp/vision-server';
+import { createTranslationServer } from '../../../system/mcp-servers/translation';
 
 afterEach(() => {
   clear();
@@ -14,41 +14,50 @@ afterEach(() => {
 
 describe('MCP Client — built-in server resolution', () => {
   it('should auto-connect a built-in server on first callServerTool', async () => {
-    registerBuiltinServer('long-tail-document-vision', createVisionServer);
+    registerBuiltinServer('long-tail-translation', createTranslationServer);
 
-    // 'vision' should fuzzy-match 'long-tail-document-vision'
-    const result = await callServerTool('vision', 'list_document_pages', {});
+    // 'translation' should fuzzy-match 'long-tail-translation'
+    const result = await callServerTool('translation', 'translate_content', {
+      content: 'hello', target_language: 'es',
+    });
     expect(result).toBeDefined();
-    expect(result.pages).toBeDefined();
-    expect(Array.isArray(result.pages)).toBe(true);
+    expect(result.translated_content).toBeDefined();
 
     // Client should now be cached
-    expect(isConnected('vision')).toBe(true);
+    expect(isConnected('translation')).toBe(true);
   });
 
   it('should reuse cached client for the same serverId', async () => {
-    registerBuiltinServer('long-tail-document-vision', createVisionServer);
+    registerBuiltinServer('long-tail-translation', createTranslationServer);
 
     // First call auto-connects
-    await callServerTool('vision', 'list_document_pages', {});
-    expect(isConnected('vision')).toBe(true);
+    await callServerTool('translation', 'translate_content', {
+      content: 'hello', target_language: 'es',
+    });
+    expect(isConnected('translation')).toBe(true);
 
     // Second call reuses — no "already connected" error
-    const result = await callServerTool('vision', 'list_document_pages', {});
+    const result = await callServerTool('translation', 'translate_content', {
+      content: 'hello', target_language: 'es',
+    });
     expect(result).toBeDefined();
   });
 
   it('should alias different serverIds to the same canonical factory', async () => {
-    registerBuiltinServer('long-tail-document-vision', createVisionServer);
+    registerBuiltinServer('long-tail-translation', createTranslationServer);
 
     // Connect via full name
-    await callServerTool('long-tail-document-vision', 'list_document_pages', {});
-    expect(isConnected('long-tail-document-vision')).toBe(true);
+    await callServerTool('long-tail-translation', 'translate_content', {
+      content: 'hello', target_language: 'es',
+    });
+    expect(isConnected('long-tail-translation')).toBe(true);
 
-    // 'vision' should find the same client via alias (no double-connect)
-    const result = await callServerTool('vision', 'list_document_pages', {});
-    expect(result.pages).toBeDefined();
-    expect(isConnected('vision')).toBe(true);
+    // 'translation' should find the same client via alias (no double-connect)
+    const result = await callServerTool('translation', 'translate_content', {
+      content: 'hello', target_language: 'es',
+    });
+    expect(result.translated_content).toBeDefined();
+    expect(isConnected('translation')).toBe(true);
   });
 
   it('should throw for unknown server', async () => {

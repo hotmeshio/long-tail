@@ -5,7 +5,7 @@
 // are pre-populated from the actual server definitions.
 
 import { HUMAN_QUEUE_TOOLS } from './tool-manifests-escalation';
-import { VISION_TOOLS, DB_QUERY_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
+import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, DB_QUERY_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
 import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './tool-manifests-browser';
 import { MCP_WORKFLOW_TOOLS, WORKFLOW_COMPILER_TOOLS, CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
 
@@ -61,14 +61,25 @@ export const SEED_MCP_SERVERS = [
     credential_providers: [],
   },
   {
-    name: 'long-tail-document-vision',
-    description: 'Document vision and analysis tools. Processes document images, extracts structured data, validates against databases, and handles translations.',
+    name: 'long-tail-translation',
+    description: 'Text translation using LLM. Translates content between languages with automatic source language detection.',
     transport_type: 'stdio',
     transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: VISION_TOOLS,
-    metadata: { builtin: true, category: 'document-processing' },
-    tags: ['document-processing', 'vision', 'ocr', 'translation'],
-    compile_hints: 'Vision tools process one document at a time. When iterating over multiple documents, each iteration should pass a single image path or URL.',
+    tool_manifest: TRANSLATION_TOOLS,
+    metadata: { builtin: true, category: 'text-processing' },
+    tags: ['translation', 'language', 'text-processing'],
+    compile_hints: null,
+    credential_providers: ['anthropic'],
+  },
+  {
+    name: 'long-tail-vision',
+    description: 'Image analysis and description using LLM vision. Analyzes images to extract structured data, text content, and descriptions.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: VISION_ANALYSIS_TOOLS,
+    metadata: { builtin: true, category: 'vision' },
+    tags: ['vision', 'image-analysis', 'multimodal'],
+    compile_hints: 'Vision tools process one image at a time. When iterating over multiple images, each iteration should pass a single image URL or data URI.',
     credential_providers: ['anthropic'],
   },
   {

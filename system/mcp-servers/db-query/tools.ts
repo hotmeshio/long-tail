@@ -10,6 +10,11 @@ import {
   HEALTH_ESCALATION_COUNTS,
   HEALTH_ACTIVE_WORKFLOW_TYPES,
   HEALTH_RECENT_ACTIVITY,
+  HEALTH_MCP_SERVERS,
+  HEALTH_MCP_SERVER_LIST,
+  HEALTH_COMPILED_WORKFLOWS,
+  HEALTH_WORKFLOW_CONFIGS,
+  HEALTH_DURABLE_WORKFLOWS,
 } from '../../../services/mcp/sql';
 
 import {
@@ -204,18 +209,28 @@ export function registerTools(instance: McpServer): void {
     {
       title: 'Get System Health',
       description:
-        'Overall system health snapshot: task counts by status, escalation counts by status, ' +
-        'active workflow types, and recent activity window.',
+        'Full system overview: durable workflow execution counts by type (active/completed), ' +
+        'task counts by status, escalation counts by status, recent activity window, ' +
+        'MCP servers (with tool counts and tags), compiled workflow totals, and workflow configurations.',
       inputSchema: getSystemHealthSchema,
     },
     async (_args: z.infer<typeof getSystemHealthSchema>) => {
       const pool = getPool();
 
-      const [taskCounts, escalationCounts, activeTypes, recentActivity] = await Promise.all([
+      const [
+        taskCounts, escalationCounts, activeTypes, recentActivity,
+        mcpServers, mcpServerList, compiledWorkflows, workflowConfigs,
+        durableWorkflows,
+      ] = await Promise.all([
         pool.query(HEALTH_TASK_COUNTS),
         pool.query(HEALTH_ESCALATION_COUNTS),
         pool.query(HEALTH_ACTIVE_WORKFLOW_TYPES),
         pool.query(HEALTH_RECENT_ACTIVITY),
+        pool.query(HEALTH_MCP_SERVERS),
+        pool.query(HEALTH_MCP_SERVER_LIST),
+        pool.query(HEALTH_COMPILED_WORKFLOWS),
+        pool.query(HEALTH_WORKFLOW_CONFIGS),
+        pool.query(HEALTH_DURABLE_WORKFLOWS),
       ]);
 
       const tasksByStatus: Record<string, number> = {};
@@ -232,10 +247,17 @@ export function registerTools(instance: McpServer): void {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
+            durable_workflows: durableWorkflows.rows,
             tasks: tasksByStatus,
             escalations: escalationsByStatus,
             active_workflow_types: activeTypes.rows.map((r: any) => r.workflow_type),
             recent_activity: recentActivity.rows[0],
+            mcp_servers: {
+              ...mcpServers.rows[0],
+              servers: mcpServerList.rows,
+            },
+            compiled_workflows: compiledWorkflows.rows[0],
+            workflow_configs: workflowConfigs.rows,
           }),
         }],
       };
