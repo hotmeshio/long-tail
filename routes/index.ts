@@ -21,6 +21,7 @@ import namespacesRouter from './namespaces';
 import filesRouter from './files';
 import controlplaneRouter from './controlplane';
 import botAccountsRouter from './bot-accounts';
+import docsRouter from './docs';
 
 const router = Router();
 
@@ -49,5 +50,6 @@ router.use('/mcp-runs', mcpRunsRouter);
 router.use('/namespaces', namespacesRouter);
 router.use('/controlplane', controlplaneRouter);
 router.use('/bot-accounts', botAccountsRouter);
+router.use('/docs', docsRouter);
 
 export default router;

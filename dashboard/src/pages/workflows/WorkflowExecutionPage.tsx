@@ -20,7 +20,7 @@ export function WorkflowExecutionPage() {
 
   const executionTitle = pathname.startsWith('/workflows/durable/')
     ? 'Durable Execution'
-    : 'Certified Execution';
+    : 'Durable Execution';
   const { data: execution, isLoading, error, refetch, isFetching } = useWorkflowExecution(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
   const { data: childTasksData } = useChildTasks(workflowId!);

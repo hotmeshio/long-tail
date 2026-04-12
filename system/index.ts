@@ -63,5 +63,6 @@ export const builtinMcpServerFactories: Record<string, () => Promise<any>> = {
   'long-tail-file-storage': () => import('./mcp-servers/file-storage').then((m) => m.createFileStorageServer()),
   'long-tail-http-fetch': () => import('./mcp-servers/http-fetch').then((m) => m.createHttpFetchServer()),
   'long-tail-oauth': () => import('./mcp-servers/oauth').then((m) => m.createOAuthServer()),
+  'long-tail-docs': () => import('./mcp-servers/docs').then((m) => m.createDocsServer()),
   'long-tail-claude-code': () => import('./mcp-servers/claude-code').then((m) => m.createClaudeCodeServer()),
 };

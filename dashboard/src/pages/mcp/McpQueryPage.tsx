@@ -117,27 +117,27 @@ export function McpQueryPage() {
     <>
       <PageHeader title="Pipeline Designer" />
 
-      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
+      <p className="text-sm text-text-secondary mb-6 leading-relaxed">
         Describe a task and MCP discovers the right tools, executes the workflow, and compiles the result into a reusable pipeline.
       </p>
 
       {/* Design lifecycle steps */}
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="flex items-start gap-3 p-3 rounded-lg border border-surface-border bg-surface-raised/50">
+        <div className="flex items-start gap-3 p-3 bg-surface-raised/50">
           <Wand2 className="w-4 h-4 mt-0.5 text-accent shrink-0" />
           <div>
             <p className="text-xs font-medium text-text-primary">1. Describe</p>
             <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">Write a specific prompt. Mention tools, URLs, credentials, and expected outputs.</p>
           </div>
         </div>
-        <div className="flex items-start gap-3 p-3 rounded-lg border border-surface-border bg-surface-raised/50">
+        <div className="flex items-start gap-3 p-3 bg-surface-raised/50">
           <Zap className="w-4 h-4 mt-0.5 text-status-warning shrink-0" />
           <div>
             <p className="text-xs font-medium text-text-primary">2. Discover</p>
             <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">MCP selects servers, calls tools, and chains results. You review the execution.</p>
           </div>
         </div>
-        <div className="flex items-start gap-3 p-3 rounded-lg border border-surface-border bg-surface-raised/50">
+        <div className="flex items-start gap-3 p-3 bg-surface-raised/50">
           <Layers className="w-4 h-4 mt-0.5 text-status-success shrink-0" />
           <div>
             <p className="text-xs font-medium text-text-primary">3. Compile</p>

@@ -5,7 +5,7 @@
 // are pre-populated from the actual server definitions.
 
 import { HUMAN_QUEUE_TOOLS } from './tool-manifests-escalation';
-import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, DB_QUERY_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
+import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, DB_QUERY_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, DOCS_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
 import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './tool-manifests-browser';
 import { MCP_WORKFLOW_TOOLS, WORKFLOW_COMPILER_TOOLS, CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
 
@@ -113,6 +113,17 @@ export const SEED_MCP_SERVERS = [
       'For screenshot_path derivation in transforms, use the `screenshot_dir` trigger input as a dynamic prefix (not hardcoded). Derivation strategy: slugify the href, prepend screenshot_dir + "/", append ".png".',
       'When login_and_capture follows a signal hook (human input), wire the password from the hook output to the `password` argument. Wire `url` and `username` from trigger inputs.',
     ].join(' '),
+    credential_providers: [],
+  },
+  {
+    name: 'long-tail-docs',
+    description: 'Product documentation search and retrieval. List, search, and read Long Tail documentation covering architecture, workflows, MCP, API reference, IAM, and more.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: DOCS_TOOLS,
+    metadata: { builtin: true, category: 'documentation' },
+    tags: ['documentation', 'help', 'reference'],
+    compile_hints: null,
     credential_providers: [],
   },
   {

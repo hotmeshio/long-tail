@@ -116,7 +116,6 @@ describe('WorkflowExecutionPage', () => {
 
     renderPage();
     // Loading skeleton has animate-pulse divs, no page header text
-    expect(screen.queryByText('Certified Execution')).not.toBeInTheDocument();
     const skeleton = document.querySelector('.animate-pulse');
     expect(skeleton).toBeInTheDocument();
   });
@@ -175,19 +174,6 @@ describe('WorkflowExecutionPage', () => {
     // workflow_id appears in both header h2 and Run ID field
     expect(screen.getAllByText('mcpQuery-abc123def456').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Completed')).toBeInTheDocument();
-  });
-
-  it('renders page header as Certified Execution for non-durable path', () => {
-    vi.mocked(useWorkflowExecution).mockReturnValue({
-      data: mockExecution,
-      isLoading: false,
-      error: null,
-      refetch: mockRefetch,
-      isFetching: false,
-    } as any);
-
-    renderPage('/workflows/executions/mcpQuery-abc123def456');
-    expect(screen.getByText('Certified Execution')).toBeInTheDocument();
   });
 
   it('renders page header as Durable Execution for durable path', () => {

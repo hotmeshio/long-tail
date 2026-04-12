@@ -144,6 +144,36 @@ export const HTTP_FETCH_TOOLS = [
   },
 ];
 
+export const DOCS_TOOLS = [
+  {
+    name: 'list_docs',
+    description: 'List all available documentation files with their titles.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'search_docs',
+    description: 'Search across all documentation for a keyword or phrase. Returns matching files with line context.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search term or phrase to find in documentation' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_doc',
+    description: 'Read the full content of a documentation file.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Document path relative to docs/ (e.g. "mcp.md" or "api/tasks.md")' },
+      },
+      required: ['path'],
+    },
+  },
+];
+
 export const OAUTH_TOOLS = [
   {
     name: 'get_access_token',
