@@ -20,7 +20,7 @@ const {
   notifyEngineering,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
-  retryPolicy: {
+  retry: {
     maximumAttempts: 3,
     backoffCoefficient: 2,
     maximumInterval: '10 seconds',
@@ -37,7 +37,7 @@ const {
 } = Durable.workflow.proxyActivities<typeof interceptorActivities>({
   activities: interceptorActivities,
   taskQueue: 'lt-interceptor',
-  retryPolicy: { maximumAttempts: 3 },
+  retry: { maximumAttempts: 3 },
 });
 
 const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
@@ -203,7 +203,7 @@ async function runTriageLLM(
 
       // Durable waitFor: if the tool returns a signal, pause until human responds
       if (result?.type === 'waitFor' && result?.signalId) {
-        const ctx = Durable.workflow.getContext();
+        const ctx = Durable.workflow.workflowInfo();
         const workflowType = ctx.workflowTopic.replace(`${ctx.taskQueue}-`, '');
         await ltEnrichEscalationRouting({
           escalationId: result.escalationId,
@@ -215,7 +215,7 @@ async function runTriageLLM(
           },
           claimForUserId: envelope.lt?.userId,
         });
-        const signalData = await Durable.workflow.waitFor<Record<string, any>>(result.signalId);
+        const signalData = await Durable.workflow.condition<Record<string, any>>(result.signalId);
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,

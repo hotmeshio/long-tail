@@ -60,7 +60,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
     "@aws-sdk/client-s3": "^3.1017.0",
-    "@hotmeshio/hotmesh": "^0.13.0",
+    "@hotmeshio/hotmesh": "^0.14.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.212.0",
     "@opentelemetry/resources": "^2.5.1",

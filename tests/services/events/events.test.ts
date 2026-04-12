@@ -110,8 +110,8 @@ describe('events service', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    Durable.registerInterceptor(ltInterceptor);
-    Durable.registerActivityInterceptor(createLTActivityInterceptor());
+    Durable.registerInboundInterceptor(ltInterceptor);
+    Durable.registerOutboundInterceptor(createLTActivityInterceptor());
 
     // Register reviewContent workflow worker
     const leafWorker = await Worker.create({
@@ -144,7 +144,7 @@ describe('events service', () => {
   afterAll(async () => {
     eventRegistry.clear();
     Durable.clearInterceptors();
-    Durable.clearActivityInterceptors();
+    Durable.clearOutboundInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
     await disconnectTelemetry();

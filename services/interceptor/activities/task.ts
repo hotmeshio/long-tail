@@ -1,16 +1,20 @@
 import * as taskService from '../../task';
 import { publishMilestoneEvent, publishTaskEvent } from '../../events/publish';
 import { getPool } from '../../db';
+import { VERIFY_USER_BY_ID, GET_USER_BY_EXTERNAL_ID } from '../../user/sql';
 import type { LTMilestone, LTTaskRecord } from '../../../types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Resolve an external_id to a UUID. Returns null if not found or already a UUID. */
+/** Resolve an identifier to a verified lt_users UUID. Returns undefined if not found. */
 async function resolveUserUuid(identifier: string | undefined): Promise<string | undefined> {
   if (!identifier) return undefined;
-  if (UUID_RE.test(identifier)) return identifier;
   const pool = getPool();
-  const { rows } = await pool.query('SELECT id FROM lt_users WHERE external_id = $1 LIMIT 1', [identifier]);
+  if (UUID_RE.test(identifier)) {
+    const { rows } = await pool.query(VERIFY_USER_BY_ID, [identifier]);
+    return rows[0]?.id ?? undefined;
+  }
+  const { rows } = await pool.query(GET_USER_BY_EXTERNAL_ID, [identifier]);
   return rows[0]?.id ?? undefined;
 }
 

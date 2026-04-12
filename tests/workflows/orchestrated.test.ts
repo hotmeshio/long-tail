@@ -57,10 +57,10 @@ describe('direct workflow invocation with LT treatment', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    Durable.registerInterceptor(ltInterceptor);
+    Durable.registerInboundInterceptor(ltInterceptor);
 
     const ltActivityInterceptor = createLTActivityInterceptor();
-    Durable.registerActivityInterceptor(ltActivityInterceptor);
+    Durable.registerOutboundInterceptor(ltActivityInterceptor);
 
     // Register reviewContent workflow worker
     const leafWorker = await Worker.create({
@@ -75,7 +75,7 @@ describe('direct workflow invocation with LT treatment', () => {
 
   afterAll(async () => {
     Durable.clearInterceptors();
-    Durable.clearActivityInterceptors();
+    Durable.clearOutboundInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
     await disconnectTelemetry();

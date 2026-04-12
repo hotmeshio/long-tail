@@ -52,10 +52,10 @@ describe('kitchenSink workflow', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    Durable.registerInterceptor(ltInterceptor);
+    Durable.registerInboundInterceptor(ltInterceptor);
 
     const ltActivityInterceptor = createLTActivityInterceptor();
-    Durable.registerActivityInterceptor(ltActivityInterceptor);
+    Durable.registerOutboundInterceptor(ltActivityInterceptor);
 
     const worker = await Worker.create({
       connection,
@@ -69,7 +69,7 @@ describe('kitchenSink workflow', () => {
 
   afterAll(async () => {
     Durable.clearInterceptors();
-    Durable.clearActivityInterceptors();
+    Durable.clearOutboundInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
     await disconnectTelemetry();

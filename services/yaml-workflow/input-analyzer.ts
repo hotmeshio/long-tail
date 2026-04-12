@@ -15,6 +15,7 @@ import {
   flattenDynamicObject,
   humanize,
   inferType,
+  isArrayWiredFromPriorStep,
 } from './input-analyzer-helpers';
 
 import type { ExtractedStepLike } from './input-analyzer-helpers';
@@ -48,6 +49,11 @@ export function extractSemanticInputs(
       // First occurrence wins
       if (seen.has(key)) continue;
 
+      // Arrays of objects that match a prior step's result are wired, not inputs
+      if (Array.isArray(value) && isArrayWiredFromPriorStep(value, steps.slice(0, i))) {
+        continue;
+      }
+
       const classification = classifyArgument(key, value, {
         stepIndex: i,
         toolName: step.toolName,
@@ -56,10 +62,21 @@ export function extractSemanticInputs(
       // Skip wired arguments — they come from step chaining
       if (classification === 'wired') continue;
 
-      // Flatten nested objects that contain dynamic keys.
-      // e.g., login: { url, username, password } → login_url, username, password
+      // Flatten nested objects that contain dynamic keys — but only if the
+      // dynamic children aren't already captured as top-level args from an
+      // earlier step. If all dynamic children are already seen, treat the
+      // whole object as fixed (structured implementation detail).
       if (classification === 'dynamic' && value && typeof value === 'object' && !Array.isArray(value)) {
-        flattenDynamicObject(key, value as Record<string, unknown>, i, step.toolName, originalPrompt, seen);
+        const obj = value as Record<string, unknown>;
+        const dynamicChildren = Object.keys(obj).filter(
+          (k) => classifyArgument(k, obj[k], { stepIndex: i, toolName: step.toolName }) === 'dynamic',
+        );
+        const allDynamicAlreadySeen = dynamicChildren.length > 0 && dynamicChildren.every((k) => seen.has(k));
+        if (allDynamicAlreadySeen) {
+          // All dynamic values are already captured — treat as fixed, don't flatten
+          continue;
+        }
+        flattenDynamicObject(key, obj, i, step.toolName, originalPrompt, seen);
         continue;
       }
 

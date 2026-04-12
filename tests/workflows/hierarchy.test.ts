@@ -202,10 +202,10 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     );
 
     // Interceptors
-    Durable.registerInterceptor(
+    Durable.registerInboundInterceptor(
       createLTInterceptor({ activityTaskQueue: ACTIVITY_QUEUE }),
     );
-    Durable.registerActivityInterceptor(createLTActivityInterceptor());
+    Durable.registerOutboundInterceptor(createLTActivityInterceptor());
 
     // Leaf workers (all on the same queue, different workflow functions)
     for (const wf of [leafA1, leafA2, leafB1, leafB2, leafB3]) {
@@ -245,7 +245,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
     }
     ltConfig.invalidate();
     Durable.clearInterceptors();
-    Durable.clearActivityInterceptors();
+    Durable.clearOutboundInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
     await disconnectTelemetry();

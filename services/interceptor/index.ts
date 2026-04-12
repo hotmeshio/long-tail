@@ -47,12 +47,12 @@ export async function registerLT(
     taskQueue,
   );
 
-  Durable.registerInterceptor(createLTInterceptor({
+  Durable.registerInboundInterceptor(createLTInterceptor({
     activityTaskQueue: taskQueue,
     defaultRole: options?.defaultRole,
   }));
 
-  Durable.registerActivityInterceptor(createLTActivityInterceptor());
+  Durable.registerOutboundInterceptor(createLTActivityInterceptor());
 }
 
 /**
@@ -98,7 +98,7 @@ export function createLTInterceptor(options: {
       const activities = Durable.workflow.proxyActivities<ActivitiesType>({
         activities: interceptorActivities,
         taskQueue: activityTaskQueue,
-        retryPolicy: { maximumAttempts: 3 },
+        retry: { maximumAttempts: 3 },
       });
 
       // 2. Load config — unregistered workflows still get ToolContext

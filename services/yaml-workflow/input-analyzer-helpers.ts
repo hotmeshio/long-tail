@@ -42,6 +42,7 @@ export interface ExtractedStepLike {
   kind: 'tool' | 'llm';
   toolName: string;
   arguments: Record<string, unknown>;
+  result?: unknown;
 }
 
 /**
@@ -73,15 +74,11 @@ export function classifyArgument(
     }
   }
 
-  // Arrays: complex instruction arrays (like browser steps) are fixed implementation details.
-  // Only flat data arrays (URLs, IDs) that are large should be dynamic.
+  // Arrays of objects are always fixed (structured implementation details)
+  // or wired (from a prior step's output). Never user-provided dynamic inputs.
   if (Array.isArray(value)) {
     if (value.length > 0 && value[0] && typeof value[0] === 'object' && !Array.isArray(value[0])) {
-      // Array of objects — check if it's an instruction array (has 'action', 'step', 'type' keys)
-      const firstItem = value[0] as Record<string, unknown>;
-      if ('action' in firstItem || 'step' in firstItem || 'type' in firstItem) {
-        return 'fixed'; // Implementation recipe — not user input
-      }
+      return 'fixed';
     }
     if (value.length > MAX_DEFAULT_ARRAY_LENGTH) {
       return 'dynamic';
@@ -106,6 +103,35 @@ function objectContainsDynamicKeys(obj: Record<string, unknown>): boolean {
     const lower = key.toLowerCase();
     if (DYNAMIC_KEYS.has(lower)) return true;
     if (lower.endsWith('_url') || lower.endsWith('_path')) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if an array argument was likely produced by a prior step's result.
+ * Compares the item keys of the argument array against result arrays from prior steps.
+ */
+export function isArrayWiredFromPriorStep(
+  value: unknown[],
+  priorSteps: ExtractedStepLike[],
+): boolean {
+  if (value.length === 0 || !value[0] || typeof value[0] !== 'object') return false;
+  const argKeys = new Set(Object.keys(value[0] as Record<string, unknown>));
+  if (argKeys.size === 0) return false;
+
+  for (const step of priorSteps) {
+    if (!step.result || typeof step.result !== 'object') continue;
+    const result = step.result as Record<string, unknown>;
+    for (const field of Object.values(result)) {
+      if (!Array.isArray(field) || field.length === 0) continue;
+      const first = field[0];
+      if (!first || typeof first !== 'object') continue;
+      const resultKeys = new Set(Object.keys(first as Record<string, unknown>));
+      // If the result array items share keys with the argument array items, it's wired
+      let overlap = 0;
+      for (const k of argKeys) if (resultKeys.has(k)) overlap++;
+      if (overlap >= 2 || (overlap >= 1 && argKeys.size <= 3)) return true;
+    }
   }
   return false;
 }

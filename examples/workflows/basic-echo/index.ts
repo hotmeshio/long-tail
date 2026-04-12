@@ -25,7 +25,7 @@ const { echo } = Durable.workflow.proxyActivities<ActivitiesType>({
 export async function basicEcho(envelope: LTEnvelope): Promise<any> {
   const { message = 'Hello, Long Tail!', sleepSeconds = 1 } = envelope.data;
 
-  await Durable.workflow.sleepFor(`${sleepSeconds} seconds`);
+  await Durable.workflow.sleep(`${sleepSeconds} seconds`);
 
   const echoResult = await echo({ message });
 

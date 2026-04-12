@@ -43,12 +43,10 @@ export function ControlPlanePage() {
 
   const subscribeMesh = useSubscribeMesh();
 
-  // ── Auto-refresh: 15s when events flowing, 60s otherwise ───
-  const [eventsActive, setEventsActive] = useState(false);
-  const refreshInterval = eventsActive ? 15_000 : 60_000;
+  const REFRESH_INTERVAL = 60_000;
 
-  const { data: rollCallData, isLoading, error: rollCallError, refetch, isFetching } = useRollCall(activeAppId, refreshInterval);
-  const { data: streamStats } = useStreamStats(activeAppId, activeDuration, undefined, refreshInterval);
+  const { data: rollCallData, isLoading, error: rollCallError, refetch, isFetching } = useRollCall(activeAppId, REFRESH_INTERVAL);
+  const { data: streamStats } = useStreamStats(activeAppId, activeDuration, undefined, REFRESH_INTERVAL);
 
   // ── All profiles (sorted) ───────────────────────────────────
   const allProfiles = useMemo(() => {
@@ -242,7 +240,7 @@ export function ControlPlanePage() {
           />
         </div>
 
-        <QuorumFeed bridgeActive={bridgeActive} onEventsActive={() => setEventsActive(true)} />
+        <QuorumFeed bridgeActive={bridgeActive} />
       </div>
 
       <ThrottleModal

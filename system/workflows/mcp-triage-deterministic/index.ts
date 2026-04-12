@@ -7,7 +7,7 @@ type ActivitiesType = typeof activities;
 
 const { invokeCompiledWorkflow } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
-  retryPolicy: {
+  retry: {
     maximumAttempts: 3,
     backoffCoefficient: 2,
     maximumInterval: '10 seconds',
