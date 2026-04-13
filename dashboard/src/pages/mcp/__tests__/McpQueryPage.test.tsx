@@ -85,7 +85,7 @@ describe('McpQueryPage', () => {
   it('shows workflow type pills', () => {
     render(<McpQueryPage />, { wrapper });
     expect(screen.getAllByText('mcpQuery').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('mcpTriage')).toBeInTheDocument();
+    expect(screen.getAllByText('mcpTriage').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows Direct checkbox (default checked)', () => {

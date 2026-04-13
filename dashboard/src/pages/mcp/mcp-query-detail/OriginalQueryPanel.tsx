@@ -1,3 +1,4 @@
+import { MessageSquare } from 'lucide-react';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { PanelTitle } from './PanelTitle';
@@ -24,7 +25,7 @@ export function OriginalQueryPanel({
 }: OriginalQueryPanelProps) {
   return (
     <div>
-      <PanelTitle title="Original Query" subtitle="Dynamic LLM-orchestrated execution — the discovery run" />
+      <PanelTitle title="Describe" subtitle="Dynamic LLM-orchestrated execution — the discovery run" icon={MessageSquare} iconClass="text-accent" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Input */}

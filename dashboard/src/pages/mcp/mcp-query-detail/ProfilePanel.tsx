@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Layers } from 'lucide-react';
 
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
@@ -21,7 +22,7 @@ interface ExistingProfileViewProps {
 function ExistingProfileView({ compiledYaml, onBack, onNext }: ExistingProfileViewProps) {
   return (
     <div>
-      <PanelTitle title="Pipeline Profile" subtitle="Configure the compiled tool — name, tags, input schema, and deployment target" />
+      <PanelTitle title="Compile" subtitle="Compiled deterministic pipeline — name, tags, input schema, and deployment target" icon={Layers} iconClass="text-status-success" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
         {/* Left: identity + description */}
@@ -148,7 +149,7 @@ function CreateProfileForm({
   const [showFeedback, setShowFeedback] = useState(!!compileFeedback);
   return (
     <div>
-      <PanelTitle title="Create Workflow Profile" subtitle="Define the deterministic workflow tool from this execution" />
+      <PanelTitle title="Compile" subtitle="Define the deterministic workflow tool from this execution" icon={Layers} iconClass="text-status-success" />
 
       {originalPrompt && (
         <div className="mb-6">
@@ -212,7 +213,7 @@ function CreateProfileForm({
       <WizardNav>
         <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
         <button onClick={onCompile} disabled={!compileName.trim() || !compileAppId.trim() || isCompiling} className="btn-primary text-xs">
-          {isCompiling ? 'Creating...' : 'Create Profile'}
+          {isCompiling ? 'Compiling...' : 'Compile Pipeline'}
         </button>
       </WizardNav>
       {compileError && <p className="mt-3 text-sm text-status-error">{compileError}</p>}
@@ -253,7 +254,7 @@ export function ProfilePanel(props: ProfilePanelProps) {
   if (isUncompilable && !compiledYaml) {
     return (
       <div>
-        <PanelTitle title="Create Workflow Profile" subtitle="Define the deterministic workflow tool from this execution" />
+        <PanelTitle title="Compile" subtitle="Define the deterministic workflow tool from this execution" icon={Layers} iconClass="text-status-success" />
         <div className="rounded-md bg-status-warning/5 border border-status-warning/20 px-4 py-3 mb-6">
           <p className="text-xs text-status-warning font-medium">Cannot compile this query</p>
           <p className="text-xs text-text-secondary mt-1">

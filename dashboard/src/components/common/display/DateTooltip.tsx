@@ -74,7 +74,7 @@ export function DateTooltip({ options, children, className = '' }: DateTooltipPr
           {options.map((opt) => (
             <button
               key={opt.label}
-              onClick={() => handleCopy(opt.value, opt.label)}
+              onClick={(e) => { e.stopPropagation(); handleCopy(opt.value, opt.label); }}
               className="flex items-center justify-between w-full px-2.5 py-1 text-left hover:bg-surface-hover transition-colors"
             >
               <span className="text-[9px] font-medium uppercase tracking-wider text-text-tertiary w-10 shrink-0">

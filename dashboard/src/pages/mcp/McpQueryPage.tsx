@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2, Zap, Layers, Circle } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers, Circle } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -21,67 +21,94 @@ function mapStatus(job: LTJob): string {
   return 'failed';
 }
 
-const columns: Column<LTJob>[] = [
-  {
-    key: 'entity',
-    label: 'Workflow Type',
-    className: 'whitespace-nowrap',
-    render: (row) => {
-      const s = mapStatus(row);
-      const dotColor = s === 'completed' ? 'fill-status-success text-status-success'
-        : s === 'in_progress' ? 'fill-status-active text-status-active animate-pulse'
-        : 'fill-status-error text-status-error';
-      return (
-        <span className="inline-flex items-center gap-2">
-          <Circle className={`w-2.5 h-2.5 shrink-0 ${dotColor}`} />
-          <WorkflowPill type={(row as any).entity || 'unknown'} />
-        </span>
-      );
+function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[] {
+  return [
+    {
+      key: 'entity',
+      label: 'Workflow Type',
+      className: 'whitespace-nowrap',
+      render: (row) => {
+        const s = mapStatus(row);
+        const dotColor = s === 'completed' ? 'fill-status-success text-status-success'
+          : s === 'in_progress' ? 'fill-status-active text-status-active animate-pulse'
+          : 'fill-status-error text-status-error';
+        return (
+          <span className="inline-flex items-center gap-2">
+            <Circle className={`w-2.5 h-2.5 shrink-0 ${dotColor}`} />
+            <WorkflowPill type={(row as any).entity || 'unknown'} />
+          </span>
+        );
+      },
     },
-  },
-  {
-    key: 'workflow_id',
-    label: 'Workflow ID',
-    render: (row) => (
-      <span className="text-xs font-mono text-text-primary truncate block">
-        {row.workflow_id}
-      </span>
-    ),
-  },
-  {
-    key: 'created_at',
-    label: 'Created',
-    className: 'w-36',
-    sortable: true,
-    render: (row) => <TimestampCell date={row.created_at} />,
-  },
-  {
-    key: 'updated_at',
-    label: 'Updated',
-    className: 'w-36',
-    render: (row) => <TimestampCell date={row.updated_at} />,
-  },
-  {
-    key: 'actions',
-    label: '',
-    className: 'w-10',
-    render: () => (
-      <span className="opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent">
-        <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
-      </span>
-    ),
-  },
-];
+    {
+      key: 'workflow_id',
+      label: 'Workflow ID',
+      render: (row) => (
+        <span className="text-xs font-mono text-text-primary truncate block">
+          {row.workflow_id}
+        </span>
+      ),
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      className: 'w-36',
+      sortable: true,
+      render: (row) => <TimestampCell date={row.created_at} />,
+    },
+    {
+      key: 'updated_at',
+      label: 'Updated',
+      className: 'w-36',
+      render: (row) => <TimestampCell date={row.updated_at} />,
+    },
+    {
+      key: 'actions',
+      label: '',
+      className: 'w-28',
+      render: (row) => {
+        const s = mapStatus(row);
+        const isComplete = s === 'completed';
+        return (
+          <span className="opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?step=1`); }}
+              className="text-text-tertiary hover:text-accent transition-colors"
+              title="Describe"
+            >
+              <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?step=2`); }}
+              className="text-text-tertiary hover:text-status-warning transition-colors"
+              title="Discover"
+            >
+              <Lightbulb className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?step=3`); }}
+              className={`transition-colors ${isComplete ? 'text-text-tertiary hover:text-status-success' : 'text-text-tertiary/30 cursor-not-allowed'}`}
+              title={isComplete ? 'Compile' : 'Complete discovery first'}
+              disabled={!isComplete}
+            >
+              <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+          </span>
+        );
+      },
+    },
+  ];
+}
 
 const LIFECYCLE_STEPS = [
   {
-    icon: Wand2,
+    icon: MessageSquare,
     color: 'text-accent',
     title: '1. Describe',
     detail: 'Write a specific prompt. Mention tools, URLs, credentials, and expected outputs.',
   },
   {
-    icon: Zap,
+    icon: Lightbulb,
     color: 'text-status-warning',
     title: '2. Discover',
     detail: 'MCP selects servers, calls tools, and chains results. You review the execution.',
@@ -101,9 +128,10 @@ export function McpQueryPage() {
   const submitDirect = useSubmitMcpQuery();
   const submitRouted = useSubmitMcpQueryRouted();
   const activeMutation = direct ? submitDirect : submitRouted;
+  const columns = buildColumns(navigate);
 
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { search: '', status: '' },
+    filters: { search: '', status: '', type: '' },
     pageSize: 20,
   });
 
@@ -112,6 +140,7 @@ export function McpQueryPage() {
     offset: pagination.offset,
     search: filters.search,
     status: filters.status,
+    entity: filters.type || undefined,
   });
 
   useWorkflowListEvents();
@@ -142,21 +171,24 @@ export function McpQueryPage() {
       </p>
 
       {/* Composer: textarea left, lifecycle steps right */}
-      <div className="grid grid-cols-[1fr_240px] gap-6 mb-10">
+      <div className="grid grid-cols-[1fr_240px] gap-6 mb-16">
         {/* Prompt input */}
         <form onSubmit={handleSubmit}>
           <div className="rounded-lg border border-surface-border bg-surface-raised overflow-hidden h-full flex flex-col">
-            <textarea
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-              placeholder="Describe what you want to accomplish. Be specific about which tools to use, what data to capture, and how results should be structured..."
-              className="flex-1 min-h-[160px] px-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none border-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  handleSubmit(e);
-                }
-              }}
-            />
+            <div className="flex items-start gap-3 flex-1">
+              <MessageSquare className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
+              <textarea
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
+                placeholder="Describe what you want to accomplish. Be specific about which tools to use, what data to capture, and how results should be structured..."
+                className="flex-1 min-h-[160px] pr-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none border-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    handleSubmit(e);
+                  }
+                }}
+              />
+            </div>
             <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
               <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <input
@@ -203,10 +235,22 @@ export function McpQueryPage() {
         </div>
       </div>
 
-      {/* Recent runs */}
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Recent Runs</p>
-        <FilterBar>
+      {/* Section break */}
+      <div className="flex items-center gap-3 mb-6">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">Recent Pipeline Runs</p>
+        <div className="flex-1 border-t border-surface-border" />
+      </div>
+
+      <FilterBar>
+          <FilterSelect
+            label="Type"
+            value={filters.type}
+            onChange={(v) => setFilter('type', v)}
+            options={[
+              { value: 'mcpQuery', label: 'mcpQuery' },
+              { value: 'mcpTriage', label: 'mcpTriage' },
+            ]}
+          />
           <FilterSelect
             label="Status"
             value={filters.status}
@@ -217,8 +261,7 @@ export function McpQueryPage() {
               { value: 'failed', label: 'Failed' },
             ]}
           />
-        </FilterBar>
-      </div>
+      </FilterBar>
 
       <DataTable
         columns={columns}
