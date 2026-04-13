@@ -85,4 +85,37 @@ describe('Docs MCP Server', () => {
     expect(data.error).toContain('not found');
     await client.close();
   });
+
+  it('should return empty matches for unrelated search term', async () => {
+    const client = await connectClient();
+    const result = await client.callTool({
+      name: 'search_docs',
+      arguments: { query: 'xyzzy_no_match_anywhere_12345' },
+    });
+    const data = parseMcpResult(result);
+    expect(data.matches).toEqual([]);
+    await client.close();
+  });
+
+  it('should read subdirectory docs (api/)', async () => {
+    const client = await connectClient();
+    const result = await client.callTool({
+      name: 'read_doc',
+      arguments: { path: 'api/tasks.md' },
+    });
+    const data = parseMcpResult(result);
+    expect(data.content).toBeDefined();
+    expect(data.path).toBe('api/tasks.md');
+    await client.close();
+  });
+
+  it('should include titles in list results', async () => {
+    const client = await connectClient();
+    const result = await client.callTool({ name: 'list_docs', arguments: {} });
+    const data = parseMcpResult(result);
+    const archDoc = data.docs.find((d: any) => d.path === 'architecture.md');
+    expect(archDoc).toBeDefined();
+    expect(archDoc.title).toBe('Architecture');
+    await client.close();
+  });
 });

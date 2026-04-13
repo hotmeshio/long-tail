@@ -65,6 +65,20 @@ describe('Translation MCP Server', () => {
     await client.close();
   });
 
+  it('should default source_language to unknown when not provided and no LLM key', async () => {
+    const llm = await import('../../../services/llm');
+    vi.spyOn(llm, 'hasLLMApiKey').mockReturnValue(false);
+
+    const client = await connectClient();
+    const result = await client.callTool({
+      name: 'translate_content',
+      arguments: { content: 'hello', target_language: 'fr' },
+    });
+    const data = parseMcpResult(result);
+    expect(data.source_language).toBe('unknown');
+    await client.close();
+  });
+
   it('should allow multiple independent server instances', async () => {
     const server1 = await createTranslationServer({ name: 'test-translation-1' });
     const server2 = await createTranslationServer({ name: 'test-translation-2' });

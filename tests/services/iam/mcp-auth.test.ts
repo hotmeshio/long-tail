@@ -66,4 +66,25 @@ describe('MCP client — ToolContext auth integration', () => {
     expect(result).toBeDefined();
     expect(result.translated_content).toBeDefined();
   });
+
+  it('getToolContext returns undefined outside runWithToolContext', () => {
+    const ctx = getToolContext();
+    expect(ctx).toBeUndefined();
+  });
+
+  it('nested runWithToolContext uses inner context', async () => {
+    const outer = makeCtx('outer-user');
+    const inner = makeCtx('inner-user');
+
+    await runWithToolContext(outer, async () => {
+      expect(getToolContext()?.principal.id).toBe('outer-user');
+
+      await runWithToolContext(inner, async () => {
+        expect(getToolContext()?.principal.id).toBe('inner-user');
+      });
+
+      // Outer context restored after inner completes
+      expect(getToolContext()?.principal.id).toBe('outer-user');
+    });
+  });
 });

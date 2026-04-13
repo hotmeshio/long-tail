@@ -65,4 +65,21 @@ describe('MCP Client — built-in server resolution', () => {
       callServerTool('nonexistent-server', 'some_tool', {}),
     ).rejects.toThrow('not connected');
   });
+
+  it('should not report unregistered server as connected', () => {
+    expect(isConnected('long-tail-translation')).toBe(false);
+    expect(isConnected('random-name')).toBe(false);
+  });
+
+  it('should clear all cached clients', async () => {
+    registerBuiltinServer('long-tail-translation', createTranslationServer);
+
+    await callServerTool('translation', 'translate_content', {
+      content: 'hello', target_language: 'es',
+    });
+    expect(isConnected('translation')).toBe(true);
+
+    clear();
+    expect(isConnected('translation')).toBe(false);
+  });
 });
