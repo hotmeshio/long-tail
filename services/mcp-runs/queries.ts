@@ -77,7 +77,7 @@ export async function listJobs(params: ListJobsParams): Promise<{ jobs: JobRow[]
 
   const [countResult, dataResult] = await Promise.all([
     pool.query(COUNT_JOBS(schema, where), values),
-    pool.query(LIST_JOBS(schema, where, idx++, idx++), [...values, limit, offset]),
+    pool.query(LIST_JOBS(schema, appId, where, idx++, idx++), [...values, limit, offset]),
   ]);
 
   const jobs = dataResult.rows.map((row: any) => ({

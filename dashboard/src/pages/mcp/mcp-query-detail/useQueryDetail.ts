@@ -174,8 +174,8 @@ export function useQueryDetail() {
     if (!compileName && describeData.tool_name) setCompileName(describeData.tool_name);
   }
 
-  // Topic always derives from namespace
-  const derivedSubscribes = compileAppId.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // Topic always derives from workflow name (not namespace — using namespace causes topic collisions)
+  const derivedSubscribes = compileName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const allAppIds = useMemo(() => appIdData?.app_ids ?? [], [appIdData?.app_ids]);
 
   const handleCompile = async () => {

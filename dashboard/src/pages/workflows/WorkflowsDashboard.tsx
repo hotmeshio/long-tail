@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Settings } from 'lucide-react';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
+import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
@@ -77,6 +78,18 @@ function buildColumns(
       render: (row) => <TimestampCell date={row.updated_at} />,
       className: 'w-40',
       sortable: true,
+    },
+    {
+      key: 'duration',
+      label: 'Duration',
+      render: (row) => (
+        <ElapsedCell
+          startDate={row.created_at}
+          endDate={row.status === 'running' ? null : row.updated_at}
+          isLive={row.status === 'running'}
+        />
+      ),
+      className: 'w-28',
     },
     {
       key: 'actions',

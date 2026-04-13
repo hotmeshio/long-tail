@@ -179,8 +179,20 @@ export async function listJobs(params: JobListParams): Promise<JobListResult> {
       values,
     ),
     pool.query(
-      `SELECT j.key, j.entity, j.status, j.is_live, j.created_at, j.updated_at
+      `WITH ju_symbols AS (
+         SELECT value FROM durable.symbols
+         WHERE key LIKE 'hmsh:durable:sym:keys:%' AND field = 'metadata/ju'
+       )
+       SELECT j.key, j.entity, j.status, j.is_live, j.created_at,
+         CASE WHEN j.updated_at != j.created_at THEN j.updated_at
+              WHEN ju.value IS NOT NULL THEN to_timestamp(ju.value, 'YYYYMMDDHH24MISS.MS')
+              ELSE j.updated_at
+         END as updated_at
        FROM durable.jobs j
+       LEFT JOIN durable.jobs_attributes ju
+         ON ju.job_id = j.id
+         AND ju.symbol IN (SELECT value FROM ju_symbols)
+         AND (ju.dimension IS NULL OR ju.dimension = '')
        WHERE ${where}
        ORDER BY ${buildJobOrderBy(params.sort_by, params.order)}
        LIMIT $${idx++} OFFSET $${idx++}`,

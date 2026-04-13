@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Play, RotateCcw, ExternalLink } from 'lucide-react';
+import { X, Play, RotateCcw, ExternalLink, User } from 'lucide-react';
 import { useInvokeYamlWorkflow } from '../../../api/yaml-workflows';
+import { useAuth } from '../../../hooks/useAuth';
 import { useYamlActivityEvents, type ActivityStep } from '../../../hooks/useYamlActivityEvents';
 import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../../api/types';
 import { buildSkeleton } from '../../../pages/workflows/yaml-workflow-detail/helpers';
@@ -88,6 +89,7 @@ interface WorkflowTestPanelProps {
 }
 
 export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps) {
+  const { user } = useAuth();
   const invokeMutation = useInvokeYamlWorkflow();
   const [argsJson, setArgsJson] = useState('');
   const [jsonError, setJsonError] = useState('');
@@ -173,6 +175,16 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
           </div>
         ) : (
           <>
+            {/* Identity context */}
+            {user && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/[0.06] border border-accent/20">
+                <User className="w-3 h-3 text-accent/75 shrink-0" strokeWidth={1.5} />
+                <span className="text-[10px] text-text-secondary">
+                  Invoking as <span className="font-medium text-accent">{user.displayName || user.userId}</span>
+                </span>
+              </div>
+            )}
+
             {workflow.description && (
               <p className="text-[11px] text-text-secondary leading-relaxed">{workflow.description}</p>
             )}

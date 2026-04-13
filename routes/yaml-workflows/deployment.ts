@@ -111,6 +111,19 @@ router.post('/:id/invoke', async (req, res) => {
       return;
     }
     const data = req.body.data || {};
+
+    // Inject _scope so compiled workflow activities have identity context
+    if (req.auth?.userId && !data._scope) {
+      const { resolvePrincipal } = await import('../../services/iam/principal');
+      const principal = await resolvePrincipal(req.auth.userId);
+      if (principal) {
+        data._scope = {
+          principal,
+          scopes: ['mcp:tool:call'],
+        };
+      }
+    }
+
     if (req.body.sync) {
       const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
