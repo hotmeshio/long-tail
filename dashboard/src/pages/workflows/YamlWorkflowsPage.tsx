@@ -1,44 +1,55 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Play } from 'lucide-react';
+import { ChevronRight, Play, Wand2 } from 'lucide-react';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { useExpandedRows } from '../../hooks/useExpandedRows';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
-import { TryWorkflowModal } from './yaml-workflow-detail/TryWorkflowModal';
+import { WorkflowTestPanel } from '../../components/common/test/WorkflowTestPanel';
 import { groupByAppId, matchesSearch, filterTools, type ProcessServer } from './yaml-helpers';
 import type { LTYamlWorkflowRecord } from '../../api/types';
 
 // ── Tool row (individual workflow inside expanded server) ─────────────────────
 
-function ToolRow({ wf, onClick, onTry }: { wf: LTYamlWorkflowRecord; onClick: () => void; onTry: () => void }) {
+function ToolRow({ wf, onTry, onWizard }: {
+  wf: LTYamlWorkflowRecord;
+  onTry: () => void;
+  onWizard: () => void;
+}) {
   const canTry = wf.status === 'active';
 
   return (
-    <div onClick={onClick} className="group/row flex items-center cursor-pointer hover:bg-surface-hover/50 transition-colors border-b border-surface-border/30">
-      {/* Tool name — indented to align under server name */}
+    <div onClick={canTry ? onTry : undefined} className={`group/row flex items-center hover:bg-surface-hover/50 transition-colors border-b border-surface-border/30 ${canTry ? 'cursor-pointer' : ''}`}>
       <div className="flex-1 pl-14 pr-6 py-2 min-w-0">
         <code className="text-xs font-mono text-accent-primary truncate block">{wf.graph_topic}</code>
         {wf.description && (
           <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-1">{wf.description}</p>
         )}
       </div>
-      {/* Status */}
       <div className="w-28 px-6 py-2 whitespace-nowrap shrink-0">
         <StatusBadge status={wf.status} />
       </div>
-      {/* Try — hover-reveal icon */}
-      <div className="w-12 px-3 py-2 flex justify-end shrink-0">
+      <div className="w-20 px-3 py-2 flex justify-end gap-2 shrink-0">
         {canTry && (
           <button
             onClick={(e) => { e.stopPropagation(); onTry(); }}
             className="opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent"
-            title="Try tool"
+            title="Test tool"
           >
-            <Play className="w-[18px] h-[18px]" strokeWidth={1.5} />
+            <Play className="w-3.5 h-3.5" strokeWidth={1.5} />
+          </button>
+        )}
+        {wf.source_workflow_id && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onWizard(); }}
+            className="opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent"
+            title="Compilation Wizard"
+          >
+            <Wand2 className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
         )}
       </div>
@@ -52,15 +63,15 @@ function ServerRow({
   server,
   expanded,
   onToggle,
-  onToolClick,
   onTryTool,
+  onWizard,
   visibleTools,
 }: {
   server: ProcessServer;
   expanded: boolean;
   onToggle: () => void;
-  onToolClick: (wf: LTYamlWorkflowRecord) => void;
   onTryTool: (wf: LTYamlWorkflowRecord) => void;
+  onWizard: (wf: LTYamlWorkflowRecord) => void;
   visibleTools: LTYamlWorkflowRecord[];
 }) {
   return (
@@ -101,7 +112,7 @@ function ServerRow({
           >
             <div className="overflow-hidden">
               {visibleTools.map((wf) => (
-                <ToolRow key={wf.id} wf={wf} onClick={() => onToolClick(wf)} onTry={() => onTryTool(wf)} />
+                <ToolRow key={wf.id} wf={wf} onTry={() => onTryTool(wf)} onWizard={() => onWizard(wf)} />
               ))}
               <div className="h-1 bg-surface-sunken/20" />
             </div>
@@ -145,17 +156,8 @@ export function YamlWorkflowsPage() {
     return servers.filter((s) => matchesSearch(s, filters.search));
   }, [servers, filters.search]);
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const { expandedIds, toggle: toggleExpand } = useExpandedRows('lt:expanded:yaml-workflows');
   const [tryWorkflow, setTryWorkflow] = useState<LTYamlWorkflowRecord | null>(null);
-
-  const toggleExpand = (appId: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(appId)) next.delete(appId);
-      else next.add(appId);
-      return next;
-    });
-  };
 
   if (isLoading) {
     return (
@@ -215,48 +217,53 @@ export function YamlWorkflowsPage() {
         />
       </FilterBar>
 
-      {filteredServers.length === 0 ? (
-        <EmptyState title="No pipelines yet" description="Use the Pipeline Designer to create your first MCP pipeline." />
-      ) : (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b">
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-                Server / Tool
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
-                Status
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface w-12" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredServers.map((server) => (
-              <ServerRow
-                key={server.appId}
-                server={server}
-                expanded={expandedIds.has(server.appId)}
-                onToggle={() => toggleExpand(server.appId)}
-                onToolClick={(wf) => navigate(
-                  wf.source_workflow_id
-                    ? `/mcp/queries/${wf.source_workflow_id}`
-                    : `/mcp/workflows/${wf.id}`
-                )}
-                onTryTool={(wf) => setTryWorkflow(wf)}
-                visibleTools={filterTools(server.workflows, filters.search)}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      <div className="flex gap-0">
+        <div className={`${tryWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
+          {filteredServers.length === 0 ? (
+            <EmptyState title="No pipelines yet" description="Use the Pipeline Designer to create your first MCP pipeline." />
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                    Server / Tool
+                  </th>
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+                    Status
+                  </th>
+                  <th className="sticky top-[2.75rem] z-10 bg-surface w-20" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredServers.map((server) => (
+                  <ServerRow
+                    key={server.appId}
+                    server={server}
+                    expanded={expandedIds.has(server.appId)}
+                    onToggle={() => toggleExpand(server.appId)}
+                    onTryTool={(wf) => setTryWorkflow(wf)}
+                    onWizard={(wf) => navigate(
+                      wf.source_workflow_id
+                        ? `/mcp/queries/${wf.source_workflow_id}?step=4`
+                        : `/mcp/workflows/${wf.id}`
+                    )}
+                    visibleTools={filterTools(server.workflows, filters.search)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-      {tryWorkflow && (
-        <TryWorkflowModal
-          open={!!tryWorkflow}
-          onClose={() => setTryWorkflow(null)}
-          workflow={tryWorkflow}
-        />
-      )}
+        {tryWorkflow && (
+          <div className="w-[380px] shrink-0 sticky top-0 h-[calc(100vh-12rem)]">
+            <WorkflowTestPanel
+              workflow={tryWorkflow}
+              onClose={() => setTryWorkflow(null)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
