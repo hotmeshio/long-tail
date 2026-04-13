@@ -4,75 +4,59 @@ Every AI-driven execution carries cost. An LLM reasons through each step, select
 
 Long Tail records what the LLM did, extracts the pattern, and compiles it into a deterministic workflow. The next time the same problem appears, it runs without an LLM — no reasoning, no token cost, same result.
 
-This guide follows a single query through the full lifecycle: dynamic execution, compilation, deterministic replay, and automatic routing.
+This guide follows a single query through the full lifecycle: dynamic execution, compilation, deterministic replay, and automatic routing. All steps take place in the dashboard's **Pipeline Designer** page (sidebar: **MCP Workflows → Pipeline Designer**).
 
 ---
 
 ## The Dynamic Execution
 
-Open the **Discover & Compile** page and describe what you need in natural language. The example below asks the system to log into the dashboard, discover all navigation pages, and screenshot each one.
-
-<details>
-<summary>Discover & Compile — prompt submission</summary>
-<br/>
-<img src="img/compilation/01-query-submit.png" width="600" />
-</details>
-
-The system ships with a few preconfigured MCP servers and tools as reference examples (it's pluggable, so the list is your choice) — browser automation, file storage, database queries, HTTP fetch, and more. Additional servers can be registered at any time.
-
-<details>
-<summary>Tool Servers — registered MCP servers and their tools</summary>
-<br/>
-<img src="img/compilation/02-mcp-servers.png" width="600" />
-</details>
+Open **Pipeline Designer** from the sidebar. The page lists previous MCP query runs and provides a prompt field to start a new one. Describe what you need in natural language — for example, "Log into the dashboard, discover all navigation pages, and screenshot each one." Optionally constrain which MCP tool tags to search.
 
 When the query is submitted, the `mcpQuery` workflow starts. It discovers available tools by tag (GIN-indexed full-text search), then enters an agentic loop: the LLM selects a tool, calls it, reads the result, and decides the next step. Every tool call is checkpointed by the workflow engine. If the process crashes mid-execution, it resumes from the last checkpoint — no work is lost, no step runs twice.
 
-The run appears in the queries list once it completes.
-
-<details>
-<summary>Query detail — completed dynamic execution</summary>
-<br/>
-<img src="img/compilation/03-query-completed.png" width="600" />
-</details>
+The run appears in the **Pipeline Designer** list once it completes. Click into it to open the **Compilation Wizard**.
 
 ---
 
 ## The Compilation Wizard
 
-Click into a completed query to open the six-panel compilation wizard. Each panel represents one stage of converting the dynamic execution into a deployable deterministic workflow.
+The wizard has six steps, shown as numbered circles in a sticky bar at the top of the page. Each step represents one stage of converting the dynamic execution into a deployable deterministic workflow:
 
-### 1. Original
+1. **Describe**
+2. **Discover**
+3. **Compile**
+4. **Deploy**
+5. **Test**
+6. **Verify**
 
-The first panel displays what the LLM produced: the input envelope and the structured output. This is the reference point — whatever the compiled workflow produces will be compared against it.
+Steps unlock sequentially — you must complete each before advancing.
 
-<details>
-<summary>Panel 1 — original query input and output</summary>
-<br/>
-<img src="img/compilation/04-wizard-original.png" width="600" />
-</details>
+### 1. Describe
 
-### 2. Timeline
+**Subtitle:** *Dynamic LLM-orchestrated execution — the discovery run*
+
+The first panel displays what the LLM produced: the input envelope on the left and the structured output on the right. Duration is shown. This is the reference point — whatever the compiled workflow produces will be compared against it.
+
+### 2. Discover
+
+**Subtitle:** *Activity swimlane showing tool calls and their durations*
 
 A swimlane visualization of the execution. Each row is an MCP server, each block is a tool call, positioned on a time axis. The pattern is visible at a glance: the LLM logged in, extracted navigation links, then looped through each page to capture a screenshot.
 
-<details>
-<summary>Panel 2 — swimlane timeline</summary>
-<br/>
-<img src="img/compilation/05-wizard-timeline.png" width="600" />
-</details>
+### 3. Compile
 
-### 3. Profile
+**Subtitle:** *Define the deterministic workflow tool from this execution*
 
-The workflow needs an identity. The wizard auto-generates a description and suggests tags from the execution trace. You provide the namespace, tool name (this becomes the workflow's MCP tool name for discovery), and adjust tags as needed.
+The workflow needs an identity. This panel presents a form with:
 
-<details>
-<summary>Panel 3 — workflow profile configuration</summary>
-<br/>
-<img src="img/compilation/06-wizard-profile.png" width="600" />
-</details>
+- **Namespace** — a required alphanumeric identifier for the workflow's application scope.
+- **Tool Name** — the workflow's MCP tool name for discovery. This is how other agents and workflows will find and invoke it.
+- **Description** — auto-generated from the execution trace. Editable.
+- **Tags** — suggested from the execution trace. Add or remove tags to control discoverability.
 
-Clicking **Create Profile** triggers the five-stage compilation pipeline:
+An optional **Refine compilation** toggle reveals a feedback textarea where you can provide additional instructions to the compiler.
+
+Clicking **Compile Pipeline** triggers the five-stage compilation pipeline:
 
 1. **Extract** — parse the execution trace into an ordered step sequence
 2. **Analyze** — detect iteration patterns (the screenshot loop), classify inputs as dynamic (user-provided) or fixed (implementation detail)
@@ -80,35 +64,33 @@ Clicking **Create Profile** triggers the five-stage compilation pipeline:
 4. **Build** — generate a deterministic YAML DAG with activity wiring
 5. **Validate** — check for missing wiring, lost session handles, broken iteration boundaries
 
+Once compilation succeeds, the panel switches to a read-only view showing the workflow name, status badge, namespace, topic, description, activity pipeline chain, and tags.
+
 ### 4. Deploy
+
+**Subtitle:** *Review configuration, input/output schemas, and YAML definition*
 
 The deploy panel displays the compiled YAML definition, input schema, and output schema. The YAML encodes the DAG: each step names an MCP tool, declares its inputs (either from the user's request or from a prior step's output), and specifies data-flow edges.
 
-<details>
-<summary>Panel 4 — YAML configuration before deployment</summary>
-<br/>
-<img src="img/compilation/07-wizard-deploy.png" width="600" />
-</details>
+Two toggle buttons are available:
+
+- **Recompile with Feedback** — provide notes to the compiler and regenerate the YAML.
+- **Manual Edit** — directly edit the YAML, schemas, or activity manifest.
+
+A version history panel on the right tracks all edits. The step label changes from "Deploy" to "Redeploy" when the workflow is already active.
 
 Clicking **Deploy & Activate** registers the workflow as a live MCP tool — tagged for discovery, versioned, invocable by any agent, workflow, or API call.
 
 ### 5. Test
 
-The test panel runs the compiled workflow and compares it against the original dynamic execution. Click **Run test** to open the invocation modal with the pre-populated input schema.
+**Header:** *Compare Runs*
 
-<details>
-<summary>Panel 5 — test invocation modal (mid-execution)</summary>
-<br/>
-<img src="img/compilation/08-wizard-test-modal.png" width="600" />
-</details>
+The test panel runs the compiled workflow and compares it against the original dynamic execution. Two columns show:
 
-After the deterministic run completes, the wizard shows both executions side by side.
+- **Left — Original MCP Query**: the dynamic LLM-orchestrated run with its input, output, and duration.
+- **Right — Compiled Pipeline Run**: the deterministic run with its input, output, and duration. A dropdown allows selecting from multiple test runs.
 
-<details>
-<summary>Panel 5 — side-by-side comparison</summary>
-<br/>
-<img src="img/compilation/09-wizard-test-compare.png" width="600" />
-</details>
+Click **Run Test** to invoke the compiled workflow with the original input. An invocation modal appears with the pre-populated input schema.
 
 The difference is structural:
 
@@ -122,13 +104,11 @@ The deterministic path is faster because the LLM is used only at the edges — r
 
 ### 6. Verify
 
-The final panel confirms end-to-end routing. The original prompt is pre-filled. Click **Submit** to send it through the `mcpQueryRouter` — the same entry point any future request would use.
+**Header:** *End-to-End Verification*
 
-<details>
-<summary>Panel 6 — router verification</summary>
-<br/>
-<img src="img/compilation/10-wizard-verify.png" width="600" />
-</details>
+The final panel confirms end-to-end routing. The original prompt is pre-filled in an editable textarea on the left. Click **Submit** to send it through the `mcpQueryRouter` — the same entry point any future request would use. A **Reset to original** button restores the prompt if you modify it.
+
+The right column shows the result: a status badge, confidence percentage (when the deterministic path is used), and the full output in a JSON viewer. A **RouterProgressTracker** displays real-time routing progress during execution.
 
 The router performs full-text search and tag matching to find candidate workflows, then uses an LLM judge to confirm scope. When confidence exceeds the threshold, the request goes straight to the compiled workflow.
 

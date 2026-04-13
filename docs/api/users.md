@@ -1,6 +1,6 @@
 # Users API
 
-Users represent the humans who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication.
+Users represent the humans who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication. Mutating endpoints (create, update, delete, role management) require admin access (`admin` or `superadmin` role).
 
 For service identities (CI bots, schedulers, automated agents), use the [Service Accounts API](service-accounts.md) instead. Service accounts share the same RBAC system but authenticate with API keys rather than passwords or OAuth.
 

@@ -14,13 +14,15 @@ Each workflow execution carries three pieces of identity:
 
 **Credentials** — OAuth tokens and API keys available to the principal. Resolved at runtime through a cascade: principal's stored credentials, then the initiating user's credentials, then system environment variables.
 
-## Certified vs Durable
+## Workflow Types and IAM
 
-Long Tail has two tiers of workflow execution:
+Long Tail has three workflow types (see the [Workflows Guide](workflows.md#three-workflow-types) for full details). IAM applies to all three:
 
 **Durable workflows** are the baseline. Every workflow registered with HotMesh is durable: checkpointed to Postgres, restartable after crashes, with full IAM context. If an activity throws, the workflow fails.
 
 **Certified workflows** add the interceptor. The interceptor wraps every execution so that failures escalate to a human reviewer instead of throwing. A certified workflow has an entry in `lt_config_workflows` that defines its escalation chain, invocation roles, and optional `execute_as` service account. It gets never-fail guarantees — when an LLM call returns garbage or an API is down, the workflow pauses and creates a human task rather than dying.
+
+**Pipeline workflows** are compiled deterministic workflows that execute tool calls without an LLM. They inherit the IAM context of the invoking workflow — the principal, credentials, and trace lineage all propagate through the YAML DAG execution.
 
 Any durable workflow can be promoted to certified through the Workflow Registry in the dashboard. Registration adds the interceptor config; de-registration removes it. The workflow code does not change.
 
@@ -163,7 +165,7 @@ When an activity calls `getCredential('anthropic')` and no credential exists in 
 
 The dashboard surfaces IAM across four pages:
 
-**Workflow Registry** (`/workflows/registry`) — lists all discovered workflows. Certified workflows display a ShieldCheck badge; durable workflows show the standard Workflow icon. Use ShieldPlus to certify a durable workflow or ShieldOff to de-certify.
+**Workflow Registry** (`/workflows/registry`) — lists all discovered workflows. Certified workflows display a ShieldCheck badge in accent blue; pipeline workflows display a Wand2 icon in purple; durable workflows show the standard Workflow icon. Use ShieldPlus to certify a durable workflow or ShieldOff to de-certify.
 
 **Accounts** (`/admin/users`) — unified management for User Accounts and Service Accounts via tab toggle. Create service accounts, assign roles, generate API keys. The key generation flow displays the raw key once; it cannot be retrieved after dismissal.
 

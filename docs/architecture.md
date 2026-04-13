@@ -6,6 +6,7 @@ This document describes how Long Tail organizes workflows, activities, and MCP s
 
 - [Project Structure](#project-structure)
 - [The Convention](#the-convention)
+- [Three Workflow Types](#three-workflow-types)
 - [System Capabilities](#system-capabilities)
   - [Tag-Based Tool Discovery](#tag-based-tool-discovery)
   - [System Workflows](#system-workflows)
@@ -94,6 +95,44 @@ server.tool('classify', schema, async (args) => activities.classify(args));
 ```
 
 With this convention in place, the system ships with a set of built-in capabilities that demonstrate the pattern.
+
+## Three Workflow Types
+
+Long Tail has three distinct workflow types. The dashboard's **Workflow Registry** page shows each with a visual badge.
+
+### Durable
+
+Any function registered as a HotMesh worker is durable. This is the baseline tier:
+
+- **Checkpointed execution** — activity results are persisted in PostgreSQL; crashes resume from the last checkpoint.
+- **Automatic retries** — failed activities retry according to their retry policy.
+- **IAM context** — the caller's identity propagates through the execution envelope.
+
+A durable workflow has no entry in `lt_config_workflows`. It runs, but without interceptor tracking, escalation chains, or task records. In the dashboard, durable workflows display a **Workflow** icon with a "Durable" label.
+
+### Certified
+
+A certified workflow is durable plus the full Long Tail control plane. It has an entry in `lt_config_workflows`, which activates:
+
+- **Interceptor wrapping** — every execution is tracked as a task in `lt_tasks` with full audit trail.
+- **Escalation chains** — returning `{ type: 'escalation' }` creates a reviewable record, routes to the correct role, and triggers re-runs on resolution.
+- **Never-fail guarantee** — unhandled errors are caught and surfaced as error escalations.
+- **Invocation controls** — `invocable: true` exposes the workflow for external invocation via the API and dashboard.
+- **Execution identity** — roles, default assignees, and `execute_as` overrides are defined in the config.
+
+In the dashboard, certified workflows display a **ShieldCheck** icon with a "Certified" label in accent blue. Promote a durable workflow to certified by creating a config entry; de-certify by removing it. The workflow code does not change.
+
+### Pipeline
+
+A pipeline workflow is a compiled deterministic workflow generated from a successful dynamic execution. The compilation pipeline extracts the tool-call sequence from an `mcpQuery` or `mcpTriage` run and produces a YAML DAG that replays the same steps without an LLM.
+
+- **No LLM per step** — the DAG executes tool calls directly with pre-wired data flow.
+- **Discoverable as a tool** — deployed pipelines become MCP tools that any workflow or agent can invoke.
+- **Automatic routing** — the `mcpQueryRouter` and `mcpTriageRouter` discover compiled pipelines via full-text search and tag matching, routing requests to the deterministic path when confidence is high.
+
+Pipeline workflows are stored in `lt_yaml_workflows` with status lifecycle: `draft` → `deployed` → `active` → `archived`. In the dashboard, pipeline workflows display a **Wand2** (magic wand) icon in purple.
+
+See the [Compilation Pipeline](compilation.md) guide for the full lifecycle and the [Workflows Guide](workflows.md) for detailed coverage of all three types.
 
 ## System Capabilities
 

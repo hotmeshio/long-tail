@@ -78,9 +78,11 @@ Each rule:
     "schedule": "0 3 * * *",
     "rules": [ ... ]
   },
-  "active": true
+  "restarted": true
 }
 ```
+
+The `restarted` field confirms the cron was restarted with the new configuration.
 
 ### What happens on PUT
 

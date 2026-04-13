@@ -1,6 +1,6 @@
 # DBA API
 
-Direct database administration endpoints for on-demand pruning and migration deployment. These complement the automated [maintenance schedule](../maintenance.md) — use them for manual cleanup or CI/CD integration. All endpoints require authentication.
+Direct database administration endpoints for on-demand pruning and migration deployment. These complement the automated [maintenance schedule](../maintenance.md) — use them for manual cleanup or CI/CD integration. All endpoints require admin access (`admin` or `superadmin` role).
 
 ## Prune on demand
 
