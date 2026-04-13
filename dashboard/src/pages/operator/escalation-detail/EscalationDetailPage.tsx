@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import {
@@ -52,7 +52,6 @@ export function EscalationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const { data: esc, isLoading } = useEscalation(id!);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
@@ -64,7 +63,6 @@ export function EscalationDetailPage() {
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
-  const returnPath = (location.state as { from?: string } | null)?.from ?? '/escalations/available';
   const [activeView, setActiveView] = useState<ActiveView>('resolve');
   const [json, setJson] = useState('{}');
 
@@ -150,21 +148,17 @@ export function EscalationDetailPage() {
     setCollapsed({ context: true, triage: true, resolver: false });
   };
 
+  const goBack = () => navigate(-1);
+
   const handleResolve = async (payload: Record<string, unknown>) => {
-    const result = await resolve.mutateAsync({ id: esc.id, resolverPayload: payload }) as any;
-    if (result?.signaled && result?.workflowId) {
-      navigate(`/workflows/executions/${result.workflowId}`);
-    } else if (result?.triage && result?.workflowId) {
-      navigate(`/workflows/executions/${result.workflowId}`);
-    } else {
-      navigate(returnPath);
-    }
+    await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
+    goBack();
   };
 
   const handleEscalate = async (targetRole: string) => {
     if (!targetRole) return;
     await escalate.mutateAsync({ id: esc.id, targetRole });
-    navigate(returnPath);
+    goBack();
   };
 
   const handleRetryTriage = async () => {
@@ -172,20 +166,16 @@ export function EscalationDetailPage() {
       await claim.mutateAsync({ id: esc.id, durationMinutes: 30 });
     }
     const diagnosis = (payloadObj?.diagnosis as string) || esc.description || '';
-    const result = await resolve.mutateAsync({
+    await resolve.mutateAsync({
       id: esc.id,
       resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
-    }) as any;
-    if (result?.triage && result?.workflowId) {
-      navigate(`/workflows/executions/${result.workflowId}`);
-    } else {
-      navigate(returnPath);
-    }
+    });
+    goBack();
   };
 
   const handleRelease = async () => {
     await claim.mutateAsync({ id: esc.id, durationMinutes: 0 });
-    navigate(returnPath);
+    goBack();
   };
 
   return (

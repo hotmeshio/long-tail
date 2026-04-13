@@ -15,7 +15,7 @@ export function TimeAxis({ ticks }: TimeAxisProps) {
         {ticks.map((tick) => (
           <span
             key={tick.pct}
-            className="absolute text-[9px] font-mono text-text-tertiary -translate-x-1/2 bottom-1"
+            className="absolute text-[9px] font-mono text-text-tertiary -translate-x-1/2 bottom-1 whitespace-nowrap"
             style={{ left: `${tick.pct}%` }}
           >
             {tick.label}

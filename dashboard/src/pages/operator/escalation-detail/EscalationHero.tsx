@@ -4,7 +4,7 @@ import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
-import { TimeAgo } from '../../../components/common/display/TimeAgo';
+import { DateValue } from '../../../components/common/display/DateValue';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { UserName } from '../../../components/common/display/UserName';
 import { isAckEscalation } from '../../../lib/escalation';
@@ -61,7 +61,7 @@ export function EscalationHero({
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Created</p>
           <span className="inline-flex items-center mb-1 text-xs text-text-secondary">
-            <TimeAgo date={esc.created_at} />
+            <DateValue date={esc.created_at} />
           </span>
         </div>
 
@@ -89,7 +89,7 @@ export function EscalationHero({
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Resolved</p>
             <span className="inline-flex items-center h-5 text-xs text-text-secondary">
-              <TimeAgo date={esc.resolved_at} />
+              <DateValue date={esc.resolved_at} />
             </span>
           </div>
         )}

@@ -123,7 +123,7 @@ export async function disconnectFromServer(serverId: string): Promise<void> {
  * Returns the client or null if not found.
  *
  * Built-in servers are connected once under their canonical factory name.
- * Alias lookups (e.g. 'vision' matching 'long-tail-document-vision') reuse
+ * Alias lookups (e.g. 'translation' matching 'long-tail-translation') reuse
  * the same client instance to avoid double-connecting the singleton server.
  */
 export async function resolveClient(serverId: string): Promise<Client | null> {

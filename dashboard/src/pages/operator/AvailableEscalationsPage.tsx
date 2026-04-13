@@ -26,6 +26,7 @@ import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
 import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import { createBulkHandlers } from './helpers';
 import type { LTEscalationRecord } from '../../api/types';
 
@@ -66,7 +67,7 @@ export function AvailableEscalationsPage() {
     : statusFilter === 'resolved' ? 'resolved'
     : undefined; // '' (All) → no filter
 
-  const { data, isLoading, error: queryError } = useEscalations({
+  const { data, isLoading, error: queryError, refetch, isFetching } = useEscalations({
     status: apiStatus,
     role: filters.role || undefined,
     type: filters.type || undefined,
@@ -205,6 +206,7 @@ export function AvailableEscalationsPage() {
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
         showStatus
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
       />
 
       {selectedIds.size > 0 && (

@@ -29,6 +29,10 @@ export const INSERT_USER_ROLE_IGNORE =
 export const GET_USER_BY_ID =
   'SELECT * FROM lt_users WHERE id = $1';
 
+/** Check if a user exists by id. Lightweight — returns only the id column. */
+export const VERIFY_USER_BY_ID =
+  'SELECT id FROM lt_users WHERE id = $1 LIMIT 1';
+
 /** Fetch user + roles in a single query. Returns one row per role (or one row with nulls if no roles). */
 export const GET_USER_WITH_ROLES =
   `SELECT u.id, u.external_id, u.display_name, u.status, u.metadata,

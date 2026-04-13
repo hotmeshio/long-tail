@@ -13,7 +13,7 @@ interface StreamVolumeChartProps {
   onQueueFilter?: (queue: string) => void;
 }
 
-export function StreamVolumeChart({ byStream, onNodeFilter, onQueueFilter }: StreamVolumeChartProps) {
+export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartProps) {
   const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
@@ -33,19 +33,14 @@ export function StreamVolumeChart({ byStream, onNodeFilter, onQueueFilter }: Str
   const renderBar = (s: StreamEntry) => {
     const pct = maxCount > 0 ? (s.count / maxCount) * 100 : 0;
     const isEngine = s.stream_type === 'engine';
-    const label = isEngine ? '(engine)' : stripStreamPrefix(s.stream_name);
+    const label = isEngine ? '(all engines)' : stripStreamPrefix(s.stream_name);
     const barColor = isEngine ? 'bg-blue-500/70' : 'bg-accent/60';
     const labelColor = isEngine ? 'text-blue-500' : 'text-text-tertiary';
-    const clickable = !isEngine && onQueueFilter;
-
     return (
       <div key={`${s.stream_type}-${s.stream_name}`} className="flex items-center gap-3">
         <span
-          className={`text-[9px] font-mono ${labelColor} w-36 truncate text-right shrink-0 ${
-            clickable ? 'cursor-pointer hover:underline hover:text-accent' : ''
-          }`}
+          className={`text-[9px] font-mono ${labelColor} w-36 truncate text-right shrink-0`}
           title={s.stream_name}
-          onClick={clickable ? () => onQueueFilter(s.stream_name) : undefined}
         >
           {label}
         </span>
@@ -72,7 +67,7 @@ export function StreamVolumeChart({ byStream, onNodeFilter, onQueueFilter }: Str
             className={`${labelCls} text-blue-500/70 hover:text-blue-500`}
             onClick={() => onNodeFilter?.('engines')}
           >
-            Engine Queue
+            Engine Message Volume
           </p>
           {engineStreams.map(renderBar)}
           {workerStreams.length > 0 && <div className="h-2" />}
@@ -84,7 +79,7 @@ export function StreamVolumeChart({ byStream, onNodeFilter, onQueueFilter }: Str
             className={`${labelCls} text-accent/70 hover:text-accent`}
             onClick={() => onNodeFilter?.('workers')}
           >
-            Worker Queues
+            Worker Message Volume
           </p>
           {workerStreams.map(renderBar)}
         </>

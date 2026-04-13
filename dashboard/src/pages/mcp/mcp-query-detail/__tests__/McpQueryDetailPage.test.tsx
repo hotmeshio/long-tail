@@ -80,10 +80,10 @@ describe('McpQueryDetailPage', () => {
 
     render(<McpQueryDetailPage />, { wrapper });
     expect(screen.getByText('Compilation Wizard')).toBeInTheDocument();
-    // All 5 wizard step labels
-    expect(screen.getByText('Original')).toBeInTheDocument();
-    expect(screen.getByText('Timeline')).toBeInTheDocument();
-    expect(screen.getByText('Profile')).toBeInTheDocument();
+    // Wizard step labels (Describe also appears in panel title)
+    expect(screen.getAllByText('Describe').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Discover')).toBeInTheDocument();
+    expect(screen.getByText('Compile')).toBeInTheDocument();
     expect(screen.getByText('Deploy')).toBeInTheDocument();
     expect(screen.getByText('Test')).toBeInTheDocument();
   });
@@ -129,7 +129,7 @@ describe('McpQueryDetailPage', () => {
     render(<McpQueryDetailPage />, { wrapper });
     // Navigate to step 3 (compile)
     fireEvent.click(screen.getByText('3'));
-    expect(screen.getByRole('button', { name: /create profile/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /compile pipeline/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/describe what this workflow does/i)).toBeInTheDocument();
     // Should have namespace and tool name inputs
     expect(screen.getByPlaceholderText(/e\.g\. longtail/i)).toBeInTheDocument();

@@ -1,6 +1,6 @@
 # Events
 
-Long Tail publishes structured events when workflows reach milestones. The event system is pluggable: register one or more adapters at startup, and every milestone event is broadcast to all of them. If no adapters are registered, the system does nothing -- no connections are opened and no work is performed.
+Long Tail publishes structured events when workflows reach milestones. The default adapter uses Socket.IO, which is included in the Express server configuration and works out of the box with no additional infrastructure. The event system is pluggable: register additional adapters at startup to fan out events to NATS, SNS, webhooks, or any other pub/sub system alongside (or instead of) the default Socket.IO transport.
 
 ## Configuration via start()
 

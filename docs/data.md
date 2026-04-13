@@ -1,6 +1,6 @@
 # Data Model
 
-Long Tail stores all state in PostgreSQL. Fourteen tables handle workflow tracking, escalation management, user identity, configuration, MCP server registration, compiled workflows, and namespace isolation. A single migration file (`services/db/schemas/001_initial.sql`) creates the full schema; the migration runner (`services/db/migrate.ts`) tracks applied files in `lt_migrations` so migrations are idempotent.
+Long Tail stores all state in PostgreSQL. The tables handle workflow tracking, escalation management, user identity, configuration, MCP server registration, compiled workflows, OAuth tokens, service tokens, ephemeral credentials, and namespace isolation. A single migration file (`services/db/schemas/001_initial.sql`) creates the full schema; the migration runner (`services/db/migrate.ts`) tracks applied files in `lt_migrations` so migrations are idempotent.
 
 ## Tables
 
@@ -344,6 +344,59 @@ Unique constraint: `(workflow_id, version)`.
 |-------|---------|---------|
 | `idx_lt_yaml_workflow_versions_wf` | `(workflow_id, version DESC)` | Look up latest version for a workflow |
 
+### lt_oauth_tokens
+
+Encrypted per-user, per-provider OAuth tokens. Supports multiple credentials per provider via the `label` column.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `user_id` | `UUID NOT NULL` | — | FK to `lt_users(id)`, CASCADE on delete |
+| `provider` | `TEXT NOT NULL` | — | OAuth provider name (e.g., `google`, `github`) |
+| `label` | `TEXT NOT NULL` | `'default'` | Label for multiple credentials per provider per user |
+| `access_token_enc` | `TEXT NOT NULL` | — | AES-encrypted access token |
+| `refresh_token_enc` | `TEXT` | — | AES-encrypted refresh token |
+| `token_type` | `TEXT NOT NULL` | `'bearer'` | Token type |
+| `scopes` | `TEXT[] NOT NULL` | `'{}'` | Granted scopes |
+| `expires_at` | `TIMESTAMPTZ` | — | Token expiry |
+| `provider_user_id` | `TEXT NOT NULL` | — | User ID at the provider |
+| `provider_email` | `TEXT` | — | Email at the provider |
+| `metadata` | `JSONB` | — | Arbitrary metadata |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+Unique constraint: `(user_id, provider, label)`.
+
+### lt_service_tokens
+
+Service tokens for external MCP servers. Each token is hashed — the raw token is returned once at creation.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | `UUID` | `gen_random_uuid()` | Primary key |
+| `name` | `TEXT UNIQUE NOT NULL` | — | Human-readable token name |
+| `token_hash` | `TEXT NOT NULL` | — | Hashed token value |
+| `server_id` | `UUID` | — | FK to `lt_mcp_servers(id)`, CASCADE on delete |
+| `scopes` | `TEXT[] NOT NULL` | `'{}'` | Allowed scopes |
+| `expires_at` | `TIMESTAMPTZ` | — | Optional expiry |
+| `last_used_at` | `TIMESTAMPTZ` | — | Updated on each use |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+### lt_ephemeral_credentials
+
+Short-lived credential store for sensitive fields in waitFor signal payloads. Supports use-count limits and TTL-based expiry.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `token` | `UUID` | `gen_random_uuid()` | Primary key |
+| `value` | `BYTEA NOT NULL` | — | Encrypted credential value |
+| `label` | `TEXT` | — | Human-readable label |
+| `max_uses` | `INTEGER NOT NULL` | `0` | Maximum retrievals (0 = unlimited) |
+| `use_count` | `INTEGER NOT NULL` | `0` | Current retrieval count |
+| `expires_at` | `TIMESTAMPTZ` | — | TTL-based expiry |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
+
 ### lt_namespaces
 
 Multi-tenant namespace registry.
@@ -387,6 +440,9 @@ lt_yaml_workflows
 lt_mcp_servers                 (standalone — MCP server registry)
 lt_namespaces                  (standalone — namespace registry)
 lt_migrations                  (standalone — tracks applied schema files)
+lt_oauth_tokens                (user_id → lt_users.id, CASCADE)
+lt_service_tokens              (standalone — service token registry)
+lt_ephemeral_credentials       (standalone — short-lived credential store)
 ```
 
 Arrows point from child to parent. `CASCADE` means deleting the parent deletes the children.

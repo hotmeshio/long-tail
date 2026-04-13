@@ -19,8 +19,8 @@ Long Tail organizes workflows, activities, and MCP servers into three tiers that
 ```
 system/          Always ships. The built-in tool inventory.
 ├── activities/    Vision, DB queries, HTTP fetch, file storage, ...
-├── workflows/     mcp-triage, insightQuery, mcpQuery
-└── mcp-servers/   9 built-in MCP servers wrapping the activities
+├── workflows/     mcpQuery pipeline, mcpTriage pipeline
+└── mcp-servers/   Built-in MCP servers wrapping the activities
 
 examples/        Opt-in demos. Seed with `examples: true`.
 ├── workflows/     review-content, verify-document, process-claim, ...
@@ -32,7 +32,7 @@ your-app/        Your workflows. Same conventions, your directory.
 └── index.ts       Barrel export of workers[]
 ```
 
-**System** workflows and tools are always available — `mcpTriage` handles AI-assisted remediation when humans can't resolve an escalation, `insightQuery` answers analytics questions using database tools, and `mcpQuery` fulfills arbitrary requests using all available MCP tools.
+**System** workflows and tools are always available. Two 3-tier pipelines handle all dynamic work: **mcpQuery** (router → deterministic | dynamic) fulfills arbitrary requests using MCP tools, and **mcpTriage** (router → deterministic | dynamic) handles AI-assisted remediation when humans can't resolve an escalation. Each pipeline has a router that checks for compiled workflows before falling back to a dynamic agentic loop.
 
 **Examples** demonstrate the patterns. They seed the dashboard with working scenarios on first run.
 
@@ -102,44 +102,47 @@ With this convention in place, the system ships with a set of built-in capabilit
 Every MCP server is tagged with categories (`database`, `vision`, `http`, `storage`, etc.). Workflows discover tools by tag rather than hard-coding server names:
 
 ```typescript
-// insightQuery discovers only analytics tools
-const servers = await findServersByTags(['database', 'analytics'], 'any');
-
-// mcpQuery discovers all tools (or filters by requested tags)
+// mcpQuery discovers all tools (or filters by user-provided tags)
 const servers = await findServersByTags(tags, 'any');
+
+// scoped discovery — only database-tagged tools
+const servers = await findServersByTags(['database', 'analytics'], 'any');
 ```
 
-Tags are GIN-indexed in PostgreSQL for fast lookup. Register a new MCP server tagged `analytics` and `insightQuery` automatically picks up its tools. Register one tagged `vision` and `mcpTriage` can use it for remediation. The tool inventory grows without code changes.
+Tags are GIN-indexed in PostgreSQL for fast lookup. Register a new MCP server tagged `analytics` and mcpQuery automatically picks up its tools. Register one tagged `vision` and mcpTriage can use it for remediation. The tool inventory grows without code changes.
 
 ### System Workflows
 
-| Workflow | Purpose | Tools Used |
-|----------|---------|------------|
-| `mcpTriage` | Remediate failed escalations using LLM + MCP tools | All (discovered dynamically) |
-| `insightQuery` | Answer analytics questions about system state | DB tools (by `database` tag) |
-| `mcpQuery` | Fulfill arbitrary requests using all available tools | All (by tag or unfiltered) |
+| Pipeline | Workflows | Purpose |
+|----------|-----------|---------|
+| **mcpQuery** | `mcpQueryRouter` → `mcpDeterministic` \| `mcpQuery` | General-purpose MCP orchestration. Router discovers compiled workflows; routes to deterministic (if match) or dynamic agentic loop. |
+| **mcpTriage** | `mcpTriageRouter` → `mcpTriageDeterministic` \| `mcpTriage` | Escalation remediation. Same 3-tier pattern — router checks for compiled solutions before falling back to dynamic triage. |
 
 **mcpQuery** is the general-purpose entry point. Ask it to "take a screenshot of example.com" and it uses Playwright tools. Ask it to "fetch the latest exchange rates and save to a file" and it chains HTTP fetch with file storage. Once a useful sequence is discovered, it can be compiled into a deterministic workflow and deployed as a new tool.
 
 Engineers can register external servers — Playwright for browser automation, file storage, custom APIs. The triage agent can even recommend that engineers add a new MCP server when it encounters a capability gap. Every server's tools become available as proxy activities in deterministic workflows and as callable tools in dynamic triage.
 
-The nine built-in servers are the starting inventory.
+The built-in servers are the starting inventory.
 
 ## Built-in MCP Servers
 
-Long Tail ships with nine built-in servers:
+Long Tail ships with the following built-in servers:
 
-| Server | Tools | Purpose |
-|--------|-------|---------|
-| `long-tail-human-queue` | 4 | Route work to humans, check resolution, claim and resolve |
-| `long-tail-db` | 6 | Query tasks, escalations, process summaries, system health |
-| `long-tail-document-vision` | 5 | Rotate pages, extract data, translate, validate members |
-| `long-tail-workflow-compiler` | 3 | Convert triage executions to YAML, deploy, list |
-| `long-tail-mcp-workflows` | 3 | Discover and invoke compiled workflow tools |
-| `long-tail-playwright` | 8 | Browser automation: navigate, screenshot, click, fill, evaluate |
-| `long-tail-file-storage` | 4 | Read, write, list, and delete files in managed storage |
-| `long-tail-http-fetch` | 3 | HTTP requests, JSON fetch, text fetch for external APIs |
-| `long-tail-playwright-cli` | 5 | High-level browser automation: login_and_capture, capture_page, capture_authenticated_pages, extract_content, submit_form |
+| Server | Purpose |
+|--------|---------|
+| `long-tail-db-query` | Query tasks, escalations, process summaries, system health |
+| `long-tail-human-queue` | Route work to humans, check resolution, claim/resolve, escalate-and-wait |
+| `mcp-workflows-longtail` | Discover and invoke compiled workflow tools |
+| `long-tail-workflow-compiler` | Convert executions to YAML, deploy, list |
+| `long-tail-translation` | Translate content between languages |
+| `long-tail-vision` | Analyze and describe images using LLM vision |
+| `long-tail-playwright` | Low-level browser automation |
+| `long-tail-playwright-cli` | High-level browser automation |
+| `long-tail-docs` | Search and read product documentation |
+| `long-tail-file-storage` | Read, write, list, and delete files |
+| `long-tail-http-fetch` | HTTP requests, JSON/text fetch |
+| `long-tail-oauth` | OAuth token management |
+| `long-tail-claude-code` | Agentic coding via Claude Code CLI |
 
 Each server can provide `compile_hints` — tool-specific constraints stored in the database that guide the compilation pipeline when converting dynamic executions into deterministic workflows.
 

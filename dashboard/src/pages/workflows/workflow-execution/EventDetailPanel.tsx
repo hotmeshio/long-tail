@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import type { WorkflowExecutionEvent, LTTaskRecord } from '../../../api/types';
-import { formatDuration, formatDateTime } from './utils';
+import { DateValue } from '../../../components/common/display/DateValue';
+import { DurationValue } from '../../../components/common/display/DurationValue';
 
 interface EventDetailPanelProps {
   event: WorkflowExecutionEvent;
@@ -89,18 +90,14 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
               Duration
             </p>
-            <p className="text-xs font-mono text-text-primary">
-              {formatDuration(event.duration_ms)}
-            </p>
+            <DurationValue ms={event.duration_ms} className="font-mono text-text-primary" />
           </div>
         )}
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
             Time
           </p>
-          <p className="text-xs font-mono text-text-primary">
-            {new Date(event.event_time).toLocaleString()}
-          </p>
+          <DateValue date={event.event_time} format="datetime" className="font-mono text-text-primary" />
         </div>
 
         {/* Signal-specific: signal name */}
@@ -220,7 +217,7 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
             <StatusBadge status={childTask.status} />
             {childTask.completed_at && (
               <span className="text-[10px] text-text-tertiary">
-                Completed {formatDateTime(childTask.completed_at)}
+                Completed <DateValue date={childTask.completed_at} format="relative" />
               </span>
             )}
           </div>

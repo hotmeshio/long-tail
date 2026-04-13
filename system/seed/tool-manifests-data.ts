@@ -1,24 +1,6 @@
 // ── Data, storage, HTTP, and OAuth tool manifests ───────────────────────────
 
-export const VISION_TOOLS = [
-  {
-    name: 'list_document_pages',
-    description: 'List available document page images from storage. Returns an array of image references.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
-    name: 'rotate_page',
-    description: 'Rotate a document page image by the given degrees. Deletes the original by default and returns the new image reference. Use the exact rotated_ref in correctedData.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        image_ref: { type: 'string', description: 'Storage reference to the image to rotate' },
-        degrees: { type: 'integer', description: 'Rotation degrees (90, 180, 270)' },
-        replace_original: { type: 'boolean', description: 'Delete the original file after rotation (default: true)' },
-      },
-      required: ['image_ref', 'degrees'],
-    },
-  },
+export const TRANSLATION_TOOLS = [
   {
     name: 'translate_content',
     description: 'Translate content text to the target language. Returns the translated content and detected source language.',
@@ -27,8 +9,36 @@ export const VISION_TOOLS = [
       properties: {
         content: { type: 'string', description: 'The content text to translate' },
         target_language: { type: 'string', description: 'Target language code (e.g. "en", "es")' },
+        source_language: { type: 'string', description: 'Source language code (auto-detected if omitted)' },
       },
       required: ['content', 'target_language'],
+    },
+  },
+];
+
+export const VISION_ANALYSIS_TOOLS = [
+  {
+    name: 'analyze_image',
+    description: 'Analyze an image and extract structured data: description, text content, and notable objects.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        image: { type: 'string', description: 'Image URL or data URI' },
+        prompt: { type: 'string', description: 'Optional analysis prompt to guide the model' },
+      },
+      required: ['image'],
+    },
+  },
+  {
+    name: 'describe_image',
+    description: 'Generate a detailed description of an image.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        image: { type: 'string', description: 'Image URL or data URI' },
+        context: { type: 'string', description: 'Optional context about the image' },
+      },
+      required: ['image'],
     },
   },
 ];
@@ -39,7 +49,7 @@ export const DB_QUERY_TOOLS = [
   { name: 'get_process_summary', description: 'List business processes grouped by origin_id. Each process shows task count, completed/escalated counts, workflow types involved, and time range.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
   { name: 'get_escalation_stats', description: 'Real-time escalation statistics: pending/claimed counts, created/resolved in last 1h and 24h, breakdown by role.', inputSchema: { type: 'object', properties: {} } },
   { name: 'get_workflow_types', description: 'List all registered workflow configurations with task queue, roles, invocable flag, and description.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_system_health', description: 'Overall system health snapshot: task counts by status, escalation counts by status, active workflow types, and recent activity window.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_system_health', description: 'Full system overview: durable workflow execution counts by type (active/completed), task counts by status, escalation counts by status, recent activity window, MCP servers (with tool counts and tags), compiled workflow totals, and workflow configurations.', inputSchema: { type: 'object', properties: {} } },
 ];
 
 export const FILE_STORAGE_TOOLS = [
@@ -130,6 +140,36 @@ export const HTTP_FETCH_TOOLS = [
         headers: { type: 'object', description: 'Request headers' },
       },
       required: ['url'],
+    },
+  },
+];
+
+export const DOCS_TOOLS = [
+  {
+    name: 'list_docs',
+    description: 'List all available documentation files with their titles.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'search_docs',
+    description: 'Search across all documentation for a keyword or phrase. Returns matching files with line context.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search term or phrase to find in documentation' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_doc',
+    description: 'Read the full content of a documentation file.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Document path relative to docs/ (e.g. "mcp.md" or "api/tasks.md")' },
+      },
+      required: ['path'],
     },
   },
 ];

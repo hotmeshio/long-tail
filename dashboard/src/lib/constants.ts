@@ -23,4 +23,15 @@ export const RETENTION_PERIOD_OPTIONS = [
   { value: '7 days', label: '7 days' },
   { value: '30 days', label: '30 days' },
   { value: '90 days', label: '90 days' },
+  { value: '120 days', label: '4 months' },
+  { value: '150 days', label: '5 months' },
+  { value: '180 days', label: '6 months' },
+  { value: '365 days', label: '1 year' },
+] as const;
+
+export const CRON_PRESETS = [
+  { value: '0 2 * * *', label: 'Daily at 2 AM' },
+  { value: '0 2 * * 0', label: 'Weekly (Sun 2 AM)' },
+  { value: '0 2 1 * *', label: 'Monthly (1st at 2 AM)' },
+  { value: '0 */6 * * *', label: 'Every 6 hours' },
 ] as const;

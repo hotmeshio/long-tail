@@ -129,7 +129,7 @@ router.post('/:workflowId/terminate', async (req, res) => {
       req.params.workflowId,
     );
 
-    await handle.interrupt();
+    await handle.terminate();
 
     res.json({ terminated: true, workflowId: req.params.workflowId });
   } catch (err: any) {

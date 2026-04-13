@@ -109,10 +109,9 @@ function ConfigPanel({ channels, onToggle, customFilter, onCustomFilterChange }:
 
 interface QuorumFeedProps {
   bridgeActive: boolean;
-  onEventsActive?: (active: boolean) => void;
 }
 
-export function QuorumFeed({ bridgeActive, onEventsActive }: QuorumFeedProps) {
+export function QuorumFeed({ bridgeActive }: QuorumFeedProps) {
   const [showConfig, setShowConfig] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [events, setEvents] = useState<QuorumEvent[]>([]);
@@ -150,7 +149,6 @@ export function QuorumFeed({ bridgeActive, onEventsActive }: QuorumFeedProps) {
       if (!haystack.includes(cf.toLowerCase())) return;
     }
 
-    onEventsActive?.(true);
     setEvents((prev) => {
       const next = [{
         id: ++eventCounter,

@@ -31,6 +31,10 @@ export async function prune(options: {
   expire?: string;
   jobs?: boolean;
   streams?: boolean;
+  engineStreams?: boolean;
+  engineStreamsExpire?: string;
+  workerStreams?: boolean;
+  workerStreamsExpire?: string;
   attributes?: boolean;
   entities?: string[];
   pruneTransient?: boolean;

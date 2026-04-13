@@ -33,7 +33,7 @@ type ActivitiesType = typeof activities;
 const { greet, fetchData, transformData, notifyComplete } =
   Durable.workflow.proxyActivities<ActivitiesType>({
     activities,
-    retryPolicy: {
+    retry: {
       maximumAttempts: 3,
       backoffCoefficient: 2,
       maximumInterval: '10 seconds',
@@ -53,7 +53,7 @@ export async function kitchenSink(envelope: LTEnvelope): Promise<any> {
   // ── 2. Durable sleep ──────────────────────────────────────────────────
   // Survives crashes. If the process restarts during the sleep, it resumes
   // where it left off — no drift, no double-execution.
-  await Durable.workflow.sleepFor('2 seconds');
+  await Durable.workflow.sleep('2 seconds');
 
   // ── 3. Parallel activities ────────────────────────────────────────────
   // Promise.all works naturally. Both activities run concurrently and each

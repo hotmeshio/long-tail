@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Settings } from 'lucide-react';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
+import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
@@ -11,6 +12,7 @@ import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
@@ -76,6 +78,18 @@ function buildColumns(
       render: (row) => <TimestampCell date={row.updated_at} />,
       className: 'w-40',
       sortable: true,
+    },
+    {
+      key: 'duration',
+      label: 'Duration',
+      render: (row) => (
+        <ElapsedCell
+          startDate={row.created_at}
+          endDate={row.status === 'running' ? null : row.updated_at}
+          isLive={row.status === 'running'}
+        />
+      ),
+      className: 'w-28',
     },
     {
       key: 'actions',
@@ -148,7 +162,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 
-  const { data: jobsData, isLoading } = useJobs({
+  const { data: jobsData, isLoading, refetch, isFetching } = useJobs({
     limit: pagination.pageSize,
     offset: pagination.offset,
     entity: filters.entity || undefined,
@@ -178,7 +192,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     <div>
       <PageHeader title={pageTitle} />
 
-      <FilterBar>
+      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
         <input
           type="text"
           placeholder="Search workflow ID..."

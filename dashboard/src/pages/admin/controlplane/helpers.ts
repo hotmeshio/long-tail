@@ -97,3 +97,52 @@ export const NODE_FILTER_OPTIONS = [
 export function rowKey(p: QuorumProfile): string {
   return `${p.engine_id}-${p.worker_topic || 'engine'}`;
 }
+
+// ── Queue-level helpers ────────────────────────────────────────────────
+
+/** Group worker profiles by `worker_topic` (engines excluded). */
+export function groupByQueue(profiles: QuorumProfile[]): Map<string, QuorumProfile[]> {
+  const map = new Map<string, QuorumProfile[]>();
+  for (const p of profiles) {
+    if (!p.worker_topic) continue;
+    const q = p.worker_topic;
+    if (!map.has(q)) map.set(q, []);
+    map.get(q)!.push(p);
+  }
+  return map;
+}
+
+/** Aggregate `counts` across profiles: 200 = success, 500 = error, all = total. */
+export function sumCounts(profiles: QuorumProfile[]): { total: number; success: number; errors: number } {
+  let total = 0;
+  let success = 0;
+  let errors = 0;
+  for (const p of profiles) {
+    if (!p.counts) continue;
+    for (const [code, n] of Object.entries(p.counts)) {
+      total += n;
+      if (code === '200') success += n;
+      else if (code === '500') errors += n;
+    }
+  }
+  return { total, success, errors };
+}
+
+/** Sum `stream_depth` across profiles. */
+export function totalPending(profiles: QuorumProfile[]): number {
+  let sum = 0;
+  for (const p of profiles) {
+    if (typeof p.stream_depth === 'number') sum += p.stream_depth;
+  }
+  return sum;
+}
+
+/** Derive queue health from member profiles. */
+export function queueHealth(profiles: QuorumProfile[]): 'healthy' | 'degraded' | 'paused' {
+  if (profiles.length === 0) return 'healthy';
+  const allPaused = profiles.every((p) => p.throttle === -1);
+  if (allPaused) return 'paused';
+  const { errors } = sumCounts(profiles);
+  if (errors > 0 || profiles.some(isThrottled)) return 'degraded';
+  return 'healthy';
+}

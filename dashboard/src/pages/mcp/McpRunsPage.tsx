@@ -1,14 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Filter } from 'lucide-react';
 import { useMcpRuns, useMcpEntities } from '../../api/mcp-runs';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
 import { useNamespaces } from '../../api/namespaces';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
-import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { WorkflowPill } from '../../components/common/display/WorkflowPill';
+import { TimestampCell } from '../../components/common/display/TimestampCell';
+import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
 const statusMap: Record<string, string> = {
@@ -17,50 +22,95 @@ const statusMap: Record<string, string> = {
   failed: 'failed',
 };
 
-const columns: Column<LTJob>[] = [
-  {
-    key: 'status',
-    label: 'Status',
-    render: (row) => <StatusBadge status={statusMap[row.status] ?? row.status} />,
-    className: 'w-32',
-  },
-  {
-    key: 'entity',
-    label: 'Tool',
-    render: (row) => (
-      <span className="font-mono text-xs text-text-secondary">{row.entity || '—'}</span>
-    ),
-  },
-  {
-    key: 'workflow_id',
-    label: 'Run ID',
-    render: (row) => (
-      <span className="font-mono text-xs text-text-secondary truncate max-w-[280px] block">
-        {row.workflow_id}
-      </span>
-    ),
-  },
-  {
-    key: 'created_at',
-    label: 'Started',
-    render: (row) => (
-      <span className="text-xs text-text-secondary font-mono">
-        {new Date(row.created_at).toISOString().replace('T', ' ').slice(0, 23)}
-      </span>
-    ),
-    className: 'w-52',
-  },
-  {
-    key: 'updated_at',
-    label: 'Updated',
-    render: (row) => (
-      <span className="text-xs text-text-secondary font-mono">
-        {new Date(row.updated_at).toISOString().replace('T', ' ').slice(0, 23)}
-      </span>
-    ),
-    className: 'w-52',
-  },
-];
+const STATUS_DOT: Record<string, string> = {
+  in_progress: 'bg-status-active',
+  completed: 'bg-status-success',
+  failed: 'bg-status-error',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  running: 'text-status-active',
+  completed: 'text-status-success',
+  failed: 'text-status-error',
+};
+
+function buildColumns(
+  onFilterEntity: (entity: string) => void,
+  onFilterStatus: (status: string) => void,
+): Column<LTJob>[] {
+  return [
+    {
+      key: 'workflow_id',
+      label: 'Run ID / Tool',
+      render: (row) => {
+        const dotClass = STATUS_DOT[statusMap[row.status] ?? row.status] ?? 'bg-status-pending';
+        const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
+        return (
+          <div className="flex items-start gap-2 min-w-0">
+            <span className={`w-[9px] h-[9px] shrink-0 rounded-full mt-1 ${dotClass}${pulseClass}`} title={row.status} />
+            <div className="min-w-0">
+              <span className="font-mono text-xs text-text-primary truncate block">
+                {row.workflow_id}
+              </span>
+              <div className="mt-0.5">
+                {row.entity
+                  ? <WorkflowPill type={row.entity} variant="pipeline" />
+                  : <span className="text-[10px] text-text-tertiary">—</span>}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (row) => <TimestampCell date={row.created_at} />,
+      className: 'w-40',
+    },
+    {
+      key: 'updated_at',
+      label: 'Updated',
+      render: (row) => <TimestampCell date={row.updated_at} />,
+      className: 'w-40',
+    },
+    {
+      key: 'duration',
+      label: 'Duration',
+      render: (row) => (
+        <ElapsedCell
+          startDate={row.created_at}
+          endDate={row.status === 'running' ? null : row.updated_at}
+          isLive={row.status === 'running'}
+        />
+      ),
+      className: 'w-28',
+    },
+    {
+      key: 'actions',
+      label: '',
+      render: (row) => (
+        <RowActionGroup>
+          <RowAction
+            icon={Filter}
+            title={`Filter by ${row.entity}`}
+            onClick={() => onFilterEntity(row.entity)}
+          />
+          <button
+            onClick={(e) => { e.stopPropagation(); onFilterStatus(row.status); }}
+            className="opacity-0 group-hover/row:opacity-100 transition-opacity"
+            title={`Filter by ${row.status}`}
+          >
+            <svg className={`w-[18px] h-[18px] ${STATUS_COLORS[row.status] ?? 'text-text-tertiary'} hover:opacity-70`} viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="6" />
+            </svg>
+          </button>
+        </RowActionGroup>
+      ),
+      className: 'w-24 text-right',
+    },
+  ];
+}
 
 export function McpRunsPage() {
   const navigate = useNavigate();
@@ -79,7 +129,6 @@ export function McpRunsPage() {
   const { data: appIdData } = useYamlWorkflowAppIds();
   const { data: nsData } = useNamespaces();
 
-  // Build the full namespace list: YAML app_ids + registered namespaces
   const allNamespaceNames = useMemo(() => {
     const set = new Set(appIdData?.app_ids ?? []);
     for (const ns of nsData?.namespaces ?? []) {
@@ -95,7 +144,7 @@ export function McpRunsPage() {
   const activeNamespace = filters.namespace || defaultNamespace;
   const { data: entitiesData } = useMcpEntities(activeNamespace);
 
-  const { data: runsData, isLoading } = useMcpRuns({
+  const { data: runsData, isLoading, refetch, isFetching } = useMcpRuns({
     app_id: activeNamespace,
     limit: pagination.pageSize,
     offset: pagination.offset,
@@ -117,9 +166,13 @@ export function McpRunsPage() {
     });
   }, [runsData?.jobs]);
 
+  const columns = buildColumns(
+    (entity) => setFilter('entity', entity),
+    (status) => setFilter('status', status),
+  );
+
   const namespaces = useMemo(() => {
     const set = new Set(allNamespaceNames);
-    // Always include the active namespace so deep-linked values appear
     if (activeNamespace) set.add(activeNamespace);
     return [...set].sort().map((id) => ({ value: id, label: id }));
   }, [allNamespaceNames, activeNamespace]);
@@ -134,7 +187,7 @@ export function McpRunsPage() {
     <div>
       <PageHeader title="Pipeline Executions" />
 
-      <FilterBar>
+      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
         <FilterSelect
           label="Namespace"
           value={activeNamespace}
@@ -175,7 +228,7 @@ export function McpRunsPage() {
         keyFn={(row) => row.workflow_id}
         onRowClick={(row) => navigate(`/mcp/executions/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
         isLoading={isLoading}
-        emptyMessage="No runs found"
+        emptyMessage="No pipeline executions found"
       />
 
       <StickyPagination

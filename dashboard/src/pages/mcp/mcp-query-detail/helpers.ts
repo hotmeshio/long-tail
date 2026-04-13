@@ -2,7 +2,7 @@
 
 export type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
-export const STEP_LABELS_BASE = ['Original', 'Timeline', 'Profile', 'Deploy', 'Test', 'Verify'] as const;
+export const STEP_LABELS_BASE = ['Describe', 'Discover', 'Compile', 'Deploy', 'Test', 'Verify'] as const;
 
 /**
  * Maps an execution record to a simplified status string.

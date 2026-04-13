@@ -12,8 +12,9 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { useFilterParams } from '../../../hooks/useFilterParams';
+import { useExpandedRows } from '../../../hooks/useExpandedRows';
 import { ServerFormModal } from './ServerFormModal';
-import { TryToolModal } from '../../mcp/TryToolModal';
+import { ToolTestPanel } from '../../../components/common/test/ToolTestPanel';
 import { matchesSearch, filterTools } from './helpers';
 import { ServerRow } from './ServerRow';
 
@@ -34,7 +35,7 @@ export function McpServersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<McpServerRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<McpServerRecord | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const { expandedIds, toggle: toggleExpand } = useExpandedRows('lt:expanded:mcp-servers');
   const [tryTool, setTryTool] = useState<{
     serverId: string;
     serverName: string;
@@ -63,31 +64,16 @@ export function McpServersPage() {
   useEffect(() => {
     if (!filters.search) return;
     const q = filters.search.toLowerCase();
-    const idsToExpand = filteredServers
-      .filter((s) => {
-        const tools = (s.tool_manifest ?? []) as McpToolManifest[];
-        return tools.some(
-          (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
-        );
-      })
-      .map((s) => s.id);
-    if (idsToExpand.length > 0) {
-      setExpandedIds((prev) => {
-        const next = new Set(prev);
-        for (const id of idsToExpand) next.add(id);
-        return next;
-      });
+    for (const s of filteredServers) {
+      const tools = (s.tool_manifest ?? []) as McpToolManifest[];
+      const hasToolMatch = tools.some(
+        (t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
+      );
+      if (hasToolMatch && !expandedIds.has(s.id)) {
+        toggleExpand(s.id);
+      }
     }
-  }, [filters.search, filteredServers]);
-
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  }, [filters.search, filteredServers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = () => {
     if (!confirmDelete) return;
@@ -158,61 +144,78 @@ export function McpServersPage() {
         />
       </FilterBar>
 
-      {filteredServers.length === 0 ? (
-        <EmptyState title="No servers found" />
-      ) : (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b">
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-                Server / Tool
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
-                Status
-              </th>
-              <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28" />
-              <th className="sticky top-[2.75rem] z-10 bg-surface w-12" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredServers.map((server) => (
-              <ServerRow
-                key={server.id}
-                server={server}
-                expanded={expandedIds.has(server.id)}
-                onToggle={() => toggleExpand(server.id)}
-                onEdit={() => {
-                  setEditing(server);
-                  setShowForm(true);
-                }}
-                onDelete={() => setConfirmDelete(server)}
-                onTryTool={(tool) =>
-                  setTryTool({
-                    serverId: server.id,
-                    serverName: server.name,
-                    tool,
-                  })
-                }
-                connect={connect}
-                disconnect={disconnect}
-                visibleTools={filterTools(
-                  (server.tool_manifest ?? []) as McpToolManifest[],
-                  filters.search,
-                )}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      <div className={`flex gap-0 ${tryTool ? '' : ''}`}>
+        {/* Server list */}
+        <div className={`${tryTool ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
+          {filteredServers.length === 0 ? (
+            <EmptyState title="No servers found" />
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                    Server / Tool
+                  </th>
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+                    Status
+                  </th>
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28" />
+                  <th className="sticky top-[2.75rem] z-10 bg-surface w-12" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredServers.map((server) => (
+                  <ServerRow
+                    key={server.id}
+                    server={server}
+                    expanded={expandedIds.has(server.id)}
+                    onToggle={() => toggleExpand(server.id)}
+                    onEdit={() => {
+                      setEditing(server);
+                      setShowForm(true);
+                    }}
+                    onDelete={() => setConfirmDelete(server)}
+                    onTryTool={(tool) =>
+                      setTryTool({
+                        serverId: server.id,
+                        serverName: server.name,
+                        tool,
+                      })
+                    }
+                    connect={connect}
+                    disconnect={disconnect}
+                    visibleTools={filterTools(
+                      (server.tool_manifest ?? []) as McpToolManifest[],
+                      filters.search,
+                    )}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
 
-      <StickyPagination
-        page={pagination.page}
-        totalPages={pagination.totalPages(total)}
-        onPageChange={pagination.setPage}
-        total={total}
-        pageSize={pagination.pageSize}
-        onPageSizeChange={pagination.setPageSize}
-      />
+          <StickyPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages(total)}
+            onPageChange={pagination.setPage}
+            total={total}
+            pageSize={pagination.pageSize}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </div>
+
+        {/* Test panel — slides in from right */}
+        {tryTool && (
+          <div className="w-[380px] shrink-0 sticky top-0 h-[calc(100vh-12rem)]">
+            <ToolTestPanel
+              serverId={tryTool.serverId}
+              serverName={tryTool.serverName}
+              tool={tryTool.tool}
+              onClose={() => setTryTool(null)}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Create / Edit modal */}
       <ServerFormModal
@@ -240,17 +243,6 @@ export function McpServersPage() {
         isPending={deleteServer.isPending}
         error={deleteServer.error as Error | null}
       />
-
-      {/* Try tool modal */}
-      {tryTool && (
-        <TryToolModal
-          open={!!tryTool}
-          onClose={() => setTryTool(null)}
-          serverId={tryTool.serverId}
-          serverName={tryTool.serverName}
-          tool={tryTool.tool}
-        />
-      )}
     </div>
   );
 }

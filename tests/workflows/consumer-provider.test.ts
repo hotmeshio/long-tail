@@ -150,8 +150,8 @@ describe('consumer/provider data injection', () => {
     const ltInterceptor = createLTInterceptor({
       activityTaskQueue: ACTIVITY_QUEUE,
     });
-    Durable.registerInterceptor(ltInterceptor);
-    Durable.registerActivityInterceptor(createLTActivityInterceptor());
+    Durable.registerInboundInterceptor(ltInterceptor);
+    Durable.registerOutboundInterceptor(createLTActivityInterceptor());
 
     // Register leaf workers (both workflows on the same queue)
     const enrichWorker = await Worker.create({
@@ -185,7 +185,7 @@ describe('consumer/provider data injection', () => {
     await configService.deleteWorkflowConfig('orderPipeline');
     ltConfig.invalidate();
     Durable.clearInterceptors();
-    Durable.clearActivityInterceptors();
+    Durable.clearOutboundInterceptors();
     await sleepFor(1500);
     await Durable.shutdown();
     await disconnectTelemetry();

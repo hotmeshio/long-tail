@@ -32,6 +32,23 @@ export async function seedSystemMcpServers(): Promise<void> {
       loggerRegistry.warn(`[system] failed to seed MCP server ${srv.name}: ${err.message}`);
     }
   }
+  // Remove stale builtin servers no longer in the seed list
+  const seedNames = SEED_MCP_SERVERS.map(s => s.name);
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM lt_mcp_servers
+       WHERE (metadata->>'builtin')::boolean = true
+         AND name != ALL($1)
+       RETURNING name`,
+      [seedNames],
+    );
+    for (const row of rows) {
+      loggerRegistry.info(`[system] removed stale builtin MCP server: ${row.name}`);
+    }
+  } catch (err: any) {
+    loggerRegistry.warn(`[system] failed to clean stale MCP servers: ${err.message}`);
+  }
+
   const totalTools = SEED_MCP_SERVERS.reduce((sum, s) => sum + s.tool_manifest.length, 0);
   loggerRegistry.info(`[system] MCP servers seeded (${SEED_MCP_SERVERS.length} servers, ${totalTools} tools)`);
 }

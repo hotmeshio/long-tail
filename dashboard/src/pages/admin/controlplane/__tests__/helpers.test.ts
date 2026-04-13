@@ -6,6 +6,10 @@ import {
   formatMemory,
   stripStreamPrefix,
   rowKey,
+  groupByQueue,
+  sumCounts,
+  totalPending,
+  queueHealth,
 } from '../helpers';
 import type { QuorumProfile } from '../../../../api/controlplane';
 
@@ -121,6 +125,94 @@ describe('control plane helpers', () => {
     it('uses "engine" suffix for engines', () => {
       const key = rowKey(baseProfile);
       expect(key).toBe('HaBC123def456-engine');
+    });
+  });
+
+  describe('groupByQueue', () => {
+    it('groups workers by worker_topic', () => {
+      const profiles = [
+        { ...baseProfile, engine_id: 'w1', worker_topic: 'queue-a' },
+        { ...baseProfile, engine_id: 'w2', worker_topic: 'queue-a' },
+        { ...baseProfile, engine_id: 'w3', worker_topic: 'queue-b' },
+        { ...baseProfile, engine_id: 'e1' }, // engine, excluded
+      ];
+      const map = groupByQueue(profiles);
+      expect(map.size).toBe(2);
+      expect(map.get('queue-a')!.length).toBe(2);
+      expect(map.get('queue-b')!.length).toBe(1);
+    });
+
+    it('returns empty map for no workers', () => {
+      const map = groupByQueue([baseProfile]);
+      expect(map.size).toBe(0);
+    });
+  });
+
+  describe('sumCounts', () => {
+    it('aggregates counts across profiles', () => {
+      const profiles: QuorumProfile[] = [
+        { ...baseProfile, counts: { '200': 10, '500': 2 } },
+        { ...baseProfile, counts: { '200': 5, '404': 1 } },
+      ];
+      const result = sumCounts(profiles);
+      expect(result.total).toBe(18);
+      expect(result.success).toBe(15);
+      expect(result.errors).toBe(2);
+    });
+
+    it('handles profiles without counts', () => {
+      const result = sumCounts([baseProfile]);
+      expect(result.total).toBe(0);
+      expect(result.success).toBe(0);
+      expect(result.errors).toBe(0);
+    });
+  });
+
+  describe('totalPending', () => {
+    it('sums stream_depth', () => {
+      const profiles = [
+        { ...baseProfile, stream_depth: 5 },
+        { ...baseProfile, stream_depth: 3 },
+        { ...baseProfile },
+      ];
+      expect(totalPending(profiles)).toBe(8);
+    });
+
+    it('returns 0 when no stream_depth', () => {
+      expect(totalPending([baseProfile])).toBe(0);
+    });
+  });
+
+  describe('queueHealth', () => {
+    it('returns healthy for normal profiles', () => {
+      expect(queueHealth([{ ...baseProfile, throttle: 0 }])).toBe('healthy');
+    });
+
+    it('returns paused when all are paused', () => {
+      const profiles = [
+        { ...baseProfile, throttle: -1 },
+        { ...baseProfile, throttle: -1 },
+      ];
+      expect(queueHealth(profiles)).toBe('paused');
+    });
+
+    it('returns degraded when some are throttled', () => {
+      const profiles = [
+        { ...baseProfile, throttle: 0 },
+        { ...baseProfile, throttle: 1000 },
+      ];
+      expect(queueHealth(profiles)).toBe('degraded');
+    });
+
+    it('returns degraded when there are errors', () => {
+      const profiles = [
+        { ...baseProfile, throttle: 0, counts: { '500': 1 } },
+      ];
+      expect(queueHealth(profiles)).toBe('degraded');
+    });
+
+    it('returns healthy for empty array', () => {
+      expect(queueHealth([])).toBe('healthy');
     });
   });
 });

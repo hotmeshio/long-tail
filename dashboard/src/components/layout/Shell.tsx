@@ -8,11 +8,13 @@ import { AdminSidebar } from './AdminSidebar';
 import { EngineerSidebar } from './EngineerSidebar';
 import { McpSidebar } from './McpSidebar';
 import { EventFeed } from './EventFeed';
+import { DocsDrawer } from './DocsDrawer';
 
 function ShellLayout() {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const location = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +30,7 @@ function ShellLayout() {
   return (
     <div className="h-screen bg-surface flex flex-col" style={{ '--feed-height': feedOpen ? '224px' : '32px' } as React.CSSProperties}>
       {/* Full-width header */}
-      <Header onToggleEventFeed={() => setFeedOpen((v) => !v)} />
+      <Header onToggleEventFeed={() => setFeedOpen((v) => !v)} onToggleDocs={() => setDocsOpen((v) => !v)} />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -71,6 +73,7 @@ function ShellLayout() {
 
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} />
+      <DocsDrawer open={docsOpen} onClose={() => setDocsOpen(false)} />
     </div>
   );
 }

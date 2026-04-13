@@ -26,6 +26,8 @@ interface DataTableProps<T> {
   sort?: SortState;
   /** Called when a sortable column header is clicked. */
   onSort?: (column: string) => void;
+  /** Disable the sticky header (useful when nested inside collapsible sections). */
+  inline?: boolean;
 }
 
 function SortIcon({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
@@ -55,6 +57,7 @@ export function DataTable<T>({
   emptyMessage = 'No records found',
   sort,
   onSort,
+  inline,
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
@@ -84,7 +87,7 @@ export function DataTable<T>({
               <th
                 key={col.key}
                 onClick={isSortable ? () => onSort(col.key) : undefined}
-                className={`sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.className ?? ''} ${
+                className={`${inline ? '' : 'sticky top-[2.75rem] z-10 '}bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.className ?? ''} ${
                   isSortable ? 'cursor-pointer select-none group/sorthead hover:text-text-secondary transition-colors' : ''
                 }`}
               >

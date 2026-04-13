@@ -72,11 +72,14 @@ async function loadJobContext(
   const job = jobResult.rows[0];
 
   const attrRows = await pool.query(
-    `SELECT field, value FROM ${schema}.jobs_attributes WHERE job_id = $1 ORDER BY field`,
+    `SELECT symbol, dimension, value FROM ${schema}.jobs_attributes WHERE job_id = $1 ORDER BY symbol, dimension`,
     [job.id],
   );
   const rawAttrs: Record<string, string> = {};
-  for (const row of attrRows.rows) rawAttrs[row.field] = row.value;
+  for (const row of attrRows.rows) {
+    const field = row.dimension ? `${row.symbol}${row.dimension}` : row.symbol;
+    rawAttrs[field] = row.value;
+  }
 
   const hierarchy = restoreHierarchy(inflateAttributes(rawAttrs, symbolMap));
   const meta = hierarchy['metadata'] as Record<string, unknown> | undefined;

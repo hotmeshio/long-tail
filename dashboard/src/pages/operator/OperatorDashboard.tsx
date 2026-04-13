@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar } from './escalation-columns';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function OperatorDashboard() {
@@ -23,7 +24,7 @@ export function OperatorDashboard() {
   const { data: rolesData } = useRoles();
   const { data: typesData } = useEscalationTypes();
 
-  const { data, isLoading, error: queryError } = useEscalations({
+  const { data, isLoading, error: queryError, refetch, isFetching } = useEscalations({
     assigned_to: user?.userId,
     status: 'pending',
     role: filters.role || undefined,
@@ -73,6 +74,7 @@ export function OperatorDashboard() {
         setFilter={setFilter}
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
       />
 
       {queryError && (

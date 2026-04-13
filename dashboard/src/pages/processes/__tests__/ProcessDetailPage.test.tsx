@@ -143,7 +143,7 @@ describe('ProcessDetailPage', () => {
     renderPage();
 
     expect(screen.getByText('Tasks')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('1/2')).toBeInTheDocument();
   });
 
   it('shows loading skeleton when data is loading', () => {

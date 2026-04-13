@@ -72,9 +72,9 @@ describe('input-analyzer', () => {
       expect(classifyArgument('options', { timeout: 5000, retries: 3 })).toBe('fixed');
     });
 
-    it('should classify large arrays as dynamic (execution-specific data)', () => {
+    it('should classify arrays of objects as fixed (structured data)', () => {
       const bigArray = Array.from({ length: 10 }, (_, i) => ({ url: `/page-${i}` }));
-      expect(classifyArgument('pages', bigArray)).toBe('dynamic');
+      expect(classifyArgument('pages', bigArray)).toBe('fixed');
     });
 
     it('should keep small arrays as fixed', () => {
@@ -232,9 +232,8 @@ describe('input-analyzer', () => {
       const result = extractSemanticInputs(stepsWithLargeArray, '');
       const itemsField = result.find(f => f.key === 'items');
 
-      // Large arrays should be classified as dynamic (no default)
-      expect(itemsField?.classification).toBe('dynamic');
-      expect(itemsField?.default).toBeUndefined();
+      // Arrays of objects are always fixed (structured data, not user input)
+      expect(itemsField?.classification).toBe('fixed');
     });
 
     it('should handle key collisions when flattening nested objects', () => {

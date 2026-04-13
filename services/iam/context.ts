@@ -3,9 +3,9 @@
  *
  * Two paths, checked in order:
  *
- * 1. **argumentMetadata** (production-safe, distributed):
+ * 1. **headers** (production-safe, distributed):
  *    The activity interceptor injects `principal` + `scopes` into
- *    `argumentMetadata`, which HotMesh delivers to the activity worker
+ *    `headers`, which HotMesh delivers to the activity worker
  *    via `Durable.activity.getContext()`. Works across process boundaries.
  *
  * 2. **AsyncLocalStorage** (workflow-local, single-process):
@@ -34,15 +34,15 @@ export function runWithToolContext<T>(
 /**
  * Retrieve the ToolContext for the current execution scope.
  *
- * Activities: reads from argumentMetadata (injected by activity interceptor).
+ * Activities: reads from headers (injected by activity interceptor).
  * Workflow scope: reads from AsyncLocalStorage (set by workflow interceptor).
  * Returns undefined when no identity is available.
  */
 export function getToolContext(): ToolContext | undefined {
-  // 1. Try argumentMetadata (activity worker — works distributed)
+  // 1. Try headers (activity worker — works distributed)
   try {
     const actCtx = Durable.activity.getContext();
-    const meta = actCtx?.argumentMetadata;
+    const meta = actCtx?.headers;
     if (meta?.principal) {
       const principal = meta.principal as ToolPrincipal;
       return {

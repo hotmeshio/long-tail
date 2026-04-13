@@ -149,5 +149,16 @@ export function useProcessDetail(originId: string) {
     queryKey: ['processes', originId],
     queryFn: () => apiFetch(`/tasks/processes/${encodeURIComponent(originId)}`),
     enabled: !!originId,
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      // Poll while waiting for data or while tasks are still running
+      if (!d || d.tasks.length === 0) return 2000;
+      const allDone = d.tasks.every(
+        (t) => t.status === 'completed' || t.status === 'cancelled',
+      );
+      return allDone ? false : 3000;
+    },
+    retry: 3,
+    retryDelay: 1000,
   });
 }

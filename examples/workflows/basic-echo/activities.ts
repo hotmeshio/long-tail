@@ -6,9 +6,9 @@
  *
  * 1. `getActivityIdentity()` — recommended: one-call access to principal + credential exchange
  * 2. `getToolContext()` — lower-level access to ToolContext (principal, scopes, trace)
- * 3. `Durable.activity.getContext()` — raw HotMesh API for argumentMetadata
+ * 3. `Durable.activity.getContext()` — raw HotMesh API for headers
  *
- * All work across process boundaries because argumentMetadata travels
+ * All work across process boundaries because headers travels
  * with the activity call via HotMesh's schema pipeline.
  */
 
@@ -28,12 +28,12 @@ export async function echo(input: {
   // const identity = getActivityIdentity();
   // const token = await identity.getCredential('anthropic'); // credential exchange
 
-  // Primary: getToolContext() reads from argumentMetadata (injected by activity interceptor)
+  // Primary: getToolContext() reads from headers (injected by activity interceptor)
   const ctx = getToolContext();
 
-  // Direct access: Durable.activity.getContext() shows the raw argumentMetadata
+  // Direct access: Durable.activity.getContext() shows the raw headers
   const activityCtx = Durable.activity.getContext();
-  const rawPrincipal = activityCtx?.argumentMetadata?.principal;
+  const rawPrincipal = activityCtx?.headers?.principal;
 
   const identity: Record<string, unknown> = ctx
     ? {
@@ -50,12 +50,12 @@ export async function echo(input: {
       }
     : rawPrincipal
       ? {
-          source: 'argumentMetadata',
+          source: 'headers',
           principal: rawPrincipal,
         }
       : {
           source: 'unavailable',
-          note: 'no principal in envelope or argumentMetadata',
+          note: 'no principal in envelope or headers',
         };
 
   return {

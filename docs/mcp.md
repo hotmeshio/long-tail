@@ -5,11 +5,11 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 ## Contents
 
 - [The Unifying Concept](#the-unifying-concept) — [Every Activity is a Tool](#every-activity-is-a-tool) · [Humans as Tools](#humans-as-tools) · [Compiled Workflows as Tools](#compiled-workflows-as-tools) · [The Cycle](#the-cycle)
-- [Human Queue Server](#human-queue-server) — escalation as 4 MCP tools
+- [Human Queue Server](#human-queue-server) — escalation as MCP tools
 - [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
 - [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
 - [External MCP Servers](#external-mcp-servers) — any server's tools as durable activities
-- [Built-in Servers](#built-in-servers) — nine servers that ship by default
+- [Built-in Servers](#built-in-servers) — servers that ship by default
 - [Configuration](#configuration)
 - [REST API](#rest-api) — server registration and management
 - [Database Schema](#database-schema)
@@ -58,6 +58,7 @@ MCP Server: "long-tail-human-queue"
 
 Tools:
   - escalate_to_human(role, message, data)   → escalation_id
+  - escalate_and_wait(role, message, data)   → blocks until resolved, returns payload
   - check_resolution(escalation_id)          → resolved | pending
   - get_available_work(role)                 → escalation[]
   - claim_and_resolve(escalation_id, payload) → result
@@ -485,19 +486,23 @@ Server registration can happen at runtime via the REST API (shown above) or at s
 
 ## Built-in Servers
 
-Long Tail ships with nine built-in MCP servers. For tool counts and descriptions, see the [architecture guide](architecture.md#built-in-mcp-servers).
+Long Tail ships with built-in MCP servers. For descriptions, see the [architecture guide](architecture.md#built-in-mcp-servers).
 
 | Server | Tags |
 |--------|------|
-| `long-tail-human-queue` | escalation, human-review |
-| `long-tail-db` | database, analytics |
-| `long-tail-document-vision` | vision, document-processing |
-| `long-tail-workflow-compiler` | workflow, compilation |
-| `long-tail-mcp-workflows` | workflow |
-| `long-tail-playwright` | browser-automation, screenshots |
-| `long-tail-file-storage` | storage, files |
-| `long-tail-http-fetch` | http, api |
+| `long-tail-db-query` | database, query, analytics |
+| `long-tail-human-queue` | escalation, human-queue, routing |
+| `mcp-workflows-longtail` | workflows, compiled, deterministic |
+| `long-tail-workflow-compiler` | compilation, yaml, codegen |
+| `long-tail-translation` | translation, language, text-processing |
+| `long-tail-vision` | vision, image-analysis, multimodal |
+| `long-tail-playwright` | browser-automation, testing, screenshots |
 | `long-tail-playwright-cli` | browser-automation, screenshots, scraping, forms |
+| `long-tail-docs` | documentation, help, reference |
+| `long-tail-file-storage` | storage, files, io |
+| `long-tail-http-fetch` | http, api, fetch, network |
+| `long-tail-oauth` | authentication, oauth, credentials |
+| `long-tail-claude-code` | development, coding, ai-agent, terminal, code-generation |
 
 ## Configuration
 
@@ -531,7 +536,7 @@ const { client, shutdown } = await start({
 });
 ```
 
-When `mcp.server.enabled` is `true` (the default), the Human Queue server starts and registers its 4 tools. When `autoConnect` lists server IDs, the adapter looks them up in `lt_mcp_servers` and connects via their configured transport.
+When `mcp.server.enabled` is `true` (the default), the Human Queue server starts and registers its tools. When `autoConnect` lists server IDs, the adapter looks them up in `lt_mcp_servers` and connects via their configured transport.
 
 ## REST API
 
@@ -603,7 +608,7 @@ CREATE TABLE IF NOT EXISTS lt_mcp_servers (
 
 The `tool_manifest` column caches the result of `listTools()` on each successful connection, so tools can be enumerated without a live connection.
 
-The `tags` column is a PostgreSQL text array with a GIN index, enabling fast tag-based tool discovery via `findServersByTags(tags, 'any'|'all')`. Workflows like `insightQuery` scope to `['database', 'analytics']` tags, while `mcpQuery` discovers all tools or filters by user-provided tags.
+The `tags` column is a PostgreSQL text array with a GIN index, enabling fast tag-based tool discovery via `findServersByTags(tags, 'any'|'all')`. Workflows like `mcpQuery` discover all tools or filter by user-provided tags.
 
 The `compile_hints` column stores per-server instructions that are injected into the compilation prompt when that server's tools appear in an execution trace. This lets each server provide tool-specific constraints (e.g., timeout requirements, retry policies, ordering rules) that guide the compiler when converting dynamic executions into deterministic workflows.
 
@@ -661,7 +666,7 @@ npm test
 
 The `tests/mcp.test.ts` suite includes 8 tests:
 
-1. **Tool discovery** — `listTools()` returns exactly 4 tools
+1. **Tool discovery** — `listTools()` returns the expected tools
 2. **Create** — `escalate_to_human` writes a real PostgreSQL record
 3. **Check** — `check_resolution` reads status from DB
 4. **List** — `get_available_work` filters by role

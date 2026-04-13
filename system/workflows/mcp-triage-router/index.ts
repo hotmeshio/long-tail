@@ -12,7 +12,7 @@ const {
   extractTriageInputs,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
-  retryPolicy: {
+  retry: {
     maximumAttempts: 3,
     backoffCoefficient: 2,
     maximumInterval: '10 seconds',

@@ -20,15 +20,14 @@ const mockServers = {
   servers: [
     {
       id: 'srv-1',
-      name: 'long-tail-document-vision',
-      description: 'Built-in document vision server',
+      name: 'long-tail-translation',
+      description: 'Built-in translation server',
       transport_type: 'stdio',
       transport_config: { builtin: true },
       auto_connect: true,
       status: 'connected',
       tool_manifest: [
-        { name: 'list_document_pages', description: 'List available document pages', inputSchema: { properties: {} } },
-        { name: 'rotate_page', description: 'Rotate a document page', inputSchema: { properties: { page_id: {}, angle: {} } } },
+        { name: 'translate_content', description: 'Translate content to target language', inputSchema: { properties: { content: {}, target_language: {} } } },
       ],
       metadata: { builtin: true },
       created_at: '2025-01-01T00:00:00Z',
@@ -93,7 +92,7 @@ describe('McpServersPage', () => {
 
   it('renders all server rows', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('long-tail-document-vision')).toBeInTheDocument();
+    expect(screen.getByText('long-tail-translation')).toBeInTheDocument();
     expect(screen.getByText('external-api-server')).toBeInTheDocument();
     expect(screen.getByText('empty-server')).toBeInTheDocument();
   });
@@ -101,8 +100,7 @@ describe('McpServersPage', () => {
   it('shows tool count badge for each server', () => {
     render(<McpServersPage />, { wrapper });
     // Count shown as number in badge circle — may appear multiple times
-    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -119,16 +117,15 @@ describe('McpServersPage', () => {
 
   it('expands server to show tool rows on click', () => {
     render(<McpServersPage />, { wrapper });
-    const serverRow = screen.getByText('long-tail-document-vision').closest('tr')!;
+    const serverRow = screen.getByText('long-tail-translation').closest('tr')!;
     fireEvent.click(serverRow);
-    expect(screen.getByText('list_document_pages')).toBeInTheDocument();
-    expect(screen.getByText('rotate_page')).toBeInTheDocument();
+    expect(screen.getByText('translate_content')).toBeInTheDocument();
   });
 
   it('renders tool descriptions in the DOM', () => {
     render(<McpServersPage />, { wrapper });
     // Tool descriptions are in the DOM (inside collapsed panels)
-    expect(screen.getByText('List available document pages')).toBeInTheDocument();
+    expect(screen.getByText('Translate content to target language')).toBeInTheDocument();
     expect(screen.getByText('Fetch data from API')).toBeInTheDocument();
   });
 

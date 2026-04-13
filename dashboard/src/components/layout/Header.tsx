@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox, User } from 'lucide-react';
+import { Inbox, User, BookOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyEscalationCount } from '../../hooks/useMyEscalationCount';
 import { NatsStatus } from '../common/display/NatsStatus';
 import { AppLogo } from '../common/display/AppLogo';
+import { QuickQuery } from './QuickQuery';
 
-export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }) {
+export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
   const pendingCount = useMyEscalationCount();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -26,12 +27,23 @@ export function Header({ onToggleEventFeed }: { onToggleEventFeed?: () => void }
 
   return (
     <header className="h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between px-5 relative z-30">
-      <Link to="/" aria-label="Home">
-        <AppLogo />
-      </Link>
+      <div className="flex items-center gap-4">
+        <Link to="/" aria-label="Home">
+          <AppLogo />
+        </Link>
+        <QuickQuery />
+      </div>
 
       {/* Right: inbox, NATS indicator + user menu */}
       <div className="flex items-center gap-4">
+        <button
+          onClick={onToggleDocs}
+          className="text-text-tertiary hover:text-accent transition-colors"
+          aria-label="Documentation"
+          title="Documentation"
+        >
+          <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+        </button>
         <Link
           to="/escalations/queue"
           className="relative text-text-tertiary hover:text-accent transition-colors"

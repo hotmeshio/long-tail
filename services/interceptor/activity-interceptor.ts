@@ -15,7 +15,7 @@ import { extractEnvelope } from './state';
  *    the stored activity result → after-phase runs
  *
  * Before phase:
- *   Injects the envelope's pre-resolved principal into argumentMetadata
+ *   Injects the envelope's pre-resolved principal into headers
  *   so activities can read it via `Durable.activity.getContext()`.
  *   Skipped for `lt*` interceptor activities (they don't need identity).
  *
@@ -37,7 +37,7 @@ export function createLTActivityInterceptor(_options?: {
     ): Promise<any> {
       try {
         // ── Before phase ─────────────────────────────────────────
-        // Inject principal into argumentMetadata for non-interceptor activities.
+        // Inject principal into headers for non-interceptor activities.
         // The principal was resolved at the front door and travels in the envelope.
         if (!activityCtx.activityName.startsWith('lt')) {
           const envelope = extractEnvelope(workflowCtx);
@@ -45,8 +45,8 @@ export function createLTActivityInterceptor(_options?: {
           if (principal) {
             activityCtx.options = {
               ...activityCtx.options,
-              argumentMetadata: {
-                ...(activityCtx.options?.argumentMetadata ?? {}),
+              headers: {
+                ...(activityCtx.options?.headers ?? {}),
                 principal,
                 scopes: envelope.lt?.scopes,
                 ...(envelope.lt?.initiatingPrincipal

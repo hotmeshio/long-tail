@@ -2,11 +2,10 @@ import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { UserName } from '../../../components/common/display/UserName';
-import { TimeAgo } from '../../../components/common/display/TimeAgo';
-import { formatDuration } from '../../../lib/format';
+import { TimestampCell } from '../../../components/common/display/TimestampCell';
+import { DurationValue } from '../../../components/common/display/DurationValue';
 import type { LTEscalationRecord } from '../../../api/types';
 import { MetricCell } from './MetricCell';
-import { formatAbsoluteTime } from './helpers';
 
 export function EscalationDetailPanel({
   escalation,
@@ -38,18 +37,15 @@ export function EscalationDetailPanel({
 
         <div className="grid grid-cols-3 gap-4">
           <MetricCell label="Created">
-            <span className="font-mono">{formatAbsoluteTime(escalation.created_at)}</span>
-            <p className="text-[10px] text-text-tertiary mt-0.5">
-              <TimeAgo date={escalation.created_at} />
-            </p>
+            <TimestampCell date={escalation.created_at} />
           </MetricCell>
 
           <MetricCell label="Claimed">
             {escalation.claimed_at ? (
               <>
-                <span className="font-mono">{formatAbsoluteTime(escalation.claimed_at)}</span>
+                <TimestampCell date={escalation.claimed_at} />
                 <p className="text-[10px] text-text-tertiary mt-0.5">
-                  after {formatDuration(claimedMs)}
+                  after <DurationValue ms={claimedMs} />
                   {escalation.assigned_to && (
                     <>
                       {' '}by{' '}
@@ -61,20 +57,20 @@ export function EscalationDetailPanel({
                 </p>
               </>
             ) : (
-              <span className="text-text-tertiary italic">Unclaimed</span>
+              <span className="text-text-tertiary italic text-xs">Unclaimed</span>
             )}
           </MetricCell>
 
           <MetricCell label="Resolved">
             {escalation.resolved_at ? (
               <>
-                <span className="font-mono">{formatAbsoluteTime(escalation.resolved_at)}</span>
+                <TimestampCell date={escalation.resolved_at} />
                 <p className="text-[10px] text-text-tertiary mt-0.5">
-                  {formatDuration(resolvedMs)} total
+                  <DurationValue ms={resolvedMs} /> total
                 </p>
               </>
             ) : (
-              <span className="text-text-tertiary italic">Pending</span>
+              <span className="text-text-tertiary italic text-xs">Pending</span>
             )}
           </MetricCell>
         </div>

@@ -114,13 +114,7 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
     }
   };
 
-  /** Find all selected events that live in this lane */
-  const selectedEvtsForLane = (lane: Lane): WorkflowExecutionEvent[] => {
-    return lane.segments
-      .filter((s) => selectedEvents.has(s.eventId))
-      .map((s) => displayEvents.find((e) => e.event_id === s.eventId)!)
-      .filter(Boolean);
-  };
+
 
   const barColor = (cat: string, pending: boolean) => {
     if (pending) return PENDING_CLASS;
@@ -180,7 +174,6 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
 
       {/* Lanes */}
       {lanes.map((lane) => {
-        const expandedEvts = selectedEvtsForLane(lane);
         const catColor = CATEGORY_COLORS[lane.category];
 
         return (
@@ -241,10 +234,11 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
 
             {/* Inline detail panels */}
             {lane.segments.map((seg) => {
-              const evt = expandedEvts.find((e) => e.event_id === seg.eventId);
+              const isOpen = selectedEvents.has(seg.eventId);
+              const evt = displayEvents.find((e) => e.event_id === seg.eventId);
               return (
-                <Collapsible key={seg.eventId} open={!!evt}>
-                  {evt ? (
+                <Collapsible key={seg.eventId} open={isOpen}>
+                  {evt && (
                     <div className="py-3">
                       <EventDetailPanel
                         event={evt}
@@ -253,7 +247,7 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
                         onClose={() => toggleEvent(evt.event_id)}
                       />
                     </div>
-                  ) : null}
+                  )}
                 </Collapsible>
               );
             })}

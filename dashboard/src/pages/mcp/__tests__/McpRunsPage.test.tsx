@@ -99,7 +99,7 @@ describe('McpRunsPage', () => {
   it('shows empty message when no jobs', () => {
     vi.mocked(useMcpRuns).mockReturnValue({ data: { jobs: [], total: 0 }, isLoading: false } as any);
     render(<McpRunsPage />, { wrapper });
-    expect(screen.getByText('No runs found')).toBeInTheDocument();
+    expect(screen.getByText('No pipeline executions found')).toBeInTheDocument();
   });
 
   it('includes URL entity param in filter options even if not from API', () => {
