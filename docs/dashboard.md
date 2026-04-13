@@ -10,9 +10,9 @@ The sidebar organizes pages into three groups.
 
 | Page | Purpose |
 |------|---------|
-| **Workflow Registry** | Lists all discovered workflows. Each row shows a certified (shield icon) or durable badge. Certify or de-certify workflows from this page. |
+| **Workflow Registry** | Lists all discovered workflows. Each row shows a Certified (shield icon), Pipeline (wand icon), or Durable badge. Certify or de-certify workflows from this page. |
 | **Invoke Workflow** | Unified launch page for all durable workflows. Start a workflow immediately or schedule it on a cron. Certified and durable workflows appear together with visual distinction. |
-| **Durable Executions** | All workflow runs. Filter by tier: All, Certified, or Durable. Each row links to execution details, task records, and escalation history. |
+| **Durable Executions** | All workflow runs. Filter by tier: All, Certified, or Durable. Each row shows duration and links to execution details, task records, and escalation history. |
 | **Escalations** | Queue of pending, claimed, and resolved escalations. Claim an escalation to lock it, then resolve with a payload that triggers a workflow re-run. |
 
 ### MCP Workflows
@@ -22,7 +22,7 @@ The sidebar organizes pages into three groups.
 | **MCP Server Tools** | Browse all registered MCP servers and their exposed tools. View tool schemas, tags, and compile hints. |
 | **MCP Pipeline Tools** | Tools available within MCP pipelines. Shows which tools the pipeline orchestrator can discover and invoke. |
 | **Pipeline Designer** | Three-step lifecycle for building deterministic pipelines. Describe the goal, discover relevant tools, then compile to a reusable DAG. Detailed below. |
-| **Pipeline Executions** | Execution history for MCP pipelines. Shows both dynamic (agentic) and compiled (deterministic) runs. |
+| **Pipeline Executions** | Execution history for MCP pipelines. Shows both dynamic (agentic) and compiled (deterministic) runs, with duration for each. |
 
 ### Admin
 
@@ -37,9 +37,10 @@ The sidebar organizes pages into three groups.
 
 ### Workflow Registry
 
-Shows every workflow the system has discovered across all registered workers. Each workflow displays one of two badges:
+Shows every workflow the system has discovered across all registered workers. Each workflow displays one of three badges:
 
 - **Certified** (shield icon) -- has an `lt_config_workflows` entry. Full interceptor tracking, escalation chains, and invocation controls.
+- **Pipeline** (wand icon) -- a compiled deterministic workflow deployed from a successful MCP execution.
 - **Durable** -- registered as a HotMesh worker but not certified. Checkpointed execution and retries, but no interceptor wrapping.
 
 Click a workflow to view its config. Certify a durable workflow by creating a config entry; de-certify by removing it. The workflow itself does not change -- only the infrastructure wrapping it.
@@ -71,7 +72,7 @@ Lists all workflow runs across the system. The tier filter at the top switches b
 - **Certified** -- only workflows with `lt_config_workflows` entries.
 - **Durable** -- only uncertified durable workflows.
 
-Each row shows workflow name, status, start time, and duration. Click through to see the full task record, activity checkpoints, milestones, and any associated escalations.
+Each row shows workflow name, status, start time, and duration (computed from start to completion). Click through to see the full task record, activity checkpoints, milestones, and any associated escalations.
 
 ### Accounts
 

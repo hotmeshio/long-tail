@@ -3,16 +3,16 @@
 ## Quick Reference
 
 ```bash
-# Frontend tests (fast — ~4s, 62 files, 676 tests)
+# Frontend tests (fast — ~4s)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~75s, 45 files, 606 tests)
+# Backend: fast unit/integration tests only (~75s)
 npx vitest run --exclude 'tests/workflows/**'
 
-# Backend: workflow tests only (~3min, 8 files, 65 tests)
+# Backend: workflow tests only (~3min)
 npx vitest run tests/workflows
 
-# Backend: all tests (~5min, 55 files, 679 tests)
+# Backend: all tests (~5min)
 npx vitest run
 
 # Integration tests (requires Docker — mcpQuery + mcpTriage lifecycle)
@@ -25,41 +25,25 @@ npx vitest run --config tests/functional/vitest.config.ts
 npm run test:integration
 ```
 
-## Total Test Counts
-
-| Suite | Files | Tests | Duration |
-|-------|-------|-------|----------|
-| Frontend | 62 | 676 | ~4s |
-| Backend fast | 45 | 606 | ~75s |
-| Backend workflows | 8 | 65 | ~3min |
-| **Backend total** | **53** | **671** | **~5min** |
-| Integration (Docker) | 2 | 15 | ~5min |
-| Functional (Docker) | — | — | varies |
-| **Grand total** | **117+** | **1,362+** | — |
-
 ## Test Categories
 
 ### Frontend (`dashboard/src/**/*.test.{ts,tsx}`)
-- **62 files, 676 tests, ~4 seconds**
 - Pure unit tests: components, hooks, utils, API mocks
 - Environment: jsdom, no external dependencies
 - Always run these first — they're instant and catch most regressions
 
 ### Backend Fast (`tests/{modules,services,routes}/**/*.test.ts`)
-- **45 files, 606 tests, ~75 seconds**
 - **Recommended for iterative development** — run after every code change
-- Organized by layer: `tests/modules/` (auth, config, start), `tests/services/` (escalations, events, MCP, OAuth, YAML workflow, etc.), `tests/routes/` (13 files mirroring routes/)
+- Organized by layer: `tests/modules/` (auth, config, start), `tests/services/` (escalations, events, MCP, OAuth, YAML workflow, etc.), `tests/routes/` (files mirroring routes/)
 - Requires: PostgreSQL (`longtail_test` database)
 - Sequential execution (`fileParallelism: false`)
 
 ### Backend Workflows (`tests/workflows/*.test.ts`)
-- **8 files, 65 tests, ~3 minutes**
 - Full durable workflow execution: escalation, orchestration, triage, export, prune
 - Requires: PostgreSQL + HotMesh engine startup per file
 - Some tests call external APIs (LLM Vision) with long timeouts
 
 ### Integration Tests (`tests/integration/`)
-- **2 files, 15 tests, ~5 minutes**
 - Require Docker (`docker compose up -d --build`)
 - **mcpQuery lifecycle**: dynamic → compile → deploy → deterministic → router verification
 - **mcpTriage lifecycle**: escalation → triage → remediation → re-run
@@ -72,33 +56,33 @@ npm run test:integration
 
 ## What Each Fast Test Covers
 
-| File | Tests | What it covers |
-|------|-------|---------------|
-| `yaml-workflow-utils.test.ts` | 21 | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction |
-| `escalations.test.ts` | 55 | Create, claim, filter, stats, bulk operations |
-| `routes/*.test.ts` | 158 | HTTP API routes (13 files mirroring routes/ — see tests/routes/) |
-| `pattern-detector.test.ts` | 47 | Iteration pattern detection, array source matching |
-| `input-analyzer.test.ts` | 37 | Input classification (dynamic/fixed/wired), schema enrichment |
-| `auth.test.ts` | 23 | JWT, middleware, role-based access |
-| `config.test.ts` | 22 | Workflow config CRUD, role management |
-| `users.test.ts` | 19 | User CRUD, role assignment |
-| `db-server.test.ts` | 18 | MCP DB server tools (find_tasks, escalation stats) |
-| `events.test.ts` | 16 | NATS event adapter, publish/subscribe |
-| `mcp.test.ts` | 14 | MCP server CRUD, tag-based discovery |
-| `invocation.test.ts` | 14 | Workflow invocation API |
-| `start.test.ts` | 12 | Startup configuration, adapter registration |
-| `hotmesh-utils.test.ts` | 10 | HotMesh utility functions |
-| `controlplane.test.ts` | 8 | Rollcall, throttle, streams |
-| `analyze-documents.test.ts` | 8 | Document analysis utilities |
-| `oauth-providers.test.ts` | 8 | OAuth provider registry, URL generation, display names |
-| `oauth-crypto.test.ts` | 6 | AES-256-GCM encrypt/decrypt, tamper detection, edge cases |
-| `nats-pubsub.test.ts` | 6 | NATS pub/sub reliability |
-| `oauth-routes.test.ts` | 6 | OAuth flow logic: state, CSRF, JWT issuance |
-| `mcp-client.test.ts` | 4 | Built-in server auto-connection |
-| `oauth-state.test.ts` | 4 | CSRF state + PKCE code verifier management |
-| `oauth-init.test.ts` | 4 | Provider auto-detection from env vars and startup config |
-| `vision-server.test.ts` | 3 | Vision MCP server tools |
-| `publish.test.ts` | 3 | Event publishing |
+| File | What it covers |
+|------|---------------|
+| `yaml-workflow-utils.test.ts` | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction |
+| `escalations.test.ts` | Create, claim, filter, stats, bulk operations |
+| `routes/*.test.ts` | HTTP API routes (files mirroring routes/ — see tests/routes/) |
+| `pattern-detector.test.ts` | Iteration pattern detection, array source matching |
+| `input-analyzer.test.ts` | Input classification (dynamic/fixed/wired), schema enrichment |
+| `auth.test.ts` | JWT, middleware, role-based access |
+| `config.test.ts` | Workflow config CRUD, role management |
+| `users.test.ts` | User CRUD, role assignment |
+| `db-server.test.ts` | MCP DB server tools (find_tasks, escalation stats) |
+| `events.test.ts` | NATS event adapter, publish/subscribe |
+| `mcp.test.ts` | MCP server CRUD, tag-based discovery |
+| `invocation.test.ts` | Workflow invocation API |
+| `start.test.ts` | Startup configuration, adapter registration |
+| `hotmesh-utils.test.ts` | HotMesh utility functions |
+| `controlplane.test.ts` | Rollcall, throttle, streams |
+| `analyze-documents.test.ts` | Document analysis utilities |
+| `oauth-providers.test.ts` | OAuth provider registry, URL generation, display names |
+| `oauth-crypto.test.ts` | AES-256-GCM encrypt/decrypt, tamper detection, edge cases |
+| `nats-pubsub.test.ts` | NATS pub/sub reliability |
+| `oauth-routes.test.ts` | OAuth flow logic: state, CSRF, JWT issuance |
+| `mcp-client.test.ts` | Built-in server auto-connection |
+| `oauth-state.test.ts` | CSRF state + PKCE code verifier management |
+| `oauth-init.test.ts` | Provider auto-detection from env vars and startup config |
+| `vision-server.test.ts` | Vision MCP server tools |
+| `publish.test.ts` | Event publishing |
 
 ## Known Slow / Flaky Tests
 
