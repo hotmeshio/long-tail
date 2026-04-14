@@ -5,22 +5,12 @@
 // are pre-populated from the actual server definitions.
 
 import { HUMAN_QUEUE_TOOLS } from './tool-manifests-escalation';
-import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, DB_QUERY_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, DOCS_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
+import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, DOCS_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
 import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './tool-manifests-browser';
-import { MCP_WORKFLOW_TOOLS, WORKFLOW_COMPILER_TOOLS, CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
+import { CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
+import { ADMIN_TOOLS } from './tool-manifests-admin';
 
 export const SEED_MCP_SERVERS = [
-  {
-    name: 'long-tail-db-query',
-    description: 'Read-only query tools for tasks, escalations, processes, and system health. Used by triage workflows to gather context before making decisions.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: DB_QUERY_TOOLS,
-    metadata: { builtin: true, category: 'database' },
-    tags: ['database', 'query', 'analytics'],
-    compile_hints: 'Query tools return structured result sets. When a query result is consumed by a later step, wire the specific output field (e.g., "rows", "tasks") — not the entire result object.',
-    credential_providers: [],
-  },
   {
     name: 'long-tail-human-queue',
     description: 'Built-in escalation and human queue management. Exposes the escalation API as MCP tools for AI agents and remediation workflows.',
@@ -36,28 +26,6 @@ export const SEED_MCP_SERVERS = [
       'When a downstream tool (e.g., run_script, login_and_capture) needs a credential from the signal, wire the signal step output field to the specific tool argument.',
       'For tools with complex stored arguments (like run_script steps arrays), the credential value should be wired to the specific nested field that needs it — use a data_flow edge from the signal step to the consuming step.',
     ].join(' '),
-    credential_providers: [],
-  },
-  {
-    name: 'mcp-workflows-longtail',
-    description: 'Compiled YAML workflows — hardened deterministic pipelines from successful MCP triage executions. Invoke proven solutions to edge cases without LLM reasoning.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: MCP_WORKFLOW_TOOLS,
-    metadata: { builtin: true, category: 'workflows' },
-    tags: ['workflows', 'compiled', 'deterministic'],
-    compile_hints: null,
-    credential_providers: [],
-  },
-  {
-    name: 'long-tail-workflow-compiler',
-    description: 'Convert dynamic MCP tool call sequences into deterministic YAML workflows. Analyze executions, generate pipelines, deploy and activate.',
-    transport_type: 'stdio',
-    transport_config: { builtin: true, process: 'in-memory' },
-    tool_manifest: WORKFLOW_COMPILER_TOOLS,
-    metadata: { builtin: true, category: 'compilation' },
-    tags: ['compilation', 'yaml', 'codegen'],
-    compile_hints: null,
     credential_providers: [],
   },
   {
@@ -179,5 +147,24 @@ export const SEED_MCP_SERVERS = [
       'allowed_tools: ["Read", "Grep", "Glob"]. Results may be large; extract specific ' +
       'fields in subsequent steps rather than passing the full result.',
     credential_providers: ['anthropic'],
+  },
+  {
+    name: 'long-tail-admin',
+    description:
+      'System administration tools for reflexive self-management. Certify and de-certify workflows, ' +
+      'update MCP server tags, connect/disconnect servers, create users, manage roles, and release ' +
+      'expired escalation claims. Closes the loop: the triage agent can compile a fix, certify it, ' +
+      'and configure the system without human intervention.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: ADMIN_TOOLS,
+    metadata: { builtin: true, category: 'admin' },
+    tags: ['admin', 'system', 'configuration'],
+    compile_hints:
+      'Admin tools modify system configuration. certify_workflow and decertify_workflow ' +
+      'change how the interceptor treats a workflow — use after deploying a compiled pipeline ' +
+      'to give it full task tracking and escalation support. update_server_tags changes tool ' +
+      'discovery scope — only use when a server genuinely serves a different purpose than tagged.',
+    credential_providers: [],
   },
 ];
