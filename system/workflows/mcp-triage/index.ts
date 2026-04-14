@@ -7,6 +7,7 @@ import * as interceptorActivities from '../../../services/interceptor/activities
 import { TRIAGE_SYSTEM_PROMPT, TRIAGE_REENTRY_CONTEXT, TRIAGE_EXHAUSTED_ROUNDS } from './prompts';
 import { handleFinalResponse } from './response';
 import type { TriageResponseDeps } from './types';
+import { sanitizeToolResult } from '../tool-result-guard';
 
 type ActivitiesType = typeof activities;
 
@@ -227,7 +228,7 @@ async function runTriageLLM(
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
-        content: JSON.stringify(result),
+        content: sanitizeToolResult(result),
       });
     }
   }

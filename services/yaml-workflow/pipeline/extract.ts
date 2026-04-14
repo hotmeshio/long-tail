@@ -124,10 +124,14 @@ export function extractStepSequence(events: WorkflowExecutionEvent[]): Extracted
       const actualArgs = extractToolArgs(attrs as unknown as Record<string, unknown>);
       const args = Object.keys(actualArgs).length > 0 ? actualArgs : pendingLlmCall.arguments;
 
-      const result = attrs.result as Record<string, unknown> | null;
+      const result = attrs.result as Record<string, unknown> | string | null;
 
-      // Skip failed steps
-      if (result && (result.error || result.code === 'TIMEOUT')) {
+      // Skip failed steps — detect both object errors and string error messages
+      // (e.g., Playwright timeout errors return as plain error strings)
+      if (result && (
+        (typeof result === 'object' && (result.error || result.code === 'TIMEOUT')) ||
+        (typeof result === 'string' && /error|timeout|failed|ECONNREFUSED/i.test(result))
+      )) {
         pendingLlmCall = pendingQueue.shift() || null;
         continue;
       }
@@ -142,7 +146,7 @@ export function extractStepSequence(events: WorkflowExecutionEvent[]): Extracted
       });
 
       // Detect escalate_and_wait → waitFor pattern: emit a signal step
-      if (result?.type === 'waitFor' && result?.signalId) {
+      if (typeof result === 'object' && result?.type === 'waitFor' && result?.signalId) {
         const signalId = result.signalId as string;
         const signalData = signaledEvents.get(signalId) || {};
         const formSchema = (args as Record<string, unknown>).form_schema as Record<string, unknown> | undefined;

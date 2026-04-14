@@ -47,7 +47,11 @@ export const SEED_MCP_SERVERS = [
     tool_manifest: VISION_ANALYSIS_TOOLS,
     metadata: { builtin: true, category: 'vision' },
     tags: ['vision', 'image-analysis', 'multimodal'],
-    compile_hints: 'Vision tools process one image at a time. When iterating over multiple images, each iteration should pass a single image URL or data URI.',
+    compile_hints: [
+      'Vision tools process one image at a time. When iterating over multiple images, each iteration should pass a single image URL or data URI.',
+      'The `image` argument accepts a storage path (e.g., "screenshot.png"), a data URI, or an https:// URL. When following a screenshot or run_script step, wire `image` from the producing step output — use `last_screenshot_path` from run_script or `path` from screenshot. NEVER make `image` a trigger input when the image is produced by a prior step.',
+      'Vision tools do NOT use browser sessions. Do NOT wire page_id or _handle to vision tools — they read from storage, not from the browser.',
+    ].join(' '),
     credential_providers: ['anthropic'],
   },
   {
@@ -63,6 +67,8 @@ export const SEED_MCP_SERVERS = [
       'run_script accepts a `steps` array — this is a fixed implementation detail, never a dynamic input.',
       'When run_script follows a signal hook (human input), dynamic values like passwords must be wired from the hook output into the stored steps array.',
       'The `steps` array should be stored as fixed tool_arguments, but individual values within it (url, username, password) that come from trigger inputs or signal hooks should be wired via data_flow edges to their specific argument keys (e.g., to_field: "password").',
+      'run_script exposes `screenshots` (array of paths) and `last_screenshot_path` (string) as top-level output fields. When a downstream step needs a screenshot path (e.g., vision analyze_image or describe_image), wire from `last_screenshot_path` — NEVER from the nested `steps` array.',
+      'The screenshot tool supports `describe: true` to auto-analyze via vision LLM. When the user intent includes understanding page content (not just capturing it), prefer screenshot with describe:true over a separate describe_image step — this eliminates an entire activity from the compiled DAG.',
     ].join(' '),
     credential_providers: [],
   },

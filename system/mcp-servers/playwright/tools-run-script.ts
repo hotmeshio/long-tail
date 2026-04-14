@@ -8,6 +8,7 @@ import { getStorageBackend } from '../../../services/storage';
 import { SESSION_NOT_FOUND, RESOURCE_NOT_FOUND } from './types';
 import { pages, ensureBrowser, resolvePage, buildHandle, allocatePageId } from './browser-lifecycle';
 import { runScriptSchema } from './schemas';
+import { analyzeScreenshot } from './vision-helper';
 
 export function registerRunScript(srv: McpServer): void {
   (srv as any).registerTool(
@@ -109,7 +110,16 @@ export function registerRunScript(srv: McpServer): void {
             }
             const { size: ssSize } = await ssBackend.commitLocalPath(step.path, ssLocalPath);
             loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${step.path} (${ssSize} bytes)`);
-            stepResults.push({ step: i, action: 'screenshot', result: { path: step.path, size_bytes: ssSize, url: page.url() } });
+            const ssResult: Record<string, unknown> = { path: step.path, size_bytes: ssSize, url: page.url() };
+            if (step.describe) {
+              try {
+                ssResult.description = await analyzeScreenshot(step.path);
+              } catch (err: any) {
+                ssResult.description = null;
+                ssResult.describe_error = err.message;
+              }
+            }
+            stepResults.push({ step: i, action: 'screenshot', result: ssResult });
             break;
           }
           case 'click': {
@@ -188,12 +198,19 @@ export function registerRunScript(srv: McpServer): void {
         }
       }
 
+      // Collect screenshot paths for top-level wiring (compiler can't reach nested step results)
+      const screenshots = stepResults
+        .filter(s => s.action === 'screenshot' && (s.result as any).path)
+        .map(s => (s.result as any).path as string);
+
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
             steps_completed: stepResults.length,
             steps: stepResults,
+            screenshots,
+            last_screenshot_path: screenshots.length > 0 ? screenshots[screenshots.length - 1] : null,
             page_id: pageId,
             url: page?.url?.() ?? null,
             _handle: pageId ? buildHandle(pageId) : undefined,

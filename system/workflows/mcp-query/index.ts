@@ -5,6 +5,7 @@ import type { LTEnvelope, LTReturn, LTEscalation } from '../../../types';
 import * as activities from './activities';
 import * as interceptorActivities from '../../../services/interceptor/activities';
 import { MCP_QUERY_SYSTEM_PROMPT, ROUNDS_EXHAUSTED_DIAGNOSTIC_PROMPT } from './prompts';
+import { sanitizeToolResult } from '../tool-result-guard';
 
 type ActivitiesType = typeof activities;
 
@@ -164,7 +165,7 @@ export async function mcpQuery(
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
-        content: JSON.stringify(result),
+        content: sanitizeToolResult(result),
       });
     }
   }
