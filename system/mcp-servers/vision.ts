@@ -1,34 +1,63 @@
+import * as path from 'path';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { callLLM } from '../../services/llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../../services/logger';
+import { getStorageBackend } from '../../services/storage';
 import { ANALYZE_IMAGE_PROMPT, DESCRIBE_IMAGE_PROMPT } from './vision-prompts';
 
+const MIME_MAP: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+};
+
 const analyzeImageSchema = z.object({
-  image: z.string().describe('Image URL or data URI (e.g. https://... or data:image/png;base64,...)'),
+  image: z.string().describe(
+    'Image source: a storage path (e.g. "amazon_initial.png"), ' +
+    'a data URI (data:image/png;base64,...), or an https:// URL.',
+  ),
   prompt: z.string().optional().describe('Optional analysis prompt to guide the model'),
 });
 
 const describeImageSchema = z.object({
-  image: z.string().describe('Image URL or data URI'),
+  image: z.string().describe(
+    'Image source: a storage path, data URI, or https:// URL.',
+  ),
   context: z.string().optional().describe('Optional context about the image'),
 });
 
-function buildImageContent(image: string): { type: 'image'; source: { type: string; media_type?: string; url?: string; data?: string } } {
+/**
+ * Resolve an image reference to an LLM-ready content block.
+ *
+ * Accepts:
+ * - data:image/...;base64,... → used directly
+ * - https:// URL → passed as-is (OpenAI can fetch; Anthropic translate layer handles)
+ * - Storage path (anything else, including file:// prefixed) → read via storage backend
+ */
+async function resolveImageContent(
+  image: string,
+): Promise<{ type: 'image_url'; image_url: { url: string } }> {
+  // Already a data URI — pass through
   if (image.startsWith('data:')) {
-    const match = image.match(/^data:(image\/[^;]+);base64,(.+)$/);
-    if (match) {
-      return {
-        type: 'image',
-        source: { type: 'base64', media_type: match[1], data: match[2] },
-      };
-    }
+    return { type: 'image_url', image_url: { url: image } };
   }
-  return {
-    type: 'image',
-    source: { type: 'url', url: image },
-  };
+
+  // HTTPS URL — pass through
+  if (image.startsWith('https://') || image.startsWith('http://')) {
+    return { type: 'image_url', image_url: { url: image } };
+  }
+
+  // Storage path — strip file:// prefix if present, read via backend
+  const storagePath = image.replace(/^file:\/\//, '');
+  const backend = getStorageBackend();
+  const { data } = await backend.read(storagePath);
+  const ext = path.extname(storagePath).toLowerCase();
+  const mime = MIME_MAP[ext] || 'image/png';
+  const base64 = data.toString('base64');
+
+  return { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } };
 }
 
 function registerTools(srv: McpServer): void {
@@ -66,7 +95,7 @@ function registerTools(srv: McpServer): void {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: [buildImageContent(args.image) as any],
+            content: [await resolveImageContent(args.image) as any],
           },
         ],
         max_tokens: LLM_MAX_TOKENS_VISION,
@@ -134,7 +163,7 @@ function registerTools(srv: McpServer): void {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: [buildImageContent(args.image) as any],
+            content: [await resolveImageContent(args.image) as any],
           },
         ],
         max_tokens: LLM_MAX_TOKENS_VISION,

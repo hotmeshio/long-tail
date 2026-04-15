@@ -15,6 +15,7 @@ GET /api/mcp/servers
 | `status` | `string` | Filter by status: `registered`, `connected`, `error`, `disconnected` |
 | `search` | `string` | Search server name, description, or tool names (case-insensitive) |
 | `auto_connect` | `boolean` | Filter by auto-connect flag |
+| `tags` | `string` | Comma-separated tags for tag-based filtering |
 | `limit` | `integer` | Max results (default: 50) |
 | `offset` | `integer` | Pagination offset (default: 0) |
 

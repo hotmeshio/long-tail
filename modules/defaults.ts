@@ -45,6 +45,9 @@ export const LLM_MAX_ARRAY_ITEMS = envInt('LT_LLM_MAX_ARRAY_ITEMS', 25);
 /** Hard character cap on serialized input payloads sent to the LLM. */
 export const LLM_MAX_INPUT_CHARS = envInt('LT_LLM_MAX_INPUT_CHARS', 12_000);
 
+/** Max characters for a single tool result before truncation in the agentic loop. */
+export const TOOL_RESULT_MAX_CHARS = envInt('LT_TOOL_RESULT_MAX_CHARS', 50_000);
+
 // ── Tool execution ───────────────────────────────────────────────────
 
 /** Max agentic loop iterations for MCP triage workflows. */

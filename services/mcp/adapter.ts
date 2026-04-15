@@ -2,9 +2,6 @@ import type { LTMcpAdapter, LTMcpToolManifest } from '../../types/mcp';
 import { loggerRegistry } from '../logger';
 import * as mcpClient from './client';
 import * as mcpServer from './server';
-import * as mcpDbServer from './db-server';
-import * as mcpWorkflowCompilerServer from './workflow-compiler-server';
-import * as mcpWorkflowServer from './workflow-server';
 import * as mcpDbService from './db';
 
 import type { BuiltInMcpAdapterOptions } from './types';
@@ -32,17 +29,6 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
       loggerRegistry.info('[lt-mcp] human queue server started');
     }
 
-    // Start DB query MCP server (always available)
-    await mcpDbServer.createDbServer();
-    loggerRegistry.info('[lt-mcp] db query server started');
-
-    // Start Workflow Compiler MCP server (always available)
-    await mcpWorkflowCompilerServer.createWorkflowCompilerServer();
-    loggerRegistry.info('[lt-mcp] workflow compiler server started');
-
-    // Start MCP Workflows server (exposes compiled YAML workflows as tools)
-    await mcpWorkflowServer.createWorkflowServer();
-    loggerRegistry.info('[lt-mcp] workflow server started');
 
     // Connect to auto-connect servers from DB
     await mcpClient.connectAutoServers();
@@ -66,9 +52,6 @@ export class BuiltInMcpAdapter implements LTMcpAdapter {
 
   async disconnect(): Promise<void> {
     await mcpClient.disconnectAll();
-    await mcpWorkflowServer.stopWorkflowServer();
-    await mcpWorkflowCompilerServer.stopWorkflowCompilerServer();
-    await mcpDbServer.stopDbServer();
     await mcpServer.stopServer();
     loggerRegistry.info('[lt-mcp] disconnected');
   }

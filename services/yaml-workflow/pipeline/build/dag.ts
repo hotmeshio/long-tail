@@ -326,11 +326,16 @@ function buildJobMaps(
   totalSteps: number,
   outputFields: string[],
 ): Record<string, string> | undefined {
-  if (stepIdx !== totalSteps - 1 || outputFields.length === 0) return undefined;
-  return outputFields.reduce((acc, field) => {
-    acc[field] = `{$self.output.data.${field}}`;
-    return acc;
-  }, {} as Record<string, string>);
+  if (stepIdx !== totalSteps - 1) return undefined;
+  if (outputFields.length > 0) {
+    return outputFields.reduce((acc, field) => {
+      acc[field] = `{$self.output.data.${field}}`;
+      return acc;
+    }, {} as Record<string, string>);
+  }
+  // Final step with no structured output fields (e.g., string result) —
+  // persist the raw response so the workflow result isn't null
+  return { response: '{$self.output.data.response}' };
 }
 
 function buildManifestEntry(

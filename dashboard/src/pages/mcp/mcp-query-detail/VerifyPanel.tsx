@@ -133,7 +133,7 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
           <textarea
             value={testPrompt}
             onChange={(e) => setTestPrompt(e.target.value)}
-            className="w-full min-h-[160px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+            className="w-full min-h-[160px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
             placeholder="Type a natural language query..."
           />
           <div className="flex justify-end mt-2">

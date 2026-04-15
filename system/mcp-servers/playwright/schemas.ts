@@ -31,6 +31,8 @@ export const screenshotSchema = z.object({
     .describe('Capture the full scrollable page (default: false)'),
   selector: z.string().optional()
     .describe('CSS selector to screenshot a specific element'),
+  describe: z.boolean().optional()
+    .describe('When true, automatically analyze the screenshot using a vision LLM and return a description alongside metadata. Use this when you need to understand the page content.'),
 });
 
 export const clickSchema = z.object({
@@ -85,6 +87,7 @@ export const runScriptStepSchema = z.object({
   script: z.string().optional().describe('JavaScript for evaluate action'),
   timeout: z.number().optional().describe('Timeout in ms for wait_for/wait_for_url/wait actions'),
   not: z.boolean().optional().describe('For wait_for_url: wait until URL does NOT match (default: false)'),
+  describe: z.boolean().optional().describe('For screenshot: auto-analyze via vision LLM and include description in result'),
 });
 
 export const runScriptSchema = z.object({

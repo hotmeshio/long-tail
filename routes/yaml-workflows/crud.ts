@@ -101,7 +101,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(record);
   } catch (err: any) {
     if (err.message?.includes('duplicate key') || err.code === '23505') {
-      res.status(409).json({ error: 'A YAML workflow with that name already exists' });
+      res.status(409).json({ error: 'A tool with that name already exists' });
       return;
     }
     res.status(500).json({ error: err.message });

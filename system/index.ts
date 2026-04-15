@@ -53,11 +53,8 @@ export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...arg
  */
 export const builtinMcpServerFactories: Record<string, () => Promise<any>> = {
   'long-tail-human-queue': () => import('./mcp-servers/human-queue').then((m) => m.createHumanQueueServer()),
-  'long-tail-db': () => import('./mcp-servers/db-query').then((m) => m.createDbServer()),
   'long-tail-translation': () => import('./mcp-servers/translation').then((m) => m.createTranslationServer()),
   'long-tail-vision': () => import('./mcp-servers/vision').then((m) => m.createVisionServer()),
-  'mcp-workflows-longtail': () => import('./mcp-servers/workflow').then((m) => m.createWorkflowServer()),
-  'long-tail-workflow-compiler': () => import('./mcp-servers/workflow-compiler').then((m) => m.createWorkflowCompilerServer()),
   'long-tail-playwright': () => import('./mcp-servers/playwright').then((m) => m.createPlaywrightServer()),
   'long-tail-playwright-cli': () => import('./mcp-servers/playwright-cli').then((m) => m.createPlaywrightCliServer()),
   'long-tail-file-storage': () => import('./mcp-servers/file-storage').then((m) => m.createFileStorageServer()),
@@ -65,4 +62,5 @@ export const builtinMcpServerFactories: Record<string, () => Promise<any>> = {
   'long-tail-oauth': () => import('./mcp-servers/oauth').then((m) => m.createOAuthServer()),
   'long-tail-docs': () => import('./mcp-servers/docs').then((m) => m.createDocsServer()),
   'long-tail-claude-code': () => import('./mcp-servers/claude-code').then((m) => m.createClaudeCodeServer()),
+  'long-tail-admin': () => import('./mcp-servers/admin').then((m) => m.createAdminServer()),
 };

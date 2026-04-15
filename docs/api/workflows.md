@@ -4,6 +4,55 @@ The workflow API covers the full lifecycle: configure a workflow, invoke it, obs
 
 ---
 
+## Discovery
+
+### List active workers
+
+```
+GET /api/workflows/workers
+```
+
+Returns all in-memory workflow workers with their registration status (whether a config exists in `lt_config_workflows`).
+
+**Response 200:**
+
+```json
+{
+  "workers": [
+    {
+      "name": "reviewContent",
+      "taskQueue": "long-tail",
+      "registered": true
+    }
+  ]
+}
+```
+
+### List discovered workflows
+
+```
+GET /api/workflows/discovered
+```
+
+Returns a unified list that merges active workers, historical workflow entities from the durable store, and workflow configurations. Each entry includes a `registered` boolean indicating whether a config exists.
+
+**Response 200:**
+
+```json
+{
+  "workflows": [
+    {
+      "name": "reviewContent",
+      "taskQueue": "long-tail",
+      "registered": true,
+      "config": { "..." }
+    }
+  ]
+}
+```
+
+---
+
 ## Configuration
 
 Workflow configuration lives in Postgres (`lt_config_workflows`) and drives everything: which workflows the interceptor manages, who can escalate, who can invoke, and what data flows between steps.
@@ -22,14 +71,17 @@ GET /api/workflows/config
     {
       "id": "a1b2c3d4-...",
       "workflow_type": "reviewContent",
-      "is_lt": true,
-      "is_container": false,
       "invocable": true,
       "task_queue": "long-tail",
       "default_role": "reviewer",
       "default_modality": "default",
       "description": "AI content review with human escalation",
       "consumes": [],
+      "execute_as": null,
+      "tool_tags": [],
+      "envelope_schema": null,
+      "resolver_schema": null,
+      "cron_schedule": null,
       "roles": ["reviewer"],
       "invocation_roles": ["submitter"],
       "created_at": "2025-01-15T10:00:00.000Z",
@@ -77,22 +129,23 @@ PUT /api/workflows/:type/config
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `is_lt` | `boolean` | `true` | Enable the LT interceptor for this workflow |
-| `is_container` | `boolean` | `false` | `true` for orchestrators that coordinate child workflows |
 | `invocable` | `boolean` | `false` | Allow this workflow to be started via `POST /api/workflows/:type/invoke` |
 | `task_queue` | `string \| null` | `null` | Task queue name (required for invocable workflows) |
 | `default_role` | `string` | `"reviewer"` | Role assigned to escalations when the workflow doesn't specify one |
-| `default_modality` | `string` | `"portal"` | Default modality |
 | `description` | `string \| null` | `null` | Human-readable description |
 | `roles` | `string[]` | `[]` | Roles allowed to claim escalations for this workflow |
 | `invocation_roles` | `string[]` | `[]` | Roles allowed to invoke via API. Empty = any authenticated user. |
 | `consumes` | `string[]` | `[]` | Workflow types whose completed data this workflow receives via `envelope.lt.providers` |
+| `execute_as` | `string \| null` | `null` | Service account `external_id` to run as (overrides invoker identity) |
+| `tool_tags` | `string[]` | `[]` | MCP tool tags for scoped tool discovery |
+| `envelope_schema` | `object \| null` | `null` | JSON Schema for the workflow input envelope |
+| `resolver_schema` | `object \| null` | `null` | JSON Schema for the escalation resolver payload |
+| `cron_schedule` | `string \| null` | `null` | Cron expression for scheduled execution (e.g., `"0 9 * * *"`) |
 
 **Example request:**
 
 ```json
 {
-  "is_lt": true,
   "invocable": true,
   "task_queue": "long-tail",
   "default_role": "reviewer",
@@ -152,6 +205,7 @@ Start a workflow by its registered type. The workflow must have `invocable: true
 |-------|------|----------|-------------|
 | `data` | `object` | yes | Business data passed to the workflow as `envelope.data` |
 | `metadata` | `object` | no | Control flow metadata passed as `envelope.metadata` |
+| `execute_as` | `string` | no | Service account `external_id` to run as (admin only) |
 
 **Example request:**
 
@@ -539,6 +593,8 @@ Interrupt a running workflow. The workflow is immediately terminated.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| `GET` | `/workers` | any | List active in-memory workers with registration status |
+| `GET` | `/discovered` | any | Unified list of workers, entities, and configs |
 | `GET` | `/cron/status` | any | List cron-configured workflows and active status |
 | `GET` | `/config` | any | List all workflow configurations |
 | `GET` | `/:type/config` | any | Get a single workflow configuration |

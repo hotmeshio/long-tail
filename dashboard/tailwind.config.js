@@ -26,7 +26,7 @@ export default {
         status: {
           active: '#2563EB',
           pending: '#F59E0B',
-          draft: '#EA580C',
+          draft: '#F97316',
           success: '#16A34A',
           warning: '#F59E0B',
           error: '#DC2626',

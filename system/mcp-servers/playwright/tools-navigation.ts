@@ -6,6 +6,7 @@ import { getStorageBackend } from '../../../services/storage';
 
 import { pages, ensureBrowser, resolvePage, buildHandle, allocatePageId } from './browser-lifecycle';
 import { navigateSchema, screenshotSchema } from './schemas';
+import { analyzeScreenshot } from './vision-helper';
 
 export function registerNavigationTools(srv: McpServer): void {
   // ── navigate ─────────────────────────────────────────────
@@ -137,16 +138,29 @@ export function registerNavigationTools(srv: McpServer): void {
       const { size } = await backend.commitLocalPath(args.path, localPath);
       loggerRegistry.info(`[lt-mcp:playwright] screenshot saved: ${args.path} (${size} bytes)`);
 
+      const metadata: Record<string, any> = {
+        page_id: pageId,
+        path: args.path,
+        size_bytes: size,
+        url: page.url(),
+        _handle: buildHandle(pageId),
+      };
+
+      // Auto-analyze via vision LLM when requested
+      if (args.describe) {
+        try {
+          const description = await analyzeScreenshot(args.path);
+          metadata.description = description;
+        } catch (err: any) {
+          metadata.description = null;
+          metadata.describe_error = err.message;
+        }
+      }
+
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({
-            page_id: pageId,
-            path: args.path,
-            size_bytes: size,
-            url: page.url(),
-            _handle: buildHandle(pageId),
-          }),
+          text: JSON.stringify(metadata),
         }],
       };
     },

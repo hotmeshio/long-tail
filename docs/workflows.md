@@ -2,9 +2,9 @@
 
 Write a function. If AI is confident, the task completes. If not, it escalates — durably, with full context — to whoever should handle it next. This guide covers how to build, compose, and test durable workflows with human-in-the-loop escalation.
 
-## Durable vs Certified Workflows
+## Three Workflow Types
 
-Not all workflows are equal. Long Tail distinguishes two tiers based on how much infrastructure wraps the execution.
+Long Tail distinguishes three workflow types based on how they are created and how much infrastructure wraps the execution.
 
 ### Durable
 
@@ -14,7 +14,7 @@ Any function registered as a HotMesh worker is durable. This is the baseline tie
 - **Automatic retries** — failed activities retry according to their retry policy.
 - **IAM context** — the caller's identity propagates through the execution envelope.
 
-A durable workflow is a plain async function. No config entry, no interceptor involvement. Register a worker, start the workflow, get a result.
+A durable workflow is a plain async function. No config entry, no interceptor involvement. Register a worker, start the workflow, get a result. In the dashboard, durable workflows display a Workflow icon with a "Durable" label.
 
 ### Certified
 
@@ -26,7 +26,7 @@ A certified workflow is durable plus the full Long Tail control plane. It has an
 - **Invocation controls** — `invocable: true` exposes the workflow for external invocation via the API and dashboard.
 - **Execution identity** — roles, default assignees, and `execute_as` overrides are defined in the config.
 
-In the dashboard, certified workflows display a shield icon. Durable workflows display a durable badge. Both are invocable from the same page; the distinction is how much operational infrastructure backs them.
+In the dashboard, certified workflows display a ShieldCheck icon with a "Certified" label in accent blue. Durable workflows display a muted "Durable" badge. Both are invocable from the same **Invoke Workflow** page; the distinction is how much operational infrastructure backs them.
 
 To certify a workflow, create a config entry:
 
@@ -36,6 +36,19 @@ PUT /api/workflows/myWorkflow/config
 ```
 
 To de-certify, delete the config. The workflow remains durable — it just loses interceptor tracking.
+
+### Pipeline
+
+A pipeline workflow is a compiled deterministic workflow. It is generated from a successful dynamic execution (typically an `mcpQuery` or `mcpTriage` run) and stored as a YAML DAG in `lt_yaml_workflows`.
+
+- **No LLM per step** — the DAG executes tool calls directly with pre-wired data flow.
+- **Discoverable as a tool** — deployed pipelines become MCP tools that any workflow or agent can invoke.
+- **Automatic routing** — the `mcpQueryRouter` discovers compiled pipelines via full-text search and tag matching. When confidence exceeds the threshold, requests go straight to the compiled workflow.
+- **Status lifecycle** — `draft` → `deployed` → `active` → `archived`.
+
+In the dashboard, pipeline workflows display a Wand2 (magic wand) icon in purple. They are managed from the **MCP Pipeline Tools** page and created through the **Pipeline Designer**.
+
+See the [Compilation Pipeline](compilation.md) guide for the full lifecycle from dynamic execution to deployed pipeline.
 
 ## Contents
 

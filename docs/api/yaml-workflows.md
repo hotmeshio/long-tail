@@ -16,6 +16,7 @@ GET /api/yaml-workflows
 | `graph_topic` | `string` | Filter by graph topic (tool name) |
 | `app_id` | `string` | Filter by namespace/server (exact match) |
 | `search` | `string` | Search name, graph topic, description, or app ID (case-insensitive) |
+| `source_workflow_id` | `string` | Filter by source execution workflow ID |
 | `limit` | `integer` | Max results (default: 50) |
 | `offset` | `integer` | Pagination offset (default: 0) |
 
@@ -80,12 +81,16 @@ Generates a YAML workflow from a completed MCP triage execution.
 | `description` | `string` | No | Human-readable description |
 | `app_id` | `string` | No | Namespace/app ID (default: auto-generated) |
 | `subscribes` | `string` | No | Topic subscription |
+| `tags` | `string[]` | No | Tags for workflow discovery |
+| `compilation_feedback` | `string` | No | Additional instructions for the compilation pipeline |
 
 **Response 201:** Created workflow record.
 
 **Response 400:** Missing required fields.
 
 **Response 409:** Workflow name already exists.
+
+**Response 422:** Source execution exhausted its tool rounds (incomplete trace).
 
 ## Get a workflow
 
@@ -133,7 +138,7 @@ Only allowed for `draft` or `archived` workflows.
 POST /api/yaml-workflows/:id/deploy
 ```
 
-Deploys all YAML workflows sharing this workflow's `app_id` as a merged version. Bumps the version and marks all non-archived siblings as `deployed`.
+Deploys all YAML workflows sharing this workflow's `app_id` as a merged version. Bumps the version, marks all non-archived siblings as `active`, and registers HotMesh workers for the deployed workflows.
 
 **Response 200:** Updated workflow record (with new version).
 
@@ -197,17 +202,18 @@ Invoke an active YAML workflow with parameters.
 POST /api/yaml-workflows/:id/regenerate
 ```
 
-Re-generate the YAML from the original source execution. Only allowed for `draft` workflows.
+Re-generate the YAML from the original source execution. Allowed for `draft`, `deployed`, and `active` workflows (not `archived`).
 
 **Request body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `task_queue` | `string` | No | Override task queue (default: from source) |
+| `compilation_feedback` | `string` | No | Additional instructions for the regeneration |
 
 **Response 200:** Updated workflow record.
 
-**Response 400:** Only draft workflows can be regenerated.
+**Response 400:** Archived workflows cannot be regenerated.
 
 **Response 404:** Workflow not found.
 

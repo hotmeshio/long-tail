@@ -10,10 +10,10 @@ The sidebar organizes pages into three groups.
 
 | Page | Purpose |
 |------|---------|
-| **Workflow Registry** | Lists all discovered workflows. Each row shows a Certified (shield icon), Pipeline (wand icon), or Durable badge. Certify or de-certify workflows from this page. |
+| **Workflow Registry** | Lists all discovered workflows. Each row shows a Certified (ShieldCheck icon, accent blue), Pipeline (Wand2 icon, purple), or Durable badge. Certify or de-certify workflows from this page. |
 | **Invoke Workflow** | Unified launch page for all durable workflows. Start a workflow immediately or schedule it on a cron. Certified and durable workflows appear together with visual distinction. |
+| **All Escalations** | Queue of pending, claimed, and resolved escalations. Claim an escalation to lock it, then resolve with a payload that triggers a workflow re-run. |
 | **Durable Executions** | All workflow runs. Filter by tier: All, Certified, or Durable. Each row shows duration and links to execution details, task records, and escalation history. |
-| **Escalations** | Queue of pending, claimed, and resolved escalations. Claim an escalation to lock it, then resolve with a payload that triggers a workflow re-run. |
 
 ### MCP Workflows
 
@@ -21,7 +21,7 @@ The sidebar organizes pages into three groups.
 |------|---------|
 | **MCP Server Tools** | Browse all registered MCP servers and their exposed tools. View tool schemas, tags, and compile hints. |
 | **MCP Pipeline Tools** | Tools available within MCP pipelines. Shows which tools the pipeline orchestrator can discover and invoke. |
-| **Pipeline Designer** | Three-step lifecycle for building deterministic pipelines. Describe the goal, discover relevant tools, then compile to a reusable DAG. Detailed below. |
+| **Pipeline Designer** | Six-step compilation wizard. Submit a query, review the dynamic execution, compile to a deterministic pipeline, deploy, test, and verify end-to-end routing. Detailed below. |
 | **Pipeline Executions** | Execution history for MCP pipelines. Shows both dynamic (agentic) and compiled (deterministic) runs, with duration for each. |
 
 ### Admin
@@ -33,15 +33,26 @@ The sidebar organizes pages into three groups.
 | **DB Maintenance** | Database housekeeping. Vacuum, reindex, and view table statistics. |
 | **Task Queues** | View active task queues, connected workers, and queue depth. |
 
+### Header
+
+The top navigation bar contains:
+
+- **Home logo** — links to the home page (`/`), which shows all business processes.
+- **Quick Query** — a search/prompt field for launching MCP queries directly from the header.
+- **Documentation** (BookOpen icon) — toggles an in-app documentation drawer.
+- **Inbox** (Inbox icon) — links to `/escalations/queue` (My Escalations). Shows a badge count of pending escalations for the current user's roles.
+- **NATS status indicator** — shows connection health.
+- **User menu** (User icon) — dropdown with Credentials and Sign Out options.
+
 ## Key Pages
 
 ### Workflow Registry
 
 Shows every workflow the system has discovered across all registered workers. Each workflow displays one of three badges:
 
-- **Certified** (shield icon) -- has an `lt_config_workflows` entry. Full interceptor tracking, escalation chains, and invocation controls.
-- **Pipeline** (wand icon) -- a compiled deterministic workflow deployed from a successful MCP execution.
-- **Durable** -- registered as a HotMesh worker but not certified. Checkpointed execution and retries, but no interceptor wrapping.
+- **Certified** (ShieldCheck icon, accent blue) -- has an `lt_config_workflows` entry. Full interceptor tracking, escalation chains, and invocation controls.
+- **Pipeline** (Wand2 icon, purple) -- a compiled deterministic workflow deployed from a successful MCP execution.
+- **Durable** (Workflow icon, muted) -- registered as a HotMesh worker but not certified. Checkpointed execution and retries, but no interceptor wrapping.
 
 Click a workflow to view its config. Certify a durable workflow by creating a config entry; de-certify by removing it. The workflow itself does not change -- only the infrastructure wrapping it.
 
@@ -56,13 +67,16 @@ Certified and durable workflows both appear in the list. Certified workflows sho
 
 ### Pipeline Designer
 
-The Pipeline Designer walks through three steps to turn a natural-language goal into a compiled deterministic pipeline.
+The Pipeline Designer page lists previous MCP query runs and provides a prompt to start new ones. Click into a completed run to open the six-step **Compilation Wizard**:
 
-1. **Describe** -- Enter a plain-text description of the goal. Optionally constrain which MCP tool tags to search.
-2. **Discover** -- The system queries MCP servers by tag, selects relevant tools, and executes the pipeline dynamically (agentic loop). The result is displayed along with the tool calls that were made.
-3. **Compile** -- The executed tool-call sequence is compiled into a deterministic YAML DAG. Future invocations skip the LLM entirely and replay the compiled steps.
+1. **Describe** -- View the original dynamic execution: input envelope and structured output side by side.
+2. **Discover** -- Swimlane timeline of tool calls, grouped by MCP server, positioned on a time axis.
+3. **Compile** -- Define the deterministic workflow: namespace, tool name, description, tags. Triggers the five-stage compilation pipeline.
+4. **Deploy** -- Review the compiled YAML DAG, input/output schemas, and version history. Deploy and activate.
+5. **Test** -- Run the compiled workflow and compare results side-by-side against the original dynamic execution.
+6. **Verify** -- End-to-end routing verification. Submit the original prompt through `mcpQueryRouter` to confirm the deterministic path is discovered and used.
 
-Compiled pipelines appear in Pipeline Executions as deterministic runs, which are faster and cheaper than their dynamic counterparts.
+Steps unlock sequentially. Compiled pipelines appear in **Pipeline Executions** as deterministic runs, which are faster and cheaper than their dynamic counterparts. See the [Compilation Pipeline](compilation.md) guide for the full walkthrough.
 
 ### Durable Executions
 
@@ -83,13 +97,37 @@ User Accounts and Service Accounts live on the same page, separated by a tab tog
 
 Both account types participate in the same role system. A service account with the `reviewer` role can claim and resolve escalations just like a human user.
 
+### Escalation Detail
+
+Click any escalation to open a full-page detail view. The page has a hero section summarizing the escalation, an action bar (Claim, Resolve, Escalate, Triage options), a resolver form when claimed, a timeline of events, and the full context data. Triage options are available when the MCP escalation strategy is configured.
+
+### Escalations Overview
+
+Accessible at `/escalations`, the overview page shows summary statistics across configurable time windows (1h, 24h, 7d, 30d): open, claimed, created, and resolved counts. A breakdown table groups escalations by role.
+
+### Workflows Overview
+
+Accessible at `/workflows`, the overview page shows workflow statistics across time windows (1h, 24h, 7d, 30d): total, running, completed, failed counts, and average duration grouped by workflow type.
+
+### MCP Overview
+
+Accessible at `/mcp`, the overview page shows MCP server and tool statistics alongside pipeline execution history across time windows.
+
+### Process Detail
+
+Click any process on the home page (`/`) to open a detail view at `/processes/detail/:originId`. This shows a swimlane timeline of all tasks and escalations sharing the same origin, giving a unified view of a multi-step workflow's progress.
+
+### Credentials
+
+Accessible via the user menu in the header (or at `/credentials`), this page lets users manage their OAuth provider connections and API keys. Status, credential type, and expiry are visible. Users connect or revoke providers here.
+
 ## Global Features
 
 ### Inbox
 
-The inbox icon in the top navigation bar shows a red dot when the current user has pending escalations assigned to their roles. The count updates live via a NATS subscription -- no polling or page refresh needed.
+The Inbox icon in the header shows a badge count when the current user has pending escalations assigned to their roles. The count updates live via a NATS subscription — no polling or page refresh needed.
 
-Click the inbox icon to jump directly to the Escalations page, filtered to the user's actionable items.
+Click the icon to jump to **My Escalations** (`/escalations/queue`) — the operator dashboard showing claimed escalations with time-remaining columns, filter bar, and release actions.
 
 ### Event Feed
 

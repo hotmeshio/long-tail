@@ -1,8 +1,7 @@
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMcpRunExecution } from '../../api/mcp-runs';
-import { useYamlWorkflowByTopic } from '../../api/yaml-workflows';
 import { useSettings } from '../../api/settings';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
@@ -37,9 +36,7 @@ export function McpRunDetailPage() {
   const { data: execution, isLoading, error, refetch, isFetching } = useMcpRunExecution(jobId!, namespace);
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
-  const workflowTopic = execution?.workflow_name || execution?.workflow_type;
-  const { data: yamlMatch } = useYamlWorkflowByTopic(workflowTopic, namespace);
-  const sourceWorkflow = yamlMatch?.workflows?.[0];
+
 
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
 
@@ -113,13 +110,7 @@ export function McpRunDetailPage() {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Pipeline Tool</p>
-            {sourceWorkflow ? (
-              <Link to={`/mcp/workflows/${sourceWorkflow.id}`} className="text-xs font-mono text-accent hover:underline truncate block">
-                {execution.workflow_type}
-              </Link>
-            ) : (
-              <p className="text-xs font-mono text-text-primary truncate">{execution.workflow_type || '—'}</p>
-            )}
+            <p className="text-xs font-mono text-text-primary truncate">{execution.workflow_type || '—'}</p>
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>

@@ -2,7 +2,7 @@
 
 ## Running the Demo
 
-The repository includes a working server with five example workflows (`reviewContent`, `verifyDocument`, `verifyDocumentMcp`, `processClaim`, and `kitchenSink`), Postgres, NATS, and a React dashboard.
+The repository includes a working server with example workflows (`reviewContent`, `kitchenSink`, `basicEcho`, and more), Postgres, NATS, and a React dashboard.
 
 ### Prerequisites
 
