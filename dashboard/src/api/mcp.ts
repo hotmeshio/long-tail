@@ -142,14 +142,16 @@ export function useCallMcpTool() {
       serverId,
       toolName,
       arguments: args,
+      execute_as,
     }: {
       serverId: string;
       toolName: string;
       arguments: Record<string, unknown>;
+      execute_as?: string;
     }) =>
       apiFetch(`/mcp/servers/${serverId}/tools/${toolName}/call`, {
         method: 'POST',
-        body: JSON.stringify({ arguments: args }),
+        body: JSON.stringify({ arguments: args, ...(execute_as ? { execute_as } : {}) }),
       }),
   });
 }

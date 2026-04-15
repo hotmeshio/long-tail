@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Play, RotateCcw, ExternalLink, User } from 'lucide-react';
+import { X, Play, RotateCcw, ExternalLink } from 'lucide-react';
 import { useInvokeYamlWorkflow } from '../../../api/yaml-workflows';
-import { useAuth } from '../../../hooks/useAuth';
 import { useYamlActivityEvents, type ActivityStep } from '../../../hooks/useYamlActivityEvents';
+import { RunAsSelector } from '../form/RunAsSelector';
 import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../../api/types';
 import { buildSkeleton } from '../../../pages/mcp/mcp-query-detail/helpers';
 
@@ -89,10 +89,12 @@ interface WorkflowTestPanelProps {
 }
 
 export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps) {
-  const { user } = useAuth();
   const invokeMutation = useInvokeYamlWorkflow();
+  const [jsonMode, setJsonMode] = useState(false);
+  const [fields, setFields] = useState<Record<string, any>>({});
   const [argsJson, setArgsJson] = useState('');
   const [jsonError, setJsonError] = useState('');
+  const [executeAs, setExecuteAs] = useState('');
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [completedResult, setCompletedResult] = useState<{ jobId: string } | null>(null);
   const { steps, isComplete } = useYamlActivityEvents(activeJobId);
@@ -102,7 +104,10 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
     setCompletedResult(null);
     setJsonError('');
     invokeMutation.reset();
-    setArgsJson(JSON.stringify(buildSkeleton(workflow.input_schema), null, 2));
+    const skeleton = buildSkeleton(workflow.input_schema);
+    setFields(skeleton);
+    setArgsJson(JSON.stringify(skeleton, null, 2));
+    setJsonMode(false);
   }, [workflow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -116,18 +121,31 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
     }
   }, [isComplete, activeJobId]);
 
+  const toggleMode = () => {
+    if (!jsonMode) {
+      setArgsJson(JSON.stringify(fields, null, 2));
+    } else {
+      try { setFields(JSON.parse(argsJson)); } catch { /* keep fields */ }
+    }
+    setJsonMode(!jsonMode);
+  };
+
   const handleRun = async () => {
     setJsonError('');
     setCompletedResult(null);
     let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(argsJson);
-    } catch {
-      setJsonError('Invalid JSON');
-      return;
+    if (jsonMode) {
+      try { parsed = JSON.parse(argsJson); } catch { setJsonError('Invalid JSON'); return; }
+    } else {
+      parsed = { ...fields };
     }
     try {
-      const result = await invokeMutation.mutateAsync({ id: workflow.id, data: parsed, sync: false });
+      const result = await invokeMutation.mutateAsync({
+        id: workflow.id,
+        data: parsed,
+        sync: false,
+        ...(executeAs ? { execute_as: executeAs } : {}),
+      });
       if (result.job_id) setActiveJobId(result.job_id);
     } catch { /* error shown in panel */ }
   };
@@ -160,45 +178,84 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
               </svg>
               <p className="text-xs font-medium text-status-success">Workflow completed</p>
             </div>
-            <Link
-              to={`/mcp/executions/${encodeURIComponent(completedResult.jobId)}?namespace=${encodeURIComponent(ns)}`}
-              className="inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
-            >
-              <ExternalLink size={12} /> View execution
-            </Link>
-            <button
-              onClick={() => setCompletedResult(null)}
-              className="btn-primary text-xs inline-flex items-center gap-1.5"
-            >
-              <RotateCcw size={12} /> Run again
-            </button>
+            <div className="flex items-center justify-between">
+              <Link
+                to={`/mcp/executions/${encodeURIComponent(completedResult.jobId)}?namespace=${encodeURIComponent(ns)}`}
+                className="inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
+              >
+                <ExternalLink size={12} /> View execution
+              </Link>
+              <button
+                onClick={() => setCompletedResult(null)}
+                className="btn-primary text-xs inline-flex items-center gap-1.5"
+              >
+                <RotateCcw size={12} /> Run again
+              </button>
+            </div>
           </div>
         ) : (
           <>
-            {/* Identity context */}
-            {user && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/[0.06] border border-accent/20">
-                <User className="w-3 h-3 text-accent/75 shrink-0" strokeWidth={1.5} />
-                <span className="text-[10px] text-text-secondary">
-                  Invoking as <span className="font-medium text-accent">{user.displayName || user.userId}</span>
-                </span>
-              </div>
-            )}
+            <RunAsSelector selected={executeAs} onChange={setExecuteAs} />
 
             {workflow.description && (
               <p className="text-[11px] text-text-secondary leading-relaxed">{workflow.description}</p>
             )}
+
+            {/* Form / JSON toggle input */}
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Input</label>
-              <textarea
-                value={argsJson}
-                onChange={(e) => setArgsJson(e.target.value)}
-                className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
-                rows={6}
-                spellCheck={false}
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Input</label>
+                <button onClick={toggleMode} className="text-[10px] text-accent hover:underline">
+                  {jsonMode ? 'Form view' : 'JSON view'}
+                </button>
+              </div>
+
+              {jsonMode ? (
+                <textarea
+                  value={argsJson}
+                  onChange={(e) => setArgsJson(e.target.value)}
+                  className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
+                  rows={6}
+                  spellCheck={false}
+                />
+              ) : (
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {Object.entries(fields).map(([key, value]) => (
+                    <div key={key}>
+                      <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
+                      {typeof value === 'boolean' ? (
+                        <select
+                          value={String(value)}
+                          onChange={(e) => setFields({ ...fields, [key]: e.target.value === 'true' })}
+                          className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                        >
+                          <option value="true">true</option>
+                          <option value="false">false</option>
+                        </select>
+                      ) : typeof value === 'object' ? (
+                        <textarea
+                          value={JSON.stringify(value, null, 2)}
+                          onChange={(e) => { try { setFields({ ...fields, [key]: JSON.parse(e.target.value) }); } catch { /* invalid */ } }}
+                          className="w-full min-h-[60px] px-3 py-1.5 bg-surface-sunken border border-surface-border rounded-md font-mono text-xs text-text-primary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                        />
+                      ) : (
+                        <input
+                          type={typeof value === 'number' ? 'number' : 'text'}
+                          value={String(value ?? '')}
+                          onChange={(e) => setFields({ ...fields, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value })}
+                          className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                        />
+                      )}
+                    </div>
+                  ))}
+                  {Object.keys(fields).length === 0 && (
+                    <p className="text-[11px] text-text-tertiary italic">No input fields defined</p>
+                  )}
+                </div>
+              )}
               {jsonError && <p className="text-[11px] text-status-error mt-1">{jsonError}</p>}
             </div>
+
             {invokeMutation.isError && (
               <div className="bg-status-error/10 border border-status-error/20 rounded-md px-3 py-2">
                 <p className="text-[11px] text-status-error">

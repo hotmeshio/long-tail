@@ -28,7 +28,7 @@ export function buildSkeleton(schema: Record<string, any>): Record<string, any> 
     const p = prop as any;
     if (p.default !== undefined) result[key] = p.default;
     else if (p.type === 'string') result[key] = '';
-    else if (p.type === 'number' || p.type === 'integer') result[key] = 0;
+    else if (p.type === 'number' || p.type === 'integer') result[key] = p.minimum ?? 0;
     else if (p.type === 'boolean') result[key] = false;
     else if (p.type === 'object') result[key] = {};
     else if (p.type === 'array') result[key] = [];

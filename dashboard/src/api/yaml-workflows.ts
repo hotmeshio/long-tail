@@ -111,10 +111,10 @@ export function useActivateYamlWorkflow() {
 export function useInvokeYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data, sync }: { id: string; data: Record<string, unknown>; sync?: boolean }) =>
+    mutationFn: ({ id, data, sync, execute_as }: { id: string; data: Record<string, unknown>; sync?: boolean; execute_as?: string }) =>
       apiFetch<{ result?: unknown; job_id?: string }>(`/yaml-workflows/${id}/invoke`, {
         method: 'POST',
-        body: JSON.stringify({ data, sync }),
+        body: JSON.stringify({ data, sync, ...(execute_as ? { execute_as } : {}) }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
