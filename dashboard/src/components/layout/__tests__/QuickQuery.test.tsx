@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
@@ -70,7 +70,7 @@ describe('QuickQuery', () => {
 
     // Simulate onSuccess to verify navigation target
     const onSuccess = mockMutate.mock.calls[0][1].onSuccess;
-    onSuccess({ workflow_id: 'wf-123' });
+    act(() => { onSuccess({ workflow_id: 'wf-123' }); });
     expect(mockNavigate).toHaveBeenCalledWith('/processes/detail/wf-123');
   });
 

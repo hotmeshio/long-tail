@@ -1,4 +1,3 @@
-import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { TimeAgo } from '../../../components/common/display/TimeAgo';
 
@@ -10,17 +9,9 @@ interface StatusCardProps {
   result: Record<string, unknown> | undefined;
 }
 
-export function StatusCard({ workflowId, status, discovery, execution, result }: StatusCardProps) {
+export function StatusCard({ workflowId, status: _status, discovery: _discovery, execution, result }: StatusCardProps) {
   return (
-    <div className="bg-surface-raised border border-surface-border rounded-md px-6 py-5 mb-6">
-      <div className="flex items-center gap-4 mb-4">
-        <StatusBadge status={status} />
-        {discovery?.method === 'compiled-workflow' && (
-          <span className="text-xs bg-status-success/10 text-status-success px-2 py-0.5 rounded-full">
-            Deterministic ({((discovery.confidence as number) * 100).toFixed(0)}% match)
-          </span>
-        )}
-      </div>
+    <div className="bg-surface-raised border border-surface-border rounded-md px-6 py-4 mb-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-8">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Run ID</p>

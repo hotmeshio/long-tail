@@ -74,9 +74,6 @@ const CertifiedExecutionsPage = lazy(() =>
 const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
 );
-const YamlWorkflowDetailPage = lazy(() =>
-  import('./pages/workflows/yaml-workflow-detail/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
-);
 const TasksListPage = lazy(() =>
   import('./pages/workflows/TasksListPage').then((m) => ({ default: m.TasksListPage })),
 );
@@ -227,7 +224,6 @@ const router = createBrowserRouter([
           { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
           { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
-          { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
           { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
           { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
         ],

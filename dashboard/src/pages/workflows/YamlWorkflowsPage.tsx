@@ -242,11 +242,9 @@ export function YamlWorkflowsPage() {
                     expanded={expandedIds.has(server.appId)}
                     onToggle={() => toggleExpand(server.appId)}
                     onTryTool={(wf) => setTryWorkflow(wf)}
-                    onWizard={(wf) => navigate(
-                      wf.source_workflow_id
-                        ? `/mcp/queries/${wf.source_workflow_id}?step=4`
-                        : `/mcp/workflows/${wf.id}`
-                    )}
+                    onWizard={(wf) => {
+                      if (wf.source_workflow_id) navigate(`/mcp/queries/${wf.source_workflow_id}?step=4`);
+                    }}
                     visibleTools={filterTools(server.workflows, filters.search)}
                   />
                 ))}

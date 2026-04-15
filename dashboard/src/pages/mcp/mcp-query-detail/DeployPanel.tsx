@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { MessageSquarePlus, Pencil } from 'lucide-react';
+import { MessageSquarePlus, Pencil, X, Check } from 'lucide-react';
+import { SecondaryAction } from '../../../components/common/display/SecondaryAction';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { WizardNav } from '../../../components/common/layout/WizardNav';
-import { ConfigurationSection } from '../../workflows/yaml-workflow-detail/ConfigurationSection';
-import { LifecycleSidebar } from '../../workflows/yaml-workflow-detail/LifecycleSidebar';
-import { VersionHistory } from '../../workflows/yaml-workflow-detail/VersionHistory';
+import { ConfigurationSection } from './ConfigurationSection';
+import { LifecycleSidebar } from './LifecycleSidebar';
+import { VersionHistory } from './VersionHistory';
 import {
   useYamlWorkflow,
   useYamlWorkflowVersions,
@@ -30,6 +31,12 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
   const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
+  const [dismissingFeedback, setDismissingFeedback] = useState(false);
+
+  const closeFeedback = () => {
+    setDismissingFeedback(true);
+    setTimeout(() => { setShowFeedback(false); setDismissingFeedback(false); }, 250);
+  };
 
   const { data: wf, refetch } = useYamlWorkflow(yamlId);
   const { data: versionsData } = useYamlWorkflowVersions(yamlId);
@@ -111,6 +118,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflow'], refetchType: 'all' });
     refetch();
+    onAdvance();
   };
 
   const handleRegenerate = async () => {
@@ -128,7 +136,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
   const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
       {/* Left: config */}
       <div>
         <div className="flex items-start justify-between mb-6">
@@ -139,24 +147,48 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
             <p className="text-xs text-text-tertiary mt-0.5">Review configuration, input/output schemas, and YAML definition</p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button type="button" onClick={() => { setShowFeedback(!showFeedback); setConfigEditing(false); }}
-              className={`inline-flex items-center gap-1 text-xs transition-colors hover:underline ${showFeedback ? 'text-accent font-medium' : 'text-accent/70 hover:text-accent'}`}>
-              <MessageSquarePlus className="w-3 h-3" />
-              Recompile with Feedback
-            </button>
-            <span className="text-text-tertiary/30">|</span>
-            <button type="button" onClick={() => { setConfigEditing(!configEditing); setShowFeedback(false); }}
-              className={`inline-flex items-center gap-1 text-xs transition-colors hover:underline ${configEditing ? 'text-accent font-medium' : 'text-accent/70 hover:text-accent'}`}>
-              <Pencil className="w-3 h-3" />
-              Manual Edit
-            </button>
+            {configEditing ? (
+              <>
+                <SecondaryAction icon={X} label="Cancel" onClick={() => { handleCancelEdit(); setConfigEditing(false); }} />
+                <SecondaryAction
+                  icon={Check}
+                  label={updateMutation.isPending ? 'Saving...' : 'Save'}
+                  onClick={handleSaveConfig}
+                  disabled={updateMutation.isPending || (
+                    yamlDraft === wf.yaml_content
+                    && inputSchemaDraft === JSON.stringify(wf.input_schema, null, 2)
+                    && outputSchemaDraft === JSON.stringify(wf.output_schema, null, 2)
+                  )}
+                />
+              </>
+            ) : (
+              <>
+                <SecondaryAction icon={MessageSquarePlus} label="Recompile with Feedback" onClick={() => { setShowFeedback(!showFeedback); }} />
+                <SecondaryAction icon={Pencil} label="Manual Edit" onClick={() => { setConfigEditing(true); setShowFeedback(false); }} />
+              </>
+            )}
           </div>
         </div>
 
         {/* Recompile feedback panel */}
         {showFeedback && (
-          <div className="mb-4 p-4 bg-surface-sunken border border-surface-border rounded-lg">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">What should change?</p>
+          <div
+            className="mb-4 p-4 bg-surface-sunken border border-surface-border rounded-lg overflow-hidden transition-all duration-250 ease-in-out"
+            style={{
+              animation: dismissingFeedback ? undefined : 'fadeIn 300ms ease-out both',
+              opacity: dismissingFeedback ? 0 : 1,
+              maxHeight: dismissingFeedback ? '0px' : '400px',
+              paddingTop: dismissingFeedback ? '0px' : undefined,
+              paddingBottom: dismissingFeedback ? '0px' : undefined,
+              marginBottom: dismissingFeedback ? '0px' : undefined,
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">What should change?</p>
+              <button onClick={closeFeedback} className="text-text-tertiary hover:text-text-secondary transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)}
               placeholder="E.g.: 'Only url, username, password, and screenshot_dir should be dynamic inputs. The steps array and script are implementation details.'"
               className="w-full min-h-[80px] px-3 py-2 bg-surface border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
@@ -200,6 +232,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
           isCollapsed={false}
           onToggle={() => {}}
           schemasGrid
+          unwrapped
         />
 
         <WizardNav>
@@ -221,7 +254,11 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
           deployedContentVersion={wf.deployed_content_version}
           onDeploy={handleDeploy}
           onArchive={() => archiveMutation.mutateAsync(yamlId).then(() => refetch())}
-          onDelete={() => deleteMutation.mutateAsync(yamlId)}
+          onDelete={async () => {
+            await deleteMutation.mutateAsync(yamlId);
+            queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
+            onBack();
+          }}
           onRegenerate={handleRegenerate}
           isPending={isPending}
           error={undefined}

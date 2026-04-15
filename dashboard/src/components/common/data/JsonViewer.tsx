@@ -229,9 +229,9 @@ export function JsonViewer({
 
   return (
     <div className={wrapperClass}>
-      <div className="flex items-center justify-between mb-2">
-        {label ? <SectionLabel>{label}</SectionLabel> : <span />}
-        <div className="flex items-center gap-1">
+      {label && <SectionLabel>{label}</SectionLabel>}
+      <div className="relative">
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 bg-surface-sunken/80 rounded-md backdrop-blur-sm">
           {mode === 'json' && (
             <button
               onClick={toggleGlobalCollapse}
@@ -268,9 +268,9 @@ export function JsonViewer({
             )}
           </button>
         </div>
-      </div>
-      <div className={contentClass}>
-        {mode === 'json' ? <JsonNode data={parsed} generation={generation} /> : <TreeNode data={parsed} />}
+        <div className={contentClass}>
+          {mode === 'json' ? <JsonNode data={parsed} generation={generation} /> : <TreeNode data={parsed} />}
+        </div>
       </div>
     </div>
   );

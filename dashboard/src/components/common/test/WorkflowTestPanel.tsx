@@ -5,7 +5,7 @@ import { useInvokeYamlWorkflow } from '../../../api/yaml-workflows';
 import { useAuth } from '../../../hooks/useAuth';
 import { useYamlActivityEvents, type ActivityStep } from '../../../hooks/useYamlActivityEvents';
 import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../../api/types';
-import { buildSkeleton } from '../../../pages/workflows/yaml-workflow-detail/helpers';
+import { buildSkeleton } from '../../../pages/mcp/mcp-query-detail/helpers';
 
 const TOOL_SOURCE_COLORS: Record<string, { border: string; text: string; icon: string }> = {
   mcp:       { border: 'border-blue-500', text: 'text-blue-500', icon: 'MCP' },

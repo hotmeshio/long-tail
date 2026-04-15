@@ -1,6 +1,5 @@
-import { useNavigate } from 'react-router-dom';
-
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
 
 import type { Step } from './helpers';
@@ -15,7 +14,6 @@ import { VerifyPanel } from './VerifyPanel';
 import { EscalationBanner } from './EscalationBanner';
 
 export function McpQueryDetailPage() {
-  const navigate = useNavigate();
   const d = useQueryDetail();
 
   return (
@@ -23,9 +21,14 @@ export function McpQueryDetailPage() {
       <PageHeader
         title="Compilation Wizard"
         actions={
-          <button onClick={() => navigate('/mcp/queries')} className="text-sm text-text-secondary hover:text-text-primary">
-            Back to list
-          </button>
+          <div className="flex items-center gap-4">
+            <StatusBadge status={d.status} />
+            {d.discovery?.method === 'compiled-workflow' && (
+              <span className="text-xs bg-status-success/10 text-status-success px-2 py-0.5 rounded-full">
+                Deterministic ({((d.discovery.confidence as number) * 100).toFixed(0)}% match)
+              </span>
+            )}
+          </div>
         }
       />
 
@@ -85,8 +88,6 @@ export function McpQueryDetailPage() {
           describeData={d.describeData}
           describePrompt={d.describePrompt}
           allAppIds={d.allAppIds}
-          compileFeedback={d.compileFeedback}
-          setCompileFeedback={d.setCompileFeedback}
           onCompile={d.handleCompile}
           isCompiling={d.createYaml.isPending}
           compileError={d.createYaml.isError ? d.createYaml.error.message : undefined}

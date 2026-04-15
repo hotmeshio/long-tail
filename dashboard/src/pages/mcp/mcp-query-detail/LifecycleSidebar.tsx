@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 
 const LIFECYCLE_STEPS = ['draft', 'active', 'archived'] as const;
@@ -15,13 +16,13 @@ const LIFECYCLE_COLORS: Record<string, { filled: string; line: string }> = {
 
 export function LifecycleSidebar({
   status,
-  sourceWorkflowId,
+  sourceWorkflowId: _sourceWorkflowId,
   contentVersion,
   deployedContentVersion,
   onDeploy,
   onArchive,
   onDelete,
-  onRegenerate,
+  onRegenerate: _onRegenerate,
   isPending,
   error,
 }: {
@@ -90,27 +91,17 @@ export function LifecycleSidebar({
                 </p>
                 {/* Show the next-step action */}
                 {isCurrent && step === 'draft' && (
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2">
                     <button onClick={onDeploy} disabled={isPending} className="btn-primary text-[11px] px-3 py-1">
-                      {isPending ? 'Deploying...' : 'Deploy'}
+                      {isPending ? 'Deploying...' : 'Deploy & Activate'}
                     </button>
-                    {sourceWorkflowId && (
-                      <button onClick={onRegenerate} disabled={isPending} className="text-[10px] text-text-tertiary hover:text-text-primary">
-                        Regenerate
-                      </button>
-                    )}
                   </div>
                 )}
                 {isCurrent && step === 'active' && (
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2">
                     <button onClick={onArchive} disabled={isPending} className="text-[11px] text-text-tertiary hover:text-status-error">
                       Archive
                     </button>
-                    {sourceWorkflowId && (
-                      <button onClick={onRegenerate} disabled={isPending} className="text-[10px] text-text-tertiary hover:text-text-primary">
-                        Regenerate
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -135,8 +126,9 @@ export function LifecycleSidebar({
       {/* Delete -- only for draft/archived */}
       {(status === 'draft' || status === 'archived') && (
         <div className="mt-4 pt-4 border-t border-surface-border">
-          <button onClick={onDelete} disabled={isPending} className="text-[11px] text-status-error hover:underline">
-            Delete workflow tool
+          <button onClick={onDelete} disabled={isPending} className="inline-flex items-center gap-1.5 text-[11px] text-status-error/70 hover:text-status-error transition-colors hover:underline">
+            <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Delete Compiled Workflow
           </button>
         </div>
       )}

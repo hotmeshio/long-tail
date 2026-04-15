@@ -22,6 +22,7 @@ export function useWizardStep(): [number | null, (step: number | null) => void] 
       }
       return next;
     }, { replace: false }); // push to history for back/forward nav
+    window.scrollTo?.({ top: 0, behavior: 'smooth' });
   }, [setSearchParams]);
 
   return [stepValue, setStep];
