@@ -144,7 +144,7 @@ vite.config.ts.timestamp-*
 .claude/*
 
 # Managed file storage (screenshots, uploads, etc.)
-data/
+/data/
 .docker-data/
 
 .DS_Store

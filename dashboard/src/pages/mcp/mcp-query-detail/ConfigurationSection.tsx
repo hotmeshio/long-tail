@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { Maximize2, Minimize2, Copy, Check, BookOpen } from 'lucide-react';
 import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
+import { FullscreenOverlay } from '../../../components/common/layout/FullscreenOverlay';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import type { InputFieldMeta } from '../../../api/types';
+
+const ICON = 'w-3 h-3';
+const BTN = 'p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised/60 transition-colors duration-150';
+const BTN_LG = 'p-2 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised transition-colors duration-150';
 
 export function ConfigurationSection({
   wf,
@@ -57,6 +63,18 @@ export function ConfigurationSection({
 }) {
   const hasFieldMeta = inputFieldMetaDraft.length > 0;
   const [advancedMode, setAdvancedMode] = useState(false);
+  const [yamlFullscreen, setYamlFullscreen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const yamlSectionRef = useRef<HTMLDivElement>(null);
+
+  const yamlText = configEditing ? yamlDraft : (resolvedYaml ?? wf.yaml_content);
+
+  const handleCopyYaml = useCallback(() => {
+    navigator.clipboard.writeText(yamlText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [yamlText]);
 
   const content = (
       <div className="space-y-6">
@@ -115,86 +133,130 @@ export function ConfigurationSection({
 
         {/* Input + Output Schemas */}
         <div className={schemasGrid ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'space-y-6'}>
-          {/* Input Schema — visual editor or raw JSON */}
+          {/* Input Schema — visual editor when editing with field meta, JsonViewer otherwise */}
           <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
-
             {configEditing && hasFieldMeta && !advancedMode ? (
-              <InputSchemaEditor
-                fields={inputFieldMetaDraft}
-                onChange={setInputFieldMetaDraft}
-                editing={configEditing}
-              />
+              <>
+                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
+                <InputSchemaEditor
+                  fields={inputFieldMetaDraft}
+                  onChange={setInputFieldMetaDraft}
+                  editing={configEditing}
+                />
+              </>
             ) : configEditing ? (
-              <textarea
-                value={inputSchemaDraft}
-                onChange={(e) => setInputSchemaDraft(e.target.value)}
-                className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
-                rows={Math.max(inputSchemaDraft.split('\n').length + 1, 6)}
-                style={{ fieldSizing: 'content' } as React.CSSProperties}
-                spellCheck={false}
-              />
-            ) : hasFieldMeta ? (
-              <InputSchemaEditor
-                fields={inputFieldMetaDraft}
-                onChange={() => {}}
-                editing={false}
-              />
+              <>
+                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
+                <textarea
+                  value={inputSchemaDraft}
+                  onChange={(e) => setInputSchemaDraft(e.target.value)}
+                  className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                  rows={Math.max(inputSchemaDraft.split('\n').length + 1, 6)}
+                  style={{ fieldSizing: 'content' } as React.CSSProperties}
+                  spellCheck={false}
+                />
+              </>
             ) : (
-              <JsonViewer data={resolvedInputSchema ?? {}} label="" />
+              <JsonViewer data={resolvedInputSchema ?? {}} label="Input Schema" />
             )}
           </div>
 
           {/* Output Schema */}
           <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
             {configEditing ? (
-              <textarea
-                value={outputSchemaDraft}
-                onChange={(e) => setOutputSchemaDraft(e.target.value)}
-                className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
-                rows={Math.max(outputSchemaDraft.split('\n').length + 1, 6)}
-                style={{ fieldSizing: 'content' } as React.CSSProperties}
-                spellCheck={false}
-              />
+              <>
+                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
+                <textarea
+                  value={outputSchemaDraft}
+                  onChange={(e) => setOutputSchemaDraft(e.target.value)}
+                  className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                  rows={Math.max(outputSchemaDraft.split('\n').length + 1, 6)}
+                  style={{ fieldSizing: 'content' } as React.CSSProperties}
+                  spellCheck={false}
+                />
+              </>
             ) : (
-              <JsonViewer data={resolvedOutputSchema ?? {}} label="" />
+              <JsonViewer data={resolvedOutputSchema ?? {}} label="Output Schema" />
             )}
           </div>
         </div>
 
         {/* YAML Definition */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">YAML Definition</h4>
-            <a
-              href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-accent hover:underline flex items-center gap-1"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              YAML Guide
-            </a>
+          <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">YAML Definition</h4>
+          <div ref={yamlSectionRef} className="relative">
+            {/* Toolbar — inside the widget, upper right */}
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 bg-surface-sunken/90 rounded backdrop-blur-sm">
+              <a
+                href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={BTN}
+                title="YAML Guide"
+              >
+                <BookOpen className={ICON} />
+              </a>
+              <button onClick={handleCopyYaml} className={BTN} title="Copy YAML">
+                {copied ? <Check className={`${ICON} text-status-success`} /> : <Copy className={ICON} />}
+              </button>
+              <button onClick={() => setYamlFullscreen(true)} className={BTN} title="Fullscreen">
+                <Maximize2 className={ICON} />
+              </button>
+            </div>
+
+            {configEditing ? (
+              <textarea
+                ref={yamlTextareaRef}
+                value={yamlDraft}
+                onChange={(e) => setYamlDraft(e.target.value)}
+                className="w-full p-4 pr-28 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
+                rows={yamlDraft.split('\n').length + 1}
+                style={{ fieldSizing: 'content' } as React.CSSProperties}
+                spellCheck={false}
+              />
+            ) : (
+              <pre className="p-4 pr-28 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
+                {resolvedYaml ?? wf.yaml_content}
+              </pre>
+            )}
+          </div>
+        </div>
+
+        {/* YAML Fullscreen overlay — supports both view and edit modes */}
+        <FullscreenOverlay open={yamlFullscreen} onClose={() => setYamlFullscreen(false)} sourceRef={yamlSectionRef}>
+          <div className="sticky top-0 float-right z-10">
+            <div className="flex items-center gap-0.5 bg-surface-sunken/80 rounded-md backdrop-blur-sm">
+              <a
+                href="https://github.com/hotmeshio/sdk-typescript/blob/main/docs/quickstart.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={BTN_LG}
+                title="YAML Guide"
+              >
+                <BookOpen className="w-5 h-5" />
+              </a>
+              <button onClick={handleCopyYaml} className={BTN_LG} title="Copy YAML">
+                {copied ? <Check className="w-5 h-5 text-status-success" /> : <Copy className="w-5 h-5" />}
+              </button>
+              <button onClick={() => setYamlFullscreen(false)} className={BTN_LG} title="Close (Esc)">
+                <Minimize2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           {configEditing ? (
             <textarea
-              ref={yamlTextareaRef}
               value={yamlDraft}
               onChange={(e) => setYamlDraft(e.target.value)}
-              className="w-full p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-primary leading-relaxed border border-surface-border focus:border-accent focus:outline-none resize-none overflow-hidden"
-              rows={yamlDraft.split('\n').length + 1}
-              style={{ fieldSizing: 'content' } as React.CSSProperties}
+              className="w-full min-h-[calc(100vh-80px)] p-6 bg-transparent text-sm font-mono text-text-primary leading-relaxed focus:outline-none resize-none"
               spellCheck={false}
+              autoFocus
             />
           ) : (
-            <pre className="p-4 bg-surface-sunken rounded-md text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre">
+            <pre className="text-sm font-mono text-text-secondary leading-relaxed whitespace-pre">
               {resolvedYaml ?? wf.yaml_content}
             </pre>
           )}
-        </div>
+        </FullscreenOverlay>
 
         {/* Activity Manifest — runtime wiring and discovery reference per step */}
         {wf.activity_manifest?.length > 0 && (

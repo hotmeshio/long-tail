@@ -3,9 +3,9 @@ export type LTYamlWorkflowStatus = 'draft' | 'deployed' | 'active' | 'archived';
 export interface ActivityManifestEntry {
   activity_id: string;
   title: string;
-  type: 'trigger' | 'worker';
+  type: 'trigger' | 'worker' | 'hook';
   topic: string;
-  tool_source: 'db' | 'mcp' | 'llm' | 'trigger';
+  tool_source: 'db' | 'mcp' | 'llm' | 'trigger' | 'signal' | 'transform';
   mcp_server_id?: string;
   mcp_tool_name?: string;
   tool_arguments?: Record<string, unknown>;
@@ -13,6 +13,10 @@ export interface ActivityManifestEntry {
   output_fields: string[];
   prompt_template?: string;
   model?: string;
+  hook_topic?: string;
+  signal_schema?: Record<string, unknown>;
+  workflow_name?: string;
+  transform_spec?: Record<string, unknown>;
 }
 
 export interface InputFieldMeta {
