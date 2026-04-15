@@ -1,6 +1,6 @@
 # Long Tail
 
-Durable workflows with IAM, Human in the Loop, and MCP tool orchestration. Backed by PostgreSQL.
+Turn your PostgreSQL database into a workflow engine with identity-aware durable execution, human-in-the-loop escalation, and MCP tool orchestration.
 
 ```bash
 npm install @hotmeshio/long-tail
