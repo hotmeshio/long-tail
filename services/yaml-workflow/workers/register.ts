@@ -162,6 +162,7 @@ export async function registerWorkersForWorkflow(
 
   await HotMesh.init({
     appId: workflow.app_id,
+    guid: `compiled::${workflow.graph_topic}-${HotMesh.guid()}`,
     engine: {
       connection: { class: Postgres, options: postgres_options },
     },

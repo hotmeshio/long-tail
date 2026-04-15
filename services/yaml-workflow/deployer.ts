@@ -24,6 +24,7 @@ export async function getEngine(appId: string): Promise<HotMesh> {
 
   const engine = await HotMesh.init({
     appId,
+    guid: `deployer::${appId}-${HotMesh.guid()}`,
     engine: {
       connection: { class: Postgres, options: postgres_options },
     },

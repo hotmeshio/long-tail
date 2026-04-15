@@ -75,10 +75,12 @@ export async function startWorkers(
 
     // Start each worker
     for (const w of workers) {
+      const label = `${w.taskQueue}::${w.workflow.name}`;
       const worker = await Durable.Worker.create({
         connection,
         taskQueue: w.taskQueue,
         workflow: w.workflow,
+        guid: `${label}-${Durable.guid()}`,
       });
       await worker.run();
       registerWorker(w.workflow.name, w.taskQueue);
