@@ -115,6 +115,12 @@ export async function mcpQuery(
 
   let toolCallCount = 0;
 
+  // Repeated-error circuit breaker: if the same tool returns the same
+  // error twice in a row, the LLM is stuck — break out immediately.
+  const MAX_REPEATED_ERRORS = 2;
+  let lastErrorKey = '';
+  let repeatedErrorCount = 0;
+
   // Agentic loop: LLM decides → execute tools → feed back → repeat
   const BUDGET_WARNING_THRESHOLD = 3;
 
@@ -145,6 +151,8 @@ export async function mcpQuery(
       content: response.content,
       tool_calls: fnCalls,
     });
+
+    let roundHadError = false;
 
     for (const toolCall of fnCalls) {
       toolCallCount++;
@@ -180,11 +188,43 @@ export async function mcpQuery(
         continue;
       }
 
+      const resultStr = sanitizeToolResult(result);
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
-        content: sanitizeToolResult(result),
+        content: resultStr,
       });
+
+      // Track repeated errors: same tool + same error = stuck
+      const isError = resultStr.includes('MCP error') || resultStr.includes('"error"');
+      if (isError) {
+        roundHadError = true;
+        const errorKey = `${toolCall.function.name}::${resultStr.slice(0, 200)}`;
+        if (errorKey === lastErrorKey) {
+          repeatedErrorCount++;
+        } else {
+          lastErrorKey = errorKey;
+          repeatedErrorCount = 1;
+        }
+
+        if (repeatedErrorCount >= MAX_REPEATED_ERRORS) {
+          messages.push({
+            role: 'user',
+            content: `[CIRCUIT BREAKER] The tool "${toolCall.function.name}" has returned the same error ${repeatedErrorCount} times. Stop retrying this tool. Summarize what you accomplished and what failed.`,
+          });
+          const bailResponse = await callQueryLLM(messages, undefined);
+          return buildQueryReturn(
+            bailResponse.content || 'Workflow stopped: repeated tool errors.',
+            toolCallCount,
+            [{ name: 'circuit_breaker', value: toolCall.function.name }],
+          );
+        }
+      }
+    }
+
+    if (!roundHadError) {
+      lastErrorKey = '';
+      repeatedErrorCount = 0;
     }
   }
 

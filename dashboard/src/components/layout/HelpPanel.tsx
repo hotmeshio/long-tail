@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Trash2, Workflow } from 'lucide-react';
+import { Send, Trash2, Workflow, GraduationCap } from 'lucide-react';
 import { useHelpAssistant, type HelpMessage } from '../../hooks/useHelpAssistant';
 import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
 import { DateValue } from '../common/display/DateValue';
+import { DurationValue } from '../common/display/DurationValue';
 
 type PanelSize = 'sm' | 'md' | 'lg' | 'full';
 const SIZE_CYCLE: PanelSize[] = ['sm', 'md', 'lg', 'full'];
@@ -88,10 +89,11 @@ function ThinkingIndicator({ msg }: { msg: HelpMessage }) {
 }
 
 export function HelpPanel() {
-  const { helpOpen, messages, sendMessage, pageContext, activeWorkflowId, clearMessages } =
+  const { helpOpen, messages, sendMessage, pageContext, activeWorkflowId, clearMessages, compileMessage } =
     useHelpAssistant();
   const [input, setInput] = useState('');
   const [size, setSize] = useState<PanelSize>('md');
+  const [hovered, setHovered] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -151,13 +153,21 @@ export function HelpPanel() {
 
   return (
     <div
-      className={`fixed z-[45] flex flex-col bg-surface-raised border border-surface-border rounded-lg shadow-xl overflow-hidden transition-all duration-200 ${
+      className={`fixed z-[45] flex flex-col border border-surface-border rounded-lg overflow-hidden transition-all duration-300 ${
         isFull ? SIZE_CLASSES.full : `right-6 ${SIZE_CLASSES[size]}`
+      } ${
+        hovered
+          ? 'bg-surface-raised shadow-xl'
+          : 'bg-surface-raised/[0.03] shadow-lg shadow-black/5'
       }`}
       style={positionStyle}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-border shrink-0">
+      <div className={`flex items-center justify-between px-4 py-2.5 border-b border-surface-border shrink-0 transition-all duration-300 ${
+        hovered ? 'opacity-100' : 'opacity-50 grayscale brightness-150'
+      }`}>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-text-primary truncate">Help Assistant</p>
           <p className="text-[10px] text-text-tertiary truncate">{pageName}</p>
@@ -195,7 +205,9 @@ export function HelpPanel() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[120px]">
+      <div ref={scrollRef} className={`flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[120px] transition-all duration-300 ${
+        hovered ? 'opacity-100' : 'opacity-50 grayscale brightness-150'
+      }`}>
         {messages.length === 0 && (
           <p className="text-xs text-text-tertiary text-center py-6">
             Ask anything about what you're viewing.
@@ -226,6 +238,38 @@ export function HelpPanel() {
                     <Workflow className="w-2.5 h-2.5" strokeWidth={1.5} />
                   </Link>
                 )}
+                {msg.durationMs != null && (
+                  <DurationValue ms={msg.durationMs} className="!text-[9px] text-text-muted/50" />
+                )}
+                {msg.role === 'assistant' && msg.workflowId && !msg.pending && (
+                  <button
+                    onClick={() => compileMessage(msg.id)}
+                    disabled={msg.compilationStatus === 'compiling' || msg.compilationStatus === 'done'}
+                    className="transition-colors"
+                    title={
+                      msg.compilationStatus === 'done'
+                        ? 'Compiled — future queries will match this pipeline'
+                        : msg.compilationStatus === 'error'
+                          ? msg.compilationError ?? 'Compilation failed'
+                          : msg.compilationStatus === 'compiling'
+                            ? 'Compiling...'
+                            : 'Compile to fast pipeline'
+                    }
+                  >
+                    <GraduationCap
+                      className={`w-2.5 h-2.5 ${
+                        msg.compilationStatus === 'done'
+                          ? 'text-status-success'
+                          : msg.compilationStatus === 'error'
+                            ? 'text-status-error'
+                            : msg.compilationStatus === 'compiling'
+                              ? 'text-accent/40 animate-pulse'
+                              : 'text-accent/40 hover:text-accent'
+                      }`}
+                      strokeWidth={1.5}
+                    />
+                  </button>
+                )}
               </div>
             )}
             <div
@@ -248,7 +292,9 @@ export function HelpPanel() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-surface-border px-3 py-2.5 flex gap-2 shrink-0">
+      <div className={`border-t border-surface-border px-3 py-2.5 flex gap-2 shrink-0 transition-all duration-300 ${
+        hovered ? 'opacity-100' : 'opacity-50 grayscale brightness-150'
+      }`}>
         <textarea
           ref={inputRef}
           value={input}

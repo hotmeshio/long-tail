@@ -19,11 +19,11 @@ export const TRANSLATION_TOOLS = [
 export const VISION_ANALYSIS_TOOLS = [
   {
     name: 'analyze_image',
-    description: 'Analyze an image and extract structured data: description, text content, and notable objects.',
+    description: 'Analyze an image and extract structured data: description, text content, and notable objects. Accepts storage paths directly (e.g., "google_homepage.png" from capture_page) — no need to read_file first.',
     inputSchema: {
       type: 'object',
       properties: {
-        image: { type: 'string', description: 'Image URL or data URI' },
+        image: { type: 'string', description: 'Image source: a storage path (e.g., "screenshot.png" from capture_page), a data URI, or an https:// URL. Storage paths are read automatically.' },
         prompt: { type: 'string', description: 'Optional analysis prompt to guide the model' },
       },
       required: ['image'],
@@ -31,11 +31,11 @@ export const VISION_ANALYSIS_TOOLS = [
   },
   {
     name: 'describe_image',
-    description: 'Generate a detailed description of an image.',
+    description: 'Generate a detailed description of an image. Accepts storage paths directly (e.g., "screenshot.png" from capture_page) — no need to read_file first.',
     inputSchema: {
       type: 'object',
       properties: {
-        image: { type: 'string', description: 'Image URL or data URI' },
+        image: { type: 'string', description: 'Image source: a storage path (e.g., "screenshot.png" from capture_page), a data URI, or an https:// URL. Storage paths are read automatically.' },
         context: { type: 'string', description: 'Optional context about the image' },
       },
       required: ['image'],

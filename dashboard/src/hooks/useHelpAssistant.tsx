@@ -33,6 +33,9 @@ export interface HelpMessage {
   timestamp: string;
   pending?: boolean;
   workflowId?: string;
+  durationMs?: number;
+  compilationStatus?: 'idle' | 'compiling' | 'done' | 'error';
+  compilationError?: string;
 }
 
 interface HelpAssistantContextValue {
@@ -45,6 +48,7 @@ interface HelpAssistantContextValue {
   setPageContext: (ctx: Partial<HelpPageContext>) => void;
   activeWorkflowId: string | null;
   clearMessages: () => void;
+  compileMessage: (msgId: string) => void;
 }
 
 const HelpAssistantContext = createContext<HelpAssistantContextValue | null>(null);
@@ -198,9 +202,20 @@ export function HelpAssistantProvider({ children }: { children: ReactNode }) {
 
               const content = extractHelpContent(result);
 
+              // Fetch execution data for duration
+              let durationMs: number | undefined;
+              try {
+                const execData = await apiFetch<{ duration_ms?: number }>(
+                  `/workflow-states/${wfId}/execution`,
+                );
+                durationMs = execData.duration_ms;
+              } catch {
+                // Duration is optional — don't block on failure
+              }
+
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === pendingMsg.id ? { ...m, content, timestamp: new Date().toISOString(), pending: false } : m,
+                  m.id === pendingMsg.id ? { ...m, content, timestamp: new Date().toISOString(), pending: false, durationMs } : m,
                 ),
               );
             }
@@ -221,6 +236,68 @@ export function HelpAssistantProvider({ children }: { children: ReactNode }) {
     [messages, pageContext],
   );
 
+  const compileMessage = useCallback(
+    async (msgId: string) => {
+      const msg = messages.find((m) => m.id === msgId);
+      if (!msg?.workflowId || msg.compilationStatus === 'compiling' || msg.compilationStatus === 'done') return;
+
+      // Find the user message that preceded this assistant message
+      const msgIndex = messages.indexOf(msg);
+      const userMsg = messages.slice(0, msgIndex).reverse().find((m) => m.role === 'user');
+      if (!userMsg) return;
+
+      setMessages((prev) =>
+        prev.map((m) => m.id === msgId ? { ...m, compilationStatus: 'compiling' as const } : m),
+      );
+
+      try {
+        // Step 1: Describe — get tool name, description, tags
+        const described = await apiFetch<{ tool_name: string; description: string; tags: string[] }>(
+          '/insight/mcp-query/describe',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              prompt: userMsg.content,
+              summary: msg.content,
+            }),
+          },
+        );
+
+        // Step 2: Compile — create YAML workflow
+        const compiled = await apiFetch<{ id: string }>(
+          '/yaml-workflows',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              workflow_id: msg.workflowId,
+              task_queue: 'long-tail-system',
+              workflow_name: 'mcpQuery',
+              name: described.tool_name,
+              description: described.description,
+              tags: described.tags,
+              app_id: 'longtail',
+            }),
+          },
+        );
+
+        // Step 3: Deploy
+        await apiFetch(`/yaml-workflows/${compiled.id}/deploy`, {
+          method: 'POST',
+        });
+
+        setMessages((prev) =>
+          prev.map((m) => m.id === msgId ? { ...m, compilationStatus: 'done' as const } : m),
+        );
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Compilation failed';
+        setMessages((prev) =>
+          prev.map((m) => m.id === msgId ? { ...m, compilationStatus: 'error' as const, compilationError: errorMsg } : m),
+        );
+      }
+    },
+    [messages],
+  );
+
   return (
     <HelpAssistantContext.Provider
       value={{
@@ -233,6 +310,7 @@ export function HelpAssistantProvider({ children }: { children: ReactNode }) {
         setPageContext,
         activeWorkflowId,
         clearMessages,
+        compileMessage,
       }}
     >
       {children}
