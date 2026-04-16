@@ -103,10 +103,12 @@ export async function mcpQuery(
       dashContext.entities?.workflowStatus ? `Status: ${dashContext.entities.workflowStatus}` : '',
       dashContext.entities?.yamlContent ? `YAML:\n${dashContext.entities.yamlContent}` : '',
       dashContext.entities?.prompt ? `Original query: ${dashContext.entities.prompt}` : '',
+      ``,
+      `IMPORTANT: This is a help assistant conversation. Always include the actual data, content, and results from tool calls in your response. Do not just confirm an action was taken — show the user what was retrieved, stored, or produced.`,
       `[End Context]`,
     ].filter(Boolean).join('\n');
     messages.push({ role: 'user', content: lines });
-    messages.push({ role: 'assistant', content: 'I have the dashboard context. How can I help?' });
+    messages.push({ role: 'assistant', content: 'I have the dashboard context. I will always show actual data and results, not just confirmations.' });
   }
 
   messages.push({ role: 'user', content: prompt });

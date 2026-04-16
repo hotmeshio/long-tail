@@ -32,6 +32,7 @@ export interface HelpMessage {
   content: string;
   timestamp: string;
   pending?: boolean;
+  workflowId?: string;
 }
 
 interface HelpAssistantContextValue {
@@ -174,6 +175,13 @@ export function HelpAssistantProvider({ children }: { children: ReactNode }) {
 
         const wfId = data.workflow_id;
         setActiveWorkflowId(wfId);
+
+        // Attach workflow ID to the pending message for progress link
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === pendingMsg.id ? { ...m, workflowId: wfId } : m,
+          ),
+        );
 
         // Poll for result
         if (pollRef.current) clearInterval(pollRef.current);
