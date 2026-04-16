@@ -5,7 +5,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMyEscalationCount } from '../../hooks/useMyEscalationCount';
 import { NatsStatus } from '../common/display/NatsStatus';
 import { AppLogo } from '../common/display/AppLogo';
-import { QuickQuery } from './QuickQuery';
 
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
@@ -31,7 +30,6 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         <Link to="/" aria-label="Home">
           <AppLogo />
         </Link>
-        <QuickQuery />
       </div>
 
       {/* Right: inbox, NATS indicator + user menu */}

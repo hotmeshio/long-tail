@@ -9,6 +9,9 @@ import { EngineerSidebar } from './EngineerSidebar';
 import { McpSidebar } from './McpSidebar';
 import { EventFeed } from './EventFeed';
 import { DocsDrawer } from './DocsDrawer';
+import { HelpButton } from './HelpButton';
+import { HelpPanel } from './HelpPanel';
+import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 
 function ShellLayout() {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
@@ -74,6 +77,8 @@ function ShellLayout() {
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} />
       <DocsDrawer open={docsOpen} onClose={() => setDocsOpen(false)} />
+      <HelpButton />
+      <HelpPanel />
     </div>
   );
 }
@@ -88,7 +93,9 @@ export function Shell() {
 
   return (
     <SidebarProvider>
-      <ShellLayout />
+      <HelpAssistantProvider>
+        <ShellLayout />
+      </HelpAssistantProvider>
     </SidebarProvider>
   );
 }

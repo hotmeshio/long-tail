@@ -93,6 +93,22 @@ export async function mcpQuery(
     messages.push({ role: 'assistant', content: 'Understood. I will use these learnings to take a more targeted approach this time.' });
   }
 
+  // If invoked from the help assistant, inject dashboard context
+  const dashContext = envelope.data?.context as Record<string, any> | undefined;
+  if (dashContext) {
+    const lines = [
+      `[Dashboard Context]`,
+      `Page: ${dashContext.page || 'unknown'}`,
+      dashContext.entities?.workflowId ? `Workflow: ${dashContext.entities.workflowId}` : '',
+      dashContext.entities?.workflowStatus ? `Status: ${dashContext.entities.workflowStatus}` : '',
+      dashContext.entities?.yamlContent ? `YAML:\n${dashContext.entities.yamlContent}` : '',
+      dashContext.entities?.prompt ? `Original query: ${dashContext.entities.prompt}` : '',
+      `[End Context]`,
+    ].filter(Boolean).join('\n');
+    messages.push({ role: 'user', content: lines });
+    messages.push({ role: 'assistant', content: 'I have the dashboard context. How can I help?' });
+  }
+
   messages.push({ role: 'user', content: prompt });
 
   let toolCallCount = 0;

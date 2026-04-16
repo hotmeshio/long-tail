@@ -11,7 +11,7 @@ const router = Router();
  */
 router.post('/mcp-query', async (req, res) => {
   try {
-    const { prompt, tags, wait, direct } = req.body;
+    const { prompt, tags, wait, direct, context } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ error: 'prompt is required' });
       return;
@@ -27,6 +27,7 @@ router.post('/mcp-query', async (req, res) => {
       tags,
       wait,
       direct,
+      context,
       userId: req.auth?.userId,
     });
 

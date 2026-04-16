@@ -18,6 +18,7 @@ export interface McpQueryInput {
   tags?: string[];
   wait?: boolean;
   direct?: boolean;
+  context?: Record<string, any>;
   userId?: string;
 }
 
@@ -44,7 +45,7 @@ export interface DescribeResult {
 // ── MCP query invocation ─────────────────────────────────────────────────────
 
 export async function startMcpQuery(input: McpQueryInput): Promise<McpQueryResult> {
-  const { prompt, tags, wait = true, direct = false, userId } = input;
+  const { prompt, tags, wait = true, direct = false, context, userId } = input;
   const startTime = Date.now();
 
   const connection = { class: Postgres, options: postgres_options };
@@ -57,7 +58,7 @@ export async function startMcpQuery(input: McpQueryInput): Promise<McpQueryResul
 
   const handle = await client.workflow.start({
     args: [{
-      data: { prompt, tags },
+      data: { prompt, tags, context },
       metadata: { source: 'dashboard' },
       lt: { userId },
     }],

@@ -17,8 +17,52 @@ function renderInline(text: string): string {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-accent-primary hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
-export function SimpleMarkdown({ content }: { content: string }) {
-  const lines = content.split('\n');
+export function SimpleMarkdown({ content, compact }: { content: string; compact?: boolean }) {
+  // Extract fenced code blocks before line-by-line processing
+  const segments: Array<{ type: 'code'; lang: string; code: string } | { type: 'text'; text: string }> = [];
+  const fencePattern = /^```(\w*)\n([\s\S]*?)^```$/gm;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = fencePattern.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', text: content.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'code', lang: match[1], code: match[2].replace(/\n$/, '') });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < content.length) {
+    segments.push({ type: 'text', text: content.slice(lastIndex) });
+  }
+
+  const sizeClasses = compact
+    ? { text: 'text-xs', heading: 'text-xs', list: 'text-xs', code: 'text-[11px]' }
+    : { text: 'text-sm', heading: 'text-sm', list: 'text-sm', code: 'text-xs' };
+
+  const allParts: string[] = [];
+  for (const segment of segments) {
+    if (segment.type === 'code') {
+      const escaped = segment.code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      allParts.push(
+        `<pre class="my-2 p-2.5 bg-surface-sunken rounded-md overflow-x-auto"><code class="${sizeClasses.code} font-mono text-text-secondary leading-relaxed">${escaped}</code></pre>`,
+      );
+      continue;
+    }
+    allParts.push(...renderTextBlock(segment.text, sizeClasses));
+  }
+
+  return (
+    <div
+      className="prose-sm"
+      dangerouslySetInnerHTML={{ __html: allParts.join('\n') }}
+    />
+  );
+}
+
+function renderTextBlock(
+  text: string,
+  sz: { text: string; heading: string; list: string; code: string },
+): string[] {
+  const lines = text.split('\n');
   const htmlParts: string[] = [];
   let inList = false;
   let inTable = false;
@@ -67,12 +111,12 @@ export function SimpleMarkdown({ content }: { content: string }) {
     // Headers
     if (trimmed.startsWith('### ')) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(`<h4 class="text-sm font-semibold text-text-primary mt-3 mb-1">${renderInline(trimmed.slice(4))}</h4>`);
+      htmlParts.push(`<h4 class="${sz.heading} font-semibold text-text-primary mt-3 mb-1">${renderInline(trimmed.slice(4))}</h4>`);
       continue;
     }
     if (trimmed.startsWith('## ')) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(`<h3 class="text-sm font-semibold text-text-primary mt-3 mb-1">${renderInline(trimmed.slice(3))}</h3>`);
+      htmlParts.push(`<h3 class="${sz.heading} font-semibold text-text-primary mt-3 mb-1">${renderInline(trimmed.slice(3))}</h3>`);
       continue;
     }
 
@@ -86,13 +130,13 @@ export function SimpleMarkdown({ content }: { content: string }) {
     // List items
     if (/^[-*] /.test(trimmed)) {
       if (!inList) { htmlParts.push('<ul class="space-y-1 my-1">'); inList = true; }
-      htmlParts.push(`<li class="text-sm text-text-secondary flex gap-2"><span class="text-text-tertiary shrink-0">-</span><span>${renderInline(trimmed.slice(2))}</span></li>`);
+      htmlParts.push(`<li class="${sz.list} text-text-secondary flex gap-2"><span class="text-text-tertiary shrink-0">-</span><span>${renderInline(trimmed.slice(2))}</span></li>`);
       continue;
     }
 
     // Paragraph
     if (inList) { htmlParts.push('</ul>'); inList = false; }
-    htmlParts.push(`<p class="text-sm text-text-secondary my-1">${renderInline(trimmed)}</p>`);
+    htmlParts.push(`<p class="${sz.text} text-text-secondary my-1">${renderInline(trimmed)}</p>`);
   }
 
   // Flush any remaining table
@@ -115,10 +159,5 @@ export function SimpleMarkdown({ content }: { content: string }) {
 
   if (inList) htmlParts.push('</ul>');
 
-  return (
-    <div
-      className="prose-sm"
-      dangerouslySetInnerHTML={{ __html: htmlParts.join('\n') }}
-    />
-  );
+  return htmlParts;
 }

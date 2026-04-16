@@ -26,10 +26,15 @@ export function DateTooltip({ options, children, className = '' }: DateTooltipPr
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const closeTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  const TOOLTIP_WIDTH = 220;
+
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.left });
+    // Prefer left-aligned with trigger, but clamp so tooltip never overflows viewport
+    const maxLeft = window.innerWidth - TOOLTIP_WIDTH - 8;
+    const left = Math.max(8, Math.min(rect.left, maxLeft));
+    setPos({ top: rect.bottom + 4, left });
   }, []);
 
   const handleCopy = useCallback(async (value: string, label: string) => {
