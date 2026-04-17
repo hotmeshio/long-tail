@@ -11,7 +11,7 @@ interface OriginalQueryPanelProps {
   originalOutput: unknown;
   originalDurationMs: number | null | undefined;
   resultSummary: string | undefined;
-  onNext: () => void;
+  onNext?: () => void;
 }
 
 export function OriginalQueryPanel({
@@ -58,7 +58,7 @@ export function OriginalQueryPanel({
         </div>
       </div>
 
-      <WizardNav><span /><button onClick={onNext} className="btn-primary text-xs">Next: Timeline</button></WizardNav>
+      <WizardNav><span /><button onClick={onNext} disabled={!onNext} className="btn-primary text-xs">Next: Timeline</button></WizardNav>
     </div>
   );
 }

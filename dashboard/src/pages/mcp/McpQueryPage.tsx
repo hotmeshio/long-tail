@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Lightbulb, Layers, Circle } from 'lucide-react';
 
@@ -12,7 +11,7 @@ import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
-import { useMcpQueryJobs, useSubmitMcpQuery, useSubmitMcpQueryRouted } from '../../api/mcp-query';
+import { useMcpQueryJobs } from '../../api/mcp-query';
 import type { LTJob } from '../../api/types';
 
 function mapStatus(job: LTJob): string {
@@ -106,34 +105,9 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[]
   ];
 }
 
-const LIFECYCLE_STEPS = [
-  {
-    icon: MessageSquare,
-    color: 'text-accent',
-    title: '1. Describe',
-    detail: 'Write a specific prompt. Mention tools, URLs, credentials, and expected outputs.',
-  },
-  {
-    icon: Lightbulb,
-    color: 'text-status-warning',
-    title: '2. Discover',
-    detail: 'MCP selects servers, calls tools, and chains results. You review the execution.',
-  },
-  {
-    icon: Layers,
-    color: 'text-status-success',
-    title: '3. Compile',
-    detail: 'Successful runs compile into deterministic pipelines. No LLM needed at runtime.',
-  },
-];
 
 export function McpQueryPage() {
   const navigate = useNavigate();
-  const [promptText, setPromptText] = useState('');
-  const [direct, setDirect] = useState(true);
-  const submitDirect = useSubmitMcpQuery();
-  const submitRouted = useSubmitMcpQueryRouted();
-  const activeMutation = direct ? submitDirect : submitRouted;
   const columns = buildColumns(navigate);
 
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
@@ -151,101 +125,22 @@ export function McpQueryPage() {
 
   useWorkflowListEvents();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const prompt = promptText.trim();
-    if (!prompt) return;
-
-    const result = await activeMutation.mutateAsync({ prompt });
-    setPromptText('');
-    if (direct) {
-      navigate(`/mcp/queries/${result.workflow_id}?prompt=${encodeURIComponent(prompt)}`);
-    } else {
-      navigate(`/workflows/executions/${result.workflow_id}`);
-    }
-  };
-
   const jobs = data?.jobs ?? [];
   const total = data?.total ?? 0;
 
   return (
     <>
-      <PageHeader title="Pipeline Designer" />
-
-      <p className="text-sm text-text-secondary mb-8 leading-relaxed max-w-xl">
-        Describe a task and MCP discovers the right tools, executes the workflow, and compiles the result into a reusable pipeline.
-      </p>
-
-      {/* Composer: textarea left, lifecycle steps right */}
-      <div className="grid grid-cols-[1fr_240px] gap-6 mb-16">
-        {/* Prompt input */}
-        <form onSubmit={handleSubmit}>
-          <div className="rounded-lg border border-surface-border bg-surface-raised overflow-hidden h-full flex flex-col">
-            <div className="flex items-start gap-3 flex-1">
-              <MessageSquare className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
-              <textarea
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                placeholder="Describe what you want to accomplish. Be specific about which tools to use, what data to capture, and how results should be structured..."
-                className="flex-1 min-h-[160px] pr-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none border-none"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    handleSubmit(e);
-                  }
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
-              <label className="flex items-center gap-2 cursor-pointer select-none group">
-                <input
-                  type="checkbox"
-                  checked={direct}
-                  onChange={(e) => setDirect(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
-                />
-                <span className="text-[10px] text-text-secondary group-hover:text-text-primary transition-colors">
-                  Force discovery
-                </span>
-                <span className="text-[10px] text-text-tertiary">
-                  {direct ? '— skip compiled pipelines' : '— prefer compiled pipelines'}
-                </span>
-              </label>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] text-text-tertiary">Cmd+Enter</span>
-                <button
-                  type="submit"
-                  disabled={!promptText.trim() || activeMutation.isPending}
-                  className="px-4 py-1.5 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {activeMutation.isPending ? 'Starting...' : 'Design Pipeline'}
-                </button>
-              </div>
-            </div>
-          </div>
-          {activeMutation.isError && (
-            <p className="mt-2 text-sm text-status-error">{activeMutation.error.message}</p>
-          )}
-        </form>
-
-        {/* Lifecycle steps — right sidebar */}
-        <div className="space-y-4 pt-1">
-          {LIFECYCLE_STEPS.map((step) => (
-            <div key={step.title} className="flex items-start gap-2.5">
-              <step.icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${step.color}`} strokeWidth={1.5} />
-              <div>
-                <p className="text-[11px] font-medium text-text-primary">{step.title}</p>
-                <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">{step.detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Section break */}
-      <div className="flex items-center gap-3 mb-6">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary shrink-0">Recent Pipeline Runs</p>
-        <div className="flex-1 border-t border-surface-border" />
-      </div>
+      <PageHeader
+        title="Pipeline Designer"
+        actions={
+          <button
+            onClick={() => navigate('/mcp/queries/new')}
+            className="btn-primary text-xs"
+          >
+            Design Pipeline
+          </button>
+        }
+      />
 
       <FilterBar>
           <FilterSelect
@@ -281,7 +176,7 @@ export function McpQueryPage() {
       />
 
       {!isLoading && jobs.length === 0 && (
-        <EmptyState title="No pipeline runs yet" description="Describe a task above to start designing" />
+        <EmptyState title="No pipeline runs yet" description="Click &quot;Design Pipeline&quot; to start" />
       )}
 
       <StickyPagination

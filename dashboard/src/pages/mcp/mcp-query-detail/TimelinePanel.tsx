@@ -6,7 +6,7 @@ import { PanelTitle } from './PanelTitle';
 interface TimelinePanelProps {
   events: any[];
   onBack: () => void;
-  onNext: () => void;
+  onNext?: () => void;
 }
 
 export function TimelinePanel({ events, onBack, onNext }: TimelinePanelProps) {
@@ -16,7 +16,7 @@ export function TimelinePanel({ events, onBack, onNext }: TimelinePanelProps) {
       <SwimlaneTimeline events={events} />
       <WizardNav>
         <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
-        <button onClick={onNext} className="btn-primary text-xs">Next: Compile</button>
+        <button onClick={onNext} disabled={!onNext} className="btn-primary text-xs">Next: Compile</button>
       </WizardNav>
     </div>
   );
