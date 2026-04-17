@@ -1,6 +1,6 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -11,14 +11,13 @@
   "files": [
     "build/",
     "docs/",
-    "lib/db/schemas/",
     "dashboard/dist/",
     "LICENSE",
     "README.md"
   ],
   "scripts": {
     "clean": "rimraf ./build",
-    "build": "tsc --build tsconfig.json",
+    "build": "tsc --build tsconfig.json && cp -r lib/db/schemas build/lib/db/schemas",
     "clean-build": "npm run clean && npm run build",
     "start": "ts-node index.ts",
     "start:dev": "ts-node-dev --respawn index.ts",

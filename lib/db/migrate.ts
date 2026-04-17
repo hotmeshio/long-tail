@@ -4,12 +4,9 @@ import * as path from 'path';
 import { getPool, closePool } from './index';
 import { loggerRegistry } from '../logger';
 
-// In dev: __dirname = lib/db → schemas is ./schemas
-// In built/published: __dirname = build/lib/db → schemas is ../../../lib/db/schemas
-const devPath = path.join(__dirname, 'schemas');
-const SCHEMAS_DIR = fs.existsSync(devPath)
-  ? devPath
-  : path.join(__dirname, '..', '..', '..', 'services', 'db', 'schemas');
+// Both dev (lib/db/) and build (build/lib/db/) have schemas/ as a sibling.
+// In dev it exists naturally; in build it's copied by the build script.
+const SCHEMAS_DIR = path.join(__dirname, 'schemas');
 
 export async function migrate(): Promise<void> {
   const pool = getPool();
