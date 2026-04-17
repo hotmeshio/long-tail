@@ -44,6 +44,9 @@ export function useCreateMcpServer() {
       transport_config: Record<string, unknown>;
       auto_connect?: boolean;
       metadata?: Record<string, unknown>;
+      tags?: string[];
+      compile_hints?: string;
+      credential_providers?: string[];
     }) =>
       apiFetch('/mcp/servers', {
         method: 'POST',
@@ -69,6 +72,9 @@ export function useUpdateMcpServer() {
       transport_config?: Record<string, unknown>;
       auto_connect?: boolean;
       metadata?: Record<string, unknown>;
+      tags?: string[];
+      compile_hints?: string;
+      credential_providers?: string[];
     }) =>
       apiFetch(`/mcp/servers/${id}`, {
         method: 'PUT',
@@ -77,6 +83,22 @@ export function useUpdateMcpServer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mcpServers'] });
     },
+  });
+}
+
+export interface TestConnectionResult {
+  success: boolean;
+  tools: McpToolManifest[];
+  error?: string;
+}
+
+export function useTestConnection() {
+  return useMutation<TestConnectionResult, Error, { transport_type: string; transport_config: Record<string, unknown> }>({
+    mutationFn: (data) =>
+      apiFetch('/mcp/servers/test-connection', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   });
 }
 

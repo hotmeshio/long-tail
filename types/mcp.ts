@@ -1,9 +1,10 @@
 /**
  * MCP server transport type.
- * - 'stdio'  — spawn a child process (command + args)
- * - 'sse'    — connect to an SSE endpoint (url)
+ * - 'stdio'           — spawn a child process (command + args)
+ * - 'sse'             — connect to an SSE endpoint (url)
+ * - 'streamable-http' — connect via streamable HTTP transport (url)
  */
-export type LTMcpTransportType = 'stdio' | 'sse';
+export type LTMcpTransportType = 'stdio' | 'sse' | 'streamable-http';
 
 /**
  * MCP server registration as stored in the database (snake_case).

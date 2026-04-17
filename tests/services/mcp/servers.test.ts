@@ -280,6 +280,71 @@ describe('MCP integration', () => {
       const autoServers = await mcpDbService.getAutoConnectServers();
       expect(autoServers.some(s => s.name === name)).toBe(true);
     });
+
+    it('should create a server with compile_hints and credential_providers', async () => {
+      const server = await mcpDbService.createMcpServer({
+        name: `test-mcp-hints-creds-${Date.now()}`,
+        description: 'Server with compile_hints and credential_providers',
+        transport_type: 'stdio',
+        transport_config: { command: 'node', args: ['server.js'] },
+        auto_connect: false,
+        compile_hints: 'Use batch mode for large datasets. Prefer streaming responses.',
+        credential_providers: ['github', 'slack'],
+      });
+      expect(server.id).toBeTruthy();
+      expect(server.compile_hints).toBe('Use batch mode for large datasets. Prefer streaming responses.');
+      expect(server.credential_providers).toEqual(['github', 'slack']);
+    });
+
+    it('should update compile_hints and credential_providers', async () => {
+      const server = await mcpDbService.createMcpServer({
+        name: `test-mcp-update-hints-${Date.now()}`,
+        description: 'Server to update hints',
+        transport_type: 'stdio',
+        transport_config: { command: 'node', args: ['server.js'] },
+        auto_connect: false,
+        compile_hints: 'Original hints',
+        credential_providers: ['github'],
+      });
+      const updated = await mcpDbService.updateMcpServer(server.id, {
+        compile_hints: 'Updated hints for compilation',
+        credential_providers: ['github', 'slack', 'jira'],
+      });
+      expect(updated.compile_hints).toBe('Updated hints for compilation');
+      expect(updated.credential_providers).toEqual(['github', 'slack', 'jira']);
+    });
+
+    it('should create a server with streamable-http transport', async () => {
+      const server = await mcpDbService.createMcpServer({
+        name: `test-mcp-streamable-http-${Date.now()}`,
+        description: 'Streamable HTTP transport server',
+        transport_type: 'streamable-http',
+        transport_config: { url: 'http://localhost:8080/mcp' },
+        auto_connect: false,
+      });
+      expect(server.id).toBeTruthy();
+      expect(server.transport_type).toBe('streamable-http');
+      expect(server.transport_config).toEqual({ url: 'http://localhost:8080/mcp' });
+    });
+
+    it('should create a server with tags, compile_hints, and credential_providers together', async () => {
+      const server = await mcpDbService.createMcpServer({
+        name: `test-mcp-full-fields-${Date.now()}`,
+        description: 'Full field coverage server',
+        transport_type: 'sse',
+        transport_config: { url: 'http://localhost:9090/sse' },
+        auto_connect: true,
+        tags: ['database', 'analytics', 'reporting'],
+        compile_hints: 'Supports batch queries. Use analytics tag for dashboards.',
+        credential_providers: ['postgres', 'bigquery'],
+      });
+      expect(server.id).toBeTruthy();
+      expect(server.tags).toEqual(['database', 'analytics', 'reporting']);
+      expect(server.compile_hints).toBe('Supports batch queries. Use analytics tag for dashboards.');
+      expect(server.credential_providers).toEqual(['postgres', 'bigquery']);
+      expect(server.transport_type).toBe('sse');
+      expect(server.auto_connect).toBe(true);
+    });
   });
 
   // ── REST API via start() ────────────────────────────────────────────

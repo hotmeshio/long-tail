@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useMcpServers,
   useConnectMcpServer,
@@ -13,12 +14,12 @@ import { FilterBar, FilterSelect, FilterInput } from '../../../components/common
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { useExpandedRows } from '../../../hooks/useExpandedRows';
-import { ServerFormModal } from './ServerFormModal';
 import { ToolTestPanel } from '../../../components/common/test/ToolTestPanel';
 import { matchesSearch, filterTools } from './helpers';
 import { ServerRow } from './ServerRow';
 
 export function McpServersPage() {
+  const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { status: '', search: '', tag: '' },
   });
@@ -32,8 +33,6 @@ export function McpServersPage() {
   const disconnect = useDisconnectMcpServer();
   const deleteServer = useDeleteMcpServer();
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<McpServerRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<McpServerRecord | null>(null);
   const { expandedIds, toggle: toggleExpand } = useExpandedRows('lt:expanded:mcp-servers');
   const [tryTool, setTryTool] = useState<{
@@ -103,10 +102,7 @@ export function McpServersPage() {
         title="MCP Server Tools"
         actions={
           <button
-            onClick={() => {
-              setEditing(null);
-              setShowForm(true);
-            }}
+            onClick={() => navigate('/mcp/servers/new')}
             className="btn-primary text-xs"
           >
             Register Server
@@ -170,10 +166,7 @@ export function McpServersPage() {
                     server={server}
                     expanded={expandedIds.has(server.id)}
                     onToggle={() => toggleExpand(server.id)}
-                    onEdit={() => {
-                      setEditing(server);
-                      setShowForm(true);
-                    }}
+                    onEdit={() => navigate(`/mcp/servers/${server.id}`)}
                     onDelete={() => setConfirmDelete(server)}
                     onTryTool={(tool) =>
                       setTryTool({
@@ -216,16 +209,6 @@ export function McpServersPage() {
           </div>
         )}
       </div>
-
-      {/* Create / Edit modal */}
-      <ServerFormModal
-        open={showForm}
-        onClose={() => {
-          setShowForm(false);
-          setEditing(null);
-        }}
-        editing={editing}
-      />
 
       {/* Delete confirmation modal */}
       <ConfirmDeleteModal

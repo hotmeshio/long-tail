@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../../../lib/logger';
@@ -78,12 +79,15 @@ export async function connectToServer(server: LTMcpServerRecord): Promise<Client
   const client = new Client({ name: 'long-tail', version: '1.0.0' });
 
   let transport: any;
-  if (server.transport_type === 'stdio') {
+  const ttype = server.transport_type as string;
+  if (ttype === 'stdio') {
     transport = new StdioClientTransport({
       command: server.transport_config.command!,
       args: server.transport_config.args || [],
       env: server.transport_config.env,
     });
+  } else if (ttype === 'streamable-http') {
+    transport = new StreamableHTTPClientTransport(new URL(server.transport_config.url!));
   } else {
     transport = new SSEClientTransport(new URL(server.transport_config.url!));
   }
@@ -257,6 +261,48 @@ export async function listServerTools(serverId: string): Promise<LTMcpToolManife
  */
 export function isConnected(serverId: string): boolean {
   return clients.has(serverId);
+}
+
+/**
+ * Test connectivity to an MCP server without persisting.
+ * Creates a temporary client, connects, lists tools, then disconnects.
+ */
+export async function testConnection(
+  transportType: 'stdio' | 'sse' | 'streamable-http',
+  transportConfig: Record<string, any>,
+): Promise<{ success: boolean; tools: LTMcpToolManifest[]; error?: string }> {
+  const client = new Client({ name: 'long-tail-test', version: '1.0.0' });
+  const timeout = setTimeout(() => { throw new Error('Connection timed out (10s)'); }, 10_000);
+
+  try {
+    let transport: any;
+    if (transportType === 'stdio') {
+      transport = new StdioClientTransport({
+        command: transportConfig.command!,
+        args: transportConfig.args || [],
+        env: transportConfig.env,
+      });
+    } else if (transportType === 'streamable-http') {
+      transport = new StreamableHTTPClientTransport(new URL(transportConfig.url!));
+    } else {
+      transport = new SSEClientTransport(new URL(transportConfig.url!));
+    }
+
+    await client.connect(transport);
+    const { tools } = await client.listTools();
+    const manifest: LTMcpToolManifest[] = tools.map((t: any) => ({
+      name: t.name,
+      description: t.description || '',
+      inputSchema: t.inputSchema || {},
+    }));
+
+    return { success: true, tools: manifest };
+  } catch (err: any) {
+    return { success: false, tools: [], error: err.message };
+  } finally {
+    clearTimeout(timeout);
+    try { await client.close(); } catch { /* ignore close errors */ }
+  }
 }
 
 /**

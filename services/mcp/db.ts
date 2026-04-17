@@ -26,6 +26,8 @@ export async function createMcpServer(
       input.auto_connect ?? false,
       input.metadata ? JSON.stringify(input.metadata) : null,
       input.tags || [],
+      input.compile_hints || null,
+      input.credential_providers || [],
     ],
   );
   return rows[0];
@@ -46,7 +48,7 @@ export async function getMcpServerByName(name: string): Promise<LTMcpServerRecor
 
 export async function updateMcpServer(
   id: string,
-  updates: Partial<Pick<CreateMcpServerInput, 'name' | 'description' | 'transport_type' | 'transport_config' | 'auto_connect' | 'metadata' | 'tags'>>,
+  updates: Partial<Pick<CreateMcpServerInput, 'name' | 'description' | 'transport_type' | 'transport_config' | 'auto_connect' | 'metadata' | 'tags' | 'compile_hints' | 'credential_providers'>>,
 ): Promise<LTMcpServerRecord | null> {
   const pool = getPool();
   const sets: string[] = [];
@@ -80,6 +82,14 @@ export async function updateMcpServer(
   if (updates.tags !== undefined) {
     sets.push(`tags = $${idx++}`);
     values.push(updates.tags);
+  }
+  if (updates.compile_hints !== undefined) {
+    sets.push(`compile_hints = $${idx++}`);
+    values.push(updates.compile_hints || null);
+  }
+  if (updates.credential_providers !== undefined) {
+    sets.push(`credential_providers = $${idx++}`);
+    values.push(updates.credential_providers);
   }
 
   if (sets.length === 0) return getMcpServer(id);
