@@ -48,7 +48,7 @@ export function OriginalQueryPanel({
           ) : originalOutput ? (
             <JsonViewer data={originalOutput} defaultMode="tree" />
           ) : resultSummary ? (
-            <ResultSummary text={resultSummary} />
+            <JsonViewer data={{ summary: resultSummary }} defaultMode="tree" />
           ) : (
             <p className="text-xs text-text-tertiary italic">No structured output</p>
           )}

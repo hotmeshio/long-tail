@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Send, Trash2, Workflow, GraduationCap } from 'lucide-react';
 import { useHelpAssistant, type HelpMessage } from '../../hooks/useHelpAssistant';
-import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
+import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { DateValue } from '../common/display/DateValue';
 import { DurationValue } from '../common/display/DurationValue';
 
@@ -282,7 +282,7 @@ export function HelpPanel() {
               {msg.pending ? (
                 <ThinkingIndicator msg={msg} />
               ) : msg.role === 'assistant' ? (
-                <SimpleMarkdown content={msg.content} compact />
+                <MarkdownRenderer content={msg.content} />
               ) : (
                 msg.content
               )}
