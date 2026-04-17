@@ -8,8 +8,8 @@ This document describes how Long Tail organizes workflows, activities, and MCP s
 - [The Convention](#the-convention)
 - [Three Workflow Types](#three-workflow-types)
 - [System Capabilities](#system-capabilities)
-  - [Tag-Based Tool Discovery](#tag-based-tool-discovery)
-  - [System Workflows](#system-workflows)
+    - [Tag-Based Tool Discovery](#tag-based-tool-discovery)
+    - [System Workflows](#system-workflows)
 - [Built-in MCP Servers](#built-in-mcp-servers)
 - [Registering Your Own](#registering-your-own)
 
@@ -157,7 +157,7 @@ Tags are GIN-indexed in PostgreSQL for fast lookup. Register a new MCP server ta
 | **mcpQuery** | `mcpQueryRouter` → `mcpDeterministic` \| `mcpQuery` | General-purpose MCP orchestration. Router discovers compiled workflows; routes to deterministic (if match) or dynamic agentic loop. |
 | **mcpTriage** | `mcpTriageRouter` → `mcpTriageDeterministic` \| `mcpTriage` | Escalation remediation. Same 3-tier pattern — router checks for compiled solutions before falling back to dynamic triage. |
 
-**mcpQuery** is the general-purpose entry point. Ask it to "take a screenshot of example.com" and it uses Playwright tools. Ask it to "fetch the latest exchange rates and save to a file" and it chains HTTP fetch with file storage. Once a useful sequence is discovered, it can be compiled into a deterministic workflow and deployed as a new tool.
+The workflow, **mcpQuery**, is the general-purpose entry point. Ask it to "take a screenshot of example.com" and it uses Playwright tools. Ask it to "fetch the latest exchange rates and save to a file" and it chains HTTP fetch with file storage. Once a useful sequence is discovered, it can be compiled into a deterministic workflow and deployed as a new tool.
 
 Engineers can register external servers — Playwright for browser automation, file storage, custom APIs. The triage agent can even recommend that engineers add a new MCP server when it encounters a capability gap. Every server's tools become available as proxy activities in deterministic workflows and as callable tools in dynamic triage.
 

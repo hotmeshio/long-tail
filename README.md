@@ -82,9 +82,39 @@ curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
 
 De-certifying removes the interceptor. The workflow continues as a standard durable workflow — same code, different guarantees.
 
-## Register an MCP Server
+## Register MCP Servers
 
-Write an MCP server to expose your own tools. The `registerMcpTool` helper handles the SDK's type complexity.
+Long Tail connects to any MCP server — an npm package, a remote service, or one you write yourself. Registered tools become durable activities and are available to the Pipeline Designer.
+
+**Use an existing package** — no code, just register:
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/servers \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "filesystem",
+    "transport_type": "stdio",
+    "transport_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"] },
+    "tags": ["files", "storage"],
+    "auto_connect": true
+  }'
+```
+
+**Connect a remote server** — point at a URL:
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/servers \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "my-python-server",
+    "transport_type": "sse",
+    "transport_config": { "url": "http://python-service:8000/mcp" },
+    "tags": ["ml", "classification"],
+    "compile_hints": "Returns confidence scores. Use threshold 0.85 for auto-approve."
+  }'
+```
+
+**Write your own** and register it in-process:
 
 ```typescript
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -106,8 +136,6 @@ export function createImageToolsServer(): McpServer {
 }
 ```
 
-Register it at startup and it appears in the dashboard:
-
 ```typescript
 const lt = await start({
   // ...
@@ -116,6 +144,8 @@ const lt = await start({
   },
 });
 ```
+
+All three paths produce the same outcome: tools callable as durable activities. Tags enable discovery. Compile hints guide the compiler when tools are compiled into deterministic pipelines. See the [MCP guide](docs/mcp.md) for the full registration lifecycle.
 
 ## Ask It Anything
 
