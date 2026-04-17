@@ -1,7 +1,6 @@
 import { Virtual } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 
-import { postgres_options } from '../../modules/config';
+import { getConnection } from '../../lib/db';
 import { loggerRegistry } from '../../lib/logger';
 import * as dbaService from '../dba';
 import type { LTMaintenanceConfig, LTMaintenanceRule } from '../../types/maintenance';
@@ -88,7 +87,7 @@ class LTMaintenanceRegistry {
 
     const rules = this._config.rules;
     const schedule = this._config.schedule;
-    const connection = { class: Postgres, options: postgres_options };
+    const connection = getConnection();
 
     await Virtual.cron({
       topic: CRON_TOPIC,
@@ -122,7 +121,7 @@ class LTMaintenanceRegistry {
     if (!this.connected) return;
 
     try {
-      const connection = { class: Postgres, options: postgres_options };
+      const connection = getConnection();
       await Virtual.interrupt({
         topic: CRON_TOPIC,
         connection,

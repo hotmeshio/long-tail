@@ -1,6 +1,12 @@
 import { getPool } from '../../lib/db';
 import { encrypt, decrypt } from '../oauth/crypto';
 import { loggerRegistry } from '../../lib/logger';
+import {
+  INSERT_EPHEMERAL,
+  EXCHANGE_EPHEMERAL,
+  DELETE_EPHEMERAL,
+  CLEANUP_EXPIRED_EPHEMERAL,
+} from './sql';
 
 // ── Token format ────────────────────────────────────────────────────────────
 // Opaque string: eph:v1:<label>:<uuid>
@@ -89,9 +95,7 @@ export async function storeEphemeral(
     : 'NULL';
 
   const { rows } = await pool.query(
-    `INSERT INTO lt_ephemeral_credentials (value, label, max_uses, expires_at)
-     VALUES ($1, $2, $3, ${expiresAt})
-     RETURNING token`,
+    INSERT_EPHEMERAL(expiresAt),
     [Buffer.from(encrypted, 'base64'), opts.label || null, maxUses],
   );
   return rows[0].token;
@@ -110,15 +114,7 @@ export async function exchangeEphemeral(token: string): Promise<string | null> {
 
   // Atomic increment + check in one query.
   // Returns the row if the exchange is valid, nothing if expired/exhausted.
-  const { rows } = await pool.query(
-    `UPDATE lt_ephemeral_credentials
-     SET use_count = use_count + 1
-     WHERE token = $1
-       AND (expires_at IS NULL OR expires_at > NOW())
-       AND (max_uses = 0 OR use_count < max_uses)
-     RETURNING value, use_count, max_uses`,
-    [token],
-  );
+  const { rows } = await pool.query(EXCHANGE_EPHEMERAL, [token]);
 
   if (rows.length === 0) return null;
 
@@ -126,10 +122,7 @@ export async function exchangeEphemeral(token: string): Promise<string | null> {
 
   // Auto-delete when max_uses is reached (if bounded)
   if (max_uses > 0 && use_count >= max_uses) {
-    await pool.query(
-      `DELETE FROM lt_ephemeral_credentials WHERE token = $1`,
-      [token],
-    );
+    await pool.query(DELETE_EPHEMERAL, [token]);
   }
 
   return decrypt((buf as Buffer).toString('base64'));
@@ -140,10 +133,7 @@ export async function exchangeEphemeral(token: string): Promise<string | null> {
  */
 export async function revokeEphemeral(token: string): Promise<boolean> {
   const pool = getPool();
-  const { rowCount } = await pool.query(
-    `DELETE FROM lt_ephemeral_credentials WHERE token = $1`,
-    [token],
-  );
+  const { rowCount } = await pool.query(DELETE_EPHEMERAL, [token]);
   return (rowCount ?? 0) > 0;
 }
 
@@ -152,9 +142,6 @@ export async function revokeEphemeral(token: string): Promise<boolean> {
  */
 export async function cleanupExpired(): Promise<number> {
   const pool = getPool();
-  const { rowCount } = await pool.query(
-    `DELETE FROM lt_ephemeral_credentials
-     WHERE expires_at IS NOT NULL AND expires_at < NOW()`,
-  );
+  const { rowCount } = await pool.query(CLEANUP_EXPIRED_EPHEMERAL);
   return rowCount ?? 0;
 }

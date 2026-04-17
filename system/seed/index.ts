@@ -1,6 +1,6 @@
 import { getPool } from '../../lib/db';
 import { loggerRegistry } from '../../lib/logger';
-import { SEED_MCP_SERVER } from '../../services/mcp/sql';
+import { SEED_MCP_SERVER, DELETE_STALE_BUILTIN_SERVERS } from '../../services/mcp/sql';
 
 import { SEED_MCP_SERVERS } from './server-definitions';
 
@@ -35,13 +35,7 @@ export async function seedSystemMcpServers(): Promise<void> {
   // Remove stale builtin servers no longer in the seed list
   const seedNames = SEED_MCP_SERVERS.map(s => s.name);
   try {
-    const { rows } = await pool.query(
-      `DELETE FROM lt_mcp_servers
-       WHERE (metadata->>'builtin')::boolean = true
-         AND name != ALL($1)
-       RETURNING name`,
-      [seedNames],
-    );
+    const { rows } = await pool.query(DELETE_STALE_BUILTIN_SERVERS, [seedNames]);
     for (const row of rows) {
       loggerRegistry.info(`[system] removed stale builtin MCP server: ${row.name}`);
     }

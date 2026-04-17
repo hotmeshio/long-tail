@@ -3,10 +3,9 @@
  * workflow description generation.
  */
 
-import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options } from '../../modules/config';
+import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS, LLM_MODEL_SECONDARY } from '../../modules/defaults';
 import { callLLM, hasLLMApiKey } from '../llm';
 import { DESCRIBE_WORKFLOW_SYSTEM_PROMPT } from './prompts';
@@ -48,8 +47,7 @@ export async function startMcpQuery(input: McpQueryInput): Promise<McpQueryResul
   const { prompt, tags, wait = true, direct = false, context, userId } = input;
   const startTime = Date.now();
 
-  const connection = { class: Postgres, options: postgres_options };
-  const client = new Durable.Client({ connection });
+  const client = new Durable.Client({ connection: getConnection() });
 
   const wfName = direct ? 'mcpQuery' : 'mcpQueryRouter';
   const entity = direct ? 'mcpQuery' : 'mcpQueryRouter';

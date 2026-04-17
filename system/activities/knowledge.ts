@@ -1,9 +1,21 @@
-import { Client as Postgres } from 'pg';
+import { Client } from 'pg';
 
-import { postgres_options } from '../../modules/config';
+import { getConnection } from '../../lib/db';
+import {
+  UPSERT_KNOWLEDGE,
+  GET_KNOWLEDGE,
+  SEARCH_KNOWLEDGE,
+  COUNT_KNOWLEDGE_SEARCH,
+  LIST_KNOWLEDGE,
+  COUNT_KNOWLEDGE_LIST,
+  DELETE_KNOWLEDGE,
+  LIST_DOMAINS,
+  APPEND_KNOWLEDGE,
+} from './sql';
 
-async function withClient<T>(fn: (client: Postgres) => Promise<T>): Promise<T> {
-  const client = new Postgres(postgres_options);
+async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const { class: PgClient, options } = getConnection();
+  const client = new PgClient(options);
   await client.connect();
   try {
     return await fn(client);
@@ -20,12 +32,7 @@ export async function storeKnowledge(args: {
 }): Promise<{ id: string; domain: string; key: string; created: boolean; updated_at: string }> {
   return withClient(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO lt_knowledge (domain, key, data, tags)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (domain, key) DO UPDATE SET
-         data = lt_knowledge.data || EXCLUDED.data,
-         tags = ARRAY(SELECT DISTINCT unnest(lt_knowledge.tags || EXCLUDED.tags))
-       RETURNING id, domain, key, (xmax = 0) AS created, updated_at`,
+      UPSERT_KNOWLEDGE,
       [args.domain, args.key, JSON.stringify(args.data), args.tags || []],
     );
     return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
@@ -37,11 +44,7 @@ export async function getKnowledge(args: {
   key: string;
 }): Promise<Record<string, any>> {
   return withClient(async (client) => {
-    const { rows } = await client.query(
-      `SELECT id, domain, key, data, tags, created_at, updated_at
-       FROM lt_knowledge WHERE domain = $1 AND key = $2`,
-      [args.domain, args.key],
-    );
+    const { rows } = await client.query(GET_KNOWLEDGE, [args.domain, args.key]);
     if (!rows.length) return { found: false, domain: args.domain, key: args.key };
     const row = rows[0];
     return {
@@ -142,10 +145,7 @@ export async function deleteKnowledge(args: {
   key: string;
 }): Promise<{ deleted: boolean }> {
   return withClient(async (client) => {
-    const { rowCount } = await client.query(
-      `DELETE FROM lt_knowledge WHERE domain = $1 AND key = $2`,
-      [args.domain, args.key],
-    );
+    const { rowCount } = await client.query(DELETE_KNOWLEDGE, [args.domain, args.key]);
     return { deleted: (rowCount ?? 0) > 0 };
   });
 }
@@ -154,10 +154,7 @@ export async function listDomains(): Promise<{
   domains: Array<{ domain: string; count: number; latest: string }>;
 }> {
   return withClient(async (client) => {
-    const { rows } = await client.query(
-      `SELECT domain, COUNT(*)::int AS count, MAX(updated_at) AS latest
-       FROM lt_knowledge GROUP BY domain ORDER BY latest DESC`,
-    );
+    const { rows } = await client.query(LIST_DOMAINS);
     return {
       domains: rows.map((r) => ({
         domain: r.domain,
@@ -186,15 +183,7 @@ export async function appendKnowledge(args: {
     }
 
     const { rows } = await client.query(
-      `INSERT INTO lt_knowledge (domain, key, data)
-       VALUES ($1, $2, $3::jsonb)
-       ON CONFLICT (domain, key) DO UPDATE SET
-         data = CASE
-           WHEN lt_knowledge.data #> $4::text[] IS NULL
-           THEN jsonb_set(lt_knowledge.data, $4::text[], jsonb_build_array($5::jsonb))
-           ELSE jsonb_set(lt_knowledge.data, $4::text[], (lt_knowledge.data #> $4::text[]) || jsonb_build_array($5::jsonb))
-         END
-       RETURNING id, domain, key, updated_at`,
+      APPEND_KNOWLEDGE,
       [args.domain, args.key, JSON.stringify(initData), pathArray, valueJson],
     );
     return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };

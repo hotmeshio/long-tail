@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Client, Pool } from 'pg';
 
 import { postgres_options } from '../../modules/config';
 
@@ -16,4 +16,13 @@ export async function closePool(): Promise<void> {
     await pool.end();
     pool = null;
   }
+}
+
+/**
+ * HotMesh connection descriptor: `{ class: Client, options: postgres_options }`.
+ * Use this everywhere HotMesh / Durable APIs need a connection config
+ * instead of importing `pg` and `postgres_options` directly.
+ */
+export function getConnection() {
+  return { class: Client, options: postgres_options };
 }

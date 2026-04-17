@@ -11,18 +11,10 @@
 
 import { getPool } from '../../lib/db';
 import type { LTEnvelopePrincipal } from '../../types/envelope';
+import { GET_USER_WITH_ROLES_FLEXIBLE } from './sql';
 
 /** UUID v4 pattern for distinguishing UUIDs from external_ids. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Fetch user + roles by external_id OR id in one query. */
-const GET_USER_WITH_ROLES_FLEXIBLE = `
-  SELECT u.id, u.external_id, u.display_name, u.status, u.metadata,
-         r.role, r.type AS role_type
-  FROM lt_users u
-  LEFT JOIN lt_user_roles r ON r.user_id = u.id
-  WHERE u.external_id = $1 OR u.id::text = $1
-  ORDER BY r.created_at`;
 
 const ROLE_TYPE_PRIORITY: Record<string, number> = { superadmin: 3, admin: 2, member: 1 };
 

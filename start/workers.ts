@@ -1,7 +1,6 @@
-import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options } from '../modules/config';
+import { getConnection } from '../lib/db';
 import { registerLT } from '../services/interceptor';
 import { registerWorker } from '../services/workers/registry';
 import { loggerRegistry } from '../lib/logger';
@@ -21,7 +20,7 @@ type WorkerEntry = { taskQueue: string; workflow: (...args: any[]) => any };
  * Build the connection descriptor used by HotMesh / Durable.
  */
 export function buildConnection() {
-  return { class: Postgres, options: postgres_options };
+  return getConnection();
 }
 
 /**

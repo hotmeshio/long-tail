@@ -1,7 +1,6 @@
 import { Virtual, Durable } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 
-import { postgres_options } from '../../modules/config';
+import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
 import * as configService from '../config';
@@ -59,7 +58,7 @@ class LTCronRegistry {
   async startCron(config: LTWorkflowConfig): Promise<void> {
     if (!config.cron_schedule || !config.task_queue) return;
 
-    const connection = { class: Postgres, options: postgres_options };
+    const connection = getConnection();
     const topic = `${CRON_TOPIC_PREFIX}.${config.workflow_type}`;
     const cronId = `${CRON_ID_PREFIX}-${config.workflow_type}`;
 
@@ -126,7 +125,7 @@ class LTCronRegistry {
     const cronId = this.activeCrons.get(workflowType);
     if (!cronId) return;
 
-    const connection = { class: Postgres, options: postgres_options };
+    const connection = getConnection();
     const topic = `${CRON_TOPIC_PREFIX}.${workflowType}`;
 
     try {

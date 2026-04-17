@@ -90,6 +90,12 @@ export const HEALTH_DURABLE_WORKFLOWS = `
 
 // ─── Seed (used by system/seed.ts) ──────────────────────────────────────────
 
+export const DELETE_STALE_BUILTIN_SERVERS = `
+  DELETE FROM lt_mcp_servers
+  WHERE (metadata->>'builtin')::boolean = true
+    AND name != ALL($1)
+  RETURNING name`;
+
 export const SEED_MCP_SERVER = `
   INSERT INTO lt_mcp_servers
     (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, last_connected_at)

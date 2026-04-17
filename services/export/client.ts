@@ -1,12 +1,9 @@
 import { Durable } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 
-import { postgres_options } from '../../modules/config';
+import { getConnection } from '../../lib/db';
 
 export function createClient() {
-  return new Durable.Client({
-    connection: { class: Postgres, options: postgres_options },
-  });
+  return new Durable.Client({ connection: getConnection() });
 }
 
 export async function getHandle(

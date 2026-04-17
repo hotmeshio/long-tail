@@ -1,8 +1,7 @@
 import { HotMesh } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 import type { HotMeshManifest } from '@hotmeshio/hotmesh/build/types/hotmesh';
 
-import { postgres_options } from '../../modules/config';
+import { getConnection } from '../../lib/db';
 import { WORKFLOW_SYNC_TIMEOUT_MS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
 import * as namespaceService from '../namespace';
@@ -26,7 +25,7 @@ export async function getEngine(appId: string): Promise<HotMesh> {
     appId,
     guid: `deployer::${appId}-${HotMesh.guid()}`,
     engine: {
-      connection: { class: Postgres, options: postgres_options },
+      connection: getConnection(),
     },
   });
   engines.set(appId, engine);

@@ -1,7 +1,6 @@
-import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options } from '../../../modules/config';
+import { getConnection } from '../../../lib/db';
 import { JOB_EXPIRE_SECS } from '../../../modules/defaults';
 import { loggerRegistry } from '../../../lib/logger';
 
@@ -18,7 +17,7 @@ export async function ltSignalParent(input: {
   data: any;
 }): Promise<void> {
   const client = new Durable.Client({
-    connection: { class: Postgres, options: postgres_options },
+    connection: getConnection(),
   });
   const handle = await client.workflow.getHandle(
     input.parentTaskQueue,
@@ -43,7 +42,7 @@ export async function ltStartWorkflow(input: {
   expire?: number;
 }): Promise<void> {
   const client = new Durable.Client({
-    connection: { class: Postgres, options: postgres_options },
+    connection: getConnection(),
   });
   await client.workflow.start({
     workflowName: input.workflowName,

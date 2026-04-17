@@ -12,6 +12,12 @@ import type { LTUserRecord, LTRoleType } from '../../types';
 import type { CreateUserInput } from '../user';
 import { generateBotApiKey, listBotApiKeys, revokeBotApiKey } from '../auth/bot-api-key';
 import type { BotApiKeyRecord } from '../auth/bot-api-key';
+import {
+  LIST_BOTS,
+  COUNT_BOTS,
+  SET_ACCOUNT_TYPE_BOT,
+  GET_USER_BY_EXTERNAL_ID,
+} from './sql';
 
 export type { BotApiKeyRecord };
 
@@ -37,15 +43,6 @@ export interface BotAccountRecord extends LTUserRecord {
   created_by?: string;
 }
 
-const LIST_BOTS = `
-  SELECT * FROM lt_users
-  WHERE account_type = 'bot'
-  ORDER BY created_at DESC
-  LIMIT $1 OFFSET $2`;
-
-const COUNT_BOTS = `
-  SELECT COUNT(*)::int AS total FROM lt_users WHERE account_type = 'bot'`;
-
 /**
  * Create a new bot account.
  */
@@ -64,10 +61,7 @@ export async function createBot(input: CreateBotInput): Promise<BotAccountRecord
   // Create the user row, then set account_type column
   const user = await createUser(userInput);
   const pool = await getPool();
-  await pool.query(
-    'UPDATE lt_users SET account_type = $1 WHERE id = $2',
-    ['bot', user.id],
-  );
+  await pool.query(SET_ACCOUNT_TYPE_BOT, ['bot', user.id]);
 
   return toBotRecord(user, input.description, input.created_by);
 }
@@ -191,10 +185,7 @@ const SYSTEM_BOT_NAME = 'lt-system';
  */
 export async function ensureSystemBot(): Promise<string> {
   const pool = await getPool();
-  const { rows } = await pool.query(
-    'SELECT id FROM lt_users WHERE external_id = $1',
-    [SYSTEM_BOT_NAME],
-  );
+  const { rows } = await pool.query(GET_USER_BY_EXTERNAL_ID, [SYSTEM_BOT_NAME]);
   if (rows.length > 0) return rows[0].id;
 
   const bot = await createBot({
