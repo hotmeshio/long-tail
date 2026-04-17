@@ -218,8 +218,9 @@ router.post('/servers/:id/tools/:toolName/call', async (req, res) => {
       res.status(400).json({ error: 'MCP adapter not registered' });
       return;
     }
-    const authContext = req.auth?.userId
-      ? { userId: req.auth.userId }
+    const executeAs = req.body.execute_as;
+    const authContext = (executeAs || req.auth?.userId)
+      ? { userId: executeAs || req.auth?.userId }
       : undefined;
     const result = await adapter.callTool(
       req.params.id,

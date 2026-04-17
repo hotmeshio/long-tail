@@ -39,3 +39,5 @@ scripts/
 docs/
 *.md
 !LICENSE
+
+CLAUDE.md

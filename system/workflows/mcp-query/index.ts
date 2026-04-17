@@ -93,9 +93,33 @@ export async function mcpQuery(
     messages.push({ role: 'assistant', content: 'Understood. I will use these learnings to take a more targeted approach this time.' });
   }
 
+  // If invoked from the help assistant, inject dashboard context
+  const dashContext = envelope.data?.context as Record<string, any> | undefined;
+  if (dashContext) {
+    const lines = [
+      `[Dashboard Context]`,
+      `Page: ${dashContext.page || 'unknown'}`,
+      dashContext.entities?.workflowId ? `Workflow: ${dashContext.entities.workflowId}` : '',
+      dashContext.entities?.workflowStatus ? `Status: ${dashContext.entities.workflowStatus}` : '',
+      dashContext.entities?.yamlContent ? `YAML:\n${dashContext.entities.yamlContent}` : '',
+      dashContext.entities?.prompt ? `Original query: ${dashContext.entities.prompt}` : '',
+      ``,
+      `IMPORTANT: This is a help assistant conversation. Always include the actual data, content, and results from tool calls in your response. Do not just confirm an action was taken — show the user what was retrieved, stored, or produced.`,
+      `[End Context]`,
+    ].filter(Boolean).join('\n');
+    messages.push({ role: 'user', content: lines });
+    messages.push({ role: 'assistant', content: 'I have the dashboard context. I will always show actual data and results, not just confirmations.' });
+  }
+
   messages.push({ role: 'user', content: prompt });
 
   let toolCallCount = 0;
+
+  // Repeated-error circuit breaker: if the same tool returns the same
+  // error twice in a row, the LLM is stuck — break out immediately.
+  const MAX_REPEATED_ERRORS = 2;
+  let lastErrorKey = '';
+  let repeatedErrorCount = 0;
 
   // Agentic loop: LLM decides → execute tools → feed back → repeat
   const BUDGET_WARNING_THRESHOLD = 3;
@@ -127,6 +151,8 @@ export async function mcpQuery(
       content: response.content,
       tool_calls: fnCalls,
     });
+
+    let roundHadError = false;
 
     for (const toolCall of fnCalls) {
       toolCallCount++;
@@ -162,11 +188,43 @@ export async function mcpQuery(
         continue;
       }
 
+      const resultStr = sanitizeToolResult(result);
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
-        content: sanitizeToolResult(result),
+        content: resultStr,
       });
+
+      // Track repeated errors: same tool + same error = stuck
+      const isError = resultStr.includes('MCP error') || resultStr.includes('"error"');
+      if (isError) {
+        roundHadError = true;
+        const errorKey = `${toolCall.function.name}::${resultStr.slice(0, 200)}`;
+        if (errorKey === lastErrorKey) {
+          repeatedErrorCount++;
+        } else {
+          lastErrorKey = errorKey;
+          repeatedErrorCount = 1;
+        }
+
+        if (repeatedErrorCount >= MAX_REPEATED_ERRORS) {
+          messages.push({
+            role: 'user',
+            content: `[CIRCUIT BREAKER] The tool "${toolCall.function.name}" has returned the same error ${repeatedErrorCount} times. Stop retrying this tool. Summarize what you accomplished and what failed.`,
+          });
+          const bailResponse = await callQueryLLM(messages, undefined);
+          return buildQueryReturn(
+            bailResponse.content || 'Workflow stopped: repeated tool errors.',
+            toolCallCount,
+            [{ name: 'circuit_breaker', value: toolCall.function.name }],
+          );
+        }
+      }
+    }
+
+    if (!roundHadError) {
+      lastErrorKey = '';
+      repeatedErrorCount = 0;
     }
   }
 

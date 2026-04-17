@@ -9,7 +9,7 @@
 import type { LTEnvelope } from '../../types';
 import type { ProxiedActivities } from './state';
 import type { WorkflowIdentity, TaskContext } from './types';
-import { publishWorkflowEvent, publishTaskEvent, publishEscalationEvent } from '../events/publish';
+import { publishWorkflowEvent, publishTaskEvent, publishEscalationEvent } from '../../lib/events/publish';
 
 /** Result of re-run detection and escalation resolution. */
 interface ReRunContext {

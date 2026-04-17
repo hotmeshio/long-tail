@@ -1,6 +1,6 @@
 import { chromium, type Browser, type Page } from 'playwright';
 
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 import type { PlaywrightHandle } from './types';
 import { SESSION_NOT_FOUND, SESSION_UNREACHABLE } from './types';

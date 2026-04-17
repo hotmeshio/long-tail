@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { QUERY_LIMIT_MAX } from '../../modules/defaults';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as yamlDb from '../yaml-workflow/db';
 import * as yamlDeployer from '../yaml-workflow/deployer';
 

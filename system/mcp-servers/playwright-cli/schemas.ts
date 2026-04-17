@@ -18,7 +18,7 @@ export const loginAndCaptureSchema = z.object({
 export const capturePageSchema = z.object({
   url: z.string().describe('URL to navigate to and capture'),
   screenshot_path: z.string().optional()
-    .describe('File path to save the screenshot PNG. If omitted, auto-derived from the URL path (e.g., /admin/users → screenshots/admin-users.png).'),
+    .describe('Storage path for the screenshot PNG (persisted to file storage). If omitted, auto-derived from the URL path (e.g., /admin/users → screenshots/admin-users.png). The screenshot is saved automatically — no separate write_file call is needed.'),
   page_id: z.string().optional().describe('Reuse an existing page to preserve session (e.g., from login_and_capture)'),
   full_page: z.boolean().optional().describe('Capture full scrollable page (default: true)'),
   wait_for_selector: z.string().optional()

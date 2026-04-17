@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTUserRole, LTRoleType } from '../../types';
 
 import {

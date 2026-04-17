@@ -1,9 +1,8 @@
 import { HotMesh } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 import type { StreamData, StreamDataResponse } from '@hotmeshio/hotmesh/build/types/stream';
 
-import { postgres_options } from '../../../modules/config';
-import { loggerRegistry } from '../../logger';
+import { getConnection } from '../../../lib/db';
+import { loggerRegistry } from '../../../lib/logger';
 import { exchangeTokensInArgs } from '../../iam/ephemeral';
 import * as mcpClient from '../../mcp/client';
 import * as yamlDb from '../db';
@@ -29,7 +28,7 @@ export async function registerWorkersForWorkflow(
   const workerConfigs: Array<{
     topic: string;
     workflowName?: string;
-    connection: { class: typeof Postgres; options: typeof postgres_options };
+    connection: ReturnType<typeof getConnection>;
     callback: (data: StreamData) => Promise<StreamDataResponse>;
   }> = [];
 
@@ -77,7 +76,7 @@ export async function registerWorkersForWorkflow(
       workerConfigs.push({
         topic: activity.topic,
         workflowName: activity.workflow_name,
-        connection: { class: Postgres, options: postgres_options },
+        connection: getConnection(),
         callback: wrap(buildTransformCallback(activity)),
       });
     } else if (toolSource === 'llm') {
@@ -85,7 +84,7 @@ export async function registerWorkersForWorkflow(
       workerConfigs.push({
         topic: activity.topic,
         workflowName: activity.workflow_name,
-        connection: { class: Postgres, options: postgres_options },
+        connection: getConnection(),
         callback: wrap(buildLlmCallback(activity)),
       });
     } else if (toolSource === 'db') {
@@ -96,7 +95,7 @@ export async function registerWorkersForWorkflow(
       workerConfigs.push({
         topic: activity.topic,
         workflowName: activity.workflow_name,
-        connection: { class: Postgres, options: postgres_options },
+        connection: getConnection(),
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
           let mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
@@ -120,7 +119,7 @@ export async function registerWorkersForWorkflow(
       workerConfigs.push({
         topic: activity.topic,
         workflowName: activity.workflow_name,
-        connection: { class: Postgres, options: postgres_options },
+        connection: getConnection(),
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
           const mergedArgs = storedArgs ? { ...storedArgs } : {};
@@ -162,8 +161,9 @@ export async function registerWorkersForWorkflow(
 
   await HotMesh.init({
     appId: workflow.app_id,
+    guid: `compiled::${workflow.graph_topic}-${HotMesh.guid()}`,
     engine: {
-      connection: { class: Postgres, options: postgres_options },
+      connection: getConnection(),
     },
     workers: workerConfigs,
   });

@@ -1,6 +1,6 @@
 import { chromium, type Browser, type Page } from 'playwright';
 
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 // Browser lifecycle: shared instance across tool calls within a single
 // server lifetime. Lazy-launched on first use, cleaned up via

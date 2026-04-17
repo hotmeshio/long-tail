@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import { requireAdmin } from '../modules/auth';
 import * as controlplane from '../services/controlplane';
-import { eventRegistry } from '../services/events';
+import { eventRegistry } from '../lib/events';
 import type { LTEvent } from '../types';
 
 const router = Router();

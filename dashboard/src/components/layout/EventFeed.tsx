@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Eraser } from 'lucide-react';
+import { ChevronUp, ChevronDown, Eraser, Maximize2, Minimize2 } from 'lucide-react';
 import { useEventSubscription } from '../../hooks/useEventContext';
 import { JsonViewer } from '../common/data/JsonViewer';
 import { Collapsible } from '../common/layout/Collapsible';
+import { FullscreenOverlay } from '../common/layout/FullscreenOverlay';
 
 const MAX_EVENTS = 100;
 const DEDUP_WINDOW_MS = 500;
@@ -33,35 +34,46 @@ const TYPE_COLORS: Record<string, string> = {
   milestone: 'text-violet-400',
 };
 
-function EventRow({ event }: { event: FeedEvent }) {
-  const [expanded, setExpanded] = useState(false);
+function EventRow({ event, forceExpanded = false }: { event: FeedEvent; forceExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(forceExpanded);
   const color = TYPE_COLORS[event.type] || 'text-text-tertiary';
+
+  // Sync with parent-driven expand/collapse
+  useEffect(() => { setExpanded(forceExpanded); }, [forceExpanded]);
+
+  const isFullsize = forceExpanded;
+  const timeSize = isFullsize ? 'text-xs' : 'text-[9px]';
+  const typeSize = isFullsize ? 'text-xs' : 'text-[9px]';
+  const idSize = isFullsize ? 'text-xs' : 'text-[9px]';
+  const chevronSize = isFullsize ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5';
+  const rowPad = isFullsize ? 'py-2 px-4' : 'py-1 px-3';
+  const detailPad = isFullsize ? 'pb-4 px-4' : 'pb-2 px-3';
 
   return (
     <div className="border-b border-surface-border/30 last:border-b-0">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 py-1 w-full text-left hover:bg-surface-hover/50 transition-colors px-3"
+        className={`flex items-center gap-2 ${rowPad} w-full text-left hover:bg-surface-hover/50 transition-colors`}
       >
-        <span className="text-[9px] font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0">
+        <span className={`${timeSize} font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0`}>
           {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
-        <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${color} bg-surface-sunken whitespace-nowrap shrink-0`}>
+        <span className={`${typeSize} font-medium px-1 py-0.5 rounded ${color} bg-surface-sunken whitespace-nowrap shrink-0`}>
           {event.type}
         </span>
-        <span className="text-[9px] text-text-tertiary font-mono flex-1 min-w-0 truncate">
+        <span className={`${idSize} text-text-tertiary font-mono flex-1 min-w-0 truncate`}>
           {event.data?.workflowId ? String(event.data.workflowId) : ''}
           {event.data?.escalationId ? ` esc:${String(event.data.escalationId).slice(0, 12)}` : ''}
         </span>
         <svg
-          className={`w-2.5 h-2.5 text-text-tertiary shrink-0 transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
+          className={`${chevronSize} text-text-tertiary shrink-0 transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       <Collapsible open={expanded}>
-        <div className="pb-2 px-3">
+        <div className={detailPad}>
           <JsonViewer data={event.data} />
         </div>
       </Collapsible>
@@ -71,6 +83,7 @@ function EventRow({ event }: { event: FeedEvent }) {
 
 export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [events, setEvents] = useState<FeedEvent[]>([]);
+  const [fullscreen, setFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recentRef = useRef<Map<string, number>>(new Map());
 
@@ -132,12 +145,21 @@ export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => v
           </span>
         )}
         {events.length > 0 && (
-          <span
-            className="ml-auto text-text-tertiary hover:text-text-primary p-0.5"
-            title="Clear events"
-            onClick={(e) => { e.stopPropagation(); setEvents([]); }}
-          >
-            <Eraser className="w-3 h-3" />
+          <span className="ml-auto flex items-center gap-1">
+            <span
+              className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
+              title="Fullscreen"
+              onClick={(e) => { e.stopPropagation(); setFullscreen(true); }}
+            >
+              <Maximize2 className="w-3 h-3" />
+            </span>
+            <span
+              className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
+              title="Clear events"
+              onClick={(e) => { e.stopPropagation(); setEvents([]); }}
+            >
+              <Eraser className="w-3 h-3" />
+            </span>
           </span>
         )}
       </button>
@@ -152,6 +174,23 @@ export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => v
           )}
         </div>
       </Collapsible>
+
+      <FullscreenOverlay open={fullscreen} onClose={() => setFullscreen(false)} sourceRef={scrollRef}>
+        <div className="sticky top-0 float-right z-10">
+          <button
+            onClick={() => setFullscreen(false)}
+            className="p-2 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised transition-colors duration-150 bg-surface-sunken/80 backdrop-blur-sm"
+            title="Close (Esc)"
+          >
+            <Minimize2 className="w-5 h-5" />
+          </button>
+        </div>
+        {events.length === 0 ? (
+          <p className="text-sm text-text-tertiary py-8">No events captured</p>
+        ) : (
+          events.map((evt) => <EventRow key={evt.id} event={evt} forceExpanded />)
+        )}
+      </FullscreenOverlay>
     </div>
   );
 }

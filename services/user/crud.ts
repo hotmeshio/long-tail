@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTUserRecord, LTUserRole, LTRoleType, LTUserStatus } from '../../types';
 
 import {

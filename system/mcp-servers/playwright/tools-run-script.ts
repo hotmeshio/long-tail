@@ -2,8 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import type { Page } from 'playwright';
 
-import { loggerRegistry } from '../../../services/logger';
-import { getStorageBackend } from '../../../services/storage';
+import { loggerRegistry } from '../../../lib/logger';
+import { getStorageBackend } from '../../../lib/storage';
 
 import { SESSION_NOT_FOUND, RESOURCE_NOT_FOUND } from './types';
 import { pages, ensureBrowser, resolvePage, buildHandle, allocatePageId } from './browser-lifecycle';

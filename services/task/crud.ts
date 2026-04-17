@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTTaskRecord, LTTaskStatus, LTMilestone } from '../../types';
 import type { CreateTaskInput, UpdateTaskInput } from './types';
 import {

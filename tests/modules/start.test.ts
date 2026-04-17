@@ -2,9 +2,9 @@ import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 
 import { start } from '../../start';
 import { config, postgres_options } from '../../modules/config';
-import { loggerRegistry } from '../../services/logger';
-import { telemetryRegistry } from '../../services/telemetry';
-import { eventRegistry } from '../../services/events';
+import { loggerRegistry } from '../../lib/logger';
+import { telemetryRegistry } from '../../lib/telemetry';
+import { eventRegistry } from '../../lib/events';
 import { maintenanceRegistry } from '../../services/maintenance';
 import type { LTLoggerAdapter } from '../../types/logger';
 import type { LTTelemetryAdapter } from '../../types/telemetry';

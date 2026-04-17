@@ -4,7 +4,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
-import { migrate } from '../../services/db/migrate';
+import { migrate } from '../../lib/db/migrate';
 import * as configService from '../../services/config';
 import * as userService from '../../services/user';
 import { ltConfig } from '../../modules/ltconfig';

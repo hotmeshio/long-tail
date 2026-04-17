@@ -11,7 +11,7 @@
   "files": [
     "build/",
     "docs/",
-    "services/db/schemas/",
+    "lib/db/schemas/",
     "dashboard/dist/",
     "LICENSE",
     "README.md"
@@ -22,7 +22,7 @@
     "clean-build": "npm run clean && npm run build",
     "start": "ts-node index.ts",
     "start:dev": "ts-node-dev --respawn index.ts",
-    "migrate": "ts-node services/db/migrate.ts",
+    "migrate": "ts-node lib/db/migrate.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --fix --ext .ts",
     "test": "vitest run",
@@ -61,11 +61,11 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
     "@aws-sdk/client-s3": "^3.1017.0",
-    "@hotmeshio/hotmesh": "^0.14.0",
+    "@hotmeshio/hotmesh": "^0.14.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.212.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.215.0",
     "@opentelemetry/resources": "^2.5.1",
-    "@opentelemetry/sdk-node": "^0.212.0",
+    "@opentelemetry/sdk-node": "^0.215.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "arctic": "^3.7.0",
     "bcryptjs": "^2.4.3",

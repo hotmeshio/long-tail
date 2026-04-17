@@ -150,6 +150,12 @@ async function runTriageLLM(
   ];
 
   let toolCallCount = 0;
+
+  // Repeated-error circuit breaker
+  const MAX_REPEATED_ERRORS = 2;
+  let lastErrorKey = '';
+  let repeatedErrorCount = 0;
+
   const BUDGET_WARNING_THRESHOLD = 3;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -190,6 +196,8 @@ async function runTriageLLM(
       tool_calls: fnCalls,
     });
 
+    let roundHadError = false;
+
     for (const toolCall of fnCalls) {
       toolCallCount++;
       let args: Record<string, any> = {};
@@ -225,11 +233,44 @@ async function runTriageLLM(
         continue;
       }
 
+      const resultStr = sanitizeToolResult(result);
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
-        content: sanitizeToolResult(result),
+        content: resultStr,
       });
+
+      // Track repeated errors: same tool + same error = stuck
+      const isError = resultStr.includes('MCP error') || resultStr.includes('"error"');
+      if (isError) {
+        roundHadError = true;
+        const errorKey = `${toolCall.function.name}::${resultStr.slice(0, 200)}`;
+        if (errorKey === lastErrorKey) {
+          repeatedErrorCount++;
+        } else {
+          lastErrorKey = errorKey;
+          repeatedErrorCount = 1;
+        }
+
+        if (repeatedErrorCount >= MAX_REPEATED_ERRORS) {
+          messages.push({
+            role: 'user',
+            content: `[CIRCUIT BREAKER] The tool "${toolCall.function.name}" has returned the same error ${repeatedErrorCount} times. Stop retrying this tool. Summarize your diagnosis and what failed.`,
+          });
+          const bailResponse = await callTriageLLM(messages, undefined);
+          return handleFinalResponse(
+            bailResponse.content || '',
+            envelope,
+            toolCallCount,
+            responseDeps,
+          );
+        }
+      }
+    }
+
+    if (!roundHadError) {
+      lastErrorKey = '';
+      repeatedErrorCount = 0;
     }
   }
 

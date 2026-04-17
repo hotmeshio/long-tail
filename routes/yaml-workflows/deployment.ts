@@ -113,14 +113,27 @@ router.post('/:id/invoke', async (req, res) => {
     const data = req.body.data || {};
 
     // Inject _scope so compiled workflow activities have identity context
-    if (req.auth?.userId && !data._scope) {
+    const executeAs = req.body.execute_as;
+    const userId = req.auth?.userId;
+    if (!data._scope) {
       const { resolvePrincipal } = await import('../../services/iam/principal');
-      const principal = await resolvePrincipal(req.auth.userId);
-      if (principal) {
-        data._scope = {
-          principal,
-          scopes: ['mcp:tool:call'],
-        };
+      if (executeAs) {
+        const [botPrincipal, invokerPrincipal] = await Promise.all([
+          resolvePrincipal(executeAs),
+          userId ? resolvePrincipal(userId) : Promise.resolve(null),
+        ]);
+        if (botPrincipal) {
+          data._scope = {
+            principal: botPrincipal,
+            scopes: ['mcp:tool:call'],
+            ...(invokerPrincipal ? { initiatedBy: userId, initiatingPrincipal: invokerPrincipal } : {}),
+          };
+        }
+      } else if (userId) {
+        const principal = await resolvePrincipal(userId);
+        if (principal) {
+          data._scope = { principal, scopes: ['mcp:tool:call'] };
+        }
       }
     }
 

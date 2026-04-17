@@ -6,7 +6,7 @@ import {
   LLM_MAX_TOKENS_JSON,
   LLM_MODEL_SECONDARY,
 } from '../../../modules/defaults';
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 import { callLLM as callLLMService } from '../../llm';
 import type { ChatMessage, LLMResponse } from '../../llm';
 import type { ActivityManifestEntry } from '../../../types/yaml-workflow';

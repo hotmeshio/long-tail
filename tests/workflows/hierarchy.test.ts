@@ -5,7 +5,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options, sleepFor, waitForEscalationByOriginId } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
-import { migrate } from '../../services/db/migrate';
+import { migrate } from '../../lib/db/migrate';
 import { createLTInterceptor } from '../../services/interceptor';
 import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
 import * as interceptorActivities from '../../services/interceptor/activities';
@@ -14,7 +14,7 @@ import * as taskService from '../../services/task';
 import * as escalationService from '../../services/escalation';
 import { ltConfig } from '../../modules/ltconfig';
 import { executeLT } from '../../services/orchestrator';
-import { getPool } from '../../services/db';
+import { getPool } from '../../lib/db';
 import type { LTEnvelope, LTReturn, LTEscalation, LTTaskRecord } from '../../types';
 
 const { Connection, Client, Worker } = Durable;

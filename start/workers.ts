@@ -1,17 +1,16 @@
-import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { postgres_options } from '../modules/config';
+import { getConnection } from '../lib/db';
 import { registerLT } from '../services/interceptor';
 import { registerWorker } from '../services/workers/registry';
-import { loggerRegistry } from '../services/logger';
-import { telemetryRegistry } from '../services/telemetry';
-import { eventRegistry } from '../services/events';
+import { loggerRegistry } from '../lib/logger';
+import { telemetryRegistry } from '../lib/telemetry';
+import { eventRegistry } from '../lib/events';
 import { maintenanceRegistry } from '../services/maintenance';
 import { cronRegistry } from '../services/cron';
 import { mcpRegistry } from '../services/mcp';
 import * as yamlWorkflowWorkers from '../services/yaml-workflow/workers';
-import { migrate } from '../services/db/migrate';
+import { migrate } from '../lib/db/migrate';
 
 import type { LTStartConfig } from '../types/startup';
 
@@ -21,7 +20,7 @@ type WorkerEntry = { taskQueue: string; workflow: (...args: any[]) => any };
  * Build the connection descriptor used by HotMesh / Durable.
  */
 export function buildConnection() {
-  return { class: Postgres, options: postgres_options };
+  return getConnection();
 }
 
 /**
@@ -75,10 +74,12 @@ export async function startWorkers(
 
     // Start each worker
     for (const w of workers) {
+      const label = `${w.taskQueue}::${w.workflow.name}`;
       const worker = await Durable.Worker.create({
         connection,
         taskQueue: w.taskQueue,
         workflow: w.workflow,
+        guid: `${label}-${Durable.guid()}`,
       });
       await worker.run();
       registerWorker(w.workflow.name, w.taskQueue);

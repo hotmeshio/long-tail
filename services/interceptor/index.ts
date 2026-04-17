@@ -42,7 +42,7 @@ export async function registerLT(
   const taskQueue = options?.taskQueue ?? DEFAULT_ACTIVITY_QUEUE;
 
   await Durable.registerActivityWorker(
-    { connection, taskQueue },
+    { connection, taskQueue, guid: `interceptor::${taskQueue}-${Durable.guid()}` as any },
     interceptorActivities,
     taskQueue,
   );

@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import {
   hmshTimestampToISO,
   loadSymbolMap,
@@ -9,6 +9,7 @@ import {
 
 import { fetchActivityInputs, fetchActivityDetails } from './enrichment';
 import { buildEvents } from './events';
+import { GET_JOB, GET_JOB_ATTRIBUTES } from './sql';
 import type { JobContext, ExecutionExport } from './types';
 
 /**
@@ -55,11 +56,7 @@ async function loadJobContext(
   const pool = getPool();
 
   const [jobResult, symbolMap] = await Promise.all([
-    pool.query(
-      `SELECT id, key, entity, status, created_at, updated_at, expired_at, is_live
-       FROM ${schema}.jobs WHERE key = $1 LIMIT 1`,
-      [jobKey],
-    ),
+    pool.query(GET_JOB(schema), [jobKey]),
     loadSymbolMap(schema, appId),
   ]);
 
@@ -71,10 +68,7 @@ async function loadJobContext(
 
   const job = jobResult.rows[0];
 
-  const attrRows = await pool.query(
-    `SELECT symbol, dimension, value FROM ${schema}.jobs_attributes WHERE job_id = $1 ORDER BY symbol, dimension`,
-    [job.id],
-  );
+  const attrRows = await pool.query(GET_JOB_ATTRIBUTES(schema), [job.id]);
   const rawAttrs: Record<string, string> = {};
   for (const row of attrRows.rows) {
     const field = row.dimension ? `${row.symbol}${row.dimension}` : row.symbol;

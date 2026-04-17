@@ -1,5 +1,6 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { SectionLabel } from '../layout/SectionLabel';
+import { FullscreenOverlay } from '../layout/FullscreenOverlay';
 
 // ---------------------------------------------------------------------------
 // JSON view — raw, collapsible syntax tree (existing)
@@ -169,6 +170,7 @@ function TreeNode({ data, depth = 0 }: { data: unknown; depth?: number }) {
   return <span>{String(data)}</span>;
 }
 
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { TreeIcon, CodeIcon, CopyIcon, CheckIcon, CollapseIcon, ExpandIcon } from './JsonViewerIcons';
 
 // ---------------------------------------------------------------------------
@@ -176,6 +178,54 @@ import { TreeIcon, CodeIcon, CopyIcon, CheckIcon, CollapseIcon, ExpandIcon } fro
 // ---------------------------------------------------------------------------
 
 type ViewMode = 'json' | 'tree';
+
+// ---------------------------------------------------------------------------
+// Toolbar — shared between inline and fullscreen views
+// ---------------------------------------------------------------------------
+
+function JsonToolbar({ mode, setMode, isCollapsed, onToggleCollapse, onCopy, copied, onFullscreen, onClose, large }: {
+  mode: ViewMode;
+  setMode: (m: ViewMode) => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  onCopy: () => void;
+  copied: boolean;
+  onFullscreen?: () => void;
+  onClose?: () => void;
+  large?: boolean;
+}) {
+  const icon = large ? 'w-5 h-5' : 'w-3.5 h-3.5';
+  const btn = `${large ? 'p-2' : 'p-1.5'} rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised transition-colors duration-150`;
+  return (
+    <div className="flex items-center gap-0.5 bg-surface-sunken/80 rounded-md backdrop-blur-sm">
+      {mode === 'json' && (
+        <button onClick={onToggleCollapse} className={btn} title={isCollapsed ? 'Expand all' : 'Collapse all'}>
+          {isCollapsed ? <ExpandIcon className={icon} /> : <CollapseIcon className={icon} />}
+        </button>
+      )}
+      <button onClick={() => setMode(mode === 'json' ? 'tree' : 'json')} className={btn} title={mode === 'json' ? 'Outline view' : 'JSON view'}>
+        {mode === 'json' ? <TreeIcon className={icon} /> : <CodeIcon className={icon} />}
+      </button>
+      <button onClick={onCopy} className={btn} title="Copy to clipboard">
+        {copied ? <CheckIcon className={`${icon} text-status-success`} /> : <CopyIcon className={icon} />}
+      </button>
+      {onFullscreen && (
+        <button onClick={onFullscreen} className={btn} title="Fullscreen">
+          <Maximize2 className={icon} />
+        </button>
+      )}
+      {onClose && (
+        <button onClick={onClose} className={btn} title="Close (Esc)">
+          <Minimize2 className={icon} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Public component
+// ---------------------------------------------------------------------------
 
 export function JsonViewer({
   data,
@@ -193,13 +243,19 @@ export function JsonViewer({
   /** Initial view mode. Defaults to 'json'. */
   defaultMode?: ViewMode;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<ViewMode>(defaultMode ?? 'json');
   const [copied, setCopied] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   // Bumping generation forces all JsonNodes to re-evaluate collapse state.
   // Even (incl. 0) = collapsed, odd = fully expanded.
   const [generation, setGeneration] = useState(defaultCollapsed ? 0 : 0);
+  // Separate generation for fullscreen (always starts expanded)
+  const [fsGeneration, setFsGeneration] = useState(1);
   const isGlobalCollapsed = generation % 2 === 0;
+  const isFsCollapsed = fsGeneration % 2 === 0;
   const toggleGlobalCollapse = useCallback(() => setGeneration((g) => g + 1), []);
+  const toggleFsCollapse = useCallback(() => setFsGeneration((g) => g + 1), []);
 
   let parsed = data;
   if (typeof data === 'string') {
@@ -217,7 +273,10 @@ export function JsonViewer({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const iconBtn = 'p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised transition-colors duration-150';
+  const openFullscreen = useCallback(() => {
+    setFsGeneration(1); // reset to expanded
+    setFullscreen(true);
+  }, []);
 
   const isPanel = variant === 'panel';
   const wrapperClass = isPanel
@@ -230,48 +289,34 @@ export function JsonViewer({
   return (
     <div className={wrapperClass}>
       {label && <SectionLabel>{label}</SectionLabel>}
-      <div className="relative">
-        <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 bg-surface-sunken/80 rounded-md backdrop-blur-sm">
-          {mode === 'json' && (
-            <button
-              onClick={toggleGlobalCollapse}
-              className={iconBtn}
-              title={isGlobalCollapsed ? 'Expand all' : 'Collapse all'}
-            >
-              {isGlobalCollapsed ? (
-                <ExpandIcon className="w-3.5 h-3.5" />
-              ) : (
-                <CollapseIcon className="w-3.5 h-3.5" />
-              )}
-            </button>
-          )}
-          <button
-            onClick={() => setMode(mode === 'json' ? 'tree' : 'json')}
-            className={iconBtn}
-            title={mode === 'json' ? 'Switch to outline view' : 'Switch to JSON view'}
-          >
-            {mode === 'json' ? (
-              <TreeIcon className="w-3.5 h-3.5" />
-            ) : (
-              <CodeIcon className="w-3.5 h-3.5" />
-            )}
-          </button>
-          <button
-            onClick={handleCopy}
-            className={iconBtn}
-            title="Copy to clipboard"
-          >
-            {copied ? (
-              <CheckIcon className="w-3.5 h-3.5 text-status-success" />
-            ) : (
-              <CopyIcon className="w-3.5 h-3.5" />
-            )}
-          </button>
+      <div ref={containerRef} className="relative">
+        <div className="absolute top-2 right-2 z-[5]">
+          <JsonToolbar
+            mode={mode} setMode={setMode}
+            isCollapsed={isGlobalCollapsed} onToggleCollapse={toggleGlobalCollapse}
+            onCopy={handleCopy} copied={copied}
+            onFullscreen={openFullscreen}
+          />
         </div>
         <div className={contentClass}>
           {mode === 'json' ? <JsonNode data={parsed} generation={generation} /> : <TreeNode data={parsed} />}
         </div>
       </div>
+
+      <FullscreenOverlay open={fullscreen} onClose={() => setFullscreen(false)} sourceRef={containerRef}>
+        <div className="sticky top-0 float-right z-10">
+          <JsonToolbar
+            mode={mode} setMode={setMode}
+            isCollapsed={isFsCollapsed} onToggleCollapse={toggleFsCollapse}
+            onCopy={handleCopy} copied={copied}
+            onClose={() => setFullscreen(false)}
+            large
+          />
+        </div>
+        <div className="font-mono text-sm leading-relaxed">
+          {mode === 'json' ? <JsonNode data={parsed} generation={fsGeneration} /> : <TreeNode data={parsed} />}
+        </div>
+      </FullscreenOverlay>
     </div>
   );
 }

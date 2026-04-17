@@ -2,7 +2,7 @@
 const yaml = require('js-yaml');
 
 import { YAML_LINE_WIDTH } from '../../modules/defaults';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as yamlDb from './db';
 
 /**

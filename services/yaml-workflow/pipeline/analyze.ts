@@ -27,7 +27,7 @@ export async function analyze(ctx: PipelineContext): Promise<PipelineContext> {
     i > 0 && ctx.collapsedSteps[i - 1].mcpServerId === s.mcpServerId,
   );
   if (consecutiveSameServer.length > 0) {
-    const { loggerRegistry } = await import('../../logger');
+    const { loggerRegistry } = await import('../../../lib/logger');
     const serverIds = [...new Set(consecutiveSameServer.map(s => s.mcpServerId))];
     loggerRegistry.info(
       `[yaml-workflow] hint: ${consecutiveSameServer.length + 1} consecutive same-server steps detected (${serverIds.join(', ')}) — pattern detector may collapse these`,

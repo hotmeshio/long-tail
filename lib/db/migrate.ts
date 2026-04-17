@@ -4,8 +4,8 @@ import * as path from 'path';
 import { getPool, closePool } from './index';
 import { loggerRegistry } from '../logger';
 
-// In dev: __dirname = services/db → schemas is ./schemas
-// In built/published: __dirname = build/services/db → schemas is ../../../services/db/schemas
+// In dev: __dirname = lib/db → schemas is ./schemas
+// In built/published: __dirname = build/lib/db → schemas is ../../../lib/db/schemas
 const devPath = path.join(__dirname, 'schemas');
 const SCHEMAS_DIR = fs.existsSync(devPath)
   ? devPath
@@ -46,7 +46,7 @@ export async function migrate(): Promise<void> {
   }
 }
 
-// run directly: npx ts-node services/db/migrate.ts
+// run directly: npx ts-node lib/db/migrate.ts
 if (require.main === module) {
   require('dotenv').config();
   migrate()

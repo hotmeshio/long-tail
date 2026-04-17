@@ -2,8 +2,9 @@ import { Router } from 'express';
 
 import * as configService from '../../services/config';
 import { cronRegistry } from '../../services/cron';
-import { getPool } from '../../services/db';
+import { getPool } from '../../lib/db';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../services/workers/registry';
+import { DISTINCT_ENTITIES_DURABLE } from '../../services/mcp-runs/sql';
 
 const router = Router();
 
@@ -52,9 +53,8 @@ router.get('/discovered', async (req, res) => {
     const activeWorkers = getRegisteredWorkers();
 
     // 2. Historical entities from durable.jobs
-    const DISTINCT_ENTITIES = `SELECT DISTINCT entity FROM durable.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`;
     const pool = getPool();
-    const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES);
+    const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES_DURABLE);
     const historicalEntities = new Set(entityRows.map((r) => r.entity));
 
     // 3. Registered configs

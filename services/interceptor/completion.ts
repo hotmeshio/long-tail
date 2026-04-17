@@ -1,7 +1,7 @@
 import type { LTReturn, LTMilestone } from '../../types';
 import type { InterceptorState } from './types';
 import { buildStoredEnvelope } from './state';
-import { publishEscalationEvent, publishMilestoneEvent, publishTaskEvent, publishWorkflowEvent } from '../events/publish';
+import { publishEscalationEvent, publishMilestoneEvent, publishTaskEvent, publishWorkflowEvent } from '../../lib/events/publish';
 
 /**
  * Handle a workflow that returned { type: 'return' }.

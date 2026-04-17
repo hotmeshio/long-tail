@@ -4,7 +4,8 @@ import { SecondaryAction } from '../../../components/common/display/SecondaryAct
 import { useQueryClient } from '@tanstack/react-query';
 
 import { WizardNav } from '../../../components/common/layout/WizardNav';
-import { ConfigurationSection } from './ConfigurationSection';
+import { YamlComposer } from '../../../components/common/data/YamlComposer';
+import { DagNodeDetail } from '../../../components/common/data/DagNodeDetail';
 import { LifecycleSidebar } from './LifecycleSidebar';
 import { VersionHistory } from './VersionHistory';
 import {
@@ -18,7 +19,7 @@ import {
   useRegenerateYamlWorkflow,
   useDeleteYamlWorkflow,
 } from '../../../api/yaml-workflows';
-import type { InputFieldMeta } from '../../../api/types';
+import type { ActivityManifestEntry, InputFieldMeta } from '../../../api/types';
 
 interface DeployPanelProps {
   yamlId: string;
@@ -84,6 +85,15 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
     const v = sp.get('version');
     setVersionParam(v ? parseInt(v, 10) : null);
   }, []);
+
+  // DAG node selection — drives right sidebar content
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const resolvedManifest: ActivityManifestEntry[] = (isViewingHistory && versionSnapshot)
+    ? versionSnapshot.activity_manifest : wf?.activity_manifest ?? [];
+  const selectedEntry = useMemo(
+    () => resolvedManifest.find((e) => e.activity_id === selectedNodeId) ?? null,
+    [resolvedManifest, selectedNodeId],
+  );
 
   const canEditConfig = wf?.status !== 'archived' && !isViewingHistory;
 
@@ -209,11 +219,12 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
           </div>
         )}
 
-        <ConfigurationSection
+        <YamlComposer
+          yamlContent={resolvedYaml}
+          activityManifest={resolvedManifest}
+          inputSchema={resolvedInputSchema}
+          outputSchema={resolvedOutputSchema}
           wf={wf}
-          resolvedInputSchema={resolvedInputSchema}
-          resolvedOutputSchema={resolvedOutputSchema}
-          resolvedYaml={resolvedYaml}
           configEditing={configEditing}
           setConfigEditing={setConfigEditing}
           canEditConfig={canEditConfig}
@@ -229,10 +240,8 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
           onCancel={handleCancelEdit}
           updateMutation={updateMutation}
           yamlTextareaRef={yamlTextareaRef}
-          isCollapsed={false}
-          onToggle={() => {}}
-          schemasGrid
-          unwrapped
+          selectedNodeId={selectedNodeId}
+          onNodeSelect={setSelectedNodeId}
         />
 
         <WizardNav>
@@ -244,33 +253,42 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
         </WizardNav>
       </div>
 
-      {/* Right: lifecycle + versions — sticky on scroll */}
+      {/* Right sidebar — swaps between lifecycle tools and node properties */}
       <div className="space-y-6">
         <div className="sticky top-6">
-        <LifecycleSidebar
-          status={wf.status}
-          sourceWorkflowId={wf.source_workflow_id}
-          contentVersion={wf.content_version}
-          deployedContentVersion={wf.deployed_content_version}
-          onDeploy={handleDeploy}
-          onArchive={() => archiveMutation.mutateAsync(yamlId).then(() => refetch())}
-          onDelete={async () => {
-            await deleteMutation.mutateAsync(yamlId);
-            queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
-            onBack();
-          }}
-          onRegenerate={handleRegenerate}
-          isPending={isPending}
-          error={undefined}
-        />
-        {(versionsData?.versions?.length ?? 0) > 1 && (
-          <VersionHistory
-            versionsData={versionsData}
-            searchParams={versionSearchParams}
-            setSearchParams={setVersionSearchParams}
-            currentVersion={wf.content_version}
-            viewingVersion={isViewingHistory ? versionParam : null}
+        {selectedEntry ? (
+          <DagNodeDetail
+            entry={selectedEntry}
+            onClose={() => setSelectedNodeId(null)}
           />
+        ) : (
+          <>
+            <LifecycleSidebar
+              status={wf.status}
+              sourceWorkflowId={wf.source_workflow_id}
+              contentVersion={wf.content_version}
+              deployedContentVersion={wf.deployed_content_version}
+              onDeploy={handleDeploy}
+              onArchive={() => archiveMutation.mutateAsync(yamlId).then(() => refetch())}
+              onDelete={async () => {
+                await deleteMutation.mutateAsync(yamlId);
+                queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
+                onBack();
+              }}
+              onRegenerate={handleRegenerate}
+              isPending={isPending}
+              error={undefined}
+            />
+            {(versionsData?.versions?.length ?? 0) > 1 && (
+              <VersionHistory
+                versionsData={versionsData}
+                searchParams={versionSearchParams}
+                setSearchParams={setVersionSearchParams}
+                currentVersion={wf.content_version}
+                viewingVersion={isViewingHistory ? versionParam : null}
+              />
+            )}
+          </>
         )}
         </div>{/* end sticky */}
       </div>

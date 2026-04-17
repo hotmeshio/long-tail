@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { loggerRegistry } from '../../services/logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as fileStorage from '../activities/file-storage';
 
 const writeFileSchema = z.object({

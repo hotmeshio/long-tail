@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 
-import { loggerRegistry } from '../../../services/logger';
-import { getStorageBackend } from '../../../services/storage';
+import { loggerRegistry } from '../../../lib/logger';
+import { getStorageBackend } from '../../../lib/storage';
 
 import { pages, ensureBrowser, resolvePage, buildHandle, allocatePageId } from './browser-lifecycle';
 import { navigateSchema, screenshotSchema } from './schemas';

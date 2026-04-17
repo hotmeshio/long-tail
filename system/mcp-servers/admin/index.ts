@@ -24,7 +24,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 import { registerTaskTools } from './tasks';
 import { registerEscalationTools } from './escalations';

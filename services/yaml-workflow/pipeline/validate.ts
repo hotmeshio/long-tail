@@ -72,11 +72,11 @@ export async function validate(ctx: PipelineContext): Promise<PipelineContext> {
 
     if (Array.isArray(parsed.issues) && parsed.issues.length > 0) {
       ctx.validationIssues = parsed.issues;
-      const { loggerRegistry } = await import('../../logger');
+      const { loggerRegistry } = await import('../../../lib/logger');
       loggerRegistry.warn(`[yaml-workflow] Validation issues found: ${parsed.issues.join('; ')}`);
     }
   } catch (err) {
-    const { loggerRegistry } = await import('../../logger');
+    const { loggerRegistry } = await import('../../../lib/logger');
     loggerRegistry.info(`[yaml-workflow] Validation skipped: ${err}`);
   }
 

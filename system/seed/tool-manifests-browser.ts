@@ -64,12 +64,12 @@ export const PLAYWRIGHT_CLI_TOOLS = [
   },
   {
     name: 'capture_page',
-    description: 'Navigate to a URL and capture a full-page screenshot in one call. Optionally waits for a selector or fixed delay before capture. Pass page_id to reuse an existing authenticated session from login_and_capture.',
+    description: 'Navigate to a URL, capture a screenshot, and save it to persistent file storage in one call. The returned `path` and `storage_ref` are the storage reference — no separate write_file call is needed. Optionally waits for a selector or fixed delay before capture. Pass page_id to reuse an existing authenticated session from login_and_capture.',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string' },
-        screenshot_path: { type: 'string' },
+        screenshot_path: { type: 'string', description: 'Storage path for the screenshot PNG (persisted to file storage). Auto-derived from URL if omitted. No separate write_file call needed.' },
         page_id: { type: 'string', description: 'Reuse an existing page to preserve session' },
         full_page: { type: 'boolean' },
         wait_for_selector: { type: 'string' },
@@ -77,7 +77,7 @@ export const PLAYWRIGHT_CLI_TOOLS = [
         wait_until: { type: 'string' },
         timeout: { type: 'number' },
       },
-      required: ['url', 'screenshot_path'],
+      required: ['url'],
     },
   },
   {

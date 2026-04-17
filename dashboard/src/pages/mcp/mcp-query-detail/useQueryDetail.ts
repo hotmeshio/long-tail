@@ -137,8 +137,14 @@ export function useQueryDetail() {
     return 5;
   }, [status, result, compiledYaml]);
 
-  const [manualStep, setManualStep] = useWizardStep();
+  const [manualStep, setManualStep, syncStepToUrl] = useWizardStep();
   const step = (manualStep as Step | null) ?? autoStep;
+
+  // Keep URL in sync with the active step (auto or manual) without
+  // affecting the manual/auto distinction used by auto-advance logic.
+  useEffect(() => {
+    syncStepToUrl(step);
+  }, [step, syncStepToUrl]);
 
   // Sequential unlock: each step requires the prior step to be satisfied
   const maxReachable: Step = (() => {

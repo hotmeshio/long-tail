@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { isSuperAdmin, hasRole } from '../user';
 import {
   GET_ESCALATION_TARGETS,

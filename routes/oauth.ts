@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import { signToken, requireAuth } from '../modules/auth';
-import { loggerRegistry } from '../services/logger';
+import { loggerRegistry } from '../lib/logger';
 import {
   listProviders,
   getProvider,

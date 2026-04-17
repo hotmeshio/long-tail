@@ -5,7 +5,7 @@ import * as taskService from '../../services/task';
 import * as userService from '../../services/user';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { publishEscalationEvent } from '../../services/events/publish';
+import { publishEscalationEvent } from '../../lib/events/publish';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 

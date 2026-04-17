@@ -1,8 +1,7 @@
 import { DBA } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 import type { PruneOptions, PruneResult } from '@hotmeshio/hotmesh/build/types/dba';
 
-import { postgres_options } from '../modules/config';
+import { getConnection } from '../lib/db';
 
 const APP_ID = 'durable';
 
@@ -12,8 +11,7 @@ const APP_ID = 'durable';
  * Idempotent — safe to call on every startup.
  */
 export async function deploy(): Promise<void> {
-  const connection = { class: Postgres, options: postgres_options };
-  await DBA.deploy(connection, APP_ID);
+  await DBA.deploy(getConnection(), APP_ID);
 }
 
 /**
@@ -40,8 +38,7 @@ export async function prune(options: {
   pruneTransient?: boolean;
   keepHmark?: boolean;
 }): Promise<PruneResult> {
-  const connection = { class: Postgres, options: postgres_options };
-  return DBA.prune({ appId: APP_ID, connection, ...options });
+  return DBA.prune({ appId: APP_ID, connection: getConnection(), ...options });
 }
 
 export type { PruneOptions, PruneResult };

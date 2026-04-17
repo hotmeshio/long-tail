@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 import { registerAtomicTools } from './tools-atomic';
 import { registerRunScript } from './tools-run-script';

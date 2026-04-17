@@ -1,9 +1,7 @@
 import { HotMesh } from '@hotmeshio/hotmesh';
-import { Client as Postgres } from 'pg';
 import type { QuorumProfile, ThrottleOptions } from '@hotmeshio/hotmesh/build/types/quorum';
 
-import { postgres_options } from '../../modules/config';
-import { getPool } from '../db';
+import { getPool, getConnection } from '../../lib/db';
 import { LIST_APPS, COUNT_PENDING, COUNT_PROCESSED_SINCE, VOLUME_BY_STREAM } from './sql';
 import { startQuorumBridge } from './quorum-bridge';
 import type { ControlPlaneApp, StreamStats } from './types';
@@ -27,8 +25,9 @@ export async function getEngine(appId: string): Promise<HotMesh> {
 
   const engine = await HotMesh.init({
     appId,
+    guid: `controlplane::${appId}-${HotMesh.guid()}`,
     engine: {
-      connection: { class: Postgres, options: postgres_options },
+      connection: getConnection(),
     },
   });
   engines.set(appId, engine);

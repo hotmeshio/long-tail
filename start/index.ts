@@ -1,8 +1,8 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { loggerRegistry } from '../services/logger';
-import { telemetryRegistry } from '../services/telemetry';
-import { eventRegistry } from '../services/events';
+import { loggerRegistry } from '../lib/logger';
+import { telemetryRegistry } from '../lib/telemetry';
+import { eventRegistry } from '../lib/events';
 import { maintenanceRegistry } from '../services/maintenance';
 import { cronRegistry } from '../services/cron';
 import { mcpRegistry } from '../services/mcp';
@@ -12,7 +12,7 @@ import { applyDatabaseConfig, applyServerAuthConfig } from './config';
 import { registerAdapters } from './adapters';
 import { buildConnection, collectWorkers, startWorkers } from './workers';
 import { startServer } from './server';
-import { SocketIOEventAdapter } from '../services/events/socketio';
+import { SocketIOEventAdapter } from '../lib/events/socketio';
 
 import type { LTStartConfig, LTInstance } from '../types/startup';
 

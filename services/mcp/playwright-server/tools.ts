@@ -4,7 +4,7 @@ import { type Page } from 'playwright';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 import {
   navigateSchema,

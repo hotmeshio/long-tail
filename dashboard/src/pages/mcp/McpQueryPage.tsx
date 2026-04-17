@@ -7,6 +7,7 @@ import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
+import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { useFilterParams } from '../../hooks/useFilterParams';
@@ -57,10 +58,15 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[]
       render: (row) => <TimestampCell date={row.created_at} />,
     },
     {
-      key: 'updated_at',
-      label: 'Updated',
-      className: 'w-36',
-      render: (row) => <TimestampCell date={row.updated_at} />,
+      key: 'duration',
+      label: 'Duration',
+      render: (row) => (
+        <ElapsedCell
+          startDate={row.created_at}
+          endDate={mapStatus(row) === 'in_progress' ? null : row.updated_at}
+          isLive={mapStatus(row) === 'in_progress'}
+        />
+      ),
     },
     {
       key: 'actions',

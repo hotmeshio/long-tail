@@ -1,4 +1,4 @@
-import { getPool } from './db';
+import { getPool } from '../lib/db';
 
 // ── HotMesh timestamp helpers ───────────────────────────────────────────────
 

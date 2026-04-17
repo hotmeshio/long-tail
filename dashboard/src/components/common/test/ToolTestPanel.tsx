@@ -1,26 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { X, RotateCcw, Play, ExternalLink, KeyRound, User } from 'lucide-react';
+import { X, RotateCcw, Play, ExternalLink, KeyRound } from 'lucide-react';
 import { useCallMcpTool } from '../../../api/mcp';
-import { useAuth } from '../../../hooks/useAuth';
 import { JsonViewer } from '../data/JsonViewer';
+import { RunAsSelector } from '../form/RunAsSelector';
 import type { McpToolManifest } from '../../../api/types';
-
-function buildSkeleton(schema: Record<string, any>): Record<string, any> {
-  if (!schema?.properties) return {};
-  const result: Record<string, any> = {};
-  for (const [key, prop] of Object.entries(schema.properties)) {
-    const p = prop as any;
-    if (p.default !== undefined) result[key] = p.default;
-    else if (p.type === 'string') result[key] = '';
-    else if (p.type === 'number' || p.type === 'integer') result[key] = 0;
-    else if (p.type === 'boolean') result[key] = false;
-    else if (p.type === 'object') result[key] = {};
-    else if (p.type === 'array') result[key] = [];
-    else result[key] = null;
-  }
-  return result;
-}
+import { buildSkeleton } from '../../../pages/mcp/mcp-query-detail/helpers';
 
 function ToolErrorDisplay({ error }: { error: Error | null }) {
   const msg = error instanceof Error ? error.message : '';
@@ -69,31 +54,48 @@ interface ToolTestPanelProps {
 }
 
 export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestPanelProps) {
-  const { user } = useAuth();
   const callTool = useCallMcpTool();
+  const [jsonMode, setJsonMode] = useState(false);
+  const [fields, setFields] = useState<Record<string, any>>({});
   const [argsJson, setArgsJson] = useState('');
   const [jsonError, setJsonError] = useState('');
+  const [executeAs, setExecuteAs] = useState('');
 
-  // Reset state when tool changes
   useEffect(() => {
-    setArgsJson(JSON.stringify(buildSkeleton(tool.inputSchema), null, 2));
+    const skeleton = buildSkeleton(tool.inputSchema);
+    setFields(skeleton);
+    setArgsJson(JSON.stringify(skeleton, null, 2));
+    setJsonMode(false);
     setJsonError('');
     callTool.reset();
   }, [tool.name, serverId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasResult = !!callTool.data || !!callTool.error;
 
+  const toggleMode = () => {
+    if (!jsonMode) {
+      setArgsJson(JSON.stringify(fields, null, 2));
+    } else {
+      try { setFields(JSON.parse(argsJson)); } catch { /* keep fields */ }
+    }
+    setJsonMode(!jsonMode);
+  };
+
   const handleRun = () => {
     setJsonError('');
     callTool.reset();
     let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(argsJson);
-    } catch {
-      setJsonError('Invalid JSON');
-      return;
+    if (jsonMode) {
+      try { parsed = JSON.parse(argsJson); } catch { setJsonError('Invalid JSON'); return; }
+    } else {
+      parsed = { ...fields };
     }
-    callTool.mutate({ serverId, toolName: tool.name, arguments: parsed });
+    callTool.mutate({
+      serverId,
+      toolName: tool.name,
+      arguments: parsed,
+      ...(executeAs ? { execute_as: executeAs } : {}),
+    });
   };
 
   return (
@@ -111,33 +113,64 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        {/* Identity context */}
-        {user && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/[0.06] border border-accent/20">
-            <User className="w-3 h-3 text-accent/75 shrink-0" strokeWidth={1.5} />
-            <span className="text-[10px] text-text-secondary">
-              Calling as <span className="font-medium text-accent">{user.displayName || user.userId}</span>
-            </span>
-          </div>
-        )}
+        <RunAsSelector selected={executeAs} onChange={setExecuteAs} />
 
-        {/* Description */}
         {tool.description && (
           <p className="text-[11px] text-text-secondary leading-relaxed">{tool.description}</p>
         )}
 
-        {/* Request */}
+        {/* Form / JSON toggle input */}
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
-            Request
-          </label>
-          <textarea
-            value={argsJson}
-            onChange={(e) => setArgsJson(e.target.value)}
-            className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
-            rows={6}
-            spellCheck={false}
-          />
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Request</label>
+            <button onClick={toggleMode} className="text-[10px] text-accent hover:underline">
+              {jsonMode ? 'Form view' : 'JSON view'}
+            </button>
+          </div>
+
+          {jsonMode ? (
+            <textarea
+              value={argsJson}
+              onChange={(e) => setArgsJson(e.target.value)}
+              className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
+              rows={6}
+              spellCheck={false}
+            />
+          ) : (
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {Object.entries(fields).map(([key, value]) => (
+                <div key={key}>
+                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
+                  {typeof value === 'boolean' ? (
+                    <select
+                      value={String(value)}
+                      onChange={(e) => setFields({ ...fields, [key]: e.target.value === 'true' })}
+                      className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                    >
+                      <option value="true">true</option>
+                      <option value="false">false</option>
+                    </select>
+                  ) : typeof value === 'object' ? (
+                    <textarea
+                      value={JSON.stringify(value, null, 2)}
+                      onChange={(e) => { try { setFields({ ...fields, [key]: JSON.parse(e.target.value) }); } catch { /* invalid */ } }}
+                      className="w-full min-h-[60px] px-3 py-1.5 bg-surface-sunken border border-surface-border rounded-md font-mono text-xs text-text-primary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                    />
+                  ) : (
+                    <input
+                      type={typeof value === 'number' ? 'number' : 'text'}
+                      value={String(value ?? '')}
+                      onChange={(e) => setFields({ ...fields, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value })}
+                      className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                    />
+                  )}
+                </div>
+              ))}
+              {Object.keys(fields).length === 0 && (
+                <p className="text-[11px] text-text-tertiary italic">No input fields defined</p>
+              )}
+            </div>
+          )}
           {jsonError && <p className="text-[11px] text-status-error mt-1">{jsonError}</p>}
         </div>
 

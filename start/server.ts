@@ -3,7 +3,7 @@ import path from 'path';
 import express from 'express';
 
 import { config } from '../modules/config';
-import { loggerRegistry } from '../services/logger';
+import { loggerRegistry } from '../lib/logger';
 import routes from '../routes';
 
 /**

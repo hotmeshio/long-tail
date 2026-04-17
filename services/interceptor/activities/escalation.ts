@@ -1,5 +1,5 @@
 import * as escalationService from '../../escalation';
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 /**
  * Resolve an escalation record. Called by the interceptor after

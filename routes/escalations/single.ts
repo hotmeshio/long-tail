@@ -3,7 +3,7 @@ import { Router } from 'express';
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 import * as roleService from '../../services/role';
-import { publishEscalationEvent } from '../../services/events/publish';
+import { publishEscalationEvent } from '../../lib/events/publish';
 
 export function registerSingleRoutes(router: Router): void {
   /**

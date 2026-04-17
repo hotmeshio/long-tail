@@ -11,7 +11,7 @@ import type { OrchestratorContext } from '../interceptor/types';
 
 import { createDelegationToken } from '../auth/delegation';
 import { getUser, getUserRoles } from '../user';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 
 /** Role type priority for determining highest role type. */
 const ROLE_TYPE_PRIORITY: Record<string, number> = { superadmin: 3, admin: 2, member: 1 };

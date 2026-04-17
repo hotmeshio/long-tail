@@ -34,8 +34,8 @@ export interface HoneycombOptions {
  *
  * Usage:
  * ```typescript
- * import { telemetryRegistry } from './services/telemetry';
- * import { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
+ * import { telemetryRegistry } from './lib/telemetry';
+ * import { HoneycombTelemetryAdapter } from './lib/telemetry/honeycomb';
  *
  * telemetryRegistry.register(new HoneycombTelemetryAdapter({
  *   apiKey: process.env.HONEYCOMB_API_KEY,

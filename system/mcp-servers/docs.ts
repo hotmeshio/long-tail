@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { loggerRegistry } from '../../services/logger';
+import { loggerRegistry } from '../../lib/logger';
 
 // Resolve docs directory (works from ts-node root and compiled build/)
 function docsDir(): string {

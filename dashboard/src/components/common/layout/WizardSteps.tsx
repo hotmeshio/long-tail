@@ -13,7 +13,7 @@ interface WizardStepsProps {
 
 export function WizardSteps({ labels, current, maxReachable, onStepClick }: WizardStepsProps) {
   return (
-    <div className="sticky top-0 z-10 bg-surface/95 backdrop-blur-sm pb-6 pt-1 -mt-1">
+    <div className="sticky top-0 z-20 bg-surface/95 backdrop-blur-sm pb-6 pt-1 -mt-1">
       <div className="flex items-center gap-3">
         {labels.map((label, i) => {
           const s = i + 1;

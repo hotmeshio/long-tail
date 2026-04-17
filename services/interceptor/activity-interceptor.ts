@@ -1,6 +1,6 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { publishMilestoneEvent } from '../events/publish';
+import { publishMilestoneEvent } from '../../lib/events/publish';
 import { extractEnvelope } from './state';
 
 /**

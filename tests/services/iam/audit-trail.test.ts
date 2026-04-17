@@ -5,9 +5,9 @@ import { createTask, getTask } from '../../../services/task';
 import { createUser, deleteUser } from '../../../services/user';
 import type { LTInstance } from '../../../types/startup';
 import type { LTStartConfig } from '../../../types/startup';
-import { loggerRegistry } from '../../../services/logger';
-import { telemetryRegistry } from '../../../services/telemetry';
-import { eventRegistry } from '../../../services/events';
+import { loggerRegistry } from '../../../lib/logger';
+import { telemetryRegistry } from '../../../lib/telemetry';
+import { eventRegistry } from '../../../lib/events';
 import { maintenanceRegistry } from '../../../services/maintenance';
 
 const TEST_DB = {

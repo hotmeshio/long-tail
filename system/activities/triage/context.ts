@@ -1,4 +1,4 @@
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 import { ltConfig } from '../../../modules/ltconfig';
 import * as taskService from '../../../services/task';
 import * as escalationService from '../../../services/escalation';

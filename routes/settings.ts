@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { telemetryRegistry } from '../services/telemetry';
-import { eventRegistry } from '../services/events';
-import { NatsEventAdapter } from '../services/events/nats';
-import { SocketIOEventAdapter } from '../services/events/socketio';
+import { telemetryRegistry } from '../lib/telemetry';
+import { eventRegistry } from '../lib/events';
+import { NatsEventAdapter } from '../lib/events/nats';
+import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 
 const router = Router();

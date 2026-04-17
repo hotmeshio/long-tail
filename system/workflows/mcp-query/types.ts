@@ -1,11 +1,2 @@
-/** Type definitions for the mcp-query workflow. */
-
-export interface ServerInfo {
-  name: string;
-  description: string | null;
-  tags: string[];
-  metadata: Record<string, any> | null;
-  toolNames: string[];
-  toolCount: number;
-  slug: string;
-}
+/** Re-export shared types for backward compatibility. */
+export type { ServerInfo } from '../shared/types';

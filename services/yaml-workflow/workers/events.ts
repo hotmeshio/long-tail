@@ -1,7 +1,7 @@
 import type { StreamData, StreamDataResponse } from '@hotmeshio/hotmesh/build/types/stream';
 
-import { loggerRegistry } from '../../logger';
-import { publishActivityEvent } from '../../events/publish';
+import { loggerRegistry } from '../../../lib/logger';
+import { publishActivityEvent } from '../../../lib/events/publish';
 import type { ActivityManifestEntry } from '../../../types/yaml-workflow';
 
 /**

@@ -1,5 +1,5 @@
 import type { LTMcpAdapter, LTMcpToolManifest } from '../../types/mcp';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as mcpClient from './client';
 import * as mcpServer from './server';
 import * as mcpDbService from './db';

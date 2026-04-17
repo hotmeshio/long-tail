@@ -1,4 +1,4 @@
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 import { MCP_TOOL_TIMEOUT_MS } from '../../../modules/defaults';
 import { getToolContext } from '../../iam/context';
 import * as mcpDbService from '../db';

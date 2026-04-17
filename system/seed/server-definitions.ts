@@ -9,6 +9,7 @@ import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETC
 import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './tool-manifests-browser';
 import { CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
 import { ADMIN_TOOLS } from './tool-manifests-admin';
+import { KNOWLEDGE_TOOLS } from './tool-manifests-knowledge';
 
 export const SEED_MCP_SERVERS = [
   {
@@ -171,6 +172,25 @@ export const SEED_MCP_SERVERS = [
       'change how the interceptor treats a workflow — use after deploying a compiled pipeline ' +
       'to give it full task tracking and escalation support. update_server_tags changes tool ' +
       'discovery scope — only use when a server genuinely serves a different purpose than tagged.',
+    credential_providers: [],
+  },
+  {
+    name: 'long-tail-knowledge',
+    description:
+      'Persistent knowledge store for autonomous agents. Store, retrieve, search, and accumulate ' +
+      'JSONB documents in isolated domains. Enables workflows to build long-term memory, ' +
+      'catalog research results, and share context across executions.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: KNOWLEDGE_TOOLS,
+    metadata: { builtin: true, category: 'knowledge' },
+    tags: ['knowledge', 'memory', 'state', 'storage'],
+    compile_hints:
+      'store_knowledge upserts by domain+key — it merges data if the entry exists. ' +
+      'Use a consistent domain name across related workflows to build shared context. ' +
+      'search_knowledge uses JSONB containment (@>) — the query object must be a subset of the stored data. ' +
+      'append_knowledge adds to arrays without replacing existing entries — ideal for catalogs and logs. ' +
+      'list_domains returns all domains with counts, useful for discovering what knowledge exists.',
     credential_providers: [],
   },
 ];

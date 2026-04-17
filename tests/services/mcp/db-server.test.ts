@@ -7,9 +7,9 @@ import { createDbServer, stopDbServer } from '../../../services/mcp/db-server';
 import * as taskService from '../../../services/task';
 import * as escalationService from '../../../services/escalation';
 import * as configService from '../../../services/config';
-import { loggerRegistry } from '../../../services/logger';
-import { telemetryRegistry } from '../../../services/telemetry';
-import { eventRegistry } from '../../../services/events';
+import { loggerRegistry } from '../../../lib/logger';
+import { telemetryRegistry } from '../../../lib/telemetry';
+import { eventRegistry } from '../../../lib/events';
 import { maintenanceRegistry } from '../../../services/maintenance';
 import { mcpRegistry } from '../../../services/mcp/index';
 import { parseMcpResult } from '../../setup/mcp';
@@ -115,7 +115,7 @@ describe('DB MCP server', () => {
 
   afterAll(async () => {
     // Cleanup test data
-    const { getPool } = await import('../../../services/db');
+    const { getPool } = await import('../../../lib/db');
     const pool = getPool();
     if (taskIds.length) {
       await pool.query(

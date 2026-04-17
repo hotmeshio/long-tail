@@ -2,7 +2,7 @@ import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 import {
   ensureBrowser,
   pages,
@@ -21,7 +21,8 @@ export function registerCaptureTools(srv: McpServer): void {
     {
       title: 'Capture Page',
       description:
-        'Navigate to a URL and capture a screenshot in one call. ' +
+        'Navigate to a URL, capture a screenshot, and save it to persistent file storage in one call. ' +
+        'The returned `path` is the storage reference — no separate write_file call is needed. ' +
         'Optionally waits for a CSS selector or a fixed delay to ensure content is loaded. ' +
         'Pass page_id from a prior login_and_capture to reuse the authenticated session.',
       inputSchema: capturePageSchema,
@@ -83,6 +84,7 @@ export function registerCaptureTools(srv: McpServer): void {
               url: page.url(),
               title: await page.title(),
               ...screenshot,
+              storage_ref: screenshot.path,
               _handle: buildHandle(pageId),
             }),
           }],
