@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { ServiceTokenRecord } from '../../types/delegation';
 
 const TOKEN_PREFIX = 'lt_svc_';

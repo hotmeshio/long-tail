@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { sanitizeAppId, quoteSchema } from '../hotmesh-utils';
 
 import { DISTINCT_ENTITIES, ACTIVE_GRAPH_TOPICS, COUNT_JOBS, LIST_JOBS } from './sql';

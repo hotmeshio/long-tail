@@ -4,14 +4,14 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options, sleepFor } from '../../setup';
 import { connectTelemetry, disconnectTelemetry } from '../../setup/telemetry';
-import { migrate } from '../../../services/db/migrate';
+import { migrate } from '../../../lib/db/migrate';
 import { createLTInterceptor } from '../../../services/interceptor';
 import { createLTActivityInterceptor } from '../../../services/interceptor/activity-interceptor';
 import * as interceptorActivities from '../../../services/interceptor/activities';
 import * as reviewContentWorkflow from '../../../examples/workflows/review-content';
 import * as configService from '../../../services/config';
-import { eventRegistry } from '../../../services/events';
-import { InMemoryEventAdapter } from '../../../services/events/memory';
+import { eventRegistry } from '../../../lib/events';
+import { InMemoryEventAdapter } from '../../../lib/events/memory';
 import type { LTReturn, LTActivity, LTEvent } from '../../../types';
 
 const { Connection, Client, Worker } = Durable;
@@ -265,7 +265,7 @@ describe('events service', () => {
     expect(evt!.workflowName).toBe('reviewContent');
     expect(evt!.taskQueue).toBeTruthy();
     expect(evt!.milestones).toBeInstanceOf(Array);
-    expect(evt!.milestones.length).toBeGreaterThan(0);
+    expect(evt!.milestones!.length).toBeGreaterThan(0);
     expect(evt!.data).toBeTruthy();
     expect(evt!.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   }, 30_000);

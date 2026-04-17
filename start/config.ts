@@ -1,6 +1,6 @@
 import { config, postgres_options } from '../modules/config';
 import { setAuthAdapter } from '../modules/auth';
-import { loggerRegistry } from '../services/logger';
+import { loggerRegistry } from '../lib/logger';
 
 import type { LTStartConfig } from '../types/startup';
 

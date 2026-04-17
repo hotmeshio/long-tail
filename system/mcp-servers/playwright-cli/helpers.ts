@@ -1,5 +1,5 @@
-import { loggerRegistry } from '../../../services/logger';
-import { getStorageBackend } from '../../../services/storage';
+import { loggerRegistry } from '../../../lib/logger';
+import { getStorageBackend } from '../../../lib/storage';
 
 export async function saveScreenshot(page: import('playwright').Page, filePath: string, fullPage: boolean) {
   const backend = getStorageBackend();

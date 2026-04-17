@@ -127,7 +127,7 @@ export async function callCompilationLLM(
     const raw = response.content || '';
     return parsePlan(raw, steps.length);
   } catch (err) {
-    const { loggerRegistry } = await import('../../../logger');
+    const { loggerRegistry } = await import('../../../../lib/logger');
     loggerRegistry.warn(`[yaml-workflow] LLM compilation failed, using mechanical fallback: ${err}`);
     return null;
   }

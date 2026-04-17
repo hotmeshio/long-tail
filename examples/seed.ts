@@ -7,7 +7,7 @@ import type {
   BasicEchoEnvelopeData,
 } from './types';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
-import { loggerRegistry } from '../services/logger';
+import { loggerRegistry } from '../lib/logger';
 import { getUserByExternalId, createUser } from '../services/user';
 import { addUserRole, getUserRoles } from '../services/user/roles';
 import { addEscalationChain, createRole } from '../services/role';

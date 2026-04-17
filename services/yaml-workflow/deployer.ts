@@ -4,7 +4,7 @@ import type { HotMeshManifest } from '@hotmeshio/hotmesh/build/types/hotmesh';
 
 import { postgres_options } from '../../modules/config';
 import { WORKFLOW_SYNC_TIMEOUT_MS } from '../../modules/defaults';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as namespaceService from '../namespace';
 import { buildMergedYaml, recompileWithContext } from './deployer-helpers';
 

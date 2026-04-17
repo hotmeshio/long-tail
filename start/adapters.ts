@@ -1,10 +1,10 @@
-import { loggerRegistry } from '../services/logger';
-import { PinoLoggerAdapter } from '../services/logger/pino';
-import { telemetryRegistry } from '../services/telemetry';
-import { HoneycombTelemetryAdapter } from '../services/telemetry/honeycomb';
-import { eventRegistry } from '../services/events';
-import { NatsEventAdapter } from '../services/events/nats';
-import { SocketIOEventAdapter } from '../services/events/socketio';
+import { loggerRegistry } from '../lib/logger';
+import { PinoLoggerAdapter } from '../lib/logger/pino';
+import { telemetryRegistry } from '../lib/telemetry';
+import { HoneycombTelemetryAdapter } from '../lib/telemetry/honeycomb';
+import { eventRegistry } from '../lib/events';
+import { NatsEventAdapter } from '../lib/events/nats';
+import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { maintenanceRegistry } from '../services/maintenance';
 import { defaultMaintenanceConfig } from '../modules/maintenance';
 import { mcpRegistry } from '../services/mcp';

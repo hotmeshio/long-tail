@@ -1,5 +1,5 @@
 import type { LTOAuthProviderConfig } from '../../../types/oauth';
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 import { createAnthropicHandler } from './anthropic';
 import { createGitHubHandler } from './github';

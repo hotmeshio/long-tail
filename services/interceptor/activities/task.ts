@@ -1,6 +1,6 @@
 import * as taskService from '../../task';
-import { publishMilestoneEvent, publishTaskEvent } from '../../events/publish';
-import { getPool } from '../../db';
+import { publishMilestoneEvent, publishTaskEvent } from '../../../lib/events/publish';
+import { getPool } from '../../../lib/db';
 import { VERIFY_USER_BY_ID, GET_USER_BY_EXTERNAL_ID } from '../../user/sql';
 import type { LTMilestone, LTTaskRecord } from '../../../types';
 

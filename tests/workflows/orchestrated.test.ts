@@ -5,7 +5,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options, sleepFor, waitForEscalation } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { resolveEscalation } from '../setup/resolve';
-import { migrate } from '../../services/db/migrate';
+import { migrate } from '../../lib/db/migrate';
 import { createLTInterceptor } from '../../services/interceptor';
 import { createLTActivityInterceptor } from '../../services/interceptor/activity-interceptor';
 import * as interceptorActivities from '../../services/interceptor/activities';

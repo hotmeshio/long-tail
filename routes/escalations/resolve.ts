@@ -3,7 +3,7 @@ import { Router } from 'express';
 import * as escalationService from '../../services/escalation';
 import * as taskService from '../../services/task';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
-import { publishEscalationEvent } from '../../services/events/publish';
+import { publishEscalationEvent } from '../../lib/events/publish';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';

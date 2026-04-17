@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { callLLM } from '../../services/llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
-import { loggerRegistry } from '../../services/logger';
+import { loggerRegistry } from '../../lib/logger';
 
 function TRANSLATE_SYSTEM_PROMPT(targetLanguage: string): string {
   return `You are a translation assistant. Translate the user's text to ${targetLanguage}. Return ONLY a JSON object: {"translated_content": "...", "source_language": "detected ISO code"}. No markdown, no explanation.`;

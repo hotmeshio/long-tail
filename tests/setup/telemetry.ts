@@ -1,5 +1,5 @@
-import { telemetryRegistry } from '../../services/telemetry';
-import { HoneycombTelemetryAdapter } from '../../services/telemetry/honeycomb';
+import { telemetryRegistry } from '../../lib/telemetry';
+import { HoneycombTelemetryAdapter } from '../../lib/telemetry/honeycomb';
 
 /**
  * Whether telemetry export is enabled for this test run.

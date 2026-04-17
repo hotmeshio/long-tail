@@ -1,4 +1,4 @@
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 import type { ToolDefinition } from '../../../services/llm';
 import * as mcpDbService from '../../../services/mcp/db';
 import { generateStrategySection } from './strategy-advisors';

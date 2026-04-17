@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 import { registerTools } from './tools';
 

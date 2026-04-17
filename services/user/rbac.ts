@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 
 import { hasRoleType } from './roles';
 import { IS_GROUP_ADMIN } from './sql';

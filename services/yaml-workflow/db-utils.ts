@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { YAML_LIST_LIMIT } from '../../modules/defaults';
 import type { LTYamlWorkflowRecord, LTYamlWorkflowStatus } from '../../types/yaml-workflow';
 import {

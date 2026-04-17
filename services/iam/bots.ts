@@ -5,7 +5,7 @@
  * They share the same RBAC, OAuth credentials, and delegation tokens
  * as human users — no separate infrastructure needed.
  */
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { createUser, getUser, updateUser, deleteUser } from '../user';
 import { addUserRole, removeUserRole, getUserRoles } from '../user';
 import type { LTUserRecord, LTRoleType } from '../../types';

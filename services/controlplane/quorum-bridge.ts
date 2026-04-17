@@ -1,7 +1,7 @@
 import type { QuorumMessageCallback } from '@hotmeshio/hotmesh/build/types/quorum';
 
-import { eventRegistry } from '../events';
-import { loggerRegistry } from '../logger';
+import { eventRegistry } from '../../lib/events';
+import { loggerRegistry } from '../../lib/logger';
 import type { LTEvent } from '../../types';
 
 /**

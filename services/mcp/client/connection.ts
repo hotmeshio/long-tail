@@ -3,7 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 import * as mcpDbService from '../db';
 import type { LTMcpServerRecord, LTMcpToolManifest } from '../../../types';
 

@@ -4,14 +4,14 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options } from '../modules/config';
 import { registerLT } from '../services/interceptor';
 import { registerWorker } from '../services/workers/registry';
-import { loggerRegistry } from '../services/logger';
-import { telemetryRegistry } from '../services/telemetry';
-import { eventRegistry } from '../services/events';
+import { loggerRegistry } from '../lib/logger';
+import { telemetryRegistry } from '../lib/telemetry';
+import { eventRegistry } from '../lib/events';
 import { maintenanceRegistry } from '../services/maintenance';
 import { cronRegistry } from '../services/cron';
 import { mcpRegistry } from '../services/mcp';
 import * as yamlWorkflowWorkers from '../services/yaml-workflow/workers';
-import { migrate } from '../services/db/migrate';
+import { migrate } from '../lib/db/migrate';
 
 import type { LTStartConfig } from '../types/startup';
 

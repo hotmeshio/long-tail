@@ -8,7 +8,7 @@
 import type { ToolPrincipal } from '../../types/tool-context';
 
 import { getFreshAccessToken } from '../oauth';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 
 /**
  * Thrown when credential resolution finds no credential for a provider.

@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import * as configService from '../../services/config';
 import { cronRegistry } from '../../services/cron';
-import { getPool } from '../../services/db';
+import { getPool } from '../../lib/db';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../services/workers/registry';
 
 const router = Router();

@@ -3,7 +3,7 @@ import { Client as Postgres } from 'pg';
 
 import { postgres_options } from '../../modules/config';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as configService from '../config';
 import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig } from '../../types';

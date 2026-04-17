@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { getPool } from '../../db';
+import { getPool } from '../../../lib/db';
 import * as taskService from '../../task';
 import * as escalationService from '../../escalation';
 import * as configService from '../../config';

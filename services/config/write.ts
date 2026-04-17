@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTWorkflowConfig } from '../../types';
 import { getWorkflowConfig } from './read';
 import {

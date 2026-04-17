@@ -1,6 +1,6 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { encrypt, decrypt } from '../oauth/crypto';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 
 // ── Token format ────────────────────────────────────────────────────────────
 // Opaque string: eph:v1:<label>:<uuid>

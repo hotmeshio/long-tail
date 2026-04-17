@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 
-import { eventRegistry } from '../../../services/events';
-import { InMemoryEventAdapter } from '../../../services/events/memory';
+import { eventRegistry } from '../../../lib/events';
+import { InMemoryEventAdapter } from '../../../lib/events/memory';
 import {
   publishMilestoneEvent,
   publishTaskEvent,
   publishEscalationEvent,
   publishWorkflowEvent,
   publishActivityEvent,
-} from '../../../services/events/publish';
+} from '../../../lib/events/publish';
 
 describe('event publish functions', () => {
   let adapter: InMemoryEventAdapter;
@@ -311,7 +311,7 @@ describe('event publish functions', () => {
 
   describe('no adapters', () => {
     it('resolves immediately when no adapters are registered', async () => {
-      const isolatedRegistry = await import('../../../services/events');
+      const isolatedRegistry = await import('../../../lib/events');
 
       // Save and restore
       const savedHasAdapters = Object.getOwnPropertyDescriptor(

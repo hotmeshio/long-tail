@@ -2,7 +2,7 @@ import { Virtual } from '@hotmeshio/hotmesh';
 import { Client as Postgres } from 'pg';
 
 import { postgres_options } from '../../modules/config';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as dbaService from '../dba';
 import type { LTMaintenanceConfig, LTMaintenanceRule } from '../../types/maintenance';
 

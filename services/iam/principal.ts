@@ -9,7 +9,7 @@
  * - UUID id (e.g., '76d28d6c-...' — as stored in JWT userId)
  */
 
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTEnvelopePrincipal } from '../../types/envelope';
 
 /** UUID v4 pattern for distinguishing UUIDs from external_ids. */

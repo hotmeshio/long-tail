@@ -75,7 +75,7 @@ export async function generateYamlFromExecution(
 
   // 4. Log validation warnings (informational — do not recompile)
   if (ctx.validationIssues.length > 0) {
-    const { loggerRegistry } = await import('../logger');
+    const { loggerRegistry } = await import('../../lib/logger');
     loggerRegistry.warn(
       `[yaml-workflow] Validation warnings (${ctx.validationIssues.length}): ${ctx.validationIssues.join('; ')}`,
     );

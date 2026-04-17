@@ -3,7 +3,7 @@ import { Client as Postgres } from 'pg';
 import type { StreamData, StreamDataResponse } from '@hotmeshio/hotmesh/build/types/stream';
 
 import { postgres_options } from '../../../modules/config';
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 import { exchangeTokensInArgs } from '../../iam/ephemeral';
 import * as mcpClient from '../../mcp/client';
 import * as yamlDb from '../db';

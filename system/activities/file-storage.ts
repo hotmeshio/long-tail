@@ -1,6 +1,6 @@
 import * as path from 'path';
 
-import { getStorageBackend } from '../../services/storage';
+import { getStorageBackend } from '../../lib/storage';
 
 const MIME_MAP: Record<string, string> = {
   '.json': 'application/json', '.txt': 'text/plain', '.html': 'text/html',

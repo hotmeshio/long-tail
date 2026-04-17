@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import path from 'path';
 
-import { getStorageBackend } from '../services/storage';
+import { getStorageBackend } from '../lib/storage';
 
 const router = Router();
 

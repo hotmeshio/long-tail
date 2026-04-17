@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTEscalationRecord } from '../../types';
 
 import {

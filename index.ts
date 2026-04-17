@@ -1,5 +1,5 @@
 import { config } from './modules/config';
-import { loggerRegistry } from './services/logger';
+import { loggerRegistry } from './lib/logger';
 
 import { start } from './start';
 
@@ -17,15 +17,15 @@ export * as EscalationService from './services/escalation';
 export * as ConfigService from './services/config';
 export * as UserService from './services/user';
 export { ltConfig } from './modules/ltconfig';
-export { eventRegistry } from './services/events';
-export { NatsEventAdapter } from './services/events/nats';
-export { InMemoryEventAdapter } from './services/events/memory';
-export { SocketIOEventAdapter } from './services/events/socketio';
-export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishWorkflowEvent } from './services/events/publish';
-export { telemetryRegistry } from './services/telemetry';
-export { HoneycombTelemetryAdapter } from './services/telemetry/honeycomb';
-export { loggerRegistry } from './services/logger';
-export { PinoLoggerAdapter } from './services/logger/pino';
+export { eventRegistry } from './lib/events';
+export { NatsEventAdapter } from './lib/events/nats';
+export { InMemoryEventAdapter } from './lib/events/memory';
+export { SocketIOEventAdapter } from './lib/events/socketio';
+export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishWorkflowEvent } from './lib/events/publish';
+export { telemetryRegistry } from './lib/telemetry';
+export { HoneycombTelemetryAdapter } from './lib/telemetry/honeycomb';
+export { loggerRegistry } from './lib/logger';
+export { PinoLoggerAdapter } from './lib/logger/pino';
 export { maintenanceRegistry } from './services/maintenance';
 export { defaultMaintenanceConfig } from './modules/maintenance';
 export { mcpRegistry } from './services/mcp';

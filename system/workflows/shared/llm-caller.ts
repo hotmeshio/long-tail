@@ -1,6 +1,6 @@
 import { callLLM as callLLMService, type ToolDefinition, type LLMResponse } from '../../../services/llm';
 import { LLM_MODEL_PRIMARY, LLM_MAX_TOKENS_DEFAULT } from '../../../modules/defaults';
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 /**
  * Call the LLM with messages and optional tool IDs.

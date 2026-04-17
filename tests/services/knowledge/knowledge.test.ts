@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 
 import { postgres_options } from '../../setup';
-import { migrate } from '../../../services/db/migrate';
+import { migrate } from '../../../lib/db/migrate';
 import * as knowledge from '../../../system/activities/knowledge';
 
 const DOMAIN = 'test-knowledge';

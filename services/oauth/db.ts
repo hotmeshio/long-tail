@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { encrypt, decrypt } from './crypto';
 import { getProvider, type OAuthTokens } from './providers';
 import type { LTDecryptedToken } from '../../types/oauth';

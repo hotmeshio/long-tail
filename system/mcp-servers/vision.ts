@@ -4,8 +4,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { callLLM } from '../../services/llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
-import { loggerRegistry } from '../../services/logger';
-import { getStorageBackend } from '../../services/storage';
+import { loggerRegistry } from '../../lib/logger';
+import { getStorageBackend } from '../../lib/storage';
 import { ANALYZE_IMAGE_PROMPT, DESCRIBE_IMAGE_PROMPT } from './vision-prompts';
 
 const MIME_MAP: Record<string, string> = {

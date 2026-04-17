@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTMcpServerRecord, LTMcpServerStatus, LTMcpToolManifest } from '../../types';
 import {
   CREATE_MCP_SERVER,

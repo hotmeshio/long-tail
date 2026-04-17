@@ -3,7 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../../../modules/config';
 import { JOB_EXPIRE_SECS } from '../../../modules/defaults';
-import { loggerRegistry } from '../../logger';
+import { loggerRegistry } from '../../../lib/logger';
 
 /**
  * Signal an orchestrator workflow from within the interceptor.

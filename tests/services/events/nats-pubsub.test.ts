@@ -144,7 +144,7 @@ describe.skip('NATS pub/sub integration (requires NATS server)', () => {
     const collecting = collectMessages(sub, `${PREFIX}.>`, 1);
     await new Promise((r) => setTimeout(r, 50));
 
-    // Exactly how services/events/nats.ts publishes:
+    // Exactly how lib/events/nats.ts publishes:
     const event = {
       type: 'workflow.completed' as const,
       source: 'interceptor',

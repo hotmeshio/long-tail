@@ -10,7 +10,7 @@ import type {
   LTTimelineEntry,
   LTTransitionEntry,
 } from '../../types';
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 
 import { getHandle } from './client';
 import { postProcessExecution } from './post-process';

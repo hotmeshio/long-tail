@@ -4,7 +4,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { postgres_options } from '../../setup';
 import { connectTelemetry, disconnectTelemetry } from '../../setup/telemetry';
-import { migrate } from '../../../services/db/migrate';
+import { migrate } from '../../../lib/db/migrate';
 import * as escalationService from '../../../services/escalation';
 import * as userService from '../../../services/user';
 
@@ -51,7 +51,7 @@ describe('escalation service', () => {
 
   afterAll(async () => {
     // Clean up test escalations
-    const { getPool } = await import('../../../services/db');
+    const { getPool } = await import('../../../lib/db');
     const pool = getPool();
     await pool.query(
       'DELETE FROM lt_escalations WHERE id = ANY($1::uuid[])',

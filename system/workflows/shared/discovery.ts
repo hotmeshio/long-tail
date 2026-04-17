@@ -1,6 +1,6 @@
 import { callLLM as callLLMService } from '../../../services/llm';
 import { LLM_MODEL_SECONDARY, STOP_WORDS } from '../../../modules/defaults';
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 import type { ToolDefinition } from '../../../services/llm';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import { WORKFLOW_MATCH_PROMPT, EXTRACT_INPUTS_PROMPT } from './prompts';

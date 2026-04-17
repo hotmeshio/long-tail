@@ -2,7 +2,7 @@ import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { loggerRegistry } from '../../../services/logger';
+import { loggerRegistry } from '../../../lib/logger';
 import {
   ensureBrowser,
   pages,

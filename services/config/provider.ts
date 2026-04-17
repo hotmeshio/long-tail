@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTProviderData } from '../../types';
 import { GET_PROVIDER_DATA } from './sql';
 

@@ -8,7 +8,7 @@
 
 import * as path from 'path';
 
-import { getStorageBackend } from '../../../services/storage';
+import { getStorageBackend } from '../../../lib/storage';
 
 const MIME_MAP: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',

@@ -1,7 +1,7 @@
 import type { LTOAuthStartConfig, LTOAuthProviderConfig } from '../../types/oauth';
 import { setEncryptionKey } from './crypto';
 import { registerProvider, listProviders, getProvider } from './providers';
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 
 export { encrypt, decrypt, getEncryptionKey, setEncryptionKey } from './crypto';
 export { createOAuthState, consumeOAuthState } from './state';

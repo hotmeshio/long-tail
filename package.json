@@ -11,7 +11,7 @@
   "files": [
     "build/",
     "docs/",
-    "services/db/schemas/",
+    "lib/db/schemas/",
     "dashboard/dist/",
     "LICENSE",
     "README.md"
@@ -22,7 +22,7 @@
     "clean-build": "npm run clean && npm run build",
     "start": "ts-node index.ts",
     "start:dev": "ts-node-dev --respawn index.ts",
-    "migrate": "ts-node services/db/migrate.ts",
+    "migrate": "ts-node lib/db/migrate.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --fix --ext .ts",
     "test": "vitest run",

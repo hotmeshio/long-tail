@@ -1,7 +1,7 @@
 import type { LTEscalation } from '../../types';
 import type { InterceptorState } from './types';
 import { buildStoredEnvelope } from './state';
-import { publishEscalationEvent, publishTaskEvent, publishWorkflowEvent } from '../events/publish';
+import { publishEscalationEvent, publishTaskEvent, publishWorkflowEvent } from '../../lib/events/publish';
 import { MissingCredentialError } from '../iam/credentials';
 
 /**

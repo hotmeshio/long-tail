@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { loggerRegistry } from '../logger';
+import { loggerRegistry } from '../../lib/logger';
 import * as yamlGenerator from '../yaml-workflow/generator';
 import * as yamlDb from '../yaml-workflow/db';
 import * as yamlDeployer from '../yaml-workflow/deployer';

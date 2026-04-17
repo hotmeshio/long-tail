@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import { getRegisteredWorkers } from '../workers/registry';
 import type { ResolvedHandle } from './types';
 import {

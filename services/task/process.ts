@@ -1,4 +1,4 @@
-import { getPool } from '../db';
+import { getPool } from '../../lib/db';
 import type { LTTaskRecord } from '../../types';
 import type { ProcessSummary, ProcessStats } from './types';
 import { VALID_PERIODS } from './types';

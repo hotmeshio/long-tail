@@ -1,5 +1,5 @@
-import { getPool } from '../../services/db';
-import { loggerRegistry } from '../../services/logger';
+import { getPool } from '../../lib/db';
+import { loggerRegistry } from '../../lib/logger';
 import { SEED_MCP_SERVER } from '../../services/mcp/sql';
 
 import { SEED_MCP_SERVERS } from './server-definitions';
