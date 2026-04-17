@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef } from 'react';
 import type { NatsEventHandler } from '../lib/nats/types';
 
 /**
- * Unified event context — both NatsProvider and SocketIOProvider
+ * Unified event context — all event transports (socket.io, NATS)
  * write to this so consumer hooks work regardless of transport.
  */
 export interface EventContextValue {

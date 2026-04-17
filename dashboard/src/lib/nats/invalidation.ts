@@ -1,7 +1,7 @@
 import type { NatsLTEvent } from './types';
 
 /**
- * Map a NATS event to the React Query keys that should be invalidated.
+ * Map an event to the React Query keys that should be invalidated.
  *
  * Returns an array of query key prefixes. React Query's `invalidateQueries`
  * will match all queries whose key starts with any returned prefix.

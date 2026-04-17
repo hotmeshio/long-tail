@@ -32,7 +32,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         </Link>
       </div>
 
-      {/* Right: inbox, NATS indicator + user menu */}
+      {/* Right: inbox, event status indicator + user menu */}
       <div className="flex items-center gap-4">
         <button
           onClick={onToggleDocs}

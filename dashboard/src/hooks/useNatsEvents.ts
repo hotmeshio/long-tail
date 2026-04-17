@@ -6,7 +6,7 @@ import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 /**
  * Debounced query invalidation. Collects query keys over a window
  * and fires a single batch invalidation, preventing rapid re-renders
- * when multiple NATS events arrive in quick succession.
+ * when multiple events arrive in quick succession.
  */
 function useDebouncedInvalidation(delayMs = 500) {
   const qc = useQueryClient();

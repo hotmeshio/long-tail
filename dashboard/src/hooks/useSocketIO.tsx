@@ -20,9 +20,9 @@ interface SocketIOContextValue {
   connected: boolean;
   /**
    * Register a callback for events matching a subject pattern.
-   * Returns an unsubscribe function. Same API as NatsProvider.
+   * Returns an unsubscribe function.
    *
-   * @param pattern — NATS-style subject pattern (e.g. `lt.events.task.>`)
+   * @param pattern — dot-delimited subject pattern (e.g. `lt.events.task.>`)
    * @param handler — called for each matching event
    */
   subscribe: (pattern: string, handler: NatsEventHandler) => () => void;
@@ -45,7 +45,7 @@ export function useSocketIOStatus(): { connected: boolean } {
 
 /**
  * Subscribe to socket.io events matching a subject pattern.
- * Same API as `useNatsSubscription`.
+ * Subscribe to socket.io events matching a subject pattern.
  */
 export function useSocketIOSubscription(pattern: string, handler: NatsEventHandler): void {
   const { subscribe } = useContext(SocketIOContext);
@@ -65,7 +65,7 @@ export function useSocketIOSubscription(pattern: string, handler: NatsEventHandl
  *
  * The server emits events as `lt.events.{type}` (e.g. `lt.events.task.created`).
  * This provider listens for all `lt.events.*` events and dispatches them to
- * registered pattern-based handlers, matching the NatsProvider API.
+ * registered pattern-based handlers, matching the unified event context API.
  */
 export function SocketIOProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);

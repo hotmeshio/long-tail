@@ -14,7 +14,7 @@ export interface ActivityStep {
 }
 
 /**
- * Subscribe to NATS activity events for a specific YAML workflow job.
+ * Subscribe to activity events for a specific YAML workflow job.
  * Returns live step progress as events arrive.
  */
 export function useYamlActivityEvents(jobId: string | null): {
