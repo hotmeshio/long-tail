@@ -286,7 +286,9 @@ export function ConfigurationSection({
                               <div key={k} className="flex items-baseline gap-2 text-xs">
                                 <span className="font-mono text-text-secondary shrink-0">{k}</span>
                                 <span className="text-text-tertiary shrink-0">&larr;</span>
-                                <span className="font-mono text-accent/70">{v as string}</span>
+                                <span className="font-mono text-accent/70">
+                                  {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                                </span>
                               </div>
                             ))}
                           </div>

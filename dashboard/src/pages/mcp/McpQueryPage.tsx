@@ -1,18 +1,26 @@
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers, Circle } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
+import { RefreshButton } from '../../components/common/data/RefreshButton';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { EmptyState } from '../../components/common/display/EmptyState';
+import { RowActionGroup } from '../../components/common/layout/RowActions';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
 import { useMcpQueryJobs } from '../../api/mcp-query';
 import type { LTJob } from '../../api/types';
+
+const STATUS_DOT: Record<string, string> = {
+  in_progress: 'bg-status-active',
+  completed: 'bg-status-success',
+  failed: 'bg-status-error',
+};
 
 function mapStatus(job: LTJob): string {
   if (job.status === 'completed') return 'completed';
@@ -24,48 +32,55 @@ function mapStatus(job: LTJob): string {
 function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[] {
   return [
     {
-      key: 'entity',
-      label: 'Workflow Type',
-      className: 'whitespace-nowrap',
+      key: 'workflow_id',
+      label: 'Workflow ID / Type',
       render: (row) => {
         const s = mapStatus(row);
-        const dotColor = s === 'completed' ? 'fill-status-success text-status-success'
-          : s === 'in_progress' ? 'fill-status-active text-status-active animate-pulse'
-          : 'fill-status-error text-status-error';
+        const dotClass = STATUS_DOT[s] ?? 'bg-status-pending';
+        const pulseClass = s === 'in_progress' ? ' animate-pulse' : '';
         return (
-          <span className="inline-flex items-center gap-2">
-            <Circle className={`w-2.5 h-2.5 shrink-0 ${dotColor}`} />
-            <WorkflowPill type={(row as any).entity || 'unknown'} />
-          </span>
+          <div className="flex items-start gap-2 min-w-0">
+            <span className={`w-[9px] h-[9px] shrink-0 rounded-full mt-1 ${dotClass}${pulseClass}`} title={s} />
+            <div className="min-w-0">
+              <span className="font-mono text-xs text-text-primary truncate block">
+                {row.workflow_id}
+              </span>
+              <div className="mt-0.5">
+                <WorkflowPill type={row.entity || 'unknown'} />
+              </div>
+            </div>
+          </div>
         );
       },
     },
     {
-      key: 'workflow_id',
-      label: 'Workflow ID',
-      render: (row) => (
-        <span className="text-xs font-mono text-text-primary truncate block">
-          {row.workflow_id}
-        </span>
-      ),
-    },
-    {
       key: 'created_at',
       label: 'Created',
-      className: 'w-36',
-      sortable: true,
       render: (row) => <TimestampCell date={row.created_at} />,
+      className: 'w-40',
+      sortable: true,
+    },
+    {
+      key: 'updated_at',
+      label: 'Updated',
+      render: (row) => <TimestampCell date={row.updated_at} />,
+      className: 'w-40',
+      sortable: true,
     },
     {
       key: 'duration',
       label: 'Duration',
-      render: (row) => (
-        <ElapsedCell
-          startDate={row.created_at}
-          endDate={mapStatus(row) === 'in_progress' ? null : row.updated_at}
-          isLive={mapStatus(row) === 'in_progress'}
-        />
-      ),
+      render: (row) => {
+        const s = mapStatus(row);
+        return (
+          <ElapsedCell
+            startDate={row.created_at}
+            endDate={s === 'in_progress' ? null : row.updated_at}
+            isLive={s === 'in_progress'}
+          />
+        );
+      },
+      className: 'w-28',
     },
     {
       key: 'actions',
@@ -75,36 +90,35 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[]
         const s = mapStatus(row);
         const isComplete = s === 'completed';
         return (
-          <span className="opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center gap-2">
+          <RowActionGroup>
             <button
               onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?step=1`); }}
-              className="text-text-tertiary hover:text-accent transition-colors"
+              className="opacity-0 group-hover/row:opacity-100 text-text-tertiary hover:text-accent transition-all"
               title="Describe"
             >
               <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?step=2`); }}
-              className="text-text-tertiary hover:text-status-warning transition-colors"
+              className="opacity-0 group-hover/row:opacity-100 text-text-tertiary hover:text-status-warning transition-all"
               title="Discover"
             >
               <Lightbulb className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?step=3`); }}
-              className={`transition-colors ${isComplete ? 'text-text-tertiary hover:text-status-success' : 'text-text-tertiary/30 cursor-not-allowed'}`}
+              className={`opacity-0 group-hover/row:opacity-100 transition-all ${isComplete ? 'text-text-tertiary hover:text-status-success' : 'text-text-tertiary/30 cursor-not-allowed'}`}
               title={isComplete ? 'Compile' : 'Complete discovery first'}
               disabled={!isComplete}
             >
               <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
-          </span>
+          </RowActionGroup>
         );
       },
     },
   ];
 }
-
 
 export function McpQueryPage() {
   const navigate = useNavigate();
@@ -115,7 +129,7 @@ export function McpQueryPage() {
     pageSize: 20,
   });
 
-  const { data, isLoading } = useMcpQueryJobs({
+  const { data, isLoading, refetch } = useMcpQueryJobs({
     limit: pagination.pageSize,
     offset: pagination.offset,
     search: filters.search,
@@ -133,12 +147,15 @@ export function McpQueryPage() {
       <PageHeader
         title="Pipeline Designer"
         actions={
-          <button
-            onClick={() => navigate('/mcp/queries/new')}
-            className="btn-primary text-xs"
-          >
-            Design Pipeline
-          </button>
+          <div className="flex items-center gap-3">
+            <RefreshButton onClick={() => refetch()} />
+            <button
+              onClick={() => navigate('/mcp/queries/new')}
+              className="btn-primary text-xs"
+            >
+              Design Pipeline
+            </button>
+          </div>
         }
       />
 

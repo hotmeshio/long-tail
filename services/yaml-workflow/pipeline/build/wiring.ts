@@ -5,9 +5,64 @@
 import type {
   ExtractedStep,
   EnhancedCompilationPlan,
+  DataFlowEdge,
 } from '../../types';
 
 import { keysRelated } from './utils';
+
+/** HotMesh @pipe expression for today's date as YYYY-MM-DD. */
+const DATE_PIPE = {
+  '@pipe': [
+    ['{@date.now}'],
+    ['{@date.toISOString}'],
+    [0, 10, '{@string.substring}'],
+  ],
+};
+
+/**
+ * Convert a scalar derivation spec into a HotMesh @pipe expression.
+ * Returns the original sourceRef string when no derivation applies.
+ */
+function buildDerivationPipe(
+  sourceRef: string,
+  derivation: DataFlowEdge['derivation'],
+): string | Record<string, unknown> {
+  if (!derivation) return sourceRef;
+
+  switch (derivation.strategy) {
+    case 'concat': {
+      const parts = derivation.parts || ['{value}'];
+      const pipeArgs = parts.map((p: string) => {
+        if (p === '{value}') return sourceRef;
+        if (p === '{date}') return DATE_PIPE;
+        return p;
+      });
+      if (pipeArgs.length === 1 && pipeArgs[0] === sourceRef) return sourceRef;
+      return { '@pipe': [pipeArgs, ['{@string.concat}']] };
+    }
+    case 'template': {
+      const tpl = derivation.template || '{value}';
+      const segments = tpl.split(/(\{value\}|\{date\})/);
+      const pipeArgs = segments.filter(Boolean).map((s: string) => {
+        if (s === '{value}') return sourceRef;
+        if (s === '{date}') return DATE_PIPE;
+        return s;
+      });
+      if (pipeArgs.length === 1 && pipeArgs[0] === sourceRef) return sourceRef;
+      return { '@pipe': [pipeArgs, ['{@string.concat}']] };
+    }
+    case 'prefix': {
+      const concatParts: unknown[] = [];
+      if (derivation.prefix) concatParts.push(derivation.prefix);
+      concatParts.push(sourceRef);
+      if (derivation.suffix) concatParts.push(derivation.suffix);
+      if (concatParts.length === 1) return sourceRef;
+      return { '@pipe': [concatParts, ['{@string.concat}']] };
+    }
+    default:
+      return sourceRef;
+  }
+}
 
 /**
  * Build input mappings for a step using the compilation plan's data flow edges.
@@ -25,8 +80,8 @@ export function wireStepInputs(
   prevActivityId: string,
   prevResult: unknown,
   collapsedToCoreIndex?: Map<number, number>,
-): Record<string, string> {
-  const inputMappings: Record<string, string> = {};
+): Record<string, unknown> {
+  const inputMappings: Record<string, unknown> = {};
 
   // Determine session fields for gap-fill after plan-driven wiring
   const sessionFieldSet = new Set(
@@ -50,13 +105,15 @@ export function wireStepInputs(
         const transformActId = `${prefix}_xf${stepIdx + 1}`;
         inputMappings[edge.toField] = `{${transformActId}.output.data.${edge.toField}}`;
       } else if (edge.fromStep === 'trigger') {
-        inputMappings[edge.toField] = `{${triggerId}.output.data.${edge.fromField}}`;
+        const rawRef = `{${triggerId}.output.data.${edge.fromField}}`;
+        inputMappings[edge.toField] = buildDerivationPipe(rawRef, edge.derivation);
       } else {
         // Remap the source step from collapsed to core index
         const remappedFrom = collapsedToCoreIndex?.get(edge.fromStep as number) ?? edge.fromStep;
         const sourceActId = stepIndexToActivityId.get(remappedFrom as number);
         if (sourceActId) {
-          inputMappings[edge.toField] = `{${sourceActId}.output.data.${edge.fromField}}`;
+          const rawRef = `{${sourceActId}.output.data.${edge.fromField}}`;
+          inputMappings[edge.toField] = buildDerivationPipe(rawRef, edge.derivation);
         }
       }
     }

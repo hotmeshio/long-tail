@@ -94,6 +94,13 @@ Specify directed edges showing how data flows between steps:
 
 Session handles are critical — they maintain authenticated browser sessions, database connections, etc. They must be threaded from their producer through ALL subsequent steps that need them.
 
+### Chain Analysis to Downstream Steps
+When a step produces a meaningful result (analysis, extraction, description, computed value) and a later step consumes related data (saving, storing, forwarding, reporting), there MUST be a data_flow edge connecting them. Match by semantic intent, not just field name:
+- Step produces \`description\` → downstream step takes \`value\` → edge with from_field: "description", to_field: "value"
+- Step produces \`analysis.summary\` → downstream step takes \`content\` → edge with appropriate field mapping
+
+If the original execution trace shows that a step's output was used (even indirectly) as input to a later step, the compiled version must preserve that data chain. A broken chain means the downstream step receives no data — the worst possible compilation error.
+
 ### Data Flow Transforms (CRITICAL for array reshaping)
 When a source step produces an array of objects in one format but the consuming step expects a DIFFERENT format, add a \`transform\` to the data_flow edge. Compare the source step's result structure with the consuming step's actual arguments from the trace.
 
@@ -104,9 +111,19 @@ Add a transform with:
 - \`field_map\`: maps target keys → source keys (e.g., \`{"url": "href"}\`). Use null for keys not in the source.
 - \`defaults\`: static values to inject (e.g., \`{"wait_ms": 3000, "full_page": true}\`)
 - \`derivations\`: for computed keys (null in field_map), how to derive them from source data
-  - strategy: "slugify" (lowercase, replace spaces/special with hyphens), "prefix", "template"
+  - strategy: "slugify" (lowercase, replace spaces/special with hyphens), "prefix", "template", "concat"
   - source_key: which source field to derive from
   - prefix/suffix/template: string manipulation params
+
+Available derivation strategies:
+- **slugify**: Lowercase, replace spaces/special chars with hyphens. Optionally add prefix/suffix.
+- **prefix**: Prepend a static string.
+- **template**: Format string with \`{value}\` (source field) and \`{date}\` (today's ISO date, YYYY-MM-DD).
+- **concat**: Join multiple parts. Each part can use \`{value}\` and \`{date}\` placeholders.
+  Example: \`{ "strategy": "concat", "parts": ["{value}", "-", "{date}"] }\` produces \`my-slug-2026-04-17\`.
+- **passthrough**: No transformation.
+
+Use these when the workflow needs runtime-computed values (date-stamped filenames, slugified URLs, templated paths).
 
 Example edge with transform:
 \`\`\`
@@ -130,6 +147,27 @@ Example edge with transform:
 
 IMPORTANT: Check EVERY array-typed data_flow edge. Compare the source step's result item keys with the consuming step's argument item keys. If they differ, add a transform. Look at the actual tool_arguments in the execution trace to determine the correct field_map, defaults, and derivations.
 
+### Scalar Derivations on Data Flow Edges
+When a scalar value needs runtime transformation before reaching its consumer, add a \`derivation\` to the data_flow edge (NOT a \`transform\` — transforms are for array reshaping). Derivations generate runtime expressions for string manipulation.
+
+Common use case: the user's prompt mentions a pattern like "save with key slug-{date}" or "name it {something}-{today's date}". The trigger provides the base value, and the derivation appends or formats it at runtime.
+
+Add a \`derivation\` field to the data_flow edge:
+\`\`\`
+{
+  "from_step": "trigger", "from_field": "key", "to_step": 3, "to_field": "key",
+  "is_session_wire": false,
+  "derivation": { "strategy": "concat", "parts": ["{value}", "-", "{date}"] }
+}
+\`\`\`
+
+This produces a runtime-computed key like \`my-slug-2026-04-17\`. The \`{value}\` placeholder is the source field value; \`{date}\` is today's ISO date (YYYY-MM-DD).
+
+Use derivations when:
+- The user wants date-stamped keys, filenames, or identifiers
+- A value needs a prefix/suffix added at runtime
+- Two values need to be concatenated
+
 ### Input Classification
 - **dynamic**: Simple values callers MUST provide: URLs, credentials, file paths, queries, search terms. These are always scalar strings, numbers, or booleans — NEVER complex objects or arrays.
 - **fixed**: Implementation details with sensible defaults: selectors, timeouts, boolean flags, AND complex structured arguments like \`steps\` arrays, \`login\` objects, or \`pages\` arrays. These are baked into stored tool_arguments.
@@ -142,6 +180,11 @@ IMPORTANT: Check EVERY array-typed data_flow edge. Compare the source step's res
 Flatten nested objects containing dynamic values. E.g., \`login: {url, username, password}\` → separate \`login_url\`, \`username\`, \`password\` fields. But NEVER expose the full nested object or array as a trigger input.
 
 **Arrays that were DISCOVERED at runtime (by a prior step) are NOT inputs.** They flow between steps via data_flow edges. Only make an array a trigger input if the user explicitly provided it in their prompt. If the array was produced by a discovery step (extract_content, query, list), keep the discovery step as core and wire its output to the consuming step.
+
+### Prompt-Mentioned Values Are Dynamic
+If a scalar value (URL, domain name, file path, key name, slug, query string) appears verbatim or closely paraphrased in the user's original prompt, classify it as **dynamic**. The user explicitly chose that value for this execution and will want to change it next time. Only classify a prompt-mentioned value as fixed if it is unambiguously an implementation constant (a CSS selector, a timeout, a boolean flag).
+
+This is the most common compilation error: treating the user's specific request values as universal defaults. When in doubt, make it dynamic.
 
 ### Data Flow Wiring Precision
 - **Only wire inputs that semantically match.** A directory name (e.g., \`screenshot_dir = "screenshots"\`) must NOT be wired to a file path argument (e.g., \`screenshot_path\` which expects \`"screenshots/home.png"\`). If a tool argument needs a specific file path but the trigger only provides a directory, leave that argument unwired — the stored tool_arguments default will provide the correct value.

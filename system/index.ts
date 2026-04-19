@@ -41,6 +41,12 @@ export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...arg
       const { mcpDeterministic } = require('./workflows/mcp-deterministic');
       workers.push({ taskQueue: 'long-tail-system', workflow: mcpDeterministic });
     } catch { /* not available */ }
+
+    // ── Workflow builder (direct YAML construction) ──
+    try {
+      const { mcpWorkflowBuilder } = require('./workflows/mcp-workflow-builder');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpWorkflowBuilder });
+    } catch { /* not available */ }
   }
 
   return workers;
