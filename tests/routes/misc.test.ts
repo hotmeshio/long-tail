@@ -172,4 +172,88 @@ describe('Insight routes', () => {
       expect(Array.isArray(body.tags)).toBe(true);
     });
   });
+
+  describe('POST /api/insight/build-workflow', () => {
+    it('returns 401 without auth', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow`, { method: 'POST' });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when prompt is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('prompt');
+    });
+
+    it('accepts async mode and returns workflow_id or 503', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ prompt: 'screenshot a webpage and save it', wait: false }),
+      });
+      expect([200, 503]).toContain(res.status);
+      const body = await res.json() as any;
+      if (res.status === 200) {
+        expect(body.workflow_id).toBeDefined();
+        expect(body.status).toBe('started');
+      }
+    });
+
+    it('accepts tags parameter', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ prompt: 'test', tags: ['browser-automation'], wait: false }),
+      });
+      expect([200, 503]).toContain(res.status);
+    });
+  });
+
+  describe('POST /api/insight/build-workflow/refine', () => {
+    it('returns 401 without auth', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, { method: 'POST' });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when required fields are missing', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ prompt: 'test' }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('prior_yaml');
+    });
+
+    it('returns 400 when feedback is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ prompt: 'test', prior_yaml: 'app:\n  id: test' }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('feedback');
+    });
+
+    it('accepts valid refine request or 503', async () => {
+      const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({
+          prompt: 'screenshot a webpage',
+          prior_yaml: 'app:\n  id: test\n  version: "1"',
+          feedback: 'screenshot_path missing .png extension',
+          wait: false,
+        }),
+      });
+      expect([200, 503]).toContain(res.status);
+    });
+  });
 });

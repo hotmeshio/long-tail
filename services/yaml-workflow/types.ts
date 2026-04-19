@@ -113,11 +113,23 @@ export interface DataFlowEdge {
     /** For computed fields (null in fieldMap): derivation hint. */
     derivations?: Record<string, {
       sourceKey: string;
-      strategy: 'slugify' | 'prefix' | 'template' | 'passthrough';
+      strategy: 'slugify' | 'prefix' | 'template' | 'passthrough' | 'concat';
       prefix?: string;
       suffix?: string;
       template?: string;
+      parts?: string[];
     }>;
+  };
+  /**
+   * Scalar derivation applied to the wired value before it reaches the consumer.
+   * Generates a HotMesh @pipe expression in the YAML input maps.
+   */
+  derivation?: {
+    strategy: 'concat' | 'template' | 'prefix' | 'slugify' | 'passthrough';
+    parts?: string[];
+    template?: string;
+    prefix?: string;
+    suffix?: string;
   };
 }
 

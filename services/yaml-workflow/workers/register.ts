@@ -113,6 +113,13 @@ export async function registerWorkersForWorkflow(
       if (!serverId) continue;
       const storedArgs = activity.tool_arguments;
       const yamlHookTopic = hookTopicByEscalationTool.get(activity.activity_id);
+      // Identify keys that are wired via input_mappings. When a wired key
+      // resolves to nothing (upstream step failed/returned null), we must
+      // NOT fall back to stored tool_arguments — that would leak hardcoded
+      // values from the original execution trace.
+      const wiredKeys = new Set(
+        Object.keys(activity.input_mappings || {}).filter(k => k !== '_scope' && k !== 'workflowName'),
+      );
       if (toolName === 'escalate_and_wait') {
         loggerRegistry.info(`[yaml-workflow] escalate_and_wait worker: activityId=${activity.activity_id}, hookTopic=${yamlHookTopic || 'NONE'}, mapKeys=[${[...hookTopicByEscalationTool.keys()].join(',')}]`);
       }
@@ -122,10 +129,15 @@ export async function registerWorkersForWorkflow(
         connection: getConnection(),
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
+          // Start from stored defaults, then strip any wired keys that
+          // didn't arrive (upstream failure) so stale defaults don't leak.
           const mergedArgs = storedArgs ? { ...storedArgs } : {};
+          for (const wk of wiredKeys) {
+            if (!(wk in args)) delete mergedArgs[wk];
+          }
           for (const [key, value] of Object.entries(args)) {
             if (key === '_scope' || key === 'workflowName') continue;
-            if (value !== undefined && value !== null && value !== '') {
+            if (value !== undefined) {
               mergedArgs[key] = value;
             }
           }

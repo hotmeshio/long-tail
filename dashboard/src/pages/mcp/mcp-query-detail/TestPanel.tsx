@@ -59,7 +59,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
     setRunParam(id);
   };
 
-  const { data: selectedRunExecution } = useMcpRunExecution(
+  const { data: selectedRunExecution, isLoading: runLoading } = useMcpRunExecution(
     selectedRunId ?? '', wf?.app_id || 'longtail',
   );
 
@@ -250,6 +250,10 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
           <div>
             {deterministicOutput ? (
               <JsonViewer data={deterministicOutput} defaultMode="tree" />
+            ) : selectedRunId && runLoading ? (
+              <p className="text-xs text-text-tertiary animate-pulse">Loading...</p>
+            ) : selectedRunId && selectedRunExecution ? (
+              <JsonViewer data={selectedRunExecution.result ?? selectedRunExecution} defaultMode="tree" />
             ) : selectedRunId ? (
               <p className="text-xs text-text-tertiary animate-pulse">Loading...</p>
             ) : (

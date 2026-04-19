@@ -9,7 +9,7 @@ export interface ActivityManifestEntry {
   mcp_server_id?: string;
   mcp_tool_name?: string;
   tool_arguments?: Record<string, unknown>;
-  input_mappings: Record<string, string>;
+  input_mappings: Record<string, unknown>;
   output_fields: string[];
   prompt_template?: string;
   model?: string;

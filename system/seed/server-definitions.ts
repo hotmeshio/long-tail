@@ -87,6 +87,7 @@ export const SEED_MCP_SERVERS = [
       'capture_authenticated_pages expects a `login` object and a `pages` array. The `login` object contains nested fields (url, username, password, selectors) — flatten credentials as dynamic trigger inputs but keep the object structure in stored tool_arguments. The `pages` array should flow from a transform edge that reshapes `links` into [{url, screenshot_path, wait_ms, full_page}].',
       'For screenshot_path derivation in transforms, use the `screenshot_dir` trigger input as a dynamic prefix (not hardcoded). Derivation strategy: slugify the href, prepend screenshot_dir + "/", append ".png".',
       'When login_and_capture follows a signal hook (human input), wire the password from the hook output to the `password` argument. Wire `url` and `username` from trigger inputs.',
+      'capture_page screenshot_path MUST include a file extension (e.g., .png). When deriving screenshot_path from a slug or identifier, always append ".png". Example @pipe: [["{trigger.output.data.slug}", ".png"], ["{@string.concat}"]]. For dates in @pipe, always call {@ date.now} first to get current timestamp, then {@ date.toISOString} to convert — e.g., [["{@date.now}"], ["{@date.toISOString}"], [0, 10, "{@string.substring}"]].',
     ].join(' '),
     credential_providers: [],
   },

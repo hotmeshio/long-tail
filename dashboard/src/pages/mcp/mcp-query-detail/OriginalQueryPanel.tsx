@@ -2,7 +2,7 @@ import { MessageSquare } from 'lucide-react';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { PanelTitle } from './PanelTitle';
-import { ResultSummary } from './ResultSummary';
+
 
 interface OriginalQueryPanelProps {
   status: string;

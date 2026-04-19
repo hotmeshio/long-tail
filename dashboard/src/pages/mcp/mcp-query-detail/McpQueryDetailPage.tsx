@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { MessageSquare, Lightbulb, Layers, Hammer, Wand2 } from 'lucide-react';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
 import { useSubmitMcpQuery, useSubmitMcpQueryRouted } from '../../../api/mcp-query';
+import { useSubmitBuildWorkflow, useBuilderResult } from '../../../api/workflow-builder';
+import { DescribePanel } from '../../mcp/workflow-builder-detail/DescribePanel';
+import { ReviewPanel } from '../../mcp/workflow-builder-detail/ReviewPanel';
+import { DeployPanel as BuilderDeployPanel } from '../../mcp/workflow-builder-detail/DeployPanel';
+import { TestPanel as BuilderTestPanel } from '../../mcp/workflow-builder-detail/TestPanel';
 
 import type { Step } from './helpers';
 import { useQueryDetail } from './useQueryDetail';
@@ -19,65 +24,124 @@ import { EscalationBanner } from './EscalationBanner';
 
 // ── Composer (shown for /mcp/queries/new) ─────────────────────────────────────
 
-const LIFECYCLE_STEPS = [
-  { icon: MessageSquare, color: 'text-accent', title: '1. Describe', detail: 'Write a specific prompt. Mention tools, URLs, credentials, and expected outputs.' },
-  { icon: Lightbulb, color: 'text-status-warning', title: '2. Discover', detail: 'MCP selects servers, calls tools, and chains results. You review the execution.' },
+type DesignMode = 'discover' | 'direct';
+
+const DISCOVER_STEPS = [
+  { icon: MessageSquare, color: 'text-accent', title: '1. Describe', detail: 'Write a prompt. The LLM executes tools dynamically to fulfill your request.' },
+  { icon: Lightbulb, color: 'text-status-warning', title: '2. Discover', detail: 'Review the execution trace — which tools were called, what data flowed between them.' },
   { icon: Layers, color: 'text-status-success', title: '3. Compile', detail: 'Successful runs compile into deterministic pipelines. No LLM needed at runtime.' },
+];
+
+const DIRECT_STEPS = [
+  { icon: Hammer, color: 'text-accent', title: '1. Describe', detail: 'Specify what tools to use, what inputs to accept, and how data should flow between steps.' },
+  { icon: Layers, color: 'text-status-warning', title: '2. Review', detail: 'The LLM constructs YAML directly from tool schemas. Review the generated pipeline.' },
+  { icon: Wand2, color: 'text-status-success', title: '3. Deploy & Test', detail: 'Deploy, run with sample inputs, and refine until the pipeline works correctly.' },
 ];
 
 function ComposerPanel() {
   const navigate = useNavigate();
   const [promptText, setPromptText] = useState('');
-  const [direct, setDirect] = useState(true);
+  const [mode, setMode] = useState<DesignMode>('discover');
+  const [forceDiscovery, setForceDiscovery] = useState(true);
   const submitDirect = useSubmitMcpQuery();
   const submitRouted = useSubmitMcpQueryRouted();
-  const activeMutation = direct ? submitDirect : submitRouted;
+  const submitBuilder = useSubmitBuildWorkflow();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const prompt = promptText.trim();
     if (!prompt) return;
-    const result = await activeMutation.mutateAsync({ prompt });
-    setPromptText('');
-    if (direct) {
-      navigate(`/mcp/queries/${result.workflow_id}?step=2`, { replace: true });
+
+    if (mode === 'direct') {
+      const result = await submitBuilder.mutateAsync({ prompt });
+      setPromptText('');
+      navigate(`/mcp/queries/${result.workflow_id}?mode=builder`, { replace: true });
     } else {
-      navigate(`/workflows/executions/${result.workflow_id}`, { replace: true });
+      const mutation = forceDiscovery ? submitDirect : submitRouted;
+      const result = await mutation.mutateAsync({ prompt });
+      setPromptText('');
+      if (forceDiscovery) {
+        navigate(`/mcp/queries/${result.workflow_id}?step=2`, { replace: true });
+      } else {
+        navigate(`/workflows/executions/${result.workflow_id}`, { replace: true });
+      }
     }
   };
 
+  const activeMutation = mode === 'direct' ? submitBuilder
+    : forceDiscovery ? submitDirect : submitRouted;
+  const lifecycleSteps = mode === 'discover' ? DISCOVER_STEPS : DIRECT_STEPS;
+
   return (
     <div>
-      <PageHeader title="Design Pipeline" />
-      <p className="text-sm text-text-secondary mb-8 leading-relaxed max-w-xl">
-        Describe a task and MCP discovers the right tools, executes the workflow, and compiles the result into a reusable pipeline.
+      <PageHeader title="Pipeline Designer" />
+      <p className="text-sm text-text-secondary mb-6 leading-relaxed max-w-xl">
+        Create deterministic pipelines from natural language. Choose how to get there.
       </p>
+
+      {/* Mode toggle */}
+      <div className="flex gap-1 mb-6 p-0.5 bg-surface-sunken rounded-lg w-fit">
+        <button
+          onClick={() => setMode('discover')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            mode === 'discover'
+              ? 'bg-surface text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-text-secondary'
+          }`}
+        >
+          <Wand2 className="w-3 h-3" strokeWidth={1.5} />
+          Discover & Compile
+        </button>
+        <button
+          onClick={() => setMode('direct')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            mode === 'direct'
+              ? 'bg-surface text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-text-secondary'
+          }`}
+        >
+          <Hammer className="w-3 h-3" strokeWidth={1.5} />
+          Direct Build
+        </button>
+      </div>
 
       <div className="grid grid-cols-[1fr_240px] gap-6">
         <form onSubmit={handleSubmit}>
           <div className="rounded-lg border border-surface-border bg-surface-raised overflow-hidden h-full flex flex-col">
             <div className="flex items-start gap-3 flex-1">
-              <MessageSquare className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
+              {mode === 'discover'
+                ? <MessageSquare className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
+                : <Hammer className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
+              }
               <textarea
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
-                placeholder="Describe what you want to accomplish. Be specific about which tools to use, what data to capture, and how results should be structured..."
+                placeholder={mode === 'discover'
+                  ? 'Describe what you want to accomplish. The LLM will discover and execute the right tools...'
+                  : 'Describe the pipeline steps, tools, inputs, and outputs. The LLM will construct the YAML directly...'
+                }
                 className="flex-1 min-h-[160px] pr-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none border-none"
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit(e); }}
               />
             </div>
             <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
-              <label className="flex items-center gap-2 cursor-pointer select-none group">
-                <input
-                  type="checkbox"
-                  checked={direct}
-                  onChange={(e) => setDirect(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
-                />
-                <span className="text-[10px] text-text-secondary group-hover:text-text-primary transition-colors">Force discovery</span>
-                <span className="text-[10px] text-text-tertiary">{direct ? '— skip compiled pipelines' : '— prefer compiled pipelines'}</span>
-              </label>
+              {mode === 'discover' ? (
+                <label className="flex items-center gap-2 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={forceDiscovery}
+                    onChange={(e) => setForceDiscovery(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
+                  />
+                  <span className="text-[10px] text-text-secondary group-hover:text-text-primary transition-colors">Force discovery</span>
+                  <span className="text-[10px] text-text-tertiary">{forceDiscovery ? '— skip compiled pipelines' : '— prefer compiled pipelines'}</span>
+                </label>
+              ) : (
+                <span className="text-[10px] text-text-tertiary">
+                  LLM builds YAML from tool schemas — no execution needed
+                </span>
+              )}
               <div className="flex items-center gap-3">
                 <span className="text-[10px] text-text-tertiary">Cmd+Enter</span>
                 <button
@@ -85,7 +149,7 @@ function ComposerPanel() {
                   disabled={!promptText.trim() || activeMutation.isPending}
                   className="px-4 py-1.5 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {activeMutation.isPending ? 'Starting...' : 'Design Pipeline'}
+                  {activeMutation.isPending ? 'Starting...' : mode === 'discover' ? 'Discover' : 'Build'}
                 </button>
               </div>
             </div>
@@ -96,7 +160,7 @@ function ComposerPanel() {
         </form>
 
         <div className="space-y-4 pt-1">
-          {LIFECYCLE_STEPS.map((step) => (
+          {lifecycleSteps.map((step) => (
             <div key={step.title} className="flex items-start gap-2.5">
               <step.icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${step.color}`} strokeWidth={1.5} />
               <div>
@@ -111,12 +175,96 @@ function ComposerPanel() {
   );
 }
 
+// ── Builder wizard (direct build mode) ────────────────────────────────────────
+
+function BuilderWizard() {
+  const { workflowId } = useParams<{ workflowId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [deployedYamlId, setDeployedYamlId] = useState<string | null>(null);
+
+  const { data: resultData, refetch } = useBuilderResult(workflowId);
+  const builderData = resultData?.result?.data as any;
+
+  const hasYaml = !!builderData?.yaml;
+  const isClarification = !!builderData?.clarification_needed;
+  const isBuilding = !resultData || (!hasYaml && !isClarification && !builderData?.title?.includes('Failed'));
+
+  type BStep = 1 | 2 | 3 | 4;
+  const BUILDER_LABELS = ['Describe', 'Review', 'Deploy', 'Test'];
+
+  let maxReachable: BStep = 1;
+  if (hasYaml) maxReachable = 2;
+  if (deployedYamlId) maxReachable = 4;
+
+  const stepParam = searchParams.get('step');
+  const [manualStep, setManualStep] = useState<BStep | null>(null);
+  const step: BStep = manualStep ?? (stepParam ? Math.min(Number(stepParam), maxReachable) as BStep : (hasYaml ? 2 : 1));
+
+  const handleStepClick = (s: number) => {
+    if (s <= maxReachable) {
+      setManualStep(s as BStep);
+      setSearchParams({ mode: 'builder', step: String(s) });
+    }
+  };
+
+  return (
+    <div className="flex flex-col min-h-[calc(100vh-12rem)]">
+      <PageHeader
+        title="Pipeline Designer"
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Direct Build</span>
+            <StatusBadge status={isClarification ? 'pending' : isBuilding ? 'in_progress' : hasYaml ? 'completed' : 'failed'} />
+          </div>
+        }
+      />
+
+      <WizardSteps labels={BUILDER_LABELS} current={step} maxReachable={maxReachable} onStepClick={handleStepClick} />
+
+      <div className="flex-1 mt-4">
+        {step === 1 && (
+          <DescribePanel
+            workflowId={workflowId!}
+            status={isClarification ? 'clarification' : isBuilding ? 'in_progress' : hasYaml ? 'completed' : 'failed'}
+            builderData={builderData}
+            onBuilt={() => { refetch(); setManualStep(2); }}
+            onNext={() => handleStepClick(2)}
+          />
+        )}
+        {step === 2 && hasYaml && (
+          <ReviewPanel
+            builderData={builderData}
+            onBack={() => handleStepClick(1)}
+            onDeploy={(yamlId) => { setDeployedYamlId(yamlId); handleStepClick(3); }}
+          />
+        )}
+        {step === 3 && deployedYamlId && (
+          <BuilderDeployPanel
+            yamlWorkflowId={deployedYamlId}
+            onBack={() => handleStepClick(2)}
+            onNext={() => handleStepClick(4)}
+          />
+        )}
+        {step === 4 && deployedYamlId && (
+          <BuilderTestPanel
+            yamlWorkflowId={deployedYamlId}
+            sampleInputs={builderData?.sample_inputs}
+            onBack={() => handleStepClick(3)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Detail page (existing workflow or new composer) ───────────────────────────
 
 export function McpQueryDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
+  const [searchParams] = useSearchParams();
 
   if (workflowId === 'new') return <ComposerPanel />;
+  if (searchParams.get('mode') === 'builder') return <BuilderWizard />;
 
   return <McpQueryWizard />;
 }

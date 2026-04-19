@@ -36,7 +36,6 @@ const McpQueryPage = lazy(() =>
 const McpQueryDetailPage = lazy(() =>
   import('./pages/mcp/mcp-query-detail/McpQueryDetailPage').then((m) => ({ default: m.McpQueryDetailPage })),
 );
-
 // Escalation pages (all authenticated users)
 const EscalationsOverview = lazy(() =>
   import('./pages/operator/EscalationsOverview').then((m) => ({ default: m.EscalationsOverview })),
