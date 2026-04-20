@@ -47,7 +47,9 @@ export function DagNodeDetail({ entry, onClose }: DagNodeDetailProps) {
               <div key={k} className="flex items-baseline gap-2">
                 <span className="font-mono text-text-secondary shrink-0">{k}</span>
                 <span className="text-text-tertiary shrink-0">&larr;</span>
-                <span className="font-mono text-accent/70 truncate">{v}</span>
+                <span className="font-mono text-accent/70 truncate">
+                  {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                </span>
               </div>
             ))}
           </div>

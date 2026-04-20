@@ -36,7 +36,6 @@ const McpQueryPage = lazy(() =>
 const McpQueryDetailPage = lazy(() =>
   import('./pages/mcp/mcp-query-detail/McpQueryDetailPage').then((m) => ({ default: m.McpQueryDetailPage })),
 );
-
 // Escalation pages (all authenticated users)
 const EscalationsOverview = lazy(() =>
   import('./pages/operator/EscalationsOverview').then((m) => ({ default: m.EscalationsOverview })),
@@ -99,6 +98,9 @@ const WorkflowConfigDetailPage = lazy(() =>
 );
 const McpServersPage = lazy(() =>
   import('./pages/mcp/servers').then((m) => ({ default: m.McpServersPage })),
+);
+const McpServerDetailPage = lazy(() =>
+  import('./pages/mcp/servers/detail').then((m) => ({ default: m.McpServerDetailPage })),
 );
 const UsersPage = lazy(() =>
   import('./pages/admin/users').then((m) => ({ default: m.UsersPage })),
@@ -223,6 +225,8 @@ const router = createBrowserRouter([
           { path: 'mcp/queries/:workflowId', element: <Lazy><McpQueryDetailPage /></Lazy> },
           { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
           { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
+          { path: 'mcp/servers/new', element: <Lazy><McpServerDetailPage /></Lazy> },
+          { path: 'mcp/servers/:serverId', element: <Lazy><McpServerDetailPage /></Lazy> },
           { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
           { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
           { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },

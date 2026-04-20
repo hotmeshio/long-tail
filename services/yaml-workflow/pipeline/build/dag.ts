@@ -135,8 +135,8 @@ export function appendNormalStep(
     );
   }
 
-  // Wire input mappings from upstream steps
-  const inputMappings = wireStepInputs(
+  // Wire input mappings from upstream steps (may include @pipe objects for derivations)
+  const inputMappings: Record<string, unknown> = wireStepInputs(
     idx, step, plan, dag.stepIndexToActivityId,
     dag.triggerId, triggerInputKeys, steps, prefix,
     dag.prevActivityId, dag.prevResult, collapsedToCoreIndex,
@@ -344,7 +344,7 @@ function buildManifestEntry(
   step: ExtractedStep,
   topic: string,
   workflowName: string,
-  inputMappings: Record<string, string>,
+  inputMappings: Record<string, unknown>,
   outputFields: string[],
 ): ActivityManifestEntry {
   const promptTemplate = step.kind === 'llm' && step.promptMessages

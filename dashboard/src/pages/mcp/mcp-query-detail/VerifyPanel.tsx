@@ -16,7 +16,7 @@ interface VerifyPanelProps {
   onGoToDeploy: () => void;
 }
 
-export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, onBack, onGoToDeploy }: VerifyPanelProps) {
+export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, onBack, onGoToDeploy: _onGoToDeploy }: VerifyPanelProps) {
   const submitQuery = useSubmitMcpQueryRouted();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -69,15 +69,12 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-light text-text-primary">End-to-End Verification</h2>
-        <p className="text-xs text-text-tertiary mt-0.5">
-          Submit the original prompt (or a variant) to verify that
-          <span className="font-mono text-text-primary mx-1">{workflowName}</span>
-          handles it deterministically.
-          If results are unexpected, go <button onClick={onGoToDeploy} className="text-accent hover:underline">back</button> to adjust.
-        </p>
-      </div>
+      <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Verify</h2>
+      <p className="text-base text-text-secondary mb-6">
+        Submit the original prompt through the router to verify that
+        <span className="font-mono text-text-primary mx-1">{workflowName}</span>
+        is selected and handles it deterministically.
+      </p>
 
       {/* Row 1: Headers + metadata (aligned) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-4">

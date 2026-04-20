@@ -121,6 +121,47 @@ router.get('/app-ids', async (_req, res) => {
   }
 });
 
+/**
+ * POST /api/yaml-workflows/direct
+ * Create a YAML workflow from raw YAML content (workflow builder output).
+ * Unlike POST /, this does not require a source execution — the YAML is provided directly.
+ * Body: { name, description?, yaml_content, input_schema?, activity_manifest?, tags?, app_id? }
+ */
+router.post('/direct', async (req, res) => {
+  try {
+    const { name, description, yaml_content, input_schema, activity_manifest, tags, app_id, graph_topic } = req.body;
+    if (!name || !yaml_content) {
+      res.status(400).json({ error: 'name and yaml_content are required' });
+      return;
+    }
+
+    // Extract subscribes topic from YAML content, or fall back to name-derived slug
+    let graphTopic = graph_topic || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const subscribesMatch = yaml_content.match(/subscribes:\s*(.+)/);
+    if (subscribesMatch) {
+      graphTopic = subscribesMatch[1].trim().replace(/^['"]|['"]$/g, '');
+    }
+
+    const wf = await yamlDb.createYamlWorkflow({
+      name,
+      description,
+      app_id: app_id || 'longtail',
+      yaml_content,
+      graph_topic: graphTopic,
+      input_schema: input_schema || {},
+      output_schema: {},
+      activity_manifest: activity_manifest || [],
+      tags: tags || [],
+      original_prompt: description,
+      category: 'builder',
+    });
+
+    res.json(wf);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -- Parameterized routes --
 
 /**

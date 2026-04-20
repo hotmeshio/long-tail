@@ -176,6 +176,40 @@ export function useDeleteYamlWorkflow() {
   });
 }
 
+// ── Cron scheduling ─────────────────────────────────────────────
+
+export function useSetYamlCron() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cron_schedule, cron_envelope, execute_as }: {
+      id: string;
+      cron_schedule: string;
+      cron_envelope?: Record<string, unknown> | null;
+      execute_as?: string | null;
+    }) =>
+      apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}/cron`, {
+        method: 'PUT',
+        body: JSON.stringify({ cron_schedule, cron_envelope, execute_as }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
+    },
+  });
+}
+
+export function useClearYamlCron() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}/cron`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
+    },
+  });
+}
+
 // ── Version history ─────────────────────────────────────────────
 
 export function useYamlWorkflowVersions(id: string) {

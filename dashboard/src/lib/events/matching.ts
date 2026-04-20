@@ -1,7 +1,7 @@
 /**
- * Match a NATS-style subject against a pattern with `>` (match-rest) and `*` (single-token) wildcards.
+ * Match a dot-delimited subject against a pattern with `>` (match-rest) and `*` (single-token) wildcards.
  *
- * Used by both NATS and socket.io transports to dispatch events to
+ * Used by all event transports (socket.io, NATS) to dispatch events to
  * pattern-based subscribers.
  *
  * Examples:

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getInvalidationKeys } from '../invalidation';
-import type { NatsLTEvent } from '../types';
+import type { NatsLTEvent } from '../../nats/types';
 
 function makeEvent(overrides: Partial<NatsLTEvent>): NatsLTEvent {
   return {
@@ -27,8 +27,15 @@ describe('getInvalidationKeys', () => {
         expect(keys).toContainEqual(['processes']);
         expect(keys).toContainEqual(['workflowExecution', 'wf-abc']);
         expect(keys).toContainEqual(['workflowState', 'wf-abc']);
+        expect(keys).toContainEqual(['mcpQueryExecution', 'wf-abc']);
       });
     }
+
+    it('invalidates process-specific key when originId is present', () => {
+      const keys = getInvalidationKeys(makeEvent({ type: 'task.completed', workflowId: 'wf-1', originId: 'proc-abc' }));
+
+      expect(keys).toContainEqual(['processes', 'proc-abc']);
+    });
 
     it('omits workflow-specific keys when workflowId is empty', () => {
       const keys = getInvalidationKeys(makeEvent({ type: 'task.created', workflowId: '' }));
@@ -72,14 +79,23 @@ describe('getInvalidationKeys', () => {
         expect(keys).toContainEqual(['workflowExecution', 'wf-99']);
         expect(keys).toContainEqual(['workflowState', 'wf-99']);
       });
+
+      it(`invalidates mcpQuery and builder result keys for ${type}`, () => {
+        const keys = getInvalidationKeys(makeEvent({ type, workflowId: 'wf-99' }));
+
+        expect(keys).toContainEqual(['mcpQueryExecution', 'wf-99']);
+        expect(keys).toContainEqual(['mcpQueryResult', 'wf-99']);
+        expect(keys).toContainEqual(['builderResult', 'wf-99']);
+      });
     }
   });
 
   describe('milestone events', () => {
-    it('invalidates workflow execution and tasks', () => {
+    it('invalidates workflow execution, mcpQueryExecution, and tasks', () => {
       const keys = getInvalidationKeys(makeEvent({ type: 'milestone', workflowId: 'wf-m' }));
 
       expect(keys).toContainEqual(['workflowExecution', 'wf-m']);
+      expect(keys).toContainEqual(['mcpQueryExecution', 'wf-m']);
       expect(keys).toContainEqual(['tasks']);
       expect(keys).not.toContainEqual(['jobs']);
     });

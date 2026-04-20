@@ -35,6 +35,9 @@ GET /api/mcp/servers
       "tool_manifest": [
         { "name": "analyze_image", "description": "Analyze an image", "inputSchema": {} }
       ],
+      "tags": ["vision", "image-analysis"],
+      "compile_hints": "Use for image processing tasks",
+      "credential_providers": ["openai"],
       "metadata": { "builtin": true },
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
@@ -56,10 +59,13 @@ POST /api/mcp/servers
 |-------|------|----------|-------------|
 | `name` | `string` | Yes | Unique server name |
 | `description` | `string` | No | Human-readable description |
-| `transport_type` | `string` | Yes | `stdio` or `sse` |
+| `transport_type` | `string` | Yes | `stdio`, `sse`, or `streamable-http` |
 | `transport_config` | `object` | Yes | Transport-specific config (see below) |
 | `auto_connect` | `boolean` | No | Connect on startup (default: false) |
 | `metadata` | `object` | No | Arbitrary metadata |
+| `tags` | `string[]` | No | Tags for tool discovery (e.g., `["database", "analytics"]`) |
+| `compile_hints` | `string` | No | Guidance for the workflow compiler when using this server's tools |
+| `credential_providers` | `string[]` | No | IAM providers required by tools (e.g., `["github", "slack"]`) |
 
 **Transport config for `stdio`:**
 
@@ -71,6 +77,12 @@ POST /api/mcp/servers
 
 ```json
 { "url": "http://localhost:3001/sse" }
+```
+
+**Transport config for `streamable-http`:**
+
+```json
+{ "url": "http://localhost:3001/mcp" }
 ```
 
 **Response 201:** Created server record.
@@ -93,7 +105,7 @@ GET /api/mcp/servers/:id
 PUT /api/mcp/servers/:id
 ```
 
-**Request body:** Any fields from the registration (partial update).
+**Request body:** Any fields from the registration (partial update), including `tags`, `compile_hints`, and `credential_providers`.
 
 **Response 200:** Updated server record.
 
@@ -112,6 +124,42 @@ DELETE /api/mcp/servers/:id
 ```
 
 **Response 404:** Server not found.
+
+## Test connection
+
+```
+POST /api/mcp/servers/test-connection
+```
+
+Test connectivity to an MCP server without persisting a registration. Creates a temporary client, connects, lists tools, then disconnects.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `transport_type` | `string` | Yes | `stdio`, `sse`, or `streamable-http` |
+| `transport_config` | `object` | Yes | Transport-specific config |
+
+**Response 200:**
+
+```json
+{
+  "success": true,
+  "tools": [
+    { "name": "analyze_image", "description": "Analyze an image", "inputSchema": {} }
+  ]
+}
+```
+
+On failure:
+
+```json
+{
+  "success": false,
+  "tools": [],
+  "error": "Connection refused"
+}
+```
 
 ## Connect to a server
 
@@ -191,5 +239,15 @@ Invoke a tool on a connected MCP server.
   "result": {
     "content": [{ "type": "text", "text": "Analysis result..." }]
   }
+}
+```
+
+**Response 422** (missing credential):
+
+```json
+{
+  "error": "missing_credential",
+  "provider": "openai",
+  "message": "Credential required for provider: openai"
 }
 ```

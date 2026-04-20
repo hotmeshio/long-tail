@@ -92,23 +92,28 @@ export const CLAUDE_CODE_TOOLS = [
         prompt: {
           type: 'string',
           description: 'The task prompt. Be specific and actionable.',
+          default: 'List the files in the current directory and describe what this project does in 2 sentences.',
         },
         working_directory: {
           type: 'string',
-          description: 'Working directory for the task. Defaults to server cwd.',
+          description: 'Working directory for the task. Defaults to /app (container root).',
+          default: '/app',
         },
         allowed_tools: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Restrict which tools Claude Code can use (e.g., ["Read", "Grep"]).',
+          description: 'Restrict which tools Claude Code can use (e.g., ["Read", "Grep", "Glob", "Bash"]).',
+          default: ['Read', 'Glob', 'Grep', 'Bash'],
         },
         max_turns: {
           type: 'number',
           description: 'Maximum agentic turns before stopping.',
+          default: 5,
         },
         model: {
           type: 'string',
           description: 'Override the Claude model (e.g., "claude-sonnet-4-6").',
+          default: 'claude-sonnet-4-6',
         },
         system_prompt: {
           type: 'string',
@@ -117,10 +122,12 @@ export const CLAUDE_CODE_TOOLS = [
         timeout_ms: {
           type: 'number',
           description: 'Execution timeout in ms. Default: 120000, max: 300000.',
+          default: 120000,
         },
         credential_label: {
           type: 'string',
-          description: 'Label of the stored Anthropic credential to use (e.g., "subscription", "api-batch"). Default: "default".',
+          description: 'Label of the stored Anthropic credential to use (e.g., "subscription", "api-batch").',
+          default: 'default',
         },
       },
       required: ['prompt'],

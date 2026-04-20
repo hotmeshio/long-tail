@@ -148,8 +148,18 @@ function applyDerivation(
       result = (spec.prefix || '') + result + (spec.suffix || '');
       break;
     case 'template':
-      result = (spec.template || '{value}').replace(/\{value\}/g, result);
+      result = (spec.template || '{value}')
+        .replace(/\{value\}/g, result)
+        .replace(/\{date\}/g, new Date().toISOString().slice(0, 10));
       break;
+    case 'concat': {
+      const parts: string[] = (spec as any).parts || ['{value}'];
+      result = parts.map((p: string) =>
+        p.replace(/\{value\}/g, result)
+         .replace(/\{date\}/g, new Date().toISOString().slice(0, 10))
+      ).join('');
+      break;
+    }
     case 'passthrough':
       break;
   }

@@ -44,6 +44,10 @@ export default {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
         },
+        'border-breathe': {
+          '0%, 100%': { borderColor: '#6C47FF' },
+          '50%': { borderColor: 'transparent' },
+        },
       },
       animation: {
         'fade-in': 'fadeIn 200ms ease-out',

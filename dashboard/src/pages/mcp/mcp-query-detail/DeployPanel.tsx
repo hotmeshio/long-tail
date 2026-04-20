@@ -25,9 +25,12 @@ interface DeployPanelProps {
   yamlId: string;
   onAdvance: () => void;
   onBack: () => void;
+  /** Override the default regeneration pathway. When provided, called instead of the compilation-based regenerate endpoint. */
+  onRegenerate?: (feedback: string) => void;
+  regeneratePending?: boolean;
 }
 
-export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
+export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regeneratePending }: DeployPanelProps) {
   const queryClient = useQueryClient();
   const yamlTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [feedbackText, setFeedbackText] = useState('');
@@ -132,6 +135,12 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
   };
 
   const handleRegenerate = async () => {
+    if (onRegenerate) {
+      onRegenerate(feedbackText.trim());
+      setFeedbackText('');
+      setShowFeedback(false);
+      return;
+    }
     await regenerateMutation.mutateAsync({
       id: yamlId,
       compilation_feedback: feedbackText.trim() || undefined,
@@ -143,18 +152,18 @@ export function DeployPanel({ yamlId, onAdvance, onBack }: DeployPanelProps) {
 
   if (!wf) return <p className="text-sm text-text-secondary animate-pulse">Loading workflow...</p>;
 
-  const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending;
+  const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending || !!regeneratePending;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
       {/* Left: config */}
-      <div>
+      <div className="min-w-0 overflow-hidden">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-lg font-light text-text-primary">
-              {wf.status === 'active' ? 'Redeploy' : 'Deploy'} Workflow
-            </h2>
-            <p className="text-xs text-text-tertiary mt-0.5">Review configuration, input/output schemas, and YAML definition</p>
+            <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Deploy</h2>
+            <p className="text-base text-text-secondary">
+              Review and edit the workflow definition. Re/deploy when ready.
+            </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {configEditing ? (

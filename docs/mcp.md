@@ -4,11 +4,15 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 
 ## Contents
 
-- [The Unifying Concept](#the-unifying-concept) — [Every Activity is a Tool](#every-activity-is-a-tool) · [Humans as Tools](#humans-as-tools) · [Compiled Workflows as Tools](#compiled-workflows-as-tools) · [The Cycle](#the-cycle)
+- [Everything is a Tool](#everything-is-a-tool)
+    - [Humans as Tools](#humans-as-tools)
+    - [Compiled Workflows as Tools](#compiled-workflows-as-tools)
+    - [The Cycle](#the-cycle)
 - [Human Queue Server](#human-queue-server) — escalation as MCP tools
 - [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
 - [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
-- [External MCP Servers](#external-mcp-servers) — any server's tools as durable activities
+- [Server Registration Lifecycle](#server-registration-lifecycle) — two paths, startup sequence, when things connect
+- [External MCP Servers](#external-mcp-servers) — Path B: dashboard/API registration
 - [Built-in Servers](#built-in-servers) — servers that ship by default
 - [Configuration](#configuration)
 - [REST API](#rest-api) — server registration and management
@@ -16,13 +20,11 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 - [Testing](#testing) — InMemoryTransport and functional tests
 - [Custom Adapters](#custom-adapters)
 
-## The Unifying Concept
+## Everything is a Tool
 
 Everything is a tool. Every proxy activity — the functions that workflows call — is an MCP tool. Every collection of related tools is an MCP server. When an engineer writes a workflow, they're composing tool calls. When the triage agent fixes an edge case, it's calling the same tools. When that fix gets compiled into a deterministic pipeline, it becomes a new tool on a new server.
 
 The protocol is the same whether the caller is deterministic code, an LLM, or a human clicking a button.
-
-### Every Activity is a Tool
 
 A proxy activity is a function that runs outside the deterministic sandbox — it makes an API call, queries a database, calls an LLM. HotMesh checkpoints the result. If the process crashes, it replays from cache. The activity isn't called twice.
 
@@ -410,27 +412,209 @@ npx vitest run tests/workflows/verify-document-mcp.test.ts --reporter=verbose
 
 The examples above use built-in servers. Long Tail can also connect to any external MCP server.
 
+## Server Registration Lifecycle
+
+When you add an MCP server to Long Tail, two things must happen: the server must be **registered** (so the system knows it exists) and **connected** (so tools are callable). There are two paths depending on where your server runs.
+
+### Path A: In-Process (serverFactories)
+
+Your MCP server runs inside the Long Tail process. You pass a factory function at startup. The server connects lazily on first tool call via `InMemoryTransport` — no network, no subprocess.
+
+```typescript
+import { start } from '@hotmeshio/long-tail';
+
+const lt = await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  mcp: {
+    serverFactories: {
+      'my-classifier': () => import('./mcp-servers/classifier').then(m => m.createServer()),
+    },
+  },
+});
+```
+
+Your factory is registered alongside the built-in factories. On first tool call, `resolveClient()` invokes the factory, creates an `InMemoryTransport` pair, connects, and caches the client. Subsequent calls reuse the cached connection.
+
+To make this server visible in the dashboard and discoverable by tag-based workflows, seed a DB row for it (same pattern as the built-in servers) or register it via the API after startup.
+
+This is the path all built-in servers use. It's the right choice when:
+- Your server needs access to in-process state (DB pool, caches, other services)
+- You want zero-latency tool calls (no IPC or network overhead)
+- The server ships as part of your application code
+
+### Path B: External (Dashboard or API)
+
+Your MCP server runs as a separate process (stdio) or remote service (SSE/Streamable HTTP). You register it via the dashboard wizard or REST API. The system stores the registration in `lt_mcp_servers` and connects via the configured transport.
+
+This is the path for:
+- npm MCP server packages (e.g., `@modelcontextprotocol/server-filesystem`)
+- Remote servers running on other machines
+- Servers you want operators to add without redeploying
+
+### Startup Sequence
+
+Here's what happens when Long Tail boots, and where each path fits:
+
+```
+1. migrate()                  — DB tables created (lt_mcp_servers exists)
+2. Start HotMesh workers      — Workflow engines ready
+3. mcpRegistry.connect()      — Human queue server starts
+   └─ connectAutoServers()    — External servers with auto_connect=true connect now
+4. registerBuiltinServer()    — All factories stored (system + your serverFactories)
+5. seedSystemMcpServers()     — Built-in servers upserted to lt_mcp_servers
+6. HTTP server starts         — Dashboard and API available
+7. First tool call            — Factory lazily connected via resolveClient()
+```
+
+**Path A factories** are registered at step 4 and connected lazily at step 7. They don't need a DB row to function — `resolveClient()` finds them by name in the factory Map. But adding a DB row (step 5 or via API after step 6) makes them visible in the dashboard and discoverable by tag-based workflows.
+
+**Path B servers** are stored in the DB (via API at step 6 or pre-seeded). If `auto_connect` is true, they connect at step 3. Otherwise, they connect on demand via `POST /api/mcp/servers/:id/connect` or lazily on first tool call.
+
+### Choosing a Path
+
+| Consideration | Path A (in-process) | Path B (external) |
+|---------------|--------------------|--------------------|
+| Server location | Same process | Separate process or remote |
+| Connection | InMemoryTransport (zero latency) | stdio / SSE / Streamable HTTP |
+| Registration | `serverFactories` in startup config | Dashboard wizard or REST API |
+| Deployment | Ships with your app code | Independent lifecycle |
+| Access to app state | Yes (DB pool, caches, services) | No (isolated process) |
+| Visibility in dashboard | Needs a DB row (seed or API) | Automatic (stored in DB) |
+
+Both paths produce the same outcome: tools callable as durable activities via `proxyActivities()`.
+
 ## External MCP Servers
 
-Long Tail can connect to any external MCP server and invoke its tools as durable activities. Register servers in the database, then wrap their tools with `proxyActivities()` — the same mechanism used for any workflow activity.
+This section covers [Path B](#path-b-external-dashboard-or-api) — registering servers via the dashboard or API. For in-process servers, see [Path A](#path-a-in-process-serverfactories) above.
 
-### Register a Server
+Every registration uses the same data model. The dashboard wizard and the REST API are interchangeable views of that data.
+
+### The Registration Data Model
+
+A server registration is a record with these fields. The dashboard wizard collects them across four steps; the API accepts them as a single JSON payload. Same data, two interfaces.
+
+| Field | API field | Wizard step | Description |
+|-------|-----------|-------------|-------------|
+| Name | `name` | Transport | Unique identifier for the server |
+| Description | `description` | Transport | What this server does |
+| Transport type | `transport_type` | Transport | `stdio`, `sse`, or `streamable-http` |
+| Transport config | `transport_config` | Transport | Connection details — command/args/env for stdio, url for network |
+| Auto-connect | `auto_connect` | Transport | Start the connection when Long Tail boots |
+| Tags | `tags` | Discovery | Categorize for tool discovery (e.g., `["database", "analytics"]`) |
+| Compile hints | `compile_hints` | Discovery | Guidance for the workflow compiler |
+| Credential providers | `credential_providers` | Discovery | IAM providers required by tools (e.g., `["github", "openai"]`) |
+
+The wizard's **Test** step calls `POST /api/mcp/servers/test-connection` with the transport fields, and the **Review** step shows the full payload before saving.
+
+#### Dashboard → API mapping
+
+Each wizard step maps directly to API fields:
+
+**Step 1 — Transport.** The mode cards select `transport_type` and determine which `transport_config` fields appear:
+
+| Mode | `transport_type` | `transport_config` |
+|------|------------------|--------------------|
+| Local Process | `stdio` | `{ "command": "...", "args": [...], "env": {...} }` |
+| Network Service (SSE) | `sse` | `{ "url": "..." }` |
+| Network Service (Streamable HTTP) | `streamable-http` | `{ "url": "..." }` |
+| In-Process | *(managed by the system)* | *(read-only for built-in servers)* |
+
+**Step 2 — Discovery.** Maps directly to `tags`, `compile_hints`, and `credential_providers`.
+
+**Step 3 — Test.** Calls the test-connection endpoint. No data is persisted.
+
+**Step 4 — Review.** Shows the assembled payload. Save calls `POST /api/mcp/servers` (create) or `PUT /api/mcp/servers/:id` (edit).
+
+#### When to use each field
+
+| Field | When to use |
+|-------|-------------|
+| **Tags** | Always. Good tags make tools discoverable. Workflows like `mcpQuery` filter servers by tags. Use lowercase, hyphenated (e.g., `database`, `image-analysis`). |
+| **Compile hints** | When the workflow compiler needs to know about tool ordering, timeouts, retry behavior, or output formats. |
+| **Credential providers** | When tools call external APIs that need user-specific credentials. Users are prompted to connect via the Credentials page before tool execution. |
+| **Auto-connect** | For servers you always want available. Skip for infrequently used servers. |
+
+### How to Register: Three Scenarios
+
+The registration data model is the same in all three scenarios. Only the transport config differs.
+
+#### Scenario 1: npm MCP Server Package
+
+Many MCP servers are published to npm (`@modelcontextprotocol/server-filesystem`, `@modelcontextprotocol/server-github`, `mcp-server-sqlite`). No wrapper code needed — install the package and register.
+
+There are two binding strategies:
+
+**Early-bound (production)** — install as a dependency, ship in the Docker image:
+
+```bash
+npm install @modelcontextprotocol/server-filesystem
+```
+
+```json
+{
+  "transport_type": "stdio",
+  "transport_config": {
+    "command": "node",
+    "args": ["node_modules/@modelcontextprotocol/server-filesystem/dist/index.js", "/data"]
+  }
+}
+```
+
+The package is in `package.json`, locked by `package-lock.json`, built into the image. Deterministic, auditable, no network call at runtime.
+
+**Late-bound (exploration)** — pull on demand via `npx`:
+
+```json
+{
+  "transport_type": "stdio",
+  "transport_config": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"]
+  }
+}
+```
+
+The package isn't in your repo, lockfile, or Docker image. It's resolved at runtime — downloaded on first spawn, cached for subsequent connections. Useful for trying out a server without committing to a dependency, or environments where operators add servers without redeploying.
+
+Long Tail serves as the registry that decides which servers to connect, when to spawn them, and how they wire into workflows. The binding strategy is a transport detail.
+
+**Dashboard:** Select **Local Process**, enter the command and args, walk through Discovery/Test/Review.
+
+**API:**
 
 ```bash
 curl -X POST http://localhost:3000/api/mcp/servers \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "doc-analyzer",
+    "name": "filesystem",
     "transport_type": "stdio",
     "transport_config": {
       "command": "npx",
-      "args": ["-y", "doc-analyzer-mcp"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"]
     },
-    "auto_connect": true
+    "auto_connect": true,
+    "tags": ["files", "storage"]
   }'
 ```
 
-Or via SSE:
+#### Scenario 2: Remote Server
+
+Point Long Tail at a URL. The server runs elsewhere.
+
+```json
+{
+  "transport_type": "sse",
+  "transport_config": {
+    "url": "https://my-server.example.com/mcp"
+  }
+}
+```
+
+For Streamable HTTP, use `"transport_type": "streamable-http"`. Same `transport_config`.
+
+**Dashboard:** Select **Network Service**, enter the URL, choose SSE or Streamable HTTP, walk through Discovery/Test/Review.
+
+**API:**
 
 ```bash
 curl -X POST http://localhost:3000/api/mcp/servers \
@@ -438,14 +622,98 @@ curl -X POST http://localhost:3000/api/mcp/servers \
   -d '{
     "name": "my-remote-server",
     "transport_type": "sse",
+    "transport_config": { "url": "https://my-server.example.com/mcp" },
+    "tags": ["api", "external"]
+  }'
+```
+
+#### Scenario 3: Build Your Own
+
+Write a custom MCP server, then register it the same way as Scenarios 1 or 2.
+
+**Create the server** using the MCP SDK:
+
+```typescript
+// my-server.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+
+const server = new McpServer({ name: 'my-tools', version: '1.0.0' });
+
+server.tool('classify_document',
+  { content: z.string() },
+  async ({ content }) => {
+    const result = await yourClassificationLogic(content);
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+  },
+);
+
+export default server;
+```
+
+**Make it runnable** via stdio (simplest):
+
+```typescript
+// bin/serve.ts
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import server from './my-server';
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+**Register it.** The transport config points at your command — same as any stdio server:
+
+```json
+{
+  "transport_type": "stdio",
+  "transport_config": { "command": "node", "args": ["dist/bin/serve.js"] }
+}
+```
+
+For in-process servers that run inside the Long Tail process, see the [Writing Your Own MCP Server](#writing-your-own-mcp-server) section above and the architecture guide's [Registering Your Own](architecture.md#registering-your-own) section.
+
+### Test Connection
+
+Test connectivity without saving a registration. The dashboard wizard's Test step and the API endpoint do the same thing — send transport fields, get back a tool list or error.
+
+**Dashboard:** Click "Test Connection" on the Test step.
+
+**API:**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/servers/test-connection \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "transport_type": "stdio",
     "transport_config": {
-      "url": "https://my-server.example.com/mcp"
-    },
-    "auto_connect": false
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  }'
+```
+
+Returns `{ "success": true, "tools": [...] }` on success, or `{ "success": false, "error": "..." }` on failure.
+
+### Edit a Registration
+
+**Dashboard:** Click any server row in **MCP > Servers** to open the detail page. All fields are editable. Built-in servers show read-only transport config but allow editing tags, hints, and credential providers.
+
+**API:** `PUT /api/mcp/servers/:id` with any fields to update:
+
+```bash
+curl -X PUT http://localhost:3000/api/mcp/servers/$ID \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "tags": ["database", "analytics"],
+    "compile_hints": "Returns paginated results. Always pass limit.",
+    "credential_providers": ["postgres"]
   }'
 ```
 
 ### Use in a Workflow
+
+Once registered, a server's tools are available as durable activities:
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -481,8 +749,6 @@ export async function classifyDocument(envelope: LTEnvelope) {
 Tool names are derived from the server name and tool name: `mcp_{serverName}_{toolName}`, with non-alphanumeric characters replaced by underscores.
 
 If the process crashes between an MCP tool call and its checkpoint, HotMesh replays from cache. The external server is not called a second time. This gives you exactly-once semantics over a protocol that doesn't natively guarantee them.
-
-Server registration can happen at runtime via the REST API (shown above) or at startup via configuration.
 
 ## Built-in Servers
 
@@ -562,6 +828,7 @@ All routes are mounted at `/api/mcp`.
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `POST` | `/api/mcp/servers/test-connection` | Test connectivity without saving |
 | `POST` | `/api/mcp/servers/:id/connect` | Connect to a server |
 | `POST` | `/api/mcp/servers/:id/disconnect` | Disconnect from a server |
 
@@ -588,21 +855,22 @@ MCP server registrations are stored in `lt_mcp_servers`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS lt_mcp_servers (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name              TEXT UNIQUE NOT NULL,
-  description       TEXT,
-  transport_type    TEXT NOT NULL CHECK (transport_type IN ('stdio', 'sse')),
-  transport_config  JSONB NOT NULL DEFAULT '{}'::JSONB,
-  auto_connect      BOOLEAN NOT NULL DEFAULT false,
-  tool_manifest     JSONB,         -- cached from last listTools()
-  tags              TEXT[],          -- categorization for tag-based tool discovery
-  compile_hints     TEXT,            -- per-server instructions for the compilation pipeline
-  status            TEXT NOT NULL DEFAULT 'registered'
-                      CHECK (status IN ('registered', 'connected', 'error', 'disconnected')),
-  last_connected_at TIMESTAMPTZ,
-  metadata          JSONB,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                 TEXT UNIQUE NOT NULL,
+  description          TEXT,
+  transport_type       TEXT NOT NULL CHECK (transport_type IN ('stdio', 'sse', 'streamable-http')),
+  transport_config     JSONB NOT NULL DEFAULT '{}'::JSONB,
+  auto_connect         BOOLEAN NOT NULL DEFAULT false,
+  tool_manifest        JSONB,            -- cached from last listTools()
+  tags                 TEXT[],           -- categorization for tag-based tool discovery
+  compile_hints        TEXT,             -- per-server instructions for the compilation pipeline
+  credential_providers TEXT[] DEFAULT '{}', -- IAM providers required by tools
+  status               TEXT NOT NULL DEFAULT 'registered'
+                         CHECK (status IN ('registered', 'connected', 'error', 'disconnected')),
+  last_connected_at    TIMESTAMPTZ,
+  metadata             JSONB,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
@@ -611,6 +879,8 @@ The `tool_manifest` column caches the result of `listTools()` on each successful
 The `tags` column is a PostgreSQL text array with a GIN index, enabling fast tag-based tool discovery via `findServersByTags(tags, 'any'|'all')`. Workflows like `mcpQuery` discover all tools or filter by user-provided tags.
 
 The `compile_hints` column stores per-server instructions that are injected into the compilation prompt when that server's tools appear in an execution trace. This lets each server provide tool-specific constraints (e.g., timeout requirements, retry policies, ordering rules) that guide the compiler when converting dynamic executions into deterministic workflows.
+
+The `credential_providers` column lists IAM credential providers required by the server's tools. When a user invokes a tool, the system checks whether they have registered credentials for each listed provider. Missing credentials trigger a `MissingCredentialError` with the provider name, prompting the user to connect via the Credentials page.
 
 The schema is created automatically by `migrate()`. See `services/db/schemas/001_initial.sql`.
 

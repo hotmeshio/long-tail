@@ -120,7 +120,7 @@ export function QuorumFeed({ bridgeActive }: QuorumFeedProps) {
   );
   const [customFilter, setCustomFilter] = useState('');
 
-  // Keep a ref to channels so the NATS callback reads the latest without re-subscribing
+  // Keep a ref to channels so the event callback reads the latest without re-subscribing
   const channelsRef = useRef(channels);
   useEffect(() => { channelsRef.current = channels; }, [channels]);
   const customFilterRef = useRef(customFilter);

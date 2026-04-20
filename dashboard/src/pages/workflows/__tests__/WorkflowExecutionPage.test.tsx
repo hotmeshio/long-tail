@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -68,7 +68,7 @@ vi.mock('../../../api/escalations', () => ({
   useEscalationsByWorkflowId: () => ({ data: { escalations: [] } }),
 }));
 
-vi.mock('../../../hooks/useNatsEvents', () => ({
+vi.mock('../../../hooks/useEventHooks', () => ({
   useWorkflowDetailEvents: vi.fn(),
 }));
 
@@ -275,6 +275,8 @@ describe('WorkflowExecutionPage', () => {
     } as any);
 
     renderPage();
+    // "Compile into Pipeline" is inside the Actions dropdown — open it first
+    fireEvent.click(screen.getByText('Actions'));
     expect(screen.getByText(/Compile into Pipeline/)).toBeInTheDocument();
   });
 });

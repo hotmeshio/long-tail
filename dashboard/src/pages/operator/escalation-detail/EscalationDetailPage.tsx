@@ -15,7 +15,7 @@ import { CollapsibleSection } from '../../../components/common/layout/Collapsibl
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
-import { useEscalationDetailEvents } from '../../../hooks/useNatsEvents';
+import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { TriageContext } from '../../../components/escalation/TriageContext';
 import { EscalationActionBar } from './EscalationActionBar';

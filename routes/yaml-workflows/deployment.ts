@@ -3,6 +3,7 @@ import { Router } from 'express';
 import * as yamlDb from '../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../../services/yaml-workflow/workers';
+import { invokeYamlWorkflow } from '../../services/yaml-workflow/invoke';
 
 import { isNotFoundError } from './helpers';
 
@@ -110,51 +111,15 @@ router.post('/:id/invoke', async (req, res) => {
       res.status(400).json({ error: 'Workflow must be active to invoke' });
       return;
     }
-    const data = req.body.data || {};
 
-    // Inject _scope so compiled workflow activities have identity context
-    const executeAs = req.body.execute_as;
-    const userId = req.auth?.userId;
-    if (!data._scope) {
-      const { resolvePrincipal } = await import('../../services/iam/principal');
-      if (executeAs) {
-        const [botPrincipal, invokerPrincipal] = await Promise.all([
-          resolvePrincipal(executeAs),
-          userId ? resolvePrincipal(userId) : Promise.resolve(null),
-        ]);
-        if (botPrincipal) {
-          data._scope = {
-            principal: botPrincipal,
-            scopes: ['mcp:tool:call'],
-            ...(invokerPrincipal ? { initiatedBy: userId, initiatingPrincipal: invokerPrincipal } : {}),
-          };
-        }
-      } else if (userId) {
-        const principal = await resolvePrincipal(userId);
-        if (principal) {
-          data._scope = { principal, scopes: ['mcp:tool:call'] };
-        }
-      }
-    }
-
-    if (req.body.sync) {
-      const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
-        wf.app_id,
-        wf.graph_topic,
-        data,
-        req.body.timeout,
-        wf.graph_topic,
-      );
-      res.json({ job_id, result });
-    } else {
-      const jobId = await yamlDeployer.invokeYamlWorkflow(
-        wf.app_id,
-        wf.graph_topic,
-        data,
-        wf.graph_topic,
-      );
-      res.json({ job_id: jobId });
-    }
+    const result = await invokeYamlWorkflow(wf, {
+      data: req.body.data,
+      sync: req.body.sync,
+      timeout: req.body.timeout,
+      execute_as: req.body.execute_as,
+      userId: req.auth?.userId,
+    });
+    res.json(result);
   } catch (err: any) {
     if (isNotFoundError(err)) {
       res.status(404).json({ error: 'YAML workflow not found' });

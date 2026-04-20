@@ -8,8 +8,6 @@ vi.mock('../../../../api/mcp', () => ({
   useConnectMcpServer: vi.fn(() => ({ mutate: vi.fn() })),
   useDisconnectMcpServer: vi.fn(() => ({ mutate: vi.fn() })),
   useDeleteMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
-  useCreateMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
-  useUpdateMcpServer: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useCredentialStatus: vi.fn(() => ({ data: null })),
 }));
 

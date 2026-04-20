@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { LockOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalations, useEscalationTypes, useReleaseEscalation } from '../../api/escalations';
-import { useEscalationListEvents } from '../../hooks/useNatsEvents';
+import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -10,7 +10,7 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar } from './escalation-columns';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function OperatorDashboard() {
@@ -74,7 +74,13 @@ export function OperatorDashboard() {
         setFilter={setFilter}
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
-        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+        actions={
+          <ListToolbar
+            onRefresh={() => refetch()}
+            isFetching={isFetching}
+            apiPath={`/escalations?status=claimed&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.role ? `&role=${filters.role}` : ''}${filters.type ? `&type=${filters.type}` : ''}${filters.priority ? `&priority=${filters.priority}` : ''}`}
+          />
+        }
       />
 
       {queryError && (

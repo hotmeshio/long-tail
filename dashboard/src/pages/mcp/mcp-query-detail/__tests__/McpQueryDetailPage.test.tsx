@@ -30,8 +30,9 @@ vi.mock('../../../../api/escalations', () => ({
   useResolveEscalation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('../../../../hooks/useNatsEvents', () => ({
+vi.mock('../../../../hooks/useEventHooks', () => ({
   useWorkflowDetailEvents: vi.fn(),
+  useMcpQueryDetailEvents: vi.fn(),
 }));
 
 vi.mock('../DeployPanel', () => ({

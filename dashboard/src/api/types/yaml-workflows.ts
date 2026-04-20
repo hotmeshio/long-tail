@@ -9,7 +9,7 @@ export interface ActivityManifestEntry {
   mcp_server_id?: string;
   mcp_tool_name?: string;
   tool_arguments?: Record<string, unknown>;
-  input_mappings: Record<string, string>;
+  input_mappings: Record<string, unknown>;
   output_fields: string[];
   prompt_template?: string;
   model?: string;
@@ -50,6 +50,9 @@ export interface LTYamlWorkflowRecord {
   activated_at: string | null;
   input_field_meta: InputFieldMeta[];
   metadata: Record<string, unknown> | null;
+  cron_schedule: string | null;
+  cron_envelope: Record<string, unknown> | null;
+  execute_as: string | null;
   created_at: string;
   updated_at: string;
 }

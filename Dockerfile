@@ -49,5 +49,6 @@ RUN npm ci --only=production
 RUN npx playwright install chromium
 RUN npm install -g @anthropic-ai/claude-code
 COPY --from=builder /app/build ./build
+COPY --from=builder /app/lib/db/schemas ./lib/db/schemas
 COPY --from=builder /app/dashboard/dist ./dashboard/dist
 CMD ["node", "build/index.js"]

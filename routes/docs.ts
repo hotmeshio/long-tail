@@ -4,13 +4,13 @@ import * as path from 'path';
 
 const router = Router();
 
-function docsDir(): string {
+function projectRoot(): string {
   const candidates = [
-    path.join(__dirname, '..', 'docs'),
-    path.join(__dirname, '..', '..', 'docs'),
+    path.join(__dirname, '..'),
+    path.join(__dirname, '..', '..'),
   ];
   for (const dir of candidates) {
-    if (fs.existsSync(dir)) return dir;
+    if (fs.existsSync(path.join(dir, 'docs'))) return dir;
   }
   return candidates[0];
 }
@@ -32,8 +32,29 @@ function listDocs(dir: string, prefix = ''): { path: string; title: string }[] {
   return results;
 }
 
+function resolveDocPath(docPath: string): string | null {
+  const root = projectRoot();
+  // README.md lives at project root, everything else under docs/
+  if (docPath === 'README.md') {
+    const fp = path.join(root, 'README.md');
+    return fs.existsSync(fp) ? fp : null;
+  }
+  const fp = path.join(root, 'docs', docPath);
+  return fs.existsSync(fp) ? fp : null;
+}
+
 router.get('/', (_req: Request, res: Response) => {
-  res.json({ docs: listDocs(docsDir()) });
+  const root = projectRoot();
+  const docs: { path: string; title: string }[] = [];
+
+  // README first
+  const readmePath = path.join(root, 'README.md');
+  if (fs.existsSync(readmePath)) {
+    docs.push({ path: 'README.md', title: 'Long Tail' });
+  }
+
+  docs.push(...listDocs(path.join(root, 'docs')));
+  res.json({ docs });
 });
 
 // Use query param for doc path to avoid Express wildcard issues
@@ -43,8 +64,8 @@ router.get('/read', (req: Request, res: Response) => {
     res.status(400).json({ error: 'Invalid path' });
     return;
   }
-  const filePath = path.join(docsDir(), docPath);
-  if (!fs.existsSync(filePath)) {
+  const filePath = resolveDocPath(docPath);
+  if (!filePath) {
     res.status(404).json({ error: 'Document not found' });
     return;
   }

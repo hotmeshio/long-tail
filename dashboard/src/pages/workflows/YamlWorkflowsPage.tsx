@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Play, Wand2 } from 'lucide-react';
+import { ChevronRight, Clock, Play, Wand2 } from 'lucide-react';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useExpandedRows } from '../../hooks/useExpandedRows';
@@ -10,17 +10,20 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { WorkflowTestPanel } from '../../components/common/test/WorkflowTestPanel';
+import { CronPanel } from '../../components/common/test/CronPanel';
 import { groupByAppId, matchesSearch, filterTools, type ProcessServer } from './yaml-helpers';
 import type { LTYamlWorkflowRecord } from '../../api/types';
 
 // ── Tool row (individual workflow inside expanded server) ─────────────────────
 
-function ToolRow({ wf, onTry, onWizard }: {
+function ToolRow({ wf, onTry, onWizard, onCron }: {
   wf: LTYamlWorkflowRecord;
   onTry: () => void;
   onWizard: () => void;
+  onCron: () => void;
 }) {
   const canTry = wf.status === 'active';
+  const hasCron = !!wf.cron_schedule;
 
   return (
     <div onClick={canTry ? onTry : undefined} className={`group/row flex items-center hover:bg-surface-hover/50 transition-colors border-b border-surface-border/30 ${canTry ? 'cursor-pointer' : ''}`}>
@@ -43,6 +46,15 @@ function ToolRow({ wf, onTry, onWizard }: {
             <Play className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
         )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onCron(); }}
+          className={hasCron
+            ? 'text-status-success'
+            : 'opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent'}
+          title={hasCron ? `Cron: ${wf.cron_schedule}` : 'Schedule cron'}
+        >
+          <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
         {wf.source_workflow_id && (
           <button
             onClick={(e) => { e.stopPropagation(); onWizard(); }}
@@ -65,6 +77,7 @@ function ServerRow({
   onToggle,
   onTryTool,
   onWizard,
+  onCron,
   visibleTools,
 }: {
   server: ProcessServer;
@@ -72,6 +85,7 @@ function ServerRow({
   onToggle: () => void;
   onTryTool: (wf: LTYamlWorkflowRecord) => void;
   onWizard: (wf: LTYamlWorkflowRecord) => void;
+  onCron: (wf: LTYamlWorkflowRecord) => void;
   visibleTools: LTYamlWorkflowRecord[];
 }) {
   return (
@@ -112,7 +126,7 @@ function ServerRow({
           >
             <div className="overflow-hidden">
               {visibleTools.map((wf) => (
-                <ToolRow key={wf.id} wf={wf} onTry={() => onTryTool(wf)} onWizard={() => onWizard(wf)} />
+                <ToolRow key={wf.id} wf={wf} onTry={() => onTryTool(wf)} onWizard={() => onWizard(wf)} onCron={() => onCron(wf)} />
               ))}
               <div className="h-1 bg-surface-sunken/20" />
             </div>
@@ -158,6 +172,10 @@ export function YamlWorkflowsPage() {
 
   const { expandedIds, toggle: toggleExpand } = useExpandedRows('lt:expanded:yaml-workflows');
   const [tryWorkflow, setTryWorkflow] = useState<LTYamlWorkflowRecord | null>(null);
+  const [cronWorkflow, setCronWorkflow] = useState<LTYamlWorkflowRecord | null>(null);
+
+  // Active sidebar: test panel or cron panel (mutually exclusive)
+  const sidebarWorkflow = tryWorkflow || cronWorkflow;
 
   if (isLoading) {
     return (
@@ -218,7 +236,7 @@ export function YamlWorkflowsPage() {
       </FilterBar>
 
       <div className="flex gap-0">
-        <div className={`${tryWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
+        <div className={`${sidebarWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
           {filteredServers.length === 0 ? (
             <EmptyState title="No pipelines yet" description="Use the Pipeline Designer to create your first MCP pipeline." />
           ) : (
@@ -241,10 +259,11 @@ export function YamlWorkflowsPage() {
                     server={server}
                     expanded={expandedIds.has(server.appId)}
                     onToggle={() => toggleExpand(server.appId)}
-                    onTryTool={(wf) => setTryWorkflow(wf)}
+                    onTryTool={(wf) => { setCronWorkflow(null); setTryWorkflow(wf); }}
                     onWizard={(wf) => {
                       if (wf.source_workflow_id) navigate(`/mcp/queries/${wf.source_workflow_id}?step=4`);
                     }}
+                    onCron={(wf) => { setTryWorkflow(null); setCronWorkflow(wf); }}
                     visibleTools={filterTools(server.workflows, filters.search)}
                   />
                 ))}
@@ -258,6 +277,15 @@ export function YamlWorkflowsPage() {
             <WorkflowTestPanel
               workflow={tryWorkflow}
               onClose={() => setTryWorkflow(null)}
+            />
+          </div>
+        )}
+
+        {cronWorkflow && (
+          <div className="w-[380px] shrink-0 sticky top-0 h-[calc(100vh-12rem)]">
+            <CronPanel
+              workflow={cronWorkflow}
+              onClose={() => setCronWorkflow(null)}
             />
           </div>
         )}
