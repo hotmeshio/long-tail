@@ -1,15 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { MessageSquare, Lightbulb, Layers, Hammer, Wand2 } from 'lucide-react';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
-import { useSubmitMcpQuery, useSubmitMcpQueryRouted } from '../../../api/mcp-query';
-import { useSubmitBuildWorkflow, useBuilderResult } from '../../../api/workflow-builder';
+import { useSubmitMcpQuery, useSubmitMcpQueryRouted, useMcpQueryExecution } from '../../../api/mcp-query';
+import { useSubmitBuildWorkflow, useBuilderResult, useRefineBuildWorkflow } from '../../../api/workflow-builder';
+import { useYamlWorkflows, useYamlWorkflow } from '../../../api/yaml-workflows';
 import { DescribePanel } from '../../mcp/workflow-builder-detail/DescribePanel';
-import { ReviewPanel } from '../../mcp/workflow-builder-detail/ReviewPanel';
-import { DeployPanel as BuilderDeployPanel } from '../../mcp/workflow-builder-detail/DeployPanel';
-import { TestPanel as BuilderTestPanel } from '../../mcp/workflow-builder-detail/TestPanel';
+import { BuilderProfilePanel } from '../../mcp/workflow-builder-detail/BuilderProfilePanel';
 
 import type { Step } from './helpers';
 import { useQueryDetail } from './useQueryDetail';
@@ -114,8 +113,14 @@ function ComposerPanel() {
                 : <Hammer className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
               }
               <textarea
+                ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = Math.min(400, Math.max(160, el.scrollHeight)) + 'px'; } }}
                 value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
+                onChange={(e) => {
+                  setPromptText(e.target.value);
+                  const el = e.target;
+                  el.style.height = 'auto';
+                  el.style.height = Math.min(400, Math.max(160, el.scrollHeight)) + 'px';
+                }}
                 placeholder={mode === 'discover'
                   ? 'Describe what you want to accomplish. The LLM will discover and execute the right tools...'
                   : 'Describe the pipeline steps, tools, inputs, and outputs. The LLM will construct the YAML directly...'
@@ -178,9 +183,11 @@ function ComposerPanel() {
 // ── Builder wizard (direct build mode) ────────────────────────────────────────
 
 function BuilderWizard() {
+  const navigate = useNavigate();
   const { workflowId } = useParams<{ workflowId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [deployedYamlId, setDeployedYamlId] = useState<string | null>(null);
+  const [createdYamlId, setCreatedYamlId] = useState<string | null>(null);
+  const refineMutation = useRefineBuildWorkflow();
 
   const { data: resultData, refetch } = useBuilderResult(workflowId);
   const builderData = resultData?.result?.data as any;
@@ -189,22 +196,68 @@ function BuilderWizard() {
   const isClarification = !!builderData?.clarification_needed;
   const isBuilding = !resultData || (!hasYaml && !isClarification && !builderData?.title?.includes('Failed'));
 
+  // Look up existing YAML workflow by name (survives page reload)
+  const builderName = builderData?.name as string | undefined;
+  const { data: existingYaml } = useYamlWorkflows(
+    builderName ? { search: builderName, limit: 1 } : {},
+  );
+  const existingYamlId = existingYaml?.workflows?.[0]?.id;
+  const resolvedYamlId = createdYamlId || existingYamlId || null;
+
+  // Fetch YAML workflow status for step gating
+  const { data: yamlWorkflow } = useYamlWorkflow(resolvedYamlId || '');
+  const yamlStatus = yamlWorkflow?.status || 'draft';
+  const isDeployedOrActive = yamlStatus === 'deployed' || yamlStatus === 'active';
+  const isActive = yamlStatus === 'active';
+
   type BStep = 1 | 2 | 3 | 4;
-  const BUILDER_LABELS = ['Describe', 'Review', 'Deploy', 'Test'];
+  const BUILDER_LABELS = ['Describe', 'Profile', 'Deploy', 'Test'];
 
   let maxReachable: BStep = 1;
   if (hasYaml) maxReachable = 2;
-  if (deployedYamlId) maxReachable = 4;
+  if (resolvedYamlId) maxReachable = 3;
+  if (isDeployedOrActive) maxReachable = 4;
 
   const stepParam = searchParams.get('step');
   const [manualStep, setManualStep] = useState<BStep | null>(null);
-  const step: BStep = manualStep ?? (stepParam ? Math.min(Number(stepParam), maxReachable) as BStep : (hasYaml ? 2 : 1));
+  const defaultStep: BStep = hasYaml ? 2 : 1;
+  const step: BStep = manualStep ?? (stepParam ? Math.min(Number(stepParam), maxReachable) as BStep : defaultStep);
+
+  // Sync URL to reflect the resolved step when no step param is present
+  useEffect(() => {
+    if (!stepParam && resultData) {
+      setSearchParams({ mode: 'builder', step: String(step) }, { replace: true });
+    }
+  }, [resultData, step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStepClick = (s: number) => {
     if (s <= maxReachable) {
       setManualStep(s as BStep);
       setSearchParams({ mode: 'builder', step: String(s) });
     }
+  };
+
+  // Extract original prompt from the workflow execution events (same approach as DescribePanel)
+  const { data: builderExecution } = useMcpQueryExecution(workflowId);
+  const startEvent = builderExecution?.events?.find(
+    (e: any) => e.event_type === 'workflow_execution_started',
+  );
+  const envelope = Array.isArray(startEvent?.attributes?.input)
+    ? startEvent.attributes.input[0]
+    : startEvent?.attributes?.input;
+  const originalPrompt: string | undefined = envelope?.data?.prompt || envelope?.data?.question || undefined;
+
+  // Builder-specific recompilation: submits feedback + prior YAML to the builder LLM,
+  // which starts a new builder workflow. Navigate to it so the user sees build progress.
+  const handleBuilderRegenerate = async (feedback: string) => {
+    if (!builderData?.yaml || !originalPrompt) return;
+    const result = await refineMutation.mutateAsync({
+      prompt: originalPrompt,
+      prior_yaml: yamlWorkflow?.yaml_content || builderData.yaml,
+      feedback,
+      tags: builderData.tags,
+    });
+    navigate(`/mcp/queries/${result.workflow_id}?mode=builder`, { replace: true });
   };
 
   return (
@@ -232,24 +285,36 @@ function BuilderWizard() {
           />
         )}
         {step === 2 && hasYaml && (
-          <ReviewPanel
+          <BuilderProfilePanel
             builderData={builderData}
+            resolvedYamlId={resolvedYamlId}
+            originalPrompt={originalPrompt}
             onBack={() => handleStepClick(1)}
-            onDeploy={(yamlId) => { setDeployedYamlId(yamlId); handleStepClick(3); }}
+            onCreate={(yamlId) => {
+              setCreatedYamlId(yamlId);
+              handleStepClick(3);
+            }}
+            onNext={() => handleStepClick(3)}
           />
         )}
-        {step === 3 && deployedYamlId && (
-          <BuilderDeployPanel
-            yamlWorkflowId={deployedYamlId}
+        {step === 3 && resolvedYamlId && (
+          <DeployPanel
+            yamlId={resolvedYamlId}
+            onAdvance={() => handleStepClick(4)}
             onBack={() => handleStepClick(2)}
-            onNext={() => handleStepClick(4)}
+            onRegenerate={handleBuilderRegenerate}
+            regeneratePending={refineMutation.isPending}
           />
         )}
-        {step === 4 && deployedYamlId && (
-          <BuilderTestPanel
-            yamlWorkflowId={deployedYamlId}
-            sampleInputs={builderData?.sample_inputs}
+        {step === 4 && resolvedYamlId && (
+          <TestPanel
+            yamlId={resolvedYamlId}
+            originalWorkflowId={workflowId}
+            originalResult={undefined}
+            originalPrompt={originalPrompt}
             onBack={() => handleStepClick(3)}
+            onAdvance={() => {}}
+            builderMode
           />
         )}
       </div>

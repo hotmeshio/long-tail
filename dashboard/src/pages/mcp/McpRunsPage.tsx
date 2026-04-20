@@ -12,7 +12,7 @@ import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import type { LTJob } from '../../api/types';
 
@@ -187,7 +187,13 @@ export function McpRunsPage() {
     <div>
       <PageHeader title="Pipeline Executions" />
 
-      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
+      <FilterBar actions={
+        <ListToolbar
+          onRefresh={() => refetch()}
+          isFetching={isFetching}
+          apiPath={`/mcp-runs?app_id=${activeNamespace || 'longtail'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+        />
+      }>
         <FilterSelect
           label="Namespace"
           value={activeNamespace}

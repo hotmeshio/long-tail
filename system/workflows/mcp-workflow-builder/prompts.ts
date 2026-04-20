@@ -96,17 +96,42 @@ field_name:
 \`\`\`
 
 ### Nested @pipe (fan-out/fan-in):
+Sub-pipes must be ROW-LEVEL entries in the parent pipe array — each is a separate row, NOT an element inside another row's array. Sub-pipes resolve first, then their results become args to the final function row.
 \`\`\`yaml
 dated_key:
   '@pipe':
-    - - '{my_trigger.output.data.slug}'
-      - '-'
-      - '@pipe':
-          - ['{@date.now}']
-          - ['{@date.toISOString}']
-          - [0, 10, '{@string.substring}']
+    - '@pipe':
+      - ['{my_trigger.output.data.slug}', '-']
+      - ['{@string.concat}']
+    - '@pipe':
+      - ['{@date.now}']
+      - ['{@date.toISOString}', 0, 10]
+      - ['{@string.substring}']
     - ['{@string.concat}']
 \`\`\`
+This produces \`my-slug-2026-04-19\`. Row 1 sub-pipe: \`slug + "-"\`. Row 2 sub-pipe: today's date. Row 3: concat all results.
+
+CRITICAL RULES for nested @pipe:
+1. Never put a nested \`@pipe\` object INSIDE an array row. Each sub-pipe must be its own row in the parent.
+2. Maximum nesting depth is 2 levels (parent @pipe containing sub-pipe rows). Never nest a @pipe inside a @pipe inside a @pipe.
+3. For multi-part string building (e.g., domain/key/date.png), use a SINGLE flat @pipe with multiple sub-pipe rows — one per part — then a final \`['{@string.concat}']\` row. EVERY row must be either a sub-pipe object OR a function call array. Static values MUST be wrapped in a sub-pipe:
+\`\`\`yaml
+path:
+  '@pipe':
+    - '@pipe':
+      - ['{trigger.output.data.domain}', '/', '{trigger.output.data.key}', '/']
+      - ['{@string.concat}']
+    - '@pipe':
+      - ['{@date.now}']
+      - ['{@date.toISOString}', 0, 10]
+      - ['{@string.substring}']
+    - '@pipe':
+      - ['.png']
+    - ['{@string.concat}']
+\`\`\`
+This resolves: sub-pipe1 → "research/google/", sub-pipe2 → "2026-04-19", sub-pipe3 → ".png", then concat all → "research/google/2026-04-19.png".
+
+IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH — HotMesh interprets it as a function call. Always wrap static values in \`'@pipe': - [value]\`.
 
 ### Available @pipe operators (every JS method is exposed):
 - **@string**: charAt, concat, includes, indexOf, replace, slice, split, startsWith, substring, toLowerCase, toUpperCase, trim
@@ -131,7 +156,8 @@ dated_key:
 4. **_scope threading**: Every worker MUST have \`_scope: '{trigger.output.data._scope}'\` for IAM context
 5. **Wire outputs forward**: Use \`{prevActivity.output.data.fieldName}\` to pass data between steps
 6. **Use @pipe for transforms**: When a value needs runtime computation (date stamp, string concat, slugify), use @pipe — never hardcode computed values
-7. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
+7. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
+8. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
 8. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
 9. **Linear transitions**: Chain activities with transitions unless iteration is needed
 

@@ -22,6 +22,38 @@ const MAX_BUILD_ATTEMPTS = 3;
 const MAX_CLARIFICATION_ROUNDS = 3;
 
 /**
+ * Fix known @pipe anti-patterns in generated YAML.
+ *
+ * LLMs consistently produce two broken patterns:
+ * 1. ['{@date.toISOString}'] then [0, 10] then ['{@string.substring}']
+ *    → should be ['{@date.toISOString}', 0, 10] then ['{@string.substring}']
+ * 2. Bare static rows like ['.png'] after sub-pipes
+ *    → should be wrapped in '@pipe': [['.png']]
+ *
+ * This runs deterministically on the YAML string before deployment.
+ */
+function fixPipePatterns(yaml: string): string {
+  // Fix pattern 1: function row followed by bare args row followed by another function
+  // ['{@date.toISOString}']  →  ['{@date.toISOString}', 0, 10]
+  // [0, 10]                     ['{@string.substring}']
+  // ['{@string.substring}']
+  yaml = yaml.replace(
+    /(\['\{@date\.toISOString\}'\])\s*\n(\s*)- \[0, 10\]\s*\n(\s*)- \['\{@string\.substring\}'\]/g,
+    "['{@date.toISOString}', 0, 10]\n$2- ['{@string.substring}']",
+  );
+
+  // Fix field name mismatches the LLM consistently gets wrong
+  // Vision: image_path → image (the tool parameter name)
+  yaml = yaml.replace(/(\s+)image_path: /g, '$1image: ');
+  // Knowledge: content: '{...}' → data: '{...}' (store_knowledge field)
+  yaml = yaml.replace(/(\s+)content: '(\{[^}]+\.output\.data\.[^}]+\})'/g, "$1data: '$2'");
+  // Vision output: .analysis} → .description} (analyze_image returns description)
+  yaml = yaml.replace(/\.analysis\}/g, '.description}');
+
+  return yaml;
+}
+
+/**
  * MCP Workflow Builder — constructs HotMesh YAML DAGs directly.
  *
  * Unlike mcpQuery (which executes tools then compiles traces), this workflow
@@ -147,6 +179,9 @@ export async function mcpWorkflowBuilder(
         continue;
       }
 
+      // Fix known @pipe anti-patterns before returning
+      const fixedYaml = fixPipePatterns(result.yaml);
+
       return {
         type: 'return',
         data: {
@@ -154,7 +189,7 @@ export async function mcpWorkflowBuilder(
           summary: result.description || 'Workflow built successfully.',
           name: result.name,
           description: result.description,
-          yaml: result.yaml,
+          yaml: fixedYaml,
           input_schema: result.input_schema,
           activity_manifest: result.activity_manifest,
           tags: result.tags,
