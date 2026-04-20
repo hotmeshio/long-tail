@@ -2,7 +2,7 @@ import { MessageSquare } from 'lucide-react';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { PanelTitle } from './PanelTitle';
-import { ResultSummary } from './ResultSummary';
+
 
 interface OriginalQueryPanelProps {
   status: string;
@@ -11,7 +11,7 @@ interface OriginalQueryPanelProps {
   originalOutput: unknown;
   originalDurationMs: number | null | undefined;
   resultSummary: string | undefined;
-  onNext: () => void;
+  onNext?: () => void;
 }
 
 export function OriginalQueryPanel({
@@ -48,7 +48,7 @@ export function OriginalQueryPanel({
           ) : originalOutput ? (
             <JsonViewer data={originalOutput} defaultMode="tree" />
           ) : resultSummary ? (
-            <ResultSummary text={resultSummary} />
+            <JsonViewer data={{ summary: resultSummary }} defaultMode="tree" />
           ) : (
             <p className="text-xs text-text-tertiary italic">No structured output</p>
           )}
@@ -58,7 +58,7 @@ export function OriginalQueryPanel({
         </div>
       </div>
 
-      <WizardNav><span /><button onClick={onNext} className="btn-primary text-xs">Next: Timeline</button></WizardNav>
+      <WizardNav><span /><button onClick={onNext} disabled={!onNext} className="btn-primary text-xs">Next: Timeline</button></WizardNav>
     </div>
   );
 }

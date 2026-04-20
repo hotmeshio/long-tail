@@ -5,9 +5,91 @@
 import type {
   ExtractedStep,
   EnhancedCompilationPlan,
+  DataFlowEdge,
 } from '../../types';
 
 import { keysRelated } from './utils';
+
+/**
+ * HotMesh @pipe sub-pipe for today's date as YYYY-MM-DD.
+ * Must be used as a ROW-LEVEL entry in a parent @pipe, never inside an array row.
+ */
+const DATE_SUB_PIPE = {
+  '@pipe': [
+    ['{@date.now}'],
+    ['{@date.toISOString}', 0, 10],
+    ['{@string.substring}'],
+  ],
+};
+
+/**
+ * Convert a scalar derivation spec into a HotMesh @pipe expression.
+ * Uses fan-out/fan-in pattern: sub-pipes as row-level siblings, NOT nested inside array rows.
+ */
+function buildDerivationPipe(
+  sourceRef: string,
+  derivation: DataFlowEdge['derivation'],
+): string | Record<string, unknown> {
+  if (!derivation) return sourceRef;
+
+  switch (derivation.strategy) {
+    case 'concat': {
+      const parts = derivation.parts || ['{value}'];
+      const hasDate = parts.some((p: string) => p === '{date}');
+      if (!hasDate) {
+        // Simple concat — no sub-pipes needed
+        const args = parts.map((p: string) => p === '{value}' ? sourceRef : p);
+        if (args.length === 1 && args[0] === sourceRef) return sourceRef;
+        return { '@pipe': [args, ['{@string.concat}']] };
+      }
+      // Fan-out/fan-in: each part that needs computation gets its own sub-pipe row
+      const rows: unknown[] = [];
+      for (const p of parts) {
+        if (p === '{value}') {
+          rows.push({ '@pipe': [[sourceRef]] });
+        } else if (p === '{date}') {
+          rows.push(DATE_SUB_PIPE);
+        } else {
+          rows.push({ '@pipe': [[p]] });
+        }
+      }
+      rows.push(['{@string.concat}']);
+      return { '@pipe': rows };
+    }
+    case 'template': {
+      const tpl = derivation.template || '{value}';
+      const segments = tpl.split(/(\{value\}|\{date\})/).filter(Boolean);
+      const hasDate = segments.includes('{date}');
+      if (!hasDate) {
+        const args = segments.map((s: string) => s === '{value}' ? sourceRef : s);
+        if (args.length === 1 && args[0] === sourceRef) return sourceRef;
+        return { '@pipe': [args, ['{@string.concat}']] };
+      }
+      const rows: unknown[] = [];
+      for (const s of segments) {
+        if (s === '{value}') {
+          rows.push({ '@pipe': [[sourceRef]] });
+        } else if (s === '{date}') {
+          rows.push(DATE_SUB_PIPE);
+        } else {
+          rows.push({ '@pipe': [[s]] });
+        }
+      }
+      rows.push(['{@string.concat}']);
+      return { '@pipe': rows };
+    }
+    case 'prefix': {
+      const concatParts: unknown[] = [];
+      if (derivation.prefix) concatParts.push(derivation.prefix);
+      concatParts.push(sourceRef);
+      if (derivation.suffix) concatParts.push(derivation.suffix);
+      if (concatParts.length === 1) return sourceRef;
+      return { '@pipe': [concatParts, ['{@string.concat}']] };
+    }
+    default:
+      return sourceRef;
+  }
+}
 
 /**
  * Build input mappings for a step using the compilation plan's data flow edges.
@@ -25,8 +107,8 @@ export function wireStepInputs(
   prevActivityId: string,
   prevResult: unknown,
   collapsedToCoreIndex?: Map<number, number>,
-): Record<string, string> {
-  const inputMappings: Record<string, string> = {};
+): Record<string, unknown> {
+  const inputMappings: Record<string, unknown> = {};
 
   // Determine session fields for gap-fill after plan-driven wiring
   const sessionFieldSet = new Set(
@@ -50,13 +132,15 @@ export function wireStepInputs(
         const transformActId = `${prefix}_xf${stepIdx + 1}`;
         inputMappings[edge.toField] = `{${transformActId}.output.data.${edge.toField}}`;
       } else if (edge.fromStep === 'trigger') {
-        inputMappings[edge.toField] = `{${triggerId}.output.data.${edge.fromField}}`;
+        const rawRef = `{${triggerId}.output.data.${edge.fromField}}`;
+        inputMappings[edge.toField] = buildDerivationPipe(rawRef, edge.derivation);
       } else {
         // Remap the source step from collapsed to core index
         const remappedFrom = collapsedToCoreIndex?.get(edge.fromStep as number) ?? edge.fromStep;
         const sourceActId = stepIndexToActivityId.get(remappedFrom as number);
         if (sourceActId) {
-          inputMappings[edge.toField] = `{${sourceActId}.output.data.${edge.fromField}}`;
+          const rawRef = `{${sourceActId}.output.data.${edge.fromField}}`;
+          inputMappings[edge.toField] = buildDerivationPipe(rawRef, edge.derivation);
         }
       }
     }

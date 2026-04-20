@@ -37,6 +37,9 @@ export interface LTYamlWorkflowRecord {
   original_prompt: string | null;
   category: string | null;
   metadata: Record<string, unknown> | null;
+  cron_schedule: string | null;
+  cron_envelope: Record<string, unknown> | null;
+  execute_as: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -77,7 +80,7 @@ export interface ActivityManifestEntry {
   /** Original arguments the LLM chose (stored for reference / defaults) */
   tool_arguments?: Record<string, unknown>;
   /** Input data mappings (e.g., { field: '{a1.output.data.x}' }) */
-  input_mappings: Record<string, string>;
+  input_mappings: Record<string, unknown>;
   /** Known output field names */
   output_fields: string[];
   /** LLM prompt template — use {field} for interpolation from input maps (llm steps only) */
@@ -97,10 +100,11 @@ export interface ActivityManifestEntry {
     /** Derivation specs for computed fields (null in fieldMap) */
     derivations?: Record<string, {
       sourceKey: string;
-      strategy: 'slugify' | 'prefix' | 'template' | 'passthrough';
+      strategy: 'slugify' | 'prefix' | 'template' | 'passthrough' | 'concat';
       prefix?: string;
       suffix?: string;
       template?: string;
+      parts?: string[];
     }>;
   };
 }

@@ -1,12 +1,13 @@
-import type { NatsLTEvent } from './types';
+import type { NatsLTEvent } from '../nats/types';
 
 /**
- * Map a NATS event to the React Query keys that should be invalidated.
+ * Map an event to the React Query keys that should be invalidated.
  *
  * Returns an array of query key prefixes. React Query's `invalidateQueries`
  * will match all queries whose key starts with any returned prefix.
  *
- * This is pure logic with no React dependency — easily testable.
+ * This is pure logic with no React or transport dependency — easily testable.
+ * Works identically regardless of event transport (Socket.IO, NATS, etc.).
  */
 export function getInvalidationKeys(event: NatsLTEvent): string[][] {
   const keys: string[][] = [];
@@ -20,6 +21,10 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
       if (event.workflowId) {
         keys.push(['workflowExecution', event.workflowId]);
         keys.push(['workflowState', event.workflowId]);
+        keys.push(['mcpQueryExecution', event.workflowId]);
+      }
+      if (event.originId) {
+        keys.push(['processes', event.originId]);
       }
       break;
 
@@ -38,6 +43,9 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
       if (event.workflowId) {
         keys.push(['workflowExecution', event.workflowId]);
         keys.push(['workflowState', event.workflowId]);
+        keys.push(['mcpQueryExecution', event.workflowId]);
+        keys.push(['mcpQueryResult', event.workflowId]);
+        keys.push(['builderResult', event.workflowId]);
       }
       break;
 
@@ -51,6 +59,7 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
     case 'milestone':
       if (event.workflowId) {
         keys.push(['workflowExecution', event.workflowId]);
+        keys.push(['mcpQueryExecution', event.workflowId]);
       }
       keys.push(['tasks']);
       break;

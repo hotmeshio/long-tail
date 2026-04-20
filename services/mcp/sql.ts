@@ -2,8 +2,8 @@
 
 export const CREATE_MCP_SERVER = `
   INSERT INTO lt_mcp_servers
-    (name, description, transport_type, transport_config, auto_connect, metadata, tags)
-  VALUES ($1, $2, $3, $4, $5, $6, $7)
+    (name, description, transport_type, transport_config, auto_connect, metadata, tags, compile_hints, credential_providers)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
   RETURNING *`;
 
 export const GET_MCP_SERVER = `

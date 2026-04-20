@@ -1,5 +1,5 @@
 /**
- * NATS event payload — mirrors the server-side LTEvent interface.
+ * Event payload — mirrors the server-side LTEvent interface.
  *
  * Topic space: `lt.events.{type}` (e.g. `lt.events.task.completed`)
  * Dashboard subscribes to `lt.events.>` to receive all events.
@@ -45,6 +45,6 @@ export type NatsLTEventType =
 export type NatsLTEventCategory = 'task' | 'escalation' | 'workflow' | 'activity' | 'milestone';
 
 /**
- * Callback signature for NATS event subscribers.
+ * Callback signature for event subscribers.
  */
 export type NatsEventHandler = (event: NatsLTEvent) => void;

@@ -50,8 +50,9 @@ export const SEED_MCP_SERVERS = [
     tags: ['vision', 'image-analysis', 'multimodal'],
     compile_hints: [
       'Vision tools process one image at a time. When iterating over multiple images, each iteration should pass a single image URL or data URI.',
-      'The `image` argument accepts a storage path (e.g., "screenshot.png"), a data URI, or an https:// URL. When following a screenshot or run_script step, wire `image` from the producing step output — use `last_screenshot_path` from run_script or `path` from screenshot. NEVER make `image` a trigger input when the image is produced by a prior step.',
+      'The argument name is `image` (NOT `image_path`). It accepts a storage path (e.g., "screenshot.png"), a data URI, or an https:// URL. When following a screenshot or capture_page step, wire `image` from the producing step output field `path`. NEVER make `image` a trigger input when the image is produced by a prior step.',
       'Vision tools do NOT use browser sessions. Do NOT wire page_id or _handle to vision tools — they read from storage, not from the browser.',
+      'analyze_image output fields: description (string), text_content (string), objects (array). The main analysis text is in `description` — NOT `analysis` or `content`.',
     ].join(' '),
     credential_providers: ['anthropic'],
   },
@@ -87,6 +88,7 @@ export const SEED_MCP_SERVERS = [
       'capture_authenticated_pages expects a `login` object and a `pages` array. The `login` object contains nested fields (url, username, password, selectors) — flatten credentials as dynamic trigger inputs but keep the object structure in stored tool_arguments. The `pages` array should flow from a transform edge that reshapes `links` into [{url, screenshot_path, wait_ms, full_page}].',
       'For screenshot_path derivation in transforms, use the `screenshot_dir` trigger input as a dynamic prefix (not hardcoded). Derivation strategy: slugify the href, prepend screenshot_dir + "/", append ".png".',
       'When login_and_capture follows a signal hook (human input), wire the password from the hook output to the `password` argument. Wire `url` and `username` from trigger inputs.',
+      'capture_page screenshot_path MUST include a file extension (e.g., .png). When deriving screenshot_path from a slug or identifier, always append ".png" using a concat derivation: { "strategy": "concat", "parts": ["{value}", ".png"] }. For date-stamped paths use: { "strategy": "concat", "parts": ["{value}", "-", "{date}", ".png"] }.',
     ].join(' '),
     credential_providers: [],
   },
@@ -186,6 +188,7 @@ export const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'knowledge' },
     tags: ['knowledge', 'memory', 'state', 'storage'],
     compile_hints:
+      'store_knowledge arguments: domain (string), key (string), data (the content to store — NOT "content"), data_key (optional sub-key). ' +
       'store_knowledge upserts by domain+key — it merges data if the entry exists. ' +
       'Use a consistent domain name across related workflows to build shared context. ' +
       'search_knowledge uses JSONB containment (@>) — the query object must be a subset of the stored data. ' +

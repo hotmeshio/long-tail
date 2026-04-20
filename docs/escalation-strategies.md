@@ -11,7 +11,7 @@ Escalation strategies are the pluggable layer that decides what happens when a r
 - [How It Works](#how-it-works)
 - [The Default Strategy](#the-default-strategy)
 - [The MCP Strategy](#the-mcp-strategy)
-- [The `_lt` Namespace](#the-_lt-namespace)
+- [The _lt Namespace](#the-_lt-namespace)
 - [The Triage Workflow](#the-triage-workflow)
 - [Writing a Custom Strategy](#writing-a-custom-strategy)
 - [Configuration](#configuration)
@@ -114,8 +114,7 @@ The `mcpTriage` workflow is a single, self-contained workflow that handles the e
 
 1. **Queries upstream tasks** — reads all tasks sharing the same `originId` to understand what happened before
 2. **Reads the resolver hint** — `_lt.hint` tells it what kind of remediation is needed
-3. **Calls MCP tools** — based on the hint, calls the appropriate tools:
-   - `image_orientation` → lists document pages, calls `rotate_page` for each
+3. **Calls MCP tools** — based on the hint, calls the appropriate tools: `image_orientation` → lists document pages, calls `rotate_page` for each
 4. **Handles the exit directly** — either starts the original workflow with corrected data (direct resolution) or creates a targeted escalation on the original task
 5. **Signals back** — the re-invoked workflow succeeds, and the interceptor signals through standard channels back to the original parent orchestrator
 

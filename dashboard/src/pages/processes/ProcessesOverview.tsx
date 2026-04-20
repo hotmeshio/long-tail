@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProcessStats } from '../../api/tasks';
-import { useProcessListEvents } from '../../hooks/useNatsEvents';
+import { useProcessListEvents } from '../../hooks/useEventHooks';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StatCard } from '../../components/common/data/StatCard';
 

@@ -66,7 +66,7 @@ export function useMcpQueryJobs(filters: {
   entity?: string;
 } = {}) {
   const params = new URLSearchParams();
-  params.set('entity', filters.entity || 'mcpQuery,mcpTriage');
+  params.set('entity', filters.entity || 'mcpQuery,mcpTriage,mcpWorkflowBuilder');
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
   if (filters.search) params.set('search', filters.search);
@@ -88,12 +88,6 @@ export function useMcpQueryExecution(workflowId: string | undefined) {
     queryKey: ['mcpQueryExecution', workflowId],
     queryFn: () => apiFetch(`/workflow-states/${workflowId}/execution`),
     enabled: !!workflowId,
-    refetchInterval: (query) => {
-      // Poll while running, stop when completed
-      const status = query.state.data?.status;
-      if (status === 'completed' || status === 'failed') return false;
-      return 3000;
-    },
   });
 }
 
@@ -105,7 +99,7 @@ export function useMcpQueryResult(workflowId: string | undefined) {
     queryKey: ['mcpQueryResult', workflowId],
     queryFn: () => apiFetch(`/workflows/${workflowId}/result`),
     enabled: !!workflowId,
-    retry: false,
+    retry: 2,
   });
 }
 

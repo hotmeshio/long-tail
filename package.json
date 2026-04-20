@@ -1,6 +1,6 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -11,14 +11,13 @@
   "files": [
     "build/",
     "docs/",
-    "lib/db/schemas/",
     "dashboard/dist/",
     "LICENSE",
     "README.md"
   ],
   "scripts": {
     "clean": "rimraf ./build",
-    "build": "tsc --build tsconfig.json",
+    "build": "tsc --build tsconfig.json && cp -r lib/db/schemas build/lib/db/schemas",
     "clean-build": "npm run clean && npm run build",
     "start": "ts-node index.ts",
     "start:dev": "ts-node-dev --respawn index.ts",
@@ -61,7 +60,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
     "@aws-sdk/client-s3": "^3.1017.0",
-    "@hotmeshio/hotmesh": "^0.14.1",
+    "@hotmeshio/hotmesh": "^0.14.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.215.0",
     "@opentelemetry/resources": "^2.5.1",
@@ -76,6 +75,7 @@
     "pg": "^8.13.0",
     "pino": "^9.6.0",
     "playwright": "^1.58.2",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "zod": "^3.25.76"
   },

@@ -228,7 +228,7 @@ export function buildIterationActivities(
   // Manifest entries
   const manifest: ActivityManifestEntry[] = [
     { activity_id: pivotId, title: `Iterate ${humanize(originalTool)}`, type: 'worker' as const, tool_source: 'trigger', topic: graphTopic, input_mappings: {}, output_fields: ['index', 'items'] },
-    { activity_id: workerId, title: humanize(originalTool), type: 'worker' as const, tool_source: step.source, topic: workerTopic, workflow_name: originalTool, mcp_server_id: spec.serverId, mcp_tool_name: originalTool, input_mappings: workerInputMaps as Record<string, string>, output_fields: [] },
+    { activity_id: workerId, title: humanize(originalTool), type: 'worker' as const, tool_source: step.source, topic: workerTopic, workflow_name: originalTool, mcp_server_id: spec.serverId, mcp_tool_name: originalTool, input_mappings: workerInputMaps, output_fields: [] },
     { activity_id: cycleId, title: 'Next Item', type: 'worker' as const, tool_source: 'trigger', topic: graphTopic, input_mappings: {}, output_fields: [] },
     { activity_id: doneId, title: 'Iteration Complete', type: 'worker' as const, tool_source: 'trigger', topic: graphTopic, input_mappings: {}, output_fields: [] },
   ];

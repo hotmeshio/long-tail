@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Trash2, Workflow, GraduationCap } from 'lucide-react';
+import { Send, Trash2, X, Workflow, GraduationCap } from 'lucide-react';
 import { useHelpAssistant, type HelpMessage } from '../../hooks/useHelpAssistant';
-import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
+import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { DateValue } from '../common/display/DateValue';
 import { DurationValue } from '../common/display/DurationValue';
 
@@ -22,32 +22,15 @@ const SIZE_LABELS: Record<PanelSize, string> = {
 
 function SizeIcon({ which }: { which: PanelSize }) {
   const cls = 'stroke-current';
-  // Progressively larger rounded rects — all 14x14 viewBox, 1.5 stroke
   switch (which) {
     case 'sm':
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="5" y="5" width="7" height="7" rx="1.5" className={cls} strokeWidth="1.5" />
-        </svg>
-      );
+      return (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="5" y="5" width="7" height="7" rx="1.5" className={cls} strokeWidth="1.5" /></svg>);
     case 'md':
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="3" y="3" width="9" height="9" rx="1.5" className={cls} strokeWidth="1.5" />
-        </svg>
-      );
+      return (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="3" width="9" height="9" rx="1.5" className={cls} strokeWidth="1.5" /></svg>);
     case 'lg':
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" className={cls} strokeWidth="1.5" />
-        </svg>
-      );
+      return (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" className={cls} strokeWidth="1.5" /></svg>);
     case 'full':
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="1.5" className={cls} strokeWidth="1.5" />
-        </svg>
-      );
+      return (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="1.5" className={cls} strokeWidth="1.5" /></svg>);
   }
 }
 
@@ -88,8 +71,61 @@ function ThinkingIndicator({ msg }: { msg: HelpMessage }) {
   );
 }
 
+function MessageMeta({ msg, compileMessage }: { msg: HelpMessage; compileMessage: (id: string) => void }) {
+  const isAssistant = msg.role === 'assistant';
+  return (
+    <div className={`flex items-center gap-1.5 ${isAssistant ? 'justify-start' : 'justify-end'}`}>
+      <DateValue date={msg.timestamp} format="time" className="!text-[9px] text-text-muted/50" />
+      {msg.durationMs != null && (
+        <>
+          <span className="text-text-muted/30 text-[8px]">&middot;</span>
+          <DurationValue ms={msg.durationMs} className="!text-[9px] text-text-muted/50" />
+        </>
+      )}
+      {msg.workflowId && (
+        <Link
+          to={`/workflows/executions/${msg.workflowId}`}
+          className="text-text-muted/40 hover:text-accent transition-colors"
+          title="View workflow execution"
+        >
+          <Workflow className="w-2.5 h-2.5" strokeWidth={1.5} />
+        </Link>
+      )}
+      {isAssistant && msg.workflowId && !msg.pending && (
+        <button
+          onClick={() => compileMessage(msg.id)}
+          disabled={msg.compilationStatus === 'compiling' || msg.compilationStatus === 'done'}
+          className="transition-colors"
+          title={
+            msg.compilationStatus === 'done'
+              ? 'Compiled — future queries will match this pipeline'
+              : msg.compilationStatus === 'error'
+                ? msg.compilationError ?? 'Compilation failed'
+                : msg.compilationStatus === 'compiling'
+                  ? 'Compiling...'
+                  : 'Compile to fast pipeline'
+          }
+        >
+          <GraduationCap
+            className={`w-2.5 h-2.5 ${
+              msg.compilationStatus === 'done'
+                ? 'text-status-success'
+                : msg.compilationStatus === 'error'
+                  ? 'text-status-error'
+                  : msg.compilationStatus === 'compiling'
+                    ? 'text-accent/40 animate-pulse'
+                    : 'text-text-muted/40 hover:text-accent'
+            }`}
+            strokeWidth={1.5}
+          />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function HelpPanel() {
-  const { helpOpen, messages, sendMessage, pageContext, activeWorkflowId, clearMessages, compileMessage } =
+  const { helpOpen, setHelpOpen, messages, sendMessage, pageContext, activeWorkflowId, clearMessages, compileMessage } =
     useHelpAssistant();
   const [input, setInput] = useState('');
   const [size, setSize] = useState<PanelSize>('md');
@@ -97,21 +133,18 @@ export function HelpPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Focus input when panel opens
   useEffect(() => {
     if (helpOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [helpOpen]);
 
-  // Escape to shrink or close
   useEffect(() => {
     if (!helpOpen) return;
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -119,11 +152,12 @@ export function HelpPanel() {
         if (size === 'full') setSize('lg');
         else if (size === 'lg') setSize('md');
         else if (size === 'md') setSize('sm');
+        else setHelpOpen(false);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [helpOpen, size]);
+  }, [helpOpen, size, setHelpOpen]);
 
   if (!helpOpen) return null;
 
@@ -197,10 +231,19 @@ export function HelpPanel() {
               onClick={clearMessages}
               className="p-1 text-text-tertiary hover:text-text-secondary transition-colors"
               aria-label="Clear conversation"
+              title="Clear conversation"
             >
               <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           )}
+          <button
+            onClick={() => setHelpOpen(false)}
+            className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+            aria-label="Close"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" strokeWidth={1.5} />
+          </button>
         </div>
       </div>
 
@@ -216,62 +259,8 @@ export function HelpPanel() {
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`text-xs leading-relaxed ${
-              msg.role === 'user'
-                ? 'text-right'
-                : 'text-left'
-            }`}
+            className={`text-xs leading-relaxed ${msg.role === 'user' ? 'text-right' : 'text-left'}`}
           >
-            {!msg.pending && (
-              <div className={`mb-0.5 flex items-center gap-1.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <DateValue
-                  date={msg.timestamp}
-                  format="time"
-                  className="!text-[9px] text-text-muted/50"
-                />
-                {msg.workflowId && (
-                  <Link
-                    to={`/workflows/executions/${msg.workflowId}`}
-                    className="text-accent/40 hover:text-accent transition-colors"
-                    title="View workflow execution"
-                  >
-                    <Workflow className="w-2.5 h-2.5" strokeWidth={1.5} />
-                  </Link>
-                )}
-                {msg.durationMs != null && (
-                  <DurationValue ms={msg.durationMs} className="!text-[9px] text-text-muted/50" />
-                )}
-                {msg.role === 'assistant' && msg.workflowId && !msg.pending && (
-                  <button
-                    onClick={() => compileMessage(msg.id)}
-                    disabled={msg.compilationStatus === 'compiling' || msg.compilationStatus === 'done'}
-                    className="transition-colors"
-                    title={
-                      msg.compilationStatus === 'done'
-                        ? 'Compiled — future queries will match this pipeline'
-                        : msg.compilationStatus === 'error'
-                          ? msg.compilationError ?? 'Compilation failed'
-                          : msg.compilationStatus === 'compiling'
-                            ? 'Compiling...'
-                            : 'Compile to fast pipeline'
-                    }
-                  >
-                    <GraduationCap
-                      className={`w-2.5 h-2.5 ${
-                        msg.compilationStatus === 'done'
-                          ? 'text-status-success'
-                          : msg.compilationStatus === 'error'
-                            ? 'text-status-error'
-                            : msg.compilationStatus === 'compiling'
-                              ? 'text-accent/40 animate-pulse'
-                              : 'text-accent/40 hover:text-accent'
-                      }`}
-                      strokeWidth={1.5}
-                    />
-                  </button>
-                )}
-              </div>
-            )}
             <div
               className={`inline-block max-w-[85%] px-3 py-2 rounded-md whitespace-pre-wrap ${
                 msg.role === 'user'
@@ -282,11 +271,16 @@ export function HelpPanel() {
               {msg.pending ? (
                 <ThinkingIndicator msg={msg} />
               ) : msg.role === 'assistant' ? (
-                <SimpleMarkdown content={msg.content} compact />
+                <MarkdownRenderer content={msg.content} />
               ) : (
                 msg.content
               )}
             </div>
+            {!msg.pending && (
+              <div className="mt-0.5">
+                <MessageMeta msg={msg} compileMessage={compileMessage} />
+              </div>
+            )}
           </div>
         ))}
       </div>

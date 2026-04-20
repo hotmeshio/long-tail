@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProcessDetail } from '../../api/tasks';
+import { useProcessDetailEvents } from '../../hooks/useEventHooks';
 import { useSettings } from '../../api/settings';
 import { PageHeaderWithStats, type InlineStat } from '../../components/common/layout/PageHeaderWithStats';
 import { SectionLabel } from '../../components/common/layout/SectionLabel';
@@ -23,6 +24,7 @@ function extractRootTask(tasks: LTTaskRecord[]): LTTaskRecord | null {
 
 export function ProcessDetailPage() {
   const { originId } = useParams<{ originId: string }>();
+  useProcessDetailEvents(originId);
   const { data, isLoading } = useProcessDetail(originId ?? '');
   const { data: settings } = useSettings();
   const traceUrl = settings?.telemetry?.traceUrl ?? null;

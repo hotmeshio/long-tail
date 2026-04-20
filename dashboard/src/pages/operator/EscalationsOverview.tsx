@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEscalationStats } from '../../api/escalations';
-import { useEscalationStatsEvents } from '../../hooks/useNatsEvents';
+import { useEscalationStatsEvents } from '../../hooks/useEventHooks';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StatCard } from '../../components/common/data/StatCard';
 

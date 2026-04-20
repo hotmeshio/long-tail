@@ -43,7 +43,7 @@ export function CredentialsPage() {
   };
 
   const connectUrl = (provider: string) =>
-    `/connect/${provider}?state=${encodeURIComponent(getToken() || '')}`;
+    `/api/auth/oauth/connect/${provider}?token=${encodeURIComponent(getToken() || '')}&returnTo=/credentials`;
 
   return (
     <div>

@@ -20,6 +20,20 @@ function styleFor(source: string) {
 
 interface Edge { from: string; to: string }
 
+/** Recursively extract `{activityId.…}` refs from a mapping value (string or @pipe object). */
+function extractMappingRefs(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return [...value.matchAll(/\{([\w-]+)\./g)].map((m) => m[1]);
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(extractMappingRefs);
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value).flatMap(extractMappingRefs);
+  }
+  return [];
+}
+
 /** Derive dependency edges by parsing `{activityId.…}` refs in input_mappings. */
 function deriveEdges(entries: ActivityManifestEntry[]): Edge[] {
   const idSet = new Set(entries.map((e) => e.activity_id));
@@ -28,9 +42,7 @@ function deriveEdges(entries: ActivityManifestEntry[]): Edge[] {
   for (const entry of entries) {
     if (!entry.input_mappings) continue;
     for (const mapping of Object.values(entry.input_mappings)) {
-      const refs = String(mapping).matchAll(/\{([\w-]+)\./g);
-      for (const m of refs) {
-        const src = m[1];
+      for (const src of extractMappingRefs(mapping)) {
         if (idSet.has(src) && src !== entry.activity_id) {
           const key = `${src}->${entry.activity_id}`;
           if (!edgeMap.has(key)) edgeMap.set(key, { from: src, to: entry.activity_id });

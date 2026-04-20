@@ -17,7 +17,7 @@ function ShellLayout() {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
-  const [docsOpen, setDocsOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(() => window.location.hash.startsWith('#docs'));
   const location = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +29,15 @@ function ShellLayout() {
     void el.offsetWidth;
     el.classList.add('animate-page-in');
   }, [location.pathname]);
+
+  // Open docs drawer when hash changes to #docs
+  useEffect(() => {
+    const onHash = () => {
+      if (window.location.hash.startsWith('#docs')) setDocsOpen(true);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   return (
     <div className="h-screen bg-surface flex flex-col" style={{ '--feed-height': feedOpen ? '224px' : '32px' } as React.CSSProperties}>
@@ -76,7 +85,7 @@ function ShellLayout() {
 
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} />
-      <DocsDrawer open={docsOpen} onClose={() => setDocsOpen(false)} />
+      <DocsDrawer open={docsOpen} onClose={() => { setDocsOpen(false); history.replaceState(null, '', window.location.pathname + window.location.search); }} />
       <HelpButton />
       <HelpPanel />
     </div>

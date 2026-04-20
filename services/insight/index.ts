@@ -82,6 +82,55 @@ export async function startMcpQuery(input: McpQueryInput): Promise<McpQueryResul
   };
 }
 
+// ── Workflow builder invocation ───────────────────────────────────────────────
+
+export interface WorkflowBuilderInput {
+  prompt: string;
+  tags?: string[];
+  wait?: boolean;
+  feedback?: string;
+  prior_yaml?: string;
+  answers?: string;
+  prior_questions?: string[];
+  userId?: string;
+}
+
+export async function startWorkflowBuilder(input: WorkflowBuilderInput): Promise<McpQueryResult> {
+  const { prompt, tags, wait = true, feedback, prior_yaml, answers, prior_questions, userId } = input;
+  const startTime = Date.now();
+
+  const client = new Durable.Client({ connection: getConnection() });
+
+  const workflowId = `wf-builder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const handle = await client.workflow.start({
+    args: [{
+      data: { prompt, tags, feedback, prior_yaml, answers, prior_questions },
+      metadata: { source: 'dashboard' },
+      lt: { userId },
+    }],
+    taskQueue: 'long-tail-system',
+    workflowName: 'mcpWorkflowBuilder',
+    workflowId,
+    expire: JOB_EXPIRE_SECS,
+    entity: 'mcpWorkflowBuilder',
+  } as any);
+
+  if (wait === false) {
+    return { workflow_id: workflowId, status: 'started', prompt };
+  }
+
+  const result = await handle.result<Record<string, any>>({ state: true });
+  const data = (result as any)?.data || result;
+
+  return {
+    ...data,
+    prompt,
+    workflow_id: workflowId,
+    duration_ms: Date.now() - startTime,
+  };
+}
+
 // ── Workflow description generation ──────────────────────────────────────────
 
 export async function describeWorkflow(input: DescribeInput): Promise<DescribeResult> {

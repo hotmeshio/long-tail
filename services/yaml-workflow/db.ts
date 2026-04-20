@@ -17,6 +17,9 @@ import {
   LIST_VERSIONS,
   GET_VERSION_SNAPSHOT,
   DISCOVER_WORKFLOWS,
+  UPDATE_CRON_SCHEDULE,
+  CLEAR_CRON_SCHEDULE,
+  GET_CRON_SCHEDULED_WORKFLOWS,
 } from './sql';
 import type { CreateYamlWorkflowInput } from './types';
 import { parseVersionFromYaml } from './db-utils';
@@ -239,4 +242,34 @@ export async function markContentDeployed(workflowId: string): Promise<void> {
 export async function markAppIdContentDeployed(appId: string): Promise<void> {
   const pool = getPool();
   await pool.query(MARK_APP_ID_CONTENT_DEPLOYED, [appId]);
+}
+
+// -- Cron scheduling ---------------------------------------------------------
+
+export async function updateCronSchedule(
+  id: string,
+  cronSchedule: string,
+  cronEnvelope: Record<string, unknown> | null,
+  executeAs: string | null,
+): Promise<LTYamlWorkflowRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(UPDATE_CRON_SCHEDULE, [
+    id,
+    cronSchedule,
+    cronEnvelope ? JSON.stringify(cronEnvelope) : null,
+    executeAs,
+  ]);
+  return rows[0] || null;
+}
+
+export async function clearCronSchedule(id: string): Promise<LTYamlWorkflowRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(CLEAR_CRON_SCHEDULE, [id]);
+  return rows[0] || null;
+}
+
+export async function getCronScheduledWorkflows(): Promise<LTYamlWorkflowRecord[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_CRON_SCHEDULED_WORKFLOWS);
+  return rows;
 }

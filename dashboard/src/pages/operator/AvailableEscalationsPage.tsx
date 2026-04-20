@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useEscalationListEvents } from '../../hooks/useNatsEvents';
+import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
   useEscalationTypes,
@@ -26,7 +26,7 @@ import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
 import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { createBulkHandlers } from './helpers';
 import type { LTEscalationRecord } from '../../api/types';
 
@@ -206,7 +206,13 @@ export function AvailableEscalationsPage() {
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
         showStatus
-        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+        actions={
+          <ListToolbar
+            onRefresh={() => refetch()}
+            isFetching={isFetching}
+            apiPath={`/escalations?limit=${pagination.pageSize}&offset=${pagination.offset}${apiStatus ? `&status=${apiStatus}` : ''}${filters.role ? `&role=${filters.role}` : ''}${filters.type ? `&type=${filters.type}` : ''}${filters.priority ? `&priority=${filters.priority}` : ''}`}
+          />
+        }
       />
 
       {selectedIds.size > 0 && (

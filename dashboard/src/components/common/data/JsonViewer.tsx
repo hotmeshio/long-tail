@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { SectionLabel } from '../layout/SectionLabel';
 import { FullscreenOverlay } from '../layout/FullscreenOverlay';
+import { MarkdownRenderer, looksLikeMarkdown } from '../display/MarkdownRenderer';
 
 // ---------------------------------------------------------------------------
 // JSON view — raw, collapsible syntax tree (existing)
@@ -118,6 +119,9 @@ function TreeNode({ data, depth = 0 }: { data: unknown; depth?: number }) {
   }
 
   if (typeof data === 'string') {
+    if (data.length > 40 && looksLikeMarkdown(data)) {
+      return <MarkdownRenderer content={data} />;
+    }
     return <span className="text-text-primary">{data}</span>;
   }
 

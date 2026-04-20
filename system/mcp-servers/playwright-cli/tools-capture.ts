@@ -64,7 +64,7 @@ export function registerCaptureTools(srv: McpServer): void {
         }
 
         // Auto-derive screenshot path from URL if not provided
-        const screenshotPath = args.screenshot_path || (() => {
+        let screenshotPath = args.screenshot_path || (() => {
           try {
             const urlPath = new URL(args.url).pathname;
             const slug = urlPath === '/' ? 'home' : urlPath.replace(/^\/+|\/+$/g, '').replace(/\//g, '-');
@@ -73,6 +73,10 @@ export function registerCaptureTools(srv: McpServer): void {
             return `screenshots/capture-${Date.now()}.png`;
           }
         })();
+        // Ensure file extension — storage backends require mime type
+        if (!path.extname(screenshotPath)) {
+          screenshotPath += '.png';
+        }
 
         const screenshot = await saveScreenshot(page, screenshotPath, args.full_page ?? true);
 

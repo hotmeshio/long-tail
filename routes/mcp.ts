@@ -35,7 +35,7 @@ router.get('/servers', async (req, res) => {
  */
 router.post('/servers', async (req, res) => {
   try {
-    const { name, description, transport_type, transport_config, auto_connect, metadata } = req.body;
+    const { name, description, transport_type, transport_config, auto_connect, metadata, tags, compile_hints, credential_providers } = req.body;
     if (!name || !transport_type || !transport_config) {
       res.status(400).json({ error: 'name, transport_type, and transport_config are required' });
       return;
@@ -47,6 +47,9 @@ router.post('/servers', async (req, res) => {
       transport_config,
       auto_connect,
       metadata,
+      tags,
+      compile_hints,
+      credential_providers,
     });
     res.status(201).json(server);
   } catch (err: any) {
@@ -55,6 +58,25 @@ router.post('/servers', async (req, res) => {
       return;
     }
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/mcp/servers/test-connection
+ * Test connectivity to an MCP server without persisting it.
+ */
+router.post('/servers/test-connection', async (req, res) => {
+  try {
+    const { transport_type, transport_config } = req.body;
+    if (!transport_type || !transport_config) {
+      res.status(400).json({ error: 'transport_type and transport_config are required' });
+      return;
+    }
+    const { testConnection } = await import('../services/mcp/client/connection');
+    const result = await testConnection(transport_type, transport_config);
+    res.json(result);
+  } catch (err: any) {
+    res.json({ success: false, error: err.message, tools: [] });
   }
 });
 

@@ -90,9 +90,9 @@ export function ServerRow({
 
         {/* Actions */}
         <td className="px-6 py-3.5 w-28">
-          {builtin ? null : (
-            <RowActionGroup>
-              {server.status === 'connected' ? (
+          <RowActionGroup>
+            {!builtin && (
+              server.status === 'connected' ? (
                 <RowAction
                   icon={Unplug}
                   title="Disconnect server"
@@ -105,20 +105,22 @@ export function ServerRow({
                   onClick={() => connect.mutate(server.id)}
                   colorClass="text-text-tertiary hover:text-status-success"
                 />
-              )}
-              <RowAction
-                icon={Pencil}
-                title="Edit server"
-                onClick={onEdit}
-              />
+              )
+            )}
+            <RowAction
+              icon={Pencil}
+              title="Edit server"
+              onClick={onEdit}
+            />
+            {!builtin && (
               <RowAction
                 icon={Trash2}
                 title="Delete server"
                 onClick={onDelete}
                 colorClass="text-text-tertiary hover:text-status-error"
               />
-            </RowActionGroup>
-          )}
+            )}
+          </RowActionGroup>
         </td>
 
         {/* Tool count badge — aligned with child row hover icons */}

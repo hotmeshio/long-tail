@@ -33,7 +33,7 @@ export interface McpServerRecord {
   id: string;
   name: string;
   description: string | null;
-  transport_type: 'stdio' | 'sse';
+  transport_type: 'stdio' | 'sse' | 'streamable-http';
   transport_config: Record<string, unknown>;
   auto_connect: boolean;
   status: 'registered' | 'connected' | 'error' | 'disconnected';

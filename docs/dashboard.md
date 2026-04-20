@@ -19,7 +19,7 @@ The sidebar organizes pages into three groups.
 
 | Page | Purpose |
 |------|---------|
-| **MCP Server Tools** | Browse all registered MCP servers and their exposed tools. View tool schemas, tags, and compile hints. |
+| **MCP Server Tools** | Browse all registered MCP servers and their exposed tools. Click "Register Server" to open a guided wizard (Transport, Discovery, Test, Review). Click any server row to edit. View tool schemas, tags, compile hints, and credential providers. |
 | **MCP Pipeline Tools** | Tools available within MCP pipelines. Shows which tools the pipeline orchestrator can discover and invoke. |
 | **Pipeline Designer** | Six-step compilation wizard. Submit a query, review the dynamic execution, compile to a deterministic pipeline, deploy, test, and verify end-to-end routing. Detailed below. |
 | **Pipeline Executions** | Execution history for MCP pipelines. Shows both dynamic (agentic) and compiled (deterministic) runs, with duration for each. |
