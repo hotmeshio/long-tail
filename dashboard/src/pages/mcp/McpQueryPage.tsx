@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers, Hammer, Wand2, Settings } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers, Wand2, Settings } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';

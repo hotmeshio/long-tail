@@ -211,8 +211,6 @@ function BuilderWizard() {
   const { data: yamlWorkflow } = useYamlWorkflow(resolvedYamlId || '');
   const yamlStatus = yamlWorkflow?.status || 'draft';
   const isDeployedOrActive = yamlStatus === 'deployed' || yamlStatus === 'active';
-  const isActive = yamlStatus === 'active';
-
   type BStep = 1 | 2 | 3 | 4;
   const BUILDER_LABELS = ['Describe', 'Profile', 'Deploy', 'Test'];
 
