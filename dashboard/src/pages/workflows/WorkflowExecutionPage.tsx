@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useWorkflowExecution, useTerminateWorkflow } from '../../api/workflows';
 import { useWorkflowDetailEvents } from '../../hooks/useEventHooks';
@@ -7,12 +8,68 @@ import { useEscalationsByWorkflowId } from '../../api/escalations';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
 
 import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
 import { EventTable } from './workflow-execution/EventTable';
+
+function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
+  isRunning: boolean;
+  hasToolCalls: boolean;
+  workflowId: string;
+  onAction: (action: 'restart' | 'terminate') => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)} className="btn-primary text-xs">
+        Actions
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-10">
+          <button
+            onClick={() => { onAction('restart'); setOpen(false); }}
+            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+          >
+            Restart Workflow
+          </button>
+          {isRunning && (
+            <button
+              onClick={() => { onAction('terminate'); setOpen(false); }}
+              className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
+            >
+              Terminate
+            </button>
+          )}
+          {hasToolCalls && (
+            <Link
+              to={`/mcp/queries/${workflowId}?step=3`}
+              className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
+              onClick={() => setOpen(false)}
+            >
+              Compile into Pipeline
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const { pathname } = useLocation();
@@ -83,6 +140,7 @@ export function WorkflowExecutionPage() {
     );
   }
 
+  const isRunning = execution.status !== 'completed' && execution.status !== 'failed';
   const hasToolCalls = execution.status === 'completed' && execution.events.some(
     (e) => {
       if (e.event_type !== 'activity_task_completed') return false;
@@ -96,25 +154,20 @@ export function WorkflowExecutionPage() {
       <PageHeader
         title={executionTitle}
         actions={
-          <>
-            {hasToolCalls && (
-              <Link
-                to={`/mcp/queries/${workflowId}?step=3`}
-                className="group flex items-center gap-2 text-left"
-              >
-                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent shrink-0">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </span>
-                <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
-                  This execution used MCP tools.{' '}
-                  <span className="text-accent group-hover:underline">Compile into Pipeline</span>
-                </span>
-              </Link>
-            )}
-            <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-          </>
+          <div className="flex items-center gap-3">
+            <ListToolbar
+              onRefresh={() => refetch()}
+              isFetching={isFetching}
+              apiPath={`/workflow-states/${workflowId}/execution`}
+            />
+            <StatusBadge status={execution.status} />
+            <ActionsDropdown
+              isRunning={isRunning}
+              hasToolCalls={hasToolCalls}
+              workflowId={workflowId!}
+              onAction={handleAction}
+            />
+          </div>
         }
       />
 
@@ -123,8 +176,6 @@ export function WorkflowExecutionPage() {
         task={task}
         childTasks={childTasksData?.tasks}
         escalations={escalationsData?.escalations}
-        hasToolCalls={hasToolCalls}
-        onAction={handleAction}
       />
 
       {terminateMutation.error && (

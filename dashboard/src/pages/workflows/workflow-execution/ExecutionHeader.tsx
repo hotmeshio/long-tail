@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import type { WorkflowExecution, LTTaskRecord, LTEscalationRecord } from '../../../api/types';
@@ -53,86 +52,18 @@ interface ExecutionHeaderProps {
   task?: LTTaskRecord | null;
   childTasks?: LTTaskRecord[];
   escalations?: LTEscalationRecord[];
-  hasToolCalls?: boolean;
-  onAction?: (action: 'restart' | 'terminate') => void;
 }
 
-export function ExecutionHeader({ execution, task, escalations, hasToolCalls, onAction }: ExecutionHeaderProps) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    if (!actionsOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setActionsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [actionsOpen]);
-
+export function ExecutionHeader({ execution, task, escalations }: ExecutionHeaderProps) {
   // Determine parent relationship
   const isLeaf = task && task.workflow_id === execution.workflow_id;
   const parentWorkflowId = isLeaf ? task.parent_workflow_id : null;
-
-  const isRunning = execution.status !== 'completed' && execution.status !== 'failed';
 
   // Split compound HotMesh keys into separate task queue / workflow type
   const { taskQueue, workflowType } = splitEntityKey(execution.workflow_type);
 
   return (
     <div className="px-6 py-6 mb-6">
-      <div className="flex items-center gap-4 mb-5">
-        <h2 className="text-lg font-medium text-text-primary font-mono truncate flex-1">
-          {execution.workflow_id}
-        </h2>
-        <StatusBadge status={execution.status} />
-        {onAction && (
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setActionsOpen(!actionsOpen)}
-              className="btn-primary text-xs"
-            >
-              Actions
-            </button>
-            {actionsOpen && (
-              <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-10">
-                <button
-                  onClick={() => {
-                    onAction('restart');
-                    setActionsOpen(false);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
-                >
-                  Restart Workflow
-                </button>
-                {isRunning && (
-                  <button
-                    onClick={() => {
-                      onAction('terminate');
-                      setActionsOpen(false);
-                    }}
-                    className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
-                  >
-                    Terminate
-                  </button>
-                )}
-                {hasToolCalls && (
-                  <Link
-                    to={`/mcp/queries/${execution.workflow_id}?step=3`}
-                    className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
-                    onClick={() => setActionsOpen(false)}
-                  >
-                    Compile into Pipeline
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-8">
         <MetadataField label="Workflow Type" value={workflowType} mono />

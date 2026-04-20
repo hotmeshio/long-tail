@@ -13,7 +13,7 @@ import { useEventSubscription } from '../../hooks/useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { DateValue } from '../../components/common/display/DateValue';
 import { DurationValue } from '../../components/common/display/DurationValue';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 
 import { SwimlaneTimeline } from '../workflows/workflow-execution/SwimlaneTimeline';
 import { EventTable } from '../workflows/workflow-execution/EventTable';
@@ -91,7 +91,13 @@ export function McpRunDetailPage() {
     <div>
       <PageHeader
         title="Pipeline Execution"
-        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+        actions={
+          <ListToolbar
+            onRefresh={() => refetch()}
+            isFetching={isFetching}
+            apiPath={`/mcp-runs/${jobId}/execution?app_id=${namespace}`}
+          />
+        }
       />
 
       {/* ── Header card ─────────────────────────────────── */}
