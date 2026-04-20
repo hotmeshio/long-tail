@@ -6,10 +6,13 @@ import { loggerRegistry } from '../../lib/logger';
 import * as configService from '../config';
 import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig } from '../../types';
+import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
 import type { LTEnvelopePrincipal } from '../../types/envelope';
 
 const CRON_TOPIC_PREFIX = 'lt.cron';
 const CRON_ID_PREFIX = 'lt-cron';
+const YAML_CRON_TOPIC_PREFIX = 'lt.cron.yaml';
+const YAML_CRON_ID_PREFIX = 'lt-cron-yaml';
 
 /**
  * Singleton registry for workflow cron schedules.
@@ -43,6 +46,9 @@ class LTCronRegistry {
     for (const config of cronConfigs) {
       await this.startCron(config);
     }
+
+    // Connect YAML workflow crons
+    await this.connectYamlCrons();
 
     this.connected = true;
     if (cronConfigs.length > 0) {
@@ -157,12 +163,130 @@ class LTCronRegistry {
     }
   }
 
+  // ── YAML workflow crons ────────────────────────────────────────────────────
+
+  /**
+   * Load all YAML workflows with a cron_schedule and start Virtual.cron for each.
+   */
+  async connectYamlCrons(): Promise<void> {
+    const { getCronScheduledWorkflows } = await import('../yaml-workflow/db');
+    const yamlWfs = await getCronScheduledWorkflows();
+
+    for (const wf of yamlWfs) {
+      await this.startYamlCron(wf);
+    }
+
+    if (yamlWfs.length > 0) {
+      loggerRegistry.info(
+        `[lt-cron] started ${yamlWfs.length} YAML cron(s): ${yamlWfs.map((w) => w.graph_topic).join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Start a single Virtual.cron for a YAML workflow.
+   */
+  async startYamlCron(wf: LTYamlWorkflowRecord): Promise<void> {
+    if (!wf.cron_schedule) return;
+
+    const connection = getConnection();
+    const topic = `${YAML_CRON_TOPIC_PREFIX}.${wf.id}`;
+    const cronId = `${YAML_CRON_ID_PREFIX}-${wf.id}`;
+
+    const cronEnvelope = wf.cron_envelope || {};
+    const executeAs = wf.execute_as;
+    const wfId = wf.id;
+    let inFlight = false;
+
+    await Virtual.cron({
+      topic,
+      connection,
+      callback: async () => {
+        if (inFlight) {
+          loggerRegistry.warn(`[lt-cron] YAML workflow ${wfId} still in-flight, skipping tick`);
+          return;
+        }
+        inFlight = true;
+        try {
+          const { invokeYamlWorkflow } = await import('../yaml-workflow/invoke');
+          const { getYamlWorkflow } = await import('../yaml-workflow/db');
+          const current = await getYamlWorkflow(wfId);
+          if (!current || current.status !== 'active') {
+            loggerRegistry.warn(`[lt-cron] YAML workflow ${wfId} no longer active, skipping`);
+            return;
+          }
+          loggerRegistry.info(`[lt-cron] invoking YAML workflow ${current.graph_topic} (${wfId})`);
+          await invokeYamlWorkflow(current, {
+            data: cronEnvelope as Record<string, unknown>,
+            execute_as: executeAs || undefined,
+            source: 'cron',
+          });
+          loggerRegistry.info(`[lt-cron] YAML workflow ${current.graph_topic} completed`);
+        } catch (err: any) {
+          loggerRegistry.error(`[lt-cron] YAML workflow ${wfId} failed: ${err?.message}`);
+        } finally {
+          inFlight = false;
+        }
+      },
+      args: [],
+      options: {
+        id: cronId,
+        interval: wf.cron_schedule,
+      },
+    });
+
+    this.activeCrons.set(`yaml:${wf.id}`, cronId);
+  }
+
+  /**
+   * Stop a single YAML workflow cron.
+   */
+  async stopYamlCron(yamlWfId: string): Promise<void> {
+    const key = `yaml:${yamlWfId}`;
+    const cronId = this.activeCrons.get(key);
+    if (!cronId) return;
+
+    const connection = getConnection();
+    const topic = `${YAML_CRON_TOPIC_PREFIX}.${yamlWfId}`;
+
+    try {
+      await Virtual.interrupt({
+        topic,
+        connection,
+        options: { id: cronId },
+      });
+    } catch (err: any) {
+      loggerRegistry.warn(
+        `[lt-cron] interrupt failed for YAML workflow ${yamlWfId}: ${err?.message}`,
+      );
+    }
+
+    this.activeCrons.delete(key);
+  }
+
+  /**
+   * Restart a YAML workflow cron after config change.
+   */
+  async restartYamlCron(wf: LTYamlWorkflowRecord): Promise<void> {
+    await this.stopYamlCron(wf.id);
+    if (wf.cron_schedule && wf.status === 'active') {
+      await this.startYamlCron(wf);
+      loggerRegistry.info(
+        `[lt-cron] restarted YAML cron ${wf.graph_topic} (${wf.cron_schedule})`,
+      );
+    }
+  }
+
   /**
    * Stop all active crons. Call during graceful shutdown.
    */
   async disconnect(): Promise<void> {
     for (const workflowType of [...this.activeCrons.keys()]) {
-      await this.stopCron(workflowType);
+      if (workflowType.startsWith('yaml:')) {
+        await this.stopYamlCron(workflowType.replace('yaml:', ''));
+      } else {
+        await this.stopCron(workflowType);
+      }
     }
     this.connected = false;
   }

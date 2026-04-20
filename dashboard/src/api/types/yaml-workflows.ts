@@ -50,6 +50,9 @@ export interface LTYamlWorkflowRecord {
   activated_at: string | null;
   input_field_meta: InputFieldMeta[];
   metadata: Record<string, unknown> | null;
+  cron_schedule: string | null;
+  cron_envelope: Record<string, unknown> | null;
+  execute_as: string | null;
   created_at: string;
   updated_at: string;
 }

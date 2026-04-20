@@ -25,10 +25,17 @@ const registeredTopics = new Set<string>();
 export async function registerWorkersForWorkflow(
   workflow: LTYamlWorkflowRecord,
 ): Promise<void> {
+  const defaultRetry = {
+    maximumAttempts: 3,
+    backoffCoefficient: 2,
+    maximumInterval: 30,
+  };
+
   const workerConfigs: Array<{
     topic: string;
     workflowName?: string;
     connection: ReturnType<typeof getConnection>;
+    retry: { maximumAttempts: number; backoffCoefficient: number; maximumInterval: number };
     callback: (data: StreamData) => Promise<StreamDataResponse>;
   }> = [];
 
@@ -77,6 +84,7 @@ export async function registerWorkersForWorkflow(
         topic: activity.topic,
         workflowName: activity.workflow_name,
         connection: getConnection(),
+        retry: defaultRetry,
         callback: wrap(buildTransformCallback(activity)),
       });
     } else if (toolSource === 'llm') {
@@ -85,6 +93,7 @@ export async function registerWorkersForWorkflow(
         topic: activity.topic,
         workflowName: activity.workflow_name,
         connection: getConnection(),
+        retry: defaultRetry,
         callback: wrap(buildLlmCallback(activity)),
       });
     } else if (toolSource === 'db') {
@@ -96,6 +105,7 @@ export async function registerWorkersForWorkflow(
         topic: activity.topic,
         workflowName: activity.workflow_name,
         connection: getConnection(),
+        retry: defaultRetry,
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
           let mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
@@ -127,6 +137,7 @@ export async function registerWorkersForWorkflow(
         topic: activity.topic,
         workflowName: activity.workflow_name,
         connection: getConnection(),
+        retry: defaultRetry,
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
           const args = (data.data || {}) as Record<string, unknown>;
           // Start from stored defaults, then strip any wired keys that
@@ -160,6 +171,9 @@ export async function registerWorkersForWorkflow(
           if (result && typeof result === 'object' && 'error' in result) {
             loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);
           }
+          if (result == null) {
+            loggerRegistry.warn(`[yaml-workflow:worker] ${toolName} returned null/undefined`);
+          }
           return { metadata: { ...data.metadata }, data: result };
         }),
       });
@@ -176,6 +190,11 @@ export async function registerWorkersForWorkflow(
     guid: `compiled::${workflow.graph_topic}-${HotMesh.guid()}`,
     engine: {
       connection: getConnection(),
+      retry: {
+        maximumAttempts: 3,
+        backoffCoefficient: 2,
+        maximumInterval: '30s',
+      },
     },
     workers: workerConfigs,
   });
