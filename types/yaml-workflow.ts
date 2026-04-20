@@ -37,6 +37,9 @@ export interface LTYamlWorkflowRecord {
   original_prompt: string | null;
   category: string | null;
   metadata: Record<string, unknown> | null;
+  cron_schedule: string | null;
+  cron_envelope: Record<string, unknown> | null;
+  execute_as: string | null;
   created_at: Date;
   updated_at: Date;
 }

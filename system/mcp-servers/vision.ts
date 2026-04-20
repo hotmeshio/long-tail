@@ -2,6 +2,7 @@ import * as path from 'path';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import sharp from 'sharp';
 import { callLLM } from '../../services/llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
@@ -12,6 +13,9 @@ const MIME_MAP: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
 };
+
+/** Max dimension for LLM vision APIs (Anthropic limit is 8000px). */
+const MAX_IMAGE_DIMENSION = 7680;
 
 const analyzeImageSchema = z.object({
   image: z.string().describe(
@@ -53,11 +57,26 @@ async function resolveImageContent(
   const storagePath = image.replace(/^file:\/\//, '');
   const backend = getStorageBackend();
   const { data } = await backend.read(storagePath);
-  const ext = path.extname(storagePath).toLowerCase();
-  const mime = MIME_MAP[ext] || 'image/png';
-  const base64 = data.toString('base64');
 
-  return { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } };
+  // Downscale if any dimension exceeds the LLM vision limit
+  let imageBuffer = data;
+  let outputMime = MIME_MAP[path.extname(storagePath).toLowerCase()] || 'image/png';
+  try {
+    const meta = await sharp(data).metadata();
+    if (meta.width && meta.height && (meta.width > MAX_IMAGE_DIMENSION || meta.height > MAX_IMAGE_DIMENSION)) {
+      loggerRegistry.info(`[lt-mcp:vision] resizing ${meta.width}x${meta.height} -> fit ${MAX_IMAGE_DIMENSION}px`);
+      imageBuffer = await sharp(data)
+        .resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: 'inside' })
+        .png()
+        .toBuffer();
+      outputMime = 'image/png';
+    }
+  } catch (err: any) {
+    loggerRegistry.warn(`[lt-mcp:vision] could not check/resize image: ${err.message}`);
+  }
+
+  const base64 = imageBuffer.toString('base64');
+  return { type: 'image_url', image_url: { url: `data:${outputMime};base64,${base64}` } };
 }
 
 function registerTools(srv: McpServer): void {
@@ -89,20 +108,35 @@ function registerTools(srv: McpServer): void {
         ? `${ANALYZE_IMAGE_PROMPT}\n\nAdditional guidance: ${args.prompt}`
         : ANALYZE_IMAGE_PROMPT;
 
-      const response = await callLLM({
-        model: LLM_MODEL_SECONDARY,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [await resolveImageContent(args.image || (args as any).image_path) as any],
-          },
-        ],
-        max_tokens: LLM_MAX_TOKENS_VISION,
-        temperature: 0,
-      });
+      let response;
+      try {
+        const imageContent = await resolveImageContent(args.image || (args as any).image_path);
+        response = await callLLM({
+          model: LLM_MODEL_SECONDARY,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: [imageContent as any] },
+          ],
+          max_tokens: LLM_MAX_TOKENS_VISION,
+          temperature: 0,
+        });
+      } catch (err: any) {
+        loggerRegistry.error(`[lt-mcp:vision] analyze_image failed: ${err.message}`);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: err.message,
+              description: null,
+              text_content: null,
+              objects: [],
+            }),
+          }],
+        };
+      }
 
       const raw = response.content || '';
+      loggerRegistry.info(`[lt-mcp:vision] analyze_image response length: ${raw.length}`);
       try {
         const cleaned = raw.replace(/^```json\n?|\n?```$/g, '').trim();
         const parsed = JSON.parse(cleaned);

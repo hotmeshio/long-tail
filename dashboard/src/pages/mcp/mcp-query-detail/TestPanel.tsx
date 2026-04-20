@@ -182,6 +182,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
   }
 
   return (
+    <div>
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
       {/* Left: results */}
       <div>
@@ -327,10 +328,6 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
           </>
         )}
 
-        <WizardNav>
-          <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
-          {!builderMode && <button onClick={onAdvance} className="btn-primary text-xs">Next: Verify</button>}
-        </WizardNav>
       </div>
 
       {/* Right: test sidebar — sticky */}
@@ -426,6 +423,12 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
           )}
         </div>
       </div>
+    </div>
+
+    <WizardNav>
+      <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
+      {!builderMode && <button onClick={onAdvance} className="btn-primary text-xs">Next: Verify</button>}
+    </WizardNav>
     </div>
   );
 }

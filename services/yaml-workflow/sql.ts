@@ -90,6 +90,25 @@ export const GET_VERSION_SNAPSHOT = `
 export const UPDATE_STATUS_BASE = `UPDATE lt_yaml_workflows SET status = $2`;
 export const UPDATE_STATUS_SUFFIX = ` WHERE id = $1 RETURNING *`;
 
+// ─── Cron scheduling ────────────────────────────────────────────────────────
+
+export const UPDATE_CRON_SCHEDULE = `
+  UPDATE lt_yaml_workflows
+  SET cron_schedule = $2, cron_envelope = $3, execute_as = $4
+  WHERE id = $1
+  RETURNING *`;
+
+export const CLEAR_CRON_SCHEDULE = `
+  UPDATE lt_yaml_workflows
+  SET cron_schedule = NULL, cron_envelope = NULL, execute_as = NULL
+  WHERE id = $1
+  RETURNING *`;
+
+export const GET_CRON_SCHEDULED_WORKFLOWS = `
+  SELECT * FROM lt_yaml_workflows
+  WHERE cron_schedule IS NOT NULL AND status = 'active'
+  ORDER BY name`;
+
 // ─── Tag-based lookup ────────────────────────────────────────────────────────
 
 export const FIND_BY_TAGS_ANY = `

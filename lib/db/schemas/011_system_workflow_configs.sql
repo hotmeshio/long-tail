@@ -10,6 +10,9 @@ VALUES
    '{}'),
   ('mcpTriage', 'long-tail-system', 'engineer', false,
    'Dynamic MCP triage — LLM agentic loop for escalation remediation',
+   '{}'),
+  ('mcpWorkflowBuilder', 'long-tail-system', 'engineer', false,
+   'Direct pipeline builder — LLM constructs DAG from tool schemas',
    '{}')
 ON CONFLICT (workflow_type) DO NOTHING;
 
@@ -20,4 +23,8 @@ ON CONFLICT (workflow_type, role) DO NOTHING;
 
 INSERT INTO lt_config_roles (workflow_type, role)
 SELECT 'mcpTriage', unnest(ARRAY['reviewer', 'engineer', 'admin'])
+ON CONFLICT (workflow_type, role) DO NOTHING;
+
+INSERT INTO lt_config_roles (workflow_type, role)
+SELECT 'mcpWorkflowBuilder', unnest(ARRAY['reviewer', 'engineer', 'admin'])
 ON CONFLICT (workflow_type, role) DO NOTHING;

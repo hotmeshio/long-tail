@@ -258,6 +258,9 @@ CREATE TABLE IF NOT EXISTS lt_yaml_workflows (
   tags                     TEXT[] NOT NULL DEFAULT '{}',
   input_field_meta         JSONB NOT NULL DEFAULT '[]'::JSONB,
   metadata                 JSONB,
+  cron_schedule            TEXT,
+  cron_envelope            JSONB,
+  execute_as               TEXT,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

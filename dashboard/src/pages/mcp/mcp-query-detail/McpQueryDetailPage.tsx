@@ -27,15 +27,15 @@ import { EscalationBanner } from './EscalationBanner';
 type DesignMode = 'discover' | 'direct';
 
 const DISCOVER_STEPS = [
-  { icon: MessageSquare, color: 'text-accent', title: '1. Describe', detail: 'Write a prompt. The LLM executes tools dynamically to fulfill your request.' },
-  { icon: Lightbulb, color: 'text-status-warning', title: '2. Discover', detail: 'Review the execution trace — which tools were called, what data flowed between them.' },
-  { icon: Layers, color: 'text-status-success', title: '3. Compile', detail: 'Successful runs compile into deterministic pipelines. No LLM needed at runtime.' },
+  { icon: MessageSquare, color: 'text-accent', title: 'Describe', detail: 'Write a prompt. The LLM executes tools dynamically to fulfill your request.' },
+  { icon: Lightbulb, color: 'text-status-warning', title: 'Discover', detail: 'Review the execution trace — which tools were called, what data flowed between them.' },
+  { icon: Layers, color: 'text-status-success', title: 'Compile', detail: 'Successful runs compile into deterministic pipelines. No LLM needed at runtime.' },
 ];
 
 const DIRECT_STEPS = [
-  { icon: Hammer, color: 'text-accent', title: '1. Describe', detail: 'Specify what tools to use, what inputs to accept, and how data should flow between steps.' },
-  { icon: Layers, color: 'text-status-warning', title: '2. Review', detail: 'The LLM constructs YAML directly from tool schemas. Review the generated pipeline.' },
-  { icon: Wand2, color: 'text-status-success', title: '3. Deploy & Test', detail: 'Deploy, run with sample inputs, and refine until the pipeline works correctly.' },
+  { icon: MessageSquare, color: 'text-accent', title: 'Describe', detail: 'Specify what tools to use, what inputs to accept, and how data should flow between steps.' },
+  { icon: Layers, color: 'text-status-warning', title: 'Review', detail: 'The LLM will create the pipeline (DAG) directly from tool schemas. Review the generated pipeline.' },
+  { icon: Wand2, color: 'text-status-success', title: 'Deploy & Test', detail: 'Deploy, run with sample inputs, and refine until the pipeline works correctly.' },
 ];
 
 function ComposerPanel() {
@@ -109,10 +109,7 @@ function ComposerPanel() {
         <form onSubmit={handleSubmit}>
           <div className="rounded-lg border border-surface-border bg-surface-raised overflow-hidden h-full flex flex-col">
             <div className="flex items-start gap-3 flex-1">
-              {mode === 'discover'
-                ? <MessageSquare className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
-                : <Hammer className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
-              }
+              <MessageSquare className="w-4 h-4 text-accent shrink-0 mt-3.5 ml-4" strokeWidth={1.5} />
               <textarea
                 ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = Math.min(400, Math.max(160, el.scrollHeight)) + 'px'; } }}
                 value={promptText}
@@ -124,7 +121,7 @@ function ComposerPanel() {
                 }}
                 placeholder={mode === 'discover'
                   ? 'Describe what you want to accomplish. The LLM will discover and execute the right tools...'
-                  : 'Describe the pipeline steps, tools, inputs, and outputs. The LLM will construct the YAML directly...'
+                  : 'Describe the pipeline steps, tools, inputs, and outputs. The LLM will create the pipeline (DAG) directly...'
                 }
                 className="flex-1 min-h-[160px] pr-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none border-none"
                 autoFocus
@@ -145,7 +142,7 @@ function ComposerPanel() {
                 </label>
               ) : (
                 <span className="text-[10px] text-text-tertiary">
-                  LLM builds YAML from tool schemas — no execution needed
+                  LLM builds pipeline from tool schemas — no execution needed
                 </span>
               )}
               <div className="flex items-center gap-3">

@@ -65,9 +65,11 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
       {originalPrompt && (
         <div className="mb-6">
           <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Original Prompt</label>
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
-            {originalPrompt}
-          </p>
+          <div className="rounded-md bg-surface-sunken/50 px-4 py-3">
+            <p className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap">
+              {originalPrompt}
+            </p>
+          </div>
         </div>
       )}
 
@@ -127,7 +129,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full flex-1 min-h-[100px] bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary resize-none focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+              className="w-full flex-1 min-h-[100px] bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary resize-none focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
             />
           ) : (
             <p className="text-sm text-text-primary leading-relaxed py-1.5">{existingWf?.description || description}</p>
