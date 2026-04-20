@@ -95,7 +95,7 @@ function registerTools(srv: McpServer): void {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: [await resolveImageContent(args.image) as any],
+            content: [await resolveImageContent(args.image || (args as any).image_path) as any],
           },
         ],
         max_tokens: LLM_MAX_TOKENS_VISION,
@@ -163,7 +163,7 @@ function registerTools(srv: McpServer): void {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: [await resolveImageContent(args.image) as any],
+            content: [await resolveImageContent(args.image || (args as any).image_path) as any],
           },
         ],
         max_tokens: LLM_MAX_TOKENS_VISION,

@@ -58,6 +58,9 @@ export async function loadToolsFromServers(
     inventoryLines.push(
       `• ${server.name} [${serverTags}] (${manifest.length} tools): ${toolNames.join(', ')}`,
     );
+    if (server.compile_hints) {
+      inventoryLines.push(`  Hints: ${server.compile_hints}`);
+    }
 
     serverInfos.push({
       name: server.name,

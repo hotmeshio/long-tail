@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers, Hammer, Wand2, Settings } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
@@ -89,6 +89,30 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[]
       render: (row) => {
         const s = mapStatus(row);
         const isComplete = s === 'completed';
+        const isBuilder = row.entity === 'mcpWorkflowBuilder';
+
+        if (isBuilder) {
+          return (
+            <RowActionGroup>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?mode=builder&step=1`); }}
+                className="opacity-0 group-hover/row:opacity-100 text-text-tertiary hover:text-accent transition-all"
+                title="Describe"
+              >
+                <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`/mcp/queries/${row.workflow_id}?mode=builder&step=2`); }}
+                className={`opacity-0 group-hover/row:opacity-100 transition-all ${isComplete ? 'text-text-tertiary hover:text-status-success' : 'text-text-tertiary/30 cursor-not-allowed'}`}
+                title={isComplete ? 'Profile' : 'Building...'}
+                disabled={!isComplete}
+              >
+                <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            </RowActionGroup>
+          );
+        }
+
         return (
           <RowActionGroup>
             <button
@@ -147,26 +171,30 @@ export function McpQueryPage() {
       <PageHeader
         title="Pipeline Designer"
         actions={
-          <div className="flex items-center gap-3">
-            <RefreshButton onClick={() => refetch()} />
-            <button
-              onClick={() => navigate('/mcp/queries/new')}
-              className="btn-primary text-xs"
-            >
-              Design Pipeline
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/mcp/queries/new')}
+            className="btn-primary text-xs inline-flex items-center gap-1.5"
+          >
+            <Wand2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Design New Pipeline
+          </button>
         }
       />
 
-      <FilterBar>
+      <FilterBar actions={
+        <ListToolbar
+          onRefresh={() => refetch()}
+          apiPath={`/workflow-states/jobs?entity=${filters.type || 'mcpQuery,mcpTriage,mcpWorkflowBuilder'}&limit=${pagination.pageSize}&offset=${pagination.offset}&sort_by=created_at&order=desc${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+        />
+      }>
           <FilterSelect
             label="Type"
             value={filters.type}
             onChange={(v) => setFilter('type', v)}
             options={[
-              { value: 'mcpQuery', label: 'mcpQuery' },
-              { value: 'mcpTriage', label: 'mcpTriage' },
+              { value: 'mcpQuery', label: 'Discovery' },
+              { value: 'mcpWorkflowBuilder', label: 'Direct Build' },
+              { value: 'mcpTriage', label: 'Triage' },
             ]}
           />
           <FilterSelect
@@ -185,7 +213,11 @@ export function McpQueryPage() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(`/mcp/queries/${row.workflow_id}`)}
+        onRowClick={(row) => navigate(
+          row.entity === 'mcpWorkflowBuilder'
+            ? `/mcp/queries/${row.workflow_id}?mode=builder`
+            : `/mcp/queries/${row.workflow_id}`
+        )}
         isLoading={isLoading}
         emptyMessage=""
         sort={sort}

@@ -9,7 +9,7 @@ import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 
 const STATUS_OPTIONS = [
@@ -103,7 +103,13 @@ export function ProcessesListPage() {
     <div>
       <PageHeader title="All Processes" />
 
-      <FilterBar actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}>
+      <FilterBar actions={
+        <ListToolbar
+          onRefresh={() => refetch()}
+          isFetching={isFetching}
+          apiPath={`/tasks/processes?limit=${pagination.pageSize}&offset=${pagination.offset}${filters.workflow_type ? `&workflow_type=${filters.workflow_type}` : ''}${filters.status ? `&status=${filters.status}` : ''}${debouncedSearch ? `&search=${debouncedSearch}` : ''}`}
+        />
+      }>
         <FilterInput
           label="Search"
           value={filters.search}

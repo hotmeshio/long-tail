@@ -66,7 +66,7 @@ export function useMcpQueryJobs(filters: {
   entity?: string;
 } = {}) {
   const params = new URLSearchParams();
-  params.set('entity', filters.entity || 'mcpQuery,mcpTriage');
+  params.set('entity', filters.entity || 'mcpQuery,mcpTriage,mcpWorkflowBuilder');
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
   if (filters.search) params.set('search', filters.search);

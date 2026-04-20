@@ -5,7 +5,7 @@ import { Hammer, MessageSquare, Layers } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
-import { RefreshButton } from '../../components/common/data/RefreshButton';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { EmptyState } from '../../components/common/display/EmptyState';
@@ -131,7 +131,7 @@ export default function WorkflowBuilderPage() {
         title="Workflow Builder"
         actions={
           <div className="flex items-center gap-2">
-            <RefreshButton onClick={() => refetch()} />
+            <ListToolbar onRefresh={() => refetch()} apiPath="/workflow-states/jobs?entity=mcpWorkflowBuilder&limit=20&sort_by=created_at&order=desc" />
             <button
               onClick={() => setShowComposer(!showComposer)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-white rounded-md hover:bg-accent/90 transition-colors"
