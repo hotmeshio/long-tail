@@ -194,38 +194,24 @@ class LTCronRegistry {
     const cronId = `${YAML_CRON_ID_PREFIX}-${wf.id}`;
 
     const cronEnvelope = wf.cron_envelope || {};
-    const executeAs = wf.execute_as;
     const wfId = wf.id;
-    let inFlight = false;
+    const graphTopic = wf.graph_topic;
+    const appId = wf.app_id;
+    let cronCallCount = 0;
 
     await Virtual.cron({
       topic,
       connection,
       callback: async () => {
-        if (inFlight) {
-          loggerRegistry.warn(`[lt-cron] YAML workflow ${wfId} still in-flight, skipping tick`);
-          return;
-        }
-        inFlight = true;
         try {
-          const { invokeYamlWorkflow } = await import('../yaml-workflow/invoke');
-          const { getYamlWorkflow } = await import('../yaml-workflow/db');
-          const current = await getYamlWorkflow(wfId);
-          if (!current || current.status !== 'active') {
-            loggerRegistry.warn(`[lt-cron] YAML workflow ${wfId} no longer active, skipping`);
-            return;
-          }
-          loggerRegistry.info(`[lt-cron] invoking YAML workflow ${current.graph_topic} (${wfId})`);
-          await invokeYamlWorkflow(current, {
-            data: cronEnvelope as Record<string, unknown>,
-            execute_as: executeAs || undefined,
-            source: 'cron',
-          });
-          loggerRegistry.info(`[lt-cron] YAML workflow ${current.graph_topic} completed`);
+          cronCallCount++;
+          loggerRegistry.info(`[lt-cron] tick #${cronCallCount} at ${new Date().toISOString()} — pub(${appId}/${graphTopic})`);
+          const { getEngine } = await import('../yaml-workflow/deployer');
+          const engine = await getEngine(appId);
+          await engine.pub(graphTopic, cronEnvelope, undefined, { entity: graphTopic });
+          loggerRegistry.info(`[lt-cron] tick #${cronCallCount} published successfully`);
         } catch (err: any) {
-          loggerRegistry.error(`[lt-cron] YAML workflow ${wfId} failed: ${err?.message}`);
-        } finally {
-          inFlight = false;
+          loggerRegistry.error(`[lt-cron] tick #${cronCallCount} failed: ${err?.message}`);
         }
       },
       args: [],
