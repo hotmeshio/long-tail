@@ -16,7 +16,7 @@ interface VerifyPanelProps {
   onGoToDeploy: () => void;
 }
 
-export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, onBack, onGoToDeploy }: VerifyPanelProps) {
+export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, onBack, onGoToDeploy: _onGoToDeploy }: VerifyPanelProps) {
   const submitQuery = useSubmitMcpQueryRouted();
   const [searchParams, setSearchParams] = useSearchParams();
 
