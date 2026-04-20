@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useProcesses, type ProcessSummary } from '../../api/tasks';
 import { useWorkflowConfigs } from '../../api/workflows';
-import { useProcessListEvents } from '../../hooks/useNatsEvents';
+import { useProcessListEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DataTable, type Column } from '../../components/common/data/DataTable';

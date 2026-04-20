@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEventSubscription } from './useEventContext';
+import { getInvalidationKeys } from '../lib/events/invalidation';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 
 /**
@@ -45,15 +46,10 @@ export function useWorkflowListEvents(): void {
 }
 
 /**
- * Invalidate queries for a specific workflow execution page.
+ * Invalidate queries for a specific workflow execution page (durable workflows).
  *
- * Events are debounced: a burst of task.created + workflow.started +
- * task.started (typical on workflow launch) triggers a single refetch
- * instead of 15 separate API calls.
- *
- * Only the queries relevant to the event category are invalidated:
- * - task/workflow/milestone events → execution timeline + state
- * - escalation events → escalation list for this workflow
+ * Uses the centralized `getInvalidationKeys` mapping plus escalation-specific
+ * keys for the detail view. Events are debounced to prevent flurries of re-renders.
  */
 export function useWorkflowDetailEvents(workflowId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(400);
@@ -61,25 +57,63 @@ export function useWorkflowDetailEvents(workflowId: string | undefined): void {
   useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
     if (!workflowId) return;
 
-    // Child workflow IDs contain the parent orchestrator ID as a substring,
-    // e.g. parent = "myOrchestrator-abc123", child = "myTask-myOrchestrator-abc123-2"
     const isRelated = event.workflowId === workflowId
       || event.workflowId?.includes(workflowId);
     if (!isRelated) return;
 
     const category = event.type.split('.')[0];
+    const keys = getInvalidationKeys(event);
 
     if (category === 'escalation') {
-      invalidate([['escalations', 'by-workflow', workflowId]]);
-    } else {
-      // task.*, workflow.*, milestone → refresh timeline + state
-      invalidate([
-        ['workflowExecution', workflowId],
-        ['workflowState', workflowId],
-        ['tasks', 'children', workflowId],
-      ]);
+      keys.push(['escalations', 'by-workflow', workflowId]);
     }
+
+    invalidate(keys);
   });
+}
+
+/**
+ * Invalidate queries for mcpQuery/builder detail pages.
+ *
+ * Covers: mcpQueryExecution, mcpQueryResult, builderResult, workflowExecution,
+ * workflowState, and escalation keys. Replaces polling on these pages.
+ */
+export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
+  const invalidate = useDebouncedInvalidation(400);
+
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
+    if (!workflowId) return;
+
+    const isRelated = event.workflowId === workflowId
+      || event.workflowId?.includes(workflowId);
+    if (!isRelated) return;
+
+    const category = event.type.split('.')[0];
+    const keys = getInvalidationKeys(event);
+
+    if (category === 'escalation') {
+      keys.push(['escalations', 'by-workflow', workflowId]);
+    }
+
+    invalidate(keys);
+  });
+}
+
+/**
+ * Invalidate process detail queries on task/workflow events for a specific origin.
+ */
+export function useProcessDetailEvents(originId: string | undefined): void {
+  const invalidate = useDebouncedInvalidation(300);
+
+  const handler = useCallback((event: any) => {
+    if (!originId) return;
+    if (event.originId !== originId && event.workflowId !== originId) return;
+    invalidate([['processes', originId]]);
+  }, [originId, invalidate]);
+
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, handler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, handler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, handler);
 }
 
 /**

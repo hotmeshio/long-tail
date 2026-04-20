@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useEscalationListEvents } from '../../hooks/useNatsEvents';
+import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
   useEscalationTypes,

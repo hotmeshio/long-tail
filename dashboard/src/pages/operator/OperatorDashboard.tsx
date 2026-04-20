@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { LockOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalations, useEscalationTypes, useReleaseEscalation } from '../../api/escalations';
-import { useEscalationListEvents } from '../../hooks/useNatsEvents';
+import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';

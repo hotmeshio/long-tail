@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { useWorkflowDetailEvents } from '../../../hooks/useNatsEvents';
+import { useMcpQueryDetailEvents } from '../../../hooks/useEventHooks';
 import { useWizardStep } from '../../../hooks/useWizardStep';
 import { useMcpQueryExecution, useMcpQueryResult, useYamlWorkflowForSource, useDescribeMcpQuery } from '../../../api/mcp-query';
 import { useCreateYamlWorkflow, useYamlWorkflowAppIds } from '../../../api/yaml-workflows';
@@ -40,7 +40,7 @@ export function useQueryDetail() {
   const { data: execution } = useMcpQueryExecution(workflowId);
   const { data: resultData } = useMcpQueryResult(workflowId);
   const { data: yamlSearch } = useYamlWorkflowForSource(workflowId);
-  useWorkflowDetailEvents(workflowId);
+  useMcpQueryDetailEvents(workflowId);
 
   const createYaml = useCreateYamlWorkflow();
   const { data: appIdData } = useYamlWorkflowAppIds();

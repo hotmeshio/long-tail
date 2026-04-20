@@ -1,6 +1,6 @@
 import { useTasks } from '../../api/tasks';
 import { useEscalations } from '../../api/escalations';
-import { useEscalationListEvents } from '../../hooks/useNatsEvents';
+import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import { useMcpServers } from '../../api/mcp';
 import { PageHeaderWithStats } from '../../components/common/layout/PageHeaderWithStats';
 

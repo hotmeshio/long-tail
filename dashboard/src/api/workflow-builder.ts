@@ -117,10 +117,5 @@ export function useBuilderResult(workflowId: string | undefined) {
     queryKey: ['builderResult', workflowId],
     queryFn: () => apiFetch(`/workflows/${workflowId}/result`),
     enabled: !!workflowId,
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (data?.result?.data?.yaml) return false;
-      return 3000;
-    },
   });
 }

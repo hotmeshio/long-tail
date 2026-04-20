@@ -86,7 +86,7 @@ const sc = StringCodec();
  * 1. Connect to NATS via WebSocket with auto-reconnect
  * 2. Subscribe to `lt.events.>` and dispatch to per-page subscribers
  *
- * Cache invalidation is handled by per-page hooks in `useNatsEvents.ts`.
+ * Cache invalidation is handled by per-page hooks in `useEventHooks.ts`.
  */
 export function NatsProvider({ children }: { children: ReactNode }) {
   const ncRef = useRef<NatsConnection | null>(null);

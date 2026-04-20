@@ -88,12 +88,6 @@ export function useMcpQueryExecution(workflowId: string | undefined) {
     queryKey: ['mcpQueryExecution', workflowId],
     queryFn: () => apiFetch(`/workflow-states/${workflowId}/execution`),
     enabled: !!workflowId,
-    refetchInterval: (query) => {
-      // Poll while running, stop when completed
-      const status = query.state.data?.status;
-      if (status === 'completed' || status === 'failed') return false;
-      return 3000;
-    },
   });
 }
 
@@ -105,7 +99,7 @@ export function useMcpQueryResult(workflowId: string | undefined) {
     queryKey: ['mcpQueryResult', workflowId],
     queryFn: () => apiFetch(`/workflows/${workflowId}/result`),
     enabled: !!workflowId,
-    retry: false,
+    retry: 2,
   });
 }
 
