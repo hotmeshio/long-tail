@@ -7,6 +7,7 @@ import { WizardSteps } from '../../../components/common/layout/WizardSteps';
 import { useSubmitMcpQuery, useSubmitMcpQueryRouted, useMcpQueryExecution } from '../../../api/mcp-query';
 import { useSubmitBuildWorkflow, useBuilderResult, useRefineBuildWorkflow } from '../../../api/workflow-builder';
 import { useYamlWorkflows, useYamlWorkflow } from '../../../api/yaml-workflows';
+import { useMcpQueryDetailEvents } from '../../../hooks/useEventHooks';
 import { DescribePanel } from '../../mcp/workflow-builder-detail/DescribePanel';
 import { BuilderProfilePanel } from '../../mcp/workflow-builder-detail/BuilderProfilePanel';
 
@@ -188,6 +189,8 @@ function BuilderWizard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [createdYamlId, setCreatedYamlId] = useState<string | null>(null);
   const refineMutation = useRefineBuildWorkflow();
+
+  useMcpQueryDetailEvents(workflowId);
 
   const { data: resultData, refetch } = useBuilderResult(workflowId);
   const builderData = resultData?.result?.data as any;

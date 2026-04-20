@@ -68,7 +68,7 @@ vi.mock('../../../api/escalations', () => ({
   useEscalationsByWorkflowId: () => ({ data: { escalations: [] } }),
 }));
 
-vi.mock('../../../hooks/useNatsEvents', () => ({
+vi.mock('../../../hooks/useEventHooks', () => ({
   useWorkflowDetailEvents: vi.fn(),
 }));
 

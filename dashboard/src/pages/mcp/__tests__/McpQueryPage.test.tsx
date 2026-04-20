@@ -7,7 +7,7 @@ vi.mock('../../../api/mcp-query', () => ({
   useMcpQueryJobs: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useNatsEvents', () => ({
+vi.mock('../../../hooks/useEventHooks', () => ({
   useWorkflowListEvents: vi.fn(),
 }));
 
@@ -44,9 +44,9 @@ describe('McpQueryPage', () => {
     expect(screen.getByText('Pipeline Designer')).toBeInTheDocument();
   });
 
-  it('renders Design Pipeline button', () => {
+  it('renders Design New Pipeline button', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Design Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Design New Pipeline')).toBeInTheDocument();
   });
 
   it('renders job rows including triage', () => {

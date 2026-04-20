@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useJobs, useWorkflowConfigs } from '../../api/workflows';
-import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
+import { useWorkflowListEvents } from '../../hooks/useEventHooks';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StatCard } from '../../components/common/data/StatCard';
 

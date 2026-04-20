@@ -7,7 +7,7 @@ vi.mock('../../../api/escalations', () => ({
   useEscalationStats: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useNatsEvents', () => ({
+vi.mock('../../../hooks/useEventHooks', () => ({
   useEscalationStatsEvents: vi.fn(),
 }));
 

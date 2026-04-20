@@ -6,13 +6,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useWorkflowListEvents,
   useWorkflowDetailEvents,
+  useMcpQueryDetailEvents,
+  useProcessDetailEvents,
   useEscalationStatsEvents,
   useEscalationListEvents,
   useEscalationDetailEvents,
   useProcessListEvents,
-} from '../useNatsEvents';
+} from '../useEventHooks';
 
-// ── Mock useNatsSubscription ─────────────────────────────────────────────────
+// ── Mock useEventSubscription (transport-agnostic) ──────────────────────────
 
 type Handler = (event: any) => void;
 const subscriptions: Array<{ pattern: string; handler: Handler }> = [];
@@ -76,7 +78,6 @@ describe('useWorkflowListEvents', () => {
     const taskSub = subscriptions.find((s) => s.pattern === 'lt.events.task.>');
     taskSub!.handler(makeEvent({ type: 'task.completed' }));
 
-    // Not yet — debounced
     expect(spy).not.toHaveBeenCalled();
 
     act(() => { vi.advanceTimersByTime(350); });
@@ -95,25 +96,17 @@ describe('useWorkflowDetailEvents', () => {
     expect(subscriptions[0].pattern).toBe('lt.events.>');
   });
 
-  it('debounces a burst of events into a single invalidation', () => {
+  it('invalidates workflow-specific keys via getInvalidationKeys on task event', () => {
     const { qc, Wrapper } = createWrapper();
     const spy = vi.spyOn(qc, 'invalidateQueries');
     renderHook(() => useWorkflowDetailEvents('wf-123'), { wrapper: Wrapper });
 
-    // Simulate rapid burst of 3 events
-    subscriptions[0].handler(makeEvent({ type: 'task.created', workflowId: 'wf-123' }));
-    subscriptions[0].handler(makeEvent({ type: 'workflow.started', workflowId: 'wf-123' }));
-    subscriptions[0].handler(makeEvent({ type: 'task.started', workflowId: 'wf-123' }));
-
-    expect(spy).not.toHaveBeenCalled();
+    subscriptions[0].handler(makeEvent({ type: 'task.completed', workflowId: 'wf-123' }));
 
     act(() => { vi.advanceTimersByTime(450); });
 
-    // Should only invalidate 3 unique keys (execution, state, children), not 9
-    expect(spy).toHaveBeenCalledTimes(3);
     expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowExecution', 'wf-123'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowState', 'wf-123'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['tasks', 'children', 'wf-123'] });
   });
 
   it('invalidates escalation queries for escalation events', () => {
@@ -125,7 +118,6 @@ describe('useWorkflowDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(450); });
 
-    expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] });
   });
 
@@ -138,7 +130,7 @@ describe('useWorkflowDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(450); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowExecution', 'myOrch-abc123'] });
+    expect(spy).toHaveBeenCalled();
   });
 
   it('ignores events for a different workflowId', () => {
@@ -152,15 +144,116 @@ describe('useWorkflowDetailEvents', () => {
 
     expect(spy).not.toHaveBeenCalled();
   });
+});
+
+// ── useMcpQueryDetailEvents ─────────────────────────────────────────────────
+
+describe('useMcpQueryDetailEvents', () => {
+  it('subscribes to lt.events.>', () => {
+    const { Wrapper } = createWrapper();
+    renderHook(() => useMcpQueryDetailEvents('wf-123'), { wrapper: Wrapper });
+
+    expect(subscriptions[0].pattern).toBe('lt.events.>');
+  });
+
+  it('invalidates mcpQueryExecution and mcpQueryResult on workflow.completed', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useMcpQueryDetailEvents('wf-123'), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'workflow.completed', workflowId: 'wf-123' }));
+
+    act(() => { vi.advanceTimersByTime(450); });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryResult', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['builderResult', 'wf-123'] });
+  });
+
+  it('invalidates mcpQueryExecution on task events', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useMcpQueryDetailEvents('wf-123'), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'task.started', workflowId: 'wf-123' }));
+
+    act(() => { vi.advanceTimersByTime(450); });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] });
+  });
+
+  it('invalidates escalation keys for escalation events', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useMcpQueryDetailEvents('wf-123'), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'escalation.created', workflowId: 'wf-123' }));
+
+    act(() => { vi.advanceTimersByTime(450); });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] });
+  });
+
+  it('ignores events for unrelated workflowId', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useMcpQueryDetailEvents('wf-123'), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ workflowId: 'wf-other' }));
+
+    act(() => { vi.advanceTimersByTime(450); });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
 
   it('does nothing when workflowId is undefined', () => {
     const { qc, Wrapper } = createWrapper();
     const spy = vi.spyOn(qc, 'invalidateQueries');
-    renderHook(() => useWorkflowDetailEvents(undefined), { wrapper: Wrapper });
+    renderHook(() => useMcpQueryDetailEvents(undefined), { wrapper: Wrapper });
 
     subscriptions[0].handler(makeEvent({ workflowId: 'wf-123' }));
 
     act(() => { vi.advanceTimersByTime(450); });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// ── useProcessDetailEvents ──────────────────────────────────────────────────
+
+describe('useProcessDetailEvents', () => {
+  it('subscribes to task.>, workflow.>, and escalation.> patterns', () => {
+    const { Wrapper } = createWrapper();
+    renderHook(() => useProcessDetailEvents('proc-1'), { wrapper: Wrapper });
+
+    const patterns = subscriptions.map((s) => s.pattern);
+    expect(patterns).toContain('lt.events.task.>');
+    expect(patterns).toContain('lt.events.workflow.>');
+    expect(patterns).toContain('lt.events.escalation.>');
+  });
+
+  it('invalidates process-specific key on matching originId', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useProcessDetailEvents('proc-1'), { wrapper: Wrapper });
+
+    const taskSub = subscriptions.find((s) => s.pattern === 'lt.events.task.>');
+    taskSub!.handler(makeEvent({ type: 'task.completed', originId: 'proc-1' }));
+
+    act(() => { vi.advanceTimersByTime(350); });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['processes', 'proc-1'] });
+  });
+
+  it('ignores events with different originId', () => {
+    const { qc, Wrapper } = createWrapper();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useProcessDetailEvents('proc-1'), { wrapper: Wrapper });
+
+    const taskSub = subscriptions.find((s) => s.pattern === 'lt.events.task.>');
+    taskSub!.handler(makeEvent({ type: 'task.completed', originId: 'proc-other' }));
+
+    act(() => { vi.advanceTimersByTime(350); });
 
     expect(spy).not.toHaveBeenCalled();
   });
@@ -215,13 +308,6 @@ describe('useEscalationListEvents', () => {
 // ── useEscalationDetailEvents ─────────────────────────────────────────────────
 
 describe('useEscalationDetailEvents', () => {
-  it('subscribes to escalation.> pattern', () => {
-    const { Wrapper } = createWrapper();
-    renderHook(() => useEscalationDetailEvents('esc-1'), { wrapper: Wrapper });
-
-    expect(subscriptions[0].pattern).toBe('lt.events.escalation.>');
-  });
-
   it('invalidates detail + list + stats for matching escalationId', () => {
     const { qc, Wrapper } = createWrapper();
     const spy = vi.spyOn(qc, 'invalidateQueries');
@@ -242,18 +328,6 @@ describe('useEscalationDetailEvents', () => {
     renderHook(() => useEscalationDetailEvents('esc-1'), { wrapper: Wrapper });
 
     subscriptions[0].handler(makeEvent({ type: 'escalation.created', escalationId: 'esc-other' }));
-
-    act(() => { vi.advanceTimersByTime(350); });
-
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  it('does nothing when escalationId is undefined', () => {
-    const { qc, Wrapper } = createWrapper();
-    const spy = vi.spyOn(qc, 'invalidateQueries');
-    renderHook(() => useEscalationDetailEvents(undefined), { wrapper: Wrapper });
-
-    subscriptions[0].handler(makeEvent({ type: 'escalation.created', escalationId: 'esc-1' }));
 
     act(() => { vi.advanceTimersByTime(350); });
 

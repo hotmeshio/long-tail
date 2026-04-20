@@ -12,7 +12,7 @@ import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { RowActionGroup } from '../../components/common/layout/RowActions';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { useWorkflowListEvents } from '../../hooks/useNatsEvents';
+import { useWorkflowListEvents } from '../../hooks/useEventHooks';
 import { useMcpQueryJobs } from '../../api/mcp-query';
 import type { LTJob } from '../../api/types';
 

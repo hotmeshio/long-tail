@@ -7,7 +7,7 @@ vi.mock('../../../api/tasks', () => ({
   useProcessStats: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useNatsEvents', () => ({
+vi.mock('../../../hooks/useEventHooks', () => ({
   useProcessListEvents: vi.fn(),
 }));
 

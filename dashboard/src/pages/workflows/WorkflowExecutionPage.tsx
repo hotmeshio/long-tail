@@ -1,6 +1,6 @@
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useWorkflowExecution, useTerminateWorkflow } from '../../api/workflows';
-import { useWorkflowDetailEvents } from '../../hooks/useNatsEvents';
+import { useWorkflowDetailEvents } from '../../hooks/useEventHooks';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
