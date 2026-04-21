@@ -5,6 +5,7 @@ import { apiFetch } from './client';
 
 export interface ControlPlaneApp {
   appId: string;
+  version: string;
 }
 
 export interface QuorumProfile {

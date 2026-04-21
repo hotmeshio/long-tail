@@ -35,8 +35,8 @@ docker/
 .claude/
 scripts/
 
-# Docs
-docs/
+# Docs (images excluded, markdown kept)
+docs/img/
 *.md
 !LICENSE
 
