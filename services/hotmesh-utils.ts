@@ -77,17 +77,15 @@ export const LOAD_SYMBOL_MAP = (schema: string) =>
  */
 export async function loadSymbolMap(schema: string, appId: string): Promise<Record<string, string>> {
   const pool = getPool();
-  const symKeyPrefix = `hmsh:${appId}:sym:keys:`;
   try {
     const result = await pool.query(
       LOAD_SYMBOL_MAP(schema),
-      [`${symKeyPrefix}%`],
+      ['keys:%'],
     );
 
     const reverseMap: Record<string, string> = {};
     for (const row of result.rows) {
-      const symbolName = row.key.slice(symKeyPrefix.length);
-      if (row.field && row.value && symbolName !== '') {
+      if (row.field && row.value) {
         reverseMap[row.value] = row.field;
       }
     }

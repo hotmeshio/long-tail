@@ -37,14 +37,14 @@ export async function getEngine(appId: string): Promise<HotMesh> {
 // ─── Application discovery ──────────────────────────────────────────────────
 
 /**
- * List all HotMesh application IDs from the `hotmesh_applications` table.
- * Excludes soft-deleted (expired) entries.
+ * List all active HotMesh application IDs from the `hmsh_applications` table.
  */
 export async function listApps(): Promise<ControlPlaneApp[]> {
   const pool = getPool();
-  const { rows } = await pool.query<{ key: string }>(LIST_APPS);
+  const { rows } = await pool.query<{ app_id: string; version: string }>(LIST_APPS);
   return rows.map((r) => ({
-    appId: r.key.replace('hmsh:a:', ''),
+    appId: r.app_id,
+    version: r.version,
   }));
 }
 

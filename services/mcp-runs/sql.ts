@@ -28,7 +28,7 @@ export const GET_JOB_ATTRIBUTES = (schema: string) =>
 export const LIST_JOBS = (schema: string, appId: string, where: string, limitIdx: number, offsetIdx: number) =>
   `WITH ju_symbols AS (
      SELECT value FROM ${schema}.symbols
-     WHERE key LIKE 'hmsh:${appId}:sym:keys:%' AND field = 'metadata/ju'
+     WHERE key LIKE 'keys:%' AND field = 'metadata/ju'
    )
    SELECT j.key, j.entity, j.status, j.is_live, j.created_at,
      CASE WHEN j.updated_at != j.created_at THEN j.updated_at
