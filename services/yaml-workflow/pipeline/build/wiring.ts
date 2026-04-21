@@ -12,7 +12,10 @@ import { keysRelated } from './utils';
 
 /**
  * HotMesh @pipe sub-pipe for today's date as YYYY-MM-DD.
- * Must be used as a ROW-LEVEL entry in a parent @pipe, never inside an array row.
+ * Follows RPN convention: operands row, then operator row.
+ * Row 1: date.now() → epoch (operator, no extra operands)
+ * Row 2: [isoString, 0, 10] — three operands for substring
+ * Row 3: substring(isoString, 0, 10) → "YYYY-MM-DD"
  */
 const DATE_SUB_PIPE = {
   '@pipe': [
@@ -126,6 +129,16 @@ export function wireStepInputs(
       : stepIdx;
     const edgesForStep = plan.dataFlow.filter(e => e.toStep === collapsedIdx);
     for (const edge of edgesForStep) {
+      // Skip edges that target a complex nested object argument — these are stored
+      // defaults in tool_arguments (e.g., a nested `login` object with selectors)
+      // and must not be overridden by a flat scalar from an upstream step.
+      if (step.kind === 'tool' && !edge.transform) {
+        const argValue = step.arguments[edge.toField];
+        if (argValue && typeof argValue === 'object' && !Array.isArray(argValue) &&
+            Object.keys(argValue as object).length > 2) {
+          continue;
+        }
+      }
       if (edge.transform && Object.keys(edge.transform.fieldMap).length > 0) {
         // This edge has a transform — the reshape activity was inserted before this step.
         // Wire from the transform activity's output (which uses toField as the output key).

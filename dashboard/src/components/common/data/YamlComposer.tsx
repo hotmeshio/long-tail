@@ -102,6 +102,7 @@ export function YamlComposer({
           manifest={activityManifest}
           selectedId={selectedNodeId}
           onSelect={onNodeSelect}
+          yaml={yamlContent}
         />
       ) : (
         <ConfigurationSection

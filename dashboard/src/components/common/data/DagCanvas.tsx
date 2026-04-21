@@ -34,19 +34,45 @@ function extractMappingRefs(value: unknown): string[] {
   return [];
 }
 
-/** Derive dependency edges by parsing `{activityId.…}` refs in input_mappings. */
-function deriveEdges(entries: ActivityManifestEntry[]): Edge[] {
+/**
+ * Extract `{activityId.…}` refs from YAML input.maps sections.
+ * The YAML is the source of truth — manifest input_mappings may flatten
+ * nested objects to summary strings, losing dependency references.
+ */
+function extractYamlRefs(yaml: string | undefined, activityId: string): string[] {
+  if (!yaml) return [];
+  // Find the maps: block for this activity by locating its ID in the YAML
+  const actIdx = yaml.indexOf(`${activityId}:`);
+  if (actIdx === -1) return [];
+  // Find the next activity block (next line at same/lower indent with ":")
+  const afterAct = yaml.slice(actIdx);
+  const mapsIdx = afterAct.indexOf('maps:');
+  if (mapsIdx === -1) return [];
+  // Grab everything from maps: to the next sibling key (output:, job:, or next activity)
+  const afterMaps = afterAct.slice(mapsIdx);
+  const endMatch = afterMaps.match(/\n {6,10}\w+:|^\n {0,8}\w+:/m);
+  const mapsBlock = endMatch ? afterMaps.slice(0, afterMaps.indexOf(endMatch[0], 1)) : afterMaps;
+  return [...mapsBlock.matchAll(/\{([\w-]+)\./g)].map((m) => m[1]);
+}
+
+/** Derive dependency edges by parsing `{activityId.…}` refs in input_mappings and YAML. */
+function deriveEdges(entries: ActivityManifestEntry[], yaml?: string): Edge[] {
   const idSet = new Set(entries.map((e) => e.activity_id));
   const edgeMap = new Map<string, Edge>();
 
   for (const entry of entries) {
-    if (!entry.input_mappings) continue;
-    for (const mapping of Object.values(entry.input_mappings)) {
-      for (const src of extractMappingRefs(mapping)) {
-        if (idSet.has(src) && src !== entry.activity_id) {
-          const key = `${src}->${entry.activity_id}`;
-          if (!edgeMap.has(key)) edgeMap.set(key, { from: src, to: entry.activity_id });
-        }
+    // Collect refs from manifest input_mappings
+    const manifestRefs = entry.input_mappings
+      ? Object.values(entry.input_mappings).flatMap(extractMappingRefs)
+      : [];
+    // Supplement with refs from YAML (catches nested objects the manifest may have flattened)
+    const yamlRefs = extractYamlRefs(yaml, entry.activity_id);
+    const allRefs = new Set([...manifestRefs, ...yamlRefs]);
+
+    for (const src of allRefs) {
+      if (idSet.has(src) && src !== entry.activity_id) {
+        const key = `${src}->${entry.activity_id}`;
+        if (!edgeMap.has(key)) edgeMap.set(key, { from: src, to: entry.activity_id });
       }
     }
   }
@@ -89,9 +115,10 @@ interface DagCanvasProps {
   manifest: ActivityManifestEntry[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  yaml?: string;
 }
 
-export function DagCanvas({ manifest, selectedId, onSelect }: DagCanvasProps) {
+export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [graphW, setGraphW] = useState(0);
 
@@ -109,7 +136,7 @@ export function DagCanvas({ manifest, selectedId, onSelect }: DagCanvasProps) {
   }, []);
 
   const { edges, layerMap, numLayers, sortedEntries, rowIndex } = useMemo(() => {
-    const edges = deriveEdges(manifest);
+    const edges = deriveEdges(manifest, yaml);
     const layerMap =
       edges.length > 0
         ? assignLayers(manifest, edges)
@@ -127,7 +154,7 @@ export function DagCanvas({ manifest, selectedId, onSelect }: DagCanvasProps) {
     const rowIndex = new Map(sorted.map((e, i) => [e.activity_id, i]));
 
     return { edges, layerMap, numLayers, sortedEntries: sorted, rowIndex };
-  }, [manifest]);
+  }, [manifest, yaml]);
 
   if (manifest.length === 0) {
     return <p className="text-xs text-text-tertiary italic">No activities in manifest</p>;

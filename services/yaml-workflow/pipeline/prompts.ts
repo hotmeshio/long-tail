@@ -118,7 +118,7 @@ Add a transform with:
 Available derivation strategies:
 - **slugify**: Lowercase, replace spaces/special chars with hyphens. Optionally add prefix/suffix.
 - **prefix**: Prepend a static string.
-- **template**: Format string with \`{value}\` (source field) and \`{date}\` (today's ISO date, YYYY-MM-DD).
+- **template**: Format string with \`{value}\` (source field) and \`{date}\` (today's date as YYYY-MM-DD via @date.yyyymmdd).
 - **concat**: Join multiple parts. Each part can use \`{value}\` and \`{date}\` placeholders.
   Example: \`{ "strategy": "concat", "parts": ["{value}", "-", "{date}"] }\` produces \`my-slug-2026-04-17\`.
 - **passthrough**: No transformation.
