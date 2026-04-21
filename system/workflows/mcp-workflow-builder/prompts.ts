@@ -42,7 +42,7 @@ app:
 ### trigger
 Entry point. Receives user input. Always the first activity.
 \`\`\`yaml
-my_trigger:
+trigger_x8kf:
   title: Trigger
   type: trigger
   output:
@@ -51,9 +51,9 @@ my_trigger:
 \`\`\`
 
 ### worker
-Executes an MCP tool. Receives data via input.maps, produces output.
+Executes an MCP tool. Receives data via input.maps, produces output. Same suffix as the trigger.
 \`\`\`yaml
-my_worker:
+capture_x8kf:
   title: Capture Page
   type: worker
   topic: <same as subscribes>
@@ -61,10 +61,10 @@ my_worker:
     schema:
       type: object
     maps:
-      url: '{my_trigger.output.data.url}'
+      url: '{trigger_x8kf.output.data.url}'
       screenshot_path:
         '@pipe':
-          - ['{my_trigger.output.data.slug}', '.png']
+          - ['{trigger_x8kf.output.data.slug}', '.png']
           - ['{@string.concat}']
       workflowName: capture_page
   output:
@@ -85,14 +85,56 @@ Loop back to a hook ancestor for iteration patterns.
 field_name: '{sourceActivity.output.data.fieldName}'
 \`\`\`
 
-### @pipe (sequential transformation — array of arrays):
-Each row's output becomes input to the next row's function.
+### @pipe — Reverse Polish Notation (operands THEN operator)
+
+@pipe uses **stack-machine / RPN evaluation**: each row is evaluated top-to-bottom. A row is either OPERANDS (data for the next function) or an OPERATOR (a function that consumes the row above it). The rule is simple and absolute:
+
+> **ALL operands for a function must appear on the single row ABOVE the function row.**
+
+A function row contains ONLY the function reference: \`['{@string.substring}']\`. It receives its arguments from the row immediately above it. The first element on the operands row is typically a dynamic reference that resolves at runtime; the remaining elements are literal values.
+
+#### Simple pipe (no extra args):
 \`\`\`yaml
 field_name:
   '@pipe':
-    - ['{source.output.data.value}', '-suffix']
-    - ['{@string.concat}']
-    - ['{@string.toLowerCase}']
+    - ['{source.output.data.value}', '-suffix']   # operands: value, suffix
+    - ['{@string.concat}']                         # operator: concat(value, suffix) → "hello-suffix"
+    - ['{@string.toLowerCase}']                    # operator: toLowerCase("hello-suffix")
+\`\`\`
+When a function takes only one argument (the result of the prior row), it needs no separate operands row — it just consumes what's above.
+
+#### Multi-arg function (THIS IS THE PATTERN LLMs GET WRONG):
+\`\`\`yaml
+date_substring:
+  '@pipe':
+    - ['{@date.now}']                              # operator: date.now() → 1713528000000
+    - ['{@date.toISOString}', 0, 10]               # operands: [isoString, 0, 10] for substring
+    - ['{@string.substring}']                       # operator: substring(isoString, 0, 10) → "2026-04-19"
+\`\`\`
+Row 2 is the OPERANDS row for substring. It contains THREE values:
+1. \`{@date.toISOString}\` — resolves dynamically (converts epoch → "2026-04-19T12:00:00.000Z")
+2. \`0\` — start index (literal)
+3. \`10\` — end index (literal)
+
+Row 3 is the OPERATOR row: \`substring\` consumes all three values from row 2.
+
+**COMMON MISTAKE** (NEVER DO THIS):
+\`\`\`yaml
+# WRONG — puts args on the operator row instead of the operands row above it
+  - ['{@date.toISOString}']
+  - ['{@string.substring}', 0, 10]     # ← BROKEN: 0, 10 must be on the row ABOVE
+\`\`\`
+\`\`\`yaml
+# ALSO WRONG — splits operands across two rows
+  - ['{@date.toISOString}']
+  - [0, 10]                            # ← BROKEN: operands separated from the dynamic value
+  - ['{@string.substring}']
+\`\`\`
+The ONLY correct form: all operands together on ONE row, operator alone on the NEXT row.
+
+**PREFERRED for dates**: Use \`{@date.yyyymmdd}\` which returns "YYYY-MM-DD" directly — no pipe needed:
+\`\`\`yaml
+today: '{@date.yyyymmdd}'
 \`\`\`
 
 ### Nested @pipe (fan-out/fan-in):
@@ -101,7 +143,7 @@ Sub-pipes must be ROW-LEVEL entries in the parent pipe array — each is a separ
 dated_key:
   '@pipe':
     - '@pipe':
-      - ['{my_trigger.output.data.slug}', '-']
+      - ['{trigger_x8kf.output.data.slug}', '-']
       - ['{@string.concat}']
     - '@pipe':
       - ['{@date.now}']
@@ -109,7 +151,7 @@ dated_key:
       - ['{@string.substring}']
     - ['{@string.concat}']
 \`\`\`
-This produces \`my-slug-2026-04-19\`. Row 1 sub-pipe: \`slug + "-"\`. Row 2 sub-pipe: today's date. Row 3: concat all results.
+This produces \`my-slug-2026-04-19\`. Sub-pipe 1: \`slug + "-"\`. Sub-pipe 2: today as YYYY-MM-DD (RPN: operands then operator). Final row: concat all sub-pipe results.
 
 CRITICAL RULES for nested @pipe:
 1. Never put a nested \`@pipe\` object INSIDE an array row. Each sub-pipe must be its own row in the parent.
@@ -119,7 +161,7 @@ CRITICAL RULES for nested @pipe:
 path:
   '@pipe':
     - '@pipe':
-      - ['{trigger.output.data.domain}', '/', '{trigger.output.data.key}', '/']
+      - ['{trigger_x8kf.output.data.domain}', '/', '{trigger_x8kf.output.data.key}', '/']
       - ['{@string.concat}']
     - '@pipe':
       - ['{@date.now}']
@@ -135,7 +177,7 @@ IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH �
 
 ### Available @pipe operators (every JS method is exposed):
 - **@string**: charAt, concat, includes, indexOf, replace, slice, split, startsWith, substring, toLowerCase, toUpperCase, trim
-- **@date**: now, toISOString, toDateString, getFullYear, getMonth, getDate, getHours, getMinutes, getSeconds, fromISOString, parse (full JS Date API)
+- **@date**: now, toISOString, toDateString, yyyymmdd (returns "YYYY-MM-DD" directly — preferred for date strings), getFullYear, getMonth, getDate, getHours, getMinutes, getSeconds, fromISOString, parse (full JS Date API)
 - **@math**: add, subtract, multiply, divide
 - **@number**: gte, lte, gt, lt
 - **@array**: get, length
@@ -152,22 +194,23 @@ IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH �
 
 1. **Trigger first**: Every workflow starts with a trigger activity
 2. **Worker per tool**: Each MCP tool call is a worker activity
-3. **workflowName**: Every worker MUST have \`workflowName: '<tool_name>'\` in its input.maps — this routes to the correct MCP tool handler
-4. **_scope threading**: Every worker MUST have \`_scope: '{trigger.output.data._scope}'\` for IAM context
-5. **Wire outputs forward**: Use \`{prevActivity.output.data.fieldName}\` to pass data between steps
-6. **Use @pipe for transforms**: When a value needs runtime computation (date stamp, string concat, slugify), use @pipe — never hardcode computed values
-7. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
-8. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
-8. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
-9. **Linear transitions**: Chain activities with transitions unless iteration is needed
+3. **Collision-proof activity IDs**: Multiple workflows share the same app namespace. Activity IDs MUST be globally unique within the app. Use a descriptive name with a shared 4-char random suffix appended to every activity in the flow: \`trigger_x8kf\`, \`capture_x8kf\`, \`analyze_x8kf\`, \`store_x8kf\`. The suffix is the same for all activities in one workflow but unique across workflows. NEVER use bare names like \`trigger\`, \`capture\`, \`analyze\` — they WILL collide with other workflows in the same app.
+4. **workflowName**: Every worker MUST have \`workflowName: '<tool_name>'\` in its input.maps — this routes to the correct MCP tool handler
+5. **_scope threading**: Every worker MUST have \`_scope: '{trigger_x8kf.output.data._scope}'\` (using YOUR trigger's ID) for IAM context
+6. **Wire outputs forward**: Use \`{prevActivity.output.data.fieldName}\` to pass data between steps
+7. **Use @pipe for transforms**: When a value needs runtime computation (date stamp, string concat, slugify), use @pipe — never hardcode computed values
+8. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger_x8kf.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
+9. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
+10. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
+11. **Linear transitions**: Chain activities with transitions unless iteration is needed
 
 ## Activity Manifest
 
-Along with the YAML, produce an activity_manifest array describing each activity:
+Along with the YAML, produce an activity_manifest array describing each activity. Note how all activity IDs share the same random suffix (\`_x8kf\`) for collision-proofing while remaining human-readable:
 \`\`\`json
 [
   {
-    "activity_id": "my_trigger",
+    "activity_id": "trigger_x8kf",
     "title": "Trigger",
     "type": "trigger",
     "tool_source": "trigger",
@@ -176,7 +219,7 @@ Along with the YAML, produce an activity_manifest array describing each activity
     "output_fields": ["url", "slug"]
   },
   {
-    "activity_id": "my_a1",
+    "activity_id": "capture_x8kf",
     "title": "Capture Page",
     "type": "worker",
     "tool_source": "mcp",
@@ -185,7 +228,7 @@ Along with the YAML, produce an activity_manifest array describing each activity
     "mcp_server_id": "long-tail-playwright-cli",
     "mcp_tool_name": "capture_page",
     "tool_arguments": {},
-    "input_mappings": { "url": "{my_trigger.output.data.url}" },
+    "input_mappings": { "url": "{trigger_x8kf.output.data.url}" },
     "output_fields": ["page_id", "path", "url", "title"]
   }
 ]
