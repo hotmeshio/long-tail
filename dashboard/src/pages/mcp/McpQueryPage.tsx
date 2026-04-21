@@ -169,14 +169,14 @@ export function McpQueryPage() {
   return (
     <>
       <PageHeader
-        title="Pipeline Designer"
+        title="MCP Tool Designer"
         actions={
           <button
             onClick={() => navigate('/mcp/queries/new')}
             className="btn-primary text-xs inline-flex items-center gap-1.5"
           >
             <Wand2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-            Design New Pipeline
+            Create New MCP Tool
           </button>
         }
       />
@@ -225,7 +225,7 @@ export function McpQueryPage() {
       />
 
       {!isLoading && jobs.length === 0 && (
-        <EmptyState title="No pipeline runs yet" description="Click &quot;Design Pipeline&quot; to start" />
+        <EmptyState title="No tool designs yet" description="Click &quot;Create New MCP Tool&quot; to start" />
       )}
 
       <StickyPagination
