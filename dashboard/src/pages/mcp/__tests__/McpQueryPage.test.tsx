@@ -41,12 +41,12 @@ beforeEach(() => {
 describe('McpQueryPage', () => {
   it('renders page header', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Pipeline Designer')).toBeInTheDocument();
+    expect(screen.getByText('MCP Tool Designer')).toBeInTheDocument();
   });
 
-  it('renders Design New Pipeline button', () => {
+  it('renders Create New MCP Tool button', () => {
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('Design New Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Create New MCP Tool')).toBeInTheDocument();
   });
 
   it('renders job rows including triage', () => {
@@ -65,7 +65,7 @@ describe('McpQueryPage', () => {
   it('shows empty state when no jobs', () => {
     vi.mocked(useMcpQueryJobs).mockReturnValue({ data: { jobs: [], total: 0 }, isLoading: false } as any);
     render(<McpQueryPage />, { wrapper });
-    expect(screen.getByText('No pipeline runs yet')).toBeInTheDocument();
+    expect(screen.getByText('No tool designs yet')).toBeInTheDocument();
   });
 
   it('renders status filter', () => {

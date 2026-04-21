@@ -74,9 +74,9 @@ function ComposerPanel() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Designer" />
+      <PageHeader title="MCP Tool Designer" />
       <p className="text-sm text-text-secondary mb-6 leading-relaxed max-w-xl">
-        Create deterministic pipelines from natural language. Choose how to get there.
+        Create deterministic MCP tools from natural language. Choose how to get there.
       </p>
 
       {/* Mode toggle */}
@@ -261,7 +261,7 @@ function BuilderWizard() {
   return (
     <div className="flex flex-col min-h-[calc(100vh-12rem)]">
       <PageHeader
-        title="Pipeline Designer"
+        title="MCP Tool Designer"
         actions={
           <div className="flex items-center gap-3">
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Direct Build</span>
@@ -338,7 +338,7 @@ function McpQueryWizard() {
   return (
     <div className="flex flex-col min-h-[calc(100vh-12rem)]">
       <PageHeader
-        title="Compilation Wizard"
+        title="MCP Tool Compiler"
         actions={
           <div className="flex items-center gap-4">
             <StatusBadge status={d.status} />

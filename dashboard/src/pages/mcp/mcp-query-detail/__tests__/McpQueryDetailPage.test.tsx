@@ -80,7 +80,7 @@ describe('McpQueryDetailPage', () => {
     vi.mocked(useMcpQueryResult).mockReturnValue({ data: undefined } as any);
 
     render(<McpQueryDetailPage />, { wrapper });
-    expect(screen.getByText('Compilation Wizard')).toBeInTheDocument();
+    expect(screen.getByText('MCP Tool Compiler')).toBeInTheDocument();
     // Wizard step labels (Describe also appears in panel title)
     expect(screen.getAllByText('Describe').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Discover')).toBeInTheDocument();
