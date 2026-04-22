@@ -199,6 +199,7 @@ Both share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud
 
 | Guide | What it covers |
 |-------|---------------|
+| [The Long Tail Story](docs/story.md) | Why this exists, what accumulates over time, what you own |
 | [Workflows](docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
 | [IAM](docs/iam.md) | Identity propagation, service accounts, credential exchange |
 | [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
