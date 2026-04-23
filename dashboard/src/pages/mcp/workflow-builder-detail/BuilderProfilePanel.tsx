@@ -17,7 +17,7 @@ interface BuilderProfilePanelProps {
 
 export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPrompt, onBack, onCreate, onNext }: BuilderProfilePanelProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(builderData?.name || '');
+  const [name, setName] = useState((builderData?.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
   const [description, setDescription] = useState(builderData?.description || '');
   const [appId, setAppId] = useState('longtail');
   const [tags, setTags] = useState<string[]>(builderData?.tags || []);
@@ -80,7 +80,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             {editable ? (
               <input
                 value={appId}
-                onChange={(e) => setAppId(e.target.value)}
+                onChange={(e) => setAppId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               />
             ) : (
@@ -92,7 +92,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             {editable ? (
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               />
             ) : (
@@ -148,6 +148,10 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
           )}
         </div>
       </div>
+
+      {createYaml.isError && (
+        <p className="text-xs text-status-error mb-4">{createYaml.error.message}</p>
+      )}
 
       <WizardNav>
         <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>

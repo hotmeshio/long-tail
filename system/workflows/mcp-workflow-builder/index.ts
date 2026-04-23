@@ -8,6 +8,7 @@ type ActivitiesType = typeof activities;
 
 const {
   loadBuilderTools,
+  loadReferenceSection,
   callBuilderLLM,
 } = Durable.workflow.proxyActivities<ActivitiesType>({
   activities,
@@ -76,6 +77,13 @@ export async function mcpWorkflowBuilder(
   const priorYaml = envelope.data?.prior_yaml as string | undefined;
   const answers = envelope.data?.answers as string | undefined;
   const priorQuestions = envelope.data?.prior_questions as string[] | undefined;
+  const compositionContext = envelope.data?.composition_context as {
+    sibling_schemas?: Array<{ name: string; input_schema: Record<string, unknown>; output_schema: Record<string, unknown>; graph_topic: string }>;
+    dependencies?: string[];
+    namespace?: string;
+    requires_await?: boolean;
+    requires_signal?: boolean;
+  } | undefined;
 
   if (!prompt) {
     return {
@@ -97,10 +105,35 @@ export async function mcpWorkflowBuilder(
     `## Available MCP Servers & Tools\n\n${raw.inventory}`,
   ].filter(Boolean).join('\n');
 
+  // 3. Load composition references if this workflow is part of a plan
+  const compositionSections: string[] = [];
+  if (compositionContext) {
+    if (compositionContext.requires_await) {
+      const awaitRef = await loadReferenceSection('await');
+      if (awaitRef) compositionSections.push(awaitRef);
+    }
+    if (compositionContext.requires_signal) {
+      const signalRef = await loadReferenceSection('signal');
+      if (signalRef) compositionSections.push(signalRef);
+    }
+    if (compositionContext.sibling_schemas?.length) {
+      const siblings = compositionContext.sibling_schemas
+        .map(s => `- **${s.name}** (topic: \`${s.graph_topic}\`)\n  Input: \`${JSON.stringify(s.input_schema)}\`\n  Output: \`${JSON.stringify(s.output_schema)}\``)
+        .join('\n');
+      compositionSections.push(
+        `## Sibling Workflows in This Plan\n\nThis workflow is part of a multi-workflow set. The following sibling workflows exist in the same namespace and can be invoked using \`type: await\` activities:\n\n${siblings}`,
+      );
+    }
+  }
+
+  const fullInventory = compositionSections.length
+    ? `${serverSection}\n\n${compositionSections.join('\n\n')}`
+    : serverSection;
+
   const messages: any[] = [
     {
       role: 'system',
-      content: BUILDER_SYSTEM_PROMPT(serverSection),
+      content: BUILDER_SYSTEM_PROMPT(fullInventory),
     },
   ];
 

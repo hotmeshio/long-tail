@@ -143,4 +143,5 @@ export interface LTJob {
   is_live: boolean;
   created_at: string;
   updated_at: string;
+  set_id?: string;
 }

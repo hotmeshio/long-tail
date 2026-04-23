@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { startMcpQuery, startWorkflowBuilder, describeWorkflow } from '../services/insight';
+import { startMcpQuery, startWorkflowBuilder, startWorkflowPlanner, describeWorkflow } from '../services/insight';
 
 const router = Router();
 

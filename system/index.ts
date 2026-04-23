@@ -47,6 +47,12 @@ export function getSystemWorkers(): Array<{ taskQueue: string; workflow: (...arg
       const { mcpWorkflowBuilder } = require('./workflows/mcp-workflow-builder');
       workers.push({ taskQueue: 'long-tail-system', workflow: mcpWorkflowBuilder });
     } catch { /* not available */ }
+
+    // ── Workflow planner (multi-workflow plan mode) ──
+    try {
+      const { mcpWorkflowPlanner } = require('./workflows/mcp-workflow-planner');
+      workers.push({ taskQueue: 'long-tail-system', workflow: mcpWorkflowPlanner });
+    } catch { /* not available */ }
   }
 
   return workers;

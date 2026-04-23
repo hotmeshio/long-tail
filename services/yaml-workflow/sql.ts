@@ -5,9 +5,15 @@ export const CREATE_YAML_WORKFLOW = `
     (name, description, app_id, app_version, source_workflow_id,
      source_workflow_type, yaml_content, graph_topic,
      input_schema, output_schema, activity_manifest, input_field_meta,
-     original_prompt, category, tags, metadata, content_version)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 1)
+     original_prompt, category, tags, metadata, content_version,
+     set_id, set_role, set_build_order)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 1, $17, $18, $19)
   RETURNING *`;
+
+export const CHECK_TOPIC_UNIQUE = `
+  SELECT id, name FROM lt_yaml_workflows
+  WHERE app_id = $1 AND graph_topic = $2 AND status != 'archived'
+  LIMIT 1`;
 
 export const GET_YAML_WORKFLOW = `
   SELECT * FROM lt_yaml_workflows WHERE id = $1`;

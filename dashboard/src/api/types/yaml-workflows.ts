@@ -53,6 +53,9 @@ export interface LTYamlWorkflowRecord {
   cron_schedule: string | null;
   cron_envelope: Record<string, unknown> | null;
   execute_as: string | null;
+  set_id: string | null;
+  set_role: 'leaf' | 'composition' | 'router' | null;
+  set_build_order: number | null;
   created_at: string;
   updated_at: string;
 }

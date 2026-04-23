@@ -3,6 +3,7 @@ import { YAML_VERSION_LIMIT } from '../../modules/defaults';
 import type { LTYamlWorkflowRecord, LTYamlWorkflowVersionRecord, ActivityManifestEntry } from '../../types/yaml-workflow';
 import {
   CREATE_YAML_WORKFLOW,
+  CHECK_TOPIC_UNIQUE,
   GET_YAML_WORKFLOW,
   GET_YAML_WORKFLOW_BY_NAME,
   UPDATE_YAML_WORKFLOW_VERSION,
@@ -32,6 +33,22 @@ export {
   findYamlWorkflowsByTags,
 } from './db-utils';
 
+/**
+ * Check whether a graph_topic is already in use by a non-archived workflow
+ * in the same namespace. Returns the conflicting workflow name, or null.
+ */
+export async function checkTopicConflict(
+  appId: string,
+  graphTopic: string,
+  excludeId?: string,
+): Promise<string | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(CHECK_TOPIC_UNIQUE, [appId, graphTopic]);
+  if (rows.length === 0) return null;
+  if (excludeId && rows[0].id === excludeId) return null;
+  return rows[0].name;
+}
+
 export async function createYamlWorkflow(
   input: CreateYamlWorkflowInput,
 ): Promise<LTYamlWorkflowRecord> {
@@ -55,6 +72,9 @@ export async function createYamlWorkflow(
       input.category || null,
       input.tags || [],
       input.metadata ? JSON.stringify(input.metadata) : null,
+      input.set_id || null,
+      input.set_role || null,
+      input.set_build_order ?? null,
     ],
   );
   const record = rows[0];

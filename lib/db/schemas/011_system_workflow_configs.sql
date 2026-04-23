@@ -13,6 +13,9 @@ VALUES
    '{}'),
   ('mcpWorkflowBuilder', 'long-tail-system', 'engineer', false,
    'Direct pipeline builder — LLM constructs DAG from tool schemas',
+   '{}'),
+  ('mcpWorkflowPlanner', 'long-tail-system', 'engineer', false,
+   'Plan mode — decomposes specifications into multi-workflow sets',
    '{}')
 ON CONFLICT (workflow_type) DO NOTHING;
 
@@ -27,4 +30,8 @@ ON CONFLICT (workflow_type, role) DO NOTHING;
 
 INSERT INTO lt_config_roles (workflow_type, role)
 SELECT 'mcpWorkflowBuilder', unnest(ARRAY['reviewer', 'engineer', 'admin'])
+ON CONFLICT (workflow_type, role) DO NOTHING;
+
+INSERT INTO lt_config_roles (workflow_type, role)
+SELECT 'mcpWorkflowPlanner', unnest(ARRAY['reviewer', 'engineer', 'admin'])
 ON CONFLICT (workflow_type, role) DO NOTHING;
