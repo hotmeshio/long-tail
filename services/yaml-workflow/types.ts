@@ -28,6 +28,9 @@ export interface CreateYamlWorkflowInput {
   category?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  set_id?: string;
+  set_role?: 'leaf' | 'composition' | 'router';
+  set_build_order?: number;
 }
 
 // ── Build stage ──────────────────────────────────────────────────────────────

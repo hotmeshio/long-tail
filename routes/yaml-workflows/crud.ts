@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
       app_id: req.query.app_id as string | undefined,
       search: req.query.search as string | undefined,
       source_workflow_id: req.query.source_workflow_id as string | undefined,
+      set_id: req.query.set_id as string | undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
     });
@@ -48,6 +49,11 @@ router.post('/', async (req, res) => {
       return;
     }
 
+    if (/-/.test(name)) {
+      res.status(400).json({ error: 'Name must not contain dashes. Use underscores or camelCase (e.g. "screenshot_analyze_store").' });
+      return;
+    }
+
     // Reject compilation of executions that exhausted their tool rounds —
     // the trace is incomplete and would produce a broken workflow.
     const task = await getTaskByWorkflowId(workflow_id);
@@ -60,6 +66,17 @@ router.post('/', async (req, res) => {
         });
         return;
       }
+    }
+
+    // Check for topic collision in the target namespace
+    const compileAppId = app_id || 'longtail';
+    const compileTopic = subscribes || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const conflicting = await yamlDb.checkTopicConflict(compileAppId, compileTopic);
+    if (conflicting) {
+      res.status(409).json({
+        error: `Topic "${compileTopic}" is already used by workflow "${conflicting}" in namespace "${compileAppId}". Use a different tool name or namespace.`,
+      });
+      return;
     }
 
     // Generate YAML from execution
@@ -101,7 +118,10 @@ router.post('/', async (req, res) => {
     res.status(201).json(record);
   } catch (err: any) {
     if (err.message?.includes('duplicate key') || err.code === '23505') {
-      res.status(409).json({ error: 'A tool with that name already exists' });
+      const msg = err.constraint?.includes('app_topic')
+        ? 'A tool with that topic already exists in this namespace'
+        : 'A tool with that name already exists';
+      res.status(409).json({ error: msg });
       return;
     }
     res.status(500).json({ error: err.message });
@@ -135,17 +155,32 @@ router.post('/direct', async (req, res) => {
       return;
     }
 
-    // Extract subscribes topic from YAML content, or fall back to name-derived slug
-    let graphTopic = graph_topic || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Sanitize name (tool name): force lowercase alphanumeric only
+    const sanitizedName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Sanitize app_id (MCP server name): force lowercase alphanumeric only
+    const targetAppId = (app_id || 'longtail').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Sanitize graph topic: force lowercase alphanumeric only
+    let graphTopic = (graph_topic || sanitizedName).toLowerCase().replace(/[^a-z0-9]/g, '');
     const subscribesMatch = yaml_content.match(/subscribes:\s*(.+)/);
     if (subscribesMatch) {
-      graphTopic = subscribesMatch[1].trim().replace(/^['"]|['"]$/g, '');
+      graphTopic = subscribesMatch[1].trim().replace(/^['"]|['"]$/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    // Check for topic collision in the target namespace
+    const conflicting = await yamlDb.checkTopicConflict(targetAppId, graphTopic);
+    if (conflicting) {
+      res.status(409).json({
+        error: `Topic "${graphTopic}" is already used by workflow "${conflicting}" in namespace "${targetAppId}". Use a different tool name or namespace.`,
+      });
+      return;
     }
 
     const wf = await yamlDb.createYamlWorkflow({
-      name,
+      name: sanitizedName,
       description,
-      app_id: app_id || 'longtail',
+      app_id: targetAppId,
       yaml_content,
       graph_topic: graphTopic,
       input_schema: input_schema || {},

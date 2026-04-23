@@ -73,10 +73,14 @@ capture_x8kf:
 \`\`\`
 
 ### hook
-Durable pause point — used for human-in-the-loop signals and iteration anchors.
+Durable pause point with three modes:
+- **Web hook**: Pauses until an external signal arrives. Define \`hook: { type: object, properties: {...} }\` for the expected signal schema. Receives signal data via \`{$self.hook.data.*}\`. Requires a matching entry in the graph-level \`hooks:\` section.
+- **Sleep**: Pauses for a duration. \`sleep: 5\` pauses 5 seconds. Supports @pipe expressions for dynamic delays.
+- **Cycle pivot**: When \`cycle: true\`, becomes an iteration anchor that a cycle activity can loop back to.
+- **Passthrough**: No hook/sleep config — acts as a data-mapping convergence point, executes immediately.
 
 ### cycle
-Loop back to a hook ancestor for iteration patterns.
+Loop back to a hook ancestor marked \`cycle: true\`. Each iteration runs in isolated state, but \`job.maps\` accumulates across iterations.
 
 ## Data Mapping Rules
 
@@ -176,14 +180,16 @@ This resolves: sub-pipe1 → "research/google/", sub-pipe2 → "2026-04-19", sub
 IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH — HotMesh interprets it as a function call. Always wrap static values in \`'@pipe': - [value]\`.
 
 ### Available @pipe operators (every JS method is exposed):
-- **@string**: charAt, concat, includes, indexOf, replace, slice, split, startsWith, substring, toLowerCase, toUpperCase, trim
-- **@date**: now, toISOString, toDateString, yyyymmdd (returns "YYYY-MM-DD" directly — preferred for date strings), getFullYear, getMonth, getDate, getHours, getMinutes, getSeconds, fromISOString, parse (full JS Date API)
-- **@math**: add, subtract, multiply, divide
-- **@number**: gte, lte, gt, lt
-- **@array**: get, length
-- **@object**: get, keys, values
-- **@conditional**: ternary, less_than, greater_than
+- **@string**: charAt, concat, endsWith, includes, indexOf, lastIndexOf, padEnd, padStart, repeat, replace, search, slice, split, startsWith, substring, toLowerCase, toUpperCase, trim, trimEnd, trimStart
+- **@date**: now, toISOString, toDateString, yyyymmdd (returns "YYYY-MM-DD" directly — preferred for date strings), getFullYear, getMonth, getDate, getDay, getHours, getMinutes, getSeconds, getTime, fromISOString, parse, UTC, toLocaleDateString, setFullYear, setMonth, setDate (full JS Date API)
+- **@math**: add, subtract, multiply, divide, abs, ceil, floor, round, trunc, pow, sqrt, max, min, random
+- **@number**: gt, gte, lt, lte, isFinite, isInteger, isEven, isOdd, isNaN, parseFloat, parseInt, toFixed, toExponential, toPrecision
+- **@array**: get, length, concat, indexOf, join, lastIndexOf, pop, push, reverse, shift, slice, sort, splice, unshift
+- **@object**: get, set, create, keys, values, entries, fromEntries, assign, hasOwnProperty, freeze
+- **@conditional**: ternary, equality, strict_equality, inequality, strict_inequality, greater_than, less_than, greater_than_or_equal, less_than_or_equal, nullish
 - **@json**: parse, stringify
+- **@logical**: and, or
+- **@bitwise**: and, or, xor, leftShift, rightShift
 
 ### Three mapping directions per activity:
 - **input.maps**: Wire data INTO this activity from trigger or upstream activities
@@ -202,7 +208,25 @@ IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH �
 8. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger_x8kf.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
 9. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
 10. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
-11. **Linear transitions**: Chain activities with transitions unless iteration is needed
+11. **Linear transitions**: Chain activities with transitions unless branching or iteration is needed
+12. **Conditional transitions**: For branching, use multi-target transitions with conditions:
+\`\`\`yaml
+transitions:
+  check_x8kf:
+    - to: handle_error_x8kf
+      conditions:
+        code: 500
+    - to: proceed_x8kf
+\`\`\`
+Conditions can match on \`code\` (HTTP status) or \`match\` (field comparisons). The first matching condition wins; the last entry (no conditions) is the default.
+13. **Trigger stats for idempotency**: Use \`stats.id\` and \`stats.key\` on the trigger when the workflow needs custom job IDs or indexed lookups:
+\`\`\`yaml
+trigger_x8kf:
+  type: trigger
+  stats:
+    id: '{$self.input.data.workflowId}'
+    key: '{$self.input.data.entityId}'
+\`\`\`
 
 ## Activity Manifest
 
@@ -262,9 +286,11 @@ When the user provides answers to your questions, build the workflow immediately
 
 ## Output Format
 
+CRITICAL: The "name" field MUST be lowercase alphanumeric only — NO dashes, NO underscores, NO dots, NO special characters. Examples: "analyzescreenshot", "captureandstore", "dailyreport". NEVER use names like "analyze-screenshot" or "capture_page".
+
 Return a JSON object (no markdown fences):
 {
-  "name": "kebab-case-workflow-name",
+  "name": "lowercasealphanumericonly",
   "description": "What this workflow does",
   "yaml": "<the complete YAML string>",
   "input_schema": { <JSON Schema for trigger inputs> },

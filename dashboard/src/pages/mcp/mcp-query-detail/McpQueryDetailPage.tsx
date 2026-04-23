@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers, Hammer, Wand2 } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers, Hammer, Wand2, GitBranch } from 'lucide-react';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
 import { useSubmitMcpQuery, useSubmitMcpQueryRouted, useMcpQueryExecution } from '../../../api/mcp-query';
 import { useSubmitBuildWorkflow, useBuilderResult, useRefineBuildWorkflow } from '../../../api/workflow-builder';
+import { useCreateWorkflowSet } from '../../../api/workflow-sets';
 import { useYamlWorkflows, useYamlWorkflow } from '../../../api/yaml-workflows';
 import { useMcpQueryDetailEvents } from '../../../hooks/useEventHooks';
 import { DescribePanel } from '../../mcp/workflow-builder-detail/DescribePanel';
 import { BuilderProfilePanel } from '../../mcp/workflow-builder-detail/BuilderProfilePanel';
+import { PlanWizard } from './PlanWizard';
 
 import type { Step } from './helpers';
 import { useQueryDetail } from './useQueryDetail';
@@ -24,7 +26,7 @@ import { EscalationBanner } from './EscalationBanner';
 
 // ── Composer (shown for /mcp/queries/new) ─────────────────────────────────────
 
-type DesignMode = 'discover' | 'direct';
+type DesignMode = 'discover' | 'direct' | 'plan';
 
 const DISCOVER_STEPS = [
   { icon: MessageSquare, color: 'text-accent', title: 'Describe', detail: 'Write a prompt. The LLM executes tools dynamically to fulfill your request.' },
@@ -38,6 +40,12 @@ const DIRECT_STEPS = [
   { icon: Wand2, color: 'text-status-success', title: 'Deploy & Test', detail: 'Deploy, run with sample inputs, and refine until the pipeline works correctly.' },
 ];
 
+const PLAN_STEPS = [
+  { icon: MessageSquare, color: 'text-accent', title: 'Specification', detail: 'Paste a PRD, TDD, or multi-workflow spec. The planner decomposes it into workflows.' },
+  { icon: GitBranch, color: 'text-status-warning', title: 'Plan & Build', detail: 'Review the decomposition, adjust namespaces, then build each workflow leaf-first.' },
+  { icon: Layers, color: 'text-status-success', title: 'Deploy & Test', detail: 'Deploy all namespaces. Test individual workflows and the full composition.' },
+];
+
 function ComposerPanel() {
   const navigate = useNavigate();
   const [promptText, setPromptText] = useState('');
@@ -46,13 +54,19 @@ function ComposerPanel() {
   const submitDirect = useSubmitMcpQuery();
   const submitRouted = useSubmitMcpQueryRouted();
   const submitBuilder = useSubmitBuildWorkflow();
+  const createSet = useCreateWorkflowSet();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const prompt = promptText.trim();
     if (!prompt) return;
 
-    if (mode === 'direct') {
+    if (mode === 'plan') {
+      const name = `plan-${Date.now().toString(36)}`;
+      const result = await createSet.mutateAsync({ name, specification: prompt });
+      setPromptText('');
+      navigate(`/mcp/queries/${result.planner_workflow_id}?mode=plan&set_id=${result.id}`, { replace: true });
+    } else if (mode === 'direct') {
       const result = await submitBuilder.mutateAsync({ prompt });
       setPromptText('');
       navigate(`/mcp/queries/${result.workflow_id}?mode=builder`, { replace: true });
@@ -68,9 +82,11 @@ function ComposerPanel() {
     }
   };
 
-  const activeMutation = mode === 'direct' ? submitBuilder
+  const activeMutation = mode === 'plan' ? createSet
+    : mode === 'direct' ? submitBuilder
     : forceDiscovery ? submitDirect : submitRouted;
-  const lifecycleSteps = mode === 'discover' ? DISCOVER_STEPS : DIRECT_STEPS;
+  const lifecycleSteps = mode === 'plan' ? PLAN_STEPS
+    : mode === 'discover' ? DISCOVER_STEPS : DIRECT_STEPS;
 
   return (
     <div>
@@ -103,6 +119,17 @@ function ComposerPanel() {
           <Hammer className="w-3 h-3" strokeWidth={1.5} />
           Direct Build
         </button>
+        <button
+          onClick={() => setMode('plan')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            mode === 'plan'
+              ? 'bg-surface text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-text-secondary'
+          }`}
+        >
+          <GitBranch className="w-3 h-3" strokeWidth={1.5} />
+          Plan Build
+        </button>
       </div>
 
       <div className="grid grid-cols-[1fr_240px] gap-6">
@@ -119,7 +146,9 @@ function ComposerPanel() {
                   el.style.height = 'auto';
                   el.style.height = Math.min(400, Math.max(160, el.scrollHeight)) + 'px';
                 }}
-                placeholder={mode === 'discover'
+                placeholder={mode === 'plan'
+                  ? 'Paste a PRD, TDD, or multi-workflow specification. The planner will decompose it into a set of related workflows...'
+                  : mode === 'discover'
                   ? 'Describe what you want to accomplish. The LLM will discover and execute the right tools...'
                   : 'Describe the pipeline steps, tools, inputs, and outputs. The LLM will create the pipeline (DAG) directly...'
                 }
@@ -129,7 +158,11 @@ function ComposerPanel() {
               />
             </div>
             <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
-              {mode === 'discover' ? (
+              {mode === 'plan' ? (
+                <span className="text-[10px] text-text-tertiary">
+                  Decomposes specification into composed workflows — builds leaf-first
+                </span>
+              ) : mode === 'discover' ? (
                 <label className="flex items-center gap-2 cursor-pointer select-none group">
                   <input
                     type="checkbox"
@@ -152,7 +185,7 @@ function ComposerPanel() {
                   disabled={!promptText.trim() || activeMutation.isPending}
                   className="px-4 py-1.5 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {activeMutation.isPending ? 'Starting...' : mode === 'discover' ? 'Discover' : 'Build'}
+                  {activeMutation.isPending ? 'Starting...' : mode === 'plan' ? 'Plan' : mode === 'discover' ? 'Discover' : 'Build'}
                 </button>
               </div>
             </div>
@@ -327,6 +360,7 @@ export function McpQueryDetailPage() {
   const [searchParams] = useSearchParams();
 
   if (workflowId === 'new') return <ComposerPanel />;
+  if (searchParams.get('mode') === 'plan') return <PlanWizard />;
   if (searchParams.get('mode') === 'builder') return <BuilderWizard />;
 
   return <McpQueryWizard />;

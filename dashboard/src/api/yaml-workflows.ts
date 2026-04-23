@@ -12,6 +12,7 @@ interface YamlWorkflowFilters {
   graph_topic?: string;
   app_id?: string;
   search?: string;
+  set_id?: string;
   limit?: number;
   offset?: number;
 }
@@ -22,6 +23,7 @@ export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
   if (filters.graph_topic) params.set('graph_topic', filters.graph_topic);
   if (filters.app_id) params.set('app_id', filters.app_id);
   if (filters.search) params.set('search', filters.search);
+  if (filters.set_id) params.set('set_id', filters.set_id);
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
 
@@ -152,7 +154,7 @@ export function useArchiveYamlWorkflow() {
 export function useUpdateYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string; input_schema?: Record<string, unknown>; output_schema?: Record<string, unknown>; tags?: string[] }) =>
+    mutationFn: ({ id, ...updates }: { id: string; yaml_content?: string; name?: string; description?: string; input_schema?: Record<string, unknown>; output_schema?: Record<string, unknown>; tags?: string[]; app_id?: string; graph_topic?: string }) =>
       apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}`, {
         method: 'PUT',
         body: JSON.stringify(updates),

@@ -29,7 +29,7 @@ vi.mock('../../../services/llm', () => ({
   hasLLMApiKey: vi.fn().mockReturnValue(false),
 }));
 
-import { startMcpQuery, startWorkflowBuilder, describeWorkflow } from '../../../services/insight';
+import { startMcpQuery, startWorkflowBuilder, startWorkflowPlanner, describeWorkflow } from '../../../services/insight';
 import { callLLM, hasLLMApiKey } from '../../../services/llm';
 
 beforeEach(() => {
@@ -97,6 +97,67 @@ describe('startWorkflowBuilder', () => {
     const startCall = mockStart.mock.calls[0][0];
     expect(startCall.args[0].data.answers).toBe('Use Playwright');
     expect(startCall.args[0].data.prior_questions).toEqual(['Which browser?']);
+  });
+});
+
+// ── startWorkflowPlanner ─────────────────────────────────────────────────────
+
+describe('startWorkflowPlanner', () => {
+  it('returns started status with wait=false', async () => {
+    const result = await startWorkflowPlanner({
+      specification: 'Build a referral intake system',
+      setId: 'set-uuid-1',
+      wait: false,
+    });
+
+    expect(result.workflow_id).toMatch(/^wf-planner-/);
+    expect(result.status).toBe('started');
+  });
+
+  it('starts mcpWorkflowPlanner workflow with correct envelope', async () => {
+    await startWorkflowPlanner({
+      specification: 'Multi-workflow spec',
+      setId: 'set-uuid-2',
+      wait: false,
+      userId: 'user-456',
+    });
+
+    const startCall = mockStart.mock.calls[0][0];
+    expect(startCall.workflowName).toBe('mcpWorkflowPlanner');
+    expect(startCall.taskQueue).toBe('long-tail-system');
+    expect(startCall.entity).toBe('mcpWorkflowPlanner');
+    expect(startCall.args[0].data.specification).toBe('Multi-workflow spec');
+    expect(startCall.args[0].data.setId).toBe('set-uuid-2');
+    expect(startCall.args[0].lt.userId).toBe('user-456');
+  });
+
+  it('generates unique workflow IDs', async () => {
+    const r1 = await startWorkflowPlanner({ specification: 'a', setId: 's1', wait: false });
+    const r2 = await startWorkflowPlanner({ specification: 'b', setId: 's2', wait: false });
+
+    expect(r1.workflow_id).not.toBe(r2.workflow_id);
+  });
+
+  it('waits for result with wait=true', async () => {
+    const result = await startWorkflowPlanner({
+      specification: 'test spec',
+      setId: 'set-uuid-3',
+      wait: true,
+    });
+
+    expect(mockResult).toHaveBeenCalledWith({ state: true });
+    expect(result.duration_ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it('truncates specification in prompt field', async () => {
+    const longSpec = 'x'.repeat(500);
+    const result = await startWorkflowPlanner({
+      specification: longSpec,
+      setId: 'set-1',
+      wait: false,
+    });
+
+    expect(result.prompt.length).toBe(200);
   });
 });
 

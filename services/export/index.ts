@@ -187,12 +187,16 @@ export async function listJobs(params: JobListParams): Promise<JobListResult> {
          CASE WHEN j.updated_at != j.created_at THEN j.updated_at
               WHEN ju.value IS NOT NULL THEN to_timestamp(ju.value, 'YYYYMMDDHH24MISS.MS')
               ELSE j.updated_at
-         END as updated_at
+         END as updated_at,
+         ws.id as set_id
        FROM durable.jobs j
        LEFT JOIN durable.jobs_attributes ju
          ON ju.job_id = j.id
          AND ju.symbol IN (SELECT value FROM ju_symbols)
          AND (ju.dimension IS NULL OR ju.dimension = '')
+       LEFT JOIN lt_workflow_sets ws
+         ON ws.source_workflow_id = REPLACE(j.key, 'hmsh:durable:j:', '')
+         AND j.entity = 'mcpWorkflowPlanner'
        WHERE ${where}
        ORDER BY ${buildJobOrderBy(params.sort_by, params.order)}
        LIMIT $${idx++} OFFSET $${idx++}`,
@@ -207,6 +211,7 @@ export async function listJobs(params: JobListParams): Promise<JobListResult> {
     is_live: row.is_live,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    ...(row.set_id ? { set_id: row.set_id } : {}),
   }));
 
   return { jobs, total: parseInt(countResult.rows[0].count, 10) };
