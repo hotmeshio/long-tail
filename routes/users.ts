@@ -1,8 +1,7 @@
 import { Router } from 'express';
 
 import { requireAdmin } from '../modules/auth';
-import * as userService from '../services/user';
-import type { LTRoleType } from '../types';
+import * as api from '../api/users';
 
 const router = Router();
 
@@ -14,18 +13,14 @@ const router = Router();
  * Query: ?role=reviewer&roleType=admin&status=active&limit=50&offset=0
  */
 router.get('/', async (req, res) => {
-  try {
-    const result = await userService.listUsers({
-      role: req.query.role as string,
-      roleType: req.query.roleType as LTRoleType,
-      status: req.query.status as any,
-      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
-      offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
-    });
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.listUsers({
+    role: req.query.role as string,
+    roleType: req.query.roleType as any,
+    status: req.query.status as any,
+    limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+    offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -33,16 +28,8 @@ router.get('/', async (req, res) => {
  * Get a single user by ID.
  */
 router.get('/:id', async (req, res) => {
-  try {
-    const user = await userService.getUser(req.params.id);
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    res.json(user);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.getUser({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -51,37 +38,8 @@ router.get('/:id', async (req, res) => {
  * Body: { external_id, email?, display_name?, roles?: [{ role, type }], metadata? }
  */
 router.post('/', requireAdmin, async (req, res) => {
-  try {
-    const { external_id, email, display_name, roles, metadata } = req.body || {};
-    if (!external_id) {
-      res.status(400).json({ error: 'external_id is required' });
-      return;
-    }
-    if (roles) {
-      for (const r of roles) {
-        if (!r.role || !r.type || !userService.isValidRoleType(r.type)) {
-          res.status(400).json({
-            error: 'Each role must have a role name and type (superadmin, admin, member)',
-          });
-          return;
-        }
-      }
-    }
-    const user = await userService.createUser({
-      external_id,
-      email,
-      display_name,
-      roles,
-      metadata,
-    });
-    res.status(201).json(user);
-  } catch (err: any) {
-    if (err.code === '23505') {
-      res.status(409).json({ error: 'User with this external_id already exists' });
-      return;
-    }
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.createUser(req.body || {});
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -90,16 +48,8 @@ router.post('/', requireAdmin, async (req, res) => {
  * Body: { email?, display_name?, status?, metadata? }
  */
 router.put('/:id', requireAdmin, async (req, res) => {
-  try {
-    const user = await userService.updateUser(req.params.id as string, req.body || {});
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    res.json(user);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.updateUser({ id: req.params.id as string, ...(req.body || {}) });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -107,16 +57,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
  * Delete a user.
  */
 router.delete('/:id', requireAdmin, async (req, res) => {
-  try {
-    const deleted = await userService.deleteUser(req.params.id as string);
-    if (!deleted) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    res.json({ deleted: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.deleteUser({ id: req.params.id as string });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 // ── Role management ─────────────────────────────────────────────────────────
@@ -126,12 +68,8 @@ router.delete('/:id', requireAdmin, async (req, res) => {
  * Get all roles for a user.
  */
 router.get('/:id/roles', async (req, res) => {
-  try {
-    const roles = await userService.getUserRoles(req.params.id);
-    res.json({ roles });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.getUserRoles({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -140,21 +78,9 @@ router.get('/:id/roles', async (req, res) => {
  * Body: { role, type } — type must be superadmin, admin, or member
  */
 router.post('/:id/roles', requireAdmin, async (req, res) => {
-  try {
-    const { role, type } = req.body || {};
-    if (!role || !type) {
-      res.status(400).json({ error: 'role and type are required' });
-      return;
-    }
-    if (!userService.isValidRoleType(type)) {
-      res.status(400).json({ error: 'type must be superadmin, admin, or member' });
-      return;
-    }
-    const result = await userService.addUserRole(req.params.id as string, role, type);
-    res.status(201).json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const { role, type } = req.body || {};
+  const result = await api.addUserRole({ id: req.params.id as string, role, type });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -162,16 +88,8 @@ router.post('/:id/roles', requireAdmin, async (req, res) => {
  * Remove a role from a user.
  */
 router.delete('/:id/roles/:role', requireAdmin, async (req, res) => {
-  try {
-    const removed = await userService.removeUserRole(req.params.id as string, req.params.role as string);
-    if (!removed) {
-      res.status(404).json({ error: 'Role not found' });
-      return;
-    }
-    res.json({ removed: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.removeUserRole({ id: req.params.id as string, role: req.params.role as string });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;

@@ -2,6 +2,7 @@
 
 export interface ControlPlaneApp {
   appId: string;
+  version: string;
 }
 
 export interface StreamStats {

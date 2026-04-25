@@ -100,6 +100,27 @@ export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
 }
 
 /**
+ * Invalidate workflow set and YAML workflow queries when plan-related events fire.
+ * Covers the planner workflow and all child builder workflows.
+ */
+export function usePlanDetailEvents(plannerWorkflowId: string | undefined): void {
+  const invalidate = useDebouncedInvalidation(400);
+
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
+    if (!plannerWorkflowId) return;
+
+    const isRelated = event.workflowId === plannerWorkflowId
+      || event.workflowId?.includes(plannerWorkflowId);
+    if (!isRelated) return;
+
+    const keys = getInvalidationKeys(event);
+    keys.push(['workflowSets']);
+    keys.push(['yamlWorkflows']);
+    invalidate(keys);
+  });
+}
+
+/**
  * Invalidate process detail queries on task/workflow events for a specific origin.
  */
 export function useProcessDetailEvents(originId: string | undefined): void {

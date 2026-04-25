@@ -61,6 +61,8 @@ export function compactForLlm(input: Record<string, unknown>): Record<string, un
  */
 export function buildLlmCallback(activity: ActivityManifestEntry) {
   return async (data: StreamData): Promise<StreamDataResponse> => {
+    const wfName = (data.data as any)?.workflowName || activity.workflow_name || activity.activity_id;
+    loggerRegistry.debug(`[yaml-workflow:worker] entering llm wf=${wfName} argKeys=[${Object.keys(data.data || {}).join(',')}]`);
     const rawInput = (data.data || {}) as Record<string, unknown>;
     const input = compactForLlm(rawInput);
     const template = activity.prompt_template || '';
@@ -115,7 +117,7 @@ export function buildLlmCallback(activity: ActivityManifestEntry) {
       result = { response: content };
     }
 
-    loggerRegistry.info(`[yaml-workflow] LLM step completed (model: ${model}, topic: ${activity.topic})`);
+    loggerRegistry.debug(`[yaml-workflow:worker] leaving llm wf=${wfName} resultType=${typeof result}`);
     return {
       metadata: { ...data.metadata },
       data: result as Record<string, unknown>,
@@ -175,10 +177,13 @@ export function buildTransformCallback(activity: ActivityManifestEntry) {
   if (!spec) throw new Error(`Transform activity ${activity.activity_id} missing transform_spec`);
 
   return async (data: StreamData): Promise<StreamDataResponse> => {
+    const wfName = (data.data as any)?.workflowName || activity.workflow_name || activity.activity_id;
+    loggerRegistry.debug(`[yaml-workflow:worker] entering transform wf=${wfName} source=${spec.sourceField} target=${spec.targetField} argKeys=[${Object.keys(data.data || {}).join(',')}]`);
     const input = (data.data || {}) as Record<string, unknown>;
     const sourceData = input[spec.sourceField];
 
     if (!Array.isArray(sourceData)) {
+      loggerRegistry.debug(`[yaml-workflow:worker] leaving transform wf=${wfName} passthrough (source not array)`);
       // Pass through non-array data unchanged
       return {
         metadata: { ...data.metadata },
@@ -222,6 +227,7 @@ export function buildTransformCallback(activity: ActivityManifestEntry) {
 
     // Return reshaped data alongside any other input fields (session handles, etc.)
     const result: Record<string, unknown> = { ...input, [spec.targetField]: reshaped };
+    loggerRegistry.debug(`[yaml-workflow:worker] leaving transform wf=${wfName} reshapedCount=${reshaped.length} resultKeys=[${Object.keys(result).join(',')}]`);
     return {
       metadata: { ...data.metadata },
       data: result,

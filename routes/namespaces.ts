@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import * as namespaceService from '../services/namespace';
+import * as api from '../api/namespaces';
 
 const router = Router();
 
@@ -9,12 +9,8 @@ const router = Router();
  * List all registered MCP YAML namespaces.
  */
 router.get('/', async (_req, res) => {
-  try {
-    const namespaces = await namespaceService.listNamespaces();
-    res.json({ namespaces });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.listNamespaces();
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -23,17 +19,12 @@ router.get('/', async (_req, res) => {
  * Body: { name: string, description?: string, metadata?: object }
  */
 router.post('/', async (req, res) => {
-  try {
-    const { name, description, metadata } = req.body || {};
-    if (!name || typeof name !== 'string') {
-      res.status(400).json({ error: 'name is required' });
-      return;
-    }
-    const namespace = await namespaceService.registerNamespace(name, description, metadata);
-    res.json(namespace);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.registerNamespace({
+    name: req.body?.name,
+    description: req.body?.description,
+    metadata: req.body?.metadata,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
+import * as api from '../api/dba';
 import { requireAdmin } from '../modules/auth';
-import * as dbaService from '../services/dba';
 
 const router = Router();
 
@@ -21,25 +21,20 @@ const router = Router();
  * Returns: { jobs, streams, attributes, transient, marked }
  */
 router.post('/prune', requireAdmin, async (req, res) => {
-  try {
-    const result = await dbaService.prune({
-      expire: req.body.expire,
-      jobs: req.body.jobs,
-      streams: req.body.streams,
-      engineStreams: req.body.engineStreams,
-      engineStreamsExpire: req.body.engineStreamsExpire,
-      workerStreams: req.body.workerStreams,
-      workerStreamsExpire: req.body.workerStreamsExpire,
-      attributes: req.body.attributes,
-      entities: req.body.entities,
-      pruneTransient: req.body.pruneTransient,
-      keepHmark: req.body.keepHmark,
-    });
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.prune({
+    expire: req.body.expire,
+    jobs: req.body.jobs,
+    streams: req.body.streams,
+    engineStreams: req.body.engineStreams,
+    engineStreamsExpire: req.body.engineStreamsExpire,
+    workerStreams: req.body.workerStreams,
+    workerStreamsExpire: req.body.workerStreamsExpire,
+    attributes: req.body.attributes,
+    entities: req.body.entities,
+    pruneTransient: req.body.pruneTransient,
+    keepHmark: req.body.keepHmark,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -47,13 +42,9 @@ router.post('/prune', requireAdmin, async (req, res) => {
  * Deploy the server-side prune function and run migrations.
  * Idempotent — safe to call on startup or from CI/CD.
  */
-router.post('/deploy', requireAdmin, async (req, res) => {
-  try {
-    await dbaService.deploy();
-    res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+router.post('/deploy', requireAdmin, async (_req, res) => {
+  const result = await api.deploy();
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;

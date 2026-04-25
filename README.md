@@ -177,34 +177,74 @@ const lt = await start({
 });
 ```
 
-## Deployment
+## Use as a Package (No HTTP Server)
 
-Two container types from the same codebase:
+Long Tail can run as an embedded package inside your existing application — no Express server, no socket.io, no extra ports. The same API surface is available as direct function calls.
 
 ```typescript
-// api.ts — dashboard + REST API
-await start({ database: { connectionString: process.env.DATABASE_URL } });
+import { start, createClient } from '@hotmeshio/long-tail';
 
-// worker.ts — workflow execution, no HTTP server
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   server: { enabled: false },
   workers: [{ taskQueue: 'default', workflow: reviewContent.reviewContent }],
 });
+
+const lt = createClient({ auth: { userId: 'system' } });
+
+// Same operations as the REST API — no HTTP overhead
+const tasks = await lt.tasks.list({ status: 'completed', limit: 10 });
+const result = await lt.escalations.claim({ id: 'esc_123', durationMinutes: 30 });
 ```
 
-Both share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud.md).
+Subscribe to events with callbacks instead of socket.io:
+
+```typescript
+lt.events.on('task.completed', (event) => {
+  console.log('done:', event.workflowId);
+});
+
+lt.events.on('escalation.*', (event) => {
+  notifyTeam(event);
+});
+```
+
+Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. The transport is the only thing that changes. See the [SDK guide](docs/sdk.md) for the full API reference.
+
+## Deployment
+
+Three modes from the same codebase:
+
+```typescript
+// 1. Standalone — dashboard + REST API + workers
+await start({ database: { connectionString: process.env.DATABASE_URL } });
+
+// 2. Worker-only — workflow execution, no HTTP server
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  server: { enabled: false },
+  workers: [{ taskQueue: 'default', workflow: reviewContent.reviewContent }],
+});
+
+// 3. Embedded — inside your NestJS/Next.js/Express app, SDK calls only
+await start({ database: { connectionString: process.env.DATABASE_URL }, server: { enabled: false } });
+const lt = createClient({ auth: { userId: 'service' } });
+```
+
+All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud.md).
 
 ## Docs
 
 | Guide | What it covers |
 |-------|---------------|
+| [The Long Tail Story](docs/story.md) | Why this exists, what accumulates over time, what you own |
 | [Workflows](docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
 | [IAM](docs/iam.md) | Identity propagation, service accounts, credential exchange |
 | [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
 | [MCP](docs/mcp.md) | Server registration, tool calls, human queue |
 | [Compilation](docs/compilation.md) | Dynamic → deterministic pipeline wizard |
 | [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
+| [SDK](docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
 | [Architecture](docs/architecture.md) | Project structure, conventions, discovery |
 | [Cloud](docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |
 | [Data Model](docs/data.md) | Database schema |

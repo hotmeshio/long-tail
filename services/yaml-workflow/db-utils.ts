@@ -51,6 +51,7 @@ export async function listYamlWorkflows(filters: {
   tags?: string[];
   search?: string;
   source_workflow_id?: string;
+  set_id?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ workflows: LTYamlWorkflowRecord[]; total: number }> {
@@ -88,6 +89,11 @@ export async function listYamlWorkflows(filters: {
   if (filters.source_workflow_id) {
     conditions.push(`source_workflow_id = $${idx++}`);
     values.push(filters.source_workflow_id);
+  }
+
+  if (filters.set_id) {
+    conditions.push(`set_id = $${idx++}`);
+    values.push(filters.set_id);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';

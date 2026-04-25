@@ -17,7 +17,7 @@ if (_testDb !== 'longtail_test') {
 
 export const postgres_options = {
   host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+  port: parseInt(process.env.POSTGRES_PORT || '5415', 10),
   user: process.env.POSTGRES_USER || 'postgres',
   password: process.env.POSTGRES_PASSWORD || 'password',
   database: 'longtail_test',

@@ -111,7 +111,7 @@ export function McpServersPage() {
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Registered MCP servers and their available tools. Each server exposes tools that can be used by the Pipeline Designer.
+        Registered MCP servers and their available tools. Each server exposes tools that can be used by the MCP Tool Designer.
       </p>
 
       <FilterBar>

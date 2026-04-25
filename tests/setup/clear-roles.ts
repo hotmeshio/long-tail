@@ -13,7 +13,7 @@ const SCHEMA = 'durable';
 beforeAll(async () => {
   const client = new Client({
     host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+    port: parseInt(process.env.POSTGRES_PORT || '5415', 10),
     user: process.env.POSTGRES_USER || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'password',
     database: 'longtail_test',

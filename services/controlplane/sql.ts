@@ -2,13 +2,12 @@
 
 /**
  * List all HotMesh applications from the global registry.
- * Keys follow the pattern `hmsh:a:{appId}`. Non-expired only.
+ * Active apps only.
  */
 export const LIST_APPS = `
-  SELECT DISTINCT key FROM hotmesh_applications
-  WHERE key LIKE 'hmsh:a:%'
-    AND (expiry IS NULL OR expiry > NOW())
-  ORDER BY key`;
+  SELECT app_id, version FROM hmsh_applications
+  WHERE active = TRUE
+  ORDER BY app_id`;
 
 // ─── Stream statistics ──────────────────────────────────────────────────────
 //

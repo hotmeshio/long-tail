@@ -29,6 +29,7 @@ export async function callServerTool(
   args: Record<string, any>,
   authContext?: { userId?: string; delegationToken?: string },
 ): Promise<any> {
+  loggerRegistry.debug(`[lt-mcp:call] entering ${serverId}/${toolName} argKeys=[${Object.keys(args).join(',')}]`);
   const client = await resolveClient(serverId);
   if (!client) {
     throw new Error(`MCP server ${serverId} is not connected`);
@@ -57,12 +58,23 @@ export async function callServerTool(
     const textContent = result.content.find((c: any) => c.type === 'text');
     if (textContent && 'text' in textContent) {
       try {
-        return JSON.parse(textContent.text);
+        const parsed = JSON.parse(textContent.text);
+        const isError = result.isError || ('error' in parsed);
+        loggerRegistry.debug(`[lt-mcp:call] leaving ${serverId}/${toolName} ok=${!isError} resultKeys=[${Object.keys(parsed).join(',')}]`);
+        return parsed;
       } catch {
+        // Non-JSON text — wrap as error object when isError flag is set
+        // to prevent raw strings from being spread as character indices downstream.
+        if (result.isError) {
+          loggerRegistry.warn(`[lt-mcp:call] leaving ${serverId}/${toolName} error: ${textContent.text.slice(0, 200)}`);
+          return { error: textContent.text };
+        }
+        loggerRegistry.debug(`[lt-mcp:call] leaving ${serverId}/${toolName} raw text (${textContent.text.length} chars)`);
         return textContent.text;
       }
     }
   }
+  loggerRegistry.debug(`[lt-mcp:call] leaving ${serverId}/${toolName} non-text content (${Array.isArray(result.content) ? result.content.length : 0} blocks)`);
   return result.content;
 }
 

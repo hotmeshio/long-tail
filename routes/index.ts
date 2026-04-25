@@ -22,6 +22,7 @@ import filesRouter from './files';
 import controlplaneRouter from './controlplane';
 import botAccountsRouter from './bot-accounts';
 import docsRouter from './docs';
+import workflowSetsRouter from './workflow-sets';
 
 const router = Router();
 
@@ -51,5 +52,6 @@ router.use('/namespaces', namespacesRouter);
 router.use('/controlplane', controlplaneRouter);
 router.use('/bot-accounts', botAccountsRouter);
 router.use('/docs', docsRouter);
+router.use('/workflow-sets', workflowSetsRouter);
 
 export default router;

@@ -59,7 +59,7 @@ function ToolRow({ wf, onTry, onWizard, onCron }: {
           <button
             onClick={(e) => { e.stopPropagation(); onWizard(); }}
             className="opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent"
-            title="Compilation Wizard"
+            title="MCP Tool Compiler"
           >
             <Wand2 className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
@@ -238,7 +238,7 @@ export function YamlWorkflowsPage() {
       <div className="flex gap-0">
         <div className={`${sidebarWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
           {filteredServers.length === 0 ? (
-            <EmptyState title="No pipelines yet" description="Use the Pipeline Designer to create your first MCP pipeline." />
+            <EmptyState title="No pipelines yet" description="Use the MCP Tool Designer to create your first MCP tool." />
           ) : (
             <table className="w-full">
               <thead>

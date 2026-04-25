@@ -20,8 +20,11 @@ COPY . .
 
 FROM base AS development
 ENV NODE_ENV=development
-# Build dashboard for dev serving
-RUN cd dashboard && npm ci && npm run build
+# Entrypoint builds the dashboard on first run if the host volume
+# mount overwrites the image's copy (i.e. fresh clone, no dist/).
+COPY docker/dev-entrypoint.sh /usr/local/bin/dev-entrypoint.sh
+RUN chmod +x /usr/local/bin/dev-entrypoint.sh
+ENTRYPOINT ["dev-entrypoint.sh"]
 # ts-node-dev watches for changes and restarts automatically
 CMD ["npx", "ts-node-dev", "--respawn", "--poll", "index.ts"]
 

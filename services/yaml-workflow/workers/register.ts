@@ -107,12 +107,15 @@ export async function registerWorkersForWorkflow(
         connection: getConnection(),
         retry: defaultRetry,
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
+          const wfName = (data.data as any)?.workflowName || activity.workflow_name || toolName;
+          loggerRegistry.debug(`[yaml-workflow:worker] entering db/${toolName} wf=${wfName} argKeys=[${Object.keys(data.data || {}).join(',')}]`);
           const args = (data.data || {}) as Record<string, unknown>;
           let mergedArgs = toolArgs ? { ...toolArgs, ...args } : args;
           delete mergedArgs._scope;
           delete mergedArgs.workflowName;
           mergedArgs = await exchangeTokensInArgs(mergedArgs);
           const result = await mcpClient.callServerTool(dbServerId, toolName, mergedArgs);
+          loggerRegistry.debug(`[yaml-workflow:worker] leaving db/${toolName} wf=${wfName} resultKeys=[${Object.keys(result || {}).join(',')}]`);
           return { metadata: { ...data.metadata }, data: result };
         }),
       });
@@ -139,6 +142,8 @@ export async function registerWorkersForWorkflow(
         connection: getConnection(),
         retry: defaultRetry,
         callback: wrap(async (data: StreamData): Promise<StreamDataResponse> => {
+          const wfName = (data.data as any)?.workflowName || activity.workflow_name || toolName;
+          loggerRegistry.debug(`[yaml-workflow:worker] entering mcp/${toolName} wf=${wfName} server=${serverId} argKeys=[${Object.keys(data.data || {}).join(',')}]`);
           const args = (data.data || {}) as Record<string, unknown>;
           // Start from stored defaults, then strip any wired keys that
           // didn't arrive (upstream failure) so stale defaults don't leak.
@@ -152,6 +157,7 @@ export async function registerWorkersForWorkflow(
               mergedArgs[key] = value;
             }
           }
+          loggerRegistry.debug(`[yaml-workflow:worker] merged mcp/${toolName} wf=${wfName} mergedKeys=[${Object.keys(mergedArgs).join(',')}]`);
           // For escalate_and_wait: inject YAML signal routing so the MCP tool
           // stores engine:'yaml' + hookTopic + jobId in the escalation metadata
           if (yamlHookTopic) {
@@ -174,6 +180,7 @@ export async function registerWorkersForWorkflow(
           if (result == null) {
             loggerRegistry.warn(`[yaml-workflow:worker] ${toolName} returned null/undefined`);
           }
+          loggerRegistry.debug(`[yaml-workflow:worker] leaving mcp/${toolName} wf=${wfName} resultKeys=[${Object.keys(result || {}).join(',')}]`);
           return { metadata: { ...data.metadata }, data: result };
         }),
       });

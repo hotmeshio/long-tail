@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers, Wand2, Settings } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers, Wand2, Settings, GitBranch } from 'lucide-react';
 
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -90,6 +90,32 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[]
         const s = mapStatus(row);
         const isComplete = s === 'completed';
         const isBuilder = row.entity === 'mcpWorkflowBuilder';
+        const isPlanner = row.entity === 'mcpWorkflowPlanner';
+
+        if (isPlanner) {
+          const planUrl = row.set_id
+            ? `/mcp/queries/${row.workflow_id}?mode=plan&set_id=${row.set_id}`
+            : `/mcp/queries/${row.workflow_id}?mode=plan`;
+          return (
+            <RowActionGroup>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`${planUrl}&step=1`); }}
+                className="opacity-0 group-hover/row:opacity-100 text-text-tertiary hover:text-accent transition-all"
+                title="Plan"
+              >
+                <GitBranch className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`${planUrl}&step=2`); }}
+                className={`opacity-0 group-hover/row:opacity-100 transition-all ${isComplete ? 'text-text-tertiary hover:text-status-success' : 'text-text-tertiary/30 cursor-not-allowed'}`}
+                title={isComplete ? 'Build' : 'Planning...'}
+                disabled={!isComplete}
+              >
+                <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            </RowActionGroup>
+          );
+        }
 
         if (isBuilder) {
           return (
@@ -169,14 +195,14 @@ export function McpQueryPage() {
   return (
     <>
       <PageHeader
-        title="Pipeline Designer"
+        title="MCP Tool Designer"
         actions={
           <button
             onClick={() => navigate('/mcp/queries/new')}
             className="btn-primary text-xs inline-flex items-center gap-1.5"
           >
             <Wand2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-            Design New Pipeline
+            Create New MCP Tool
           </button>
         }
       />
@@ -184,7 +210,7 @@ export function McpQueryPage() {
       <FilterBar actions={
         <ListToolbar
           onRefresh={() => refetch()}
-          apiPath={`/workflow-states/jobs?entity=${filters.type || 'mcpQuery,mcpTriage,mcpWorkflowBuilder'}&limit=${pagination.pageSize}&offset=${pagination.offset}&sort_by=created_at&order=desc${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+          apiPath={`/workflow-states/jobs?entity=${filters.type || 'mcpQuery,mcpTriage,mcpWorkflowBuilder,mcpWorkflowPlanner'}&limit=${pagination.pageSize}&offset=${pagination.offset}&sort_by=created_at&order=desc${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
         />
       }>
           <FilterSelect
@@ -194,6 +220,7 @@ export function McpQueryPage() {
             options={[
               { value: 'mcpQuery', label: 'Discovery' },
               { value: 'mcpWorkflowBuilder', label: 'Direct Build' },
+              { value: 'mcpWorkflowPlanner', label: 'Plan Build' },
               { value: 'mcpTriage', label: 'Triage' },
             ]}
           />
@@ -213,11 +240,18 @@ export function McpQueryPage() {
         columns={columns}
         data={jobs}
         keyFn={(row) => row.workflow_id}
-        onRowClick={(row) => navigate(
-          row.entity === 'mcpWorkflowBuilder'
-            ? `/mcp/queries/${row.workflow_id}?mode=builder`
-            : `/mcp/queries/${row.workflow_id}`
-        )}
+        onRowClick={(row) => {
+          if (row.entity === 'mcpWorkflowPlanner') {
+            const url = row.set_id
+              ? `/mcp/queries/${row.workflow_id}?mode=plan&set_id=${row.set_id}`
+              : `/mcp/queries/${row.workflow_id}?mode=plan`;
+            navigate(url);
+          } else if (row.entity === 'mcpWorkflowBuilder') {
+            navigate(`/mcp/queries/${row.workflow_id}?mode=builder`);
+          } else {
+            navigate(`/mcp/queries/${row.workflow_id}`);
+          }
+        }}
         isLoading={isLoading}
         emptyMessage=""
         sort={sort}
@@ -225,7 +259,7 @@ export function McpQueryPage() {
       />
 
       {!isLoading && jobs.length === 0 && (
-        <EmptyState title="No pipeline runs yet" description="Click &quot;Design Pipeline&quot; to start" />
+        <EmptyState title="No tool designs yet" description="Click &quot;Create New MCP Tool&quot; to start" />
       )}
 
       <StickyPagination
