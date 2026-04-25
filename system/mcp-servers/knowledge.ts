@@ -7,7 +7,7 @@ import * as knowledge from '../activities/knowledge';
 const storeSchema = z.object({
   domain: z.string().describe('Knowledge domain (namespace)'),
   key: z.string().describe('Unique key within domain'),
-  data: z.record(z.any()).describe('JSONB payload to store'),
+  data: z.record(z.any()).describe('JSONB object payload to store (must be an object, not a string — wrap text as { "description": "..." })'),
   tags: z.array(z.string()).optional().describe('Categorization tags'),
 });
 

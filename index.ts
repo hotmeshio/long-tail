@@ -44,6 +44,10 @@ export { getToolContext } from './services/iam/context';
 export { registerMcpTool } from './services/mcp/register-tool';
 export { getSystemWorkers, builtinMcpServerFactories } from './system';
 export { seedSystemMcpServers } from './system/seed';
+export { CallbackEventAdapter } from './lib/events/callback';
+export { createClient } from './sdk';
+export type { LTClient, LTClientOptions } from './sdk';
+export * as api from './api';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 

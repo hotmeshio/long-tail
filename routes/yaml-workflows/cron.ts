@@ -1,9 +1,6 @@
 import { Router } from 'express';
 
-import * as yamlDb from '../../services/yaml-workflow/db';
-import { cronRegistry } from '../../services/cron';
-
-import { isNotFoundError } from './helpers';
+import * as api from '../../api/yaml-workflows';
 
 const router = Router();
 
@@ -12,38 +9,13 @@ const router = Router();
  * Set or update cron schedule + envelope + execute_as.
  */
 router.put('/:id/cron', async (req, res) => {
-  try {
-    const wf = await yamlDb.getYamlWorkflow(req.params.id);
-    if (!wf) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-
-    const { cron_schedule, cron_envelope, execute_as } = req.body;
-    if (!cron_schedule || typeof cron_schedule !== 'string') {
-      res.status(400).json({ error: 'cron_schedule is required' });
-      return;
-    }
-
-    const updated = await yamlDb.updateCronSchedule(
-      wf.id,
-      cron_schedule.trim(),
-      cron_envelope ?? null,
-      execute_as ?? null,
-    );
-
-    if (updated) {
-      await cronRegistry.restartYamlCron(updated);
-    }
-
-    res.json(updated);
-  } catch (err: any) {
-    if (isNotFoundError(err)) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.setCronSchedule({
+    id: req.params.id,
+    cron_schedule: req.body.cron_schedule,
+    cron_envelope: req.body.cron_envelope,
+    execute_as: req.body.execute_as,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -51,24 +23,8 @@ router.put('/:id/cron', async (req, res) => {
  * Clear cron schedule.
  */
 router.delete('/:id/cron', async (req, res) => {
-  try {
-    const wf = await yamlDb.getYamlWorkflow(req.params.id);
-    if (!wf) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-
-    await cronRegistry.stopYamlCron(wf.id);
-    const updated = await yamlDb.clearCronSchedule(wf.id);
-
-    res.json(updated);
-  } catch (err: any) {
-    if (isNotFoundError(err)) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.clearCronSchedule({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -76,24 +32,8 @@ router.delete('/:id/cron', async (req, res) => {
  * List all YAML workflows with active cron schedules.
  */
 router.get('/cron/status', async (_req, res) => {
-  try {
-    const workflows = await yamlDb.getCronScheduledWorkflows();
-    const activeTypes = cronRegistry.activeWorkflowTypes;
-
-    const schedules = workflows.map((wf) => ({
-      id: wf.id,
-      name: wf.name,
-      graph_topic: wf.graph_topic,
-      app_id: wf.app_id,
-      cron_schedule: wf.cron_schedule,
-      execute_as: wf.execute_as,
-      active: activeTypes.includes(`yaml:${wf.id}`),
-    }));
-
-    res.json({ schedules });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.getCronStatus();
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;

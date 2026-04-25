@@ -129,3 +129,8 @@ export type {
   LTDecryptedToken,
   LTOAuthTokenRecord,
 } from './oauth';
+
+export type {
+  LTApiResult,
+  LTApiAuth,
+} from './sdk';

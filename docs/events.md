@@ -133,6 +133,34 @@ await eventRegistry.connect();
 
 On disconnect, the adapter calls `drain()` on the NATS connection, ensuring in-flight publishes complete before closing.
 
+## Callback Adapter
+
+`CallbackEventAdapter` delivers events via registered callbacks. Use it when Long Tail runs as an embedded package and you want event subscriptions without socket.io or NATS.
+
+```typescript
+import { eventRegistry, CallbackEventAdapter } from '@hotmeshio/long-tail';
+
+const adapter = new CallbackEventAdapter();
+eventRegistry.register(adapter);
+await adapter.connect();
+
+// Exact match
+const unsub = adapter.on('escalation.claimed', (event) => {
+  console.log('claimed:', event.escalationId);
+});
+
+// Category wildcard — matches all task.* events
+adapter.on('task.*', (event) => { ... });
+
+// Global wildcard
+adapter.on('*', (event) => { ... });
+
+// Unsubscribe
+unsub();
+```
+
+The adapter is registered automatically by `start()`. If you use `createClient()`, the SDK exposes it as `lt.events.on()` — see the [SDK guide](sdk.md) for details.
+
 ## In-Memory Adapter
 
 `InMemoryEventAdapter` captures events in an array. It exists for testing.

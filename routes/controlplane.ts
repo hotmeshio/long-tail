@@ -1,9 +1,7 @@
 import { Router } from 'express';
 
 import { requireAdmin } from '../modules/auth';
-import * as controlplane from '../services/controlplane';
-import { eventRegistry } from '../lib/events';
-import type { LTEvent } from '../types';
+import * as api from '../api/controlplane';
 
 const router = Router();
 
@@ -13,12 +11,8 @@ const router = Router();
  * Admin-only.
  */
 router.get('/apps', requireAdmin, async (_req, res) => {
-  try {
-    const apps = await controlplane.listApps();
-    res.json({ apps });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.listApps();
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -27,15 +21,11 @@ router.get('/apps', requireAdmin, async (_req, res) => {
  * Admin-only.
  */
 router.get('/rollcall', requireAdmin, async (req, res) => {
-  try {
-    const appId = (req.query.app_id as string) || 'durable';
-    const delay = req.query.delay ? parseInt(req.query.delay as string, 10) : undefined;
-
-    const profiles = await controlplane.rollCall(appId, delay);
-    res.json({ profiles });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.rollCall({
+    appId: (req.query.app_id as string) || 'durable',
+    delay: req.query.delay ? parseInt(req.query.delay as string, 10) : undefined,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -47,33 +37,9 @@ router.get('/rollcall', requireAdmin, async (req, res) => {
  *   throttle: ms delay (-1 = pause, 0 = resume, >0 = delay per msg)
  */
 router.post('/throttle', requireAdmin, async (req, res) => {
-  try {
-    const { appId = 'durable', throttle, topic, guid } = req.body;
-
-    if (typeof throttle !== 'number') {
-      res.status(400).json({ error: 'throttle (number) is required' });
-      return;
-    }
-
-    const result = await controlplane.applyThrottle(appId, { throttle, topic, guid });
-
-    // Publish a synthetic event so the dashboard event stream sees it
-    // (throttle commands don't echo back through the quorum subscription)
-    const throttleEvent: LTEvent = {
-      type: 'mesh.throttle' as any,
-      source: 'controlplane',
-      workflowId: guid || '',
-      workflowName: '',
-      taskQueue: appId,
-      data: { throttle, topic, guid, appId },
-      timestamp: new Date().toISOString(),
-    };
-    eventRegistry.publish(throttleEvent).catch(() => {});
-
-    res.json({ success: result });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const { appId = 'durable', throttle, topic, guid } = req.body;
+  const result = await api.applyThrottle({ appId, throttle, topic, guid });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -85,15 +51,12 @@ router.post('/throttle', requireAdmin, async (req, res) => {
  * stream: optional stream_name filter (specific task queue topic)
  */
 router.get('/streams', requireAdmin, async (req, res) => {
-  try {
-    const schema = (req.query.app_id as string) || 'durable';
-    const duration = (req.query.duration as string) || '1h';
-    const stream = (req.query.stream as string) || undefined;
-    const stats = await controlplane.getStreamStats(schema, duration, stream);
-    res.json(stats);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.getStreamStats({
+    app_id: (req.query.app_id as string) || 'durable',
+    duration: (req.query.duration as string) || '1h',
+    stream: (req.query.stream as string) || undefined,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -106,13 +69,9 @@ router.get('/streams', requireAdmin, async (req, res) => {
  * Body: { appId: string }
  */
 router.post('/subscribe', requireAdmin, async (req, res) => {
-  try {
-    const { appId = 'durable' } = req.body;
-    await controlplane.subscribeMesh(appId);
-    res.json({ subscribed: true, appId });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const { appId = 'durable' } = req.body;
+  const result = await api.subscribeMesh({ appId });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;
