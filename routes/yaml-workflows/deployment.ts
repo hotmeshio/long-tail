@@ -1,11 +1,6 @@
 import { Router } from 'express';
 
-import * as yamlDb from '../../services/yaml-workflow/db';
-import * as yamlDeployer from '../../services/yaml-workflow/deployer';
-import * as yamlWorkers from '../../services/yaml-workflow/workers';
-import { invokeYamlWorkflow } from '../../services/yaml-workflow/invoke';
-
-import { isNotFoundError } from './helpers';
+import * as api from '../../api/yaml-workflows';
 
 const router = Router();
 
@@ -15,46 +10,8 @@ const router = Router();
  * Bumps the version and deploys all graphs together.
  */
 router.post('/:id/deploy', async (req, res) => {
-  try {
-    const wf = await yamlDb.getYamlWorkflow(req.params.id);
-    if (!wf) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-
-    // Use the version declared in the YAML (like package.json)
-    const deployVersion = wf.app_version || '1';
-
-    // Deploy + activate merged YAML for the full app_id
-    const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
-    await yamlDeployer.deployAppId(wf.app_id, deployVersion);
-
-    // Register workers and mark all non-archived siblings as active
-    for (const sibling of siblings) {
-      await yamlDb.updateYamlWorkflowVersion(sibling.id, deployVersion);
-      await yamlWorkers.registerWorkersForWorkflow(sibling);
-      if (sibling.status === 'draft' || sibling.status === 'deployed') {
-        await yamlDb.updateYamlWorkflowStatus(sibling.id, 'active');
-      }
-    }
-
-    // Mark content as deployed for the entire app_id
-    await yamlDb.markAppIdContentDeployed(wf.app_id);
-
-    const updated = await yamlDb.getYamlWorkflow(req.params.id);
-    res.json(updated);
-  } catch (err: any) {
-    if (isNotFoundError(err)) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    res.status(500).json({
-      error: err.message,
-      hint: err.message.includes('Duplicate activity id')
-        ? 'Colliding activity IDs across workflows. A Claude Code repair was attempted — check server logs. You may need to archive conflicting workflows and recompile.'
-        : undefined,
-    });
-  }
+  const result = await api.deployYamlWorkflow({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -62,37 +19,8 @@ router.post('/:id/deploy', async (req, res) => {
  * Activate the deployed version for this workflow's app_id and register all workers.
  */
 router.post('/:id/activate', async (req, res) => {
-  try {
-    const wf = await yamlDb.getYamlWorkflow(req.params.id);
-    if (!wf) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    if (wf.status !== 'deployed' && wf.status !== 'active') {
-      res.status(400).json({ error: 'Workflow must be deployed before activation' });
-      return;
-    }
-
-    await yamlDeployer.activateYamlWorkflow(wf.app_id, wf.app_version);
-
-    // Register workers for ALL workflows sharing this app_id
-    const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
-    for (const sibling of siblings) {
-      await yamlWorkers.registerWorkersForWorkflow(sibling);
-      if (sibling.status === 'deployed') {
-        await yamlDb.updateYamlWorkflowStatus(sibling.id, 'active');
-      }
-    }
-
-    const updated = await yamlDb.getYamlWorkflow(req.params.id);
-    res.json(updated);
-  } catch (err: any) {
-    if (isNotFoundError(err)) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.activateYamlWorkflow({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -101,32 +29,17 @@ router.post('/:id/activate', async (req, res) => {
  * Body: { data, sync?: boolean }
  */
 router.post('/:id/invoke', async (req, res) => {
-  try {
-    const wf = await yamlDb.getYamlWorkflow(req.params.id);
-    if (!wf) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    if (wf.status !== 'active') {
-      res.status(400).json({ error: 'Workflow must be active to invoke' });
-      return;
-    }
-
-    const result = await invokeYamlWorkflow(wf, {
+  const result = await api.invokeYamlWorkflow(
+    {
+      id: req.params.id,
       data: req.body.data,
       sync: req.body.sync,
       timeout: req.body.timeout,
       execute_as: req.body.execute_as,
-      userId: req.auth?.userId,
-    });
-    res.json(result);
-  } catch (err: any) {
-    if (isNotFoundError(err)) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    res.status(500).json({ error: err.message });
-  }
+    },
+    req.auth?.userId ? { userId: req.auth.userId } : undefined,
+  );
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
@@ -134,24 +47,8 @@ router.post('/:id/invoke', async (req, res) => {
  * Archive a YAML workflow (stops accepting new invocations).
  */
 router.post('/:id/archive', async (req, res) => {
-  try {
-    const wf = await yamlDb.getYamlWorkflow(req.params.id);
-    if (!wf) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    if (wf.status === 'active') {
-      await yamlDeployer.stopEngine(wf.app_id);
-    }
-    const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'archived');
-    res.json(updated);
-  } catch (err: any) {
-    if (isNotFoundError(err)) {
-      res.status(404).json({ error: 'YAML workflow not found' });
-      return;
-    }
-    res.status(500).json({ error: err.message });
-  }
+  const result = await api.archiveYamlWorkflow({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;

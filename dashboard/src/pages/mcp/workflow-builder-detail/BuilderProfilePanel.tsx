@@ -17,7 +17,7 @@ interface BuilderProfilePanelProps {
 
 export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPrompt, onBack, onCreate, onNext }: BuilderProfilePanelProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState((builderData?.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const [name, setName] = useState((builderData?.name || '').toLowerCase().replace(/[^a-z0-9._-]/g, ''));
   const [description, setDescription] = useState(builderData?.description || '');
   const [appId, setAppId] = useState('longtail');
   const [tags, setTags] = useState<string[]>(builderData?.tags || []);
@@ -92,7 +92,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             {editable ? (
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               />
             ) : (

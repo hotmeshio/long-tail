@@ -5,6 +5,7 @@ import { HoneycombTelemetryAdapter } from '../lib/telemetry/honeycomb';
 import { eventRegistry } from '../lib/events';
 import { NatsEventAdapter } from '../lib/events/nats';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
+import { CallbackEventAdapter } from '../lib/events/callback';
 import { maintenanceRegistry } from '../services/maintenance';
 import { defaultMaintenanceConfig } from '../modules/maintenance';
 import { mcpRegistry } from '../services/mcp';
@@ -46,6 +47,10 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     }
     eventRegistry.register(new SocketIOEventAdapter());
   }
+
+  // Always register the callback adapter for SDK event subscriptions.
+  // Zero-cost when no listeners are registered.
+  eventRegistry.register(new CallbackEventAdapter());
 
   // Maintenance
   if (startConfig.maintenance === false) {

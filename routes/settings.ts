@@ -1,9 +1,6 @@
 import { Router } from 'express';
-import { telemetryRegistry } from '../lib/telemetry';
-import { eventRegistry } from '../lib/events';
-import { NatsEventAdapter } from '../lib/events/nats';
-import { SocketIOEventAdapter } from '../lib/events/socketio';
-import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
+
+import * as api from '../api/settings';
 
 const router = Router();
 
@@ -11,28 +8,9 @@ const router = Router();
  * GET /api/settings
  * Returns frontend-relevant configuration (no secrets).
  */
-router.get('/', (_req, res) => {
-  const hasSocketIO = !!eventRegistry.getAdapter(SocketIOEventAdapter);
-  const hasNats = !!eventRegistry.getAdapter(NatsEventAdapter);
-
-  // Prefer socket.io (same-origin, no extra infrastructure)
-  // Fall back to NATS when socket.io is unavailable
-  const transport = hasSocketIO ? 'socketio' : hasNats ? 'nats' : 'none';
-
-  res.json({
-    telemetry: {
-      traceUrl: telemetryRegistry.traceUrl ?? null,
-    },
-    escalation: {
-      claimDurations: CLAIM_DURATION_OPTIONS,
-    },
-    events: {
-      transport,
-      natsWsUrl: hasNats
-        ? (process.env.VITE_NATS_WS_URL || process.env.NATS_WS_URL || null)
-        : null,
-    },
-  });
+router.get('/', async (_req, res) => {
+  const result = await api.getSettings();
+  res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 export default router;

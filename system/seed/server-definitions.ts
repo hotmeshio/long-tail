@@ -188,7 +188,8 @@ export const SEED_MCP_SERVERS = [
     metadata: { builtin: true, category: 'knowledge' },
     tags: ['knowledge', 'memory', 'state', 'storage'],
     compile_hints:
-      'store_knowledge arguments: domain (string), key (string), data (the content to store — NOT "content"), data_key (optional sub-key). ' +
+      'store_knowledge arguments: domain (string), key (string), data (object — MUST be a JSON object, never a string), tags (optional string[]). ' +
+      'The data field is a JSONB object. When storing text content, wrap it: { "description": "the text" }. NEVER pass a bare string as data. ' +
       'store_knowledge upserts by domain+key — it merges data if the entry exists. ' +
       'Use a consistent domain name across related workflows to build shared context. ' +
       'search_knowledge uses JSONB containment (@>) — the query object must be a subset of the stored data. ' +

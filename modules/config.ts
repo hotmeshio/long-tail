@@ -1,6 +1,6 @@
 export const config = {
   POSTGRES_HOST: process.env.POSTGRES_HOST || 'localhost',
-  POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+  POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5415', 10),
   POSTGRES_USER: process.env.POSTGRES_USER || 'postgres',
   POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || 'password',
   // In test environments, always use the test database to prevent accidental
