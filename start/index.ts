@@ -23,6 +23,7 @@ import type { LTStartConfig, LTInstance } from '../types/startup';
  * worker startup, and the embedded API server. Returns a client
  * for starting workflows and a shutdown function.
  *
+ * @example Standard worker
  * ```typescript
  * import { start } from '@hotmeshio/long-tail';
  * import * as myWorkflow from './workflows/my-workflow';
@@ -33,6 +34,29 @@ import type { LTStartConfig, LTInstance } from '../types/startup';
  *     { taskQueue: 'my-queue', workflow: myWorkflow.myWorkflow },
  *   ],
  * });
+ * ```
+ *
+ * @example Dashboard for a remote system
+ *
+ * Point at another system's Postgres database and register its workflows
+ * by name with `readonly` connections. The dashboard discovers and displays
+ * them, and invocations are picked up by the real workers in the other system.
+ *
+ * ```typescript
+ * import { start } from '@hotmeshio/long-tail';
+ *
+ * const lt = await start({
+ *   database: { connectionString: 'postgres://shared-db:5432/other-system' },
+ *   workers: [
+ *     { taskQueue: 'ingest', workflow: 'orderPipeline', connection: { readonly: true } },
+ *     { taskQueue: 'ingest', workflow: 'invoiceReconciler', connection: { readonly: true } },
+ *     { taskQueue: 'billing', workflow: 'paymentProcessor', connection: { readonly: true } },
+ *   ],
+ *   server: { port: 4000 },
+ * });
+ *
+ * // Workflows appear in the dashboard UI — invoke, audit, and view executions
+ * // without competing for work. The real workers handle execution.
  * ```
  */
 export async function start(startConfig: LTStartConfig): Promise<LTInstance> {

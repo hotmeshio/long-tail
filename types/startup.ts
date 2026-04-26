@@ -26,10 +26,34 @@ export interface LTStartConfig {
     port?: number;
   };
 
-  /** Workflow workers to start. Each entry registers a worker on the given queue. */
+  /**
+   * Workflow workers to start. Each entry registers a worker on the given queue.
+   *
+   * Pass a function for normal workers. Pass a **string name** with
+   * `connection: { readonly: true }` for dashboard/observer mode — a no-op
+   * worker is created automatically so the workflow appears in discovery
+   * and can be invoked without competing for work.
+   *
+   * @example
+   * ```typescript
+   * workers: [
+   *   // Normal worker — runs the workflow
+   *   { taskQueue: 'my-queue', workflow: myWorkflow },
+   *   // Readonly observer — discovers and invokes without competing for work
+   *   { taskQueue: 'ingest', workflow: 'orderPipeline', connection: { readonly: true } },
+   * ]
+   * ```
+   */
   workers?: Array<{
     taskQueue: string;
-    workflow: (...args: any[]) => any;
+    /** Workflow function, or a string name when registering a readonly observer. */
+    workflow: ((...args: any[]) => any) | string;
+    /**
+     * Optional overrides merged onto the HotMesh connection/provider config.
+     * Common fields: `readonly` (observe without consuming work),
+     * `retry` (stream-level retry policy with backoff).
+     */
+    connection?: { readonly?: boolean; retry?: Record<string, unknown> };
   }>;
 
   /** Interceptor defaults applied when a workflow escalates. */

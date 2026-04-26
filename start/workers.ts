@@ -14,12 +14,29 @@ import { migrate } from '../lib/db/migrate';
 
 import type { LTStartConfig } from '../types/startup';
 
-type WorkerEntry = { taskQueue: string; workflow: (...args: any[]) => any };
+type WorkerEntry = {
+  taskQueue: string;
+  workflow: (...args: any[]) => any;
+  connection?: { readonly?: boolean; retry?: Record<string, unknown> };
+};
+
+/**
+ * Create a named no-op workflow function for readonly/observer workers.
+ * The function name is used by `registerWorker` for discovery.
+ */
+function createNoOpWorkflow(name: string): (...args: any[]) => any {
+  const container = {
+    [name](..._args: any[]) {
+      /* readonly no-op */
+    },
+  };
+  return container[name];
+}
 
 /**
  * Build the connection descriptor used by HotMesh / Durable.
  */
-export function buildConnection() {
+export function buildConnection(): { class: unknown; options: Record<string, unknown> } {
   return getConnection();
 }
 
@@ -31,9 +48,23 @@ export async function collectWorkers(startConfig: LTStartConfig): Promise<{
   builtinMcpServerFactories: Record<string, any>;
 }> {
   const { getSystemWorkers, builtinMcpServerFactories } = await import('../system');
+  // Normalize user workers: string workflows become named no-ops (readonly only)
+  const userWorkers: WorkerEntry[] = (startConfig.workers ?? []).map((w) => {
+    if (typeof w.workflow === 'string') {
+      if (!w.connection?.readonly) {
+        throw new Error(
+          `Worker "${w.workflow}" on queue "${w.taskQueue}": ` +
+            'string workflow names require connection.readonly = true',
+        );
+      }
+      return { ...w, workflow: createNoOpWorkflow(w.workflow) };
+    }
+    return w as WorkerEntry;
+  });
+
   const workers: WorkerEntry[] = [
     ...getSystemWorkers(),
-    ...(startConfig.workers ?? []),
+    ...userWorkers,
   ];
   loggerRegistry.info('[long-tail] system workflows loaded');
 
@@ -76,7 +107,7 @@ export async function startWorkers(
     for (const w of workers) {
       const label = `${w.taskQueue}::${w.workflow.name}`;
       const worker = await Durable.Worker.create({
-        connection,
+        connection: w.connection ? { ...connection, ...w.connection } : connection,
         taskQueue: w.taskQueue,
         workflow: w.workflow,
         guid: `${label}-${Durable.guid()}`,
