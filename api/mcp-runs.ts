@@ -2,6 +2,12 @@ import { sanitizeAppId, quoteSchema } from '../services/hotmesh-utils';
 import { buildExecution, listEntities as listEntitiesService, listJobs as listJobsService } from '../services/mcp-runs';
 import type { LTApiResult } from '../types/sdk';
 
+/**
+ * List distinct entity types for an app (HotMesh namespace).
+ *
+ * @param input.app_id — HotMesh app ID (e.g. `"durable"`)
+ * @returns `{ status: 200, data: { entities: string[] } }`
+ */
 export async function listEntities(input: {
   app_id: string;
 }): Promise<LTApiResult> {
@@ -19,6 +25,17 @@ export async function listEntities(input: {
   }
 }
 
+/**
+ * List jobs (workflow executions) for an app, with optional filters.
+ *
+ * @param input.app_id — HotMesh app ID
+ * @param input.limit — max results
+ * @param input.offset — pagination offset
+ * @param input.entity — filter by entity type
+ * @param input.search — full-text search
+ * @param input.status — filter by job status
+ * @returns `{ status: 200, data: { jobs, total } }`
+ */
 export async function listJobs(input: {
   app_id: string;
   limit?: number;
@@ -48,6 +65,16 @@ export async function listJobs(input: {
   }
 }
 
+/**
+ * Get the full execution history for a single job.
+ *
+ * Reconstructs the execution timeline from the HotMesh stream,
+ * including activity calls, signals, and state transitions.
+ *
+ * @param input.jobId — HotMesh job (workflow) ID
+ * @param input.app_id — HotMesh app ID
+ * @returns `{ status: 200, data: <execution timeline> }` or 404
+ */
 export async function getJobExecution(input: {
   jobId: string;
   app_id: string;

@@ -4,6 +4,32 @@ import * as api from '../../api/escalations';
 
 export function registerListRoutes(router: Router): void {
   /**
+   * POST /api/escalations
+   * Create a standalone escalation (not tied to a workflow).
+   *
+   * RBAC: caller must hold the target role or be superadmin.
+   *
+   * Body: { type, role, subtype?, description?, priority?, envelope?,
+   *         metadata?, escalation_payload? }
+   */
+  router.post('/', async (req, res) => {
+    const result = await api.createEscalation(
+      {
+        type: req.body?.type,
+        subtype: req.body?.subtype,
+        role: req.body?.role,
+        description: req.body?.description,
+        priority: req.body?.priority,
+        envelope: req.body?.envelope,
+        metadata: req.body?.metadata,
+        escalation_payload: req.body?.escalation_payload,
+      },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * GET /api/escalations
    * List escalations with optional filters.
    * RBAC: superadmin sees all; others see only roles they belong to.

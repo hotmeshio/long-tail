@@ -2,6 +2,13 @@ import * as iam from '../services/iam';
 import { isValidRoleType } from '../services/user';
 import type { LTApiResult, LTApiAuth } from '../types/sdk';
 
+/**
+ * List all bot accounts with pagination.
+ *
+ * @param input.limit — maximum number of bots to return (default 50)
+ * @param input.offset — number of bots to skip for pagination (default 0)
+ * @returns `{ status: 200, data: Bot[] }` paginated list of bots
+ */
 export async function listBots(input: {
   limit?: number;
   offset?: number;
@@ -16,6 +23,12 @@ export async function listBots(input: {
   }
 }
 
+/**
+ * Retrieve a single bot account by ID.
+ *
+ * @param input.id — unique identifier of the bot
+ * @returns `{ status: 200, data: Bot }` the bot record, or 404 if not found
+ */
 export async function getBot(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -30,6 +43,19 @@ export async function getBot(input: {
   }
 }
 
+/**
+ * Create a new bot account with optional roles.
+ *
+ * Validates that each provided role has a valid type (superadmin, admin, member).
+ * Returns 409 if a bot with the same name already exists.
+ *
+ * @param input.name — unique bot name (required)
+ * @param input.description — optional text description of the bot
+ * @param input.display_name — optional human-friendly display name
+ * @param input.roles — optional list of roles to assign at creation, each with a role name and type
+ * @param auth — authenticated user context; userId is recorded as the bot creator
+ * @returns `{ status: 201, data: Bot }` the newly created bot record
+ */
 export async function createBot(
   input: {
     name: string;
@@ -69,6 +95,15 @@ export async function createBot(
   }
 }
 
+/**
+ * Update mutable fields on an existing bot account.
+ *
+ * @param input.id — unique identifier of the bot to update
+ * @param input.display_name — new display name
+ * @param input.description — new description
+ * @param input.status — new status value
+ * @returns `{ status: 200, data: Bot }` the updated bot record, or 404 if not found
+ */
 export async function updateBot(input: {
   id: string;
   display_name?: string;
@@ -87,6 +122,12 @@ export async function updateBot(input: {
   }
 }
 
+/**
+ * Delete a bot account by ID.
+ *
+ * @param input.id — unique identifier of the bot to delete
+ * @returns `{ status: 200, data: { deleted: true } }` on success, or 404 if not found
+ */
 export async function deleteBot(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -101,6 +142,12 @@ export async function deleteBot(input: {
   }
 }
 
+/**
+ * List all roles assigned to a bot account.
+ *
+ * @param input.id — unique identifier of the bot
+ * @returns `{ status: 200, data: { roles: Role[] } }` the bot's roles, or 404 if bot not found
+ */
 export async function getBotRoles(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -116,6 +163,16 @@ export async function getBotRoles(input: {
   }
 }
 
+/**
+ * Assign a role to a bot account.
+ *
+ * Validates that the role type is one of superadmin, admin, or member.
+ *
+ * @param input.id — unique identifier of the bot
+ * @param input.role — role name to assign
+ * @param input.type — role type (superadmin, admin, or member)
+ * @returns `{ status: 201, data: Role }` the newly assigned role, or 404 if bot not found
+ */
 export async function addBotRole(input: {
   id: string;
   role: string;
@@ -139,6 +196,13 @@ export async function addBotRole(input: {
   }
 }
 
+/**
+ * Remove a role from a bot account.
+ *
+ * @param input.id — unique identifier of the bot
+ * @param input.role — role name to remove
+ * @returns `{ status: 200, data: { removed: true } }` on success, or 404 if role not found
+ */
 export async function removeBotRole(input: {
   id: string;
   role: string;
@@ -154,6 +218,12 @@ export async function removeBotRole(input: {
   }
 }
 
+/**
+ * List all API keys for a bot account.
+ *
+ * @param input.id — unique identifier of the bot
+ * @returns `{ status: 200, data: { keys: ApiKey[] } }` the bot's API keys, or 404 if bot not found
+ */
 export async function listBotKeys(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -169,6 +239,17 @@ export async function listBotKeys(input: {
   }
 }
 
+/**
+ * Create a new API key for a bot account.
+ *
+ * Returns 409 if an API key with the same name already exists for this bot.
+ *
+ * @param input.id — unique identifier of the bot
+ * @param input.name — human-readable name for the API key (required)
+ * @param input.scopes — optional list of permission scopes to restrict the key
+ * @param input.expires_at — optional ISO 8601 expiration timestamp
+ * @returns `{ status: 201, data: ApiKey }` the newly created API key (includes the secret)
+ */
 export async function createBotKey(input: {
   id: string;
   name: string;
@@ -198,6 +279,12 @@ export async function createBotKey(input: {
   }
 }
 
+/**
+ * Revoke an existing bot API key.
+ *
+ * @param input.keyId — unique identifier of the API key to revoke
+ * @returns `{ status: 200, data: { revoked: true } }` on success, or 404 if key not found
+ */
 export async function revokeBotKey(input: {
   keyId: string;
 }): Promise<LTApiResult> {

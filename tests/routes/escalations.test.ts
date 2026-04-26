@@ -4,6 +4,39 @@ import { setupRouteTest, authHeaders } from './setup';
 const ctx = setupRouteTest(4617);
 
 describe('Escalation routes', () => {
+  describe('POST /api/escalations (create)', () => {
+    it('returns 401 without auth', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'support', role: 'reviewer' }),
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when type is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ role: 'reviewer' }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('type');
+    });
+
+    it('returns 400 when role is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ type: 'support' }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('role');
+    });
+  });
+
   describe('GET /api/escalations', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/escalations`);

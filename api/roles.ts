@@ -1,6 +1,11 @@
 import * as roleService from '../services/role';
 import type { LTApiResult } from '../types/sdk';
 
+/**
+ * List all distinct role names in the system.
+ *
+ * @returns `{ status: 200, data: { roles: string[] } }` on success
+ */
 export async function listRoles(): Promise<LTApiResult> {
   try {
     const roles = await roleService.listDistinctRoles();
@@ -10,6 +15,11 @@ export async function listRoles(): Promise<LTApiResult> {
   }
 }
 
+/**
+ * List all roles with their full details (member counts, escalation chains, etc.).
+ *
+ * @returns `{ status: 200, data: { roles: RoleDetail[] } }` on success
+ */
 export async function listRolesWithDetails(): Promise<LTApiResult> {
   try {
     const roles = await roleService.listRolesWithDetails();
@@ -19,7 +29,16 @@ export async function listRolesWithDetails(): Promise<LTApiResult> {
   }
 }
 
-// Admin-required
+/**
+ * Create a new role. Requires admin privileges.
+ *
+ * The role name is trimmed, lowercased, and validated against the pattern
+ * `^[a-z][a-z0-9_-]*$` (must start with a letter, then lowercase alphanumerics,
+ * hyphens, or underscores).
+ *
+ * @param input.role — the role name to create
+ * @returns `{ status: 201, data: { role: string } }` on success
+ */
 export async function createRole(input: {
   role: string;
 }): Promise<LTApiResult> {
@@ -41,6 +60,11 @@ export async function createRole(input: {
   }
 }
 
+/**
+ * Retrieve all escalation chains across all roles.
+ *
+ * @returns `{ status: 200, data: { chains: EscalationChain[] } }` on success
+ */
 export async function getEscalationChains(): Promise<LTApiResult> {
   try {
     const chains = await roleService.getAllEscalationChains();
@@ -50,7 +74,13 @@ export async function getEscalationChains(): Promise<LTApiResult> {
   }
 }
 
-// Admin-required
+/**
+ * Add an escalation chain link from one role to another. Requires admin privileges.
+ *
+ * @param input.source_role — the role that escalates from
+ * @param input.target_role — the role that receives the escalation
+ * @returns `{ status: 201, data: { source_role, target_role } }` on success
+ */
 export async function addEscalationChain(input: {
   source_role: string;
   target_role: string;
@@ -69,7 +99,13 @@ export async function addEscalationChain(input: {
   }
 }
 
-// Admin-required
+/**
+ * Remove an escalation chain link between two roles. Requires admin privileges.
+ *
+ * @param input.source_role — the role that escalates from
+ * @param input.target_role — the role that receives the escalation
+ * @returns `{ status: 200, data: { removed: true } }` on success, or `{ status: 404 }` if not found
+ */
 export async function removeEscalationChain(input: {
   source_role: string;
   target_role: string;
@@ -91,6 +127,12 @@ export async function removeEscalationChain(input: {
   }
 }
 
+/**
+ * Get all escalation target roles for a given source role.
+ *
+ * @param input.role — the source role to look up escalation targets for
+ * @returns `{ status: 200, data: { targets: string[] } }` on success
+ */
 export async function getEscalationTargets(input: {
   role: string;
 }): Promise<LTApiResult> {
@@ -102,7 +144,16 @@ export async function getEscalationTargets(input: {
   }
 }
 
-// Admin-required
+/**
+ * Replace all escalation targets for a role with a new set. Requires admin privileges.
+ *
+ * Removes all existing escalation links from the source role and creates new
+ * ones for each target in the provided array.
+ *
+ * @param input.role — the source role whose targets are being replaced
+ * @param input.targets — array of target role names to set as the new escalation targets
+ * @returns `{ status: 200, data: { role, targets } }` on success
+ */
 export async function replaceEscalationTargets(input: {
   role: string;
   targets: string[];
@@ -118,7 +169,14 @@ export async function replaceEscalationTargets(input: {
   }
 }
 
-// Admin-required
+/**
+ * Delete a role from the system. Requires admin privileges.
+ *
+ * Returns 409 if the role cannot be deleted (e.g., still assigned to users).
+ *
+ * @param input.role — the role name to delete
+ * @returns `{ status: 200, data: { deleted: true } }` on success, or `{ status: 409 }` if deletion blocked
+ */
 export async function deleteRole(input: {
   role: string;
 }): Promise<LTApiResult> {

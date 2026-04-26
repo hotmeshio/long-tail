@@ -17,6 +17,21 @@ function isNotFoundError(err: any): boolean {
 // CRUD
 // ---------------------------------------------------------------------------
 
+/**
+ * List YAML workflows with optional filtering and pagination.
+ *
+ * Delegates to the DB layer. Returns 404 when a filter references an invalid UUID.
+ *
+ * @param input.status — lifecycle filter (draft, deployed, active, archived)
+ * @param input.graph_topic — filter by the HotMesh subscription topic
+ * @param input.app_id — filter by namespace (MCP server name)
+ * @param input.search — free-text search across workflow name/description
+ * @param input.source_workflow_id — filter by the execution trace this workflow was compiled from
+ * @param input.set_id — filter by compositional set membership
+ * @param input.limit — max rows to return
+ * @param input.offset — pagination offset
+ * @returns `{ status: 200, data: YamlWorkflow[] }` matching workflows
+ */
 export async function listYamlWorkflows(input: {
   status?: string;
   graph_topic?: string;
@@ -47,6 +62,25 @@ export async function listYamlWorkflows(input: {
   }
 }
 
+/**
+ * Compile an execution trace into a new YAML workflow (draft).
+ *
+ * Validates that the source execution did not exhaust its tool rounds, checks for
+ * topic collisions in the target namespace, then delegates to the LLM-based YAML
+ * generator. The resulting YAML, schemas, and activity manifest are persisted as a
+ * new draft record. Auto-derived tags are merged with any user-supplied tags.
+ *
+ * @param input.workflow_id — ID of the source execution trace to compile from
+ * @param input.task_queue — HotMesh task queue the source execution ran on
+ * @param input.workflow_name — type name of the source workflow
+ * @param input.name — tool name for the new workflow (no dashes; used to derive the topic)
+ * @param input.description — human-readable description passed to the generator
+ * @param input.app_id — target namespace (defaults to "longtail")
+ * @param input.subscribes — explicit subscription topic override (otherwise derived from name)
+ * @param input.tags — additional tags to merge with auto-derived tags
+ * @param input.compilation_feedback — natural-language feedback to steer the LLM compilation
+ * @returns `{ status: 201, data: YamlWorkflow }` the newly created draft record
+ */
 export async function createYamlWorkflow(input: {
   workflow_id: string;
   task_queue: string;
@@ -141,6 +175,23 @@ export async function createYamlWorkflow(input: {
   }
 }
 
+/**
+ * Create a YAML workflow directly from user-supplied YAML content (no compilation).
+ *
+ * Sanitizes the name, app_id, and graph_topic to lowercase alphanumeric characters.
+ * Rewrites the `subscribes`, `id`, and `topic` fields inside the YAML to match the
+ * sanitized values. Checks for topic collisions before persisting.
+ *
+ * @param input.name — tool name (sanitized to lowercase alphanumeric, periods, dashes, underscores)
+ * @param input.description — human-readable description; also stored as original_prompt
+ * @param input.yaml_content — raw HotMesh YAML definition
+ * @param input.input_schema — JSON Schema describing the workflow's input (defaults to empty object)
+ * @param input.activity_manifest — list of activity declarations (defaults to empty array)
+ * @param input.tags — classification tags (defaults to empty array)
+ * @param input.app_id — target namespace / MCP server name (defaults to "longtail", sanitized to lowercase alphanumeric)
+ * @param input.graph_topic — subscription topic override (defaults to sanitized name; overridden by `subscribes` in YAML if present)
+ * @returns `{ status: 200, data: YamlWorkflow }` the persisted workflow record
+ */
 export async function createYamlWorkflowDirect(input: {
   name: string;
   description?: string;
@@ -216,6 +267,11 @@ export async function createYamlWorkflowDirect(input: {
   }
 }
 
+/**
+ * Retrieve all distinct app_id namespaces that have at least one YAML workflow.
+ *
+ * @returns `{ status: 200, data: { app_ids: string[] } }` sorted list of namespace identifiers
+ */
 export async function getAppIds(): Promise<LTApiResult> {
   try {
     const appIds = await yamlDb.getDistinctAppIds();
@@ -225,6 +281,12 @@ export async function getAppIds(): Promise<LTApiResult> {
   }
 }
 
+/**
+ * Fetch a single YAML workflow by its primary key.
+ *
+ * @param input.id — UUID of the workflow record
+ * @returns `{ status: 200, data: YamlWorkflow }` the full workflow record, or 404 if not found
+ */
 export async function getYamlWorkflow(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -242,6 +304,15 @@ export async function getYamlWorkflow(input: {
   }
 }
 
+/**
+ * Partially update a YAML workflow record.
+ *
+ * Accepts arbitrary fields beyond `id` and forwards them to the DB update layer.
+ *
+ * @param input.id — UUID of the workflow to update
+ * @param input.[key] — any mutable workflow fields (name, description, yaml_content, tags, etc.)
+ * @returns `{ status: 200, data: YamlWorkflow }` the updated record, or 404 if not found
+ */
 export async function updateYamlWorkflow(input: {
   id: string;
   [key: string]: any;
@@ -261,6 +332,19 @@ export async function updateYamlWorkflow(input: {
   }
 }
 
+/**
+ * Re-compile an existing YAML workflow from its original execution trace.
+ *
+ * Looks up the source workflow reference, re-runs the LLM-based YAML generator, and
+ * overwrites the YAML content, schemas, manifest, and tags in place. When
+ * compilation_feedback is provided, the current YAML is passed as priorFailedYaml so
+ * the generator can incorporate the feedback. Archived workflows cannot be regenerated.
+ *
+ * @param input.id — UUID of the workflow to regenerate
+ * @param input.task_queue — override the task queue (otherwise resolved from the source task record)
+ * @param input.compilation_feedback — natural-language feedback to steer the re-compilation
+ * @returns `{ status: 200, data: YamlWorkflow }` the updated record with new YAML content
+ */
 export async function regenerateYamlWorkflow(input: {
   id: string;
   task_queue?: string;
@@ -317,6 +401,15 @@ export async function regenerateYamlWorkflow(input: {
   }
 }
 
+/**
+ * Permanently delete a YAML workflow record.
+ *
+ * Only draft or archived workflows can be deleted. Active or deployed workflows must
+ * be archived first.
+ *
+ * @param input.id — UUID of the workflow to delete
+ * @returns `{ status: 200, data: { deleted: true } }` on success, or 400 if the workflow is active/deployed
+ */
 export async function deleteYamlWorkflow(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -342,6 +435,16 @@ export async function deleteYamlWorkflow(input: {
 // Deployment
 // ---------------------------------------------------------------------------
 
+/**
+ * Deploy a YAML workflow and all sibling workflows sharing its app_id namespace.
+ *
+ * Merges and deploys the full app_id YAML, registers HotMesh workers for every
+ * non-archived sibling, transitions draft/deployed siblings to active, and marks
+ * the app_id content as deployed. Uses the app_version declared in the workflow record.
+ *
+ * @param input.id — UUID of the workflow to deploy
+ * @returns `{ status: 200, data: YamlWorkflow }` the refreshed workflow record after deployment
+ */
 export async function deployYamlWorkflow(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -383,6 +486,16 @@ export async function deployYamlWorkflow(input: {
   }
 }
 
+/**
+ * Activate a previously deployed YAML workflow and its app_id siblings.
+ *
+ * Calls the deployer to activate the app_id at its current version, then registers
+ * HotMesh workers for all sibling workflows. Siblings in "deployed" status are
+ * transitioned to "active". The workflow must already be in deployed or active status.
+ *
+ * @param input.id — UUID of the workflow to activate
+ * @returns `{ status: 200, data: YamlWorkflow }` the refreshed workflow record after activation
+ */
 export async function activateYamlWorkflow(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -416,6 +529,21 @@ export async function activateYamlWorkflow(input: {
   }
 }
 
+/**
+ * Invoke an active YAML workflow, executing its DAG pipeline.
+ *
+ * The workflow must be in "active" status. Delegates to the invoke service which
+ * starts the HotMesh execution. Supports both synchronous (wait for result) and
+ * asynchronous (fire-and-forget) invocation modes.
+ *
+ * @param input.id — UUID of the workflow to invoke
+ * @param input.data — input payload passed to the workflow's entry point
+ * @param input.sync — when true, block until the workflow completes and return its output
+ * @param input.timeout — max milliseconds to wait when sync is true
+ * @param input.execute_as — override identity for the execution context
+ * @param auth — authenticated user context; userId is forwarded to the invoke service
+ * @returns `{ status: 200, data: ... }` workflow execution result (sync) or job metadata (async)
+ */
 export async function invokeYamlWorkflow(input: {
   id: string;
   data?: any;
@@ -448,6 +576,16 @@ export async function invokeYamlWorkflow(input: {
   }
 }
 
+/**
+ * Archive a YAML workflow, removing it from active service.
+ *
+ * If the workflow is currently active, its HotMesh engine is stopped before
+ * transitioning the status to "archived". Archived workflows cannot be invoked
+ * or regenerated but can still be viewed or deleted.
+ *
+ * @param input.id — UUID of the workflow to archive
+ * @returns `{ status: 200, data: YamlWorkflow }` the updated record with status "archived"
+ */
 export async function archiveYamlWorkflow(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -473,6 +611,16 @@ export async function archiveYamlWorkflow(input: {
 // Versions
 // ---------------------------------------------------------------------------
 
+/**
+ * Retrieve the version history for a YAML workflow.
+ *
+ * Returns a paginated list of version snapshots ordered by version number.
+ *
+ * @param input.id — UUID of the workflow
+ * @param input.limit — max versions to return (defaults to 20)
+ * @param input.offset — pagination offset (defaults to 0)
+ * @returns `{ status: 200, data: VersionSnapshot[] }` paginated version history
+ */
 export async function getVersionHistory(input: {
   id: string;
   limit?: number;
@@ -491,6 +639,15 @@ export async function getVersionHistory(input: {
   }
 }
 
+/**
+ * Retrieve a specific version snapshot of a YAML workflow.
+ *
+ * Validates that the version number is a positive integer before querying.
+ *
+ * @param input.id — UUID of the workflow
+ * @param input.version — 1-based version number to retrieve
+ * @returns `{ status: 200, data: VersionSnapshot }` the snapshot at the requested version, or 404
+ */
 export async function getVersionSnapshot(input: {
   id: string;
   version: number;
@@ -513,6 +670,16 @@ export async function getVersionSnapshot(input: {
   }
 }
 
+/**
+ * Retrieve the raw YAML content for a workflow, optionally at a specific version.
+ *
+ * When a version is provided, fetches from the version snapshot table. Otherwise
+ * returns the current yaml_content from the live workflow record.
+ *
+ * @param input.id — UUID of the workflow
+ * @param input.version — optional version number; when omitted, returns the current content
+ * @returns `{ status: 200, data: string }` the raw YAML string
+ */
 export async function getYamlContent(input: {
   id: string;
   version?: number;
@@ -542,6 +709,18 @@ export async function getYamlContent(input: {
 // Cron
 // ---------------------------------------------------------------------------
 
+/**
+ * Set or update the cron schedule for a YAML workflow.
+ *
+ * Persists the schedule in the DB and restarts the in-process cron timer via the
+ * cron registry so the change takes effect immediately.
+ *
+ * @param input.id — UUID of the workflow to schedule
+ * @param input.cron_schedule — cron expression (e.g. "0 * * * *")
+ * @param input.cron_envelope — optional payload passed to each scheduled invocation
+ * @param input.execute_as — optional identity override for scheduled executions
+ * @returns `{ status: 200, data: YamlWorkflow }` the updated workflow record with cron fields set
+ */
 export async function setCronSchedule(input: {
   id: string;
   cron_schedule: string;
@@ -578,6 +757,14 @@ export async function setCronSchedule(input: {
   }
 }
 
+/**
+ * Remove the cron schedule from a YAML workflow.
+ *
+ * Stops the in-process cron timer first, then clears the schedule fields in the DB.
+ *
+ * @param input.id — UUID of the workflow to unschedule
+ * @returns `{ status: 200, data: YamlWorkflow }` the updated workflow record with cron fields cleared
+ */
 export async function clearCronSchedule(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -599,6 +786,14 @@ export async function clearCronSchedule(input: {
   }
 }
 
+/**
+ * List all YAML workflows that have a cron schedule, with their live timer status.
+ *
+ * Fetches all cron-scheduled workflows from the DB and cross-references with the
+ * in-process cron registry to determine which timers are actually running.
+ *
+ * @returns `{ status: 200, data: { schedules: Array<{ id, name, graph_topic, app_id, cron_schedule, execute_as, active }> } }`
+ */
 export async function getCronStatus(): Promise<LTApiResult> {
   try {
     const workflows = await yamlDb.getCronScheduledWorkflows();
