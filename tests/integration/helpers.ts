@@ -95,6 +95,17 @@ export class ApiClient {
     return { status: res.status, data };
   }
 
+  async put<T = any>(path: string, body?: any): Promise<ApiResponse<T>> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'PUT',
+      headers: this.headers(),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json() as T;
+    if (!res.ok) throw new Error(`PUT ${path} → ${res.status}: ${JSON.stringify(data)}`);
+    return { status: res.status, data };
+  }
+
   async patch<T = any>(path: string, body?: any): Promise<ApiResponse<T>> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'PATCH',

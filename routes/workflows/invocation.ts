@@ -8,22 +8,28 @@ const router = Router();
 
 /**
  * POST /api/workflows/:type/invoke
- * Start a workflow by its registered type.
+ * Proxy for `Durable.Client.workflow.start()` with IAM resolution.
  *
- * The workflow must have `invocable: true` in its config. If the config
- * includes `invocation_roles`, the authenticated user must hold at least
- * one of those roles. When invocation_roles is empty, any authenticated
- * user can invoke.
+ * The workflow must have `invocable: true` in its config (or an active
+ * worker). If the config includes `invocation_roles`, the authenticated
+ * user must hold at least one of those roles.
  *
- * Body: { data: Record<string, any>, metadata?: Record<string, any> }
+ * Body fields `data`, `metadata`, and `execute_as` are extracted for
+ * envelope/IAM handling. Everything else in `options` passes through
+ * to the Durable client unchanged (workflowId, expire, entity,
+ * namespace, search, signalIn, pending, etc.).
+ *
+ * @see https://docs.hotmesh.io/types/types_durable.WorkflowOptions.html
  */
 router.post('/:type/invoke', async (req, res) => {
+  const { data, metadata, execute_as, ...options } = req.body ?? {};
   const result = await api.invokeWorkflow(
     {
       type: req.params.type,
-      data: req.body?.data,
-      metadata: req.body?.metadata,
-      execute_as: req.body?.execute_as,
+      data,
+      metadata,
+      execute_as,
+      options: Object.keys(options).length > 0 ? options : undefined,
     },
     { userId: req.auth?.userId ?? '' },
   );

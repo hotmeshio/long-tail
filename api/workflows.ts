@@ -20,12 +20,25 @@ function isResolveError(err: any): boolean {
 
 // ── Invocation ──────────────────────────────────────────────────────────────
 
+/**
+ * Start a workflow — proxy for `Durable.Client.workflow.start()`.
+ *
+ * Resolves the task queue, enforces auth/role constraints, builds the
+ * LTEnvelope with IAM context, and delegates to the Durable client.
+ * Any WorkflowOptions field (workflowId, expire, entity, namespace,
+ * search, signalIn, pending, etc.) can be passed via `options` and
+ * flows through to the Durable client unchanged.
+ *
+ * @see https://docs.hotmesh.io/types/types_durable.WorkflowOptions.html
+ */
 export async function invokeWorkflow(
   input: {
     type: string;
     data?: Record<string, any>;
     metadata?: Record<string, any>;
     execute_as?: string;
+    /** Passthrough to Durable WorkflowOptions. */
+    options?: Record<string, any>;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
@@ -37,6 +50,7 @@ export async function invokeWorkflow(
       data: input.data || {},
       metadata: input.metadata,
       executeAs: input.execute_as,
+      options: input.options,
       auth: {
         userId: auth.userId,
       },

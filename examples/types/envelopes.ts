@@ -34,6 +34,39 @@ export interface BasicEchoEnvelopeData {
   sleepSeconds?: number;
 }
 
+// ── assemblyLine ─────────────────────────────────────────────
+
+/** Assembly line — durable orchestrator with sequential human task queues. */
+export interface AssemblyLineEnvelopeData {
+  /** Product name for the assembly run. */
+  productName: string;
+  /** Ordered stations the product passes through. */
+  stations: Array<{
+    stationName: string;
+    role: string;
+    instructions: string;
+  }>;
+}
+
+// ── stepIterator ─────────────────────────────────────────────
+
+/** Step iterator — generic loop over data-driven steps with human escalations. */
+export interface StepIteratorEnvelopeData {
+  /** Display name for this run. */
+  name: string;
+  /** Dynamic list of steps — each spawns a child workflow with an escalation. */
+  steps: Array<{
+    stationName: string;
+    role: string;
+    instructions: string;
+  }>;
+}
+
+// ── reverter ─────────────────────────────────────────────────
+
+/** Reverter — step loop with revert support (same shape as stepIterator). */
+export type ReverterEnvelopeData = StepIteratorEnvelopeData;
+
 // ── Workflow envelope map ───────────────────────────────────────
 
 /** Map of invocable workflow type → its typed envelope data shape. */
@@ -41,6 +74,9 @@ export type WorkflowEnvelopeMap = {
   reviewContent: ReviewContentEnvelopeData;
   kitchenSink: KitchenSinkEnvelopeData;
   basicEcho: BasicEchoEnvelopeData;
+  assemblyLine: AssemblyLineEnvelopeData;
+  stepIterator: StepIteratorEnvelopeData;
+  reverter: ReverterEnvelopeData;
 };
 
 /** All invocable workflow type names. */
