@@ -2,6 +2,16 @@ import * as userService from '../services/user';
 import type { LTApiResult } from '../types/sdk';
 import type { LTRoleType } from '../types';
 
+/**
+ * List users with optional filters for role, role type, status, and pagination.
+ *
+ * @param input.role — filter by role name
+ * @param input.roleType — filter by role type (superadmin, admin, member)
+ * @param input.status — filter by user status
+ * @param input.limit — maximum number of users to return
+ * @param input.offset — number of users to skip for pagination
+ * @returns `{ status: 200, data: User[] }` on success
+ */
 export async function listUsers(input: {
   role?: string;
   roleType?: LTRoleType;
@@ -17,6 +27,12 @@ export async function listUsers(input: {
   }
 }
 
+/**
+ * Retrieve a single user by ID.
+ *
+ * @param input.id — the user's unique identifier
+ * @returns `{ status: 200, data: User }` on success, or `{ status: 404 }` if not found
+ */
 export async function getUser(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -31,7 +47,19 @@ export async function getUser(input: {
   }
 }
 
-// Admin-required
+/**
+ * Create a new user. Requires admin privileges.
+ *
+ * Validates that external_id is present and that any provided roles have valid
+ * names and types. Returns 409 if a user with the same external_id already exists.
+ *
+ * @param input.external_id — external system identifier (required)
+ * @param input.email — user's email address
+ * @param input.display_name — user's display name
+ * @param input.roles — initial role assignments, each with a role name and type (superadmin, admin, member)
+ * @param input.metadata — arbitrary key-value metadata to attach to the user
+ * @returns `{ status: 201, data: User }` on success, or `{ status: 409 }` on duplicate external_id
+ */
 export async function createUser(input: {
   external_id?: string;
   email?: string;
@@ -69,7 +97,18 @@ export async function createUser(input: {
   }
 }
 
-// Admin-required
+/**
+ * Update an existing user's profile fields. Requires admin privileges.
+ *
+ * Only the provided fields are updated; omitted fields remain unchanged.
+ *
+ * @param input.id — the user's unique identifier (required)
+ * @param input.email — new email address
+ * @param input.display_name — new display name
+ * @param input.status — new user status
+ * @param input.metadata — replacement metadata object
+ * @returns `{ status: 200, data: User }` on success, or `{ status: 404 }` if not found
+ */
 export async function updateUser(input: {
   id: string;
   email?: string;
@@ -89,7 +128,12 @@ export async function updateUser(input: {
   }
 }
 
-// Admin-required
+/**
+ * Delete a user by ID. Requires admin privileges.
+ *
+ * @param input.id — the user's unique identifier
+ * @returns `{ status: 200, data: { deleted: true } }` on success, or `{ status: 404 }` if not found
+ */
 export async function deleteUser(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -104,6 +148,12 @@ export async function deleteUser(input: {
   }
 }
 
+/**
+ * Retrieve all roles assigned to a user.
+ *
+ * @param input.id — the user's unique identifier
+ * @returns `{ status: 200, data: { roles: Role[] } }` on success
+ */
 export async function getUserRoles(input: {
   id: string;
 }): Promise<LTApiResult> {
@@ -115,7 +165,17 @@ export async function getUserRoles(input: {
   }
 }
 
-// Admin-required
+/**
+ * Assign a role to a user. Requires admin privileges.
+ *
+ * Validates that both role and type are provided and that the type is one of
+ * superadmin, admin, or member.
+ *
+ * @param input.id — the user's unique identifier
+ * @param input.role — the role name to assign
+ * @param input.type — the role type (superadmin, admin, or member)
+ * @returns `{ status: 201, data: UserRole }` on success
+ */
 export async function addUserRole(input: {
   id: string;
   role: string;
@@ -135,7 +195,13 @@ export async function addUserRole(input: {
   }
 }
 
-// Admin-required
+/**
+ * Remove a role from a user. Requires admin privileges.
+ *
+ * @param input.id — the user's unique identifier
+ * @param input.role — the role name to remove
+ * @returns `{ status: 200, data: { removed: true } }` on success, or `{ status: 404 }` if role not found
+ */
 export async function removeUserRole(input: {
   id: string;
   role: string;

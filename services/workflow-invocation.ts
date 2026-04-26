@@ -35,6 +35,16 @@ export interface InvokeWorkflowInput {
   metadata?: Record<string, any>;
   /** Per-request execute_as override (admin-only). */
   executeAs?: string;
+  /**
+   * Passthrough options forwarded to `Durable.Client.workflow.start()`.
+   * Any WorkflowOptions field (workflowId, expire, entity, namespace,
+   * search, signalIn, pending, etc.) can be set here. The service
+   * applies defaults for workflowId, expire, entity, taskQueue, and
+   * workflowName when not provided.
+   *
+   * @see https://docs.hotmesh.io/types/types_durable.WorkflowOptions.html
+   */
+  options?: Record<string, any>;
   auth: InvocationAuthContext;
 }
 
@@ -59,8 +69,11 @@ export class InvocationError extends Error {
 /**
  * Start a workflow by its registered type.
  *
- * Validates config, roles, scopes, resolves principals, builds the
- * LTEnvelope, and starts the workflow via the Durable client.
+ * Thin proxy over `Durable.Client.workflow.start()` — callers have
+ * access to the full option set (workflowId, expire, entity) with
+ * sensible defaults when omitted. The service resolves the task queue,
+ * enforces auth/scope constraints, builds the LTEnvelope with IAM
+ * context, and delegates to the Durable client.
  *
  * Throws `InvocationError` with an appropriate status code on failure.
  */
@@ -97,17 +110,19 @@ export async function invokeWorkflow(
     wfConfig?.execute_as ?? undefined,
   );
 
-  // 5. Start workflow
+  // 5. Start workflow — caller options pass through to Durable client
   const client = createClient();
-  const workflowId = `${workflowType}-${Durable.guid()}`;
+  const callerOpts = input.options ?? {};
+  const workflowId = callerOpts.workflowId || `${workflowType}-${Durable.guid()}`;
 
   await client.workflow.start({
+    ...callerOpts,
     args: [envelope],
     taskQueue,
     workflowName: workflowType,
     workflowId,
-    expire: JOB_EXPIRE_SECS,
-    entity: workflowType,
+    expire: callerOpts.expire ?? JOB_EXPIRE_SECS,
+    entity: callerOpts.entity ?? workflowType,
   } as any);
 
   return { workflowId };

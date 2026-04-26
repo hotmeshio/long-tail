@@ -2,6 +2,17 @@ import { verifyPassword } from '../services/user';
 import { signToken } from '../modules/auth';
 import type { LTApiResult } from '../types/sdk';
 
+/**
+ * Authenticate a user by username and password.
+ *
+ * Verifies credentials against the user store and returns a signed JWT
+ * with the user's roles and highest privilege level. The token is valid
+ * for 24 hours.
+ *
+ * @param input.username — login identifier (external_id)
+ * @param input.password — plaintext password
+ * @returns `{ status: 200, data: { token, user: { id, external_id, display_name, roles } } }`
+ */
 export async function login(input: {
   username: string;
   password: string;

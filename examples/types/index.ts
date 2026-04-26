@@ -11,6 +11,9 @@ export type {
   ReviewContentEnvelopeData,
   KitchenSinkEnvelopeData,
   BasicEchoEnvelopeData,
+  AssemblyLineEnvelopeData,
+  StepIteratorEnvelopeData,
+  ReverterEnvelopeData,
   WorkflowEnvelopeMap,
   InvocableWorkflowType,
 } from './envelopes';

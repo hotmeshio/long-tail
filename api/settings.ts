@@ -5,6 +5,14 @@ import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 import type { LTApiResult } from '../types/sdk';
 
+/**
+ * Return platform settings for the current deployment.
+ *
+ * Includes telemetry configuration (trace URL), escalation claim duration
+ * options, and event transport details (socket.io, NATS, or none).
+ *
+ * @returns `{ status: 200, data: { telemetry, escalation, events } }`
+ */
 export async function getSettings(): Promise<LTApiResult> {
   try {
     const hasSocketIO = !!eventRegistry.getAdapter(SocketIOEventAdapter);

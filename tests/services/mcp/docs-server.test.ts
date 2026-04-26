@@ -101,11 +101,11 @@ describe('Docs MCP Server', () => {
     const client = await connectClient();
     const result = await client.callTool({
       name: 'read_doc',
-      arguments: { path: 'api/tasks.md' },
+      arguments: { path: 'api/http/tasks.md' },
     });
     const data = parseMcpResult(result);
     expect(data.content).toBeDefined();
-    expect(data.path).toBe('api/tasks.md');
+    expect(data.path).toBe('api/http/tasks.md');
     await client.close();
   });
 

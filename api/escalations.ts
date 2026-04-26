@@ -57,8 +57,106 @@ function publishBulkClaimEvents(ids: string[], assignedTo: string): void {
   }
 }
 
+// ── Create ────────────────────────────────────────────────────────────────
+
+/**
+ * Create a standalone escalation (not tied to a workflow).
+ *
+ * Useful for manual work items, support tickets, or approval requests
+ * that originate outside the durable workflow engine. The caller must
+ * hold the target role or be a superadmin.
+ *
+ * @param input.type — escalation category (e.g. `"support"`, `"approval"`)
+ * @param input.subtype — subcategory for finer routing
+ * @param input.role — role responsible for resolving this escalation
+ * @param input.description — human-readable summary
+ * @param input.priority — 1 (critical) through 4 (low), default 2
+ * @param input.envelope — serialized context for the resolver
+ * @param input.metadata — arbitrary key-value data (e.g. signal_routing)
+ * @param input.escalation_payload — serialized payload for the resolver UI
+ * @param auth — authenticated user context (must hold target role or be superadmin)
+ * @returns `{ status: 201, data: <escalation record> }`
+ */
+export async function createEscalation(
+  input: {
+    type: string;
+    subtype?: string;
+    role: string;
+    description?: string;
+    priority?: number;
+    envelope?: string;
+    metadata?: Record<string, any>;
+    escalation_payload?: string;
+  },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    const { type, role } = input;
+    if (!type || typeof type !== 'string') {
+      return { status: 400, error: 'type is required' };
+    }
+    if (!role || typeof role !== 'string') {
+      return { status: 400, error: 'role is required' };
+    }
+
+    // RBAC: caller must hold the target role or be superadmin
+    const isSuperAdminUser = await userService.isSuperAdmin(auth.userId);
+    if (!isSuperAdminUser) {
+      const userHasRole = await userService.hasRole(auth.userId, role);
+      if (!userHasRole) {
+        return { status: 403, error: `You must hold the "${role}" role or be a superadmin to create escalations for it` };
+      }
+    }
+
+    const escalation = await escalationService.createEscalation({
+      type,
+      subtype: input.subtype ?? type,
+      description: input.description,
+      priority: input.priority,
+      role,
+      envelope: input.envelope ?? '{}',
+      metadata: input.metadata,
+      escalation_payload: input.escalation_payload,
+    });
+
+    publishEscalationEvent({
+      type: 'escalation.created',
+      source: 'api',
+      workflowId: '',
+      workflowName: '',
+      taskQueue: '',
+      escalationId: escalation.id,
+      status: 'pending',
+      data: { type: input.type, role },
+    });
+
+    return { status: 201, data: escalation };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
 // ── List routes ────────────────────────────────────────────────────────────
 
+/**
+ * List escalations with optional filters.
+ *
+ * Results are scoped to the authenticated user's roles unless the user
+ * is a superadmin (who sees all roles).
+ *
+ * @param input.status — filter by `pending`, `resolved`, or `cancelled`
+ * @param input.role — filter by assigned role
+ * @param input.type — filter by workflow type
+ * @param input.subtype — filter by subtype
+ * @param input.assigned_to — filter by assigned user ID
+ * @param input.priority — filter by priority (1–4)
+ * @param input.limit — max results (default: 50)
+ * @param input.offset — pagination offset
+ * @param input.sort_by — column to sort by (e.g. `created_at`, `priority`)
+ * @param input.order — `asc` or `desc`
+ * @param auth — authenticated user context (required for role scoping)
+ * @returns `{ status: 200, data: { escalations, total } }`
+ */
 export async function listEscalations(
   input: {
     status?: string;
@@ -99,6 +197,23 @@ export async function listEscalations(
   }
 }
 
+/**
+ * List escalations available for claim (pending and not actively claimed).
+ *
+ * Similar to `listEscalations` but excludes escalations with active claims.
+ * Scoped to the authenticated user's roles.
+ *
+ * @param input.role — filter by role
+ * @param input.type — filter by workflow type
+ * @param input.subtype — filter by subtype
+ * @param input.priority — filter by priority (1–4)
+ * @param input.limit — max results (default: 50)
+ * @param input.offset — pagination offset
+ * @param input.sort_by — column to sort by
+ * @param input.order — `asc` or `desc`
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { escalations, total } }`
+ */
 export async function listAvailableEscalations(
   input: {
     role?: string;
@@ -135,6 +250,11 @@ export async function listAvailableEscalations(
   }
 }
 
+/**
+ * List all distinct escalation type values.
+ *
+ * @returns `{ status: 200, data: { types: string[] } }`
+ */
 export async function listDistinctTypes(): Promise<LTApiResult> {
   try {
     const types = await escalationService.listDistinctTypes();
@@ -144,6 +264,13 @@ export async function listDistinctTypes(): Promise<LTApiResult> {
   }
 }
 
+/**
+ * Get aggregate escalation statistics scoped to the user's roles.
+ *
+ * @param input.period — time window (`1h`, `24h`, `7d`, `30d`)
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { pending, claimed, created, resolved, by_role, by_type } }`
+ */
 export async function getEscalationStats(
   input: { period?: string },
   auth: LTApiAuth,
@@ -172,6 +299,15 @@ export async function getEscalationStats(
 
 // ── Single-escalation routes ───────────────────────────────────────────────
 
+/**
+ * Get a single escalation by ID.
+ *
+ * Non-superadmin users must hold the escalation's assigned role.
+ *
+ * @param input.id — escalation UUID
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: <escalation record> }` or 403/404
+ */
 export async function getEscalation(
   input: { id: string },
   auth: LTApiAuth,
@@ -196,6 +332,12 @@ export async function getEscalation(
   }
 }
 
+/**
+ * List all escalations for a given workflow ID.
+ *
+ * @param input.workflowId — HotMesh workflow ID
+ * @returns `{ status: 200, data: { escalations } }`
+ */
 export async function getEscalationsByWorkflowId(
   input: { workflowId: string },
 ): Promise<LTApiResult> {
@@ -207,6 +349,17 @@ export async function getEscalationsByWorkflowId(
   }
 }
 
+/**
+ * Route a pending escalation to a different role.
+ *
+ * The user must be authorized to escalate from the current role to the
+ * target role (checked via escalation chain configuration).
+ *
+ * @param input.id — escalation UUID
+ * @param input.targetRole — destination role
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: <updated escalation> }` or 403/404/409
+ */
 export async function escalateToRole(
   input: { id: string; targetRole: string },
   auth: LTApiAuth,
@@ -242,6 +395,18 @@ export async function escalateToRole(
   }
 }
 
+/**
+ * Claim a pending escalation for the authenticated user.
+ *
+ * Sets `assigned_to` and `assigned_until` on the escalation (soft lock).
+ * Non-superadmin users must hold the escalation's role. Publishes a
+ * `escalation.claimed` event.
+ *
+ * @param input.id — escalation UUID
+ * @param input.durationMinutes — claim duration (default: 30)
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { escalation, isExtension } }` or 403/404/409
+ */
 export async function claimEscalation(
   input: { id: string; durationMinutes?: number },
   auth: LTApiAuth,
@@ -287,6 +452,16 @@ export async function claimEscalation(
   }
 }
 
+/**
+ * Release a claimed escalation back to the pool.
+ *
+ * Only the user who holds the claim can release it. Publishes a
+ * `escalation.released` event.
+ *
+ * @param input.id — escalation UUID
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { escalation } }` or 409
+ */
 export async function releaseEscalation(
   input: { id: string },
   auth: LTApiAuth,
@@ -316,6 +491,14 @@ export async function releaseEscalation(
 
 // ── Bulk routes ────────────────────────────────────────────────────────────
 
+/**
+ * Release all escalation claims past their `assigned_until` deadline.
+ *
+ * Typically called on a maintenance schedule. Returns the count of
+ * released claims.
+ *
+ * @returns `{ status: 200, data: { released: number } }`
+ */
 export async function releaseExpiredClaims(): Promise<LTApiResult> {
   try {
     const released = await escalationService.releaseExpiredClaims();
@@ -325,6 +508,14 @@ export async function releaseExpiredClaims(): Promise<LTApiResult> {
   }
 }
 
+/**
+ * Update priority for one or more escalations.
+ *
+ * @param input.ids — array of escalation UUIDs
+ * @param input.priority — new priority (1=critical, 2=high, 3=medium, 4=low)
+ * @param auth — authenticated user context (admin or role-holder required)
+ * @returns `{ status: 200, data: { updated: number } }`
+ */
 export async function updatePriority(
   input: { ids: string[]; priority: number },
   auth: LTApiAuth,
@@ -348,6 +539,14 @@ export async function updatePriority(
   }
 }
 
+/**
+ * Claim multiple escalations at once for the authenticated user.
+ *
+ * @param input.ids — array of escalation UUIDs
+ * @param input.durationMinutes — claim duration (default: 30)
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { claimed, skipped } }`
+ */
 export async function bulkClaim(
   input: { ids: string[]; durationMinutes?: number },
   auth: LTApiAuth,
@@ -375,6 +574,18 @@ export async function bulkClaim(
   }
 }
 
+/**
+ * Assign multiple escalations to a specific user.
+ *
+ * Non-superadmin callers must verify the target user holds each
+ * escalation's role. Publishes claim events for assigned items.
+ *
+ * @param input.ids — array of escalation UUIDs
+ * @param input.targetUserId — user to assign to
+ * @param input.durationMinutes — assignment duration (default: 30)
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { assigned, skipped } }`
+ */
 export async function bulkAssign(
   input: { ids: string[]; targetUserId: string; durationMinutes?: number },
   auth: LTApiAuth,
@@ -417,6 +628,14 @@ export async function bulkAssign(
   }
 }
 
+/**
+ * Route multiple escalations to a different role.
+ *
+ * @param input.ids — array of escalation UUIDs
+ * @param input.targetRole — destination role
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { updated: number } }`
+ */
 export async function bulkEscalate(
   input: { ids: string[]; targetRole: string },
   auth: LTApiAuth,
@@ -440,6 +659,17 @@ export async function bulkEscalate(
   }
 }
 
+/**
+ * Trigger AI triage for multiple escalations.
+ *
+ * Resolves each escalation and starts a triage workflow that uses MCP
+ * tools to analyze and potentially auto-resolve the issue.
+ *
+ * @param input.ids — array of escalation UUIDs
+ * @param input.hint — optional natural-language guidance for the triage AI
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { triaged, workflows } }`
+ */
 export async function bulkTriage(
   input: { ids: string[]; hint?: string },
   auth: LTApiAuth,
@@ -475,6 +705,28 @@ export async function bulkTriage(
 
 // ── Resolve route ──────────────────────────────────────────────────────────
 
+/**
+ * Resolve a pending escalation with a human-provided payload.
+ *
+ * Handles two resolution paths:
+ * 1. **Signal-routed** — if the escalation has `signal_routing` metadata,
+ *    the resolver payload is sent directly to the paused workflow via
+ *    `handle.signal()`. Supports both Durable and YAML engines.
+ * 2. **Re-run** — the original workflow is re-started with the resolver
+ *    payload injected into `envelope.resolver`. The interceptor detects
+ *    the re-run and skips to the resolution branch.
+ *
+ * Password fields in the resolver payload are replaced with ephemeral
+ * tokens (15-minute TTL) so plaintext never enters the signal store.
+ *
+ * Supports optional escalation strategy execution after resolution.
+ *
+ * @param input.id — escalation UUID
+ * @param input.resolverPayload — human decision data
+ * @param auth — authenticated user context
+ * @returns `{ status: 200, data: { signaled, escalationId, workflowId } }` (signal path)
+ *          or `{ status: 200, data: { workflowId, resumed, escalationId } }` (re-run path)
+ */
 export async function resolveEscalation(
   input: { id: string; resolverPayload: Record<string, any> },
   auth: LTApiAuth,

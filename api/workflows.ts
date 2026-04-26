@@ -20,12 +20,25 @@ function isResolveError(err: any): boolean {
 
 // ── Invocation ──────────────────────────────────────────────────────────────
 
+/**
+ * Start a workflow — proxy for `Durable.Client.workflow.start()`.
+ *
+ * Resolves the task queue, enforces auth/role constraints, builds the
+ * LTEnvelope with IAM context, and delegates to the Durable client.
+ * Any WorkflowOptions field (workflowId, expire, entity, namespace,
+ * search, signalIn, pending, etc.) can be passed via `options` and
+ * flows through to the Durable client unchanged.
+ *
+ * @see https://docs.hotmesh.io/types/types_durable.WorkflowOptions.html
+ */
 export async function invokeWorkflow(
   input: {
     type: string;
     data?: Record<string, any>;
     metadata?: Record<string, any>;
     execute_as?: string;
+    /** Passthrough to Durable WorkflowOptions. */
+    options?: Record<string, any>;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
@@ -37,6 +50,7 @@ export async function invokeWorkflow(
       data: input.data || {},
       metadata: input.metadata,
       executeAs: input.execute_as,
+      options: input.options,
       auth: {
         userId: auth.userId,
       },
@@ -52,6 +66,15 @@ export async function invokeWorkflow(
   }
 }
 
+/**
+ * Get the execution status of a workflow.
+ *
+ * Returns the HotMesh status code (0 = completed, 1 = running).
+ * Resolves the workflow handle via task record or worker registry.
+ *
+ * @param input.workflowId — HotMesh workflow ID
+ * @returns `{ status: 200, data: { workflowId, status } }` or 404
+ */
 export async function getWorkflowStatus(input: {
   workflowId: string;
 }): Promise<LTApiResult> {
@@ -76,6 +99,15 @@ export async function getWorkflowStatus(input: {
   }
 }
 
+/**
+ * Get the result of a completed workflow.
+ *
+ * Returns 202 if the workflow is still running, 200 with the result
+ * payload when complete. Never blocks — always returns immediately.
+ *
+ * @param input.workflowId — HotMesh workflow ID
+ * @returns `{ status: 200, data: { workflowId, result } }` or 202 if running
+ */
 export async function getWorkflowResult(input: {
   workflowId: string;
 }): Promise<LTApiResult> {
@@ -108,6 +140,14 @@ export async function getWorkflowResult(input: {
   }
 }
 
+/**
+ * Terminate a running workflow.
+ *
+ * Interrupts the workflow execution immediately via HotMesh.
+ *
+ * @param input.workflowId — HotMesh workflow ID
+ * @returns `{ status: 200, data: { terminated: true, workflowId } }` or 404
+ */
 export async function terminateWorkflow(input: {
   workflowId: string;
 }): Promise<LTApiResult> {
@@ -133,6 +173,15 @@ export async function terminateWorkflow(input: {
   }
 }
 
+/**
+ * Export the full state of a workflow.
+ *
+ * Returns the serialized workflow state including all activity
+ * results, signals, and metadata.
+ *
+ * @param input.workflowId — HotMesh workflow ID
+ * @returns `{ status: 200, data: <exported state> }` or 404
+ */
 export async function exportWorkflow(input: {
   workflowId: string;
 }): Promise<LTApiResult> {
@@ -154,6 +203,12 @@ export async function exportWorkflow(input: {
 
 // ── Discovery ───────────────────────────────────────────────────────────────
 
+/**
+ * List active workflow workers with their registration status.
+ *
+ * @param input.include_system — include system workflows (default: false)
+ * @returns `{ status: 200, data: { workers: [{ name, task_queue, registered, system }] } }`
+ */
 export async function listWorkers(input: {
   include_system?: boolean;
 }): Promise<LTApiResult> {
@@ -178,6 +233,16 @@ export async function listWorkers(input: {
   }
 }
 
+/**
+ * Discover all known workflow types from workers, history, and config.
+ *
+ * Merges three sources: active in-memory workers, historical entities
+ * from the durable jobs table, and registered workflow configs. Returns
+ * a unified list with status flags for each type.
+ *
+ * @param input.include_system — include system workflows (default: false)
+ * @returns `{ status: 200, data: { workflows: [{ workflow_type, task_queue, registered, active, invocable, ... }] } }`
+ */
 export async function listDiscoveredWorkflows(input: {
   include_system?: boolean;
 }): Promise<LTApiResult> {
@@ -226,6 +291,11 @@ export async function listDiscoveredWorkflows(input: {
   }
 }
 
+/**
+ * List all cron-scheduled workflows and their active state.
+ *
+ * @returns `{ status: 200, data: { schedules: [{ workflow_type, cron_schedule, active, ... }] } }`
+ */
 export async function getCronStatus(): Promise<LTApiResult> {
   try {
     const configs = await configService.listWorkflowConfigs();
@@ -250,6 +320,11 @@ export async function getCronStatus(): Promise<LTApiResult> {
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
+/**
+ * List all registered workflow configurations.
+ *
+ * @returns `{ status: 200, data: { workflows: LTWorkflowConfig[] } }`
+ */
 export async function listWorkflowConfigs(): Promise<LTApiResult> {
   try {
     const configs = await configService.listWorkflowConfigs();
@@ -259,6 +334,12 @@ export async function listWorkflowConfigs(): Promise<LTApiResult> {
   }
 }
 
+/**
+ * Get a single workflow configuration by type.
+ *
+ * @param input.type — workflow type name (e.g. `"reviewContent"`)
+ * @returns `{ status: 200, data: <config> }` or 404
+ */
 export async function getWorkflowConfig(input: {
   type: string;
 }): Promise<LTApiResult> {
@@ -273,6 +354,27 @@ export async function getWorkflowConfig(input: {
   }
 }
 
+/**
+ * Create or replace a workflow configuration.
+ *
+ * Invalidates the config cache and restarts the cron schedule if one
+ * is defined. Idempotent — safe to call repeatedly with the same input.
+ *
+ * @param input.type — workflow type name
+ * @param input.invocable — whether the workflow can be started via the API
+ * @param input.task_queue — HotMesh task queue
+ * @param input.default_role — default escalation role
+ * @param input.description — human-readable description
+ * @param input.execute_as — service account for proxy invocation
+ * @param input.roles — roles that can resolve escalations
+ * @param input.invocation_roles — roles that can invoke this workflow
+ * @param input.consumes — workflow types whose data this workflow consumes
+ * @param input.tool_tags — MCP tool tags for discovery
+ * @param input.envelope_schema — JSON Schema for envelope.data validation
+ * @param input.resolver_schema — JSON Schema for resolver payload validation
+ * @param input.cron_schedule — cron expression for scheduled execution
+ * @returns `{ status: 200, data: <saved config> }`
+ */
 export async function upsertWorkflowConfig(input: {
   type: string;
   invocable?: boolean;
@@ -312,6 +414,15 @@ export async function upsertWorkflowConfig(input: {
   }
 }
 
+/**
+ * Delete a workflow configuration.
+ *
+ * Removes the config record and invalidates the cache. Active workers
+ * continue running — this only removes the config/interceptor binding.
+ *
+ * @param input.type — workflow type name
+ * @returns `{ status: 200, data: { deleted: true, workflow_type } }` or 404
+ */
 export async function deleteWorkflowConfig(input: {
   type: string;
 }): Promise<LTApiResult> {

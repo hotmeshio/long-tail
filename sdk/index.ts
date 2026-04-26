@@ -94,6 +94,7 @@ export function createClient(options: LTClientOptions = {}) {
 
     // ── Escalations ────────────────────────────────────────────────────────
     escalations: {
+      create: bindAuth(escalationsApi.createEscalation, auth),
       list: bindAuth(escalationsApi.listEscalations, auth),
       listAvailable: bindAuth(escalationsApi.listAvailableEscalations, auth),
       listTypes: escalationsApi.listDistinctTypes,

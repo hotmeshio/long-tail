@@ -2,6 +2,11 @@ import { maintenanceRegistry } from '../services/maintenance';
 import type { LTMaintenanceConfig } from '../types/maintenance';
 import type { LTApiResult } from '../types/sdk';
 
+/**
+ * Return the current maintenance cron configuration and active state.
+ *
+ * @returns `{ status: 200, data: { config, active } }`
+ */
 export function getMaintenanceConfig(): LTApiResult {
   return {
     status: 200,
@@ -9,6 +14,16 @@ export function getMaintenanceConfig(): LTApiResult {
   };
 }
 
+/**
+ * Replace the maintenance configuration and restart the cron.
+ *
+ * Disconnects the current maintenance schedule, registers the new
+ * config, and reconnects. The cron begins executing immediately.
+ *
+ * @param input.schedule — cron expression (e.g. `"0 3 * * *"`)
+ * @param input.rules — maintenance rule definitions
+ * @returns `{ status: 200, data: { config, restarted: true } }`
+ */
 export async function updateMaintenanceConfig(
   input: { schedule: string; rules: LTMaintenanceConfig['rules'] },
 ): Promise<LTApiResult> {

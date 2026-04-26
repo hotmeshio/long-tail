@@ -1,6 +1,11 @@
 import * as namespaceService from '../services/namespace';
 import type { LTApiResult } from '../types/sdk';
 
+/**
+ * List all registered namespaces.
+ *
+ * @returns `{ status: 200, data: { namespaces: LTNamespace[] } }`
+ */
 export async function listNamespaces(): Promise<LTApiResult> {
   try {
     const namespaces = await namespaceService.listNamespaces();
@@ -10,6 +15,14 @@ export async function listNamespaces(): Promise<LTApiResult> {
   }
 }
 
+/**
+ * Register a new namespace.
+ *
+ * @param input.name — unique namespace identifier
+ * @param input.description — human-readable description
+ * @param input.metadata — arbitrary key-value metadata
+ * @returns `{ status: 200, data: <namespace record> }`
+ */
 export async function registerNamespace(input: {
   name: string;
   description?: string;
