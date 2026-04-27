@@ -11,6 +11,7 @@ export type {
   ReviewContentEnvelopeData,
   KitchenSinkEnvelopeData,
   BasicEchoEnvelopeData,
+  BasicSignalEnvelopeData,
   AssemblyLineEnvelopeData,
   StepIteratorEnvelopeData,
   ReverterEnvelopeData,

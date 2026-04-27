@@ -55,7 +55,14 @@ VALUES
    'Kitchen sink — demonstrates sleep, signals, parallel activities, escalation, and every durable primitive',
    '{}',
    '{"data": {"name": "World", "mode": "full"}, "metadata": {"source": "dashboard"}}'::jsonb,
-   NULL)
+   NULL),
+
+  -- Basic signal (configured, NOT certified — no escalation roles)
+  ('basicSignal', 'long-tail-examples', 'reviewer', true,
+   'Signal-based escalation — workflow stays running while waiting for human input via conditionLT',
+   '{}',
+   '{"data": {"message": "Deployment approval needed for v2.1.0", "role": "reviewer"}, "metadata": {"certified": false, "source": "dashboard"}}'::jsonb,
+   '{"properties": {"approved": {"type": "boolean", "default": false, "description": "Approve this deployment?"}, "notes": {"type": "string", "default": "", "description": "Reviewer notes — visible to the workflow author"}}}'::jsonb)
 ON CONFLICT (workflow_type) DO NOTHING;
 
 -- ─── Assign roles to all workflows ──────────────────────────────────────────
@@ -63,5 +70,6 @@ ON CONFLICT (workflow_type) DO NOTHING;
 INSERT INTO lt_config_roles (workflow_type, role)
 SELECT workflow_type, unnest(ARRAY['reviewer', 'engineer', 'admin'])
 FROM lt_config_workflows
+WHERE workflow_type != 'basicSignal'
 ON CONFLICT (workflow_type, role) DO NOTHING;
 

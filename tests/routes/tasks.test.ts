@@ -4,6 +4,135 @@ import { setupRouteTest, authHeaders } from './setup';
 const ctx = setupRouteTest(4621);
 
 describe('Task routes', () => {
+  describe('POST /api/tasks (create)', () => {
+    const validTask = {
+      workflow_id: 'test-wf-123',
+      workflow_type: 'testWorkflow',
+      lt_type: 'workflow',
+      signal_id: 'sig-test-123',
+      parent_workflow_id: 'test-wf-123',
+      envelope: '{"data":{"key":"value"}}',
+    };
+
+    it('returns 401 without auth', async () => {
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validTask),
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when workflow_id is missing', async () => {
+      const { workflow_id, ...missing } = validTask;
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify(missing),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('workflow_id');
+    });
+
+    it('returns 400 when workflow_type is missing', async () => {
+      const { workflow_type, ...missing } = validTask;
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify(missing),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('workflow_type');
+    });
+
+    it('returns 400 when lt_type is missing', async () => {
+      const { lt_type, ...missing } = validTask;
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify(missing),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('lt_type');
+    });
+
+    it('returns 400 when signal_id is missing', async () => {
+      const { signal_id, ...missing } = validTask;
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify(missing),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('signal_id');
+    });
+
+    it('returns 400 when parent_workflow_id is missing', async () => {
+      const { parent_workflow_id, ...missing } = validTask;
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify(missing),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('parent_workflow_id');
+    });
+
+    it('creates a task with valid input', async () => {
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify(validTask),
+      });
+      const body = await res.json() as any;
+      expect(res.status).toBe(201);
+      expect(body).toHaveProperty('id');
+      expect(body.workflow_id).toBe(validTask.workflow_id);
+      expect(body.workflow_type).toBe(validTask.workflow_type);
+      expect(body.lt_type).toBe(validTask.lt_type);
+      expect(body.signal_id).toBe(validTask.signal_id);
+      expect(body.status).toBe('pending');
+    });
+
+    it('creates a task with optional fields', async () => {
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify({
+          ...validTask,
+          workflow_id: 'test-wf-optional',
+          signal_id: 'sig-optional',
+          task_queue: 'test-queue',
+          origin_id: 'origin-123',
+          priority: 1,
+          metadata: { source: 'test' },
+        }),
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json() as any;
+      expect(body.task_queue).toBe('test-queue');
+      expect(body.origin_id).toBe('origin-123');
+      expect(body.priority).toBe(1);
+    });
+
+    it('defaults envelope to empty object when omitted', async () => {
+      const { envelope, ...noEnvelope } = validTask;
+      const res = await fetch(`${ctx.BASE}/tasks`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify({ ...noEnvelope, workflow_id: 'test-wf-no-env', signal_id: 'sig-no-env' }),
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json() as any;
+      expect(body.envelope).toBe('{}');
+    });
+  });
+
   describe('GET /api/tasks', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/tasks`);

@@ -77,21 +77,19 @@ export function EscalationDetailPage() {
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
   useEffect(() => {
-    if (metadataFormSchema) {
-      // waitFor escalation: build initial form from form_schema and include _form_schema for ResolverForm
-      const initial: Record<string, any> = { _form_schema: metadataFormSchema };
-      const props = metadataFormSchema.properties;
-      if (props && typeof props === 'object') {
-        for (const [key, def] of Object.entries(props)) {
-          const fieldDef = def as Record<string, any>;
-          initial[key] = fieldDef.default ?? '';
-        }
+    // Build typed form from schema with `properties` (escalation or workflow config)
+    const formSchema = metadataFormSchema ?? (resolverSchema?.properties ? resolverSchema : null);
+    if (formSchema?.properties) {
+      const initial: Record<string, any> = { _form_schema: formSchema };
+      for (const [key, def] of Object.entries(formSchema.properties)) {
+        const fieldDef = def as Record<string, any>;
+        initial[key] = fieldDef.default ?? '';
       }
       setJson(JSON.stringify(initial, null, 2));
     } else {
       setJson(effectiveSchema ? JSON.stringify(effectiveSchema, null, 2) : '{}');
     }
-  }, [effectiveSchema, metadataFormSchema]);
+  }, [effectiveSchema, metadataFormSchema, resolverSchema]);
 
   // When triage or rounds-exhausted data is present, collapse Input/Output so structured context is central
   const hasTriage = hasTriageData(esc?.escalation_payload);

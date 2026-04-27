@@ -201,6 +201,20 @@ The new workflow ID follows the pattern `rerun-{escalationId}-{timestamp}`.
 
 Returned when the escalation has already been resolved.
 
+### Signal-based resolution (metadata.signal_id)
+
+When an escalation has `metadata.signal_id`, the resolve endpoint signals the running workflow instead of starting a new one. The workflow is still alive — it called `conditionLT(signalId)` and is paused.
+
+The resolver payload is augmented with `$escalation_id` before signaling:
+
+```json
+{ "approved": true, "notes": "Looks good", "$escalation_id": "esc-a1b2c3d4-..." }
+```
+
+The workflow is responsible for resolving the escalation. The `conditionLT()` helper handles this automatically — it strips `$escalation_id`, calls `ltResolveEscalation` as a durable activity, and returns the clean payload.
+
+If you use raw `Durable.workflow.condition()` instead, you must resolve the escalation yourself using the `$escalation_id` from the signal data.
+
 ### What happens during resolution
 
 1. The route reads the escalation record and verifies it is still `pending`.
@@ -208,6 +222,91 @@ Returned when the escalation has already been resolved.
 3. It injects `resolver` (the reviewer's payload) and `lt.escalationId` into the envelope.
 4. It starts a new workflow with the modified envelope on the original task queue.
 5. The LT interceptor detects `envelope.lt.escalationId`, marks the escalation as resolved, and signals the parent orchestrator (if any) that the child workflow has completed.
+
+## Resolver form schemas
+
+When a reviewer claims an escalation, the dashboard renders a typed form instead of a raw JSON editor — if a schema is available. There are two ways to attach a schema:
+
+### Option 1: Workflow config (static)
+
+Register a `resolver_schema` in the workflow registry wizard (Step 3, Certification). Every escalation from that workflow type inherits the schema automatically.
+
+### Option 2: Escalation metadata (dynamic)
+
+Pass `form_schema` inside `metadata` when creating an escalation. This overrides any workflow-level schema and is useful for one-off or dynamically generated forms.
+
+```json
+{
+  "type": "approval",
+  "role": "reviewer",
+  "description": "Review deployment to production",
+  "metadata": {
+    "form_schema": {
+      "properties": {
+        "approved": {
+          "type": "boolean",
+          "default": false,
+          "description": "Approve this deployment?"
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["staging", "production"],
+          "description": "Target environment"
+        },
+        "api_key": {
+          "type": "string",
+          "format": "password",
+          "description": "Deployment API key (stored as ephemeral token)"
+        },
+        "notes": {
+          "type": "string",
+          "default": "",
+          "description": "Optional reviewer notes"
+        },
+        "confidence": {
+          "type": "number",
+          "default": 0,
+          "description": "Confidence score (0-1)"
+        }
+      }
+    }
+  }
+}
+```
+
+### Supported field features
+
+| Schema property | Effect |
+|----------------|--------|
+| `type` | Inferred from value at runtime; hints only |
+| `default` | Pre-fills the form field |
+| `description` | Helper text displayed below the field label |
+| `enum` | Renders a dropdown select instead of free text |
+| `format: "password"` | Masks input; value is replaced with a 15-minute ephemeral token on resolution (never stored as plaintext) |
+
+### Field type rendering
+
+The dashboard infers field types from the default value:
+
+| Value type | Renders as |
+|-----------|------------|
+| `boolean` | Checkbox |
+| `number` | Number input |
+| `string` (short) | Text input |
+| `string` (>80 chars) | Textarea |
+| `string` + `enum` | Dropdown select |
+| `string` + `format: "password"` | Password input |
+| `null` | Disabled placeholder |
+| `array` | Read-only tag list |
+| `object` | Nested section with recursive field rendering |
+
+### Hidden fields
+
+Keys prefixed with `_` (e.g., `_internal_id`) are stored in the payload but hidden from the form UI. The `_form_schema` key is reserved — the dashboard stores the schema itself there for round-trip access during resolution.
+
+### Schema priority
+
+When both exist, `metadata.form_schema` takes precedence over `resolver_schema` from the workflow config. This lets workflows define a default form while allowing individual escalations to override it.
 
 ## Release expired claims
 

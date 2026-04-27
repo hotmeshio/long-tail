@@ -101,17 +101,27 @@ export function createLTInterceptor(options: {
         retry: { maximumAttempts: 3 },
       });
 
-      // 2. Load config — unregistered workflows still get ToolContext
-      const wfConfig = await activities.ltGetWorkflowConfig(wf.workflowName);
-      if (!wfConfig) {
-        const envelope = extractEnvelope(ctx);
+      const envelope = extractEnvelope(ctx);
+
+      // 2. Fast path: envelope.metadata.certified === false skips the DB
+      //    lookup entirely. Use this for configured (non-certified) workflows
+      //    that manage their own escalation lifecycle via conditionLT.
+      if (envelope?.metadata?.certified === false) {
         const toolCtx = buildToolContextFromEnvelope(
           envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
         );
         return toolCtx ? runWithToolContext(toolCtx, next) : next();
       }
 
-      const envelope = extractEnvelope(ctx);
+      // 3. Load config — unregistered/uncertified workflows get ToolContext only
+      const wfConfig = await activities.ltGetWorkflowConfig(wf.workflowName);
+      if (!wfConfig) {
+        const toolCtx = buildToolContextFromEnvelope(
+          envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
+        );
+        return toolCtx ? runWithToolContext(toolCtx, next) : next();
+      }
+
       const taskQueue = deriveTaskQueue(wf);
 
       // 3. Find existing task and handle re-run escalation resolution

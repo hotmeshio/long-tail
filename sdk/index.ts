@@ -85,6 +85,7 @@ export function createClient(options: LTClientOptions = {}) {
   return {
     // ── Tasks ──────────────────────────────────────────────────────────────
     tasks: {
+      create: bindAuth(tasksApi.createTask, auth),
       list: tasksApi.listTasks,
       get: tasksApi.getTask,
       listProcesses: tasksApi.listProcesses,

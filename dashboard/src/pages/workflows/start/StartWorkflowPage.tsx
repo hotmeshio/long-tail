@@ -2,16 +2,14 @@ import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useWorkflowConfigs, useDiscoveredWorkflows, useCronStatus } from '../../../api/workflows';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
-import type { LTWorkflowConfig } from '../../../api/types';
+import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
 import { ModeToggle } from './ModeToggle';
 import type { Mode } from './ModeToggle';
 import { WorkflowSelector } from './WorkflowSelector';
 import { StartNowPanel } from './StartNowPanel';
 import { SchedulePanel } from './SchedulePanel';
 
-export type InvokeTier = 'certified' | 'durable';
-
-export function StartWorkflowPage({ tier: _tier }: { tier?: InvokeTier }) {
+export function StartWorkflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: configsData, isLoading } = useWorkflowConfigs();
   const { data: discoveredData, isLoading: discoveredLoading } = useDiscoveredWorkflows();
@@ -22,10 +20,13 @@ export function StartWorkflowPage({ tier: _tier }: { tier?: InvokeTier }) {
 
   const configs: LTWorkflowConfig[] = configsData ?? [];
 
-  const certifiedTypes = useMemo(
-    () => new Set(configs.filter((c) => c.invocable).map((c) => c.workflow_type)),
-    [configs],
-  );
+  const tierMap = useMemo(() => {
+    const map = new Map<string, WorkflowTier>();
+    for (const dw of discoveredData ?? []) {
+      map.set(dw.workflow_type, dw.tier ?? 'durable');
+    }
+    return map;
+  }, [discoveredData]);
 
   const invocableConfigs = useMemo(() => {
     const certified = configs.filter((c) => c.invocable);
@@ -101,7 +102,7 @@ export function StartWorkflowPage({ tier: _tier }: { tier?: InvokeTier }) {
             configs={invocableConfigs}
             selectedType={selectedType}
             onSelect={handleSelect}
-            certifiedTypes={certifiedTypes}
+            tierMap={tierMap}
           />
 
           <div className="lg:col-span-2">

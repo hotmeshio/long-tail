@@ -2,6 +2,46 @@
 
 Manage human-in-the-loop escalations -- list, claim, resolve, and bulk-operate on workflow escalations.
 
+## create
+
+Create an escalation. The caller must hold the target role or be a superadmin.
+
+```typescript
+const result = await lt.escalations.create({
+  type: 'approval',
+  role: 'reviewer',
+  description: 'Review deployment to production',
+  metadata: {
+    form_schema: {
+      properties: {
+        approved: { type: 'boolean', default: false, description: 'Approve?' },
+        environment: { type: 'string', enum: ['staging', 'production'] },
+        api_key: { type: 'string', format: 'password', description: 'Deploy key' },
+      },
+    },
+  },
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `string` | Yes | Escalation category |
+| `role` | `string` | Yes | Target role for the reviewer queue |
+| `subtype` | `string` | No | Subcategory (defaults to `type`) |
+| `description` | `string` | No | Human-readable reason |
+| `priority` | `number` | No | 1 (highest) to 4 (lowest), default: 2 |
+| `envelope` | `string` | No | JSON-serialized workflow envelope |
+| `metadata` | `object` | No | Arbitrary metadata; include `form_schema` for typed resolver forms |
+| `escalation_payload` | `string` | No | JSON context data shown to the reviewer |
+
+**Returns:** `LTApiResult<Escalation>` with status 201.
+
+**Auth:** Required (RBAC enforced)
+
+---
+
 ## list
 
 List escalations with optional filters, scoped to the authenticated user's roles.
@@ -232,6 +272,103 @@ const result = await lt.escalations.resolve({
 **Returns:** `LTApiResult<{ signaled, escalationId, workflowId }>` (signal path) or `LTApiResult<{ started, escalationId, workflowId }>` (re-run path) -- returns 404 if not found, 409 if not pending.
 
 **Auth:** Required
+
+---
+
+## conditionLT (workflow helper)
+
+Wait for a signal and automatically resolve the associated escalation. This is the counterpart to `executeLT` — where `executeLT` wraps `startChild` + `condition`, `conditionLT` wraps `condition` + escalation resolution.
+
+```typescript
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function myWorkflow(envelope: LTEnvelope) {
+  const signalId = `approval-${Durable.workflow.workflowId}`;
+
+  // Create escalation with signal_id in metadata
+  await activities.ltCreateEscalation({
+    type: 'approval',
+    role: 'reviewer',
+    workflow_id: Durable.workflow.workflowId,
+    workflow_type: 'myWorkflow',
+    task_queue: 'my-queue',
+    metadata: {
+      signal_id: signalId,
+      form_schema: {
+        properties: {
+          approved: { type: 'boolean', default: false },
+          notes: { type: 'string', default: '' },
+        },
+      },
+    },
+    envelope: JSON.stringify(envelope),
+  });
+
+  // Pause — dashboard signals on resolve
+  const decision = await conditionLT<{ approved: boolean; notes: string }>(signalId);
+  // decision is clean: { approved: true, notes: "..." }
+  // $escalation_id was stripped and the escalation was resolved via durable activity
+}
+```
+
+**How it works:**
+
+1. The workflow creates an escalation with `metadata.signal_id` pointing to its own signal key
+2. The workflow calls `conditionLT(signalId)` and pauses
+3. A reviewer claims and resolves the escalation in the dashboard
+4. The resolve API injects `$escalation_id` into the payload and signals the workflow
+5. `conditionLT` receives the signal, strips `$escalation_id`, calls `ltResolveEscalation` as a durable activity, and returns the clean payload
+
+The escalation resolution happens inside the workflow as a durable activity — crash-safe and transactional within the workflow's execution context.
+
+If you use raw `Durable.workflow.condition()` instead, the `$escalation_id` field will be present in the payload and you are responsible for resolving the escalation yourself.
+
+---
+
+## Resolver form schemas
+
+When a reviewer claims an escalation in the dashboard, a typed form is rendered instead of a raw JSON editor — if a schema is available. There are two ways to provide one:
+
+**Option 1 — Workflow config (static):** Set `resolver_schema` in the workflow registry wizard (Step 3, Certification). Every escalation from that workflow inherits the schema.
+
+**Option 2 — Escalation metadata (dynamic):** Pass `form_schema` inside `metadata` when creating an escalation. This overrides any workflow-level schema.
+
+### Schema shape
+
+```typescript
+{
+  properties: {
+    fieldName: {
+      type: 'string',         // inferred from default value at runtime
+      default: 'initial',     // pre-fills the form field
+      description: 'Helper',  // text below the label
+      enum: ['a', 'b'],       // renders a dropdown select
+      format: 'password',     // masks input; stored as 15-min ephemeral token
+    },
+  },
+}
+```
+
+### Field rendering by type
+
+| Default value | Renders as |
+|--------------|------------|
+| `boolean` | Checkbox |
+| `number` | Number input |
+| `string` (short) | Text input |
+| `string` (>80 chars) | Textarea |
+| `string` + `enum` | Dropdown |
+| `string` + `format: "password"` | Password input (ephemeral token on resolve) |
+| `object` | Nested section with recursive fields |
+| `array` | Read-only tag list |
+
+### Hidden fields
+
+Keys prefixed with `_` are stored in the payload but hidden from the form. `_form_schema` is reserved for round-trip schema access.
+
+### Priority
+
+`metadata.form_schema` takes precedence over `resolver_schema` from the workflow config.
 
 ---
 

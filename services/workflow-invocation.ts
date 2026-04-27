@@ -165,9 +165,13 @@ async function resolveTaskQueue(workflowType: string): Promise<string> {
 export async function checkInvocationRoles(
   workflowType: string,
   userId: string,
+  authRole?: string,
 ): Promise<void> {
   const wfConfig = await configService.getWorkflowConfig(workflowType);
   if (!wfConfig || wfConfig.invocation_roles.length === 0) return;
+
+  // Superadmin from JWT bypasses all invocation role checks
+  if (authRole === 'superadmin') return;
 
   const user = await userService.getUserByExternalId(userId);
   if (!user) {

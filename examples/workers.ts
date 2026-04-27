@@ -5,6 +5,7 @@ import * as assemblyLineWorkflow from './workflows/assembly-line';
 import * as workstationWorkflow from './workflows/assembly-line/worker';
 import * as stepIteratorWorkflow from './workflows/assembly-line/iterator';
 import * as reverterWorkflow from './workflows/assembly-line/reverter';
+import * as basicSignalWorkflow from './workflows/basic-signal';
 
 /**
  * Example workers that ship with Long Tail.
@@ -19,4 +20,5 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: workstationWorkflow.workstation },
   { taskQueue: 'long-tail-examples', workflow: stepIteratorWorkflow.stepIterator },
   { taskQueue: 'long-tail-examples', workflow: reverterWorkflow.reverter },
+  { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal },
 ];

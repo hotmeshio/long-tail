@@ -116,9 +116,12 @@ export interface WorkflowExecution {
   activities?: ActivityDetail[];
 }
 
+export type WorkflowTier = 'durable' | 'configured' | 'certified';
+
 export interface DiscoveredWorkflow {
   workflow_type: string;
   task_queue: string | null;
+  tier: WorkflowTier;
   registered: boolean;
   active?: boolean;
   invocable: boolean;

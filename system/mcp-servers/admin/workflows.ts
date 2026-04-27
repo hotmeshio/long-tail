@@ -46,9 +46,16 @@ export function registerWorkflowTools(server: McpServer): void {
         .map((wt) => {
           const config = configMap.get(wt);
           const worker = activeWorkers.get(wt);
+          const hasCertification = !!(
+            config &&
+            ((config.roles?.length ?? 0) > 0 ||
+             (config.consumes?.length ?? 0) > 0)
+          );
+          const tier = !config ? 'durable' : hasCertification ? 'certified' : 'configured';
           return {
             workflow_type: wt,
             task_queue: config?.task_queue ?? worker?.taskQueue ?? null,
+            tier,
             registered: !!config,
             active: !!worker,
             invocable: config?.invocable ?? false,

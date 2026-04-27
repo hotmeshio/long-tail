@@ -1,6 +1,6 @@
-import { Workflow, ShieldCheck, Wand2 } from 'lucide-react';
+import { Workflow, ShieldCheck, Settings, Wand2 } from 'lucide-react';
 
-type WorkflowVariant = 'durable' | 'certified' | 'pipeline';
+type WorkflowVariant = 'durable' | 'configured' | 'certified' | 'pipeline';
 
 interface WorkflowPillProps {
   type: string;
@@ -11,9 +11,10 @@ interface WorkflowPillProps {
 }
 
 const VARIANT_CONFIG: Record<WorkflowVariant, { icon: typeof Workflow; color: string }> = {
-  certified: { icon: ShieldCheck, color: 'text-status-success' },
-  pipeline:  { icon: Wand2,       color: 'text-purple-400' },
-  durable:   { icon: Workflow,     color: 'text-accent/75' },
+  certified:  { icon: ShieldCheck, color: 'text-status-success' },
+  configured: { icon: Settings,    color: 'text-status-info' },
+  pipeline:   { icon: Wand2,       color: 'text-purple-400' },
+  durable:    { icon: Workflow,     color: 'text-accent/75' },
 };
 
 export function WorkflowPill({ type, size = 'sm', certified, variant }: WorkflowPillProps) {

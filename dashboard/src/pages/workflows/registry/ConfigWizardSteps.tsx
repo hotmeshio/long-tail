@@ -38,7 +38,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
         {showPickList && !form.workflow_type ? (
           <div className="space-y-2">
             <p className="text-xs text-text-secondary">
-              Select a durable workflow to register as certified:
+              Select a durable workflow to register:
             </p>
             <div className="grid gap-1">
               {durableTypes.map((type) => (
@@ -82,7 +82,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
           </>
         )}
         <p className={hintCls}>
-          Registering a durable workflow makes it certified — the interceptor wraps every execution so failures escalate instead of throwing.
+          Register a workflow to configure invocation schemas and dashboard visibility. Certification for HITL escalation is optional (step 3).
         </p>
       </div>
 
@@ -114,64 +114,9 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
   );
 }
 
-// ── Step 2: Escalation ──────────────────────────────────────────────────────
+// ── Step 2: Invocation ─────────────────────────────────────────────────────
 
-export function AccessStep({ form, set }: StepProps) {
-  const { data: configs } = useWorkflowConfigs();
-  const consumesOptions = (configs ?? [])
-    .map((c) => c.workflow_type)
-    .filter((t) => t !== form.workflow_type);
-
-  return (
-    <div className="space-y-5">
-      <p className="text-xs text-text-secondary leading-relaxed">
-        Configure how escalations are routed and who can interact with this workflow.
-      </p>
-
-      <div>
-        <label className={labelCls}>Default Escalation Role</label>
-        <RolePicker
-          selected={csvToArray(form.default_role)}
-          onChange={(roles) => set('default_role', roles[0] ?? '')}
-          single
-          placeholder="Select escalation role..."
-        />
-        <p className={hintCls}>
-          When this workflow escalates, assign to users with this role
-        </p>
-      </div>
-
-      <div>
-        <label className={labelCls}>Escalation Roles</label>
-        <RolePicker
-          selected={csvToArray(form.roles)}
-          onChange={(roles) => set('roles', arrayToCsv(roles))}
-          placeholder="Select who can resolve escalations..."
-        />
-        <p className={hintCls}>
-          Users with any of these roles can claim and resolve escalations from this workflow.
-        </p>
-      </div>
-
-      <div>
-        <label className={labelCls}>Consumes</label>
-        <WorkflowPicker
-          options={consumesOptions}
-          selected={csvToArray(form.consumes)}
-          onChange={(workflows) => set('consumes', arrayToCsv(workflows))}
-          placeholder="Select workflow dependencies..."
-        />
-        <p className={hintCls}>
-          Output from these upstream workflows will be injected into the input envelope for this workflow.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Step 3: Invocation & Schemas ────────────────────────────────────────────
-
-export function SchemasStep({ form, set }: StepProps) {
+export function InvocationStep({ form, set }: StepProps) {
   return (
     <div className="space-y-5">
       {/* Invocable toggle */}
@@ -248,26 +193,112 @@ export function SchemasStep({ form, set }: StepProps) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Resolver schema — always available */}
+// ── Step 3: Advanced ───────────────────────────────────────────────────────
+
+export function AdvancedStep({ form, set }: StepProps) {
+  const { data: configs } = useWorkflowConfigs();
+  const consumesOptions = (configs ?? [])
+    .map((c) => c.workflow_type)
+    .filter((t) => t !== form.workflow_type);
+
+  return (
+    <div className="space-y-5">
+      {/* Resolver Schema — always available */}
       <div>
         <label className={labelCls}>Resolver Schema</label>
         <textarea
           value={form.resolver_schema}
           onChange={(e) => set('resolver_schema', e.target.value)}
-          placeholder={`{\n  "approved": true,\n  "analysis": {\n    "confidence": 0.95,\n    "flags": [],\n    "summary": "Content meets guidelines"\n  }\n}`}
+          placeholder={`{\n  "properties": {\n    "approved": { "type": "boolean", "default": false, "description": "Approve?" },\n    "notes": { "type": "string", "default": "", "description": "Reviewer notes" }\n  }\n}`}
           className={jsonCls}
           rows={8}
           spellCheck={false}
         />
         <p className={hintCls}>
-          The shape of data a human or AI provides when resolving an escalation from this workflow.
-          Pre-fills the JSON editor in the escalation resolution form.
+          Default form template for resolving escalations from this workflow.
+          Use <span className="font-mono">properties</span> with <span className="font-mono">type</span>, <span className="font-mono">default</span>, <span className="font-mono">description</span>, <span className="font-mono">enum</span>, and <span className="font-mono">format</span> for typed form fields.
         </p>
         {form.resolver_schema.trim() && !jsonValid(form.resolver_schema) && (
           <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
         )}
       </div>
+
+      {/* Certify toggle */}
+      <div className="flex gap-6 pt-1">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.certified}
+            onChange={(e) => set('certified', e.target.checked)}
+            className="w-4 h-4 rounded border-border accent-accent"
+          />
+          <span className="text-xs text-text-primary font-medium">Certify for HITL Escalation</span>
+        </label>
+      </div>
+      <p className={hintCls}>
+        Certified workflows use the interceptor to wrap executions — failures
+        escalate to human reviewers instead of throwing.
+      </p>
+
+      {form.certified ? (
+        <>
+          {/* Default Escalation Role */}
+          <div>
+            <label className={labelCls}>Default Escalation Role</label>
+            <RolePicker
+              selected={csvToArray(form.default_role)}
+              onChange={(roles) => set('default_role', roles[0] ?? '')}
+              single
+              placeholder="Select escalation role..."
+            />
+            <p className={hintCls}>
+              When this workflow escalates, assign to users with this role
+            </p>
+          </div>
+
+          {/* Escalation Roles */}
+          <div>
+            <label className={labelCls}>Escalation Roles</label>
+            <RolePicker
+              selected={csvToArray(form.roles)}
+              onChange={(roles) => set('roles', arrayToCsv(roles))}
+              placeholder="Select who can resolve escalations..."
+            />
+            <p className={hintCls}>
+              Users with any of these roles can claim and resolve escalations from this workflow.
+            </p>
+          </div>
+
+          {/* Consumes */}
+          <div>
+            <label className={labelCls}>Consumes</label>
+            <WorkflowPicker
+              options={consumesOptions}
+              selected={csvToArray(form.consumes)}
+              onChange={(workflows) => set('consumes', arrayToCsv(workflows))}
+              placeholder="Select workflow dependencies..."
+            />
+            <p className={hintCls}>
+              Output from these upstream workflows will be injected into the input envelope for this workflow.
+            </p>
+          </div>
+        </>
+      ) : (
+        <div className="py-4 px-4 bg-surface-sunken/50 rounded-md text-center">
+          <p className="text-xs text-text-tertiary">
+            This workflow will run as standard durable without the interceptor.
+            Enable{' '}
+            <span className="font-medium text-text-secondary">
+              Certify for HITL Escalation
+            </span>{' '}
+            to add automatic escalation routing and role-based resolution.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

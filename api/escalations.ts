@@ -746,7 +746,49 @@ export async function resolveEscalation(
       return { status: 409, error: 'Escalation not available for resolution' };
     }
 
-    // 2. waitFor signal escalation -- signal the paused workflow directly
+    // 2. Lightweight signal path: metadata.signal_id + escalation fields
+    //    The workflow called `await conditionLT(signalId)` and created its
+    //    own escalation with the signal_id in metadata. On resolution, we
+    //    inject $escalation_id into the payload and signal the running
+    //    workflow. The workflow is responsible for resolving the escalation
+    //    (conditionLT handles this automatically via a durable activity).
+    const metadataSignalId = (escalation.metadata as any)?.signal_id;
+    if (metadataSignalId && escalation.workflow_id && escalation.task_queue && escalation.workflow_type) {
+      const client = createClient();
+      const handle = await client.workflow.getHandle(
+        escalation.task_queue,
+        escalation.workflow_type,
+        escalation.workflow_id,
+      );
+      await handle.signal(metadataSignalId, {
+        ...resolverPayload,
+        $escalation_id: escalation.id,
+      });
+
+      publishEscalationEvent({
+        type: 'escalation.resolved',
+        source: 'api',
+        workflowId: escalation.workflow_id,
+        workflowName: escalation.workflow_type,
+        taskQueue: escalation.task_queue,
+        taskId: escalation.task_id!,
+        escalationId: escalation.id,
+        originId: escalation.origin_id ?? undefined,
+        status: 'resolved',
+      });
+
+      return {
+        status: 200,
+        data: {
+          signaled: true,
+          escalationId: escalation.id,
+          workflowId: escalation.workflow_id,
+        },
+      };
+    }
+
+    // 3. waitFor signal escalation -- signal the paused workflow directly
+    //    (full signal_routing object from interceptor/MCP tool)
     const signalRouting = (escalation.metadata as any)?.signal_routing;
     if (signalRouting?.signalId) {
       // Replace password fields with ephemeral tokens so plaintext never enters the signal store
@@ -806,7 +848,7 @@ export async function resolveEscalation(
       };
     }
 
-    // 3. Reconstruct the original envelope from the escalation or task
+    // 4. Reconstruct the original envelope from the escalation or task
     let envelope: Record<string, any> = {};
     if (escalation.envelope) {
       try {
@@ -821,7 +863,7 @@ export async function resolveEscalation(
       }
     }
 
-    // 4. Check escalation strategy for triage routing
+    // 5. Check escalation strategy for triage routing
     const strategy = escalationStrategyRegistry.current;
     if (strategy) {
       const directive = await strategy.onResolution({
@@ -889,13 +931,13 @@ export async function resolveEscalation(
       }
     }
 
-    // 5. If no workflow_type, this is a notification-only escalation -- acknowledge and close
+    // 6. If no workflow_type, this is a notification-only escalation -- acknowledge and close
     if (!escalation.workflow_type || !escalation.task_queue) {
       await escalationService.resolveEscalation(escalation.id, resolverPayload);
       return { status: 200, data: { acknowledged: true, escalationId: escalation.id } };
     }
 
-    // 6. Standard re-run: inject resolver data and start original workflow
+    // 7. Standard re-run: inject resolver data and start original workflow
     envelope.resolver = resolverPayload;
     envelope.lt = {
       ...envelope.lt,

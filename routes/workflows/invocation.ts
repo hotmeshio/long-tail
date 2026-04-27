@@ -31,7 +31,7 @@ router.post('/:type/invoke', async (req, res) => {
       execute_as,
       options: Object.keys(options).length > 0 ? options : undefined,
     },
-    { userId: req.auth?.userId ?? '' },
+    { userId: req.auth?.userId ?? '', role: req.auth?.role, scopes: req.auth?.scopes },
   );
   res.status(result.status).json(result.data ?? { error: result.error });
 });

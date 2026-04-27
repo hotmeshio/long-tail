@@ -1,6 +1,45 @@
 # lt.tasks
 
-Query workflow tasks and processes tracked by the Long Tail interceptor.
+Create and query workflow tasks and processes tracked by the Long Tail interceptor.
+
+## create
+
+Create a new task record.
+
+```typescript
+const result = await lt.tasks.create({
+  workflow_id: 'order-pipeline-abc123',
+  workflow_type: 'orderPipeline',
+  lt_type: 'workflow',
+  signal_id: 'sig-abc123',
+  parent_workflow_id: 'order-pipeline-abc123',
+  envelope: '{"data":{"orderId":"order-456"}}',
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `workflow_id` | `string` | Yes | HotMesh workflow ID |
+| `workflow_type` | `string` | Yes | Registered workflow name |
+| `lt_type` | `string` | Yes | Interceptor classification |
+| `signal_id` | `string` | Yes | HotMesh signal ID for resume/replay |
+| `parent_workflow_id` | `string` | Yes | Orchestrator workflow ID |
+| `task_queue` | `string` | No | Task queue the workflow runs on |
+| `origin_id` | `string` | No | Correlation ID shared by sibling workflows |
+| `parent_id` | `string` | No | Direct parent workflow ID |
+| `envelope` | `string` | No | JSON-serialized input envelope (default: `{}`) |
+| `metadata` | `object` | No | Arbitrary metadata |
+| `priority` | `number` | No | Numeric priority (default: 2) |
+| `trace_id` | `string` | No | Trace ID for distributed tracing |
+| `span_id` | `string` | No | Span ID for distributed tracing |
+
+**Returns:** `LTApiResult<Task>` with status 201.
+
+**Auth:** Required (authenticated user is recorded as `initiated_by`)
+
+---
 
 ## list
 

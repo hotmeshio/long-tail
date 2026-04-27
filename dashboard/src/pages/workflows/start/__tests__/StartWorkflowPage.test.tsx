@@ -37,7 +37,7 @@ const mockConfigs = [
 ];
 
 const mockDiscovered = [
-  { workflow_type: 'durableOnly', task_queue: 'durable-queue', active: true },
+  { workflow_type: 'durableOnly', task_queue: 'durable-queue', tier: 'durable', active: true },
 ];
 
 const mockCronEntries = [
