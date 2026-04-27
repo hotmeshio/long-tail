@@ -1,6 +1,73 @@
 import * as taskService from '../services/task';
 import * as escalationService from '../services/escalation';
-import type { LTApiResult } from '../types/sdk';
+import type { LTApiResult, LTApiAuth } from '../types/sdk';
+
+/**
+ * Create a task record.
+ *
+ * Tasks represent workflow executions tracked by the LT interceptor.
+ * Required fields: `workflow_id`, `workflow_type`, `lt_type`,
+ * `signal_id`, `parent_workflow_id`, and `envelope`.
+ *
+ * @returns `{ status: 201, data: <task record> }`
+ */
+export async function createTask(
+  input: {
+    workflow_id: string;
+    workflow_type: string;
+    lt_type: string;
+    task_queue?: string;
+    signal_id: string;
+    parent_workflow_id: string;
+    origin_id?: string;
+    parent_id?: string;
+    envelope?: string;
+    metadata?: Record<string, any>;
+    priority?: number;
+    trace_id?: string;
+    span_id?: string;
+  },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    const { workflow_id, workflow_type, lt_type, signal_id, parent_workflow_id } = input;
+    if (!workflow_id || typeof workflow_id !== 'string') {
+      return { status: 400, error: 'workflow_id is required' };
+    }
+    if (!workflow_type || typeof workflow_type !== 'string') {
+      return { status: 400, error: 'workflow_type is required' };
+    }
+    if (!lt_type || typeof lt_type !== 'string') {
+      return { status: 400, error: 'lt_type is required' };
+    }
+    if (!signal_id || typeof signal_id !== 'string') {
+      return { status: 400, error: 'signal_id is required' };
+    }
+    if (!parent_workflow_id || typeof parent_workflow_id !== 'string') {
+      return { status: 400, error: 'parent_workflow_id is required' };
+    }
+
+    const task = await taskService.createTask({
+      workflow_id,
+      workflow_type,
+      lt_type,
+      task_queue: input.task_queue,
+      signal_id,
+      parent_workflow_id,
+      origin_id: input.origin_id,
+      parent_id: input.parent_id,
+      envelope: input.envelope ?? '{}',
+      metadata: input.metadata,
+      priority: input.priority,
+      trace_id: input.trace_id,
+      span_id: input.span_id,
+    });
+
+    return { status: 201, data: task };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
 
 /**
  * List tasks with optional filters.

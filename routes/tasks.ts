@@ -5,6 +5,33 @@ import * as api from '../api/tasks';
 const router = Router();
 
 /**
+ * POST /api/tasks
+ * Create a new task record.
+ * Body: { workflow_id, workflow_type, lt_type, signal_id, parent_workflow_id, envelope, ... }
+ */
+router.post('/', async (req, res) => {
+  const result = await api.createTask(
+    {
+      workflow_id: req.body?.workflow_id,
+      workflow_type: req.body?.workflow_type,
+      lt_type: req.body?.lt_type,
+      task_queue: req.body?.task_queue,
+      signal_id: req.body?.signal_id,
+      parent_workflow_id: req.body?.parent_workflow_id,
+      origin_id: req.body?.origin_id,
+      parent_id: req.body?.parent_id,
+      envelope: req.body?.envelope,
+      metadata: req.body?.metadata,
+      priority: req.body?.priority,
+      trace_id: req.body?.trace_id,
+      span_id: req.body?.span_id,
+    },
+    { userId: req.auth?.userId ?? '', role: req.auth?.role, scopes: req.auth?.scopes },
+  );
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/tasks
  * List tasks with optional filters.
  * Query: ?status=completed&workflow_type=reviewContent&workflow_id=abc&lt_type=...&origin_id=...&limit=50&offset=0
