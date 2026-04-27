@@ -43,7 +43,7 @@ export async function invokeWorkflow(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    await checkInvocationRoles(input.type, auth.userId);
+    await checkInvocationRoles(input.type, auth.userId, auth.role);
 
     const result = await invokeWorkflowService({
       workflowType: input.type,
@@ -53,6 +53,8 @@ export async function invokeWorkflow(
       options: input.options,
       auth: {
         userId: auth.userId,
+        role: auth.role,
+        scopes: auth.scopes,
       },
     });
 
@@ -271,9 +273,17 @@ export async function listDiscoveredWorkflows(input: {
       .map((workflowType) => {
         const config = configMap.get(workflowType);
         const worker = activeWorkers.get(workflowType);
+        const hasCertification = !!(
+          config &&
+          ((config.roles?.length ?? 0) > 0 ||
+           (config.consumes?.length ?? 0) > 0 ||
+           config.resolver_schema)
+        );
+        const tier = !config ? 'durable' : hasCertification ? 'certified' : 'configured';
         return {
           workflow_type: workflowType,
           task_queue: config?.task_queue ?? worker?.taskQueue ?? null,
+          tier,
           registered: !!config,
           active: !!worker,
           invocable: config?.invocable ?? !!worker,

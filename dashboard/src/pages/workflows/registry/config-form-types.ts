@@ -13,6 +13,8 @@ export interface ConfigFormState {
   resolver_schema: string;
   cron_schedule: string;
   execute_as: string;
+  /** UI-only — gates escalation fields in the wizard. Not sent to backend. */
+  certified: boolean;
 }
 
 export const EMPTY_FORM: ConfigFormState = {
@@ -28,26 +30,30 @@ export const EMPTY_FORM: ConfigFormState = {
   resolver_schema: '',
   cron_schedule: '',
   execute_as: '',
+  certified: false,
 };
 
 export function configToForm(c: LTWorkflowConfig): ConfigFormState {
+  const roles = (c.roles ?? []).join(', ');
+  const consumes = (c.consumes ?? []).join(', ');
   return {
     workflow_type: c.workflow_type,
     description: c.description ?? '',
     task_queue: c.task_queue ?? '',
     default_role: c.default_role,
     invocable: c.invocable,
-    roles: (c.roles ?? []).join(', '),
+    roles,
     invocation_roles: (c.invocation_roles ?? []).join(', '),
-    consumes: (c.consumes ?? []).join(', '),
+    consumes,
     envelope_schema: c.envelope_schema ? JSON.stringify(c.envelope_schema, null, 2) : '',
     resolver_schema: c.resolver_schema ? JSON.stringify(c.resolver_schema, null, 2) : '',
     cron_schedule: c.cron_schedule ?? '',
     execute_as: c.execute_as ?? '',
+    certified: !!(roles || consumes || c.resolver_schema),
   };
 }
 
-export const STEP_LABELS = ['Identity', 'Escalation', 'Invocation & Schemas'];
+export const STEP_LABELS = ['Identity', 'Invocation', 'Certification'];
 
 export function jsonValid(v: string): boolean {
   if (!v.trim()) return true;
@@ -56,7 +62,8 @@ export function jsonValid(v: string): boolean {
 
 export function isStepValid(step: number, form: ConfigFormState): boolean {
   if (step === 1) return !!form.workflow_type.trim();
-  if (step === 3) return jsonValid(form.envelope_schema) && jsonValid(form.resolver_schema);
+  if (step === 2) return jsonValid(form.envelope_schema);
+  if (step === 3) return jsonValid(form.resolver_schema);
   return true;
 }
 

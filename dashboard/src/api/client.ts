@@ -77,8 +77,9 @@ export async function apiFetch<T>(
     headers,
   });
 
-  // On 401/403, try a silent token refresh and retry once
-  if ((res.status === 401 || res.status === 403) && authToken) {
+  // On 401 (expired/invalid token), try a silent refresh and retry once.
+  // 403 (permission denied) is a business-logic error, not a session issue.
+  if (res.status === 401 && authToken) {
     if (!refreshPromise) {
       refreshPromise = tryRefresh().finally(() => { refreshPromise = null; });
     }
@@ -92,7 +93,7 @@ export async function apiFetch<T>(
       res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
     }
 
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       // Refresh failed or retry still unauthorized — force logout
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       throw new Error('Session expired');

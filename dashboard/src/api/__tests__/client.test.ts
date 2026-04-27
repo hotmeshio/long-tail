@@ -161,42 +161,30 @@ describe('apiFetch', () => {
   });
 
   describe('403 handling', () => {
-    it('attempts silent refresh on 403 when token exists', async () => {
+    it('treats 403 as a permission error without refresh or logout', async () => {
       setToken(validToken());
-      sessionStorage.setItem(
-        'lt_credentials',
-        JSON.stringify({ username: 'alice', password: 'secret' }),
-      );
-
-      const newToken = validToken();
-      // First call returns 403 (stale user, admin route)
-      fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Forbidden' }, 403));
-      // Refresh call → success
-      fetchSpy.mockResolvedValueOnce(
-        jsonResponse({ token: newToken, user: { id: 'u1' } }),
-      );
-      // Retry with new token → success
-      fetchSpy.mockResolvedValueOnce(jsonResponse({ apps: ['durable'] }));
-
-      const result = await apiFetch('/controlplane/apps');
-
-      expect(result).toEqual({ apps: ['durable'] });
-      expect(fetchSpy).toHaveBeenCalledTimes(3);
-    });
-
-    it('dispatches auth:unauthorized on 403 when refresh fails', async () => {
-      setToken(validToken());
-      // No stored credentials — refresh returns null
-      // First call returns 403
       fetchSpy.mockResolvedValueOnce(jsonResponse({ error: 'Forbidden' }, 403));
 
       const handler = vi.fn();
       window.addEventListener('auth:unauthorized', handler);
 
-      await expect(apiFetch('/controlplane/apps')).rejects.toThrow('Session expired');
-      expect(handler).toHaveBeenCalledOnce();
+      await expect(apiFetch('/controlplane/apps')).rejects.toThrow('Forbidden');
+      // No refresh attempted, no logout — just the error
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
 
       window.removeEventListener('auth:unauthorized', handler);
+    });
+
+    it('preserves error message from 403 response body', async () => {
+      setToken(validToken());
+      fetchSpy.mockResolvedValueOnce(
+        jsonResponse({ message: 'Workflow is not invocable' }, 403),
+      );
+
+      await expect(apiFetch('/workflows/echo/invoke')).rejects.toThrow(
+        'Workflow is not invocable',
+      );
     });
   });
 

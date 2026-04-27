@@ -4,7 +4,7 @@ import {
   useDiscoveredWorkflows,
   useDeleteWorkflowConfig,
 } from '../../../api/workflows';
-import { ShieldCheck, ShieldPlus, ShieldOff } from 'lucide-react';
+import { ShieldCheck, ShieldPlus, ShieldOff, Settings, Wrench } from 'lucide-react';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
@@ -64,8 +64,7 @@ export function WorkflowConfigsPage() {
     if (filters.search) result = result.filter((w) => matchesSearch(w, filters.search));
     if (filters.queue) result = result.filter((w) => w.task_queue === filters.queue);
     if (filters.role) result = result.filter((w) => (w.roles ?? []).includes(filters.role));
-    if (filters.tier === 'certified') result = result.filter((w) => w.registered);
-    if (filters.tier === 'durable') result = result.filter((w) => !w.registered);
+    if (filters.tier) result = result.filter((w) => w.tier === filters.tier);
     return result;
   }, [allWorkflows, filters]);
 
@@ -89,11 +88,13 @@ export function WorkflowConfigsPage() {
       className: 'whitespace-nowrap',
     },
     {
-      key: 'registered',
+      key: 'tier',
       label: 'Tier',
-      render: (row) => row.registered
-        ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>
-        : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Durable</span>,
+      render: (row) => {
+        if (row.tier === 'certified') return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>;
+        if (row.tier === 'configured') return <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-status-info/10 text-status-info"><Settings className="w-3 h-3" />Configured</span>;
+        return <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Durable</span>;
+      },
       className: 'whitespace-nowrap',
     },
     {
@@ -115,19 +116,28 @@ export function WorkflowConfigsPage() {
       label: '',
       render: (row) => (
         <RowActionGroup>
-          {row.registered ? (
+          {row.tier === 'durable' && (
             <RowAction
-              icon={ShieldOff}
-              title="De-certify workflow"
-              onClick={() => setConfirmDelete(row.workflow_type)}
-              colorClass="text-text-tertiary hover:text-status-warning"
+              icon={Wrench}
+              title="Configure workflow"
+              onClick={() => navigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(row.workflow_type)}&task_queue=${encodeURIComponent(row.task_queue ?? '')}`)}
+              colorClass="text-text-tertiary hover:text-status-info"
             />
-          ) : (
+          )}
+          {row.tier === 'configured' && (
             <RowAction
               icon={ShieldPlus}
               title="Certify workflow"
-              onClick={() => navigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(row.workflow_type)}&task_queue=${encodeURIComponent(row.task_queue ?? '')}`)}
+              onClick={() => navigate(`/workflows/registry/${encodeURIComponent(row.workflow_type)}`)}
               colorClass="text-text-tertiary hover:text-status-success"
+            />
+          )}
+          {row.registered && (
+            <RowAction
+              icon={ShieldOff}
+              title="Remove configuration"
+              onClick={() => setConfirmDelete(row.workflow_type)}
+              colorClass="text-text-tertiary hover:text-status-warning"
             />
           )}
         </RowActionGroup>
@@ -185,6 +195,7 @@ export function WorkflowConfigsPage() {
           onChange={(v) => setFilter('tier', v)}
           options={[
             { value: 'certified', label: 'Certified' },
+            { value: 'configured', label: 'Configured' },
             { value: 'durable', label: 'Durable' },
           ]}
         />

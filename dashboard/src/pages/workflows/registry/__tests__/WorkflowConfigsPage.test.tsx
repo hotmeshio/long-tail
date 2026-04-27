@@ -17,6 +17,7 @@ function makeWorkflow(overrides: Partial<DiscoveredWorkflow> = {}): DiscoveredWo
     workflow_type: 'review-content',
     description: null,
     task_queue: 'default',
+    tier: 'certified',
     registered: true,
     invocable: true,
     system: false,
@@ -46,14 +47,16 @@ const WORKFLOWS: DiscoveredWorkflow[] = [
   }),
   makeWorkflow({
     workflow_type: 'basic-echo',
+    tier: 'configured',
     registered: true,
-    invocable: false,
+    invocable: true,
     task_queue: 'default',
-    roles: ['reviewer'],
+    roles: [],
   }),
   makeWorkflow({
     workflow_type: 'unregistered-flow',
     description: 'Discovered but not registered',
+    tier: 'durable',
     registered: false,
     invocable: false,
     task_queue: 'user-queue',
@@ -125,10 +128,12 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Tier column ──
 
-  it('renders tier pills for certified and durable workflows', () => {
+  it('renders tier pills for certified, configured, and durable workflows', () => {
     renderPage();
-    // 3 in table + 1 in filter dropdown option
-    expect(screen.getAllByText('Certified').length).toBe(4);
+    // 2 in table + 1 in filter dropdown option
+    expect(screen.getAllByText('Certified').length).toBe(3);
+    // 1 in table + 1 in filter dropdown option
+    expect(screen.getAllByText('Configured').length).toBe(2);
     // 1 in table + 1 in filter dropdown option
     expect(screen.getAllByText('Durable').length).toBe(2);
   });
@@ -153,6 +158,8 @@ describe('WorkflowConfigsPage', () => {
     // Tier is the second select (Queue, Tier, Role)
     fireEvent.change(selects[1], { target: { value: 'certified' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
+    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
+    expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
     expect(screen.queryByText('unregistered-flow')).not.toBeInTheDocument();
   });
 
@@ -207,9 +214,10 @@ describe('WorkflowConfigsPage', () => {
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'default' } });
     fireEvent.change(selects[2], { target: { value: 'reviewer' } });
-    // review-content and basic-echo are in default queue with reviewer role
+    // review-content is in default queue with reviewer role
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('basic-echo')).toBeInTheDocument();
+    // basic-echo is in default queue but has no roles
+    expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
     expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
   });
 
@@ -251,13 +259,20 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Actions ──
 
-  it('shows de-certify icon for certified workflows', () => {
+  it('shows remove config icon for registered workflows', () => {
     renderPage();
-    const decertifyButtons = screen.getAllByTitle('De-certify workflow');
-    expect(decertifyButtons.length).toBe(3);
+    const removeButtons = screen.getAllByTitle('Remove configuration');
+    // 2 certified + 1 configured = 3 registered
+    expect(removeButtons.length).toBe(3);
   });
 
-  it('shows certify icon for uncertified workflows', () => {
+  it('shows configure icon for durable workflows', () => {
+    renderPage();
+    const configureButtons = screen.getAllByTitle('Configure workflow');
+    expect(configureButtons.length).toBe(1);
+  });
+
+  it('shows certify icon for configured workflows', () => {
     renderPage();
     const certifyButtons = screen.getAllByTitle('Certify workflow');
     expect(certifyButtons.length).toBe(1);

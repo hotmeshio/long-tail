@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Filter, Settings } from 'lucide-react';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
-import { useJobs, useWorkflowConfigs } from '../../api/workflows';
+import { useJobs, useWorkflowConfigs, useDiscoveredWorkflows } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkflowListEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
@@ -14,7 +14,7 @@ import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar'
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
-import type { LTJob } from '../../api/types';
+import type { LTJob, WorkflowTier } from '../../api/types';
 
 export type ExecutionsTier = 'all' | 'certified' | 'durable';
 
@@ -41,7 +41,7 @@ function buildColumns(
   onFilterStatus: (status: string) => void,
   isSuperAdmin: boolean,
   navigate: (path: string) => void,
-  certifiedTypes: Set<string>,
+  tierMap: Map<string, WorkflowTier>,
 ): Column<LTJob>[] {
   return [
     {
@@ -58,7 +58,7 @@ function buildColumns(
                 {row.workflow_id}
               </span>
               <div className="mt-0.5">
-                <WorkflowPill type={row.entity} certified={certifiedTypes.has(row.entity)} />
+                <WorkflowPill type={row.entity} variant={tierMap.get(row.entity) ?? 'durable'} />
               </div>
             </div>
           </div>
@@ -141,18 +141,22 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     : undefined;
 
   const { data: configs } = useWorkflowConfigs();
+  const { data: discoveredData } = useDiscoveredWorkflows();
 
-  const certifiedTypes = useMemo(
-    () => new Set((configs ?? []).map((c) => c.workflow_type)),
-    [configs],
-  );
+  const tierMap = useMemo(() => {
+    const map = new Map<string, WorkflowTier>();
+    for (const dw of discoveredData ?? []) {
+      map.set(dw.workflow_type, dw.tier ?? 'durable');
+    }
+    return map;
+  }, [discoveredData]);
 
   const columns = buildColumns(
     (entity) => setFilter('entity', entity),
     (status) => setFilter('status', status),
     isSuperAdmin,
     navigate,
-    certifiedTypes,
+    tierMap,
   );
   const [searchInput, setSearchInput] = useState(filters.search);
 

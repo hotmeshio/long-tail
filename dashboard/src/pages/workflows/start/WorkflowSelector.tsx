@@ -1,17 +1,18 @@
-import { Bot, ShieldCheck, Workflow } from 'lucide-react';
+import { Bot, ShieldCheck, Settings, Workflow } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import type { LTWorkflowConfig } from '../../../api/types';
+import type { WorkflowTier } from '../../../api/types';
 
 export function WorkflowSelector({
   configs,
   selectedType,
   onSelect,
-  certifiedTypes,
+  tierMap,
 }: {
   configs: LTWorkflowConfig[];
   selectedType: string;
   onSelect: (config: LTWorkflowConfig) => void;
-  certifiedTypes: Set<string>;
+  tierMap: Map<string, WorkflowTier>;
 }) {
   return (
     <div>
@@ -19,7 +20,7 @@ export function WorkflowSelector({
       <div>
         {configs.map((config) => {
           const isSelected = selectedType === config.workflow_type;
-          const isCertified = certifiedTypes.has(config.workflow_type);
+          const tier = tierMap.get(config.workflow_type) ?? 'durable';
           return (
             <button
               key={config.workflow_type}
@@ -31,9 +32,9 @@ export function WorkflowSelector({
               }`}
             >
               <div className="flex items-center gap-2">
-                {isCertified
-                  ? <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-status-success" />
-                  : <Workflow className="w-3.5 h-3.5 shrink-0 text-accent/75" />}
+                {tier === 'certified' && <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-status-success" />}
+                {tier === 'configured' && <Settings className="w-3.5 h-3.5 shrink-0 text-status-info" />}
+                {tier === 'durable' && <Workflow className="w-3.5 h-3.5 shrink-0 text-accent/75" />}
                 <p className={`text-sm font-mono ${isSelected ? 'font-medium text-accent' : 'text-text-secondary'}`}>
                   {config.workflow_type}
                 </p>

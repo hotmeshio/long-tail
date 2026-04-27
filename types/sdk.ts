@@ -25,4 +25,6 @@ export interface LTApiResult<T = any> {
  */
 export interface LTApiAuth {
   userId: string;
+  role?: string;
+  scopes?: string[];
 }
