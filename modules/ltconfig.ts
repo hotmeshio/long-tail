@@ -82,10 +82,19 @@ class LTConfigCache {
     this.loadPromise = null;
   }
 
-  /** Get the full resolved config for a workflow (used by interceptor activities). */
+  /**
+   * Get the resolved config for a workflow, but only if certified.
+   *
+   * The interceptor uses this to decide whether to wrap the workflow
+   * with task tracking, escalation handling, and re-run detection.
+   * Configured-but-not-certified workflows (no roles, no consumes)
+   * return null so the interceptor skips them.
+   */
   async getResolvedConfig(name: string): Promise<LTResolvedConfig | null> {
     const config = await this.get(name);
-    return config ?? null;
+    if (!config) return null;
+    const isCertified = (config.roles?.length ?? 0) > 0 || (config.consumes?.length ?? 0) > 0;
+    return isCertified ? config : null;
   }
 }
 

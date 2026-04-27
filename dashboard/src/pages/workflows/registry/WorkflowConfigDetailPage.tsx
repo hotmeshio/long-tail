@@ -6,7 +6,7 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { splitCsv } from '../../../lib/parse';
 import { EMPTY_FORM, configToForm, STEP_LABELS, isStepValid } from './config-form-types';
 import type { ConfigFormState } from './config-form-types';
-import { BasicsStep, InvocationStep, CertificationStep } from './ConfigWizardSteps';
+import { BasicsStep, InvocationStep, AdvancedStep } from './ConfigWizardSteps';
 
 export function WorkflowConfigDetailPage() {
   const { workflowType } = useParams<{ workflowType: string }>();
@@ -152,7 +152,7 @@ export function WorkflowConfigDetailPage() {
           <div className="min-h-[360px] py-2">
             {step === 1 && <BasicsStep form={form} set={set} editing={!!editing} durableTypes={unregisteredTypes} />}
             {step === 2 && <InvocationStep form={form} set={set} />}
-            {step === 3 && <CertificationStep form={form} set={set} />}
+            {step === 3 && <AdvancedStep form={form} set={set} />}
           </div>
 
           {(schemaError || upsert.error) && (

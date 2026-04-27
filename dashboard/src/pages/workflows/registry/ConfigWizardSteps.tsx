@@ -197,9 +197,9 @@ export function InvocationStep({ form, set }: StepProps) {
   );
 }
 
-// ── Step 3: Certification ──────────────────────────────────────────────────
+// ── Step 3: Advanced ───────────────────────────────────────────────────────
 
-export function CertificationStep({ form, set }: StepProps) {
+export function AdvancedStep({ form, set }: StepProps) {
   const { data: configs } = useWorkflowConfigs();
   const consumesOptions = (configs ?? [])
     .map((c) => c.workflow_type)
@@ -207,6 +207,26 @@ export function CertificationStep({ form, set }: StepProps) {
 
   return (
     <div className="space-y-5">
+      {/* Resolver Schema — always available */}
+      <div>
+        <label className={labelCls}>Resolver Schema</label>
+        <textarea
+          value={form.resolver_schema}
+          onChange={(e) => set('resolver_schema', e.target.value)}
+          placeholder={`{\n  "properties": {\n    "approved": { "type": "boolean", "default": false, "description": "Approve?" },\n    "notes": { "type": "string", "default": "", "description": "Reviewer notes" }\n  }\n}`}
+          className={jsonCls}
+          rows={8}
+          spellCheck={false}
+        />
+        <p className={hintCls}>
+          Default form template for resolving escalations from this workflow.
+          Use <span className="font-mono">properties</span> with <span className="font-mono">type</span>, <span className="font-mono">default</span>, <span className="font-mono">description</span>, <span className="font-mono">enum</span>, and <span className="font-mono">format</span> for typed form fields.
+        </p>
+        {form.resolver_schema.trim() && !jsonValid(form.resolver_schema) && (
+          <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
+        )}
+      </div>
+
       {/* Certify toggle */}
       <div className="flex gap-6 pt-1">
         <label className="flex items-center gap-2 cursor-pointer">
@@ -266,36 +286,16 @@ export function CertificationStep({ form, set }: StepProps) {
               Output from these upstream workflows will be injected into the input envelope for this workflow.
             </p>
           </div>
-
-          {/* Resolver Schema */}
-          <div>
-            <label className={labelCls}>Resolver Schema</label>
-            <textarea
-              value={form.resolver_schema}
-              onChange={(e) => set('resolver_schema', e.target.value)}
-              placeholder={`{\n  "approved": true,\n  "analysis": {\n    "confidence": 0.95,\n    "flags": [],\n    "summary": "Content meets guidelines"\n  }\n}`}
-              className={jsonCls}
-              rows={8}
-              spellCheck={false}
-            />
-            <p className={hintCls}>
-              The shape of data a human or AI provides when resolving an escalation from this workflow.
-              Pre-fills the JSON editor in the escalation resolution form.
-            </p>
-            {form.resolver_schema.trim() && !jsonValid(form.resolver_schema) && (
-              <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
-            )}
-          </div>
         </>
       ) : (
         <div className="py-4 px-4 bg-surface-sunken/50 rounded-md text-center">
           <p className="text-xs text-text-tertiary">
-            This workflow will run as standard durable — failures are handled by
-            the workflow code. Enable{' '}
+            This workflow will run as standard durable without the interceptor.
+            Enable{' '}
             <span className="font-medium text-text-secondary">
               Certify for HITL Escalation
             </span>{' '}
-            to configure escalation routing and a resolver schema.
+            to add automatic escalation routing and role-based resolution.
           </p>
         </div>
       )}

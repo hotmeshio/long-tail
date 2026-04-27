@@ -34,6 +34,16 @@ export interface BasicEchoEnvelopeData {
   sleepSeconds?: number;
 }
 
+// ── basicSignal ──────────────────────────────────────────────
+
+/** Basic signal — lightweight escalation via conditionLT. */
+export interface BasicSignalEnvelopeData {
+  /** Message shown to the reviewer in the escalation description. */
+  message?: string;
+  /** Role to assign the escalation to. */
+  role?: string;
+}
+
 // ── assemblyLine ─────────────────────────────────────────────
 
 /** Assembly line — durable orchestrator with sequential human task queues. */
@@ -74,6 +84,7 @@ export type WorkflowEnvelopeMap = {
   reviewContent: ReviewContentEnvelopeData;
   kitchenSink: KitchenSinkEnvelopeData;
   basicEcho: BasicEchoEnvelopeData;
+  basicSignal: BasicSignalEnvelopeData;
   assemblyLine: AssemblyLineEnvelopeData;
   stepIterator: StepIteratorEnvelopeData;
   reverter: ReverterEnvelopeData;

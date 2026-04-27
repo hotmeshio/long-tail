@@ -49,11 +49,11 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     resolver_schema: c.resolver_schema ? JSON.stringify(c.resolver_schema, null, 2) : '',
     cron_schedule: c.cron_schedule ?? '',
     execute_as: c.execute_as ?? '',
-    certified: !!(roles || consumes || c.resolver_schema),
+    certified: !!(roles || consumes),
   };
 }
 
-export const STEP_LABELS = ['Identity', 'Invocation', 'Certification'];
+export const STEP_LABELS = ['Identity', 'Invocation', 'Advanced'];
 
 export function jsonValid(v: string): boolean {
   if (!v.trim()) return true;

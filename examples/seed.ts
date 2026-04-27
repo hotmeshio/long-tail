@@ -5,6 +5,7 @@ import type {
   ReviewContentEnvelopeData,
   KitchenSinkEnvelopeData,
   BasicEchoEnvelopeData,
+  BasicSignalEnvelopeData,
 } from './types';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { loggerRegistry } from '../lib/logger';
@@ -79,7 +80,7 @@ const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho';
+type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal';
 
 const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -176,6 +177,25 @@ const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'basic-echo',
         description: 'Minimal durable workflow — echoes a message and reveals IAM context.',
+      },
+    },
+  },
+
+  // -- Process 6: Basic Signal
+  {
+    label: 'Process 6 — Basic Signal',
+    workflowName: 'basicSignal',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: {
+        message: 'Seed deployment needs approval before proceeding.',
+        role: 'reviewer',
+      } satisfies BasicSignalEnvelopeData,
+      metadata: {
+        certified: false,
+        source: 'seed',
+        process: 'basic-signal',
+        description: 'Lightweight signal-based escalation — workflow stays running, no interceptor. Claim the escalation, fill the form, and resolve to resume the workflow.',
       },
     },
   },

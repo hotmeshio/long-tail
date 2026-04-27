@@ -276,8 +276,7 @@ export async function listDiscoveredWorkflows(input: {
         const hasCertification = !!(
           config &&
           ((config.roles?.length ?? 0) > 0 ||
-           (config.consumes?.length ?? 0) > 0 ||
-           config.resolver_schema)
+           (config.consumes?.length ?? 0) > 0)
         );
         const tier = !config ? 'durable' : hasCertification ? 'certified' : 'configured';
         return {

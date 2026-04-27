@@ -21,6 +21,13 @@ export interface LTEnvelopePrincipal {
 export interface LTEnvelope {
   data: Record<string, any>;
   metadata: {
+    /**
+     * Set to `false` to bypass the interceptor's config lookup entirely.
+     * Skips the `ltGetWorkflowConfig` proxyActivity call — no DB hit,
+     * no task creation, no escalation wiring. The workflow still gets
+     * ToolContext (IAM identity) but manages its own lifecycle.
+     */
+    certified?: boolean;
     [key: string]: any;
   };
   lt?: {
