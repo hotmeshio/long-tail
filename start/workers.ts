@@ -105,9 +105,18 @@ export async function startWorkers(
 
     // Start each worker
     for (const w of workers) {
+      if (w.connection?.readonly) {
+        // Readonly workers register for discovery only — they must not
+        // consume messages from the stream (that is the real worker's job).
+        registerWorker(w.workflow.name, w.taskQueue);
+        loggerRegistry.info(
+          `[long-tail] readonly worker registered: ${w.taskQueue}::${w.workflow.name}`,
+        );
+        continue;
+      }
       const label = `${w.taskQueue}::${w.workflow.name}`;
       const worker = await Durable.Worker.create({
-        connection: w.connection ? { ...connection, ...w.connection } : connection,
+        connection,
         taskQueue: w.taskQueue,
         workflow: w.workflow,
         guid: `${label}-${Durable.guid()}`,
