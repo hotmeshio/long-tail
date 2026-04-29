@@ -135,12 +135,17 @@ export async function resolveClient(serverId: string): Promise<Client | null> {
   if (clients.has(serverId)) return clients.get(serverId)!;
 
   // 2. Check built-in server factories -- exact match first, then fuzzy
+  //    Normalize strips non-alphanumeric chars so hyphens and underscores
+  //    match (e.g., "long_tail_vision" matches "long-tail-vision").
+  const norm = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
   let matchedName: string | null = null;
   if (builtinFactories.has(serverId)) {
     matchedName = serverId;
   } else {
+    const normId = norm(serverId);
     for (const [name] of builtinFactories) {
-      if (name.includes(serverId) || serverId.includes(name)) {
+      const normName = norm(name);
+      if (normName.includes(normId) || normId.includes(normName)) {
         matchedName = name;
         break;
       }

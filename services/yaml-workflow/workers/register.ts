@@ -12,6 +12,26 @@ import { wrapWithScope } from './scope';
 import { buildLlmCallback, buildTransformCallback } from './callbacks';
 import { wrapWithEvents } from './events';
 
+/**
+ * HotMesh YAML maps serialize arrays as objects with numeric keys
+ * (e.g., {0: "a", 1: "b"}). Recursively coerce these back to arrays
+ * before passing args to MCP tools that expect real arrays.
+ */
+function coerceNumericObjects(obj: unknown): unknown {
+  if (Array.isArray(obj)) return obj.map(coerceNumericObjects);
+  if (obj === null || typeof obj !== 'object') return obj;
+  const record = obj as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length > 0 && keys.every((k, i) => k === String(i))) {
+    return keys.map((k) => coerceNumericObjects(record[k]));
+  }
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(record)) {
+    result[k] = coerceNumericObjects(v);
+  }
+  return result;
+}
+
 /** Track which topics already have registered workers */
 const registeredTopics = new Set<string>();
 
@@ -173,7 +193,8 @@ export async function registerWorkersForWorkflow(
             };
           }
           const exchangedArgs = await exchangeTokensInArgs(mergedArgs);
-          const result = await mcpClient.callServerTool(serverId, toolName, exchangedArgs);
+          const coercedArgs = coerceNumericObjects(exchangedArgs) as Record<string, unknown>;
+          const result = await mcpClient.callServerTool(serverId, toolName, coercedArgs);
           if (result && typeof result === 'object' && 'error' in result) {
             loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);
           }

@@ -202,14 +202,15 @@ IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH �
 2. **Worker per tool**: Each MCP tool call is a worker activity
 3. **Collision-proof activity IDs**: Multiple workflows share the same app namespace. Activity IDs MUST be globally unique within the app. Use a descriptive name with a shared 4-char random suffix appended to every activity in the flow: \`trigger_x8kf\`, \`capture_x8kf\`, \`analyze_x8kf\`, \`store_x8kf\`. The suffix is the same for all activities in one workflow but unique across workflows. NEVER use bare names like \`trigger\`, \`capture\`, \`analyze\` — they WILL collide with other workflows in the same app.
 4. **workflowName**: Every worker MUST have \`workflowName: '<tool_name>'\` in its input.maps — this routes to the correct MCP tool handler
-5. **_scope threading**: Every worker MUST have \`_scope: '{trigger_x8kf.output.data._scope}'\` (using YOUR trigger's ID) for IAM context
-6. **Wire outputs forward**: Use \`{prevActivity.output.data.fieldName}\` to pass data between steps
-7. **Use @pipe for transforms**: When a value needs runtime computation (date stamp, string concat, slugify), use @pipe — never hardcode computed values
-8. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger_x8kf.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
-9. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
-10. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
-11. **Linear transitions**: Chain activities with transitions unless branching or iteration is needed
-12. **Conditional transitions**: For branching, use multi-target transitions with conditions:
+5. **mcp_server_id**: In the activity_manifest, use the exact hyphenated server name from the inventory (e.g., "long-tail-vision"), NOT the underscored tool prefix (e.g., "long_tail_vision")
+6. **_scope threading**: Every worker MUST have \`_scope: '{trigger_x8kf.output.data._scope}'\` (using YOUR trigger's ID) for IAM context
+7. **Wire outputs forward**: Use \`{prevActivity.output.data.fieldName}\` to pass data between steps
+8. **Use @pipe for transforms**: When a value needs runtime computation (date stamp, string concat, slugify), use @pipe — never hardcode computed values
+9. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger_x8kf.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
+10. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
+11. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
+12. **Linear transitions**: Chain activities with transitions unless branching or iteration is needed
+13. **Conditional transitions**: For branching, use multi-target transitions with conditions:
 \`\`\`yaml
 transitions:
   check_x8kf:
@@ -219,7 +220,7 @@ transitions:
     - to: proceed_x8kf
 \`\`\`
 Conditions can match on \`code\` (HTTP status) or \`match\` (field comparisons). The first matching condition wins; the last entry (no conditions) is the default.
-13. **Trigger stats for idempotency**: Use \`stats.id\` and \`stats.key\` on the trigger when the workflow needs custom job IDs or indexed lookups:
+14. **Trigger stats for idempotency**: Use \`stats.id\` and \`stats.key\` on the trigger when the workflow needs custom job IDs or indexed lookups:
 \`\`\`yaml
 trigger_x8kf:
   type: trigger
