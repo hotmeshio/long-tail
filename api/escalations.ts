@@ -824,7 +824,12 @@ export async function resolveEscalation(
         await handle.signal(signalRouting.signalId, signalPayload);
       }
 
-      await escalationService.resolveEscalation(escalation.id, resolverPayload);
+      // For YAML workflows, the resolve worker inside the workflow calls
+      // claim_and_resolve to close the escalation transactionally. Only resolve
+      // here for Durable workflows that lack an in-workflow resolve step.
+      if (signalRouting.engine !== 'yaml') {
+        await escalationService.resolveEscalation(escalation.id, resolverPayload);
+      }
 
       publishEscalationEvent({
         type: 'escalation.resolved',
@@ -835,7 +840,7 @@ export async function resolveEscalation(
         taskId: escalation.task_id!,
         escalationId: escalation.id,
         originId: escalation.origin_id ?? undefined,
-        status: 'resolved',
+        status: signalRouting.engine === 'yaml' ? 'signaled' : 'resolved',
       });
 
       return {

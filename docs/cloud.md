@@ -270,3 +270,126 @@ services:
 ```
 
 The combined `index.js` entry point (used in development and the demo) calls `start()` with both server and workers enabled. In production, split them into `api.js` and `worker.js` with different `start()` configs.
+
+## PostgreSQL Performance Tuning
+
+HotMesh's durable execution model is write-heavy. Every workflow creates a `jobs` row, and every field mutation creates rows in `jobs_attributes`. A simple 3-step workflow generates ~100 attribute rows per execution. At 1,000 concurrent workflows, that's 300K+ inserts in seconds.
+
+The default Postgres configuration is tuned for mixed workloads on modest hardware. For Long Tail, the write-heavy profile needs specific adjustments.
+
+### Determining Your Profile
+
+Run a baseline throughput test to understand your bottleneck:
+
+```bash
+# Submit 100 minimal workflows, measure submit rate
+time for i in $(seq 1 100); do
+  curl -s -X POST http://localhost:3000/api/workflows/basicEcho/invoke \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    -d '{"data":{"message":"test","sleepSeconds":0}}' > /dev/null
+done
+```
+
+Then check where Postgres is spending time:
+
+```sql
+-- Check for write pressure (high buffers_checkpoint = WAL bottleneck)
+SELECT * FROM pg_stat_bgwriter;
+
+-- Check for connection saturation
+SELECT count(*) as active, max_conn
+FROM pg_stat_activity, (SELECT setting::int as max_conn FROM pg_settings WHERE name = 'max_connections') mc
+WHERE state = 'active'
+GROUP BY max_conn;
+
+-- Check table bloat after burst writes
+SELECT relname, n_live_tup, n_dead_tup,
+       round(100.0 * n_dead_tup / nullif(n_live_tup + n_dead_tup, 0), 1) as dead_pct
+FROM pg_stat_user_tables
+WHERE n_live_tup > 1000
+ORDER BY n_dead_tup DESC LIMIT 10;
+```
+
+### Recommended Settings
+
+| Parameter | Default | Recommended | Why |
+|-----------|---------|-------------|-----|
+| `shared_buffers` | 128MB | 25% of RAM (256MB–1GB) | Cache hot pages — `jobs_attributes` partitions are read/written constantly |
+| `work_mem` | 4MB | 16MB | Workflow queries join across partitions; larger sort memory avoids disk spills |
+| `maintenance_work_mem` | 64MB | 128MB–256MB | Speeds VACUUM on large `jobs_attributes` tables after burst writes |
+| `wal_buffers` | -1 (auto) | 16MB | Write-heavy workloads saturate the default 8MB WAL buffer |
+| `max_wal_size` | 1GB | 1GB–2GB | Prevents excessive checkpointing during sustained write bursts |
+| `checkpoint_completion_target` | 0.9 | 0.9 | Spread checkpoint I/O over time — already optimal |
+| `effective_cache_size` | 4GB | 50–75% of RAM | Query planner hint — tells Postgres how much OS cache to expect |
+| `synchronous_commit` | on | off (dev/staging) | Trades durability for 2–5x write throughput. WAL is still written; only fsync is deferred. Acceptable for dev and staging. **Keep `on` in production** unless you understand the trade-off. |
+| `max_connections` | 100 | 200 | HotMesh uses connection-per-worker; concurrent workflows can exhaust 100 connections |
+
+### Docker Compose Configuration
+
+```yaml
+postgres:
+  image: postgres:16
+  command:
+    - postgres
+    - -c
+    - shared_buffers=256MB
+    - -c
+    - work_mem=16MB
+    - -c
+    - maintenance_work_mem=128MB
+    - -c
+    - wal_buffers=16MB
+    - -c
+    - max_wal_size=1GB
+    - -c
+    - checkpoint_completion_target=0.9
+    - -c
+    - effective_cache_size=512MB
+    - -c
+    - synchronous_commit=off
+    - -c
+    - max_connections=200
+  shm_size: 512m    # Required: shared_buffers > 128MB needs larger /dev/shm
+```
+
+The `shm_size` setting is critical — Docker defaults to 64MB for `/dev/shm`, but `shared_buffers=256MB` requires at least that much shared memory. Without it, Postgres will fail to start or silently fall back to smaller buffers.
+
+### Production (RDS / Cloud SQL)
+
+For managed databases, apply the same parameters through parameter groups:
+
+**AWS RDS:**
+```
+# Custom parameter group
+shared_buffers = {DBInstanceClassMemory/4}
+work_mem = 16384          # 16MB in KB
+maintenance_work_mem = 262144
+wal_buffers = 16384
+max_wal_size = 2048       # 2GB in MB
+synchronous_commit = on   # Keep on for production
+max_connections = 200
+```
+
+**GCP Cloud SQL:**
+```
+# Database flags
+shared_buffers: 25% of instance RAM (auto-tuned by Cloud SQL)
+work_mem: 16MB
+maintenance_work_mem: 256MB
+max_wal_size: 2GB
+synchronous_commit: on
+max_connections: 200
+```
+
+### Maintenance
+
+After burst workloads, dead tuples accumulate in `jobs_attributes`. Autovacuum handles this, but for large bursts (10K+ workflows), consider:
+
+```sql
+-- Manual VACUUM after a load test or batch run
+VACUUM ANALYZE durable.jobs_attributes;
+VACUUM ANALYZE durable.engine_streams;
+```
+
+Long Tail includes a built-in maintenance cron that prunes completed workflow data. Configure it via the dashboard or API to keep table sizes manageable.
