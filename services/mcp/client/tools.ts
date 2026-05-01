@@ -4,7 +4,7 @@ import { getToolContext } from '../../iam/context';
 import * as mcpDbService from '../db';
 import type { LTMcpToolManifest } from '../../../types';
 
-import { resolveClient, listServerTools } from './connection';
+import { resolveClient, listServerTools, dispatchBuiltinTool } from './connection';
 
 /**
  * Derive auth context from the ambient ToolContext (AsyncLocalStorage).
@@ -30,16 +30,13 @@ export async function callServerTool(
   authContext?: { userId?: string; delegationToken?: string },
 ): Promise<any> {
   loggerRegistry.debug(`[lt-mcp:call] entering ${serverId}/${toolName} argKeys=[${Object.keys(args).join(',')}]`);
-  const client = await resolveClient(serverId);
-  if (!client) {
-    throw new Error(`MCP server ${serverId} is not connected`);
-  }
-  // Resolve auth: explicit authContext > ambient ToolContext > none
+
+  // Resolve auth context before dispatch — both paths need it
   const resolvedAuth = authContext ?? deriveAuthFromToolContext();
-  // Inject auth context as a hidden _auth argument when available
   const toolArgs = resolvedAuth?.userId || resolvedAuth?.delegationToken
     ? { ...args, _auth: { userId: resolvedAuth.userId, token: resolvedAuth.delegationToken } }
     : args;
+
   // Audit: log tool invocation with principal identity
   const ctx = getToolContext();
   if (ctx?.principal.id) {
@@ -48,11 +45,36 @@ export async function callServerTool(
     );
   }
 
-  const result = await client.callTool(
+  // Direct dispatch for built-in servers — bypasses MCP Client/Transport.
+  // Each built-in server is a cached singleton; tool handlers are called
+  // as plain functions. No transport contention under concurrent load.
+  const builtin = await dispatchBuiltinTool(serverId, toolName, toolArgs);
+  if (builtin) {
+    loggerRegistry.debug(`[lt-mcp:call] leaving ${serverId}/${toolName} (builtin) resultKeys=[${typeof builtin.result === 'object' && builtin.result ? Object.keys(builtin.result).join(',') : 'raw'}]`);
+    return builtin.result;
+  }
+
+  // External servers — use MCP Client/Transport with timeout guard
+  const client = await resolveClient(serverId);
+  if (!client) {
+    throw new Error(`MCP server ${serverId} is not connected`);
+  }
+
+  // Guard against hung transports: the MCP SDK timeout relies on the transport
+  // to respond, which fails when InMemoryTransport is saturated under concurrency.
+  // Promise.race ensures we throw on timeout regardless of transport state.
+  const callPromise = client.callTool(
     { name: toolName, arguments: toolArgs },
     undefined,
     { timeout: MCP_TOOL_TIMEOUT_MS },
   );
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`MCP tool ${serverId}/${toolName} timed out after ${MCP_TOOL_TIMEOUT_MS}ms`)),
+      MCP_TOOL_TIMEOUT_MS,
+    ),
+  );
+  const result = await Promise.race([callPromise, timeoutPromise]);
   // Extract text content from MCP response
   if (Array.isArray(result.content)) {
     const textContent = result.content.find((c: any) => c.type === 'text');

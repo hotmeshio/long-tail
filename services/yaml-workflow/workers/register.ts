@@ -5,6 +5,7 @@ import { getConnection } from '../../../lib/db';
 import { loggerRegistry } from '../../../lib/logger';
 import { exchangeTokensInArgs } from '../../iam/ephemeral';
 import * as mcpClient from '../../mcp/client';
+import { dispatchBuiltinTool } from '../../mcp/client/connection';
 import * as yamlDb from '../db';
 import type { LTYamlWorkflowRecord } from '../../../types/yaml-workflow';
 
@@ -145,7 +146,11 @@ export async function registerWorkersForWorkflow(
       const serverId = activity.mcp_server_id;
       if (!serverId) continue;
       const storedArgs = activity.tool_arguments;
-      const yamlHookTopic = hookTopicByEscalationTool.get(activity.activity_id);
+      // For escalate_and_wait, resolve hookTopic at runtime from the activity
+      // context — multiple escalation workers share a single registered callback,
+      // so we look up by activity_id from the incoming metadata, not the static
+      // activity captured at registration time.
+      const staticHookTopic = hookTopicByEscalationTool.get(activity.activity_id);
       // Identify keys that are wired via input_mappings. When a wired key
       // resolves to nothing (upstream step failed/returned null), we must
       // NOT fall back to stored tool_arguments — that would leak hardcoded
@@ -154,7 +159,7 @@ export async function registerWorkersForWorkflow(
         Object.keys(activity.input_mappings || {}).filter(k => k !== '_scope' && k !== 'workflowName'),
       );
       if (toolName === 'escalate_and_wait') {
-        loggerRegistry.info(`[yaml-workflow] escalate_and_wait worker: activityId=${activity.activity_id}, hookTopic=${yamlHookTopic || 'NONE'}, mapKeys=[${[...hookTopicByEscalationTool.keys()].join(',')}]`);
+        loggerRegistry.info(`[yaml-workflow] escalate_and_wait worker: activityId=${activity.activity_id}, hookTopic=${staticHookTopic || 'NONE'}, mapKeys=[${[...hookTopicByEscalationTool.keys()].join(',')}]`);
       }
       workerConfigs.push({
         topic: activity.topic,
@@ -179,7 +184,13 @@ export async function registerWorkersForWorkflow(
           }
           loggerRegistry.debug(`[yaml-workflow:worker] merged mcp/${toolName} wf=${wfName} mergedKeys=[${Object.keys(mergedArgs).join(',')}]`);
           // For escalate_and_wait: inject YAML signal routing so the MCP tool
-          // stores engine:'yaml' + hookTopic + jobId in the escalation metadata
+          // stores engine:'yaml' + hookTopic + jobId in the escalation metadata.
+          // Resolve hookTopic at runtime — multiple escalation workers share
+          // this callback, so we look up by the current activity_id from metadata.
+          const runtimeActivityId = (data.metadata as any)?.aid;
+          const yamlHookTopic = runtimeActivityId
+            ? hookTopicByEscalationTool.get(runtimeActivityId) || staticHookTopic
+            : staticHookTopic;
           if (yamlHookTopic) {
             const jid = (data.metadata as any)?.jid;
             mergedArgs._yaml_signal_routing = {
@@ -194,7 +205,17 @@ export async function registerWorkersForWorkflow(
           }
           const exchangedArgs = await exchangeTokensInArgs(mergedArgs);
           const coercedArgs = coerceNumericObjects(exchangedArgs) as Record<string, unknown>;
-          const result = await mcpClient.callServerTool(serverId, toolName, coercedArgs);
+
+          // Try direct dispatch for built-in servers (bypasses MCP transport).
+          // Falls through to mcpClient.callServerTool() for external servers.
+          let result: any;
+          const builtin = await dispatchBuiltinTool(serverId, toolName, coercedArgs);
+          if (builtin) {
+            result = builtin.result;
+          } else {
+            result = await mcpClient.callServerTool(serverId, toolName, coercedArgs);
+          }
+
           if (result && typeof result === 'object' && 'error' in result) {
             loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);
           }

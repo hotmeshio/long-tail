@@ -16,8 +16,17 @@ services:
     ports:
       - "${LT_PORT:-3000}:3000"
       - "9229:9229"
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 4G
+        reservations:
+          cpus: '4'
+          memory: 2G
     environment:
       - NODE_ENV=development
+      - NODE_OPTIONS=--max-old-space-size=3072 --max-semi-space-size=64
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=postgres
@@ -73,9 +82,38 @@ services:
       POSTGRES_DB: longtail
     ports:
       - "${LT_PG_PORT:-5415}:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '2'
+          memory: 1G
     volumes:
       - pgdata:/var/lib/postgresql
       - ./docker/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - max_wal_size=1GB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - synchronous_commit=off
+      - -c
+      - max_connections=200
+    shm_size: 512m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
