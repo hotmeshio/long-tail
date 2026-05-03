@@ -1,6 +1,6 @@
 # Long Tail
 
-Turn your PostgreSQL database into a workflow engine with identity-aware durable execution, human-in-the-loop escalation, and MCP tool orchestration.
+Long Tail turns your PostgreSQL database into a workflow engine where human and AI work share the same durable execution path. Hand off, pull back, escalate, automate — without rewriting systems or losing continuity.
 
 ```bash
 npm install @hotmeshio/long-tail
