@@ -475,15 +475,16 @@ describe('MCP integration', () => {
       clearRegistries();
     }, 15_000);
 
-    it('should discover all 4 registered tools via listTools()', async () => {
+    it('should discover all 6 registered tools via listTools()', async () => {
       const { tools } = await mcpClient.listTools();
       const names = tools.map(t => t.name);
       expect(names).toContain('escalate_to_human');
       expect(names).toContain('check_resolution');
       expect(names).toContain('get_available_work');
       expect(names).toContain('claim_and_resolve');
+      expect(names).toContain('resolve_escalation');
       expect(names).toContain('escalate_and_wait');
-      expect(tools).toHaveLength(5);
+      expect(tools).toHaveLength(6);
     });
 
     it('should create a real escalation via escalate_to_human', async () => {

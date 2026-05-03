@@ -1,0 +1,457 @@
+# Factory Floor Workflow — 5 automated steps + 5 human stations
+#
+# Phase 1: Machine work (ingest → classify → prepress → print → scan)
+# Phase 2: Human stations — each hook fans out to two parallel children:
+#   1. resolve worker (calls claim_and_resolve to close the escalation)
+#   2. next escalate worker (continues the chain)
+# Phase 3: Rollup (complete)
+#
+# The resolve worker runs inside the workflow — escalation closure has
+# the same transactional guarantee as the workflow step itself.
+
+app:
+  id: longtail
+  version: '1'
+  graphs:
+    - subscribes: factory.floor
+      expire: 432000
+
+      input:
+        schema:
+          type: object
+          properties:
+            orderId:
+              type: string
+            product:
+              type: string
+
+      output:
+        schema:
+          type: object
+
+      activities:
+
+        trigger_ff:
+          type: trigger
+          output:
+            schema:
+              type: object
+
+        # ── Phase 1: Automated steps ─────────────────────────────────
+
+        ingest_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: get_knowledge
+              domain: factory
+              key: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        classify_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: get_knowledge
+              domain: factory
+              key: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        prepress_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: get_knowledge
+              domain: factory
+              key: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        print_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: get_knowledge
+              domain: factory
+              key: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        scan_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: get_knowledge
+              domain: factory
+              key: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        # ── Phase 2: Human stations ──────────────────────────────────
+        # Pattern: escalate → wait(hook) → [resolve + next_escalate] in parallel
+
+        # Station 1: QC Inspector
+        esc_qc_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: escalate_and_wait
+              title: 'QC Inspection'
+              message: 'Inspect order quality and approve'
+              role: qc_inspector
+              data:
+                orderId: '{trigger_ff.output.data.orderId}'
+                product: '{trigger_ff.output.data.product}'
+          output:
+            schema:
+              type: object
+
+        wait_qc_ff:
+          type: hook
+          hook:
+            type: object
+            properties:
+              job_id: { type: string }
+              escalationId: { type: string }
+              approved: { type: boolean }
+          output:
+            schema:
+              type: object
+
+        resolve_qc_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: resolve_escalation
+              escalation_id: '{wait_qc_ff.hook.data.escalationId}'
+              resolver_id: workflow
+              payload:
+                approved: '{wait_qc_ff.hook.data.approved}'
+          output:
+            schema:
+              type: object
+
+        # Station 2: Packaging
+        esc_pack_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: escalate_and_wait
+              title: 'Packaging'
+              message: 'Pack order for shipment'
+              role: packaging
+              data:
+                orderId: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait_pack_ff:
+          type: hook
+          hook:
+            type: object
+            properties:
+              job_id: { type: string }
+              escalationId: { type: string }
+              packed: { type: boolean }
+          output:
+            schema:
+              type: object
+
+        resolve_pack_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: resolve_escalation
+              escalation_id: '{wait_pack_ff.hook.data.escalationId}'
+              resolver_id: workflow
+              payload:
+                packed: '{wait_pack_ff.hook.data.packed}'
+          output:
+            schema:
+              type: object
+
+        # Station 3: Shipping
+        esc_ship_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: escalate_and_wait
+              title: 'Shipping Label'
+              message: 'Generate shipping label and attach'
+              role: shipping
+              data:
+                orderId: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait_ship_ff:
+          type: hook
+          hook:
+            type: object
+            properties:
+              job_id: { type: string }
+              escalationId: { type: string }
+              tracking: { type: string }
+          output:
+            schema:
+              type: object
+
+        resolve_ship_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: resolve_escalation
+              escalation_id: '{wait_ship_ff.hook.data.escalationId}'
+              resolver_id: workflow
+              payload:
+                tracking: '{wait_ship_ff.hook.data.tracking}'
+          output:
+            schema:
+              type: object
+
+        # Station 4: Loading Dock
+        esc_dock_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: escalate_and_wait
+              title: 'Loading Dock'
+              message: 'Load onto transport and confirm'
+              role: loading_dock
+              data:
+                orderId: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait_dock_ff:
+          type: hook
+          hook:
+            type: object
+            properties:
+              job_id: { type: string }
+              escalationId: { type: string }
+              loaded: { type: boolean }
+          output:
+            schema:
+              type: object
+
+        resolve_dock_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: resolve_escalation
+              escalation_id: '{wait_dock_ff.hook.data.escalationId}'
+              resolver_id: workflow
+              payload:
+                loaded: '{wait_dock_ff.hook.data.loaded}'
+          output:
+            schema:
+              type: object
+
+        # Station 5: Final Sign-off
+        esc_signoff_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: escalate_and_wait
+              title: 'Final Sign-off'
+              message: 'Final approval before dispatch'
+              role: final_signoff
+              data:
+                orderId: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait_signoff_ff:
+          type: hook
+          hook:
+            type: object
+            properties:
+              job_id: { type: string }
+              escalationId: { type: string }
+              signed: { type: boolean }
+          output:
+            schema:
+              type: object
+
+        resolve_signoff_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: resolve_escalation
+              escalation_id: '{wait_signoff_ff.hook.data.escalationId}'
+              resolver_id: workflow
+              payload:
+                signed: '{wait_signoff_ff.hook.data.signed}'
+          output:
+            schema:
+              type: object
+
+        # ── Phase 3: Rollup ──────────────────────────────────────────
+
+        complete_ff:
+          type: worker
+          topic: factory.floor
+          input:
+            schema:
+              type: object
+            maps:
+              _scope: '{trigger_ff.output.data._scope}'
+              workflowName: get_knowledge
+              domain: factory
+              key: '{trigger_ff.output.data.orderId}'
+          output:
+            schema:
+              type: object
+          job:
+            maps:
+              orderId: '{trigger_ff.output.data.orderId}'
+              product: '{trigger_ff.output.data.product}'
+              status: completed
+
+        done_ff:
+          type: hook
+
+      transitions:
+        trigger_ff:
+          - to: ingest_ff
+        ingest_ff:
+          - to: classify_ff
+        classify_ff:
+          - to: prepress_ff
+        prepress_ff:
+          - to: print_ff
+        print_ff:
+          - to: scan_ff
+        scan_ff:
+          - to: esc_qc_ff
+        esc_qc_ff:
+          - to: wait_qc_ff
+        wait_qc_ff:
+          - to: resolve_qc_ff
+          - to: esc_pack_ff
+        esc_pack_ff:
+          - to: wait_pack_ff
+        wait_pack_ff:
+          - to: resolve_pack_ff
+          - to: esc_ship_ff
+        esc_ship_ff:
+          - to: wait_ship_ff
+        wait_ship_ff:
+          - to: resolve_ship_ff
+          - to: esc_dock_ff
+        esc_dock_ff:
+          - to: wait_dock_ff
+        wait_dock_ff:
+          - to: resolve_dock_ff
+          - to: esc_signoff_ff
+        esc_signoff_ff:
+          - to: wait_signoff_ff
+        wait_signoff_ff:
+          - to: resolve_signoff_ff
+          - to: complete_ff
+        complete_ff:
+          - to: done_ff
+
+      hooks:
+        factory.qc.ack:
+          - to: wait_qc_ff
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.job_id}'
+        factory.pack.ack:
+          - to: wait_pack_ff
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.job_id}'
+        factory.ship.ack:
+          - to: wait_ship_ff
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.job_id}'
+        factory.dock.ack:
+          - to: wait_dock_ff
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.job_id}'
+        factory.signoff.ack:
+          - to: wait_signoff_ff
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.job_id}'

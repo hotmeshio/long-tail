@@ -1,0 +1,74 @@
+app:
+  id: echo01
+  version: '3'
+  graphs:
+    - subscribes: echo01.echo
+      publishes: echo01.echo.done
+
+      input:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+
+      output:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            echoedAt:
+              type: string
+
+      activities:
+        trigger:
+          type: trigger
+
+        echo1:
+          type: worker
+          topic: echo01.echo
+          input:
+            schema:
+              type: object
+            maps:
+              message: '{trigger.output.data.message}'
+          output:
+            schema:
+              type: object
+
+        echo2:
+          type: worker
+          topic: echo01.echo
+          input:
+            schema:
+              type: object
+            maps:
+              message: '{echo1.output.data.message}'
+          output:
+            schema:
+              type: object
+
+        echo3:
+          type: worker
+          topic: echo01.echo
+          input:
+            schema:
+              type: object
+            maps:
+              message: '{echo2.output.data.message}'
+          output:
+            schema:
+              type: object
+          job:
+            maps:
+              message: '{$self.output.data.message}'
+              echoedAt: '{$self.output.data.echoedAt}'
+
+      transitions:
+        trigger:
+          - to: echo1
+        echo1:
+          - to: echo2
+        echo2:
+          - to: echo3
