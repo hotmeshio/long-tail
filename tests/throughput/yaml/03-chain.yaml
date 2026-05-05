@@ -1,0 +1,230 @@
+app:
+  id: chain03
+  version: '21'
+  graphs:
+    - subscribes: chain03.chain.test
+      expire: 300
+
+      input:
+        schema:
+          type: object
+          properties:
+            orderId:
+              type: string
+
+      output:
+        schema:
+          type: object
+
+      activities:
+        trigger:
+          type: trigger
+          stats:
+            id: '{$self.input.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        # Auto step
+        work1:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: work
+              orderId: '{trigger.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        # Station 1: escalate → wait → resolve
+        escalate1:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: escalate
+              station: station1
+              orderId: '{trigger.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait1:
+          type: hook
+          hook:
+            type: object
+            properties:
+              id: { type: string }
+              ack: { type: string }
+          output:
+            schema:
+              type: object
+
+        resolve1:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: resolve
+              station: station1
+              orderId: '{trigger.output.data.orderId}'
+              ack: '{wait1.hook.data.ack}'
+          output:
+            schema:
+              type: object
+
+        # Station 2: escalate → wait → resolve
+        escalate2:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: escalate
+              station: station2
+              orderId: '{trigger.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait2:
+          type: hook
+          hook:
+            type: object
+            properties:
+              id: { type: string }
+              ack: { type: string }
+          output:
+            schema:
+              type: object
+
+        resolve2:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: resolve
+              station: station2
+              orderId: '{trigger.output.data.orderId}'
+              ack: '{wait2.hook.data.ack}'
+          output:
+            schema:
+              type: object
+
+        # Station 3: escalate → wait → resolve
+        escalate3:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: escalate
+              station: station3
+              orderId: '{trigger.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait3:
+          type: hook
+          hook:
+            type: object
+            properties:
+              id: { type: string }
+              ack: { type: string }
+          output:
+            schema:
+              type: object
+
+        resolve3:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: resolve
+              station: station3
+              orderId: '{trigger.output.data.orderId}'
+              ack: '{wait3.hook.data.ack}'
+          output:
+            schema:
+              type: object
+
+        # Final rollup
+        complete:
+          type: worker
+          topic: chain03.chain.test
+          input:
+            schema:
+              type: object
+            maps:
+              step: complete
+              orderId: '{trigger.output.data.orderId}'
+          output:
+            schema:
+              type: object
+          job:
+            maps:
+              orderId: '{trigger.output.data.orderId}'
+              status: completed
+
+        done:
+          type: hook
+
+      transitions:
+        trigger:
+          - to: work1
+        work1:
+          - to: escalate1
+        escalate1:
+          - to: wait1
+        wait1:
+          - to: resolve1
+        resolve1:
+          - to: escalate2
+        escalate2:
+          - to: wait2
+        wait2:
+          - to: resolve2
+        resolve2:
+          - to: escalate3
+        escalate3:
+          - to: wait3
+        wait3:
+          - to: resolve3
+        resolve3:
+          - to: complete
+        complete:
+          - to: done
+
+      hooks:
+        chain03.chain.ack1:
+          - to: wait1
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.id}'
+        chain03.chain.ack2:
+          - to: wait2
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.id}'
+        chain03.chain.ack3:
+          - to: wait3
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.id}'

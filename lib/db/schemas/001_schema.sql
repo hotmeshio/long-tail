@@ -1,5 +1,5 @@
 -- Long Tail Workflows: Schema
--- Tasks track workflow executions; escalations track human interventions.
+-- All tables, indexes, triggers, and functions.
 
 -- ─── updated_at trigger ─────────────────────────────────────────────────────
 
@@ -28,28 +28,31 @@ ON CONFLICT DO NOTHING;
 -- ─── lt_tasks ────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lt_tasks (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workflow_id     TEXT NOT NULL,
-  workflow_type   TEXT NOT NULL,
-  lt_type         TEXT NOT NULL,
-  task_queue      TEXT,
-  status          TEXT NOT NULL DEFAULT 'pending',
-  priority        INTEGER NOT NULL DEFAULT 2,
-  signal_id       TEXT NOT NULL,
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id        TEXT NOT NULL,
+  workflow_type      TEXT NOT NULL,
+  lt_type            TEXT NOT NULL,
+  task_queue         TEXT,
+  status             TEXT NOT NULL DEFAULT 'pending',
+  priority           INTEGER NOT NULL DEFAULT 2,
+  signal_id          TEXT NOT NULL,
   parent_workflow_id TEXT NOT NULL,
-  origin_id       TEXT,
-  parent_id       TEXT,
-  started_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at    TIMESTAMPTZ,
-  envelope        TEXT NOT NULL,
-  metadata        JSONB,
-  error           TEXT,
-  milestones      JSONB NOT NULL DEFAULT '[]'::JSONB,
-  data            TEXT,
-  trace_id        TEXT,
-  span_id         TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  origin_id          TEXT,
+  parent_id          TEXT,
+  started_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at       TIMESTAMPTZ,
+  envelope           TEXT NOT NULL,
+  metadata           JSONB,
+  error              TEXT,
+  milestones         JSONB NOT NULL DEFAULT '[]'::JSONB,
+  data               TEXT,
+  trace_id           TEXT,
+  span_id            TEXT,
+  initiated_by       UUID,
+  principal_type     TEXT DEFAULT 'user',
+  executing_as       TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_lt_tasks_status_type ON lt_tasks (status, workflow_type, created_at DESC);
@@ -61,39 +64,80 @@ CREATE INDEX IF NOT EXISTS idx_lt_tasks_origin ON lt_tasks (origin_id, created_a
 CREATE INDEX IF NOT EXISTS idx_lt_tasks_workflow_id ON lt_tasks (workflow_id);
 CREATE INDEX IF NOT EXISTS idx_lt_tasks_origin_id ON lt_tasks (origin_id) WHERE origin_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_lt_tasks_trace ON lt_tasks (trace_id) WHERE trace_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_lt_tasks_initiated_by ON lt_tasks (initiated_by) WHERE initiated_by IS NOT NULL;
 
 CREATE OR REPLACE TRIGGER trg_lt_tasks_updated_at
   BEFORE UPDATE ON lt_tasks
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
+-- ─── lt_users ────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_users (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  external_id      TEXT UNIQUE NOT NULL,
+  email            TEXT,
+  display_name     TEXT,
+  password_hash    TEXT,
+  status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+  account_type     TEXT NOT NULL DEFAULT 'user' CHECK (account_type IN ('user', 'bot')),
+  oauth_provider   TEXT,
+  oauth_provider_id TEXT,
+  metadata         JSONB,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_users_status ON lt_users (status);
+CREATE INDEX IF NOT EXISTS idx_lt_users_oauth
+  ON lt_users (oauth_provider, oauth_provider_id)
+  WHERE oauth_provider IS NOT NULL;
+
+CREATE TRIGGER lt_users_updated_at
+  BEFORE UPDATE ON lt_users
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
+
+-- ─── lt_user_roles ───────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_user_roles (
+  user_id    UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
+  role       TEXT NOT NULL REFERENCES lt_roles(role),
+  type       TEXT NOT NULL DEFAULT 'member' CHECK (type IN ('superadmin', 'admin', 'member')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, role)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_user_roles_type ON lt_user_roles (type);
+CREATE INDEX IF NOT EXISTS idx_lt_user_roles_user_id ON lt_user_roles (user_id);
+
 -- ─── lt_escalations ─────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lt_escalations (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type              TEXT NOT NULL,
-  subtype           TEXT NOT NULL,
-  description       TEXT,
-  status            TEXT NOT NULL DEFAULT 'pending',
-  priority          INTEGER NOT NULL DEFAULT 2,
-  task_id           UUID REFERENCES lt_tasks(id),
-  origin_id         TEXT,
-  parent_id         TEXT,
-  workflow_id       TEXT,
-  task_queue        TEXT,
-  workflow_type     TEXT,
-  role              TEXT NOT NULL REFERENCES lt_roles(role),
-  assigned_to       TEXT,
-  assigned_until    TIMESTAMPTZ,
-  resolved_at       TIMESTAMPTZ,
-  claimed_at        TIMESTAMPTZ,
-  envelope          TEXT NOT NULL,
-  metadata          JSONB,
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type               TEXT NOT NULL,
+  subtype            TEXT NOT NULL,
+  description        TEXT,
+  status             TEXT NOT NULL DEFAULT 'pending',
+  priority           INTEGER NOT NULL DEFAULT 2,
+  task_id            UUID REFERENCES lt_tasks(id),
+  origin_id          TEXT,
+  parent_id          TEXT,
+  workflow_id        TEXT,
+  task_queue         TEXT,
+  workflow_type      TEXT,
+  role               TEXT NOT NULL REFERENCES lt_roles(role),
+  assigned_to        TEXT,
+  assigned_until     TIMESTAMPTZ,
+  resolved_at        TIMESTAMPTZ,
+  claimed_at         TIMESTAMPTZ,
+  created_by         UUID,
+  envelope           TEXT NOT NULL,
+  metadata           JSONB,
   escalation_payload TEXT,
-  resolver_payload  TEXT,
-  trace_id          TEXT,
-  span_id           TEXT,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  resolver_payload   TEXT,
+  trace_id           TEXT,
+  span_id            TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_lt_escalations_available ON lt_escalations (status, role, assigned_until, created_at DESC);
@@ -113,43 +157,11 @@ CREATE INDEX IF NOT EXISTS idx_lt_escalations_trace ON lt_escalations (trace_id)
 CREATE INDEX IF NOT EXISTS idx_lt_escalations_created_desc ON lt_escalations (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lt_escalations_updated_desc ON lt_escalations (updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lt_escalations_priority_desc ON lt_escalations (priority DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lt_escalations_created_by ON lt_escalations (created_by) WHERE created_by IS NOT NULL;
 
 CREATE OR REPLACE TRIGGER trg_lt_escalations_updated_at
   BEFORE UPDATE ON lt_escalations
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
-
--- ─── lt_users ────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS lt_users (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  external_id   TEXT UNIQUE NOT NULL,
-  email         TEXT,
-  display_name  TEXT,
-  password_hash TEXT,
-  status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
-  metadata      JSONB,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TRIGGER lt_users_updated_at
-  BEFORE UPDATE ON lt_users
-  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
-
-CREATE INDEX IF NOT EXISTS idx_lt_users_status ON lt_users (status);
-
--- ─── lt_user_roles ───────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS lt_user_roles (
-  user_id    UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
-  role       TEXT NOT NULL REFERENCES lt_roles(role),
-  type       TEXT NOT NULL DEFAULT 'member' CHECK (type IN ('superadmin', 'admin', 'member')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (user_id, role)
-);
-
-CREATE INDEX IF NOT EXISTS idx_lt_user_roles_type ON lt_user_roles (type);
-CREATE INDEX IF NOT EXISTS idx_lt_user_roles_user_id ON lt_user_roles (user_id);
 
 -- ─── lt_config_workflows ────────────────────────────────────────────────────
 
@@ -193,35 +205,6 @@ CREATE TABLE IF NOT EXISTS lt_config_invocation_roles (
   UNIQUE(workflow_type, role)
 );
 
--- ─── lt_mcp_servers ─────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS lt_mcp_servers (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name              TEXT UNIQUE NOT NULL,
-  description       TEXT,
-  transport_type    TEXT NOT NULL CHECK (transport_type IN ('stdio', 'sse')),
-  transport_config  JSONB NOT NULL DEFAULT '{}'::JSONB,
-  auto_connect      BOOLEAN NOT NULL DEFAULT false,
-  tool_manifest     JSONB,
-  status            TEXT NOT NULL DEFAULT 'registered'
-                      CHECK (status IN ('registered', 'connected', 'error', 'disconnected')),
-  last_connected_at TIMESTAMPTZ,
-  metadata          JSONB,
-  tags              TEXT[] NOT NULL DEFAULT '{}',
-  compile_hints     TEXT,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_name ON lt_mcp_servers (name);
-CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_status ON lt_mcp_servers (status);
-CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_auto_connect ON lt_mcp_servers (auto_connect) WHERE auto_connect = true;
-CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_tags ON lt_mcp_servers USING GIN (tags);
-
-CREATE OR REPLACE TRIGGER trg_lt_mcp_servers_updated_at
-  BEFORE UPDATE ON lt_mcp_servers
-  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
-
 -- ─── lt_config_role_escalations ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lt_config_role_escalations (
@@ -233,6 +216,37 @@ CREATE TABLE IF NOT EXISTS lt_config_role_escalations (
 
 CREATE INDEX IF NOT EXISTS idx_lt_config_role_escalations_source
   ON lt_config_role_escalations (source_role);
+
+-- ─── lt_mcp_servers ─────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_mcp_servers (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                 TEXT UNIQUE NOT NULL,
+  description          TEXT,
+  transport_type       TEXT NOT NULL CHECK (transport_type IN ('stdio', 'sse', 'streamable-http')),
+  transport_config     JSONB NOT NULL DEFAULT '{}'::JSONB,
+  auto_connect         BOOLEAN NOT NULL DEFAULT false,
+  tool_manifest        JSONB,
+  status               TEXT NOT NULL DEFAULT 'registered'
+                         CHECK (status IN ('registered', 'connected', 'error', 'disconnected')),
+  last_connected_at    TIMESTAMPTZ,
+  metadata             JSONB,
+  tags                 TEXT[] NOT NULL DEFAULT '{}',
+  compile_hints        TEXT,
+  required_scopes      TEXT[] NOT NULL DEFAULT '{}',
+  credential_providers TEXT[] NOT NULL DEFAULT '{}',
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_name ON lt_mcp_servers (name);
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_status ON lt_mcp_servers (status);
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_auto_connect ON lt_mcp_servers (auto_connect) WHERE auto_connect = true;
+CREATE INDEX IF NOT EXISTS idx_lt_mcp_servers_tags ON lt_mcp_servers USING GIN (tags);
+
+CREATE OR REPLACE TRIGGER trg_lt_mcp_servers_updated_at
+  BEFORE UPDATE ON lt_mcp_servers
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
 -- ─── lt_yaml_workflows ──────────────────────────────────────────────────────
 
@@ -261,6 +275,12 @@ CREATE TABLE IF NOT EXISTS lt_yaml_workflows (
   cron_schedule            TEXT,
   cron_envelope            JSONB,
   execute_as               TEXT,
+  original_prompt          TEXT,
+  category                 TEXT,
+  search_vector            TSVECTOR,
+  set_id                   UUID,
+  set_role                 TEXT CHECK (set_role IN ('leaf', 'composition', 'router')),
+  set_build_order          INTEGER,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -268,10 +288,35 @@ CREATE TABLE IF NOT EXISTS lt_yaml_workflows (
 CREATE INDEX IF NOT EXISTS idx_lt_yaml_workflows_status ON lt_yaml_workflows (status);
 CREATE INDEX IF NOT EXISTS idx_lt_yaml_workflows_app_id ON lt_yaml_workflows (app_id);
 CREATE INDEX IF NOT EXISTS idx_lt_yaml_workflows_tags ON lt_yaml_workflows USING GIN (tags);
+CREATE INDEX IF NOT EXISTS idx_lt_yaml_workflows_search ON lt_yaml_workflows USING GIN (search_vector);
+CREATE INDEX IF NOT EXISTS idx_lt_yaml_workflows_category ON lt_yaml_workflows (category) WHERE category IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_lt_yaml_workflows_set_id ON lt_yaml_workflows (set_id) WHERE set_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lt_yaml_workflows_app_topic_unique
+  ON lt_yaml_workflows (app_id, graph_topic)
+  WHERE status != 'archived';
 
 CREATE OR REPLACE TRIGGER trg_lt_yaml_workflows_updated_at
   BEFORE UPDATE ON lt_yaml_workflows
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
+
+-- Full-text search trigger
+CREATE OR REPLACE FUNCTION lt_yaml_workflows_search_vector_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.original_prompt, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(NEW.category, '')), 'C') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(NEW.tags, ' '), '')), 'C');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_lt_yaml_workflows_search_vector
+  BEFORE INSERT OR UPDATE ON lt_yaml_workflows
+  FOR EACH ROW EXECUTE FUNCTION lt_yaml_workflows_search_vector_update();
 
 -- ─── lt_yaml_workflow_versions ──────────────────────────────────────────────
 
@@ -291,6 +336,136 @@ CREATE TABLE IF NOT EXISTS lt_yaml_workflow_versions (
 
 CREATE INDEX IF NOT EXISTS idx_lt_yaml_wf_versions_workflow
   ON lt_yaml_workflow_versions (workflow_id, version DESC);
+
+-- ─── lt_workflow_sets ───────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_workflow_sets (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name               TEXT UNIQUE NOT NULL,
+  description        TEXT,
+  specification      TEXT NOT NULL,
+  plan               JSONB NOT NULL DEFAULT '[]'::JSONB,
+  namespaces         TEXT[] NOT NULL DEFAULT '{}',
+  status             TEXT NOT NULL DEFAULT 'planning'
+                       CHECK (status IN ('planning','planned','building','deploying','completed','failed')),
+  source_workflow_id TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE TRIGGER trg_lt_workflow_sets_updated_at
+  BEFORE UPDATE ON lt_workflow_sets
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
+
+-- Add FK for lt_yaml_workflows.set_id (table already exists, add constraint)
+DO $$ BEGIN
+  ALTER TABLE lt_yaml_workflows ADD CONSTRAINT fk_lt_yaml_workflows_set_id
+    FOREIGN KEY (set_id) REFERENCES lt_workflow_sets(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ─── lt_oauth_tokens ────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_oauth_tokens (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
+  provider          TEXT NOT NULL,
+  label             TEXT NOT NULL DEFAULT 'default',
+  access_token_enc  TEXT NOT NULL,
+  refresh_token_enc TEXT,
+  token_type        TEXT NOT NULL DEFAULT 'bearer',
+  scopes            TEXT[] NOT NULL DEFAULT '{}',
+  expires_at        TIMESTAMPTZ,
+  provider_user_id  TEXT NOT NULL,
+  provider_email    TEXT,
+  metadata          JSONB,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, provider, label)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_oauth_tokens_provider
+  ON lt_oauth_tokens (provider, user_id);
+
+CREATE OR REPLACE TRIGGER trg_lt_oauth_tokens_updated_at
+  BEFORE UPDATE ON lt_oauth_tokens
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
+
+-- ─── lt_service_tokens ──────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_service_tokens (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT UNIQUE NOT NULL,
+  token_hash   TEXT NOT NULL,
+  server_id    UUID REFERENCES lt_mcp_servers(id) ON DELETE CASCADE,
+  scopes       TEXT[] NOT NULL DEFAULT '{}',
+  expires_at   TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_service_tokens_server
+  ON lt_service_tokens (server_id);
+
+CREATE OR REPLACE TRIGGER trg_lt_service_tokens_updated_at
+  BEFORE UPDATE ON lt_service_tokens
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
+
+-- ─── lt_bot_api_keys ────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_bot_api_keys (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT NOT NULL,
+  user_id      UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
+  key_hash     TEXT NOT NULL,
+  scopes       TEXT[] NOT NULL DEFAULT '{}',
+  expires_at   TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bot_api_keys_user_id ON lt_bot_api_keys (user_id);
+
+-- ─── lt_ephemeral_credentials ───────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_ephemeral_credentials (
+  token       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  value       BYTEA NOT NULL,
+  label       TEXT,
+  max_uses    INTEGER NOT NULL DEFAULT 0,
+  use_count   INTEGER NOT NULL DEFAULT 0,
+  expires_at  TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_ephemeral_expiry
+  ON lt_ephemeral_credentials (expires_at)
+  WHERE expires_at IS NOT NULL;
+
+-- ─── lt_knowledge ───────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS lt_knowledge (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  domain      TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  data        JSONB NOT NULL DEFAULT '{}',
+  tags        TEXT[] NOT NULL DEFAULT '{}',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(domain, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lt_knowledge_domain ON lt_knowledge (domain);
+CREATE INDEX IF NOT EXISTS idx_lt_knowledge_tags ON lt_knowledge USING GIN (tags);
+CREATE INDEX IF NOT EXISTS idx_lt_knowledge_data ON lt_knowledge USING GIN (data);
+
+CREATE TRIGGER lt_knowledge_updated_at
+  BEFORE UPDATE ON lt_knowledge
+  FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
 -- ─── lt_namespaces ──────────────────────────────────────────────────────────
 

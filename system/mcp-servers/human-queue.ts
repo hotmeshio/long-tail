@@ -34,6 +34,11 @@ const claimAndResolveSchema = z.object({
   payload: z.record(z.any()).describe('Resolution payload data'),
 });
 
+const resolveEscalationSchema = z.object({
+  escalation_id: z.string().describe('The escalation ID to resolve'),
+  payload: z.record(z.any()).describe('Resolution payload data'),
+});
+
 const escalateAndWaitSchema = z.object({
   role: z.string().describe('Target role for the escalation (e.g., "reviewer")'),
   message: z.string().describe('Description of what input is needed from the human'),
@@ -192,6 +197,41 @@ export async function createHumanQueueServer(options?: {
           isError: true,
         };
       }
+      const resolved = await escalationService.resolveEscalation(
+        args.escalation_id,
+        args.payload,
+      );
+      if (!resolved) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: 'Failed to resolve escalation' }),
+          }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            escalation_id: resolved.id,
+            status: resolved.status,
+            resolved_at: resolved.resolved_at,
+          }),
+        }],
+      };
+    },
+  );
+
+  // ── resolve_escalation ──────────────────────────────────────────────
+  (server as any).registerTool(
+    'resolve_escalation',
+    {
+      title: 'Resolve Escalation',
+      description: 'Resolve an already-claimed escalation with a payload. Use when the claim happened externally (e.g. via API).',
+      inputSchema: resolveEscalationSchema,
+    },
+    async (args: z.infer<typeof resolveEscalationSchema>) => {
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,
