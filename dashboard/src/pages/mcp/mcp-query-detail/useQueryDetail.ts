@@ -10,6 +10,7 @@ import { useWorkflowExecution } from '../../../api/workflows';
 import { useTaskByWorkflowId } from '../../../api/tasks';
 import { useEscalationsByWorkflowId, useClaimEscalation, useResolveEscalation } from '../../../api/escalations';
 
+import { sanitizeToolName } from '../../../lib/sanitize';
 import { mapStatus, extractJsonFromSummary, STEP_LABELS_BASE } from './helpers';
 import type { Step } from './helpers';
 
@@ -177,11 +178,11 @@ export function useQueryDetail() {
     setCompileInitialized(true);
     if (!compileDescription) setCompileDescription(describeData.description);
     if (compileTags.length === 0 && describeData.tags.length > 0) setCompileTags(describeData.tags);
-    if (!compileName && describeData.tool_name) setCompileName(describeData.tool_name);
+    if (!compileName && describeData.tool_name) setCompileName(sanitizeToolName(describeData.tool_name));
   }
 
   // Topic always derives from workflow name (not namespace — using namespace causes topic collisions)
-  const derivedSubscribes = compileName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const derivedSubscribes = sanitizeToolName(compileName);
   const allAppIds = useMemo(() => appIdData?.app_ids ?? [], [appIdData?.app_ids]);
 
   const handleCompile = async () => {

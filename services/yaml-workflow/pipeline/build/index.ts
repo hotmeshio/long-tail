@@ -21,7 +21,8 @@ import {
 } from './dag';
 
 // Re-export public utilities used by other modules
-export { capToolArguments, sanitizeName } from './utils';
+export { capToolArguments } from './utils';
+export { sanitizeToolName } from '../../../../modules/utils';
 
 /**
  * Build pipeline stage: construct the HotMesh YAML DAG.

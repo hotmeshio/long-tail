@@ -5,6 +5,7 @@ import * as yamlWorkers from '../services/yaml-workflow/workers';
 import { invokeYamlWorkflow as invokeYamlWorkflowService } from '../services/yaml-workflow/invoke';
 import { getTaskByWorkflowId } from '../services/task';
 import { cronRegistry } from '../services/cron';
+import { sanitizeToolName, sanitizeServerName } from '../modules/utils';
 import type { LTApiResult, LTApiAuth } from '../types/sdk';
 
 /** Return true if a Postgres error indicates an invalid/missing ID */
@@ -117,8 +118,8 @@ export async function createYamlWorkflow(input: {
     }
 
     // Check for topic collision in the target namespace
-    const compileAppId = app_id || 'longtail';
-    const compileTopic = subscribes || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const compileAppId = sanitizeServerName(app_id || 'longtail');
+    const compileTopic = sanitizeToolName(subscribes || name);
     const conflicting = await yamlDb.checkTopicConflict(compileAppId, compileTopic);
     if (conflicting) {
       return {
@@ -209,17 +210,17 @@ export async function createYamlWorkflowDirect(input: {
       return { status: 400, error: 'name and yaml_content are required' };
     }
 
-    // Sanitize name (tool name): lowercase alphanumeric, periods, dashes, underscores
-    const sanitizedName = name.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    // Sanitize name (tool name): snake_case only
+    const sanitizedName = sanitizeToolName(name);
 
-    // Sanitize app_id (MCP server name): force lowercase alphanumeric only
-    const targetAppId = (app_id || 'longtail').toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Sanitize app_id (MCP server name): lowercase alphanumeric, must start with a letter
+    const targetAppId = sanitizeServerName(app_id || 'longtail');
 
-    // Sanitize graph topic: lowercase alphanumeric, periods, dashes, underscores
-    let graphTopic = (graph_topic || sanitizedName).toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    // Sanitize graph topic: snake_case only
+    let graphTopic = sanitizeToolName(graph_topic || sanitizedName);
     const subscribesMatch = yaml_content.match(/subscribes:\s*(.+)/);
     if (subscribesMatch) {
-      graphTopic = subscribesMatch[1].trim().replace(/^['"]|['"]$/g, '').toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      graphTopic = sanitizeToolName(subscribesMatch[1].trim().replace(/^['"]|['"]$/g, ''));
     }
 
     // Rewrite the subscribes line in the YAML to match the sanitized topic
@@ -454,8 +455,10 @@ export async function deployYamlWorkflow(input: {
       return { status: 404, error: 'YAML workflow not found' };
     }
 
-    // Use the version declared in the YAML (like package.json)
-    const deployVersion = wf.app_version || '1';
+    // Compute the next app-level version for the namespace.
+    // Each deploy increments regardless of individual tool versions —
+    // adding a second tool (v1 of itself) to an app already at v1 produces app v2.
+    const deployVersion = await yamlDb.getNextAppVersion(wf.app_id);
 
     // Deploy + activate merged YAML for the full app_id
     const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);

@@ -38,13 +38,13 @@ Each workflow has a typed input and output contract (JSON Schema). Composition w
 
 Return a JSON object (no markdown fences):
 {
-  "plan_name": "kebab-case-plan-name",
+  "plan_name": "snake_case_plan_name",
   "plan_description": "What this set of workflows accomplishes",
   "workflows": [
     {
-      "name": "kebab-case-workflow-name",
+      "name": "snake_case_workflow_name",
       "description": "What this workflow does — specific enough to build from",
-      "namespace": "the-app-namespace",
+      "namespace": "appnamespace",
       "role": "leaf" | "composition" | "router",
       "dependencies": ["name-of-workflow-this-depends-on"],
       "build_order": 0,

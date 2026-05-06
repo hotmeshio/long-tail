@@ -244,7 +244,7 @@ describe('describeWorkflow', () => {
 
     expect(result.description).toBe('Fetches order data');
     expect(result.tags).toEqual(['orders', 'api']);
-    expect(result.tool_name).toBe('fetch-orders');
+    expect(result.tool_name).toBe('fetch_orders');
   });
 
   it('handles markdown-wrapped JSON response', async () => {
@@ -256,10 +256,10 @@ describe('describeWorkflow', () => {
     const result = await describeWorkflow({ prompt: 'test' });
 
     expect(result.description).toBe('Desc');
-    expect(result.tool_name).toBe('test-tool');
+    expect(result.tool_name).toBe('test_tool');
   });
 
-  it('normalizes tool_name to kebab-case', async () => {
+  it('normalizes tool_name to snake_case', async () => {
     vi.mocked(hasLLMApiKey).mockReturnValue(true);
     vi.mocked(callLLM).mockResolvedValue({
       content: '{"tool_name": "My Cool Tool!!!", "description": "d", "tags": []}',
@@ -267,7 +267,7 @@ describe('describeWorkflow', () => {
 
     const result = await describeWorkflow({ prompt: 'test' });
 
-    expect(result.tool_name).toBe('my-cool-tool');
+    expect(result.tool_name).toBe('my_cool_tool');
   });
 
   it('includes result_title and result_summary in LLM prompt', async () => {

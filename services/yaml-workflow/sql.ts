@@ -39,6 +39,11 @@ export const LIST_BY_APP_ID = `
   WHERE app_id = $1 AND status != 'archived'
   ORDER BY name`;
 
+export const GET_MAX_APP_VERSION = `
+  SELECT COALESCE(MAX(CAST(app_version AS INTEGER)), 0) AS max_version
+  FROM lt_yaml_workflows
+  WHERE app_id = $1 AND status != 'archived'`;
+
 export const GET_DISTINCT_APP_IDS = `
   SELECT DISTINCT app_id FROM lt_yaml_workflows
   WHERE status != 'archived'

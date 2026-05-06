@@ -10,6 +10,7 @@ import { LifecycleSidebar } from './LifecycleSidebar';
 import { VersionHistory } from './VersionHistory';
 import {
   useYamlWorkflow,
+  useYamlWorkflows,
   useYamlWorkflowVersions,
   useYamlWorkflowVersion,
   useUpdateYamlWorkflow,
@@ -43,6 +44,9 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
   };
 
   const { data: wf, refetch } = useYamlWorkflow(yamlId);
+  const { data: siblingsData } = useYamlWorkflows(wf ? { app_id: wf.app_id } : {});
+  const siblingCount = siblingsData?.workflows?.length ?? 0;
+  const currentAppVersion = Math.max(...(siblingsData?.workflows?.map(w => parseInt(w.app_version || '0', 10)) ?? [0]));
   const { data: versionsData } = useYamlWorkflowVersions(yamlId);
 
   const deployMutation = useDeployYamlWorkflow();
@@ -277,6 +281,9 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
               sourceWorkflowId={wf.source_workflow_id}
               contentVersion={wf.content_version}
               deployedContentVersion={wf.deployed_content_version}
+              appId={wf.app_id}
+              appVersion={currentAppVersion}
+              siblingCount={siblingCount}
               onDeploy={handleDeploy}
               onArchive={() => archiveMutation.mutateAsync(yamlId).then(() => refetch())}
               onDelete={async () => {

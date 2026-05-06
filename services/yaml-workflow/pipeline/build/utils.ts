@@ -28,13 +28,6 @@ export function capToolArguments(args: Record<string, unknown>): Record<string, 
   return capped;
 }
 
-/** Sanitize a name for use in HotMesh app IDs and topics. */
-export function sanitizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 /** Convert a snake_case/camelCase field name to a readable label. */
 export function humanize(name: string): string {

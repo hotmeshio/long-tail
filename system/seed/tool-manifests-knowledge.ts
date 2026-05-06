@@ -3,14 +3,15 @@
 export const KNOWLEDGE_TOOLS = [
   {
     name: 'store_knowledge',
-    description: 'Store or update a knowledge entry. Upserts by domain+key: merges data and unions tags if the entry already exists.',
+    description: 'Store a value in a 3-level additive hierarchy: domain > key > field. Upserts by domain+key — fields accumulate across calls. Same domain+key+field overwrites that field. When field is provided, data can be any type. When omitted, data must be an object.',
     inputSchema: {
       type: 'object',
       properties: {
-        domain: { type: 'string', description: 'Knowledge domain (namespace)' },
-        key: { type: 'string', description: 'Unique key within domain' },
-        data: { type: 'object', description: 'JSONB payload to store' },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Categorization tags' },
+        domain: { type: 'string', description: 'Top level — groups entries by namespace (e.g. "screenshots", "config")' },
+        key: { type: 'string', description: 'Second level — unique identifier within domain (e.g. "homepage")' },
+        field: { type: 'string', description: 'Third level (leaf) — names a specific field. Different fields accumulate; same field overwrites.' },
+        data: { description: 'The value to store. Any type when field is provided; must be an object when field is omitted.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Categorization tags (unioned on upsert)' },
       },
       required: ['domain', 'key', 'data'],
     },

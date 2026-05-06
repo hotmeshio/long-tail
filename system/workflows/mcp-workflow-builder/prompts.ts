@@ -287,11 +287,11 @@ When the user provides answers to your questions, build the workflow immediately
 
 ## Output Format
 
-CRITICAL: The "name" field MUST match the "subscribes" topic in the YAML exactly. Use lowercase with dots as separators (e.g. "screenshot.analyze.store", "capture.page", "daily.report"). Dashes and underscores are also allowed but dots are preferred. The name and subscribes topic MUST be identical.
+CRITICAL: The "name" field MUST match the "subscribes" topic in the YAML exactly. Use snake_case (e.g. "screenshot_analyze_store", "capture_page", "daily_report"). Only lowercase letters, digits, and underscores. The name and subscribes topic MUST be identical.
 
 Return a JSON object (no markdown fences):
 {
-  "name": "screenshot.analyze.store",
+  "name": "screenshot_analyze_store",
   "description": "What this workflow does",
   "yaml": "<the complete YAML string>",
   "input_schema": { <JSON Schema for trigger inputs> },

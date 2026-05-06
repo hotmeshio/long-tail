@@ -5,6 +5,7 @@ import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { TagInput } from '../../../components/common/form/TagInput';
 import { useCreateDirectYamlWorkflow } from '../../../api/workflow-builder';
 import { useYamlWorkflow, useUpdateYamlWorkflow } from '../../../api/yaml-workflows';
+import { sanitizeToolName, sanitizeServerName } from '../../../lib/sanitize';
 
 interface BuilderProfilePanelProps {
   builderData: any;
@@ -17,7 +18,7 @@ interface BuilderProfilePanelProps {
 
 export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPrompt, onBack, onCreate, onNext }: BuilderProfilePanelProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState((builderData?.name || '').toLowerCase().replace(/[^a-z0-9._-]/g, ''));
+  const [name, setName] = useState(sanitizeToolName(builderData?.name || ''));
   const [description, setDescription] = useState(builderData?.description || '');
   const [appId, setAppId] = useState('longtail');
   const [tags, setTags] = useState<string[]>(builderData?.tags || []);
@@ -80,7 +81,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             {editable ? (
               <input
                 value={appId}
-                onChange={(e) => setAppId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                onChange={(e) => setAppId(sanitizeServerName(e.target.value))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               />
             ) : (
@@ -92,7 +93,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             {editable ? (
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                onChange={(e) => setName(sanitizeToolName(e.target.value))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
               />
             ) : (

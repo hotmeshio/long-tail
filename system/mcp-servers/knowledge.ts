@@ -5,10 +5,11 @@ import { loggerRegistry } from '../../lib/logger';
 import * as knowledge from '../activities/knowledge';
 
 const storeSchema = z.object({
-  domain: z.string().describe('Knowledge domain (namespace)'),
-  key: z.string().describe('Unique key within domain'),
-  data: z.record(z.any()).describe('JSONB object payload to store (must be an object, not a string — wrap text as { "description": "..." })'),
-  tags: z.array(z.string()).optional().describe('Categorization tags'),
+  domain: z.string().describe('Top level of a 3-level hierarchy (domain > key > field). Groups related entries by namespace (e.g. "screenshots", "config", "analysis").'),
+  key: z.string().describe('Second level. Unique identifier within a domain (e.g. "homepage", "user_profile"). Multiple fields accumulate under the same domain+key.'),
+  field: z.string().optional().describe('Third level (leaf). Names a specific field within the domain+key entry (e.g. "url", "analysis", "score"). When provided, data is stored as { [field]: data } and merged into the existing entry. Calls with the same domain+key+field overwrite that field; different fields accumulate additively. Omit to pass data as a full object.'),
+  data: z.any().describe('The value to store. When field is provided, this can be any type (string, number, boolean, object, array). When field is omitted, this must be a JSON object whose keys become the fields.'),
+  tags: z.array(z.string()).optional().describe('Categorization tags (unioned on upsert)'),
 });
 
 const getSchema = z.object({
@@ -47,11 +48,39 @@ function registerTools(server: McpServer) {
     'store_knowledge',
     {
       title: 'Store Knowledge',
-      description: 'Store or update a knowledge entry. Upserts by domain+key: merges data and unions tags if the entry already exists.',
+      description:
+        'Store a value in a 3-level additive hierarchy: domain > key > field. ' +
+        'Upserts by domain+key — fields accumulate across calls. ' +
+        'If all three (domain+key+field) match, that field is overwritten. ' +
+        'When field is provided, data can be any type (string, number, etc.). ' +
+        'When field is omitted, data must be an object whose keys become the fields.',
       inputSchema: storeSchema,
     },
     async (args: z.infer<typeof storeSchema>) => {
-      const result = await knowledge.storeKnowledge(args);
+      // When field is provided, wrap the data value as { [field]: data }
+      // so it merges into the JSONB column at the field level.
+      // When field is omitted, data must be a plain object — reject strings,
+      // arrays, and primitives that would corrupt the JSONB merge
+      // (Postgres `object || string` produces an array, not a merge).
+      let dataObj: Record<string, any>;
+      if (args.field != null) {
+        dataObj = { [args.field]: args.data };
+      } else {
+        if (args.data == null || typeof args.data !== 'object' || Array.isArray(args.data)) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'When field is omitted, data must be a JSON object. Use the field parameter to store strings and other primitives.',
+              }),
+            }],
+          };
+        }
+        dataObj = args.data;
+      }
+      const result = await knowledge.storeKnowledge({
+        domain: args.domain, key: args.key, data: dataObj, tags: args.tags,
+      });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );
