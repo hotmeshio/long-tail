@@ -9,6 +9,8 @@ interface McpRunFilters {
   search?: string;
   status?: string;
   app_id?: string;
+  sort_by?: string;
+  order?: string;
 }
 
 export function useMcpRuns(filters: McpRunFilters = {}) {
@@ -18,6 +20,8 @@ export function useMcpRuns(filters: McpRunFilters = {}) {
   if (filters.entity) params.set('entity', filters.entity);
   if (filters.search) params.set('search', filters.search);
   if (filters.status) params.set('status', filters.status);
+  if (filters.sort_by) params.set('sort_by', filters.sort_by);
+  if (filters.order) params.set('order', filters.order);
   params.set('app_id', filters.app_id || 'longtail');
 
   return useQuery<{ jobs: LTJob[]; total: number }>({

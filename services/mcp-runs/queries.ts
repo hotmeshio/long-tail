@@ -10,6 +10,19 @@ export interface ListJobsParams {
   entity?: string;
   search?: string;
   status?: string;
+  sort_by?: string;
+  order?: 'asc' | 'desc';
+}
+
+const SORTABLE_COLUMNS = new Set(['created_at', 'updated_at', 'entity', 'status']);
+
+function buildOrderBy(sortBy?: string, order?: string): string {
+  if (!sortBy || !SORTABLE_COLUMNS.has(sortBy)) {
+    return '(CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC';
+  }
+  const dir = order === 'asc' ? 'ASC' : 'DESC';
+  const col = sortBy === 'status' ? '(CASE WHEN j.status > 0 THEN 0 WHEN j.status = 0 THEN 1 ELSE 2 END)' : `j.${sortBy}`;
+  return `${col} ${dir}`;
 }
 
 interface JobRow {
@@ -75,9 +88,11 @@ export async function listJobs(params: ListJobsParams): Promise<{ jobs: JobRow[]
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const keyPrefix = `hmsh:${appId}:j:`;
 
+  const orderBy = buildOrderBy(params.sort_by, params.order);
+
   const [countResult, dataResult] = await Promise.all([
     pool.query(COUNT_JOBS(schema, where), values),
-    pool.query(LIST_JOBS(schema, appId, where, idx++, idx++), [...values, limit, offset]),
+    pool.query(LIST_JOBS(schema, appId, where, idx++, idx++, orderBy), [...values, limit, offset]),
   ]);
 
   const jobs = dataResult.rows.map((row: any) => ({

@@ -65,12 +65,14 @@ function buildColumns(
     {
       key: 'created_at',
       label: 'Created',
+      sortable: true,
       render: (row) => <TimestampCell date={row.created_at} />,
       className: 'w-40',
     },
     {
       key: 'updated_at',
       label: 'Updated',
+      sortable: true,
       render: (row) => <TimestampCell date={row.updated_at} />,
       className: 'w-40',
     },
@@ -114,7 +116,7 @@ function buildColumns(
 
 export function McpRunsPage() {
   const navigate = useNavigate();
-  const { filters, setFilter, setFilters, pagination } = useFilterParams({
+  const { filters, setFilter, setFilters, pagination, sort, setSort } = useFilterParams({
     filters: { search: '', entity: '', status: '', namespace: '' },
   });
 
@@ -151,20 +153,12 @@ export function McpRunsPage() {
     entity: filters.entity || undefined,
     search: filters.search || undefined,
     status: filters.status || undefined,
+    sort_by: sort.sort_by || undefined,
+    order: sort.order || undefined,
   });
 
   const total = runsData?.total ?? 0;
-
-  const jobs = useMemo(() => {
-    const raw = runsData?.jobs ?? [];
-    const STATUS_ORDER: Record<string, number> = { running: 0, failed: 1, completed: 2 };
-    return [...raw].sort((a, b) => {
-      const sa = STATUS_ORDER[a.status] ?? 9;
-      const sb = STATUS_ORDER[b.status] ?? 9;
-      if (sa !== sb) return sa - sb;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [runsData?.jobs]);
+  const jobs = runsData?.jobs ?? [];
 
   const columns = buildColumns(
     (entity) => setFilter('entity', entity),
@@ -235,6 +229,8 @@ export function McpRunsPage() {
         onRowClick={(row) => navigate(`/mcp/executions/${encodeURIComponent(row.workflow_id)}?namespace=${activeNamespace}`)}
         isLoading={isLoading}
         emptyMessage="No pipeline executions found"
+        sort={sort}
+        onSort={setSort}
       />
 
       <StickyPagination

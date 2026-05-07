@@ -30,6 +30,8 @@ router.get('/', async (req, res) => {
     entity: (req.query.entity as string) || undefined,
     search: (req.query.search as string) || undefined,
     status: (req.query.status as string) || undefined,
+    sort_by: (req.query.sort_by as string) || undefined,
+    order: (req.query.order as string) || undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
