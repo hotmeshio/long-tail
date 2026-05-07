@@ -610,6 +610,33 @@ export async function archiveYamlWorkflow(input: {
   }
 }
 
+/**
+ * Restore an archived YAML workflow back to draft status.
+ *
+ * Transitions the workflow from "archived" to "draft" so it can be
+ * redeployed. The workflow must be in "archived" status.
+ */
+export async function restoreYamlWorkflow(input: {
+  id: string;
+}): Promise<LTApiResult> {
+  try {
+    const wf = await yamlDb.getYamlWorkflow(input.id);
+    if (!wf) {
+      return { status: 404, error: 'YAML workflow not found' };
+    }
+    if (wf.status !== 'archived') {
+      return { status: 400, error: 'Only archived workflows can be restored' };
+    }
+    const updated = await yamlDb.updateYamlWorkflowStatus(wf.id, 'draft');
+    return { status: 200, data: updated };
+  } catch (err: any) {
+    if (isNotFoundError(err)) {
+      return { status: 404, error: 'YAML workflow not found' };
+    }
+    return { status: 500, error: err.message };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Versions
 // ---------------------------------------------------------------------------

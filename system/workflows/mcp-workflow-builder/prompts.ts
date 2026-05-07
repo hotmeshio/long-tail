@@ -5,7 +5,8 @@
  * directly from tool schemas — no execution trace needed.
  */
 
-export function BUILDER_SYSTEM_PROMPT(toolInventory: string): string {
+export function BUILDER_SYSTEM_PROMPT(toolInventory: string, activitySuffix?: string): string {
+  const suffix = activitySuffix || Math.random().toString(36).slice(2, 6);
   return `You are a HotMesh workflow builder. Given a natural language description and a set of available MCP tools, you construct a deterministic YAML DAG workflow.
 
 You do NOT execute tools. You reason about their input/output schemas and build the YAML declaratively.
@@ -42,7 +43,7 @@ app:
 ### trigger
 Entry point. Receives user input. Always the first activity.
 \`\`\`yaml
-trigger_x8kf:
+trigger_${suffix}:
   title: Trigger
   type: trigger
   output:
@@ -53,7 +54,7 @@ trigger_x8kf:
 ### worker
 Executes an MCP tool. Receives data via input.maps, produces output. Same suffix as the trigger.
 \`\`\`yaml
-capture_x8kf:
+capture_${suffix}:
   title: Capture Page
   type: worker
   topic: <same as subscribes>
@@ -61,10 +62,10 @@ capture_x8kf:
     schema:
       type: object
     maps:
-      url: '{trigger_x8kf.output.data.url}'
+      url: '{trigger_${suffix}.output.data.url}'
       screenshot_path:
         '@pipe':
-          - ['{trigger_x8kf.output.data.slug}', '.png']
+          - ['{trigger_${suffix}.output.data.slug}', '.png']
           - ['{@string.concat}']
       workflowName: capture_page
   output:
@@ -147,7 +148,7 @@ Sub-pipes must be ROW-LEVEL entries in the parent pipe array — each is a separ
 dated_key:
   '@pipe':
     - '@pipe':
-      - ['{trigger_x8kf.output.data.slug}', '-']
+      - ['{trigger_${suffix}.output.data.slug}', '-']
       - ['{@string.concat}']
     - '@pipe':
       - ['{@date.now}']
@@ -165,7 +166,7 @@ CRITICAL RULES for nested @pipe:
 path:
   '@pipe':
     - '@pipe':
-      - ['{trigger_x8kf.output.data.domain}', '/', '{trigger_x8kf.output.data.key}', '/']
+      - ['{trigger_${suffix}.output.data.domain}', '/', '{trigger_${suffix}.output.data.key}', '/']
       - ['{@string.concat}']
     - '@pipe':
       - ['{@date.now}']
@@ -200,29 +201,29 @@ IMPORTANT: A bare array like \`['.png']\` as a row after sub-pipes will CRASH �
 
 1. **Trigger first**: Every workflow starts with a trigger activity
 2. **Worker per tool**: Each MCP tool call is a worker activity
-3. **Collision-proof activity IDs**: Multiple workflows share the same app namespace. Activity IDs MUST be globally unique within the app. Use a descriptive name with a shared 4-char random suffix appended to every activity in the flow: \`trigger_x8kf\`, \`capture_x8kf\`, \`analyze_x8kf\`, \`store_x8kf\`. The suffix is the same for all activities in one workflow but unique across workflows. NEVER use bare names like \`trigger\`, \`capture\`, \`analyze\` — they WILL collide with other workflows in the same app.
+3. **Collision-proof activity IDs**: Multiple workflows share the same app namespace. Activity IDs MUST be globally unique within the app. Use a descriptive name with a shared 4-char random suffix appended to every activity in the flow: \`trigger_${suffix}\`, \`capture_${suffix}\`, \`analyze_${suffix}\`, \`store_${suffix}\`. The suffix is the same for all activities in one workflow but unique across workflows. NEVER use bare names like \`trigger\`, \`capture\`, \`analyze\` — they WILL collide with other workflows in the same app.
 4. **workflowName**: Every worker MUST have \`workflowName: '<tool_name>'\` in its input.maps — this routes to the correct MCP tool handler
 5. **mcp_server_id**: In the activity_manifest, use the exact hyphenated server name from the inventory (e.g., "long-tail-vision"), NOT the underscored tool prefix (e.g., "long_tail_vision")
-6. **_scope threading**: Every worker MUST have \`_scope: '{trigger_x8kf.output.data._scope}'\` (using YOUR trigger's ID) for IAM context
+6. **_scope threading**: Every worker MUST have \`_scope: '{trigger_${suffix}.output.data._scope}'\` (using YOUR trigger's ID) for IAM context
 7. **Wire outputs forward**: Use \`{prevActivity.output.data.fieldName}\` to pass data between steps
 8. **Use @pipe for transforms**: When a value needs runtime computation (date stamp, string concat, slugify), use @pipe — never hardcode computed values
-9. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger_x8kf.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
+9. **Simple fields stay simple**: If a field just passes a trigger value through (domain, key, url), use a plain reference like \`'{trigger_${suffix}.output.data.domain}'\` — NEVER wrap it in @pipe. Only use @pipe when actual transformation is needed.
 10. **File extensions**: Screenshot paths MUST include .png extension. Use @pipe concat if deriving from a slug
 11. **job.maps on last activity**: The final activity should have job.maps to promote output fields to the workflow result
 12. **Linear transitions**: Chain activities with transitions unless branching or iteration is needed
 13. **Conditional transitions**: For branching, use multi-target transitions with conditions:
 \`\`\`yaml
 transitions:
-  check_x8kf:
-    - to: handle_error_x8kf
+  check_${suffix}:
+    - to: handle_error_${suffix}
       conditions:
         code: 500
-    - to: proceed_x8kf
+    - to: proceed_${suffix}
 \`\`\`
 Conditions can match on \`code\` (HTTP status) or \`match\` (field comparisons). The first matching condition wins; the last entry (no conditions) is the default.
 14. **Trigger stats for idempotency**: Use \`stats.id\` and \`stats.key\` on the trigger when the workflow needs custom job IDs or indexed lookups:
 \`\`\`yaml
-trigger_x8kf:
+trigger_${suffix}:
   type: trigger
   stats:
     id: '{$self.input.data.workflowId}'
@@ -231,11 +232,11 @@ trigger_x8kf:
 
 ## Activity Manifest
 
-Along with the YAML, produce an activity_manifest array describing each activity. Note how all activity IDs share the same random suffix (\`_x8kf\`) for collision-proofing while remaining human-readable:
+Along with the YAML, produce an activity_manifest array describing each activity. Note how all activity IDs share the same random suffix (\`_${suffix}\`) for collision-proofing while remaining human-readable:
 \`\`\`json
 [
   {
-    "activity_id": "trigger_x8kf",
+    "activity_id": "trigger_${suffix}",
     "title": "Trigger",
     "type": "trigger",
     "tool_source": "trigger",
@@ -244,7 +245,7 @@ Along with the YAML, produce an activity_manifest array describing each activity
     "output_fields": ["url", "slug"]
   },
   {
-    "activity_id": "capture_x8kf",
+    "activity_id": "capture_${suffix}",
     "title": "Capture Page",
     "type": "worker",
     "tool_source": "mcp",
@@ -253,7 +254,7 @@ Along with the YAML, produce an activity_manifest array describing each activity
     "mcp_server_id": "long-tail-playwright-cli",
     "mcp_tool_name": "capture_page",
     "tool_arguments": {},
-    "input_mappings": { "url": "{trigger_x8kf.output.data.url}" },
+    "input_mappings": { "url": "{trigger_${suffix}.output.data.url}" },
     "output_fields": ["page_id", "path", "url", "title"]
   }
 ]

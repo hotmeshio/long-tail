@@ -30,27 +30,69 @@ const {
 export async function mcpWorkflowPlanner(
   envelope: LTEnvelope,
 ): Promise<LTReturn> {
-  const { specification, setId } = envelope.data as {
+  const {
+    specification,
+    setId,
+    existingPlan,
+    existingSchemas,
+  } = envelope.data as {
     specification: string;
     setId: string;
+    existingPlan?: Array<{ name: string; description: string; namespace: string }>;
+    existingSchemas?: Array<{ name: string; input_schema: Record<string, unknown>; output_schema: Record<string, unknown>; graph_topic: string }>;
   };
 
-  // 1. Generate plan from specification
-  const planResult = await generatePlan(specification);
+  const isAddition = !!existingPlan?.length;
 
-  // 2. Persist the plan to the workflow set
-  await persistPlan(setId, planResult.workflows);
+  // 1. Generate plan from specification
+  // When adding to an existing set, tell the planner what already exists
+  let planSpec = specification;
+  if (isAddition) {
+    const existingNames = existingPlan!.map(p => `- ${p.name} [${p.namespace}]: ${p.description}`).join('\n');
+    const namespaces = [...new Set(existingPlan!.map(p => p.namespace))];
+    planSpec = `${specification}\n\n## Existing workflows in this set (do NOT recreate these):\n${existingNames}\n\n## Namespace constraint\nNew workflows MUST use namespace "${namespaces[0]}". This set already uses this namespace and all tools must be co-located.`;
+  }
+  const planResult = await generatePlan(planSpec);
+
+  // 2. Offset build_order for additions so new items sort after existing ones
+  const buildOrderOffset = isAddition
+    ? Math.max(...existingPlan!.map((_, i) => i), 0) + 1
+    : 0;
+  if (isAddition) {
+    for (const item of planResult.workflows) {
+      item.build_order += buildOrderOffset;
+    }
+  }
+
+  // 2b. Persist plan — append to existing plan for additions
+  if (isAddition) {
+    // Fetch current plan from the set and merge
+    const { getWorkflowSet } = await import('../../../services/workflow-sets');
+    const currentSet = await getWorkflowSet(setId);
+    const mergedPlan = [...(currentSet?.plan || []), ...planResult.workflows];
+    const mergedNamespaces = [...new Set([
+      ...(currentSet?.namespaces || []),
+      ...planResult.workflows.map(w => w.namespace),
+    ])];
+    await persistPlan(setId, mergedPlan, mergedNamespaces);
+  } else {
+    await persistPlan(setId, planResult.workflows);
+  }
 
   // 3. Build each workflow in dependency order (leaf-first)
   await updateSetStatus(setId, 'building');
 
+  // Seed sibling schemas with existing workflows when adding to a set
   const builtWorkflows: Array<{
     name: string;
     id: string;
     input_schema: Record<string, unknown>;
     output_schema: Record<string, unknown>;
     graph_topic: string;
-  }> = [];
+  }> = (existingSchemas || []).map(s => ({
+    ...s,
+    id: '',
+  }));
 
   for (const planItem of planResult.workflows) {
     // Build context for the builder: sibling schemas for composition wiring

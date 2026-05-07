@@ -4,6 +4,7 @@ export {
   updateWorkflowSetPlan,
   updateWorkflowSetStatus,
   updateWorkflowSetSourceWorkflow,
+  appendWorkflowSetSpecification,
   deleteWorkflowSet,
   listWorkflowSets,
 } from './db';

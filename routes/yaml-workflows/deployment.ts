@@ -51,4 +51,13 @@ router.post('/:id/archive', async (req, res) => {
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
+/**
+ * POST /api/yaml-workflows/:id/restore
+ * Restore an archived YAML workflow back to draft status for redeployment.
+ */
+router.post('/:id/restore', async (req, res) => {
+  const result = await api.restoreYamlWorkflow({ id: req.params.id });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
 export default router;

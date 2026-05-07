@@ -79,6 +79,25 @@ export function useUpdateWorkflowSetPlan() {
   });
 }
 
+/** Add additional workflows to an existing set. */
+export function useAddToWorkflowSet() {
+  const queryClient = useQueryClient();
+  return useMutation<WorkflowSetRecord & { planner_workflow_id: string }, Error, {
+    id: string;
+    specification: string;
+  }>({
+    mutationFn: ({ id, ...body }) =>
+      apiFetch(`/workflow-sets/${id}/add`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_SETS_KEY, refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
+    },
+  });
+}
+
 /** Trigger build phase for a workflow set. */
 export function useBuildWorkflowSet() {
   const queryClient = useQueryClient();

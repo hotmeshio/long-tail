@@ -13,6 +13,7 @@ import {
   UPDATE_WORKFLOW_SET_STATUS,
   DELETE_WORKFLOW_SET,
   LIST_WORKFLOW_SETS_BASE,
+  APPEND_WORKFLOW_SET_SPECIFICATION,
 } from './sql';
 
 const DEFAULT_LIMIT = 20;
@@ -51,6 +52,15 @@ export async function updateWorkflowSetPlan(
     JSON.stringify(plan),
     namespaces,
   ]);
+  return rows[0] || null;
+}
+
+export async function appendWorkflowSetSpecification(
+  id: string,
+  specification: string,
+): Promise<LTWorkflowSetRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(APPEND_WORKFLOW_SET_SPECIFICATION, [id, specification]);
   return rows[0] || null;
 }
 

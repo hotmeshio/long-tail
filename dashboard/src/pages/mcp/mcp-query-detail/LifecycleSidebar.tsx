@@ -24,6 +24,7 @@ export function LifecycleSidebar({
   siblingCount,
   onDeploy,
   onArchive,
+  onRestore,
   onDelete,
   onRegenerate: _onRegenerate,
   isPending,
@@ -38,6 +39,7 @@ export function LifecycleSidebar({
   siblingCount?: number;
   onDeploy: () => void;
   onArchive: () => void;
+  onRestore?: () => void;
   onDelete: () => void;
   onRegenerate: () => void;
   isPending: boolean;
@@ -107,6 +109,13 @@ export function LifecycleSidebar({
                   <div className="mt-2">
                     <button onClick={onArchive} disabled={isPending} className="text-[11px] text-text-tertiary hover:text-status-error">
                       Archive
+                    </button>
+                  </div>
+                )}
+                {isCurrent && step === 'archived' && onRestore && (
+                  <div className="mt-2">
+                    <button onClick={onRestore} disabled={isPending} className="text-[11px] font-medium text-accent hover:text-accent/80">
+                      {isPending ? 'Restoring...' : 'Restore to Draft'}
                     </button>
                   </div>
                 )}

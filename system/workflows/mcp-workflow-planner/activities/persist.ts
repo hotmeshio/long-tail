@@ -22,9 +22,10 @@ import type { CreateYamlWorkflowInput } from '../../../../services/yaml-workflow
 export async function persistPlan(
   setId: string,
   planItems: PlanItem[],
+  namespaces?: string[],
 ): Promise<void> {
-  const namespaces = [...new Set(planItems.map(w => w.namespace))];
-  await updateWorkflowSetPlan(setId, planItems, namespaces);
+  const ns = namespaces || [...new Set(planItems.map(w => w.namespace))];
+  await updateWorkflowSetPlan(setId, planItems, ns);
 }
 
 export interface BuiltWorkflowData {

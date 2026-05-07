@@ -5,7 +5,7 @@
 // are pre-populated from the actual server definitions.
 
 import { HUMAN_QUEUE_TOOLS } from './tool-manifests-escalation';
-import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, DOCS_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
+import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, SCHEMA_EXCHANGE_TOOLS, DOCS_TOOLS, OAUTH_TOOLS } from './tool-manifests-data';
 import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './tool-manifests-browser';
 import { CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
 import { ADMIN_TOOLS } from './tool-manifests-admin';
@@ -195,6 +195,35 @@ export const SEED_MCP_SERVERS = [
       'search_knowledge uses JSONB containment (@>) — the query object must be a subset of the stored data. ' +
       'append_knowledge adds to arrays without replacing existing entries — ideal for catalogs and logs. ' +
       'list_domains returns all domains with counts, useful for discovering what knowledge exists.',
+    credential_providers: [],
+  },
+  {
+    name: 'long-tail-schema-exchange',
+    description:
+      'Schema-driven data exchange with external service endpoints. Validates requests and responses ' +
+      'against JSON Schema. Transport is an implementation detail — the principle is endpoint + schema + ' +
+      'validated exchange. Use this as the building block for wrapping any external API.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: SCHEMA_EXCHANGE_TOOLS,
+    metadata: { builtin: true, category: 'data' },
+    tags: ['api', 'schema', 'exchange', 'validation', 'fetch'],
+    compile_hints:
+      'Schema-driven data exchange for external API endpoints. Validates requests before sending and responses after receiving against JSON Schema. ' +
+      'When building a workflow that calls an external API endpoint, use exchange as the worker activity. ' +
+      'Embed request_schema and response_schema as STATIC values in input.maps (not dynamic inputs — schemas are fixed per endpoint). ' +
+      'Build the endpoint URL using @pipe concat for template variables. Use "url" for the endpoint field name. ' +
+      'Wire auth headers from trigger inputs (access_token, api_key, etc.). ' +
+      'The trigger input_schema should reflect the endpoint\'s dynamic parameters (IDs, search terms, pagination) plus base_url and credentials. ' +
+      'CRITICAL — exchange output structure: the exchange tool returns { status, data, headers, elapsed_ms, validated, validation_errors }. ' +
+      'The actual API response body is inside the "data" field. So to reference a response field like "token", ' +
+      'use {activity.output.data.data.token} (NOT {activity.output.data.token}). ' +
+      'The double .data is because HotMesh wraps activity output in .output.data, and the exchange tool puts the API response in its own .data field. ' +
+      'For job.maps on the last activity: job.maps.token: \'{exchange_xxxx.output.data.data.token}\'. ' +
+      'Also surface validated and status: job.maps.validated: \'{exchange_xxxx.output.data.validated}\', job.maps.status: \'{exchange_xxxx.output.data.status}\'. ' +
+      'response_schema enables self-testing: schedule the compiled tool on cron against a dev/staging server — if validation fails, the API schema changed. ' +
+      'request_schema prevents malformed requests from ever leaving the system. ' +
+      'Both schemas are optional — use response_schema alone for read endpoints, both for write endpoints, neither for exploratory calls.',
     credential_providers: [],
   },
 ];

@@ -45,8 +45,11 @@ export const GET_MAX_APP_VERSION = `
   WHERE app_id = $1 AND status != 'archived'`;
 
 export const GET_DISTINCT_APP_IDS = `
-  SELECT DISTINCT app_id FROM lt_yaml_workflows
-  WHERE status != 'archived'
+  SELECT DISTINCT app_id FROM (
+    SELECT app_id FROM lt_yaml_workflows WHERE status != 'archived'
+    UNION
+    SELECT app_id FROM hmsh_applications WHERE active = true
+  ) all_apps
   ORDER BY app_id`;
 
 export const MARK_CONTENT_DEPLOYED = `

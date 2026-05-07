@@ -139,10 +139,14 @@ export interface WorkflowPlannerInput {
   setId: string;
   wait?: boolean;
   userId?: string;
+  /** When adding to an existing set, pass the current plan items so the planner avoids duplicates. */
+  existingPlan?: Array<{ name: string; description: string; namespace: string }>;
+  /** Sibling schemas from already-built workflows for composition context. */
+  existingSchemas?: Array<{ name: string; input_schema: Record<string, unknown>; output_schema: Record<string, unknown>; graph_topic: string }>;
 }
 
 export async function startWorkflowPlanner(input: WorkflowPlannerInput): Promise<McpQueryResult> {
-  const { specification, setId, wait = true, userId } = input;
+  const { specification, setId, wait = true, userId, existingPlan, existingSchemas } = input;
   const startTime = Date.now();
 
   const client = new Durable.Client({ connection: getConnection() });
@@ -151,7 +155,7 @@ export async function startWorkflowPlanner(input: WorkflowPlannerInput): Promise
 
   const handle = await client.workflow.start({
     args: [{
-      data: { specification, setId },
+      data: { specification, setId, existingPlan, existingSchemas },
       metadata: { source: 'dashboard' },
       lt: { userId },
     }],

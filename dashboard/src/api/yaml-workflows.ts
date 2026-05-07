@@ -151,6 +151,20 @@ export function useArchiveYamlWorkflow() {
   });
 }
 
+export function useRestoreYamlWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<LTYamlWorkflowRecord>(`/yaml-workflows/${id}/restore`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflows'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['yamlWorkflow'], refetchType: 'all' });
+    },
+  });
+}
+
 export function useUpdateYamlWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({

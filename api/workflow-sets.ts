@@ -4,9 +4,11 @@ import {
   updateWorkflowSetPlan,
   updateWorkflowSetStatus,
   updateWorkflowSetSourceWorkflow,
+  appendWorkflowSetSpecification,
   listWorkflowSets as listWorkflowSetsService,
 } from '../services/workflow-sets';
 import { startWorkflowPlanner } from '../services/insight';
+import { listYamlWorkflows as listYamlWorkflowsApi } from './yaml-workflows';
 import type { LTApiResult, LTApiAuth } from '../types/sdk';
 
 /**
@@ -181,6 +183,76 @@ export async function deployWorkflowSet(
     }
     await updateWorkflowSetStatus(input.id, 'deploying');
     return { status: 200, data: { status: 'deploying', id: input.id } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Add additional workflows to an existing set.
+ *
+ * Invokes the planner with the new specification and existing set context.
+ * The planner appends new plan items (offset build_order) and builds them
+ * with sibling schema awareness so composition wiring works.
+ */
+export async function addToWorkflowSet(
+  input: { id: string; specification: string },
+  auth?: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    if (!input.specification || typeof input.specification !== 'string') {
+      return { status: 400, error: 'specification is required' };
+    }
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+      return { status: 503, error: 'Workflow planner requires an LLM API key' };
+    }
+
+    const set = await getWorkflowSetService(input.id);
+    if (!set) {
+      return { status: 404, error: 'Workflow set not found' };
+    }
+
+    // Gather existing plan items and built workflow schemas
+    const existingPlan = (set.plan || []).map(p => ({
+      name: p.name,
+      description: p.description,
+      namespace: p.namespace,
+    }));
+
+    const yamlResult = await listYamlWorkflowsApi({ set_id: input.id, limit: 100 });
+    const workflows = (yamlResult.data as any)?.workflows || [];
+    const existingSchemas = workflows
+      .filter((w: any) => w.status === 'active' || w.status === 'draft')
+      .map((w: any) => ({
+        name: w.name,
+        input_schema: w.input_schema || {},
+        output_schema: w.output_schema || {},
+        graph_topic: w.graph_topic,
+      }));
+
+    // Append the new spec to the set's specification field so the full
+    // history of what was pasted is preserved and visible on step 1.
+    await appendWorkflowSetSpecification(input.id, input.specification);
+
+    const plannerResult = await startWorkflowPlanner({
+      specification: input.specification,
+      setId: input.id,
+      wait: false,
+      userId: auth?.userId,
+      existingPlan,
+      existingSchemas,
+    });
+
+    await updateWorkflowSetSourceWorkflow(input.id, plannerResult.workflow_id);
+
+    return {
+      status: 200,
+      data: {
+        ...set,
+        source_workflow_id: plannerResult.workflow_id,
+        planner_workflow_id: plannerResult.workflow_id,
+      },
+    };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
