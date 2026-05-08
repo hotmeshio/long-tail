@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import jwt from 'jsonwebtoken';
 
 import type { StorageBackend } from './types';
+import { mimeFromPath } from './mime';
 
 const BASE_DIR = process.env.LT_FILE_STORAGE_DIR || './data/files';
 
@@ -100,5 +102,82 @@ export class LocalStorageBackend implements StorageBackend {
       throw new Error(`File not found: ${key}`);
     }
     return fs.createReadStream(resolved);
+  }
+
+  async listWithPrefixes(prefix?: string, pageSize?: number, continuationToken?: string): Promise<{
+    files: Array<{ path: string; size: number; modified_at: string }>;
+    directories: string[];
+    nextToken?: string;
+  }> {
+    ensureBaseDir();
+    const dir = prefix ? resolveAndValidate(prefix) : path.resolve(BASE_DIR);
+    if (!fs.existsSync(dir)) {
+      return { files: [], directories: [] };
+    }
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const limit = pageSize || 100;
+    const offset = continuationToken ? parseInt(continuationToken, 10) : 0;
+
+    const allDirs: string[] = [];
+    const allFiles: Array<{ path: string; size: number; modified_at: string }> = [];
+
+    for (const entry of entries) {
+      const relativePath = path.relative(
+        path.resolve(BASE_DIR),
+        path.join(dir, entry.name),
+      );
+      if (entry.isDirectory()) {
+        allDirs.push(relativePath + '/');
+      } else if (entry.isFile()) {
+        const stat = fs.statSync(path.join(dir, entry.name));
+        allFiles.push({
+          path: relativePath,
+          size: stat.size,
+          modified_at: stat.mtime.toISOString(),
+        });
+      }
+    }
+
+    // Directories first, then files — paginate the combined list
+    const combined = [...allDirs.map((d) => ({ type: 'dir' as const, value: d })),
+                      ...allFiles.map((f) => ({ type: 'file' as const, value: f }))];
+    const page = combined.slice(offset, offset + limit);
+    const hasMore = offset + limit < combined.length;
+
+    const directories = page.filter((e) => e.type === 'dir').map((e) => e.value as string);
+    const files = page.filter((e) => e.type === 'file').map((e) => e.value as { path: string; size: number; modified_at: string });
+
+    return {
+      files,
+      directories,
+      nextToken: hasMore ? String(offset + limit) : undefined,
+    };
+  }
+
+  async getMetadata(key: string): Promise<{ size: number; modified_at: string; content_type: string }> {
+    const resolved = resolveAndValidate(key);
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`File not found: ${key}`);
+    }
+    const stat = fs.statSync(resolved);
+    return {
+      size: stat.size,
+      modified_at: stat.mtime.toISOString(),
+      content_type: mimeFromPath(key),
+    };
+  }
+
+  async getSignedUrl(key: string, expiresInSeconds: number): Promise<string> {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET not configured — cannot generate signed URLs');
+    }
+    const token = jwt.sign(
+      { filePath: key.replace(/^\/+/, ''), purpose: 'file-download' },
+      secret,
+      { expiresIn: expiresInSeconds },
+    );
+    return `/api/files/${key.replace(/^\/+/, '')}?token=${token}`;
   }
 }

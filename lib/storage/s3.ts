@@ -9,20 +9,25 @@ import {
   DeleteObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl as s3GetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'stream';
 
 import type { StorageBackend } from './types';
+import { mimeFromPath } from './mime';
 
 const STAGING_DIR = path.join(os.tmpdir(), 'lt-staging');
 
 export class S3StorageBackend implements StorageBackend {
   private client: S3Client;
+  private signingClient: S3Client | null = null;
   private bucket: string;
   private bucketReady: Promise<void>;
 
   constructor() {
     const endpoint = process.env.LT_S3_ENDPOINT;
+    const publicEndpoint = process.env.LT_S3_PUBLIC_ENDPOINT;
     const region = process.env.LT_S3_REGION || 'us-east-1';
     const forcePathStyle = process.env.LT_S3_FORCE_PATH_STYLE === 'true';
     this.bucket = process.env.LT_S3_BUCKET || 'long-tail-files';
@@ -48,6 +53,14 @@ export class S3StorageBackend implements StorageBackend {
     }
 
     this.client = new S3Client(clientConfig);
+
+    // Signed URLs need the public-facing endpoint so browsers can reach them.
+    // In Docker, LT_S3_ENDPOINT is the internal hostname (e.g. http://minio:9000)
+    // while LT_S3_PUBLIC_ENDPOINT is the host-accessible URL (e.g. http://localhost:9000).
+    if (publicEndpoint && publicEndpoint !== endpoint) {
+      this.signingClient = new S3Client({ ...clientConfig, endpoint: publicEndpoint });
+    }
+
     this.bucketReady = this.ensureBucket();
   }
 
@@ -154,6 +167,75 @@ export class S3StorageBackend implements StorageBackend {
       Key: normalizeKey(key),
     }));
     return resp.Body as Readable;
+  }
+
+  async listWithPrefixes(prefix?: string, pageSize?: number, continuationToken?: string): Promise<{
+    files: Array<{ path: string; size: number; modified_at: string }>;
+    directories: string[];
+    nextToken?: string;
+  }> {
+    await this.bucketReady;
+    const normalizedPrefix = prefix ? normalizeKey(prefix) : undefined;
+    const listPrefix = normalizedPrefix
+      ? (normalizedPrefix.endsWith('/') ? normalizedPrefix : normalizedPrefix + '/')
+      : undefined;
+
+    const resp = await this.client.send(new ListObjectsV2Command({
+      Bucket: this.bucket,
+      Prefix: listPrefix,
+      Delimiter: '/',
+      MaxKeys: pageSize || 100,
+      ContinuationToken: continuationToken || undefined,
+    }));
+
+    const files: Array<{ path: string; size: number; modified_at: string }> = [];
+    for (const obj of resp.Contents || []) {
+      if (!obj.Key) continue;
+      // Skip the prefix itself if it appears as a "file"
+      if (obj.Key === listPrefix) continue;
+      files.push({
+        path: obj.Key,
+        size: obj.Size || 0,
+        modified_at: obj.LastModified?.toISOString() || new Date().toISOString(),
+      });
+    }
+
+    const directories: string[] = [];
+    for (const cp of resp.CommonPrefixes || []) {
+      if (cp.Prefix) {
+        directories.push(cp.Prefix);
+      }
+    }
+
+    return {
+      files,
+      directories,
+      nextToken: resp.NextContinuationToken || undefined,
+    };
+  }
+
+  async getMetadata(key: string): Promise<{ size: number; modified_at: string; content_type: string }> {
+    await this.bucketReady;
+    const resp = await this.client.send(new HeadObjectCommand({
+      Bucket: this.bucket,
+      Key: normalizeKey(key),
+    }));
+    return {
+      size: resp.ContentLength || 0,
+      modified_at: resp.LastModified?.toISOString() || new Date().toISOString(),
+      content_type: resp.ContentType || mimeFromPath(key),
+    };
+  }
+
+  async getSignedUrl(key: string, expiresInSeconds: number): Promise<string> {
+    await this.bucketReady;
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: normalizeKey(key),
+    });
+    // Use the public-facing client so the signed URL hostname is reachable from browsers
+    const client = this.signingClient || this.client;
+    return s3GetSignedUrl(client, command, { expiresIn: expiresInSeconds });
   }
 }
 
