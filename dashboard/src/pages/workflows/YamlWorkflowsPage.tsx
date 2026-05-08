@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Clock, Play, Wand2 } from 'lucide-react';
+import { ChevronRight, Clock, Play, Wand2, Wrench } from 'lucide-react';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
+import { useWorkflowSets } from '../../api/workflow-sets';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useExpandedRows } from '../../hooks/useExpandedRows';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
@@ -28,10 +29,16 @@ function ToolRow({ wf, onTry, onWizard, onCron }: {
   return (
     <div onClick={canTry ? onTry : undefined} className={`group/row flex items-center hover:bg-surface-hover/50 transition-colors border-b border-surface-border/30 ${canTry ? 'cursor-pointer' : ''}`}>
       <div className="flex-1 pl-14 pr-6 py-2 min-w-0">
-        <code className="text-xs font-mono text-accent-primary truncate block">{wf.graph_topic}</code>
+        <div className="flex items-center gap-2">
+          <code className="text-xs font-mono text-accent-primary truncate">{wf.graph_topic}</code>
+          <span className="text-[9px] text-text-tertiary font-mono shrink-0">v{wf.content_version}</span>
+        </div>
         {wf.description && (
           <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-1">{wf.description}</p>
         )}
+      </div>
+      <div className="w-32 px-4 py-2 text-[10px] text-text-tertiary whitespace-nowrap shrink-0">
+        {new Date(wf.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
       </div>
       <div className="w-28 px-6 py-2 whitespace-nowrap shrink-0">
         <StatusBadge status={wf.status} />
@@ -77,6 +84,7 @@ function ServerRow({
   onToggle,
   onTryTool,
   onWizard,
+  onWorkbench,
   onCron,
   visibleTools,
 }: {
@@ -85,6 +93,7 @@ function ServerRow({
   onToggle: () => void;
   onTryTool: (wf: LTYamlWorkflowRecord) => void;
   onWizard: (wf: LTYamlWorkflowRecord) => void;
+  onWorkbench: () => void;
   onCron: (wf: LTYamlWorkflowRecord) => void;
   visibleTools: LTYamlWorkflowRecord[];
 }) {
@@ -94,13 +103,14 @@ function ServerRow({
         onClick={onToggle}
         className="group/row border-b transition-colors duration-100 cursor-pointer row-hover"
       >
-        {/* Name + badge + timestamp */}
+        {/* Name + version */}
         <td className="px-6 py-3.5">
           <div className="flex items-center gap-2">
             <span className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''} text-text-tertiary`}>
               <ChevronRight size={14} />
             </span>
             <p className="text-sm text-text-primary font-medium font-mono">{server.appId}</p>
+            <span className="text-[9px] text-text-tertiary font-mono">app v{server.appVersion}</span>
           </div>
         </td>
 
@@ -109,11 +119,22 @@ function ServerRow({
           <StatusBadge status={server.status} />
         </td>
 
-        {/* Tool count badge — aligned with child row hover icons */}
-        <td className="w-12 text-center">
-          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-accent/30 text-[10px] font-medium text-accent">
-            {server.toolCount}
-          </span>
+        {/* Tool count + workbench */}
+        <td className="w-20 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-accent/30 text-[10px] font-medium text-accent">
+              {server.toolCount}
+            </span>
+            {server.setId && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onWorkbench(); }}
+                className="opacity-0 group-hover/row:opacity-100 transition-opacity text-text-tertiary hover:text-accent"
+                title="Open workbench"
+              >
+                <Wrench className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
         </td>
       </tr>
 
@@ -155,6 +176,16 @@ export function YamlWorkflowsPage() {
   });
 
   const workflows = data?.workflows ?? [];
+
+  // Fetch workflow sets to resolve workbench links (set_id → planner workflow ID)
+  const { data: setsData } = useWorkflowSets({ limit: 100 });
+  const setSourceMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of setsData?.sets ?? []) {
+      if (s.source_workflow_id) map.set(s.id, s.source_workflow_id);
+    }
+    return map;
+  }, [setsData?.sets]);
 
   const servers = useMemo(() => groupByAppId(workflows), [workflows]);
 
@@ -262,6 +293,14 @@ export function YamlWorkflowsPage() {
                     onTryTool={(wf) => { setCronWorkflow(null); setTryWorkflow(wf); }}
                     onWizard={(wf) => {
                       if (wf.source_workflow_id) navigate(`/mcp/queries/${wf.source_workflow_id}?step=4`);
+                    }}
+                    onWorkbench={() => {
+                      if (server.setId) {
+                        const plannerWfId = setSourceMap.get(server.setId);
+                        if (plannerWfId) {
+                          navigate(`/mcp/queries/${plannerWfId}?mode=plan&set_id=${server.setId}&step=2`);
+                        }
+                      }
                     }}
                     onCron={(wf) => { setTryWorkflow(null); setCronWorkflow(wf); }}
                     visibleTools={filterTools(server.workflows, filters.search)}

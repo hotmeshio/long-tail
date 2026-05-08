@@ -10,12 +10,14 @@ import { LifecycleSidebar } from './LifecycleSidebar';
 import { VersionHistory } from './VersionHistory';
 import {
   useYamlWorkflow,
+  useYamlWorkflows,
   useYamlWorkflowVersions,
   useYamlWorkflowVersion,
   useUpdateYamlWorkflow,
   useDeployYamlWorkflow,
   useActivateYamlWorkflow,
   useArchiveYamlWorkflow,
+  useRestoreYamlWorkflow,
   useRegenerateYamlWorkflow,
   useDeleteYamlWorkflow,
 } from '../../../api/yaml-workflows';
@@ -43,11 +45,15 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
   };
 
   const { data: wf, refetch } = useYamlWorkflow(yamlId);
+  const { data: siblingsData } = useYamlWorkflows(wf ? { app_id: wf.app_id } : {});
+  const siblingCount = siblingsData?.workflows?.length ?? 0;
+  const currentAppVersion = Math.max(...(siblingsData?.workflows?.map(w => parseInt(w.app_version || '0', 10)) ?? [0]));
   const { data: versionsData } = useYamlWorkflowVersions(yamlId);
 
   const deployMutation = useDeployYamlWorkflow();
   const activateMutation = useActivateYamlWorkflow();
   const archiveMutation = useArchiveYamlWorkflow();
+  const restoreMutation = useRestoreYamlWorkflow();
   const deleteMutation = useDeleteYamlWorkflow();
   const regenerateMutation = useRegenerateYamlWorkflow();
   const updateMutation = useUpdateYamlWorkflow();
@@ -152,7 +158,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
 
   if (!wf) return <p className="text-sm text-text-secondary animate-pulse">Loading workflow...</p>;
 
-  const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending || !!regeneratePending;
+  const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || restoreMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending || !!regeneratePending;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6">
@@ -277,8 +283,12 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
               sourceWorkflowId={wf.source_workflow_id}
               contentVersion={wf.content_version}
               deployedContentVersion={wf.deployed_content_version}
+              appId={wf.app_id}
+              appVersion={currentAppVersion}
+              siblingCount={siblingCount}
               onDeploy={handleDeploy}
               onArchive={() => archiveMutation.mutateAsync(yamlId).then(() => refetch())}
+              onRestore={() => restoreMutation.mutateAsync(yamlId).then(() => refetch())}
               onDelete={async () => {
                 await deleteMutation.mutateAsync(yamlId);
                 queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });

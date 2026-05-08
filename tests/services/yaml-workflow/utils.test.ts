@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { parseVersionFromYaml } from '../../../services/yaml-workflow/db';
 import { compactForLlm } from '../../../services/yaml-workflow/workers';
 import { capToolArguments } from '../../../services/yaml-workflow/generator';
-import { sanitizeName } from '../../../services/yaml-workflow/pipeline/build';
+import { sanitizeToolName, sanitizeServerName } from '../../../modules/utils';
 import { extractStepSequence } from '../../../services/yaml-workflow/pipeline/extract';
 import {
   TOOL_ARG_LIMIT_CAP,
@@ -101,19 +101,39 @@ describe('capToolArguments', () => {
   });
 });
 
-// ── sanitizeName ─────────────────────────────────────────────
+// ── sanitizeToolName ─────────────────────────────────────────
 
-describe('sanitizeName', () => {
-  it('lowercases and replaces non-alphanumeric with hyphens', () => {
-    expect(sanitizeName('My Workflow Name')).toBe('my-workflow-name');
+describe('sanitizeToolName', () => {
+  it('lowercases and replaces non-alphanumeric with underscores', () => {
+    expect(sanitizeToolName('My Workflow Name')).toBe('my_workflow_name');
   });
 
-  it('strips leading and trailing hyphens', () => {
-    expect(sanitizeName('--test--')).toBe('test');
+  it('strips leading and trailing underscores', () => {
+    expect(sanitizeToolName('--test--')).toBe('test');
   });
 
-  it('collapses consecutive special chars into a single hyphen', () => {
-    expect(sanitizeName('a!!!b___c')).toBe('a-b-c');
+  it('collapses consecutive special chars into a single underscore', () => {
+    expect(sanitizeToolName('a!!!b___c')).toBe('a_b_c');
+  });
+});
+
+// ── sanitizeServerName ───────────────────────────────────────
+
+describe('sanitizeServerName', () => {
+  it('lowercases and strips non-alphanumeric', () => {
+    expect(sanitizeServerName('My-Server_123')).toBe('myserver123');
+  });
+
+  it('strips leading digits', () => {
+    expect(sanitizeServerName('123abc')).toBe('abc');
+  });
+
+  it('returns empty string for all-digit input', () => {
+    expect(sanitizeServerName('12345')).toBe('');
+  });
+
+  it('handles empty string', () => {
+    expect(sanitizeServerName('')).toBe('');
   });
 });
 

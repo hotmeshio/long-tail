@@ -43,6 +43,8 @@ export async function listJobs(input: {
   entity?: string;
   search?: string;
   status?: string;
+  sort_by?: string;
+  order?: string;
 }): Promise<LTApiResult> {
   try {
     if (!input.app_id) {
@@ -55,6 +57,8 @@ export async function listJobs(input: {
       entity: input.entity,
       search: input.search,
       status: input.status,
+      sort_by: input.sort_by,
+      order: input.order as 'asc' | 'desc' | undefined,
     });
     return { status: 200, data: result };
   } catch (err: any) {

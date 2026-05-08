@@ -70,7 +70,7 @@ export function useFilterParams<F extends Record<string, string> = Record<string
   // ── Batch-update helper ───────────────────────────────────────────────────
 
   const updateParams = useCallback(
-    (updates: Record<string, string | null>) => {
+    (updates: Record<string, string | null>, replace = false) => {
       setSearchParamsRef.current(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -83,7 +83,7 @@ export function useFilterParams<F extends Record<string, string> = Record<string
           }
           return next;
         },
-        { replace: true },
+        { replace },
       );
     },
     [],
@@ -113,7 +113,7 @@ export function useFilterParams<F extends Record<string, string> = Record<string
 
   const setPage = useCallback(
     (p: number) => {
-      updateParams({ page: p <= 1 ? null : String(p) });
+      updateParams({ page: p <= 1 ? null : String(p) }, true);
     },
     [updateParams],
   );
@@ -123,7 +123,7 @@ export function useFilterParams<F extends Record<string, string> = Record<string
       updateParams({
         pageSize: size === defaultPageSize ? null : String(size),
         page: null,
-      });
+      }, true);
     },
     [updateParams, defaultPageSize],
   );

@@ -3,6 +3,7 @@ import { Pencil } from 'lucide-react';
 
 import { TagInput } from '../../../components/common/form/TagInput';
 import { useYamlWorkflow, useUpdateYamlWorkflow } from '../../../api/yaml-workflows';
+import { sanitizeToolName, sanitizeServerName } from '../../../lib/sanitize';
 import type { PlanItem } from '../../../api/types';
 
 interface PlanProfilePanelProps {
@@ -29,8 +30,8 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
   useEffect(() => {
     if (wf && wf.id !== loadedId) {
       setAppId(lockedAppId || wf.app_id || 'longtail');
-      const defaultName = planItem.name.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '');
-      setName((wf.name !== defaultName && wf.name) ? wf.name.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '') : defaultName);
+      const defaultName = sanitizeToolName(planItem.name);
+      setName((wf.name !== defaultName && wf.name) ? sanitizeToolName(wf.name) : defaultName);
       setDescription(wf.description || planItem.description || '');
       setTags(wf.tags || []);
       setLoadedId(wf.id);
@@ -45,8 +46,8 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
 
   const handleSave = async () => {
     if (!wf) return;
-    const sanitizedAppId = appId.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const sanitizedName = name.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '');
+    const sanitizedAppId = sanitizeServerName(appId);
+    const sanitizedName = sanitizeToolName(name);
 
     // Always rewrite YAML to align app.id, subscribes, topic, and activity suffixes
     let yaml = wf.yaml_content || '';
@@ -117,9 +118,9 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
             {editable && !isLocked ? (
               <input
                 value={appId}
-                onChange={(e) => setAppId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                onChange={(e) => setAppId(sanitizeServerName(e.target.value))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-                placeholder="lowercase alphanumeric only"
+                placeholder="lowercase letters only"
               />
             ) : (
               <p className="text-sm font-mono text-text-primary py-1.5">{wf.app_id || appId}</p>
@@ -133,9 +134,9 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
             {editable ? (
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                onChange={(e) => setName(sanitizeToolName(e.target.value))}
                 className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-                placeholder="unique tool name (dashes allowed)"
+                placeholder="snake_case tool name (e.g. take_screenshot)"
               />
             ) : (
               <p className="text-sm font-mono text-text-primary py-1.5">{wf.name || name}</p>

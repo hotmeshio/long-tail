@@ -30,4 +30,21 @@ export interface StorageBackend {
 
   /** Create a readable stream for HTTP serving. */
   createReadStream(key: string): Promise<NodeJS.ReadableStream>;
+
+  /** List files and directory prefixes under a path (for directory browsing). */
+  listWithPrefixes(prefix?: string, pageSize?: number, continuationToken?: string): Promise<{
+    files: Array<{ path: string; size: number; modified_at: string }>;
+    directories: string[];
+    nextToken?: string;
+  }>;
+
+  /** Get file metadata without reading content. */
+  getMetadata(key: string): Promise<{
+    size: number;
+    modified_at: string;
+    content_type: string;
+  }>;
+
+  /** Generate a time-limited signed URL for unauthenticated file access. */
+  getSignedUrl(key: string, expiresInSeconds: number): Promise<string>;
 }

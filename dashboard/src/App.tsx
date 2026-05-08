@@ -118,6 +118,9 @@ const ControlPlanePage = lazy(() =>
 const CredentialsPage = lazy(() =>
   import('./pages/settings/CredentialsPage').then((m) => ({ default: m.CredentialsPage })),
 );
+const FilesPage = lazy(() =>
+  import('./pages/files').then((m) => ({ default: m.FilesPage })),
+);
 
 // ---------------------------------------------------------------------------
 // Suspense fallback
@@ -230,6 +233,9 @@ const router = createBrowserRouter([
           { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
           { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
           { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
+
+          // Files section
+          { path: 'files', element: <Lazy><FilesPage /></Lazy> },
         ],
       },
 

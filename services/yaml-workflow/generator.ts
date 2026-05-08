@@ -15,7 +15,8 @@ import { analyze } from './pipeline/analyze';
 import { compile } from './pipeline/compile';
 import { build } from './pipeline/build';
 import { validate } from './pipeline/validate';
-import { sanitizeName, capToolArguments } from './pipeline/build';
+import { capToolArguments } from './pipeline/build';
+import { sanitizeToolName } from '../../modules/utils';
 import type { PipelineContext, GenerateYamlOptions, GenerateYamlResult } from './types';
 
 // Re-exports for backward compatibility
@@ -34,7 +35,7 @@ export async function generateYamlFromExecution(
   options: GenerateYamlOptions,
 ): Promise<GenerateYamlResult> {
   const appId = options.appId || 'longtail';
-  const graphTopic = options.subscribes || sanitizeName(options.name);
+  const graphTopic = sanitizeToolName(options.subscribes || options.name);
 
   // 1. Export the execution to get events
   const execution = await exportWorkflowExecution(

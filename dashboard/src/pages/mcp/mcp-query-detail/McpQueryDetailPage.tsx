@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MessageSquare, Lightbulb, Layers, Hammer, Wand2, GitBranch } from 'lucide-react';
+import { MessageSquare, Lightbulb, Layers, Wand2, GitBranch } from 'lucide-react';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
@@ -41,9 +41,9 @@ const DIRECT_STEPS = [
 ];
 
 const PLAN_STEPS = [
-  { icon: MessageSquare, color: 'text-accent', title: 'Specification', detail: 'Paste a PRD, TDD, or multi-workflow spec. The planner decomposes it into workflows.' },
-  { icon: GitBranch, color: 'text-status-warning', title: 'Plan & Build', detail: 'Review the decomposition, adjust namespaces, then build each workflow leaf-first.' },
-  { icon: Layers, color: 'text-status-success', title: 'Deploy & Test', detail: 'Deploy all namespaces. Test individual workflows and the full composition.' },
+  { icon: MessageSquare, color: 'text-accent', title: 'Specification', detail: 'Describe API endpoints, processes, or paste a spec. The system decomposes it into pipeline tools.' },
+  { icon: GitBranch, color: 'text-status-warning', title: 'Plan & Build', detail: 'Review the decomposition, configure the toolset, then build each tool leaf-first.' },
+  { icon: Layers, color: 'text-status-success', title: 'Deploy & Test', detail: 'Deploy the toolset. Test individual tools and the full composition.' },
 ];
 
 function ComposerPanel() {
@@ -109,17 +109,6 @@ function ComposerPanel() {
           Discover & Compile
         </button>
         <button
-          onClick={() => setMode('direct')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            mode === 'direct'
-              ? 'bg-surface text-text-primary shadow-sm'
-              : 'text-text-tertiary hover:text-text-secondary'
-          }`}
-        >
-          <Hammer className="w-3 h-3" strokeWidth={1.5} />
-          Direct Build
-        </button>
-        <button
           onClick={() => setMode('plan')}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
             mode === 'plan'
@@ -128,7 +117,7 @@ function ComposerPanel() {
           }`}
         >
           <GitBranch className="w-3 h-3" strokeWidth={1.5} />
-          Plan Build
+          Build
         </button>
       </div>
 
@@ -147,10 +136,8 @@ function ComposerPanel() {
                   el.style.height = Math.min(400, Math.max(160, el.scrollHeight)) + 'px';
                 }}
                 placeholder={mode === 'plan'
-                  ? 'Paste a PRD, TDD, or multi-workflow specification. The planner will decompose it into a set of related workflows...'
-                  : mode === 'discover'
-                  ? 'Describe what you want to accomplish. The LLM will discover and execute the right tools...'
-                  : 'Describe the pipeline steps, tools, inputs, and outputs. The LLM will create the pipeline (DAG) directly...'
+                  ? 'Describe the tools you want to build — API specs, process descriptions, or a full PRD. The system will decompose, build, and deploy them as a composable toolset...'
+                  : 'Describe what you want to accomplish. The system will discover and execute the right tools...'
                 }
                 className="flex-1 min-h-[160px] pr-4 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none border-none"
                 autoFocus
@@ -160,7 +147,7 @@ function ComposerPanel() {
             <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
               {mode === 'plan' ? (
                 <span className="text-[10px] text-text-tertiary">
-                  Decomposes specification into composed workflows — builds leaf-first
+                  Decomposes into composable pipeline tools — builds leaf-first
                 </span>
               ) : mode === 'discover' ? (
                 <label className="flex items-center gap-2 cursor-pointer select-none group">

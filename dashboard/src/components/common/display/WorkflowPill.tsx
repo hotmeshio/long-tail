@@ -1,4 +1,5 @@
 import { Workflow, ShieldCheck, Settings, Wand2 } from 'lucide-react';
+import { typeColor } from '../../../lib/type-color';
 
 type WorkflowVariant = 'durable' | 'configured' | 'certified' | 'pipeline';
 
@@ -10,11 +11,16 @@ interface WorkflowPillProps {
   variant?: WorkflowVariant;
 }
 
-const VARIANT_CONFIG: Record<WorkflowVariant, { icon: typeof Workflow; color: string }> = {
-  certified:  { icon: ShieldCheck, color: 'text-status-success' },
-  configured: { icon: Settings,    color: 'text-status-info' },
-  pipeline:   { icon: Wand2,       color: 'text-purple-400' },
-  durable:    { icon: Workflow,     color: 'text-accent/75' },
+const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
+  certified:  ShieldCheck,
+  configured: Settings,
+  pipeline:   Wand2,
+  durable:    Workflow,
+};
+
+const VARIANT_FIXED_COLOR: Record<string, string> = {
+  certified:  'text-status-success',
+  configured: 'text-status-info',
 };
 
 export function WorkflowPill({ type, size = 'sm', certified, variant }: WorkflowPillProps) {
@@ -24,10 +30,17 @@ export function WorkflowPill({ type, size = 'sm', certified, variant }: Workflow
   const iconClass = size === 'md' ? 'w-3 h-3' : 'w-2.5 h-2.5';
 
   const resolved = variant ?? (certified ? 'certified' : 'durable');
-  const { icon: Icon, color: iconColor } = VARIANT_CONFIG[resolved];
+  const Icon = VARIANT_ICON[resolved];
+
+  // Pipeline and durable variants get a type-name-derived color.
+  // Certified and configured keep their fixed semantic colors.
+  const fixedColor = VARIANT_FIXED_COLOR[resolved];
+  const derived = fixedColor ? null : typeColor(type);
+  const iconColor = fixedColor || (derived?.text ?? 'text-accent/75');
+  const bgColor = derived?.bg ?? 'bg-accent/[0.06]';
 
   return (
-    <span className={`inline-flex items-center ${sizeClass} font-mono bg-accent/[0.06] text-text-secondary rounded-lg`}>
+    <span className={`inline-flex items-center ${sizeClass} font-mono ${bgColor} text-text-secondary rounded-lg`}>
       <Icon className={`${iconClass} shrink-0 ${iconColor}`} />
       {type}
     </span>

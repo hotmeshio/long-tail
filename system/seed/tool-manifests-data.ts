@@ -144,6 +144,43 @@ export const HTTP_FETCH_TOOLS = [
   },
 ];
 
+export const SCHEMA_EXCHANGE_TOOLS = [
+  {
+    name: 'exchange',
+    description: 'Exchange data with an external service endpoint under schema enforcement. Validates request body against request_schema before sending and response body against response_schema after receiving. Transport is hidden — the principle is endpoint + schema + validated exchange.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        endpoint: { type: 'string', description: 'Service endpoint URL' },
+        method: { type: 'string', description: 'HTTP method: GET, POST, PUT, DELETE, PATCH' },
+        headers: { type: 'object', description: 'Request headers' },
+        query: { type: 'object', description: 'Query parameters' },
+        body: { description: 'Request body (validated against request_schema if provided)' },
+        request_schema: { type: 'object', description: 'JSON Schema for request body validation' },
+        response_schema: { type: 'object', description: 'JSON Schema for response body validation' },
+        timeout_ms: { type: 'number', description: 'Request timeout in milliseconds' },
+        credential_provider: { type: 'string', description: 'Credential provider name — resolves auth from the connection store automatically' },
+        credential_label: { type: 'string', description: 'Credential label for multi-credential accounts' },
+        auth_scheme: { type: 'string', description: 'Auth scheme (default: Bearer)' },
+        auth_header: { type: 'string', description: 'Header name for credential (default: Authorization)' },
+      },
+      required: ['endpoint', 'method'],
+    },
+  },
+  {
+    name: 'validate_schema',
+    description: 'Validate any value against a JSON Schema without making a network call. Useful for pre-validation, testing, and transform verification.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: { description: 'The value to validate' },
+        schema: { type: 'object', description: 'JSON Schema to validate against' },
+      },
+      required: ['data', 'schema'],
+    },
+  },
+];
+
 export const DOCS_TOOLS = [
   {
     name: 'list_docs',

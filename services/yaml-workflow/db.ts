@@ -11,6 +11,7 @@ import {
   GET_ACTIVE_YAML_WORKFLOWS,
   LIST_BY_APP_ID,
   GET_DISTINCT_APP_IDS,
+  GET_MAX_APP_VERSION,
   MARK_CONTENT_DEPLOYED,
   MARK_APP_ID_CONTENT_DEPLOYED,
   CREATE_VERSION_SNAPSHOT as CREATE_VERSION_SNAPSHOT_SQL,
@@ -194,6 +195,24 @@ export async function listYamlWorkflowsByAppId(appId: string): Promise<LTYamlWor
   const pool = getPool();
   const { rows } = await pool.query(LIST_BY_APP_ID, [appId]);
   return rows;
+}
+
+/**
+ * Return the next app-level version for a namespace.
+ *
+ * Each deploy of an app (namespace) must use a strictly increasing integer
+ * version. This queries the current max across all non-archived workflows
+ * in the namespace and returns max + 1.
+ *
+ * A new namespace with no workflows returns '1'.
+ * An existing namespace with one active tool at v1 returns '2' when a
+ * second tool is added — even though that second tool is "version 1" of itself.
+ */
+export async function getNextAppVersion(appId: string): Promise<string> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_MAX_APP_VERSION, [appId]);
+  const max = parseInt(rows[0]?.max_version ?? '0', 10);
+  return String(max + 1);
 }
 
 export async function getDistinctAppIds(): Promise<string[]> {

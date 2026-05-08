@@ -134,7 +134,7 @@ describe('McpQueryDetailPage', () => {
     expect(screen.getByPlaceholderText(/describe what this workflow does/i)).toBeInTheDocument();
     // Should have namespace and tool name inputs
     expect(screen.getByPlaceholderText(/e\.g\. longtail/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/e\.g\. auth-screenshot/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/e\.g\. auth_screenshot/i)).toBeInTheDocument();
   });
 
   it('shows deploy step when YAML workflow exists in draft', () => {

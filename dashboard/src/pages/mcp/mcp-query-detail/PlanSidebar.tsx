@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Loader2, FileCode2, Rocket, PackageCheck } from 'lucide-react';
+import { Loader2, FileCode2, Rocket, PackageCheck, Plus, Minus } from 'lucide-react';
 import type { PlanItem } from '../../../api/types';
 
 interface PlanSidebarProps {
@@ -7,7 +7,9 @@ interface PlanSidebarProps {
   namespaces: string[];
   yamlStatuses: Record<string, string>;
   activeWorkflow: string | null;
+  isAddOpen?: boolean;
   onSelect: (name: string) => void;
+  onAdd?: () => void;
 }
 
 function statusIcon(status: string | undefined) {
@@ -23,7 +25,7 @@ function statusIcon(status: string | undefined) {
   return <Loader2 className={`${base} text-accent animate-spin`} strokeWidth={1.5} />;
 }
 
-export function PlanSidebar({ plan, namespaces, yamlStatuses, activeWorkflow, onSelect }: PlanSidebarProps) {
+export function PlanSidebar({ plan, namespaces, yamlStatuses, activeWorkflow, isAddOpen, onSelect, onAdd }: PlanSidebarProps) {
   const grouped = useMemo(() => {
     const groups: Record<string, PlanItem[]> = {};
     for (const item of plan) {
@@ -35,10 +37,28 @@ export function PlanSidebar({ plan, namespaces, yamlStatuses, activeWorkflow, on
   const showNsHeaders = namespaces.length > 1;
 
   return (
-    <nav className="w-56 shrink-0 overflow-y-auto">
-      <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-        Workflows
-      </p>
+    <nav className="w-56 shrink-0 overflow-y-auto sticky top-0 self-start">
+      <div className="flex items-center justify-between px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          Pipeline Tools
+        </p>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className={`w-6 h-6 flex items-center justify-center rounded-full border transition-all duration-200 ${
+              isAddOpen
+                ? 'bg-accent/20 border-accent/40 text-accent rotate-0'
+                : 'border-accent/30 text-accent/60 hover:bg-accent/10 hover:border-accent/50 hover:text-accent'
+            }`}
+            title={isAddOpen ? 'Cancel' : 'Add additional tools'}
+          >
+            {isAddOpen
+              ? <Minus className="w-3 h-3" strokeWidth={2} />
+              : <Plus className="w-3 h-3" strokeWidth={2} />
+            }
+          </button>
+        )}
+      </div>
       <div className="space-y-0.5">
         {namespaces.map((ns) => (
           <div key={ns}>

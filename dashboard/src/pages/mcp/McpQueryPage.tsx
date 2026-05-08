@@ -210,7 +210,7 @@ export function McpQueryPage() {
       <FilterBar actions={
         <ListToolbar
           onRefresh={() => refetch()}
-          apiPath={`/workflow-states/jobs?entity=${filters.type || 'mcpQuery,mcpTriage,mcpWorkflowBuilder,mcpWorkflowPlanner'}&limit=${pagination.pageSize}&offset=${pagination.offset}&sort_by=created_at&order=desc${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+          apiPath={`/workflow-states/jobs?entity=${filters.type || 'mcpQuery,mcpTriage,mcpWorkflowPlanner'}&limit=${pagination.pageSize}&offset=${pagination.offset}&sort_by=created_at&order=desc${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
         />
       }>
           <FilterSelect
@@ -219,8 +219,7 @@ export function McpQueryPage() {
             onChange={(v) => setFilter('type', v)}
             options={[
               { value: 'mcpQuery', label: 'Discovery' },
-              { value: 'mcpWorkflowBuilder', label: 'Direct Build' },
-              { value: 'mcpWorkflowPlanner', label: 'Plan Build' },
+              { value: 'mcpWorkflowPlanner', label: 'Build' },
               { value: 'mcpTriage', label: 'Triage' },
             ]}
           />

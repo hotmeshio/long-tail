@@ -19,8 +19,12 @@ export function LifecycleSidebar({
   sourceWorkflowId: _sourceWorkflowId,
   contentVersion,
   deployedContentVersion,
+  appId,
+  appVersion,
+  siblingCount,
   onDeploy,
   onArchive,
+  onRestore,
   onDelete,
   onRegenerate: _onRegenerate,
   isPending,
@@ -30,8 +34,12 @@ export function LifecycleSidebar({
   sourceWorkflowId?: string | null;
   contentVersion?: number;
   deployedContentVersion?: number | null;
+  appId?: string;
+  appVersion?: number;
+  siblingCount?: number;
   onDeploy: () => void;
   onArchive: () => void;
+  onRestore?: () => void;
   onDelete: () => void;
   onRegenerate: () => void;
   isPending: boolean;
@@ -104,16 +112,43 @@ export function LifecycleSidebar({
                     </button>
                   </div>
                 )}
+                {isCurrent && step === 'archived' && onRestore && (
+                  <div className="mt-2">
+                    <button onClick={onRestore} disabled={isPending} className="text-[11px] font-medium text-accent hover:text-accent/80">
+                      {isPending ? 'Restoring...' : 'Restore to Draft'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Version info */}
+      {/* App namespace info */}
+      {appId && (
+        <div className="mt-4 pt-4 border-t border-surface-border">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">App Namespace</p>
+          <p className="text-xs font-mono text-text-primary">{appId}</p>
+          <div className="flex items-center gap-3 mt-1.5">
+            {appVersion != null && (
+              <span className="text-[10px] text-text-secondary">
+                app v{appVersion} {'\u2192'} <span className="text-accent">v{appVersion + 1}</span> on deploy
+              </span>
+            )}
+          </div>
+          {siblingCount != null && siblingCount > 1 && (
+            <p className="text-[10px] text-text-tertiary mt-1">
+              {siblingCount} tool{siblingCount === 1 ? '' : 's'} in this namespace
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Content version */}
       {contentVersion != null && (
         <div className="mt-4 pt-4 border-t border-surface-border">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Content Version</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Content</p>
           <p className="text-xs font-mono text-text-primary">
             v{contentVersion}
             {deployedContentVersion != null && (

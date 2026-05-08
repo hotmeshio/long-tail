@@ -1,10 +1,21 @@
 // ─── Knowledge CRUD ─────────────────────────────────────────────────────────
 
+// Upsert knowledge entry. On conflict (domain+key), merges JSONB data at
+// the top level — new keys are added, existing keys are overwritten.
+//
+// Guard: if the existing `data` column is not a JSON object (e.g. it was
+// corrupted into an array by a prior string merge), replace it entirely
+// rather than appending to the array. The CASE expression ensures the
+// `||` operator always receives object || object, which produces a merge.
 export const UPSERT_KNOWLEDGE = `
   INSERT INTO lt_knowledge (domain, key, data, tags)
   VALUES ($1, $2, $3, $4)
   ON CONFLICT (domain, key) DO UPDATE SET
-    data = lt_knowledge.data || EXCLUDED.data,
+    data = CASE
+      WHEN jsonb_typeof(lt_knowledge.data) = 'object'
+      THEN lt_knowledge.data || EXCLUDED.data
+      ELSE EXCLUDED.data
+    END,
     tags = ARRAY(SELECT DISTINCT unnest(lt_knowledge.tags || EXCLUDED.tags))
   RETURNING id, domain, key, (xmax = 0) AS created, updated_at`;
 

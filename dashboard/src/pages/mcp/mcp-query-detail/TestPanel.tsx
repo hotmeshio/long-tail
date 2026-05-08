@@ -183,9 +183,9 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
 
   return (
     <div>
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8 min-w-0">
       {/* Left: results */}
-      <div>
+      <div className="min-w-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>

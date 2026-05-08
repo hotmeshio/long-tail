@@ -1,11 +1,11 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertCircle, GitBranch } from 'lucide-react';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
-import { useWorkflowSet } from '../../../api/workflow-sets';
+import { useWorkflowSet, useAddToWorkflowSet } from '../../../api/workflow-sets';
 import { useYamlWorkflows } from '../../../api/yaml-workflows';
 import { useBuilderResult } from '../../../api/workflow-builder';
 import { useMcpQueryDetailEvents } from '../../../hooks/useEventHooks';
@@ -70,13 +70,45 @@ export function PlanWizard() {
     }
   }, [setStatus, queryClient]);
 
-  // ── Plan-item → YAML workflow mapping (by build_order) ──────────────────
+  // ── Plan-item → YAML workflow mapping ───────────────────────────────────
+  // The builder may rename workflows (e.g. plan says "login", builder
+  // outputs "auth_login"). Match by name/graph_topic first, then by
+  // positional order within the same build_order group.
   const yamlByPlanName = useMemo(() => {
     const map: Record<string, (typeof yamlWorkflows)[number]> = {};
+    const used = new Set<string>();
+
+    // Pass 1: exact name or graph_topic match
     for (const item of plan) {
-      const match = yamlWorkflows.find(w => w.set_build_order === item.build_order);
-      if (match) map[item.name] = match;
+      const match = yamlWorkflows.find(w =>
+        !used.has(w.id) && (w.name === item.name || w.graph_topic === item.name),
+      );
+      if (match) { map[item.name] = match; used.add(match.id); }
     }
+
+    // Pass 2: positional match within build_order groups
+    // Group remaining workflows by build_order, then assign in plan order
+    if (Object.keys(map).length < plan.length) {
+      const remaining = yamlWorkflows
+        .filter(w => !used.has(w.id))
+        .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+      const byOrder = new Map<number, typeof remaining>();
+      for (const w of remaining) {
+        const order = w.set_build_order ?? 0;
+        if (!byOrder.has(order)) byOrder.set(order, []);
+        byOrder.get(order)!.push(w);
+      }
+      for (const item of plan) {
+        if (map[item.name]) continue;
+        const group = byOrder.get(item.build_order);
+        if (group?.length) {
+          const match = group.shift()!;
+          map[item.name] = match;
+          used.add(match.id);
+        }
+      }
+    }
+
     return map;
   }, [plan, yamlWorkflows]);
 
@@ -129,6 +161,23 @@ export function PlanWizard() {
   const builtCount = yamlWorkflows.length;
   const totalCount = plan.length;
   const activeCount = yamlWorkflows.filter(w => w.status === 'active').length;
+
+  // ── Add-to-set dialog state ────────────────────────────────────────────
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addSpec, setAddSpec] = useState('');
+  const addMutation = useAddToWorkflowSet();
+  const [addSubmitted, setAddSubmitted] = useState(false);
+
+  // Auto-close the expand dialog when set returns to completed after an addition
+  const prevSetStatus = useRef(setStatus);
+  useEffect(() => {
+    if (addSubmitted && prevSetStatus.current !== 'completed' && setStatus === 'completed') {
+      setAddSubmitted(false);
+      setShowAddDialog(false);
+      setAddSpec('');
+    }
+    prevSetStatus.current = setStatus;
+  }, [setStatus, addSubmitted]);
 
   // ── URL sync helpers ────────────────────────────────────────────────────
   const updateUrl = (overrides: Record<string, string | undefined>) => {
@@ -260,17 +309,97 @@ export function PlanWizard() {
 
         {/* ── Steps 2-4: Sidebar + Main ────────────────────────────────── */}
         {step >= 2 && (
-          <div className="flex gap-6">
+          <div className="flex gap-6 max-h-[calc(100vh-220px)]">
             <PlanSidebar
               plan={plan}
               namespaces={namespaces}
               yamlStatuses={yamlStatuses}
               activeWorkflow={selectedWorkflow}
+              isAddOpen={showAddDialog}
               onSelect={handleSelectWorkflow}
+              onAdd={() => setShowAddDialog(!showAddDialog)}
             />
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-y-auto">
+              {/* Add-to-set panel — animated expand/collapse */}
+              <div
+                className="transition-all duration-300 ease-in-out grid"
+                style={{
+                  gridTemplateRows: showAddDialog ? '1fr' : '0fr',
+                  opacity: showAddDialog ? 1 : 0,
+                  marginBottom: showAddDialog ? '24px' : '0px',
+                }}
+              >
+                <div className="overflow-hidden">
+                <div className="rounded-lg border border-accent/20 bg-gradient-to-b from-accent/[0.04] to-transparent p-5">
+                  {addSubmitted ? (
+                    <>
+                      <div className="flex items-center gap-3 py-6 justify-center">
+                        <Loader2 className="w-5 h-5 text-accent animate-spin" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">Building new tools...</p>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">Watch the sidebar — new tools will appear as they're built.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-text-tertiary">{plan.length} tool{plan.length === 1 ? '' : 's'} in set</span>
+                        <button
+                          onClick={() => { setAddSubmitted(false); setShowAddDialog(false); setAddSpec(''); }}
+                          className="text-[10px] text-text-tertiary hover:text-text-primary transition-colors"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium text-text-primary mb-1">Expand this Toolset</p>
+                      <p className="text-[11px] text-text-tertiary mb-4">Describe additional activities you would like to add.</p>
+                      <textarea
+                        value={addSpec}
+                        onChange={(e) => {
+                          setAddSpec(e.target.value);
+                          const el = e.target;
+                          el.style.height = 'auto';
+                          el.style.height = `${Math.max(100, el.scrollHeight)}px`;
+                        }}
+                        placeholder="What else should this set do?"
+                        className="w-full min-h-[100px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-sm font-mono text-text-primary placeholder:text-text-tertiary/50 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
+                        style={{ resize: 'none', overflow: 'hidden' }}
+                      />
+                      {addMutation.isError && (
+                        <p className="text-xs text-status-error mt-2">{addMutation.error.message}</p>
+                      )}
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-[10px] text-text-tertiary">
+                          {plan.length} tool{plan.length === 1 ? '' : 's'} in set
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setShowAddDialog(false); setAddSpec(''); }}
+                            className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!setId || !addSpec.trim()) return;
+                              await addMutation.mutateAsync({ id: setId, specification: addSpec.trim() });
+                              setAddSubmitted(true);
+                            }}
+                            disabled={!addSpec.trim() || addMutation.isPending}
+                            className="btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {addMutation.isPending ? 'Submitting...' : 'Add to Set'}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                </div>
+              </div>
               {!selectedWorkflow ? (
-                <p className="text-sm text-text-tertiary py-12 text-center">Select a workflow from the sidebar.</p>
+                <p className="text-sm text-text-tertiary py-12 text-center">Select a pipeline tool from the sidebar.</p>
               ) : !selectedYamlId ? (
                 <div className="flex items-center gap-3 py-12 justify-center">
                   <Loader2 className="w-4 h-4 text-accent animate-spin" />
@@ -287,12 +416,14 @@ export function PlanWizard() {
                 />
               ) : step === 3 ? (
                 <DeployPanel
+                  key={selectedYamlId}
                   yamlId={selectedYamlId}
                   onAdvance={() => handleStepClick(4)}
                   onBack={() => handleStepClick(2)}
                 />
               ) : step === 4 ? (
                 <TestPanel
+                  key={`test-${selectedYamlId}`}
                   yamlId={selectedYamlId}
                   originalWorkflowId={workflowId}
                   originalResult={undefined}

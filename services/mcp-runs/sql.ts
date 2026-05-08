@@ -25,7 +25,7 @@ export const GET_JOB_ATTRIBUTES = (schema: string) =>
 
 // ─── Queries (queries.ts) ───────────────────────────────────────────────────
 
-export const LIST_JOBS = (schema: string, appId: string, where: string, limitIdx: number, offsetIdx: number) =>
+export const LIST_JOBS = (schema: string, appId: string, where: string, limitIdx: number, offsetIdx: number, orderBy?: string) =>
   `WITH ju_symbols AS (
      SELECT value FROM ${schema}.symbols
      WHERE key LIKE 'keys:%' AND field = 'metadata/ju'
@@ -41,5 +41,5 @@ export const LIST_JOBS = (schema: string, appId: string, where: string, limitIdx
      AND ju.symbol IN (SELECT value FROM ju_symbols)
      AND (ju.dimension IS NULL OR ju.dimension = '')
    ${where}
-   ORDER BY (CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC
+   ORDER BY ${orderBy || '(CASE WHEN j.status > 0 THEN 0 ELSE 1 END), j.created_at DESC'}
    LIMIT $${limitIdx} OFFSET $${offsetIdx}`;

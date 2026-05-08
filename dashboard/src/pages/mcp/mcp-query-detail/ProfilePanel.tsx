@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { TagInput } from '../../../components/common/form/TagInput';
 import { useUpdateYamlWorkflow } from '../../../api/yaml-workflows';
+import { sanitizeToolName, sanitizeServerName } from '../../../lib/sanitize';
 import { PanelTitle } from './PanelTitle';
 import { SectionHeading } from './SectionHeading';
 
@@ -235,7 +236,7 @@ function CreateProfileForm({
         <div className="w-[30%] shrink-0 space-y-4">
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Namespace *</label>
-            <input type="text" value={compileAppId} onChange={(e) => setCompileAppId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+            <input type="text" value={compileAppId} onChange={(e) => setCompileAppId(sanitizeServerName(e.target.value))}
               className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. longtail" />
             {allAppIds.length > 0 && (
               <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -248,8 +249,8 @@ function CreateProfileForm({
           </div>
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Name *</label>
-            <input type="text" value={compileName} onChange={(e) => setCompileName(e.target.value)}
-              className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. auth-screenshot-all-nav-pages" />
+            <input type="text" value={compileName} onChange={(e) => setCompileName(sanitizeToolName(e.target.value))}
+              className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" placeholder="e.g. auth_screenshot_all_nav_pages" />
           </div>
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>

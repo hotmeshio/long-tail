@@ -20,6 +20,12 @@ export const UPDATE_WORKFLOW_SET_STATUS = `
   WHERE id = $1
   RETURNING *`;
 
+export const APPEND_WORKFLOW_SET_SPECIFICATION = `
+  UPDATE lt_workflow_sets
+  SET specification = specification || E'\\n\\n---\\n\\n' || $2, updated_at = NOW()
+  WHERE id = $1
+  RETURNING *`;
+
 export const DELETE_WORKFLOW_SET = `
   DELETE FROM lt_workflow_sets WHERE id = $1`;
 

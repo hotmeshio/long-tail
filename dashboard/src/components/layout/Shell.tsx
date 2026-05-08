@@ -7,6 +7,7 @@ import { Header } from './Header';
 import { AdminSidebar } from './AdminSidebar';
 import { EngineerSidebar } from './EngineerSidebar';
 import { McpSidebar } from './McpSidebar';
+import { FilesSidebar } from './FilesSidebar';
 import { EventFeed } from './EventFeed';
 import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
@@ -56,6 +57,7 @@ function ShellLayout() {
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <FilesSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
 

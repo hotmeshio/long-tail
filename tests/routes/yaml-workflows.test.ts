@@ -173,6 +173,16 @@ describe('YAML Workflows routes', () => {
     });
   });
 
+  describe('POST /api/yaml-workflows/:id/restore', () => {
+    it('returns 404 for non-existent workflow', async () => {
+      const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/restore`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('POST /api/yaml-workflows (create)', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows`, { method: 'POST' });

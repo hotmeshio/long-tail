@@ -7,6 +7,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS, LLM_MODEL_SECONDARY } from '../../modules/defaults';
+import { sanitizeToolName } from '../../modules/utils';
 import { callLLM, hasLLMApiKey } from '../llm';
 import { DESCRIBE_WORKFLOW_SYSTEM_PROMPT } from './prompts';
 
@@ -138,10 +139,14 @@ export interface WorkflowPlannerInput {
   setId: string;
   wait?: boolean;
   userId?: string;
+  /** When adding to an existing set, pass the current plan items so the planner avoids duplicates. */
+  existingPlan?: Array<{ name: string; description: string; namespace: string }>;
+  /** Sibling schemas from already-built workflows for composition context. */
+  existingSchemas?: Array<{ name: string; input_schema: Record<string, unknown>; output_schema: Record<string, unknown>; graph_topic: string }>;
 }
 
 export async function startWorkflowPlanner(input: WorkflowPlannerInput): Promise<McpQueryResult> {
-  const { specification, setId, wait = true, userId } = input;
+  const { specification, setId, wait = true, userId, existingPlan, existingSchemas } = input;
   const startTime = Date.now();
 
   const client = new Durable.Client({ connection: getConnection() });
@@ -150,7 +155,7 @@ export async function startWorkflowPlanner(input: WorkflowPlannerInput): Promise
 
   const handle = await client.workflow.start({
     args: [{
-      data: { specification, setId },
+      data: { specification, setId, existingPlan, existingSchemas },
       metadata: { source: 'dashboard' },
       lt: { userId },
     }],
@@ -204,11 +209,7 @@ export async function describeWorkflow(input: DescribeInput): Promise<DescribeRe
   const cleaned = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
   const parsed = JSON.parse(cleaned);
 
-  const toolName = (parsed.tool_name || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 60);
+  const toolName = sanitizeToolName(parsed.tool_name || '').slice(0, 60);
 
   return {
     tool_name: toolName || undefined,

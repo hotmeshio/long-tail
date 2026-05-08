@@ -21,12 +21,19 @@ export function extractJsonFromSummary(summary: string): Record<string, unknown>
 
 export type Section = 'invoke' | 'tools' | 'config';
 
+/** Keys that should auto-fill with the current session token when building test input skeletons. */
+const TOKEN_FIELD_NAMES = new Set(['token', 'authorization', 'bearer_token', 'access_token', 'api_token']);
+
 export function buildSkeleton(schema: Record<string, any>): Record<string, any> {
   if (!schema?.properties) return {};
   const result: Record<string, any> = {};
+  // Auto-fill token fields with the current session token so test invocations
+  // always use a fresh credential instead of requiring manual paste.
+  const sessionToken = sessionStorage.getItem('lt_token') || '';
   for (const [key, prop] of Object.entries(schema.properties)) {
     const p = prop as any;
     if (p.default !== undefined) result[key] = p.default;
+    else if (TOKEN_FIELD_NAMES.has(key.toLowerCase()) && p.type === 'string') result[key] = sessionToken;
     else if (p.type === 'string') result[key] = '';
     else if (p.type === 'number' || p.type === 'integer') result[key] = p.minimum ?? 0;
     else if (p.type === 'boolean') result[key] = false;

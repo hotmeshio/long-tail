@@ -1,28 +1,16 @@
 import { Router } from 'express';
-import path from 'path';
+import jwt from 'jsonwebtoken';
 
 import { getStorageBackend } from '../lib/storage';
+import { mimeFromPath } from '../lib/storage/mime';
 
 const router = Router();
-
-const MIME_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-  '.pdf': 'application/pdf',
-  '.json': 'application/json',
-  '.txt': 'text/plain',
-  '.html': 'text/html',
-  '.csv': 'text/csv',
-  '.xml': 'application/xml',
-};
 
 /**
  * GET /api/files/*
  * Serve files from managed file storage.
+ * Supports optional signed token (?token=<jwt>) for authenticated access
+ * to locally-generated signed URLs.
  */
 router.get('/{*filePath}', async (req, res) => {
   const raw = (req.params as any).filePath;
@@ -32,10 +20,29 @@ router.get('/{*filePath}', async (req, res) => {
     return;
   }
 
+  // Validate signed token if provided
+  const token = req.query.token as string | undefined;
+  if (token) {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      res.status(500).json({ error: 'Server not configured for signed URLs' });
+      return;
+    }
+    try {
+      const decoded = jwt.verify(token, secret) as { filePath?: string; purpose?: string };
+      if (decoded.purpose !== 'file-download' || decoded.filePath !== filePath.replace(/^\/+/, '')) {
+        res.status(403).json({ error: 'Token does not match requested file' });
+        return;
+      }
+    } catch {
+      res.status(403).json({ error: 'Invalid or expired token' });
+      return;
+    }
+  }
+
   try {
     const stream = await getStorageBackend().createReadStream(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const contentType = mimeFromPath(filePath);
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=300');

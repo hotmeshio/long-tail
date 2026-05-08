@@ -55,6 +55,19 @@ router.put('/:id/plan', async (req, res) => {
 });
 
 /**
+ * POST /api/workflow-sets/:id/add
+ * Add additional workflows to an existing set from a new specification.
+ */
+router.post('/:id/add', async (req, res) => {
+  const { specification } = req.body;
+  const result = await api.addToWorkflowSet(
+    { id: req.params.id, specification },
+    req.auth ? { userId: req.auth.userId } : undefined,
+  );
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * POST /api/workflow-sets/:id/build
  * Trigger the build phase (resume the planner workflow).
  */
