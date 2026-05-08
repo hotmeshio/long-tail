@@ -1,13 +1,17 @@
 /**
  * Schema-driven data exchange with external service endpoints.
  *
- * The principle: endpoint + request schema + response schema.
+ * Three pillars: endpoint + schema + identity.
  * Transport (fetch, Playwright, gRPC) is an implementation detail.
- * The value is schema enforcement — validating both sides of the exchange
- * so API drift is caught immediately, not three layers deep.
+ * The value is schema enforcement and credential resolution —
+ * validating both sides of the exchange and resolving auth from
+ * the connection store at the last mile.
  */
 
 import Ajv from 'ajv';
+
+import { getToolContext } from '../../services/iam/context';
+import { resolveCredential } from '../../services/iam/credentials';
 
 const DEFAULT_TIMEOUT = parseInt(process.env.LT_SCHEMA_EXCHANGE_TIMEOUT_MS || '30000', 10);
 
@@ -82,6 +86,10 @@ export async function exchange(args: {
   request_schema?: Record<string, unknown>;
   response_schema?: Record<string, unknown>;
   timeout_ms?: number;
+  credential_provider?: string;
+  credential_label?: string;
+  auth_scheme?: string;
+  auth_header?: string;
 }): Promise<{
   status: number;
   data: unknown;
@@ -105,7 +113,35 @@ export async function exchange(args: {
     }
   }
 
-  // 2. Build URL with query parameters (accept endpoint or url)
+  // 2. Resolve credential from connection store (if credential_provider set)
+  if (args.credential_provider) {
+    const ctx = getToolContext();
+    if (!ctx?.principal) {
+      return {
+        status: 0, data: null, headers: {}, elapsed_ms: 0,
+        validated: false,
+        validation_errors: ['credential: no identity context — cannot resolve credential_provider without a principal'],
+      };
+    }
+    const cred = await resolveCredential(
+      ctx.principal,
+      args.credential_provider,
+      args.credential_label,
+      ctx.initiatingPrincipal ? { fallbackPrincipal: ctx.initiatingPrincipal } : undefined,
+    );
+    if (!cred) {
+      return {
+        status: 0, data: null, headers: {}, elapsed_ms: 0,
+        validated: false,
+        validation_errors: [`credential: no credential found for provider "${args.credential_provider}" — register one at Settings > Connections`],
+      };
+    }
+    const scheme = args.auth_scheme || 'Bearer';
+    const headerName = args.auth_header || 'Authorization';
+    args.headers = { ...args.headers, [headerName]: `${scheme} ${cred.value}` };
+  }
+
+  // 3. Build URL with query parameters (accept endpoint or url)
   let url = args.endpoint || args.url;
   if (!url) {
     return {

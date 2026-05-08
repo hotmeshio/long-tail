@@ -223,7 +223,11 @@ export const SEED_MCP_SERVERS = [
       'Also surface validated and status: job.maps.validated: \'{exchange_xxxx.output.data.validated}\', job.maps.status: \'{exchange_xxxx.output.data.status}\'. ' +
       'response_schema enables self-testing: schedule the compiled tool on cron against a dev/staging server — if validation fails, the API schema changed. ' +
       'request_schema prevents malformed requests from ever leaving the system. ' +
-      'Both schemas are optional — use response_schema alone for read endpoints, both for write endpoints, neither for exploratory calls.',
+      'Both schemas are optional — use response_schema alone for read endpoints, both for write endpoints, neither for exploratory calls. ' +
+      'For authentication, prefer credential_provider over manually wiring tokens in headers. ' +
+      'Set credential_provider to the provider name registered in the connection store (e.g. "stripe", "epic", "google"). ' +
+      'The tool resolves the credential from the calling principal\'s stored connections at the last mile — no token input needed, auto-refreshes expired tokens. ' +
+      'Use auth_scheme for non-Bearer schemes (e.g. "Basic", "Token") and auth_header for APIs that use X-API-Key instead of Authorization.',
     credential_providers: [],
   },
 ];

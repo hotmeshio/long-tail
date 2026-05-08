@@ -14,6 +14,10 @@ const exchangeSchema = z.object({
   request_schema: z.record(z.any()).optional().describe('JSON Schema for the request body. When provided, the body is validated before the request is sent. Validation failure returns immediately — the request is never made.'),
   response_schema: z.record(z.any()).optional().describe('JSON Schema for the expected response body. When provided, the response is validated after receiving. The validated flag and validation_errors in the output indicate whether the response matched.'),
   timeout_ms: z.number().optional().describe('Request timeout in milliseconds (default: 30000).'),
+  credential_provider: z.string().optional().describe('Credential provider name (e.g. "stripe", "epic", "google"). When set, resolves authentication from the connection store using the calling principal\'s identity. No manual token input needed.'),
+  credential_label: z.string().optional().describe('Credential label for multi-credential accounts (default: "default").'),
+  auth_scheme: z.string().optional().describe('Authentication scheme (default: "Bearer"). Used with credential_provider to build the auth header value.'),
+  auth_header: z.string().optional().describe('Header name for the credential (default: "Authorization"). Some APIs use X-API-Key instead.'),
 });
 
 const validateSchema = z.object({
