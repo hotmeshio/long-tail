@@ -213,7 +213,13 @@ export const SEED_MCP_SERVERS = [
       'When building a workflow that calls an external API endpoint, use exchange as the worker activity. ' +
       'Embed request_schema and response_schema as STATIC values in input.maps (not dynamic inputs — schemas are fixed per endpoint). ' +
       'Build the endpoint URL using @pipe concat for template variables. Use "url" for the endpoint field name. ' +
-      'Wire auth headers from trigger inputs (access_token, api_key, etc.). ' +
+      'CRITICAL — Authorization headers: when the trigger provides a token and you need to build "Bearer {token}", use this EXACT YAML structure for the headers field in input.maps:\n' +
+      '  headers:\n' +
+      '    Authorization:\n' +
+      '      \'@pipe\':\n' +
+      '        - [\'Bearer \', \'{trigger_XXXX.output.data.token}\']\n' +
+      '        - [\'{@string.concat}\']\n' +
+      'NEVER nest @pipe inside @pipe for headers. NEVER use @object.fromEntries for headers. The headers field is a plain object — each header name is a key, and its value can be a static string or a single @pipe expression. ' +
       'The trigger input_schema should reflect the endpoint\'s dynamic parameters (IDs, search terms, pagination) plus base_url and credentials. ' +
       'CRITICAL — exchange output structure: the exchange tool returns { status, data, headers, elapsed_ms, validated, validation_errors }. ' +
       'The actual API response body is inside the "data" field. So to reference a response field like "token", ' +
