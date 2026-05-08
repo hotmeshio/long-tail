@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { parseVersionFromYaml } from '../../../services/yaml-workflow/db';
 import { compactForLlm } from '../../../services/yaml-workflow/workers';
 import { capToolArguments } from '../../../services/yaml-workflow/generator';
-import { sanitizeToolName } from '../../../modules/utils';
+import { sanitizeToolName, sanitizeServerName } from '../../../modules/utils';
 import { extractStepSequence } from '../../../services/yaml-workflow/pipeline/extract';
 import {
   TOOL_ARG_LIMIT_CAP,
@@ -114,6 +114,26 @@ describe('sanitizeToolName', () => {
 
   it('collapses consecutive special chars into a single underscore', () => {
     expect(sanitizeToolName('a!!!b___c')).toBe('a_b_c');
+  });
+});
+
+// ── sanitizeServerName ───────────────────────────────────────
+
+describe('sanitizeServerName', () => {
+  it('lowercases and strips non-alphanumeric', () => {
+    expect(sanitizeServerName('My-Server_123')).toBe('myserver123');
+  });
+
+  it('strips leading digits', () => {
+    expect(sanitizeServerName('123abc')).toBe('abc');
+  });
+
+  it('returns empty string for all-digit input', () => {
+    expect(sanitizeServerName('12345')).toBe('');
+  });
+
+  it('handles empty string', () => {
+    expect(sanitizeServerName('')).toBe('');
   });
 });
 

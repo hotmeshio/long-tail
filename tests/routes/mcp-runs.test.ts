@@ -99,6 +99,27 @@ describe('MCP Runs routes', () => {
         expect(job).toHaveProperty('updated_at');
       }
     });
+
+    it('supports sort_by and order params', async () => {
+      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=durable&sort_by=created_at&order=asc&limit=2`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      if (body.jobs.length === 2) {
+        expect(new Date(body.jobs[0].created_at).getTime())
+          .toBeLessThanOrEqual(new Date(body.jobs[1].created_at).getTime());
+      }
+    });
+
+    it('falls back to default sort for invalid sort_by', async () => {
+      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=durable&sort_by=INVALID_COLUMN&limit=2`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(Array.isArray(body.jobs)).toBe(true);
+    });
   });
 
   describe('GET /api/mcp-runs/entities', () => {
