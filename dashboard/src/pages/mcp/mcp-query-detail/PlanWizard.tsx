@@ -399,7 +399,7 @@ export function PlanWizard() {
                 </div>
               </div>
               {!selectedWorkflow ? (
-                <p className="text-sm text-text-tertiary py-12 text-center">Select a workflow from the sidebar.</p>
+                <p className="text-sm text-text-tertiary py-12 text-center">Select a pipeline tool from the sidebar.</p>
               ) : !selectedYamlId ? (
                 <div className="flex items-center gap-3 py-12 justify-center">
                   <Loader2 className="w-4 h-4 text-accent animate-spin" />

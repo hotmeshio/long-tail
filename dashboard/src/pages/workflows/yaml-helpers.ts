@@ -8,6 +8,8 @@ export interface ProcessServer {
   toolCount: number;
   status: string;
   updatedAt: string;
+  appVersion: string;
+  setId: string | null;
 }
 
 // ── Grouping & filtering helpers ──────────────────────────────────────────────
@@ -28,12 +30,21 @@ export function groupByAppId(workflows: LTYamlWorkflowRecord[]): ProcessServer[]
     );
     const latest = wfs.reduce((max, wf) => (wf.updated_at > max ? wf.updated_at : max), wfs[0].updated_at);
 
+    const maxAppVersion = wfs.reduce((max, wf) => {
+      const v = parseInt(wf.app_version || '0', 10);
+      return v > max ? v : max;
+    }, 0);
+    // Use the set_id from any workflow in the group (they all share the same set)
+    const setId = wfs.find(wf => wf.set_id)?.set_id || null;
+
     return {
       appId,
       workflows: wfs,
       toolCount: wfs.length,
       status: bestStatus,
       updatedAt: latest,
+      appVersion: String(maxAppVersion),
+      setId,
     };
   });
 }
