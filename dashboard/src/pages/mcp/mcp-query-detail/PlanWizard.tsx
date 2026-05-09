@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, GitBranch } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { WizardSteps } from '../../../components/common/layout/WizardSteps';
@@ -13,6 +13,8 @@ import { PlanSidebar } from './PlanSidebar';
 import { PlanProfilePanel } from './PlanProfilePanel';
 import { DeployPanel } from './DeployPanel';
 import { TestPanel } from './TestPanel';
+import { PlanStep1 } from './PlanStep1';
+import { AddToSetDialog } from './AddToSetDialog';
 import type { WorkflowSetStatus } from '../../../api/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -25,15 +27,6 @@ function badgeStatus(status: WorkflowSetStatus): string {
   if (status === 'failed') return 'failed';
   if (status === 'planning' || status === 'building' || status === 'deploying') return 'in_progress';
   return 'pending';
-}
-
-function roleLabel(role: string): string {
-  switch (role) {
-    case 'leaf': return 'Leaf';
-    case 'composition': return 'Composition';
-    case 'router': return 'Router';
-    default: return role;
-  }
 }
 
 // ── PlanWizard ────────────────────────────────────────────────────────────────
@@ -70,10 +63,7 @@ export function PlanWizard() {
     }
   }, [setStatus, queryClient]);
 
-  // ── Plan-item → YAML workflow mapping ───────────────────────────────────
-  // The builder may rename workflows (e.g. plan says "login", builder
-  // outputs "auth_login"). Match by name/graph_topic first, then by
-  // positional order within the same build_order group.
+  // ── Plan-item to YAML workflow mapping ──────────────────────────────────
   const yamlByPlanName = useMemo(() => {
     const map: Record<string, (typeof yamlWorkflows)[number]> = {};
     const used = new Set<string>();
@@ -87,7 +77,6 @@ export function PlanWizard() {
     }
 
     // Pass 2: positional match within build_order groups
-    // Group remaining workflows by build_order, then assign in plan order
     if (Object.keys(map).length < plan.length) {
       const remaining = yamlWorkflows
         .filter(w => !used.has(w.id))
@@ -127,8 +116,6 @@ export function PlanWizard() {
   }, [yamlWorkflows]);
 
   // ── Profile saved tracking ──────────────────────────────────────────────
-  // A workflow is "profiled" if its app_id matches the locked namespace
-  // (meaning the user explicitly saved it with a chosen server name)
   const profiledSet = useMemo(() => {
     const set = new Set<string>();
     if (!lockedAppId) return set;
@@ -215,6 +202,23 @@ export function PlanWizard() {
     updateUrl({ step: '3' });
   };
 
+  const handleAddSubmit = async () => {
+    if (!setId || !addSpec.trim()) return;
+    await addMutation.mutateAsync({ id: setId, specification: addSpec.trim() });
+    setAddSubmitted(true);
+  };
+
+  const handleAddCancel = () => {
+    setShowAddDialog(false);
+    setAddSpec('');
+  };
+
+  const handleAddDismiss = () => {
+    setAddSubmitted(false);
+    setShowAddDialog(false);
+    setAddSpec('');
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col min-h-[calc(100vh-12rem)]">
@@ -239,72 +243,14 @@ export function PlanWizard() {
       <div className="flex-1 mt-4">
         {/* ── Step 1: Plan ──────────────────────────────────────────────── */}
         {step === 1 && (
-          <div className="space-y-6">
-            {/* Original specification */}
-            {workflowSet?.specification && (
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Specification</label>
-                <div className="rounded-md bg-surface-sunken/50 px-4 py-3">
-                  <p className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap">
-                    {workflowSet.specification}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Planning spinner */}
-            {isPlanning && (
-              <div className="flex items-center gap-3 py-4">
-                <Loader2 className="w-4 h-4 text-accent animate-spin" />
-                <span className="text-sm text-text-secondary">Analyzing specification and generating plan...</span>
-              </div>
-            )}
-
-            {isFailed && (
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-status-error/20 bg-status-error/5">
-                <AlertCircle className="w-4 h-4 text-status-error" />
-                <span className="text-sm text-status-error">Plan generation failed.</span>
-              </div>
-            )}
-
-            {/* Plan description + workflow list */}
-            {plan.length > 0 && (
-              <div>
-                {workflowSet?.description && (
-                  <p className="text-sm text-text-secondary mb-4 leading-relaxed">{workflowSet.description}</p>
-                )}
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
-                  Planned Workflows ({plan.length})
-                </label>
-                <div className="space-y-2">
-                  {plan.map((item) => (
-                    <div key={item.name} className="px-3 py-2.5 rounded-md bg-surface-raised/50">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-text-primary">{item.name}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-sunken text-text-tertiary">{roleLabel(item.role)}</span>
-                      </div>
-                      <p className="text-[11px] text-text-secondary mt-1">{item.description}</p>
-                      {item.dependencies.length > 0 && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <GitBranch className="w-2.5 h-2.5 text-text-tertiary" />
-                          <span className="text-[10px] text-text-tertiary">{item.dependencies.join(', ')}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!isPlanning && !isFailed && plan.length > 0 && (
-              <button
-                onClick={() => handleStepClick(2)}
-                className="px-4 py-2 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 transition-colors"
-              >
-                Continue to Profile
-              </button>
-            )}
-          </div>
+          <PlanStep1
+            specification={workflowSet?.specification}
+            description={workflowSet?.description}
+            plan={plan}
+            isPlanning={isPlanning}
+            isFailed={isFailed}
+            onContinue={() => handleStepClick(2)}
+          />
         )}
 
         {/* ── Steps 2-4: Sidebar + Main ────────────────────────────────── */}
@@ -320,84 +266,19 @@ export function PlanWizard() {
               onAdd={() => setShowAddDialog(!showAddDialog)}
             />
             <div className="flex-1 min-w-0 overflow-y-auto">
-              {/* Add-to-set panel — animated expand/collapse */}
-              <div
-                className="transition-all duration-300 ease-in-out grid"
-                style={{
-                  gridTemplateRows: showAddDialog ? '1fr' : '0fr',
-                  opacity: showAddDialog ? 1 : 0,
-                  marginBottom: showAddDialog ? '24px' : '0px',
-                }}
-              >
-                <div className="overflow-hidden">
-                <div className="rounded-lg border border-accent/20 bg-gradient-to-b from-accent/[0.04] to-transparent p-5">
-                  {addSubmitted ? (
-                    <>
-                      <div className="flex items-center gap-3 py-6 justify-center">
-                        <Loader2 className="w-5 h-5 text-accent animate-spin" strokeWidth={1.5} />
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">Building new tools...</p>
-                          <p className="text-[11px] text-text-tertiary mt-0.5">Watch the sidebar — new tools will appear as they're built.</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-text-tertiary">{plan.length} tool{plan.length === 1 ? '' : 's'} in set</span>
-                        <button
-                          onClick={() => { setAddSubmitted(false); setShowAddDialog(false); setAddSpec(''); }}
-                          className="text-[10px] text-text-tertiary hover:text-text-primary transition-colors"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium text-text-primary mb-1">Expand this Toolset</p>
-                      <p className="text-[11px] text-text-tertiary mb-4">Describe additional activities you would like to add.</p>
-                      <textarea
-                        value={addSpec}
-                        onChange={(e) => {
-                          setAddSpec(e.target.value);
-                          const el = e.target;
-                          el.style.height = 'auto';
-                          el.style.height = `${Math.max(100, el.scrollHeight)}px`;
-                        }}
-                        placeholder="What else should this set do?"
-                        className="w-full min-h-[100px] px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-sm font-mono text-text-primary placeholder:text-text-tertiary/50 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-                        style={{ resize: 'none', overflow: 'hidden' }}
-                      />
-                      {addMutation.isError && (
-                        <p className="text-xs text-status-error mt-2">{addMutation.error.message}</p>
-                      )}
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-[10px] text-text-tertiary">
-                          {plan.length} tool{plan.length === 1 ? '' : 's'} in set
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => { setShowAddDialog(false); setAddSpec(''); }}
-                            className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (!setId || !addSpec.trim()) return;
-                              await addMutation.mutateAsync({ id: setId, specification: addSpec.trim() });
-                              setAddSubmitted(true);
-                            }}
-                            disabled={!addSpec.trim() || addMutation.isPending}
-                            className="btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {addMutation.isPending ? 'Submitting...' : 'Add to Set'}
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-                </div>
-              </div>
+              <AddToSetDialog
+                isOpen={showAddDialog}
+                addSubmitted={addSubmitted}
+                addSpec={addSpec}
+                setAddSpec={setAddSpec}
+                planCount={plan.length}
+                isPending={addMutation.isPending}
+                isError={addMutation.isError}
+                errorMessage={addMutation.error?.message}
+                onSubmit={handleAddSubmit}
+                onCancel={handleAddCancel}
+                onDismiss={handleAddDismiss}
+              />
               {!selectedWorkflow ? (
                 <p className="text-sm text-text-tertiary py-12 text-center">Select a pipeline tool from the sidebar.</p>
               ) : !selectedYamlId ? (

@@ -1,8 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { PageHeaderWithStats, type InlineStat } from '../../../components/common/layout/PageHeaderWithStats';
-import { DataTable } from '../../../components/common/data/DataTable';
-import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import {
@@ -22,10 +20,8 @@ import {
 import { getEngineColumns } from './columns';
 import { useMeshSelection } from './useMeshSelection';
 import { ThrottleModal } from './ThrottleModal';
-import { StreamVolumeChart } from './StreamVolumeChart';
-import { QuorumFeed } from './QuorumFeed';
-import { QueueCard } from './QueueCard';
 import { EmergencyControls } from './EmergencyControls';
+import { ControlPlaneContent } from './ControlPlaneContent';
 
 export function ControlPlanePage() {
   const { data: appsData } = useControlPlaneApps();
@@ -236,86 +232,25 @@ export function ControlPlanePage() {
         </div>
       )}
 
-      {/* Main content: sections (left) + quorum feed (right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-        <div className="flex flex-col gap-12 mt-10">
-          {/* Stream Volume section */}
-          <CollapsibleSection
-            title={`Stream Volume (${activeDuration})`}
-            sectionKey="volume"
-            isCollapsed={!!collapsed.volume}
-            onToggle={toggleSection}
-            contentClassName="mt-4 ml-7"
-          >
-            <StreamVolumeChart
-              byStream={streamStats?.byStream ?? []}
-              onNodeFilter={() => {}}
-              onQueueFilter={() => {}}
-            />
-          </CollapsibleSection>
-
-          {/* Task Queues section */}
-          <CollapsibleSection
-            title="Worker Queues"
-            sectionKey="queues"
-            isCollapsed={!!collapsed.queues}
-            onToggle={toggleSection}
-            contentClassName="mt-4 ml-7 flex flex-col gap-0"
-          >
-            {isLoading ? (
-              <p className="text-xs text-text-tertiary">Discovering mesh nodes...</p>
-            ) : queueMap.size === 0 ? (
-              <p className="text-xs text-text-tertiary">No worker queues found. Click "Roll Call" to discover.</p>
-            ) : (
-              <>
-                <div className="flex justify-end mb-2">
-                  <button onClick={toggleAllQueues} className="text-[10px] text-accent hover:underline">
-                    {allQueuesExpanded ? 'Collapse all' : 'Expand all'}
-                  </button>
-                </div>
-                {[...queueMap.entries()]
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([queue, qWorkers]) => (
-                    <QueueCard
-                      key={queue}
-                      queue={queue}
-                      workers={qWorkers}
-                      expanded={expandedQueues.has(queue)}
-                      onToggle={toggleQueue}
-                      onWorkerClick={handleRowClick}
-                      onResumeThrottle={handleResumeThrottle}
-                      onQueueThrottle={handleQueueThrottle}
-                      onResumeQueue={handleResumeQueue}
-                      byStream={streamStats?.byStream ?? []}
-                      activeDuration={activeDuration}
-                    />
-                  ))}
-              </>
-            )}
-          </CollapsibleSection>
-
-          {/* Engines section */}
-          <CollapsibleSection
-            title="Engines"
-            sectionKey="engines"
-            isCollapsed={!!collapsed.engines}
-            onToggle={toggleSection}
-            contentClassName="mt-4 ml-7"
-          >
-            <DataTable
-              columns={engineColumns}
-              data={engines}
-              keyFn={rowKey}
-              onRowClick={handleRowClick}
-              isLoading={isLoading}
-              emptyMessage={isLoading ? 'Discovering engines...' : 'No engines found.'}
-              inline
-            />
-          </CollapsibleSection>
-        </div>
-
-        <QuorumFeed bridgeActive={bridgeActive} />
-      </div>
+      <ControlPlaneContent
+        collapsed={collapsed}
+        toggleSection={toggleSection}
+        activeDuration={activeDuration}
+        streamStats={streamStats}
+        isLoading={isLoading}
+        queueMap={queueMap}
+        expandedQueues={expandedQueues}
+        toggleQueue={toggleQueue}
+        allQueuesExpanded={allQueuesExpanded}
+        toggleAllQueues={toggleAllQueues}
+        handleRowClick={handleRowClick}
+        handleResumeThrottle={handleResumeThrottle}
+        handleQueueThrottle={handleQueueThrottle}
+        handleResumeQueue={handleResumeQueue}
+        engineColumns={engineColumns}
+        engines={engines}
+        bridgeActive={bridgeActive}
+      />
 
       <ThrottleModal
         open={throttleModalOpen}

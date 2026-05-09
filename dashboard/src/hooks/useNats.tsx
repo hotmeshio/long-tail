@@ -88,7 +88,15 @@ const sc = StringCodec();
  *
  * Cache invalidation is handled by per-page hooks in `useEventHooks.ts`.
  */
-export function NatsProvider({ children }: { children: ReactNode }) {
+interface NatsProviderProps {
+  children: ReactNode;
+  /** Runtime NATS WebSocket URL from server settings. Falls back to build-time config. */
+  url?: string | null;
+  /** Runtime NATS auth token from server settings. Falls back to build-time config. */
+  token?: string | null;
+}
+
+export function NatsProvider({ children, url, token }: NatsProviderProps) {
   const ncRef = useRef<NatsConnection | null>(null);
   const subRef = useRef<Subscription | null>(null);
   const [connected, setConnected] = useState(false);
@@ -132,8 +140,8 @@ export function NatsProvider({ children }: { children: ReactNode }) {
       if (ncRef.current) return;
 
       const nc = await connect({
-        servers: NATS_WS_URL,
-        token: NATS_TOKEN,
+        servers: url || NATS_WS_URL,
+        token: token || NATS_TOKEN,
         reconnect: true,
         maxReconnectAttempts: -1,
         reconnectTimeWait: 2000,

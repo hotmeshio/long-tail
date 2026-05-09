@@ -44,7 +44,10 @@
     "dashboard:build": "cd dashboard && npm run build",
     "dashboard:test": "cd dashboard && npm test",
     "dashboard:test:watch": "cd dashboard && npm run test:watch",
-    "build:all": "npm run build && npm run dashboard:build"
+    "build:all": "npm run build && npm run dashboard:build",
+    "release:patch": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags"
   },
   "keywords": [
     "Long Tail Workflows",

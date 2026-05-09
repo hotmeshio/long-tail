@@ -90,8 +90,7 @@ describe('FilePreviewPanel', () => {
 
   it('renders metadata fields', () => {
     render(<FilePreviewPanel filePath="screenshots/page.png" onClose={vi.fn()} />, { wrapper });
-    // "Path" appears as both action button and metadata label
-    expect(screen.getAllByText('Path').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Path')).toBeInTheDocument();
     expect(screen.getByText('Type')).toBeInTheDocument();
     expect(screen.getByText('Size')).toBeInTheDocument();
     expect(screen.getByText('Modified')).toBeInTheDocument();

@@ -5,6 +5,11 @@ import { SocketIOProvider } from './useSocketIO';
 
 type Transport = 'nats' | 'socketio' | null;
 
+interface NatsSettings {
+  url: string | null;
+  token: string | null;
+}
+
 /**
  * Auto-detecting event transport provider.
  *
@@ -15,6 +20,7 @@ type Transport = 'nats' | 'socketio' | null;
  */
 export function EventTransportProvider({ children }: { children: ReactNode }) {
   const [transport, setTransport] = useState<Transport>(null);
+  const [natsSettings, setNatsSettings] = useState<NatsSettings>({ url: null, token: null });
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +38,12 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
         const value = data?.events?.transport;
         console.log('[lt-transport] server reports:', value);
         if (!cancelled) {
+          if (value === 'nats') {
+            setNatsSettings({
+              url: data.events.natsWsUrl ?? null,
+              token: data.events.natsToken ?? null,
+            });
+          }
           setTransport(value === 'nats' ? 'nats' : 'socketio');
         }
       } catch (err) {
@@ -45,7 +57,7 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (transport === 'nats') {
-    return <NatsProvider>{children}</NatsProvider>;
+    return <NatsProvider url={natsSettings.url} token={natsSettings.token}>{children}</NatsProvider>;
   }
 
   if (transport === 'socketio') {

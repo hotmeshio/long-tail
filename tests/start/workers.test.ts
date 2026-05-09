@@ -49,8 +49,12 @@ vi.mock('../../lib/telemetry', () => ({
   telemetryRegistry: { hasAdapter: false, connect: vi.fn() },
 }));
 
+const { eventConnectMock } = vi.hoisted(() => ({
+  eventConnectMock: vi.fn(),
+}));
+
 vi.mock('../../lib/events', () => ({
-  eventRegistry: { hasAdapters: false, connect: vi.fn() },
+  eventRegistry: { hasAdapters: true, connect: eventConnectMock },
 }));
 
 vi.mock('../../services/maintenance', () => ({
@@ -89,6 +93,7 @@ vi.mock('../../services/iam/bots', () => ({
 // ── Imports (after mocks) ────────────────────────────────────────────
 import { startWorkers, collectWorkers } from '../../start/workers';
 import { registerWorker, getRegisteredWorkers } from '../../services/workers/registry';
+import { eventRegistry } from '../../lib/events';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const baseConfig = { workers: [], interceptor: { defaultRole: 'reviewer' as const } };
@@ -235,5 +240,21 @@ describe('collectWorkers — string workflow names', () => {
     expect(spy).not.toHaveBeenCalled();
     expect(workerCreateMock).not.toHaveBeenCalled();
     expect(getRegisteredWorkers().has('orderPipeline')).toBe(true);
+  });
+});
+
+describe('startWorkers — event adapters connect unconditionally', () => {
+  it('connects event adapters even when workers list is empty', async () => {
+    await startWorkers(baseConfig as any, [], {});
+
+    expect(eventConnectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('connects event adapters when workers are present', async () => {
+    const worker = makeWorker('processOrder', 'order-tracking', false);
+
+    await startWorkers(baseConfig as any, [worker.entry], {});
+
+    expect(eventConnectMock).toHaveBeenCalledTimes(1);
   });
 });

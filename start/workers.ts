@@ -129,12 +129,6 @@ export async function startWorkers(
       `[long-tail] workers started on queues: ${workers.map((w) => w.taskQueue).join(', ')}`,
     );
 
-    // Connect event adapters
-    if (eventRegistry.hasAdapters) {
-      await eventRegistry.connect();
-      loggerRegistry.info('[long-tail] event adapters connected');
-    }
-
     // Start maintenance cron
     if (maintenanceRegistry.hasConfig) {
       await maintenanceRegistry.connect();
@@ -163,6 +157,13 @@ export async function startWorkers(
 
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();
+  }
+
+  // Connect event adapters (outside workers guard so API-only containers
+  // still connect to NATS and can publish/receive events)
+  if (eventRegistry.hasAdapters) {
+    await eventRegistry.connect();
+    loggerRegistry.info('[long-tail] event adapters connected');
   }
 
   // Seed system MCP servers (always)
