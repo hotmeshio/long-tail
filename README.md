@@ -256,7 +256,8 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/
 | [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
 | [MCP](docs/mcp.md) | Server registration, tool calls, human queue |
 | [Compilation](docs/compilation.md) | Dynamic → deterministic pipeline wizard |
-| [Compiler](docs/compiler.md) | `ltc` CLI — compile durable TypeScript to YAML DAGs |
+| [Compiler](docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
+| [CLI](docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
 | [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
 | [SDK](docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
 | [Architecture](docs/architecture.md) | Project structure, conventions, discovery |
