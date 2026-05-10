@@ -56,6 +56,23 @@ export const LIST_DOMAINS = `
   SELECT domain, COUNT(*)::int AS count, MAX(updated_at) AS latest
   FROM lt_knowledge GROUP BY domain ORDER BY latest DESC`;
 
+// Set a value at a specific JSONB path without clobbering siblings.
+// Creates the entry if it doesn't exist. Uses jsonb_set for surgical updates.
+export const SET_KNOWLEDGE_FIELD = `
+  INSERT INTO lt_knowledge (domain, key, data, tags)
+  VALUES ($1, $2, $3::jsonb, $4)
+  ON CONFLICT (domain, key) DO UPDATE SET
+    data = jsonb_set(lt_knowledge.data, $5::text[], $6::jsonb, true),
+    tags = ARRAY(SELECT DISTINCT unnest(lt_knowledge.tags || EXCLUDED.tags))
+  RETURNING id, domain, key, (xmax = 0) AS created, updated_at`;
+
+// Remove a field at a specific JSONB path. Entry survives; only the targeted path is removed.
+export const REMOVE_KNOWLEDGE_FIELD = `
+  UPDATE lt_knowledge
+  SET data = data #- $3::text[]
+  WHERE domain = $1 AND key = $2
+  RETURNING id, domain, key, updated_at`;
+
 export const APPEND_KNOWLEDGE = `
   INSERT INTO lt_knowledge (domain, key, data)
   VALUES ($1, $2, $3::jsonb)

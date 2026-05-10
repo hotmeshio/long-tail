@@ -126,6 +126,7 @@ export async function mcpWorkflowPlanner(
     });
 
     const builderData = builderResult.data as Record<string, any>;
+    const builderPrompt = buildPromptForPlanItem(planItem, siblingSchemas);
 
     // Persist the built workflow with set membership
     const yamlId = await persistBuiltWorkflow(setId, planItem, {
@@ -137,6 +138,7 @@ export async function mcpWorkflowPlanner(
       activity_manifest: builderData.activity_manifest || [],
       tags: builderData.tags || [],
       graph_topic: builderData.name || planItem.name,
+      original_prompt: builderPrompt,
     });
 
     builtWorkflows.push({

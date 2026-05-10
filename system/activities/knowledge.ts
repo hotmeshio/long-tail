@@ -11,6 +11,8 @@ import {
   COUNT_KNOWLEDGE_LIST,
   DELETE_KNOWLEDGE,
   LIST_DOMAINS,
+  SET_KNOWLEDGE_FIELD,
+  REMOVE_KNOWLEDGE_FIELD,
   APPEND_KNOWLEDGE,
 } from './sql';
 
@@ -166,6 +168,50 @@ export async function deleteKnowledge(args: {
   return withClient(async (client) => {
     const { rowCount } = await client.query(DELETE_KNOWLEDGE, [args.domain, args.key]);
     return { deleted: (rowCount ?? 0) > 0 };
+  });
+}
+
+export async function setKnowledgeField(args: {
+  domain: string;
+  key: string;
+  path: string;
+  value: any;
+  tags?: string[];
+}): Promise<{ id: string; domain: string; key: string; created: boolean; updated_at: string }> {
+  return withClient(async (client) => {
+    const pathParts = args.path.split('.');
+    // Build initial data for INSERT (nested structure from path)
+    let initData: Record<string, any> = { [pathParts[pathParts.length - 1]]: args.value };
+    for (let i = pathParts.length - 2; i >= 0; i--) {
+      initData = { [pathParts[i]]: initData };
+    }
+    const { rows } = await client.query(
+      SET_KNOWLEDGE_FIELD,
+      [
+        args.domain,
+        args.key,
+        JSON.stringify(initData),
+        args.tags || [],
+        pathParts,
+        JSON.stringify(args.value),
+      ],
+    );
+    return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
+  });
+}
+
+export async function removeKnowledgeField(args: {
+  domain: string;
+  key: string;
+  path: string;
+}): Promise<{ removed: boolean }> {
+  return withClient(async (client) => {
+    const pathParts = args.path.split('.');
+    const { rowCount } = await client.query(
+      REMOVE_KNOWLEDGE_FIELD,
+      [args.domain, args.key, pathParts],
+    );
+    return { removed: (rowCount ?? 0) > 0 };
   });
 }
 

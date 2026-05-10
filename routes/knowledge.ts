@@ -82,4 +82,36 @@ router.delete('/entry', async (req, res) => {
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
+/**
+ * PUT /api/knowledge/field
+ * Set a value at a specific JSONB path without clobbering siblings.
+ * Body: { domain, key, path, value, tags? }
+ */
+router.put('/field', async (req, res) => {
+  const { domain, key, path, value, tags } = req.body;
+  if (!domain || !key || !path || value === undefined) {
+    res.status(400).json({ error: 'domain, key, path, and value are required' });
+    return;
+  }
+  const result = await api.setField({ domain, key, path, value, tags });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * DELETE /api/knowledge/field
+ * Remove a specific field at a JSONB path.
+ * Query: ?domain=...&key=...&path=...
+ */
+router.delete('/field', async (req, res) => {
+  const domain = req.query.domain as string;
+  const key = req.query.key as string;
+  const path = req.query.path as string;
+  if (!domain || !key || !path) {
+    res.status(400).json({ error: 'domain, key, and path are required' });
+    return;
+  }
+  const result = await api.removeField({ domain, key, path });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
 export default router;

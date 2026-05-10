@@ -1,9 +1,12 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
+  "bin": {
+    "ltc": "./build/bin/ltc.js"
+  },
   "homepage": "https://github.com/hotmeshio/long-tail/",
   "publishConfig": {
     "access": "public"
@@ -44,6 +47,7 @@
     "dashboard:build": "cd dashboard && npm run build",
     "dashboard:test": "cd dashboard && npm test",
     "dashboard:test:watch": "cd dashboard && npm run test:watch",
+    "ltc": "tsx bin/ltc.ts",
     "build:all": "npm run build && npm run dashboard:build",
     "release:patch": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",
@@ -74,11 +78,14 @@
     "ajv": "^8.20.0",
     "arctic": "^3.7.0",
     "bcryptjs": "^2.4.3",
+    "commander": "^14.0.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.3",
     "nats": "^2.28.0",
     "openai": "^5.9.0",
+    "ora": "^9.4.0",
     "pg": "^8.13.0",
+    "picocolors": "^1.1.1",
     "pino": "^9.6.0",
     "playwright": "^1.58.2",
     "sharp": "^0.34.5",
@@ -96,6 +103,7 @@
     "rimraf": "^4.4.1",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.0.4",
     "vitest": "^3.2.4"
   }

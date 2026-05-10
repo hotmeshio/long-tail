@@ -52,6 +52,37 @@ export async function storeEntry(input: {
   }
 }
 
+export async function setField(input: {
+  domain: string;
+  key: string;
+  path: string;
+  value: any;
+  tags?: string[];
+}): Promise<LTApiResult> {
+  try {
+    const result = await knowledgeActivity.setKnowledgeField(input);
+    return { status: 200, data: result };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+export async function removeField(input: {
+  domain: string;
+  key: string;
+  path: string;
+}): Promise<LTApiResult> {
+  try {
+    const result = await knowledgeActivity.removeKnowledgeField(input);
+    if (!result.removed) {
+      return { status: 404, error: 'Field not found' };
+    }
+    return { status: 200, data: result };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
 export async function deleteEntry(input: {
   domain: string;
   key: string;

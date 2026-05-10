@@ -9,6 +9,13 @@ import type { LTLoggerAdapter } from '../../types/logger';
  *
  * When no adapter is registered, all methods fall back to console.*.
  */
+const LOG_LEVELS: Record<string, number> = { error: 0, warn: 1, info: 2, debug: 3 };
+
+function shouldLog(level: string): boolean {
+  const threshold = LOG_LEVELS[process.env.LOG_LEVEL || 'debug'] ?? 3;
+  return (LOG_LEVELS[level] ?? 3) <= threshold;
+}
+
 class LTLoggerRegistry implements LTLoggerAdapter {
   private adapter: LTLoggerAdapter | null = null;
 
@@ -36,7 +43,7 @@ class LTLoggerRegistry implements LTLoggerAdapter {
   info(msg: string, context?: Record<string, any>): void {
     if (this.adapter) {
       this.adapter.info(msg, context);
-    } else {
+    } else if (shouldLog('info')) {
       console.log(msg);
     }
   }
@@ -44,7 +51,7 @@ class LTLoggerRegistry implements LTLoggerAdapter {
   warn(msg: string, context?: Record<string, any>): void {
     if (this.adapter) {
       this.adapter.warn(msg, context);
-    } else {
+    } else if (shouldLog('warn')) {
       console.warn(msg);
     }
   }
@@ -52,7 +59,7 @@ class LTLoggerRegistry implements LTLoggerAdapter {
   error(msg: string, context?: Record<string, any>): void {
     if (this.adapter) {
       this.adapter.error(msg, context);
-    } else {
+    } else if (shouldLog('error')) {
       console.error(msg);
     }
   }
@@ -60,7 +67,7 @@ class LTLoggerRegistry implements LTLoggerAdapter {
   debug(msg: string, context?: Record<string, any>): void {
     if (this.adapter) {
       this.adapter.debug(msg, context);
-    } else {
+    } else if (shouldLog('debug')) {
       console.debug(msg);
     }
   }

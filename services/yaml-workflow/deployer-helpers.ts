@@ -23,26 +23,32 @@ export async function buildMergedYaml(appId: string, version: string): Promise<s
     }
   }
 
-  // Pre-validate: check for duplicate activity IDs across all graphs
-  const activityIds = new Map<string, string>(); // id -> graph subscribes topic
-  const duplicates: string[] = [];
+  // Resolve duplicate activity IDs across graphs by rewriting suffixes
+  const activityIds = new Set<string>();
   for (const graph of allGraphs) {
-    const g = graph as { subscribes?: string; activities?: Record<string, unknown> };
-    const topic = g.subscribes || 'unknown';
-    if (g.activities) {
-      for (const id of Object.keys(g.activities)) {
-        if (activityIds.has(id)) {
-          duplicates.push(`"${id}" in both "${activityIds.get(id)}" and "${topic}"`);
-        } else {
-          activityIds.set(id, topic);
-        }
+    const g = graph as { subscribes?: string; activities?: Record<string, unknown>; transitions?: Record<string, unknown>; hooks?: Record<string, unknown> };
+    if (!g.activities) continue;
+
+    // Check if any activity IDs collide with previously seen IDs
+    const ids = Object.keys(g.activities);
+    const hasCollision = ids.some((id) => activityIds.has(id));
+
+    if (hasCollision) {
+      // Rewrite all activity IDs in this graph with a unique suffix
+      const newSuffix = Math.random().toString(36).slice(2, 6);
+      const oldSuffix = extractSuffix(ids[0]);
+      if (oldSuffix) {
+        rewriteGraphSuffix(g, oldSuffix, newSuffix);
+        loggerRegistry.info(
+          `[yaml-workflow] rewrote activity suffix ${oldSuffix}→${newSuffix} in "${g.subscribes}" to resolve collision`,
+        );
       }
     }
-  }
-  if (duplicates.length > 0) {
-    const msg = `Duplicate activity IDs across graphs in app "${appId}": ${duplicates.join('; ')}`;
-    loggerRegistry.error(`[yaml-workflow] ${msg}`);
-    throw new Error(msg);
+
+    // Register all (possibly rewritten) activity IDs
+    for (const id of Object.keys(g.activities)) {
+      activityIds.add(id);
+    }
   }
 
   const merged = {
@@ -54,6 +60,38 @@ export async function buildMergedYaml(appId: string, version: string): Promise<s
   };
 
   return yaml.dump(merged, { lineWidth: YAML_LINE_WIDTH, noRefs: true, sortKeys: false });
+}
+
+/** Extract the 4-char suffix from an activity ID like "trigger_x8kf" */
+function extractSuffix(activityId: string): string | null {
+  const match = activityId.match(/_([a-z0-9]{4})$/);
+  return match ? match[1] : null;
+}
+
+/** Rewrite all activity ID suffixes in a graph definition */
+function rewriteGraphSuffix(
+  graph: { activities?: Record<string, unknown>; transitions?: Record<string, unknown>; hooks?: Record<string, unknown> },
+  oldSuffix: string,
+  newSuffix: string,
+): void {
+  const suffixPattern = new RegExp(`_${oldSuffix}\\b`, 'g');
+  const replace = (obj: any): any => {
+    if (typeof obj === 'string') return obj.replace(suffixPattern, `_${newSuffix}`);
+    if (Array.isArray(obj)) return obj.map(replace);
+    if (obj && typeof obj === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const newKey = k.replace(suffixPattern, `_${newSuffix}`);
+        result[newKey] = replace(v);
+      }
+      return result;
+    }
+    return obj;
+  };
+
+  if (graph.activities) graph.activities = replace(graph.activities);
+  if (graph.transitions) graph.transitions = replace(graph.transitions);
+  if (graph.hooks) graph.hooks = replace(graph.hooks);
 }
 
 /**

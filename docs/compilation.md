@@ -134,3 +134,19 @@ Every subsequent occurrence is routed automatically. A single LLM call extracts 
 Each compiled workflow is itself a discoverable MCP tool. Other workflows and agents can invoke it. Solutions compose. The inventory of deterministic pathways grows with every problem the system solves, and the fraction of requests that require LLM reasoning shrinks.
 
 The dynamic path remains for genuinely new problems. But the long tail gets shorter.
+
+---
+
+## Compilation from Source Code
+
+The Pipeline Designer compiles from execution traces — the dynamic path. But there's a second entry point: compiling directly from source code.
+
+If you've written a durable workflow using the Temporal-like API (`proxyActivities`, `sleep`, `condition`, `startChild`), you can compile it to a YAML DAG without executing it first. The `ltc` CLI reads your TypeScript source, extracts the orchestration structure, and produces an equivalent DAG that runs without replay overhead.
+
+```bash
+ltc compile workflows/assembly-line.ts
+```
+
+The source is the spec. The compiled YAML is the optimized execution. Both live in the repo.
+
+See the [Compiler Guide](compiler.md) for the full walkthrough.

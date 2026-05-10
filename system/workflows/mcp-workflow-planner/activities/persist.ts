@@ -37,6 +37,7 @@ export interface BuiltWorkflowData {
   activity_manifest: unknown[];
   tags: string[];
   graph_topic: string;
+  original_prompt?: string;
 }
 
 export async function persistBuiltWorkflow(
@@ -55,6 +56,7 @@ export async function persistBuiltWorkflow(
     activity_manifest: builderOutput.activity_manifest as any,
     tags: builderOutput.tags || [],
     source_workflow_type: 'mcpWorkflowPlanner',
+    original_prompt: builderOutput.original_prompt,
     set_id: setId,
     set_role: planItem.role,
     set_build_order: planItem.build_order,
