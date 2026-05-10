@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { getConnection } from '../../lib/db';
 import {
   UPSERT_KNOWLEDGE,
+  REPLACE_KNOWLEDGE,
   GET_KNOWLEDGE,
   SEARCH_KNOWLEDGE,
   COUNT_KNOWLEDGE_SEARCH,
@@ -29,10 +30,12 @@ export async function storeKnowledge(args: {
   key: string;
   data: Record<string, any>;
   tags?: string[];
+  replace?: boolean;
 }): Promise<{ id: string; domain: string; key: string; created: boolean; updated_at: string }> {
   return withClient(async (client) => {
+    const sql = args.replace ? REPLACE_KNOWLEDGE : UPSERT_KNOWLEDGE;
     const { rows } = await client.query(
-      UPSERT_KNOWLEDGE,
+      sql,
       [args.domain, args.key, JSON.stringify(args.data), args.tags || []],
     );
     return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };

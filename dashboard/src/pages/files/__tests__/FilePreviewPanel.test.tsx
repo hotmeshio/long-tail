@@ -9,6 +9,12 @@ vi.mock('../../../api/files', () => ({
     isError: false,
     error: null,
   })),
+  useDeleteFile: vi.fn(() => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  })),
   getFilePreviewUrl: (p: string) => `/api/files/${p}`,
   getFileDownloadUrl: (p: string) => `/api/file-browser/download/${p}`,
 }));
@@ -59,17 +65,6 @@ describe('FilePreviewPanel', () => {
     expect(screen.getByText('Download')).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
     expect(screen.getByText('Share')).toBeInTheDocument();
-  });
-
-  it('renders fullscreen button for images', () => {
-    render(<FilePreviewPanel filePath="screenshots/page.png" onClose={vi.fn()} />, { wrapper });
-    expect(screen.getByText('Full')).toBeInTheDocument();
-  });
-
-  it('does not render fullscreen button for non-images', () => {
-    vi.mocked(useFileMetadata).mockReturnValue({ data: txtMeta, isLoading: false } as any);
-    render(<FilePreviewPanel filePath="docs/readme.txt" onClose={vi.fn()} />, { wrapper });
-    expect(screen.queryByText('Full')).not.toBeInTheDocument();
   });
 
   it('renders image preview for image content type', () => {

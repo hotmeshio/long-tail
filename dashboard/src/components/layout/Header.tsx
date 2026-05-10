@@ -1,14 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox, User, BookOpen } from 'lucide-react';
+import { AlertCircle, Inbox, User, BookOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyEscalationCount } from '../../hooks/useMyEscalationCount';
+import { useEscalationCounts } from '../../hooks/useEscalationCounts';
 import { NatsStatus } from '../common/display/NatsStatus';
 import { AppLogo } from '../common/display/AppLogo';
 
+function CountBadge({ count, active, color = 'bg-blue-500', textColor = 'text-blue-500' }: { count: number; active: boolean; color?: string; textColor?: string }) {
+  return (
+    <>
+      <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${active ? color : 'bg-text-tertiary/40'}`} />
+      <span className={`absolute -top-2.5 -right-3 text-[8px] font-bold tabular-nums ${active ? textColor : 'text-text-tertiary'}`}>
+        {count}
+      </span>
+    </>
+  );
+}
+
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
-  const pendingCount = useMyEscalationCount();
+  const { available, mine } = useEscalationCounts();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -32,8 +43,33 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         </Link>
       </div>
 
-      {/* Right: inbox, event status indicator + user menu */}
+      {/* Right: escalation indicators | separator | docs, events, user */}
       <div className="flex items-center gap-4">
+        {/* Escalation indicators — leftmost */}
+        <Link
+          to="/escalations/available"
+          className="relative text-text-tertiary hover:text-accent transition-colors"
+          aria-label="Available escalations"
+          title="Available escalations"
+        >
+          <AlertCircle className="w-4 h-4" strokeWidth={1.5} />
+          <CountBadge count={available} active={available > 0} />
+        </Link>
+        <Link
+          to="/escalations/queue"
+          className="relative text-text-tertiary hover:text-accent transition-colors"
+          aria-label="My escalation queue"
+          title="My escalation queue"
+        >
+          <Inbox className="w-4 h-4" strokeWidth={1.5} />
+          <CountBadge count={mine} active={mine > 0} color="bg-status-warning" textColor="text-status-warning" />
+        </Link>
+
+        {/* Separator */}
+        <div className="w-px h-5 bg-surface-border" />
+
+        {/* Events, docs, user */}
+        <NatsStatus onClick={onToggleEventFeed} />
         <button
           onClick={onToggleDocs}
           className="text-text-tertiary hover:text-accent transition-colors"
@@ -42,17 +78,6 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         >
           <BookOpen className="w-4 h-4" strokeWidth={1.5} />
         </button>
-        <Link
-          to="/escalations/queue"
-          className="relative text-text-tertiary hover:text-accent transition-colors"
-          aria-label="Escalation inbox"
-          title="Escalation inbox"
-        >
-          <Inbox className="w-4 h-4" strokeWidth={1.5} />
-          <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${pendingCount > 0 ? 'bg-status-warning' : 'bg-text-tertiary'}`} />
-          <span className={`absolute -top-2.5 -right-3 text-[8px] font-bold tabular-nums ${pendingCount > 0 ? 'text-status-warning' : 'text-text-tertiary'}`}>{pendingCount}</span>
-        </Link>
-        <NatsStatus onClick={onToggleEventFeed} />
         {user && (
           <div className="relative" ref={menuRef}>
             <button
