@@ -8,6 +8,23 @@ import type { LTApiResult } from '../../types/sdk';
 import { isNotFoundError } from './helpers';
 
 /**
+ * Strip the qualified `{slug}__` prefix from mcp_tool_name entries.
+ * The builder LLM sometimes echoes the qualified name (e.g.
+ * "long_tail_playwright_cli__capture_page") instead of the short
+ * tool name ("capture_page"). MCP servers register tools by short
+ * name, so the qualified form fails at runtime.
+ */
+function normalizeManifestToolNames(manifest: any[] | undefined): any[] | undefined {
+  if (!manifest) return manifest;
+  for (const entry of manifest) {
+    if (entry.mcp_tool_name?.includes('__')) {
+      entry.mcp_tool_name = entry.mcp_tool_name.slice(entry.mcp_tool_name.indexOf('__') + 2);
+    }
+  }
+  return manifest;
+}
+
+/**
  * List YAML workflows with optional filtering and pagination.
  *
  * Delegates to the DB layer. Returns 404 when a filter references an invalid UUID.
@@ -141,7 +158,7 @@ export async function createYamlWorkflow(input: {
       graph_topic: result.graphTopic,
       input_schema: result.inputSchema,
       output_schema: result.outputSchema,
-      activity_manifest: result.activityManifest,
+      activity_manifest: normalizeManifestToolNames(result.activityManifest) as any,
       tags: mergedTags,
       source_workflow_id: workflow_id,
       source_workflow_type: workflow_name,
@@ -245,7 +262,7 @@ export async function createYamlWorkflowDirect(input: {
       graph_topic: graphTopic,
       input_schema: input_schema || {},
       output_schema: {},
-      activity_manifest: activity_manifest || [],
+      activity_manifest: normalizeManifestToolNames(activity_manifest) || [],
       tags: tags || [],
       original_prompt: description,
       category: 'builder',
@@ -309,6 +326,9 @@ export async function updateYamlWorkflow(input: {
 }): Promise<LTApiResult> {
   try {
     const { id, ...fields } = input;
+    if (fields.activity_manifest) {
+      normalizeManifestToolNames(fields.activity_manifest);
+    }
     const wf = await yamlDb.updateYamlWorkflow(id, fields);
     if (!wf) {
       return { status: 404, error: 'YAML workflow not found' };
@@ -365,7 +385,7 @@ export async function regenerateYamlWorkflow(input: {
         yaml_content: result.yaml,
         input_schema: result.inputSchema,
         output_schema: result.outputSchema,
-        activity_manifest: result.activityManifest as any,
+        activity_manifest: normalizeManifestToolNames(result.activityManifest as any[]) as any,
         tags: result.tags,
       });
       return { status: 200, data: updated };
@@ -400,7 +420,7 @@ export async function regenerateYamlWorkflow(input: {
       yaml_content: result.yaml,
       input_schema: result.inputSchema,
       output_schema: result.outputSchema,
-      activity_manifest: result.activityManifest,
+      activity_manifest: normalizeManifestToolNames(result.activityManifest),
       tags: result.tags,
       metadata: { input_field_meta: result.inputFieldMeta },
     });
@@ -497,7 +517,7 @@ export async function createYamlWorkflowFromDurable(input: {
       graph_topic: result.graphTopic,
       input_schema: result.inputSchema,
       output_schema: result.outputSchema,
-      activity_manifest: result.activityManifest,
+      activity_manifest: normalizeManifestToolNames(result.activityManifest),
       tags: mergedTags,
       source_workflow_type: 'durable',
       original_prompt: description,

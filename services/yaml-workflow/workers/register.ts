@@ -119,7 +119,8 @@ export async function registerWorkersForWorkflow(
       });
     } else if (toolSource === 'db') {
       if (!activity.mcp_tool_name) continue;
-      const toolName = activity.mcp_tool_name;
+      const rawToolName = activity.mcp_tool_name;
+      const toolName = rawToolName.includes('__') ? rawToolName.slice(rawToolName.indexOf('__') + 2) : rawToolName;
       const dbServerId = activity.mcp_server_id || 'long-tail-db';
       const toolArgs = activity.tool_arguments;
       workerConfigs.push({
@@ -142,7 +143,8 @@ export async function registerWorkersForWorkflow(
       });
     } else {
       if (!activity.mcp_tool_name) continue;
-      const toolName = activity.mcp_tool_name;
+      const rawToolName = activity.mcp_tool_name;
+      const toolName = rawToolName.includes('__') ? rawToolName.slice(rawToolName.indexOf('__') + 2) : rawToolName;
       const serverId = activity.mcp_server_id;
       if (!serverId) continue;
       const storedArgs = activity.tool_arguments;
