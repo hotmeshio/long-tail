@@ -16,6 +16,8 @@ import * as workflowSetsApi from '../api/workflow-sets';
 import * as dbaApi from '../api/dba';
 import * as namespacesApi from '../api/namespaces';
 import * as maintenanceApi from '../api/maintenance';
+import * as filesApi from '../api/files';
+import * as knowledgeApi from '../api/knowledge';
 import { eventRegistry } from '../lib/events';
 import { CallbackEventAdapter } from '../lib/events/callback';
 import type { LTApiAuth, LTApiResult } from '../types/sdk';
@@ -276,6 +278,23 @@ export function createClient(options: LTClientOptions = {}) {
     maintenance: {
       getConfig: maintenanceApi.getMaintenanceConfig,
       updateConfig: maintenanceApi.updateMaintenanceConfig,
+    },
+
+    // ── Files ──────────────────────────────────────────────────────────────
+    files: {
+      browse: filesApi.browseFiles,
+      getMetadata: filesApi.getFileMetadata,
+      delete: filesApi.deleteFile,
+      generateSignedUrl: filesApi.generateSignedUrl,
+    },
+
+    // ── Knowledge ─────────────────────────────────────────────────────────
+    knowledge: {
+      listDomains: knowledgeApi.listDomains,
+      listEntries: knowledgeApi.listEntries,
+      getEntry: knowledgeApi.getEntry,
+      storeEntry: knowledgeApi.storeEntry,
+      deleteEntry: knowledgeApi.deleteEntry,
     },
 
     // ── Events ─────────────────────────────────────────────────────────────

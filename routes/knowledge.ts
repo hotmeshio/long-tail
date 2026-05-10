@@ -27,10 +27,11 @@ router.get('/entries', async (req, res) => {
   const tags = req.query.tags
     ? (req.query.tags as string).split(',').map((t) => t.trim()).filter(Boolean)
     : undefined;
+  const search = (req.query.search as string) || undefined;
   const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
   const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
 
-  const result = await api.listEntries({ domain, tags, limit, offset });
+  const result = await api.listEntries({ domain, tags, search, limit, offset });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

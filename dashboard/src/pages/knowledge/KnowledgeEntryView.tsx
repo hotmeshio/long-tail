@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useGetKnowledge, useDeleteKnowledge, useStoreKnowledge } from '../../api/knowledge';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
+import { TagInput } from '../../components/common/form/TagInput';
 
 interface KnowledgeEntryViewProps {
   domain: string;
@@ -81,6 +82,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
   const [ghostValue, setGhostValue] = useState('');
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
   const [jsonHint, setJsonHint] = useState<string | null>(null);
+  const [editingTags, setEditingTags] = useState(false);
 
   const data = entry?.data as Record<string, unknown> | undefined;
   const allFields = data ? Object.entries(data) : [];
@@ -151,6 +153,17 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
     refetch();
   }
 
+  async function saveTags(tags: string[]) {
+    await storeMutation.mutateAsync({
+      domain,
+      key: entryKey,
+      data: data || {},
+      tags,
+      replace: true,
+    });
+    refetch();
+  }
+
   async function commitGhostRow() {
     const name = ghostField.trim();
     if (!name) return;
@@ -199,14 +212,37 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
     <div>
       {/* Metadata + actions bar */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4 text-[10px] text-text-tertiary uppercase tracking-wider">
-          {entry.tags && entry.tags.length > 0 && (
-            <div className="flex gap-1">
-              {entry.tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent/10 text-accent normal-case">
-                  {tag}
-                </span>
-              ))}
+        <div className="flex items-center gap-4 min-h-[28px]">
+          {editingTags ? (
+            <div className="flex items-center gap-2">
+              <TagInput
+                tags={entry.tags || []}
+                onChange={(tags) => { saveTags(tags); }}
+                placeholder="Add tag..."
+                compact
+              />
+              <button
+                onClick={() => setEditingTags(false)}
+                className="text-[10px] text-text-tertiary hover:text-text-secondary shrink-0"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <div
+              className="flex items-center gap-1 cursor-text group"
+              onClick={() => setEditingTags(true)}
+              title="Click to edit tags"
+            >
+              {entry.tags && entry.tags.length > 0 ? (
+                entry.tags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
+                    {tag}
+                  </span>
+                ))
+              ) : (
+                <span className="text-[10px] text-text-tertiary/40 italic group-hover:text-text-tertiary">add tags...</span>
+              )}
             </div>
           )}
         </div>

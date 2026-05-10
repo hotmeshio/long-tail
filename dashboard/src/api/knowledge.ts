@@ -35,19 +35,18 @@ export function useListDomains() {
 
 export function useListKnowledge(
   domain: string,
-  tags?: string[],
-  limit?: number,
-  offset?: number,
+  opts?: { tags?: string[]; search?: string; limit?: number; offset?: number },
 ) {
   const params = new URLSearchParams();
   params.set('domain', domain);
-  if (tags?.length) params.set('tags', tags.join(','));
-  if (limit != null) params.set('limit', String(limit));
-  if (offset != null) params.set('offset', String(offset));
+  if (opts?.tags?.length) params.set('tags', opts.tags.join(','));
+  if (opts?.search) params.set('search', opts.search);
+  if (opts?.limit != null) params.set('limit', String(opts.limit));
+  if (opts?.offset != null) params.set('offset', String(opts.offset));
   const qs = params.toString();
 
   return useQuery<ListEntriesResponse>({
-    queryKey: ['knowledge', domain, tags, limit, offset],
+    queryKey: ['knowledge', domain, opts?.tags, opts?.search, opts?.limit, opts?.offset],
     queryFn: () => apiFetch(`/knowledge/entries?${qs}`),
     enabled: !!domain,
   });

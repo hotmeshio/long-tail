@@ -1,52 +1,73 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronRight, Brain, Database, Table2 } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterInput } from '../../components/common/data/FilterBar';
+import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { useListDomains, useListKnowledge } from '../../api/knowledge';
 import { KnowledgeEntryView } from './KnowledgeEntryView';
+
+const PAGE_SIZE = 50;
 
 export function KnowledgePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const domain = searchParams.get('domain') || '';
   const entryKey = searchParams.get('key') || '';
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+
+  // Debounce search to avoid hammering the API on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const offset = (page - 1) * pageSize;
 
   const domainsQuery = useListDomains();
-  const entriesQuery = useListKnowledge(domain);
+  const entriesQuery = useListKnowledge(domain, {
+    search: debouncedSearch || undefined,
+    limit: pageSize,
+    offset,
+  });
 
   const domains = domainsQuery.data?.domains ?? [];
   const entries = entriesQuery.data?.entries ?? [];
+  const entriesTotal = entriesQuery.data?.total ?? 0;
 
+  // Domains are a small list — client-side filter is fine
   const filteredDomains = useMemo(() => {
     if (!search) return domains;
     const q = search.toLowerCase();
     return domains.filter((d) => d.domain.toLowerCase().includes(q));
   }, [domains, search]);
 
-  const filteredEntries = useMemo(() => {
-    if (!search) return entries;
-    const q = search.toLowerCase();
-    return entries.filter(
-      (e) =>
-        e.key.toLowerCase().includes(q) ||
-        e.tags?.some((t) => t.toLowerCase().includes(q)),
-    );
-  }, [entries, search]);
-
   function navigate(d: string, k?: string) {
     setSearch('');
+    setDebouncedSearch('');
+    setPage(1);
     const params: Record<string, string> = {};
     if (d) params.domain = d;
     if (k) params.key = k;
     setSearchParams(params);
   }
 
-  // Determine which level we're at
   const level = entryKey ? 'entry' : domain ? 'entries' : 'domains';
   const isLoading = level === 'entries' ? entriesQuery.isLoading : level === 'domains' ? domainsQuery.isLoading : false;
+  const totalPages = Math.ceil((level === 'entries' ? entriesTotal : filteredDomains.length) / pageSize);
+
+  const entriesApiPath = domain
+    ? `/knowledge/entries?domain=${encodeURIComponent(domain)}&limit=${pageSize}&offset=${offset}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`
+    : undefined;
+  const domainsApiPath = '/knowledge/domains';
 
   return (
     <div>
@@ -92,7 +113,7 @@ export function KnowledgePage() {
         )}
       </nav>
 
-      {/* Level: entry detail (field/value table) */}
+      {/* Level: entry detail */}
       {level === 'entry' ? (
         <KnowledgeEntryView
           domain={domain}
@@ -101,7 +122,13 @@ export function KnowledgePage() {
         />
       ) : (
         <>
-          <FilterBar>
+          <FilterBar actions={
+            <ListToolbar
+              onRefresh={() => level === 'entries' ? entriesQuery.refetch() : domainsQuery.refetch()}
+              isFetching={level === 'entries' ? entriesQuery.isFetching : domainsQuery.isFetching}
+              apiPath={level === 'entries' ? entriesApiPath : domainsApiPath}
+            />
+          }>
             <FilterInput
               label="Search"
               value={search}
@@ -117,7 +144,6 @@ export function KnowledgePage() {
               ))}
             </div>
           ) : level === 'domains' ? (
-            /* Domain list */
             filteredDomains.length === 0 ? (
               <EmptyState title={search ? 'No matching domains' : 'No knowledge domains yet'} />
             ) : (
@@ -156,61 +182,71 @@ export function KnowledgePage() {
               </table>
             )
           ) : (
-            /* Entries list */
-            filteredEntries.length === 0 ? (
+            entries.length === 0 ? (
               <EmptyState title={search ? 'No matching entries' : 'No entries in this domain'} />
             ) : (
-              <table className="w-full mt-2">
-                <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary">
-                    <th className="pb-2 pl-2 font-medium">Key</th>
-                    <th className="pb-2 font-medium w-32">Tags</th>
-                    <th className="pb-2 font-medium w-20 text-right">Fields</th>
-                    <th className="pb-2 pr-2 font-medium w-40 text-right">Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEntries.map((entry) => (
-                    <tr
-                      key={entry.key}
-                      onClick={() => navigate(domain, entry.key)}
-                      className="row-hover cursor-pointer group"
-                    >
-                      <td className="py-2 pl-2">
-                        <span className="flex items-center gap-2.5">
-                          <Table2 className="w-4 h-4 text-accent/75 shrink-0" strokeWidth={1.5} />
-                          <span className="text-sm text-text-primary truncate group-hover:text-accent transition-colors">
-                            {entry.key}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {entry.tags?.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center px-1.5 py-0 rounded-full text-[10px] font-medium bg-accent/10 text-accent"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {entry.tags && entry.tags.length > 3 && (
-                            <span className="text-[10px] text-text-tertiary">
-                              +{entry.tags.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2 text-right text-xs text-text-secondary tabular-nums">
-                        {entry.data ? Object.keys(entry.data).length : 0}
-                      </td>
-                      <td className="py-2 pr-2 text-right text-xs text-text-secondary">
-                        <TimeAgo date={entry.updated_at} />
-                      </td>
+              <>
+                <table className="w-full mt-2">
+                  <thead>
+                    <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary">
+                      <th className="pb-2 pl-2 font-medium w-[200px]">Key</th>
+                      <th className="pb-2 font-medium">Tags</th>
+                      <th className="pb-2 font-medium w-16 text-right">Fields</th>
+                      <th className="pb-2 pr-2 font-medium w-32 text-right">Updated</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry) => (
+                      <tr
+                        key={entry.key}
+                        onClick={() => navigate(domain, entry.key)}
+                        className="row-hover cursor-pointer group"
+                      >
+                        <td className="py-2 pl-2 w-[200px]">
+                          <span className="flex items-center gap-2.5">
+                            <Table2 className="w-4 h-4 text-accent/75 shrink-0" strokeWidth={1.5} />
+                            <span className="text-sm text-text-primary group-hover:text-accent transition-colors truncate max-w-[160px]" title={entry.key}>
+                              {entry.key}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {entry.tags?.slice(0, 5).map((tag) => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center px-1.5 py-0 rounded-full text-[10px] font-medium bg-accent/10 text-accent"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {entry.tags && entry.tags.length > 5 && (
+                              <span className="text-[10px] text-text-tertiary">
+                                +{entry.tags.length - 5}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 text-right text-xs text-text-secondary tabular-nums">
+                          {entry.data ? Object.keys(entry.data).length : 0}
+                        </td>
+                        <td className="py-2 pr-2 text-right text-xs text-text-secondary">
+                          <TimeAgo date={entry.updated_at} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <StickyPagination
+                  page={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  total={entriesTotal}
+                  pageSize={pageSize}
+                  onPageSizeChange={setPageSize}
+                />
+              </>
             )
           )}
         </>

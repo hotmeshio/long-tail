@@ -19,14 +19,14 @@ export const UPSERT_KNOWLEDGE = `
     tags = ARRAY(SELECT DISTINCT unnest(lt_knowledge.tags || EXCLUDED.tags))
   RETURNING id, domain, key, (xmax = 0) AS created, updated_at`;
 
-// Full replacement — overwrites the data column entirely (no merge).
-// Used when removing fields from the JSONB object.
+// Full replacement — overwrites data and tags entirely (no merge).
+// Used when removing fields or tags.
 export const REPLACE_KNOWLEDGE = `
   INSERT INTO lt_knowledge (domain, key, data, tags)
   VALUES ($1, $2, $3, $4)
   ON CONFLICT (domain, key) DO UPDATE SET
     data = EXCLUDED.data,
-    tags = ARRAY(SELECT DISTINCT unnest(lt_knowledge.tags || EXCLUDED.tags))
+    tags = EXCLUDED.tags
   RETURNING id, domain, key, (xmax = 0) AS created, updated_at`;
 
 export const GET_KNOWLEDGE = `

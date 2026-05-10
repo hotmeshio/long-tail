@@ -13,6 +13,7 @@ export async function listDomains(): Promise<LTApiResult> {
 export async function listEntries(input: {
   domain: string;
   tags?: string[];
+  search?: string;
   limit?: number;
   offset?: number;
 }): Promise<LTApiResult> {
