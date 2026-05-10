@@ -13,4 +13,5 @@ export interface CompileOptions {
   output?: string;
   model?: string;
   function?: string;
+  quiet?: boolean;
 }
