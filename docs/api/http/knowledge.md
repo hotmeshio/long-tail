@@ -125,6 +125,58 @@ Create or update a knowledge entry. By default, JSONB data is merged at the top 
 }
 ```
 
+## Set field (nested path)
+
+```
+PUT /api/knowledge/field
+```
+
+Set a value at a specific JSONB path without overwriting sibling fields. Use dot-notation for nested paths. Creates the entry if it doesn't exist.
+
+**Body:**
+
+```json
+{
+  "domain": "research",
+  "key": "screenshots",
+  "path": "google.holiday",
+  "value": "Mother's Day doodle with flowers",
+  "tags": ["screenshot"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `domain` | `string` | Yes | Domain |
+| `key` | `string` | Yes | Entry key |
+| `path` | `string` | Yes | Dot-notation path (e.g., `google.holiday`, `config.retries`) |
+| `value` | `any` | Yes | Value to set at that path (any JSON type) |
+| `tags` | `string[]` | No | Tags to union with existing |
+
+**Response 200:**
+
+```json
+{ "id": "uuid", "domain": "research", "key": "screenshots", "created": false, "updated_at": "..." }
+```
+
+## Remove field
+
+```
+DELETE /api/knowledge/field?domain=research&key=screenshots&path=google.legacy_data
+```
+
+Remove a specific field at a JSONB path. The entry survives — only the targeted path is deleted.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `domain` | `string` | Yes | Domain |
+| `key` | `string` | Yes | Entry key |
+| `path` | `string` | Yes | Dot-notation path to remove |
+
+**Response 200:** `{ "removed": true }`
+
+**Response 404:** `{ "error": "Field not found" }`
+
 ## Delete entry
 
 ```

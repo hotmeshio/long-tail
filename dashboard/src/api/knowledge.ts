@@ -83,6 +83,41 @@ export function useStoreKnowledge() {
   });
 }
 
+export function useSetKnowledgeField() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    { id: string; domain: string; key: string; created: boolean; updated_at: string },
+    Error,
+    { domain: string; key: string; path: string; value: unknown; tags?: string[] }
+  >({
+    mutationFn: (body) =>
+      apiFetch('/knowledge/field', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledge'] });
+    },
+  });
+}
+
+export function useRemoveKnowledgeField() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    { removed: boolean },
+    Error,
+    { domain: string; key: string; path: string }
+  >({
+    mutationFn: ({ domain, key, path }) => {
+      const params = new URLSearchParams({ domain, key, path });
+      return apiFetch(`/knowledge/field?${params}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledge'] });
+    },
+  });
+}
+
 export function useDeleteKnowledge() {
   const queryClient = useQueryClient();
   return useMutation<

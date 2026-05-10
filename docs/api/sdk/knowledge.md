@@ -75,6 +75,43 @@ const result = await lt.knowledge.storeEntry({
 
 **Returns:** `LTApiResult<{ id, domain, key, created, updated_at }>`
 
+## setField
+
+Set a value at a specific JSONB path without overwriting sibling fields.
+
+```typescript
+const result = await lt.knowledge.setField({
+  domain: 'research',
+  key: 'screenshots',
+  path: 'google.holiday',
+  value: "Mother's Day doodle with flowers",
+});
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `domain` | `string` | Yes | Domain |
+| `key` | `string` | Yes | Entry key |
+| `path` | `string` | Yes | Dot-notation path |
+| `value` | `any` | Yes | Value to set (any JSON type) |
+| `tags` | `string[]` | No | Tags to union |
+
+**Returns:** `LTApiResult<{ id, domain, key, created, updated_at }>`
+
+## removeField
+
+Remove a specific field at a JSONB path.
+
+```typescript
+const result = await lt.knowledge.removeField({
+  domain: 'research',
+  key: 'screenshots',
+  path: 'google.legacy_data',
+});
+```
+
+**Returns:** `LTApiResult<{ removed }>`
+
 ## deleteEntry
 
 Permanently delete a knowledge entry.

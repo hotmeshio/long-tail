@@ -5,10 +5,10 @@ import { loggerRegistry } from '../../lib/logger';
 import * as knowledge from '../activities/knowledge';
 
 const storeSchema = z.object({
-  domain: z.string().describe('Top level of a 3-level hierarchy (domain > key > field). Groups related entries by namespace (e.g. "screenshots", "config", "analysis").'),
-  key: z.string().describe('Second level. Unique identifier within a domain (e.g. "homepage", "user_profile"). Multiple fields accumulate under the same domain+key.'),
-  field: z.string().optional().describe('Third level (leaf). Names a specific field within the domain+key entry (e.g. "url", "analysis", "score"). When provided, data is stored as { [field]: data } and merged into the existing entry. Calls with the same domain+key+field overwrite that field; different fields accumulate additively. Omit to pass data as a full object.'),
-  data: z.any().describe('The value to store. When field is provided, this can be any type (string, number, boolean, object, array). When field is omitted, this must be a JSON object whose keys become the fields.'),
+  domain: z.string().describe('Namespace grouping related entries (e.g. "screenshots", "config", "analysis").'),
+  key: z.string().describe('Unique identifier within the domain (e.g. "google", "user_profile").'),
+  field: z.string().optional().describe('RECOMMENDED. Names a specific field to set within the entry (e.g. "2026-05-09", "url", "score"). Using field is additive — it merges into existing data without clobbering other fields. Without field, the entire data object is merged at the top level, which can overwrite existing fields with the same keys. Always use field when adding to an entry that may already have data.'),
+  data: z.any().describe('The value to store. When field is provided, this can be any type (string, number, boolean, object, array) and is stored as { [field]: data }. When field is omitted, data must be a JSON object whose keys merge into existing data.'),
   tags: z.array(z.string()).optional().describe('Categorization tags (unioned on upsert)'),
 });
 
@@ -38,6 +38,20 @@ const deleteSchema = z.object({
   key: z.string().describe('Document key to delete'),
 });
 
+const setFieldSchema = z.object({
+  domain: z.string().describe('Knowledge domain'),
+  key: z.string().describe('Document key'),
+  path: z.string().describe('Dot-notation path to the field (e.g. "google.holiday", "config.retries"). Sets the value at this exact path without overwriting sibling fields.'),
+  value: z.any().refine((v) => v !== undefined, 'value is required').describe('Value to set — any JSON type (string, number, boolean, object, array)'),
+  tags: z.array(z.string()).optional().describe('Tags to union with existing tags'),
+});
+
+const removeFieldSchema = z.object({
+  domain: z.string().describe('Knowledge domain'),
+  key: z.string().describe('Document key'),
+  path: z.string().describe('Dot-notation path to remove (e.g. "google.legacy_data", "temp.cache")'),
+});
+
 const appendSchema = z.object({
   domain: z.string().describe('Knowledge domain'),
   key: z.string().describe('Document key'),
@@ -51,11 +65,11 @@ function registerTools(server: McpServer) {
     {
       title: 'Store Knowledge',
       description:
-        'Store a value in a 3-level additive hierarchy: domain > key > field. ' +
-        'Upserts by domain+key — fields accumulate across calls. ' +
-        'If all three (domain+key+field) match, that field is overwritten. ' +
-        'When field is provided, data can be any type (string, number, etc.). ' +
-        'When field is omitted, data must be an object whose keys become the fields.',
+        'Store a value in the knowledge base using a 3-level hierarchy: domain > key > field. ' +
+        'IMPORTANT: Always use the field parameter when adding data to an existing entry — ' +
+        'it merges additively without clobbering other fields. Without field, top-level keys ' +
+        'in data overwrite existing keys with the same name. ' +
+        'Example: domain="screenshots", key="google", field="2026-05-10", data="description text".',
       inputSchema: storeSchema,
     },
     async (args: z.infer<typeof storeSchema>) => {
@@ -161,6 +175,38 @@ function registerTools(server: McpServer) {
     },
     async (args: z.infer<typeof appendSchema>) => {
       const result = await knowledge.appendKnowledge(args as { domain: string; key: string; path: string; value: any });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+    },
+  );
+
+  (server as any).registerTool(
+    'set_knowledge_field',
+    {
+      title: 'Set Knowledge Field',
+      description:
+        'RECOMMENDED for updating existing entries. Set a value at a specific path within a knowledge entry ' +
+        'without overwriting sibling fields. Use dot-notation for nested paths (e.g. "google.holiday" sets ' +
+        'data.google.holiday while preserving data.google.description). Creates the entry if it does not exist. ' +
+        'Use this instead of store_knowledge when the entry may already have data you want to preserve.',
+      inputSchema: setFieldSchema,
+    },
+    async (args: z.infer<typeof setFieldSchema>) => {
+      const result = await knowledge.setKnowledgeField(args as { domain: string; key: string; path: string; value: any; tags?: string[] });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+    },
+  );
+
+  (server as any).registerTool(
+    'remove_knowledge_field',
+    {
+      title: 'Remove Knowledge Field',
+      description:
+        'Remove a specific field from a knowledge entry by dot-path. The entry survives — only the targeted ' +
+        'path is deleted. Use this for intentional cleanup of obsolete or incorrect fields.',
+      inputSchema: removeFieldSchema,
+    },
+    async (args: z.infer<typeof removeFieldSchema>) => {
+      const result = await knowledge.removeKnowledgeField(args);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );

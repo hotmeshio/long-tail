@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
-import { useGetKnowledge, useDeleteKnowledge, useStoreKnowledge } from '../../api/knowledge';
+import { useGetKnowledge, useDeleteKnowledge, useStoreKnowledge, useSetKnowledgeField, useRemoveKnowledgeField } from '../../api/knowledge';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { TagInput } from '../../components/common/form/TagInput';
 
@@ -74,6 +74,8 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
   const { data: entry, isLoading, refetch } = useGetKnowledge(domain, entryKey);
   const deleteMutation = useDeleteKnowledge();
   const storeMutation = useStoreKnowledge();
+  const setFieldMutation = useSetKnowledgeField();
+  const removeFieldMutation = useRemoveKnowledgeField();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState<EditingCell>(null);
@@ -127,16 +129,15 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
     if (column === 'value') {
       const { value: parsed, looksLikeJson, parsedOk } = parseValue(draft);
       if (looksLikeJson && !parsedOk) showJsonHint();
-      const updated = { ...data, [field]: parsed };
-      await storeMutation.mutateAsync({ domain, key: entryKey, data: updated });
+      // Use setField for surgical update — preserves siblings
+      await setFieldMutation.mutateAsync({ domain, key: entryKey, path: field, value: parsed });
     } else {
+      // Rename: remove old field, set new field
       const newName = draft.trim();
       if (!newName || newName === field) { cancelEdit(); return; }
-      const updated = { ...data };
-      const val = updated[field];
-      delete updated[field];
-      updated[newName] = val;
-      await storeMutation.mutateAsync({ domain, key: entryKey, data: updated, replace: true });
+      const val = data[field];
+      await removeFieldMutation.mutateAsync({ domain, key: entryKey, path: field });
+      await setFieldMutation.mutateAsync({ domain, key: entryKey, path: newName, value: val });
     }
 
     setEditing(null);
@@ -145,9 +146,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
   }
 
   async function removeField(field: string) {
-    const updated = { ...data };
-    delete updated[field];
-    await storeMutation.mutateAsync({ domain, key: entryKey, data: updated, replace: true });
+    await removeFieldMutation.mutateAsync({ domain, key: entryKey, path: field });
     setPendingRemove(null);
     setEditing(null);
     refetch();

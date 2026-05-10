@@ -294,6 +294,8 @@ export function createClient(options: LTClientOptions = {}) {
       listEntries: knowledgeApi.listEntries,
       getEntry: knowledgeApi.getEntry,
       storeEntry: knowledgeApi.storeEntry,
+      setField: knowledgeApi.setField,
+      removeField: knowledgeApi.removeField,
       deleteEntry: knowledgeApi.deleteEntry,
     },
 
