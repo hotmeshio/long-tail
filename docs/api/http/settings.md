@@ -19,8 +19,9 @@ GET /api/settings
     "claimDurations": [15, 30, 60, 120, 480]
   },
   "events": {
-    "transport": "nats",
-    "natsWsUrl": "ws://localhost:8222"
+    "transport": "socketio",
+    "natsWsUrl": null,
+    "natsToken": null
   }
 }
 ```
@@ -29,5 +30,6 @@ GET /api/settings
 |-------|------|-------------|
 | `telemetry.traceUrl` | `string \| null` | Template string where `{traceId}` is replaced with the actual trace ID to build a link to the trace viewer. Returns `null` if no trace URL is configured. |
 | `escalation.claimDurations` | `number[]` | Available claim duration options in minutes. Used by the frontend to populate duration selectors. Configurable via the `LT_CLAIM_DURATION_OPTIONS` environment variable (JSON array). |
-| `events.transport` | `string \| null` | Event transport type (e.g., `"nats"`). `null` if no event transport is configured. |
-| `events.natsWsUrl` | `string \| null` | NATS WebSocket URL for real-time event subscriptions. Only present when NATS is the configured transport. |
+| `events.transport` | `'socketio' \| 'nats' \| 'none'` | Dashboard event transport. Defaults to `socketio`. Reports `nats` only when `EVENT_TRANSPORT=nats` is set and a NATS adapter is registered. |
+| `events.natsWsUrl` | `string \| null` | NATS WebSocket URL for browser connections. Only present when a NATS adapter is registered. Read from `VITE_NATS_WS_URL` or `NATS_WS_URL`. |
+| `events.natsToken` | `string \| null` | NATS auth token for browser connections. Only present when a NATS adapter is registered. Read from `NATS_TOKEN`. |
