@@ -147,13 +147,17 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
       setShowFeedback(false);
       return;
     }
-    await regenerateMutation.mutateAsync({
-      id: yamlId,
-      compilation_feedback: feedbackText.trim() || undefined,
-    });
-    setFeedbackText('');
-    setShowFeedback(false);
-    refetch();
+    try {
+      await regenerateMutation.mutateAsync({
+        id: yamlId,
+        compilation_feedback: feedbackText.trim() || undefined,
+      });
+      setFeedbackText('');
+      setShowFeedback(false);
+      refetch();
+    } catch {
+      // Error is surfaced via regenerateMutation.isError below
+    }
   };
 
   if (!wf) return <p className="text-sm text-text-secondary animate-pulse">Loading workflow...</p>;
@@ -205,6 +209,13 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
             onRegenerate={handleRegenerate}
             isPending={regenerateMutation.isPending}
           />
+        )}
+
+        {/* Recompile error */}
+        {regenerateMutation.isError && (
+          <div className="mb-4 px-3 py-2 bg-status-error/5 border border-status-error/20 rounded-md">
+            <p className="text-xs text-status-error">{regenerateMutation.error?.message || 'Recompilation failed'}</p>
+          </div>
         )}
 
         {/* Version history banner */}

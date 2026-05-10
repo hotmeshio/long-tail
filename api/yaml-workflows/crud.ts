@@ -1,6 +1,7 @@
 import * as yamlDb from '../../services/yaml-workflow/db';
 import * as yamlGenerator from '../../services/yaml-workflow/generator';
 import { compileDurableToYaml } from '../../services/yaml-workflow/durable-compiler';
+import { rebuildFromPrompt } from '../../services/yaml-workflow/builder-regenerate';
 import { getTaskByWorkflowId } from '../../services/task';
 import { sanitizeToolName, sanitizeServerName } from '../../modules/utils';
 import type { LTApiResult } from '../../types/sdk';
@@ -347,11 +348,34 @@ export async function regenerateYamlWorkflow(input: {
     if (wf.status === 'archived') {
       return { status: 400, error: 'Archived workflows cannot be regenerated' };
     }
+    // Plan Build workflows: recompile from original prompt via builder LLM
+    if (!wf.source_workflow_id && wf.source_workflow_type === 'mcpWorkflowPlanner') {
+      if (!wf.original_prompt) {
+        return { status: 400, error: 'Cannot recompile: original prompt not stored. Re-run the plan to rebuild this workflow.' };
+      }
+      const feedback = input.compilation_feedback;
+      const result = await rebuildFromPrompt({
+        prompt: wf.original_prompt,
+        feedback: feedback || undefined,
+        priorYaml: feedback ? wf.yaml_content : undefined,
+        name: wf.name,
+        appId: wf.app_id,
+      });
+      const updated = await yamlDb.updateYamlWorkflow(wf.id, {
+        yaml_content: result.yaml,
+        input_schema: result.inputSchema,
+        output_schema: result.outputSchema,
+        activity_manifest: result.activityManifest as any,
+        tags: result.tags,
+      });
+      return { status: 200, data: updated };
+    }
+
     if (!wf.source_workflow_id || !wf.source_workflow_type) {
       return { status: 400, error: 'Missing source workflow reference — cannot regenerate' };
     }
 
-    // Look up task queue from the source task record, or use input override
+    // Execution-trace workflows: recompile from source execution
     let taskQueue = input.task_queue;
     if (!taskQueue) {
       const sourceTask = await getTaskByWorkflowId(wf.source_workflow_id);
