@@ -1,4 +1,5 @@
 import type { StorageBackend } from './types';
+import { LocalStorageBackend } from './local';
 
 export type { StorageBackend } from './types';
 
@@ -19,7 +20,6 @@ export function getStorageBackend(): StorageBackend {
       const { S3StorageBackend } = require('./s3');
       _backend = new S3StorageBackend();
     } else {
-      const { LocalStorageBackend } = require('./local');
       _backend = new LocalStorageBackend();
     }
   }
