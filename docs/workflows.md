@@ -693,3 +693,22 @@ OPENAI_API_KEY=sk-... npm run test:vision
 # Full backend suite
 npm test
 ```
+
+---
+
+## From Durable to DAG
+
+Every durable workflow you write is a candidate for compilation. The `ltc` CLI reads your workflow source and produces an equivalent YAML DAG that runs without replay overhead.
+
+```bash
+ltc compile workflows/my-workflow.ts
+```
+
+The durable code is the spec — developer-friendly, familiar, testable with standard tools. The compiled YAML is the optimized execution path — each step fires exactly once, state is plucked explicitly from upstream activities, no replay loop.
+
+```
+  my-workflow.ts              →  my-workflow.compiled.yaml
+  (write and test here)           (deploy and run this)
+```
+
+Write procedural because it's productive. Compile because it's fast. See the [Compiler Guide](compiler.md) for details.

@@ -52,6 +52,16 @@ router.post('/direct', async (req, res) => {
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
+/**
+ * POST /api/yaml-workflows/from-durable
+ * Compile a durable TypeScript workflow into a YAML DAG.
+ * Body: { source, is_file_path?, workflow_name, name, description?, app_id?, subscribes?, tags? }
+ */
+router.post('/from-durable', async (req, res) => {
+  const result = await api.createYamlWorkflowFromDurable(req.body);
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
 // -- Parameterized routes --
 
 /**

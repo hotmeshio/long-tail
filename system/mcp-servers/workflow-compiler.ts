@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
 import * as yamlGenerator from '../../services/yaml-workflow/generator';
+import { compileDurableToYaml } from '../../services/yaml-workflow/durable-compiler';
 import * as yamlDb from '../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../../services/yaml-workflow/workers';
@@ -32,6 +33,18 @@ const listSchema = z.object({
     .describe('Maximum number of results'),
   offset: z.number().int().min(0).optional().default(0)
     .describe('Pagination offset'),
+});
+
+const compileDurableSchema = z.object({
+  source: z.string().describe(
+    'TypeScript source code of the durable workflow function (inline source, not a file path)',
+  ),
+  workflow_name: z.string().describe(
+    'Name of the exported workflow function to compile (e.g., "assemblyLine", "basicSignal")',
+  ),
+  yaml_name: z.string().describe('Name for the generated YAML workflow (becomes graph topic)'),
+  description: z.string().optional().describe('Optional description of what the workflow does'),
+  app_id: z.string().optional().describe('Target namespace (defaults to "longtail")'),
 });
 
 /**
@@ -204,6 +217,60 @@ export async function createWorkflowCompilerServer(options?: {
               graph_topic: wf.graph_topic,
               created_at: wf.created_at,
             })),
+          }),
+        }],
+      };
+    },
+  );
+
+  // ── compile_durable_to_yaml ────────────────────────────────────────
+  (server as any).registerTool(
+    'compile_durable_to_yaml',
+    {
+      title: 'Compile Durable Workflow to YAML',
+      description:
+        'Convert a procedural durable TypeScript workflow (Temporal-like API) into an equivalent ' +
+        'HotMesh YAML DAG. The generated YAML runs without replay overhead and achieves the same ' +
+        'orchestration behavior. Handles proxyActivities, sleep, condition/signal, escalation, ' +
+        'startChild composition, parallel execution, and loop patterns.',
+      inputSchema: compileDurableSchema,
+    },
+    async (args: z.infer<typeof compileDurableSchema>) => {
+      const result = await compileDurableToYaml({
+        source: args.source,
+        isFilePath: false,
+        workflowName: args.workflow_name,
+        name: args.yaml_name,
+        description: args.description,
+        appId: args.app_id,
+      });
+
+      const record = await yamlDb.createYamlWorkflow({
+        name: args.yaml_name,
+        description: args.description,
+        app_id: result.appId,
+        yaml_content: result.yaml,
+        graph_topic: result.graphTopic,
+        input_schema: result.inputSchema,
+        output_schema: result.outputSchema,
+        activity_manifest: result.activityManifest,
+        tags: result.tags,
+        source_workflow_type: 'durable',
+        original_prompt: args.description,
+        category: result.category,
+        metadata: { durable_source: args.source },
+      });
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            yaml_workflow_id: record.id,
+            app_id: record.app_id,
+            graph_topic: result.graphTopic,
+            activity_count: result.activityManifest.filter((a) => a.type === 'worker').length,
+            input_schema: result.inputSchema,
+            yaml_preview: result.yaml.slice(0, 500),
           }),
         }],
       };

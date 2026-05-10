@@ -70,6 +70,19 @@ export async function analyzeContent(content: string) {
 }
 ```
 
+## Compile Workflows
+
+Write durable workflows in TypeScript. Compile to YAML DAGs that run without replay overhead. `ltc` is the compiler — like `tsc` for workflows.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+
+npx ltc compile workflows/              # scan and compile all workflow files
+npx ltc compile --dry-run               # discover without compiling
+```
+
+The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
+
 ## Certify a Workflow
 
 Any durable workflow can be promoted to **certified** through the dashboard or API. A certified workflow gains interceptor guarantees: failures escalate instead of throwing, escalation chains route through roles, and every error is either handled or surfaced. It cannot silently fail.
@@ -243,6 +256,7 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/
 | [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
 | [MCP](docs/mcp.md) | Server registration, tool calls, human queue |
 | [Compilation](docs/compilation.md) | Dynamic → deterministic pipeline wizard |
+| [Compiler](docs/compiler.md) | `ltc` CLI — compile durable TypeScript to YAML DAGs |
 | [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
 | [SDK](docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
 | [Architecture](docs/architecture.md) | Project structure, conventions, discovery |

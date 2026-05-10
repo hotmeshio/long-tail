@@ -1,5 +1,6 @@
 import * as yamlDb from '../../services/yaml-workflow/db';
 import * as yamlGenerator from '../../services/yaml-workflow/generator';
+import { compileDurableToYaml } from '../../services/yaml-workflow/durable-compiler';
 import { getTaskByWorkflowId } from '../../services/task';
 import { sanitizeToolName, sanitizeServerName } from '../../modules/utils';
 import type { LTApiResult } from '../../types/sdk';
@@ -415,6 +416,73 @@ export async function deleteYamlWorkflow(input: {
     if (isNotFoundError(err)) {
       return { status: 404, error: 'YAML workflow not found' };
     }
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Compile a durable TypeScript workflow into a YAML DAG.
+ *
+ * Accepts inline source code or a file path. The LLM translates the procedural
+ * orchestration into an equivalent HotMesh YAML DAG that runs without replay.
+ *
+ * @param input.source — TypeScript source code or file path
+ * @param input.is_file_path — whether source is a file path (default: false)
+ * @param input.workflow_name — name of the exported workflow function
+ * @param input.name — name for the generated YAML workflow
+ * @param input.description — optional description
+ * @param input.app_id — target namespace (defaults to "longtail")
+ * @param input.subscribes — graph topic override
+ * @param input.tags — additional tags
+ * @returns `{ status: 201, data: YamlWorkflow }` the newly created draft record
+ */
+export async function createYamlWorkflowFromDurable(input: {
+  source: string;
+  is_file_path?: boolean;
+  workflow_name: string;
+  name: string;
+  description?: string;
+  app_id?: string;
+  subscribes?: string;
+  tags?: string[];
+}): Promise<LTApiResult> {
+  try {
+    const { source, workflow_name, name, description, app_id, subscribes, tags: userTags } = input;
+
+    if (!source || !workflow_name || !name) {
+      return { status: 400, error: 'source, workflow_name, and name are required' };
+    }
+
+    const result = await compileDurableToYaml({
+      source,
+      isFilePath: !!input.is_file_path,
+      workflowName: workflow_name,
+      name,
+      description,
+      appId: app_id,
+      subscribes,
+    });
+
+    const mergedTags = [...new Set([...(result.tags || []), ...(Array.isArray(userTags) ? userTags : [])])];
+
+    const record = await yamlDb.createYamlWorkflow({
+      name,
+      description,
+      app_id: result.appId,
+      yaml_content: result.yaml,
+      graph_topic: result.graphTopic,
+      input_schema: result.inputSchema,
+      output_schema: result.outputSchema,
+      activity_manifest: result.activityManifest,
+      tags: mergedTags,
+      source_workflow_type: 'durable',
+      original_prompt: description,
+      category: result.category,
+      metadata: { durable_source: source.slice(0, 5000) },
+    });
+
+    return { status: 201, data: record };
+  } catch (err: any) {
     return { status: 500, error: err.message };
   }
 }
