@@ -14,7 +14,7 @@ List files and directories at a given prefix.
 |-----------|------|----------|-------------|
 | `prefix` | `string` | No | Directory prefix to list (e.g., `screenshots/google/`) |
 | `pageSize` | `number` | No | Max results (default: 100) |
-| `continuationToken` | `string` | No | Pagination token from a previous response |
+| `continuationToken` | `string` | No | Cursor token from a previous response's `nextToken` field. S3/GCS use opaque cursor strings; local storage uses numeric offsets. |
 
 **Response 200:**
 

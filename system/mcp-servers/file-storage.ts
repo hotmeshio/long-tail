@@ -20,6 +20,8 @@ const readFileSchema = z.object({
 const listFilesSchema = z.object({
   directory: z.string().optional().describe('Subdirectory to list (default: root)'),
   pattern: z.string().optional().describe('Glob-like filter pattern (e.g., "*.json")'),
+  page_size: z.number().optional().describe('Max results per page (default 100)'),
+  continuation_token: z.string().optional().describe('Pagination token from a previous response'),
 });
 
 const deleteFileSchema = z.object({
@@ -66,7 +68,7 @@ export async function createFileStorageServer(options?: {
     'list_files',
     {
       title: 'List Files',
-      description: 'List files in a storage directory. Returns file paths, sizes, and modification timestamps.',
+      description: 'List files and directories at a storage prefix. Supports cursor-based pagination via continuation tokens. Returns file paths, sizes, timestamps, subdirectories, and a nextToken for the next page.',
       inputSchema: listFilesSchema,
     },
     async (args: z.infer<typeof listFilesSchema>) => {

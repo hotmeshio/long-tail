@@ -39,8 +39,24 @@ export async function readFile(args: {
 export async function listFiles(args: {
   directory?: string;
   pattern?: string;
-}): Promise<{ files: Array<{ path: string; size: number; modified_at: string }> }> {
-  return getStorageBackend().list(args.directory, args.pattern);
+  page_size?: number;
+  continuation_token?: string;
+}): Promise<{
+  files: Array<{ path: string; size: number; modified_at: string }>;
+  directories?: string[];
+  nextToken?: string;
+}> {
+  const result = await getStorageBackend().listWithPrefixes(
+    args.directory,
+    args.page_size || 100,
+    args.continuation_token,
+  );
+  // Apply glob pattern client-side if provided (S3/GCS don't support server-side glob)
+  if (args.pattern) {
+    const regex = new RegExp(args.pattern.replace(/\./g, '\\.').replace(/\*/g, '.*'));
+    result.files = result.files.filter((f) => regex.test(f.path));
+  }
+  return result;
 }
 
 export async function deleteFile(args: {
