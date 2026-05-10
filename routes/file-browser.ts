@@ -55,6 +55,21 @@ router.post('/signed-url', async (req, res) => {
 });
 
 /**
+ * DELETE /api/file-browser/delete/*
+ * Permanently delete a file.
+ */
+router.delete('/delete/{*filePath}', async (req, res) => {
+  const raw = (req.params as any).filePath;
+  const filePath = Array.isArray(raw) ? raw.join('/') : raw;
+  if (!filePath) {
+    res.status(400).json({ error: 'File path required' });
+    return;
+  }
+  const result = await api.deleteFile({ filePath });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/file-browser/download/*
  * Download a file with Content-Disposition: attachment.
  */

@@ -26,6 +26,25 @@ await start({
 
 `start()` handles adapter connection and graceful disconnection on shutdown automatically.
 
+## Dashboard Transport Selection
+
+The dashboard auto-detects its event transport via `GET /api/settings`. By default, Socket.IO is reported — it works in-process with no additional infrastructure.
+
+For multi-container deployments where the API and workers run as separate processes, set `EVENT_TRANSPORT=nats` to tell the dashboard to connect via NATS WebSocket instead of Socket.IO:
+
+```yaml
+# docker-compose.yml
+services:
+  app:
+    environment:
+      - EVENT_TRANSPORT=nats
+      - NATS_URL=nats://nats:4222
+      - NATS_WS_URL=ws://localhost:9222
+      - NATS_TOKEN=your-token
+```
+
+Both adapters still publish events regardless of `EVENT_TRANSPORT` — the setting only controls what the dashboard listens on. This means server-side event consumers (callbacks, NATS subscribers) work independently of the dashboard transport.
+
 ## LTEvent
 
 Every published event conforms to the `LTEvent` interface:

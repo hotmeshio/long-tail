@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { getConnection } from '../../lib/db';
 import {
   UPSERT_KNOWLEDGE,
+  REPLACE_KNOWLEDGE,
   GET_KNOWLEDGE,
   SEARCH_KNOWLEDGE,
   COUNT_KNOWLEDGE_SEARCH,
@@ -29,10 +30,12 @@ export async function storeKnowledge(args: {
   key: string;
   data: Record<string, any>;
   tags?: string[];
+  replace?: boolean;
 }): Promise<{ id: string; domain: string; key: string; created: boolean; updated_at: string }> {
   return withClient(async (client) => {
+    const sql = args.replace ? REPLACE_KNOWLEDGE : UPSERT_KNOWLEDGE;
     const { rows } = await client.query(
-      UPSERT_KNOWLEDGE,
+      sql,
       [args.domain, args.key, JSON.stringify(args.data), args.tags || []],
     );
     return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
@@ -64,28 +67,35 @@ export async function searchKnowledge(args: {
   query: Record<string, any>;
   tags?: string[];
   limit?: number;
+  offset?: number;
 }): Promise<{ entries: Record<string, any>[]; total: number }> {
   return withClient(async (client) => {
     const limit = Math.min(args.limit || 50, 200);
-    const params: any[] = [args.domain, JSON.stringify(args.query), limit];
+    const offset = args.offset || 0;
+    const params: any[] = [args.domain, JSON.stringify(args.query)];
     let tagClause = '';
     if (args.tags?.length) {
-      tagClause = ' AND tags && $4';
       params.push(args.tags);
+      tagClause = ` AND tags && $${params.length}`;
     }
 
+    const countParams = [...params];
     const countResult = await client.query(
       `SELECT COUNT(*)::int AS total FROM lt_knowledge
        WHERE domain = $1 AND data @> $2::jsonb${tagClause}`,
-      tagClause ? [args.domain, JSON.stringify(args.query), ...(args.tags ? [args.tags] : [])]
-        : [args.domain, JSON.stringify(args.query)],
+      countParams,
     );
+
+    params.push(limit);
+    const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
 
     const { rows } = await client.query(
       `SELECT id, domain, key, data, tags, created_at, updated_at
        FROM lt_knowledge
        WHERE domain = $1 AND data @> $2::jsonb${tagClause}
-       ORDER BY updated_at DESC LIMIT $3`,
+       ORDER BY updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       params,
     );
 
@@ -102,6 +112,7 @@ export async function searchKnowledge(args: {
 export async function listKnowledge(args: {
   domain: string;
   tags?: string[];
+  search?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ entries: Record<string, any>[]; total: number }> {
@@ -109,14 +120,22 @@ export async function listKnowledge(args: {
     const limit = Math.min(args.limit || 50, 200);
     const offset = args.offset || 0;
     const params: any[] = [args.domain];
-    let tagClause = '';
+    let extraClauses = '';
+
     if (args.tags?.length) {
-      tagClause = ' AND tags && $2';
       params.push(args.tags);
+      extraClauses += ` AND tags && $${params.length}`;
+    }
+
+    if (args.search) {
+      params.push(`%${args.search}%`);
+      const searchIdx = params.length;
+      // Match key by ILIKE or any tag element by ILIKE
+      extraClauses += ` AND (key ILIKE $${searchIdx} OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE $${searchIdx}))`;
     }
 
     const countResult = await client.query(
-      `SELECT COUNT(*)::int AS total FROM lt_knowledge WHERE domain = $1${tagClause}`,
+      `SELECT COUNT(*)::int AS total FROM lt_knowledge WHERE domain = $1${extraClauses}`,
       params,
     );
 
@@ -125,7 +144,7 @@ export async function listKnowledge(args: {
     const offsetIdx = params.length + 2;
     const { rows } = await client.query(
       `SELECT id, domain, key, data, tags, created_at, updated_at
-       FROM lt_knowledge WHERE domain = $1${tagClause}
+       FROM lt_knowledge WHERE domain = $1${extraClauses}
        ORDER BY updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       queryParams,
     );

@@ -1,57 +1,20 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { TOOL_ROUNDS_TRIAGE } from '../../../modules/defaults';
 import type { LTEnvelope, LTReturn } from '../../../types';
-import * as activities from '../../activities/triage';
-import * as interceptorActivities from '../../../services/interceptor/activities';
 import { TRIAGE_SYSTEM_PROMPT, TRIAGE_REENTRY_CONTEXT, TRIAGE_EXHAUSTED_ROUNDS } from './prompts';
 import { handleFinalResponse } from './response';
-import type { TriageResponseDeps } from './types';
 import { sanitizeToolResult } from '../tool-result-guard';
-
-type ActivitiesType = typeof activities;
-
-const {
+import {
+  MAX_TOOL_ROUNDS,
+  responseDeps,
   getUpstreamTasks,
   getEscalationHistory,
   getToolTags,
   loadTriageTools,
   callTriageTool,
   callTriageLLM,
-  notifyEngineering,
-} = Durable.workflow.proxyActivities<ActivitiesType>({
-  activities,
-  retry: {
-    maximumAttempts: 3,
-    backoffCoefficient: 2,
-    maximumInterval: '10 seconds',
-  },
-});
-
-const {
-  ltCreateEscalation,
-  ltCreateTask,
-  ltGetTask,
-  ltGetWorkflowConfig,
-  ltStartWorkflow,
   ltEnrichEscalationRouting,
-} = Durable.workflow.proxyActivities<typeof interceptorActivities>({
-  activities: interceptorActivities,
-  taskQueue: 'lt-interceptor',
-  retry: { maximumAttempts: 3 },
-});
-
-const MAX_TOOL_ROUNDS = TOOL_ROUNDS_TRIAGE;
-
-/** Proxied activity refs passed to response handlers */
-const responseDeps: TriageResponseDeps = {
-  ltCreateEscalation,
-  ltCreateTask,
-  ltGetTask,
-  ltGetWorkflowConfig,
-  ltStartWorkflow,
-  notifyEngineering,
-};
+} from './activities-proxy';
 
 // ── Workflow ─────────────────────────────────────────────────
 
@@ -89,10 +52,6 @@ export async function mcpTriage(
 ): Promise<LTReturn> {
   const {
     originId,
-    originalWorkflowType,
-    originalTaskQueue,
-    escalationPayload,
-    resolverPayload,
   } = envelope.data;
 
   // ── Re-entry: engineer responded to our escalation ──

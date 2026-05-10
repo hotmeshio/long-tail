@@ -19,6 +19,16 @@ export const UPSERT_KNOWLEDGE = `
     tags = ARRAY(SELECT DISTINCT unnest(lt_knowledge.tags || EXCLUDED.tags))
   RETURNING id, domain, key, (xmax = 0) AS created, updated_at`;
 
+// Full replacement — overwrites data and tags entirely (no merge).
+// Used when removing fields or tags.
+export const REPLACE_KNOWLEDGE = `
+  INSERT INTO lt_knowledge (domain, key, data, tags)
+  VALUES ($1, $2, $3, $4)
+  ON CONFLICT (domain, key) DO UPDATE SET
+    data = EXCLUDED.data,
+    tags = EXCLUDED.tags
+  RETURNING id, domain, key, (xmax = 0) AS created, updated_at`;
+
 export const GET_KNOWLEDGE = `
   SELECT id, domain, key, data, tags, created_at, updated_at
   FROM lt_knowledge WHERE domain = $1 AND key = $2`;

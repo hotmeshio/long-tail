@@ -18,7 +18,12 @@ export async function getSettings(): Promise<LTApiResult> {
     const hasSocketIO = !!eventRegistry.getAdapter(SocketIOEventAdapter);
     const hasNats = !!eventRegistry.getAdapter(NatsEventAdapter);
 
-    const transport = hasSocketIO ? 'socketio' : hasNats ? 'nats' : 'none';
+    // Dashboard transport: Socket.IO is the default (works in-process, zero config).
+    // NATS is only reported when explicitly opted in via EVENT_TRANSPORT=nats,
+    // which a multi-container deployment sets when it wants the dashboard to
+    // connect via NATS instead of Socket.IO.
+    const forceNats = process.env.EVENT_TRANSPORT === 'nats';
+    const transport = forceNats && hasNats ? 'nats' : hasSocketIO ? 'socketio' : hasNats ? 'nats' : 'none';
 
     return {
       status: 200,
@@ -33,6 +38,9 @@ export async function getSettings(): Promise<LTApiResult> {
           transport,
           natsWsUrl: hasNats
             ? (process.env.VITE_NATS_WS_URL || process.env.NATS_WS_URL || null)
+            : null,
+          natsToken: hasNats
+            ? (process.env.NATS_TOKEN || null)
             : null,
         },
       },

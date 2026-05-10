@@ -22,10 +22,12 @@ const searchSchema = z.object({
   query: z.record(z.any()).describe('JSONB containment query (e.g. {"type":"screenshot"})'),
   tags: z.array(z.string()).optional().describe('Filter by tags (any match)'),
   limit: z.number().optional().describe('Max results (default 50, max 200)'),
+  offset: z.number().optional().describe('Pagination offset'),
 });
 
 const listSchema = z.object({
   domain: z.string().describe('Knowledge domain'),
+  search: z.string().optional().describe('Search by key name or tag (partial match)'),
   tags: z.array(z.string()).optional().describe('Filter by tags (any match)'),
   limit: z.number().optional().describe('Max results (default 50, max 200)'),
   offset: z.number().optional().describe('Pagination offset'),

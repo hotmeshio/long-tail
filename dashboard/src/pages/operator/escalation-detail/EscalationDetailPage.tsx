@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { KeyRound } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import {
   useEscalation,
@@ -9,19 +8,15 @@ import {
   useEscalateToRole,
 } from '../../../api/escalations';
 import { useEscalationTargets } from '../../../api/roles';
-import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
-import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
-import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
-import { TriageContext } from '../../../components/escalation/TriageContext';
 import { EscalationActionBar } from './EscalationActionBar';
 import { EscalationHero } from './EscalationHero';
-import { ResolverSection } from './ResolverSection';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
+import { EscalationContextBlocks, EscalationCollapsibleSections } from './EscalationDetailSections';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,7 +72,6 @@ export function EscalationDetailPage() {
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
   useEffect(() => {
-    // Build typed form from schema with `properties` (escalation or workflow config)
     const formSchema = metadataFormSchema ?? (resolverSchema?.properties ? resolverSchema : null);
     if (formSchema?.properties) {
       const initial: Record<string, any> = { _form_schema: formSchema };
@@ -91,7 +85,6 @@ export function EscalationDetailPage() {
     }
   }, [effectiveSchema, metadataFormSchema, resolverSchema]);
 
-  // When triage or rounds-exhausted data is present, collapse Input/Output so structured context is central
   const hasTriage = hasTriageData(esc?.escalation_payload);
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
   const isWaitForHuman = esc?.subtype === 'wait_for_human';
@@ -99,7 +92,6 @@ export function EscalationDetailPage() {
     if (hasTriage || isRoundsExhausted) {
       setCollapsed((prev) => ({ ...prev, context: true }));
     }
-    // waitFor escalations: auto-expand resolver, collapse context
     if (isWaitForHuman && metadataFormSchema) {
       setCollapsed((prev) => ({ ...prev, context: true, resolver: false }));
     }
@@ -126,13 +118,11 @@ export function EscalationDetailPage() {
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
 
-  // Detect triage context in escalation payload
   const payloadObj = (typeof escalationPayload === 'object' && escalationPayload !== null && !Array.isArray(escalationPayload))
     ? escalationPayload as Record<string, unknown>
     : null;
   const triageData = payloadObj?._triage as Record<string, unknown> | undefined;
 
-  // Derive action bar mode
   const actionBarMode: ActionBarMode = isTerminal
     ? 'terminal'
     : claimedByMe
@@ -188,106 +178,34 @@ export function EscalationDetailPage() {
         traceUrl={traceUrl}
       />
 
-      {/* Rounds-exhausted structured context */}
-      {isRoundsExhausted && payloadObj && (
-        <div className="mt-8">
-          <RoundsExhaustedContext
-            payload={payloadObj}
-            isTerminal={isTerminal}
-            resolverPayload={resolverPayload as Record<string, unknown> | null}
-            onRetryTriage={handleRetryTriage}
-            isRetrying={claim.isPending || resolve.isPending}
-          />
-        </div>
-      )}
+      <EscalationContextBlocks
+        isRoundsExhausted={isRoundsExhausted}
+        payloadObj={payloadObj}
+        isTerminal={isTerminal}
+        resolverPayload={resolverPayload as Record<string, unknown> | null}
+        onRetryTriage={handleRetryTriage}
+        isRetrying={claim.isPending || resolve.isPending}
+      />
 
-      {/* Missing credential context */}
-      {payloadObj?.category === 'missing_credential' && (
-        <div className="mt-8 bg-status-warning/10 border border-status-warning/30 rounded-md px-5 py-4 flex items-start gap-3">
-          <KeyRound size={20} className="text-status-warning mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-text-primary mb-1">Missing Credential</p>
-            <p className="text-xs text-text-secondary mb-3">
-              This workflow requires a <span className="font-medium capitalize">{String(payloadObj.provider)}</span> credential
-              to continue. Register one and then resolve this escalation to retry.
-            </p>
-            <Link
-              to="/credentials"
-              className="btn-primary text-xs inline-flex items-center gap-1.5"
-            >
-              <KeyRound size={12} />
-              Go to Credentials
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Collapsible sections */}
-      <div className="mt-8 space-y-6">
-
-        {/* Input/Output */}
-        <CollapsibleSection
-          title="Input / Output"
-          sectionKey="context"
-          isCollapsed={collapsed.context ?? true}
-          onToggle={toggleSection}
-          contentClassName="mt-4 ml-9"
-        >
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {esc.envelope && (
-                <div>
-                  <JsonViewer data={esc.envelope} label="Input Envelope" />
-                </div>
-              )}
-              {escalationPayload != null && (
-                <div>
-                  <JsonViewer data={escalationPayload} label="Escalation Context" />
-                </div>
-              )}
-            </div>
-
-            {resolverPayload != null && (
-              <div className="max-w-xl">
-                <JsonViewer data={resolverPayload} label="Resolver Payload" />
-              </div>
-            )}
-          </div>
-        </CollapsibleSection>
-
-        {/* Triage context — only when present */}
-        {triageData && payloadObj && (
-          <CollapsibleSection
-            title="AI Triage"
-            sectionKey="triage"
-            isCollapsed={!!collapsed.triage}
-            onToggle={toggleSection}
-            contentClassName="mt-4 ml-9"
-          >
-            <TriageContext triage={triageData} payload={payloadObj} />
-          </CollapsibleSection>
-        )}
-
-        {/* Resolver form — when claimed and resolving */}
-        {!isTerminal && claimedByMe && activeView === 'resolve' && (esc.workflow_type || metadataFormSchema) && (
-          <CollapsibleSection
-            title="Submit Your Resolution"
-            sectionKey="resolver"
-            isCollapsed={!!collapsed.resolver}
-            onToggle={toggleSection}
-            contentClassName="mt-4 ml-9"
-          >
-            <ResolverSection
-              json={json}
-              onJsonChange={setJson}
-              requestTriage={requestTriage}
-              onRequestTriageChange={setRequestTriage}
-              triageNotes={triageNotes}
-              onTriageNotesChange={setTriageNotes}
-            />
-          </CollapsibleSection>
-        )}
-      </div>
+      <EscalationCollapsibleSections
+        collapsed={collapsed}
+        toggleSection={toggleSection}
+        esc={esc}
+        escalationPayload={escalationPayload}
+        resolverPayload={resolverPayload}
+        triageData={triageData}
+        payloadObj={payloadObj}
+        isTerminal={isTerminal}
+        claimedByMe={claimedByMe}
+        activeView={activeView}
+        metadataFormSchema={metadataFormSchema}
+        json={json}
+        onJsonChange={setJson}
+        requestTriage={requestTriage}
+        onRequestTriageChange={setRequestTriage}
+        triageNotes={triageNotes}
+        onTriageNotesChange={setTriageNotes}
+      />
 
       <div className="flex-1" />
 

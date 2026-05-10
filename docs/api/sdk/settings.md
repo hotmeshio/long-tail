@@ -18,7 +18,8 @@ const result = await lt.settings.get();
 |-------|------|-------------|
 | `telemetry.traceUrl` | `string \| null` | Trace URL for the telemetry provider |
 | `escalation.claimDurations` | `number[]` | Available claim duration options (minutes) |
-| `events.transport` | `'socketio' \| 'nats' \| 'none'` | Active event transport |
-| `events.natsWsUrl` | `string \| null` | NATS WebSocket URL (only when transport is `nats`) |
+| `events.transport` | `'socketio' \| 'nats' \| 'none'` | Dashboard event transport (default: `socketio`; `nats` when `EVENT_TRANSPORT=nats`) |
+| `events.natsWsUrl` | `string \| null` | NATS WebSocket URL (present when NATS adapter registered) |
+| `events.natsToken` | `string \| null` | NATS auth token (present when NATS adapter registered) |
 
 **Auth:** Not required

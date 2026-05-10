@@ -121,6 +121,9 @@ const CredentialsPage = lazy(() =>
 const FilesPage = lazy(() =>
   import('./pages/files').then((m) => ({ default: m.FilesPage })),
 );
+const KnowledgePage = lazy(() =>
+  import('./pages/knowledge').then((m) => ({ default: m.KnowledgePage })),
+);
 
 // ---------------------------------------------------------------------------
 // Suspense fallback
@@ -236,6 +239,9 @@ const router = createBrowserRouter([
 
           // Files section
           { path: 'files', element: <Lazy><FilesPage /></Lazy> },
+
+          // Knowledge section
+          { path: 'knowledge', element: <Lazy><KnowledgePage /></Lazy> },
         ],
       },
 

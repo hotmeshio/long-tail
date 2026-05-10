@@ -56,6 +56,13 @@ export function useGenerateSignedUrl() {
   });
 }
 
+export function useDeleteFile() {
+  return useMutation<{ deleted: boolean; path: string }, Error, string>({
+    mutationFn: (filePath) =>
+      apiFetch(`/file-browser/delete/${filePath}`, { method: 'DELETE' }),
+  });
+}
+
 export function getFilePreviewUrl(filePath: string): string {
   return `/api/files/${filePath.replace(/^\/+/, '')}`;
 }

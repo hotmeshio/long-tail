@@ -8,6 +8,7 @@ import { YamlComposer } from '../../../components/common/data/YamlComposer';
 import { DagNodeDetail } from '../../../components/common/data/DagNodeDetail';
 import { LifecycleSidebar } from './LifecycleSidebar';
 import { VersionHistory } from './VersionHistory';
+import { RecompileFeedbackPanel } from './RecompileFeedbackPanel';
 import {
   useYamlWorkflow,
   useYamlWorkflows,
@@ -95,7 +96,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
     setVersionParam(v ? parseInt(v, 10) : null);
   }, []);
 
-  // DAG node selection — drives right sidebar content
+  // DAG node selection
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const resolvedManifest: ActivityManifestEntry[] = (isViewingHistory && versionSnapshot)
     ? versionSnapshot.activity_manifest : wf?.activity_manifest ?? [];
@@ -131,7 +132,6 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
 
   const handleDeploy = async () => {
     if (!wf) return;
-    // Always deploy (updates deployed_content_version), then activate
     await deployMutation.mutateAsync(wf.id);
     await activateMutation.mutateAsync(wf.id);
     queryClient.invalidateQueries({ queryKey: ['yamlWorkflowForSource'], refetchType: 'all' });
@@ -197,33 +197,14 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
 
         {/* Recompile feedback panel */}
         {showFeedback && (
-          <div
-            className="mb-4 p-4 bg-surface-sunken border border-surface-border rounded-lg overflow-hidden transition-all duration-250 ease-in-out"
-            style={{
-              animation: dismissingFeedback ? undefined : 'fadeIn 300ms ease-out both',
-              opacity: dismissingFeedback ? 0 : 1,
-              maxHeight: dismissingFeedback ? '0px' : '400px',
-              paddingTop: dismissingFeedback ? '0px' : undefined,
-              paddingBottom: dismissingFeedback ? '0px' : undefined,
-              marginBottom: dismissingFeedback ? '0px' : undefined,
-            }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">What should change?</p>
-              <button onClick={closeFeedback} className="text-text-tertiary hover:text-text-secondary transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="E.g.: 'Only url, username, password, and screenshot_dir should be dynamic inputs. The steps array and script are implementation details.'"
-              className="w-full min-h-[80px] px-3 py-2 bg-surface border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-[10px] text-text-tertiary">This feedback guides the compiler. The current YAML will be replaced.</p>
-              <button onClick={handleRegenerate} disabled={!feedbackText.trim() || regenerateMutation.isPending} className="btn-primary text-xs shrink-0 ml-4">
-              {regenerateMutation.isPending ? 'Recompiling...' : 'Recompile Pipeline'}
-            </button>
-            </div>
-          </div>
+          <RecompileFeedbackPanel
+            feedbackText={feedbackText}
+            setFeedbackText={setFeedbackText}
+            dismissing={dismissingFeedback}
+            onClose={closeFeedback}
+            onRegenerate={handleRegenerate}
+            isPending={regenerateMutation.isPending}
+          />
         )}
 
         {/* Version history banner */}
@@ -268,7 +249,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
         </WizardNav>
       </div>
 
-      {/* Right sidebar — swaps between lifecycle tools and node properties */}
+      {/* Right sidebar */}
       <div className="space-y-6">
         <div className="sticky top-6">
         {selectedEntry ? (
@@ -309,7 +290,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
             )}
           </>
         )}
-        </div>{/* end sticky */}
+        </div>
       </div>
     </div>
   );

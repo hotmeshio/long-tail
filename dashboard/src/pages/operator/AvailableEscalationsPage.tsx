@@ -16,18 +16,17 @@ import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
-import { Modal } from '../../components/common/modal/Modal';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
-import { CustomDurationPicker } from '../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
 import { Lock } from 'lucide-react';
 import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { createBulkHandlers } from './helpers';
+import { ClaimModal } from './ClaimModal';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
@@ -60,12 +59,11 @@ export function AvailableEscalationsPage() {
     setSelectedIds(new Set());
   }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
-  // Map the UI status filter to the API status parameter
   const statusFilter = filters.status || '';
   const apiStatus = statusFilter === 'available' ? 'pending'
     : statusFilter === 'claimed' ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
-    : undefined; // '' (All) → no filter
+    : undefined;
 
   const { data, isLoading, error: queryError, refetch, isFetching } = useEscalations({
     status: apiStatus,
@@ -78,7 +76,6 @@ export function AvailableEscalationsPage() {
     order: sort.sort_by ? sort.order : undefined,
   });
 
-  // Client-side filter for available/claimed based on claim expiry
   const now = new Date();
   const rawEscalations = data?.escalations ?? [];
   const escalations = statusFilter === 'available'
@@ -261,42 +258,17 @@ export function AvailableEscalationsPage() {
         onPageSizeChange={pagination.setPageSize}
       />
 
-      <Modal
-        open={!!claimTarget}
+      <ClaimModal
+        claimTarget={claimTarget}
         onClose={() => setClaimTarget(null)}
-        title="Claim Escalation"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            Claim <span className="font-medium text-text-primary">{claimTarget?.type}</span> for:
-          </p>
-          <select
-            value={claimDuration}
-            onChange={(e) => { setClaimDuration(e.target.value); setCustomClaimMinutes(0); }}
-            className="select w-full text-sm"
-          >
-            {claimDurations.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-            <option value="custom">Other...</option>
-          </select>
-          {claimDuration === 'custom' && (
-            <CustomDurationPicker onChange={onCustomClaimChange} autoFocus />
-          )}
-          <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => setClaimTarget(null)} className="btn-secondary text-xs">
-              Cancel
-            </button>
-            <button
-              onClick={handleClaim}
-              className="btn-primary text-xs"
-              disabled={claim.isPending}
-            >
-              {claim.isPending ? 'Claiming...' : 'Claim'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        claimDuration={claimDuration}
+        onDurationChange={(v) => { setClaimDuration(v); setCustomClaimMinutes(0); }}
+        claimDurations={claimDurations}
+        customClaimMinutes={customClaimMinutes}
+        onCustomClaimChange={onCustomClaimChange}
+        onClaim={handleClaim}
+        isPending={claim.isPending}
+      />
 
       <BulkTriageModal
         open={triageModalOpen}
