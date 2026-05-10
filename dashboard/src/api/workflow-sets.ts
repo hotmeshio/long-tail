@@ -27,17 +27,12 @@ export function useWorkflowSets(filters: {
   });
 }
 
-/** Get a single workflow set by ID. Polls while status is non-terminal. */
+/** Get a single workflow set by ID. Updates via push events, not polling. */
 export function useWorkflowSet(id: string | undefined) {
   return useQuery<WorkflowSetRecord>({
     queryKey: [...WORKFLOW_SETS_KEY, id],
     queryFn: () => apiFetch(`/workflow-sets/${id}`),
     enabled: !!id,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      if (!status || status === 'completed' || status === 'failed') return false;
-      return 3000;
-    },
   });
 }
 

@@ -8,7 +8,7 @@ import { WizardSteps } from '../../../components/common/layout/WizardSteps';
 import { useWorkflowSet, useAddToWorkflowSet } from '../../../api/workflow-sets';
 import { useYamlWorkflows } from '../../../api/yaml-workflows';
 import { useBuilderResult } from '../../../api/workflow-builder';
-import { useMcpQueryDetailEvents } from '../../../hooks/useEventHooks';
+import { useMcpQueryDetailEvents, usePlanDetailEvents } from '../../../hooks/useEventHooks';
 import { PlanSidebar } from './PlanSidebar';
 import { PlanProfilePanel } from './PlanProfilePanel';
 import { DeployPanel } from './DeployPanel';
@@ -37,6 +37,7 @@ export function PlanWizard() {
   const queryClient = useQueryClient();
 
   useMcpQueryDetailEvents(workflowId);
+  usePlanDetailEvents(workflowId);
 
   // ── Resolve set_id (URL param first, planner result fallback) ───────────
   const urlSetId = searchParams.get('set_id') || undefined;
@@ -134,11 +135,10 @@ export function PlanWizard() {
 
   const isPlanning = setStatus === 'planning';
   const isFailed = setStatus === 'failed';
-  const hasYaml = yamlWorkflows.length > 0;
   const hasActive = yamlWorkflows.some(w => w.status === 'active');
 
   let maxReachable: PlanStep = 1;
-  if (plan.length > 0 && hasYaml) maxReachable = 2;
+  if (plan.length > 0) maxReachable = 2; // Allow step 2 as soon as plan exists (YAML may still be building)
   if (hasProfiled) maxReachable = 3;
   if (hasActive) maxReachable = 4;
 
