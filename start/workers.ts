@@ -12,12 +12,13 @@ import { mcpRegistry } from '../services/mcp';
 import * as yamlWorkflowWorkers from '../services/yaml-workflow/workers';
 import { migrate } from '../lib/db/migrate';
 
-import type { LTStartConfig } from '../types/startup';
+import type { LTStartConfig, LTWorkerConfig } from '../types/startup';
 
 type WorkerEntry = {
   taskQueue: string;
   workflow: (...args: any[]) => any;
   connection?: { readonly?: boolean; retry?: Record<string, unknown> };
+  config?: LTWorkerConfig;
 };
 
 /**
@@ -128,6 +129,40 @@ export async function startWorkers(
     loggerRegistry.info(
       `[long-tail] workers started on queues: ${workers.map((w) => w.taskQueue).join(', ')}`,
     );
+
+    // Seed inline workflow configs declared on workers
+    const workersWithConfig = workers.filter((w) => w.config);
+    if (workersWithConfig.length) {
+      const { upsertWorkflowConfig } = await import('../services/config/write');
+      const { ltConfig } = await import('../modules/ltconfig');
+      for (const w of workersWithConfig) {
+        const workflowType = w.workflow.name;
+        const c = w.config!;
+        try {
+          await upsertWorkflowConfig({
+            workflow_type: workflowType,
+            task_queue: w.taskQueue,
+            invocable: c.invocable ?? false,
+            default_role: c.defaultRole ?? 'reviewer',
+            description: c.description ?? null,
+            roles: c.roles ?? [],
+            invocation_roles: c.invocationRoles ?? [],
+            consumes: c.consumes ?? [],
+            tool_tags: c.toolTags ?? [],
+            envelope_schema: c.envelopeSchema ?? null,
+            resolver_schema: c.resolverSchema ?? null,
+            cron_schedule: c.cronSchedule ?? null,
+            execute_as: c.executeAs ?? null,
+          });
+          loggerRegistry.info(`[long-tail] config seeded: ${workflowType}`);
+        } catch (err: any) {
+          loggerRegistry.warn(
+            `[long-tail] config seed failed for ${workflowType}: ${err.message}`,
+          );
+        }
+      }
+      ltConfig.invalidate();
+    }
 
     // Start maintenance cron
     if (maintenanceRegistry.hasConfig) {

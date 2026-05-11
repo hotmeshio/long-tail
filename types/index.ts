@@ -89,6 +89,7 @@ export type {
 export type {
   LTStartConfig,
   LTInstance,
+  LTWorkerConfig,
 } from './startup';
 
 export type {

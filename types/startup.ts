@@ -9,6 +9,38 @@ import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
 import type { LTEscalationStrategy } from './escalation-strategy';
 
+/**
+ * Inline workflow profile declared alongside a worker registration.
+ * When present, the config is upserted into `lt_config_workflows` at startup
+ * so the dashboard shows forms, roles, and tier badges on first boot.
+ *
+ * `workflow_type` and `task_queue` are derived automatically from the worker entry.
+ * Roles referenced here are auto-created if they don't already exist.
+ */
+export interface LTWorkerConfig {
+  description?: string;
+  /** Allow invocation from the dashboard / API. Default: false. */
+  invocable?: boolean;
+  /** Roles allowed to invoke this workflow. */
+  invocationRoles?: string[];
+  /** Default role for escalations. Default: 'reviewer'. */
+  defaultRole?: string;
+  /** Roles that can claim and resolve escalations (certifies the workflow for HITL). */
+  roles?: string[];
+  /** JSON template that pre-fills the dashboard invocation form. */
+  envelopeSchema?: Record<string, any>;
+  /** JSON template that pre-fills the escalation resolution form. */
+  resolverSchema?: Record<string, any>;
+  /** Upstream workflow types whose output is injected into this workflow's envelope. */
+  consumes?: string[];
+  /** MCP tool tags for discovery routing. */
+  toolTags?: string[];
+  /** Cron expression for scheduled execution. */
+  cronSchedule?: string;
+  /** Bot identity to run as (proxy invocation). */
+  executeAs?: string;
+}
+
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
@@ -54,6 +86,8 @@ export interface LTStartConfig {
      * `retry` (stream-level retry policy with backoff).
      */
     connection?: { readonly?: boolean; retry?: Record<string, unknown> };
+    /** Inline workflow profile — auto-seeds dashboard forms, roles, and tier on startup. */
+    config?: LTWorkerConfig;
   }>;
 
   /** Interceptor defaults applied when a workflow escalates. */
