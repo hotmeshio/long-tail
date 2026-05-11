@@ -56,22 +56,22 @@ function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 function buildManifest(): any[] {
   const manifest: any[] = [
-    { activity_id: 'trigger_ff', title: 'Trigger', type: 'trigger', tool_source: 'trigger', topic: 'factory.floor', input_mappings: {}, output_fields: ['orderId', 'product'] },
+    { activity_id: 'trigger_ff', title: 'Trigger', type: 'trigger', tool_source: 'trigger', topic: 'factory_floor', input_mappings: {}, output_fields: ['orderId', 'product'] },
   ];
   for (const step of ['ingest', 'classify', 'prepress', 'print', 'scan']) {
-    manifest.push({ activity_id: `${step}_ff`, title: step, type: 'worker', tool_source: 'mcp', topic: 'factory.floor', workflow_name: 'get_knowledge', mcp_server_id: 'long-tail-knowledge', mcp_tool_name: 'get_knowledge', input_mappings: {}, output_fields: [] });
+    manifest.push({ activity_id: `${step}_ff`, title: step, type: 'worker', tool_source: 'mcp', topic: 'factory_floor', workflow_name: 'get_knowledge', mcp_server_id: 'long-tail-knowledge', mcp_tool_name: 'get_knowledge', input_mappings: {}, output_fields: [] });
   }
-  const hookTopics = ['factory.qc.ack', 'factory.pack.ack', 'factory.ship.ack', 'factory.dock.ack', 'factory.signoff.ack'];
+  const hookTopics = ['factory_qc_ack', 'factory_pack_ack', 'factory_ship_ack', 'factory_dock_ack', 'factory_signoff_ack'];
   const escIds = ['esc_qc_ff', 'esc_pack_ff', 'esc_ship_ff', 'esc_dock_ff', 'esc_signoff_ff'];
   const waitIds = ['wait_qc_ff', 'wait_pack_ff', 'wait_ship_ff', 'wait_dock_ff', 'wait_signoff_ff'];
   const resolveIds = ['resolve_qc_ff', 'resolve_pack_ff', 'resolve_ship_ff', 'resolve_dock_ff', 'resolve_signoff_ff'];
   for (let i = 0; i < 5; i++) {
-    manifest.push({ activity_id: escIds[i], title: `Escalate ${STATIONS[i]}`, type: 'worker', tool_source: 'mcp', topic: 'factory.floor', workflow_name: 'escalate_and_wait', mcp_server_id: 'long-tail-human-queue', mcp_tool_name: 'escalate_and_wait', input_mappings: {}, output_fields: ['escalationId', 'signalId'] });
-    manifest.push({ activity_id: waitIds[i], title: `Wait ${STATIONS[i]}`, type: 'hook', tool_source: 'signal', topic: 'factory.floor', hook_topic: hookTopics[i], input_mappings: {}, output_fields: [] });
-    manifest.push({ activity_id: resolveIds[i], title: `Resolve ${STATIONS[i]}`, type: 'worker', tool_source: 'mcp', topic: 'factory.floor', workflow_name: 'resolve_escalation', mcp_server_id: 'long-tail-human-queue', mcp_tool_name: 'resolve_escalation', input_mappings: {}, output_fields: [] });
+    manifest.push({ activity_id: escIds[i], title: `Escalate ${STATIONS[i]}`, type: 'worker', tool_source: 'mcp', topic: 'factory_floor', workflow_name: 'escalate_and_wait', mcp_server_id: 'long-tail-human-queue', mcp_tool_name: 'escalate_and_wait', input_mappings: {}, output_fields: ['escalationId', 'signalId'] });
+    manifest.push({ activity_id: waitIds[i], title: `Wait ${STATIONS[i]}`, type: 'hook', tool_source: 'signal', topic: 'factory_floor', hook_topic: hookTopics[i], input_mappings: {}, output_fields: [] });
+    manifest.push({ activity_id: resolveIds[i], title: `Resolve ${STATIONS[i]}`, type: 'worker', tool_source: 'mcp', topic: 'factory_floor', workflow_name: 'resolve_escalation', mcp_server_id: 'long-tail-human-queue', mcp_tool_name: 'resolve_escalation', input_mappings: {}, output_fields: [] });
   }
-  manifest.push({ activity_id: 'complete_ff', title: 'Complete', type: 'worker', tool_source: 'mcp', topic: 'factory.floor', workflow_name: 'get_knowledge', mcp_server_id: 'long-tail-knowledge', mcp_tool_name: 'get_knowledge', input_mappings: {}, output_fields: [] });
-  manifest.push({ activity_id: 'done_ff', title: 'Done', type: 'hook', tool_source: 'signal', topic: 'factory.floor', input_mappings: {}, output_fields: [] });
+  manifest.push({ activity_id: 'complete_ff', title: 'Complete', type: 'worker', tool_source: 'mcp', topic: 'factory_floor', workflow_name: 'get_knowledge', mcp_server_id: 'long-tail-knowledge', mcp_tool_name: 'get_knowledge', input_mappings: {}, output_fields: [] });
+  manifest.push({ activity_id: 'done_ff', title: 'Done', type: 'hook', tool_source: 'signal', topic: 'factory_floor', input_mappings: {}, output_fields: [] });
   return manifest;
 }
 
@@ -82,9 +82,9 @@ async function main() {
   if (!token) { console.error('Login failed'); process.exit(1); }
 
   // 2. Deploy workflow
-  console.log('2. Deploy factory.floor workflow');
+  console.log('2. Deploy factory_floor workflow');
   const yamlContent = readFileSync(join(__dirname, 'yaml/04-factory.yaml'), 'utf-8');
-  const existing = await api('GET', '/yaml-workflows?graph_topic=factory.floor&limit=1', undefined, token);
+  const existing = await api('GET', '/yaml-workflows?graph_topic=factory_floor&limit=1', undefined, token);
   let wfId: string;
 
   if (existing?.workflows?.length) {
@@ -96,7 +96,7 @@ async function main() {
     console.log(`   Updated existing: ${wfId}`);
   } else {
     const created = await api('POST', '/yaml-workflows/direct', {
-      name: 'factory.floor',
+      name: 'factory_floor',
       description: 'Factory floor: 5 auto + 5 human stations + rollup',
       yaml_content: yamlContent,
       input_schema: { type: 'object', properties: { orderId: { type: 'string' }, product: { type: 'string' } }, required: ['orderId', 'product'] },
