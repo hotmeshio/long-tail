@@ -14,6 +14,7 @@ import { escalationStrategyRegistry } from '../services/escalation-strategy';
 import { DefaultEscalationStrategy } from '../services/escalation-strategy/default';
 import { McpEscalationStrategy } from '../services/escalation-strategy/mcp';
 
+import { createSocketIOAuthenticator } from './socket-auth';
 import type { LTStartConfig } from '../types/startup';
 
 /**
@@ -45,7 +46,9 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     if (startConfig.events?.nats) {
       eventRegistry.register(new NatsEventAdapter(startConfig.events.nats));
     }
-    eventRegistry.register(new SocketIOEventAdapter());
+    eventRegistry.register(new SocketIOEventAdapter({
+      authenticate: createSocketIOAuthenticator(startConfig),
+    }));
   }
 
   // Always register the callback adapter for SDK event subscriptions.

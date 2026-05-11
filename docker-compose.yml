@@ -1,6 +1,6 @@
 # Long Tail Workflows
 # Usage:  docker compose up
-# Ports:  3000 (API), 5415 (Postgres), 4222/8222 (NATS)
+# Ports:  3000 (API), 9230 (debug), 5415 (Postgres), 4222/8222 (NATS)
 # Adjust: Change the left side of any port mapping to resolve collisions
 #         e.g. "5433:5432" to use host port 5433 for Postgres
 
@@ -15,7 +15,7 @@ services:
       - /app/dashboard/node_modules
     ports:
       - "${LT_PORT:-3000}:3000"
-      - "9229:9229"
+      - "${LT_DEBUG_PORT:-9230}:9229"
     deploy:
       resources:
         limits:

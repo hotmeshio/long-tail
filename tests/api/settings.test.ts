@@ -77,29 +77,21 @@ describe('getSettings — transport detection', () => {
   });
 });
 
-describe('getSettings — NATS token and URL', () => {
-  it('includes natsToken from env when NATS is registered', async () => {
+describe('getSettings — NATS credentials excluded', () => {
+  it('does not include natsToken even when NATS is registered', async () => {
     process.env.NATS_TOKEN = 'my-secret-token';
     eventRegistry.register(new NatsEventAdapter({ url: 'nats://localhost:4222' }));
 
     const result = await getSettings();
-    expect(result.data.events.natsToken).toBe('my-secret-token');
+    expect(result.data.events).not.toHaveProperty('natsToken');
   });
 
-  it('returns null natsToken when NATS is not registered', async () => {
+  it('does not include natsToken when NATS is not registered', async () => {
     process.env.NATS_TOKEN = 'my-secret-token';
     eventRegistry.register(new SocketIOEventAdapter());
 
     const result = await getSettings();
-    expect(result.data.events.natsToken).toBeNull();
-  });
-
-  it('returns null natsToken when env var is not set', async () => {
-    delete process.env.NATS_TOKEN;
-    eventRegistry.register(new NatsEventAdapter({ url: 'nats://localhost:4222' }));
-
-    const result = await getSettings();
-    expect(result.data.events.natsToken).toBeNull();
+    expect(result.data.events).not.toHaveProperty('natsToken');
   });
 
   it('includes natsWsUrl from NATS_WS_URL env when NATS is registered', async () => {

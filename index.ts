@@ -21,7 +21,7 @@ export { ltConfig } from './modules/ltconfig';
 export { eventRegistry } from './lib/events';
 export { NatsEventAdapter } from './lib/events/nats';
 export { InMemoryEventAdapter } from './lib/events/memory';
-export { SocketIOEventAdapter } from './lib/events/socketio';
+export { SocketIOEventAdapter, type SocketIOAuthenticator } from './lib/events/socketio';
 export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishWorkflowEvent } from './lib/events/publish';
 export { telemetryRegistry } from './lib/telemetry';
 export { HoneycombTelemetryAdapter } from './lib/telemetry/honeycomb';

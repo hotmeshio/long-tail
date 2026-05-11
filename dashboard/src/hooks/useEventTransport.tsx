@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
+import { getToken } from '../api/client';
 import { NatsProvider } from './useNats';
 import { SocketIOProvider } from './useSocketIO';
 
@@ -39,10 +40,27 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
         console.log('[lt-transport] server reports:', value);
         if (!cancelled) {
           if (value === 'nats') {
-            setNatsSettings({
-              url: data.events.natsWsUrl ?? null,
-              token: data.events.natsToken ?? null,
-            });
+            let natsUrl = data.events.natsWsUrl ?? null;
+            let natsToken: string | null = null;
+
+            // Fetch NATS token from authenticated endpoint
+            const jwt = getToken();
+            if (jwt) {
+              try {
+                const credRes = await fetch('/api/nats-credentials', {
+                  headers: { Authorization: `Bearer ${jwt}` },
+                });
+                if (credRes.ok) {
+                  const creds = await credRes.json();
+                  natsUrl = creds.natsWsUrl ?? natsUrl;
+                  natsToken = creds.natsToken ?? null;
+                }
+              } catch {
+                console.warn('[lt-transport] failed to fetch NATS credentials');
+              }
+            }
+
+            setNatsSettings({ url: natsUrl, token: natsToken });
           }
           setTransport(value === 'nats' ? 'nats' : 'socketio');
         }

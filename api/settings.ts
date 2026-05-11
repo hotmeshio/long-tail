@@ -39,9 +39,6 @@ export async function getSettings(): Promise<LTApiResult> {
           natsWsUrl: hasNats
             ? (process.env.VITE_NATS_WS_URL || process.env.NATS_WS_URL || null)
             : null,
-          natsToken: hasNats
-            ? (process.env.NATS_TOKEN || null)
-            : null,
         },
       },
     };
