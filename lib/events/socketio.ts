@@ -5,6 +5,12 @@ import { loggerRegistry } from '../logger';
 import type { LTEvent, LTEventAdapter } from '../../types';
 
 /**
+ * Callback to verify a Socket.IO handshake token.
+ * Return `true` to allow the connection, `false` to reject.
+ */
+export type SocketIOAuthenticator = (token: string) => boolean | Promise<boolean>;
+
+/**
  * Socket.IO event adapter for browser clients.
  *
  * Publishes LTEvent payloads to all connected Socket.IO clients
@@ -13,6 +19,9 @@ import type { LTEvent, LTEventAdapter } from '../../types';
  * The HTTP server must be attached via `attachServer()` before
  * `connect()` is called. The startup flow handles this automatically
  * when Socket.IO is the active event transport.
+ *
+ * When an `authenticate` callback is provided, Socket.IO middleware
+ * rejects handshakes that do not include a valid `auth.token`.
  *
  * Usage:
  * ```typescript
@@ -29,6 +38,11 @@ import type { LTEvent, LTEventAdapter } from '../../types';
 export class SocketIOEventAdapter implements LTEventAdapter {
   private io: SocketIOServer | null = null;
   private httpServer: HttpServer | null = null;
+  private authenticate: SocketIOAuthenticator | null;
+
+  constructor(options?: { authenticate?: SocketIOAuthenticator }) {
+    this.authenticate = options?.authenticate ?? null;
+  }
 
   /** Attach to an HTTP server. Must be called before connect(). */
   attachServer(server: HttpServer): void {
@@ -46,6 +60,25 @@ export class SocketIOEventAdapter implements LTEventAdapter {
       transports: ['polling', 'websocket'],
       allowEIO3: true,
     });
+
+    if (this.authenticate) {
+      const verify = this.authenticate;
+      this.io.use(async (socket, next) => {
+        const token = socket.handshake.auth?.token as string | undefined;
+        if (!token) {
+          return next(new Error('Authentication required'));
+        }
+        try {
+          const valid = await verify(token);
+          if (!valid) {
+            return next(new Error('Authentication failed'));
+          }
+          next();
+        } catch {
+          next(new Error('Authentication failed'));
+        }
+      });
+    }
 
     this.io.on('connection', (socket) => {
       loggerRegistry.info(`[lt-events:socketio] client connected (${socket.id})`);

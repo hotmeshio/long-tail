@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
+import { getToken } from '../api/client';
 import { subjectMatchesPattern } from '../lib/events/matching';
 import type { NatsLTEvent, NatsEventHandler } from '../lib/nats/types';
 import { EventContext } from './useEventContext';
@@ -108,6 +109,7 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
     // Connect to same origin. Works for both:
     // - Production: dashboard served from same Express server
     // - Dev (Vite): proxy in vite.config.ts forwards /socket.io to backend
+    const authToken = getToken();
     const socket = io({
       path: '/socket.io',
       transports: ['polling', 'websocket'],
@@ -115,6 +117,7 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,
+      ...(authToken ? { auth: { token: authToken } } : {}),
     });
 
     socketRef.current = socket;

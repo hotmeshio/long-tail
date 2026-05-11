@@ -25,6 +25,7 @@ import botAccountsRouter from './bot-accounts';
 import docsRouter from './docs';
 import workflowSetsRouter from './workflow-sets';
 import knowledgeRouter from './knowledge';
+import natsCredentialsRouter from './nats-credentials';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.use('/settings', settingsRouter);
 // Apply auth to all API routes
 router.use(requireAuth);
 
+router.use('/nats-credentials', natsCredentialsRouter);
 router.use('/tasks', tasksRouter);
 router.use('/escalations', escalationsRouter);
 router.use('/workflows', workflowsRouter);
