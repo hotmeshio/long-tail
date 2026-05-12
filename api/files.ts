@@ -52,6 +52,22 @@ export async function deleteFile(input: {
   }
 }
 
+export async function uploadFile(input: {
+  path: string;
+  buffer: Buffer;
+}): Promise<LTApiResult> {
+  try {
+    const result = await getStorageBackend().write(input.path, input.buffer);
+    const contentType = mimeFromPath(input.path);
+    return {
+      status: 200,
+      data: { path: input.path, size: result.size, content_type: contentType },
+    };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
 export async function generateSignedUrl(input: {
   filePath: string;
   expiresIn: number;

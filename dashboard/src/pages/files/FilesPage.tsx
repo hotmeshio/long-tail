@@ -1,14 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
+  Upload,
+  UploadCloud,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterInput } from '../../components/common/data/FilterBar';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { EmptyState } from '../../components/common/display/EmptyState';
-import { useFileBrowse } from '../../api/files';
+import { DropZone } from '../../components/common/DropZone';
+import { useFileBrowse, useUploadFile } from '../../api/files';
 import { FileBreadcrumbs } from './FileBreadcrumbs';
 import { FilePreviewPanel } from './FilePreviewPanel';
 import { ListView } from './FileListViews';
@@ -40,6 +45,40 @@ export function FilesPage() {
     : prefix;
 
   const { data, isLoading, isFetching, refetch } = useFileBrowse(effectivePrefix, pageSize, currentToken);
+  const uploadMutation = useUploadFile();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [uploadPrefix, setUploadPrefix] = useState('');
+
+  const handleUploadFiles = useCallback((files: File[]) => {
+    setPendingFiles(files);
+    setUploadPrefix(prefix);
+  }, [prefix]);
+
+  const [uploadError, setUploadError] = useState('');
+
+  const confirmUpload = useCallback(() => {
+    if (!pendingFiles) return;
+    setUploadError('');
+    let remaining = pendingFiles.length;
+    for (const file of pendingFiles) {
+      const targetPath = `${uploadPrefix}${file.name}`;
+      uploadMutation.mutate({ path: targetPath, file }, {
+        onSuccess: () => {
+          remaining--;
+          queryClient.invalidateQueries({ queryKey: ['fileBrowse'] });
+          if (remaining <= 0) setPendingFiles(null);
+        },
+        onError: (err) => {
+          remaining--;
+          setUploadError(err.message);
+          console.error('[Upload] failed:', targetPath, err);
+        },
+      });
+    }
+  }, [pendingFiles, uploadPrefix, uploadMutation, queryClient]);
 
   const directories = data?.directories ?? [];
   const files = data?.files ?? [];
@@ -86,10 +125,37 @@ export function FilesPage() {
   const apiPath = `/file-browser/browse?prefix=${encodeURIComponent(effectivePrefix)}&pageSize=${pageSize}${currentToken ? `&continuationToken=${encodeURIComponent(currentToken)}` : ''}`;
 
   return (
+    <DropZone onDrop={handleUploadFiles} label="Drop files to upload">
     <div className="flex gap-0">
+      {/* Hidden file input for button-triggered upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          if (files.length) handleUploadFiles(files);
+          e.target.value = '';
+        }}
+      />
+
       {/* Main content */}
       <div className="flex-1 min-w-0 overflow-hidden">
-        <PageHeader title="Files" docsHash="#docs:dashboard.md:files" />
+        <PageHeader
+          title="Files"
+          docsHash="#docs:dashboard.md:files"
+          actions={
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadMutation.isPending}
+              className="btn-primary text-xs inline-flex items-center gap-1.5"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+            </button>
+          }
+        />
 
         <FileBreadcrumbs prefix={prefix} onNavigate={navigateTo} />
 
@@ -115,7 +181,13 @@ export function FilesPage() {
             ))}
           </div>
         ) : isEmpty ? (
-          <EmptyState title={search ? 'No matching files' : 'This directory is empty'} />
+          <div className="cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+            <EmptyState
+              icon={UploadCloud}
+              title={search ? 'No matching files' : 'No files yet'}
+              description={search ? undefined : 'Drop files here or click to upload'}
+            />
+          </div>
         ) : (
           <ListView
             directories={directories}
@@ -176,5 +248,45 @@ export function FilesPage() {
         />
       )}
     </div>
+    {/* Upload confirmation dialog */}
+    {pendingFiles && createPortal(
+      <>
+        <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setPendingFiles(null)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-raised border border-surface-border rounded-lg shadow-lg w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-surface-border">
+              <h3 className="text-sm font-medium text-text-primary">Upload {pendingFiles.length} file{pendingFiles.length > 1 ? 's' : ''}</h3>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Destination folder</label>
+                <input
+                  type="text"
+                  value={uploadPrefix}
+                  onChange={(e) => setUploadPrefix(e.target.value)}
+                  placeholder="e.g., images/ or leave empty for root"
+                  className="input text-xs w-full font-mono"
+                />
+              </div>
+              <div className="text-[10px] text-text-quaternary space-y-0.5">
+                {pendingFiles.map((f, i) => (
+                  <p key={i} className="truncate">{uploadPrefix}{f.name} <span className="text-text-tertiary">({(f.size / 1024).toFixed(1)} KB)</span></p>
+                ))}
+              </div>
+              {uploadError && <p className="text-xs text-status-error">{uploadError}</p>}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-surface-border">
+              <button onClick={() => setPendingFiles(null)} className="btn-ghost text-xs">Cancel</button>
+              <button onClick={confirmUpload} className="btn-primary text-xs">
+                <Upload className="w-3.5 h-3.5 mr-1.5 inline" />
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      </>,
+      document.body,
+    )}
+    </DropZone>
   );
 }

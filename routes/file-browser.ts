@@ -94,4 +94,35 @@ router.get('/download/{*filePath}', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/file-browser/upload
+ * Upload a file to storage.
+ * Query: ?path=images/photo.png (target path including filename)
+ * Body: raw file bytes (Content-Type should match the file type)
+ */
+router.post('/upload', async (req, res) => {
+  const targetPath = req.query.path as string;
+  if (!targetPath) {
+    res.status(400).json({ error: 'path query parameter required (e.g., ?path=images/photo.png)' });
+    return;
+  }
+
+  // Collect raw body chunks
+  const chunks: Buffer[] = [];
+  req.on('data', (chunk: Buffer) => chunks.push(chunk));
+  req.on('end', async () => {
+    try {
+      const buffer = Buffer.concat(chunks);
+      if (buffer.length === 0) {
+        res.status(400).json({ error: 'Empty file body' });
+        return;
+      }
+      const result = await api.uploadFile({ path: targetPath, buffer });
+      res.status(result.status).json(result.data ?? { error: result.error });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+});
+
 export default router;

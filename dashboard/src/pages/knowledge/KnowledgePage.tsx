@@ -1,14 +1,16 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronRight, Brain, Database, Table2 } from 'lucide-react';
+import { ChevronRight, Brain, Database, Table2, Plus } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterInput } from '../../components/common/data/FilterBar';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { EmptyState } from '../../components/common/display/EmptyState';
+import { DropZone } from '../../components/common/DropZone';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { useListDomains, useListKnowledge } from '../../api/knowledge';
 import { KnowledgeEntryView } from './KnowledgeEntryView';
+import { CreateEntryModal } from './CreateEntryModal';
 
 const PAGE_SIZE = 50;
 
@@ -20,6 +22,34 @@ export function KnowledgePage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [showCreate, setShowCreate] = useState(false);
+  const [prefillData, setPrefillData] = useState<Record<string, unknown> | undefined>();
+
+  const handleJsonDrop = useCallback((files: File[]) => {
+    console.debug('[Knowledge] drop received:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
+    const jsonFile = files.find(f => f.name.endsWith('.json') || f.type === 'application/json');
+    if (!jsonFile) {
+      console.warn('[Knowledge] no JSON file found in dropped files');
+      return;
+    }
+    console.debug('[Knowledge] reading:', jsonFile.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+          console.debug('[Knowledge] parsed object with keys:', Object.keys(parsed));
+          setPrefillData(parsed);
+          setShowCreate(true);
+        } else {
+          console.warn('[Knowledge] JSON is not a plain object, got:', Array.isArray(parsed) ? 'array' : typeof parsed);
+        }
+      } catch (err) {
+        console.warn('[Knowledge] JSON parse failed:', err);
+      }
+    };
+    reader.readAsText(jsonFile);
+  }, []);
 
   // Debounce search to avoid hammering the API on every keystroke
   useEffect(() => {
@@ -70,8 +100,21 @@ export function KnowledgePage() {
   const domainsApiPath = '/knowledge/domains';
 
   return (
+    <DropZone onDrop={handleJsonDrop} label="Drop a JSON file to create an entry" accept=".json,application/json">
     <div>
-      <PageHeader title="Knowledge" docsHash="#docs:dashboard.md:knowledge" />
+      <PageHeader
+        title="Knowledge"
+        docsHash="#docs:dashboard.md:knowledge"
+        actions={
+          <button
+            onClick={() => { setPrefillData(undefined); setShowCreate(true); }}
+            className="btn-primary text-xs inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Entry
+          </button>
+        }
+      />
 
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm mb-6 min-h-[28px]">
@@ -145,7 +188,9 @@ export function KnowledgePage() {
             </div>
           ) : level === 'domains' ? (
             filteredDomains.length === 0 ? (
-              <EmptyState title={search ? 'No matching domains' : 'No knowledge domains yet'} />
+              <div className="cursor-pointer" onClick={() => { setPrefillData(undefined); setShowCreate(true); }}>
+                <EmptyState icon={Brain} title={search ? 'No matching domains' : 'No knowledge yet'} description={search ? undefined : 'Create your first entry or drop a JSON file'} />
+              </div>
             ) : (
               <table className="w-full mt-2">
                 <thead>
@@ -183,7 +228,9 @@ export function KnowledgePage() {
             )
           ) : (
             entries.length === 0 ? (
-              <EmptyState title={search ? 'No matching entries' : 'No entries in this domain'} />
+              <div className="cursor-pointer" onClick={() => { setPrefillData(undefined); setShowCreate(true); }}>
+                <EmptyState icon={Plus} title={search ? 'No matching entries' : 'No entries in this domain'} description={search ? undefined : 'Add an entry or drop a JSON file'} />
+              </div>
             ) : (
               <>
                 <table className="w-full mt-2">
@@ -252,5 +299,17 @@ export function KnowledgePage() {
         </>
       )}
     </div>
+
+    <CreateEntryModal
+      open={showCreate}
+      onClose={() => { setShowCreate(false); setPrefillData(undefined); }}
+      onCreated={(d, k) => {
+        setSearchParams({ domain: d, key: k });
+        domainsQuery.refetch();
+      }}
+      prefillData={prefillData}
+      prefillDomain={domain || undefined}
+    />
+    </DropZone>
   );
 }

@@ -5,7 +5,9 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../api/files', () => ({
   useFileBrowse: vi.fn(),
+  useUploadFile: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useFileMetadata: vi.fn(() => ({ data: null, isLoading: false })),
+  useFilePreviewUrl: vi.fn(() => ({ data: undefined })),
   useGenerateSignedUrl: vi.fn(() => ({ mutateAsync: vi.fn(), isError: false })),
   useDeleteFile: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false, isError: false })),
   getFilePreviewUrl: (p: string) => `/api/files/${p}`,
@@ -90,7 +92,7 @@ describe('FilesPage', () => {
       refetch: vi.fn(),
     } as any);
     render(<FilesPage />, { wrapper });
-    expect(screen.getByText('This directory is empty')).toBeInTheDocument();
+    expect(screen.getByText('No files yet')).toBeInTheDocument();
   });
 
   it('shows loading skeleton', () => {
