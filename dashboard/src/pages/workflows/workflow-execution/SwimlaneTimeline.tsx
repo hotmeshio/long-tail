@@ -23,6 +23,7 @@ interface SwimlaneTimelineProps {
 
 export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimelineProps) {
   const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set());
+  const [hoveredEvent, setHoveredEvent] = useState<number | null>(null);
 
   // Filter out workflow-level events (started/completed) — they aren't operations
   const timelineEvents = events.filter(
@@ -206,29 +207,43 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
                   />
                 ))}
 
-                {lane.segments.map((seg) => (
-                  <div
-                    key={seg.eventId}
-                    className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 ${outline ? 'border-2' : ''} ${
-                      selectedEvents.has(seg.eventId)
-                        ? `${barColor(lane.category, seg.pending)} ring-2 ring-accent ring-offset-1`
-                        : `${barColor(lane.category, seg.pending)} hover:opacity-80`
-                    }`}
-                    style={{
-                      left: `${seg.startPct}%`,
-                      width: `${seg.widthPct}%`,
-                      minWidth: '4px',
-                    }}
-                    title={seg.label}
-                    onClick={() => toggleEvent(seg.eventId)}
-                  >
-                    {seg.widthPct > 8 && (
-                      <span className={`absolute inset-0 flex items-center px-1.5 text-[9px] font-mono ${textColor(lane.category)} truncate`}>
-                        {seg.duration !== null ? formatDuration(seg.duration) : 'pending'}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {lane.segments.map((seg) => {
+                  const isHovered = hoveredEvent === seg.eventId;
+                  const isSelected = selectedEvents.has(seg.eventId);
+                  const isNarrow = seg.widthPct < 3;
+                  return (
+                    <div
+                      key={seg.eventId}
+                      className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 origin-center ${outline ? 'border-2' : ''} ${
+                        isSelected
+                          ? `${barColor(lane.category, seg.pending)} ring-2 ring-accent ring-offset-1`
+                          : `${barColor(lane.category, seg.pending)} hover:opacity-80`
+                      }`}
+                      style={{
+                        left: `${seg.startPct}%`,
+                        width: `${seg.widthPct}%`,
+                        minWidth: '4px',
+                        ...(isHovered && isNarrow ? {
+                          transform: 'scaleX(4) scaleY(1.3) translateY(-2px)',
+                          zIndex: 20,
+                          borderRadius: '4px',
+                        } : {
+                          zIndex: isSelected ? 10 : 1,
+                        }),
+                      }}
+                      title={seg.label}
+                      onClick={() => toggleEvent(seg.eventId)}
+                      onMouseEnter={() => setHoveredEvent(seg.eventId)}
+                      onMouseLeave={() => setHoveredEvent(null)}
+                    >
+                      {seg.widthPct > 8 && (
+                        <span className={`absolute inset-0 flex items-center px-1.5 text-[9px] font-mono ${textColor(lane.category)} truncate`}>
+                          {seg.duration !== null ? formatDuration(seg.duration) : 'pending'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -254,6 +269,7 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
           </div>
         );
       })}
+
     </div>
   );
 }

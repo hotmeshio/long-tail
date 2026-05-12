@@ -100,6 +100,7 @@ export function McpServersPage() {
     <div>
       <PageHeader
         title="MCP Server Tools"
+        docsHash="#docs:dashboard.md:mcp-server-tools"
         actions={
           <button
             onClick={() => navigate('/mcp/servers/new')}

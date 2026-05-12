@@ -71,7 +71,7 @@ export function KnowledgePage() {
 
   return (
     <div>
-      <PageHeader title="Knowledge" />
+      <PageHeader title="Knowledge" docsHash="#docs:dashboard.md:knowledge" />
 
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm mb-6 min-h-[28px]">

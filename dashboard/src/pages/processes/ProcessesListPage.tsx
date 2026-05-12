@@ -101,7 +101,7 @@ export function ProcessesListPage() {
 
   return (
     <div>
-      <PageHeader title="All Processes" />
+      <PageHeader title="All Processes" docsHash="#docs:dashboard.md:processes-overview" />
 
       <FilterBar actions={
         <ListToolbar

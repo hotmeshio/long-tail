@@ -99,7 +99,7 @@ export function WorkersPage() {
 
   return (
     <div>
-      <PageHeader title="Workers" />
+      <PageHeader title="Workers" docsHash="#docs:dashboard.md:task-queues" />
 
       <FilterBar>
         <input

@@ -152,7 +152,7 @@ export function SidebarNav({ heading, entries }: SidebarNavProps) {
       {collapsed ? (
         <div className="h-px bg-surface-border mx-3 my-2" title={heading} />
       ) : (
-        <p className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-accent/80">
+        <p className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-accent/80">
           {heading}
         </p>
       )}

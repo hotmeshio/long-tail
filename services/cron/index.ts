@@ -1,4 +1,5 @@
 import { Virtual, Durable } from '@hotmeshio/hotmesh';
+import { parseExpression } from 'cron-parser';
 
 import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
@@ -8,6 +9,29 @@ import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig } from '../../types';
 import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
 import type { LTEnvelopePrincipal } from '../../types/envelope';
+
+const MIN_CRON_INTERVAL_MS = 60_000; // 1 minute minimum
+
+/**
+ * Validate a cron expression and enforce a minimum interval.
+ * Throws if the expression is invalid or fires more often than once per minute.
+ */
+export function validateCronSchedule(expr: string): void {
+  let interval;
+  try {
+    interval = parseExpression(expr, { utc: true });
+  } catch {
+    throw new Error(`Invalid cron expression: "${expr}"`);
+  }
+  const first = interval.next().toDate().getTime();
+  const second = interval.next().toDate().getTime();
+  const gap = second - first;
+  if (gap < MIN_CRON_INTERVAL_MS) {
+    throw new Error(
+      `Cron interval too frequent: "${expr}" fires every ${Math.round(gap / 1000)}s (minimum is 60s)`,
+    );
+  }
+}
 
 const CRON_TOPIC_PREFIX = 'lt.cron';
 const CRON_ID_PREFIX = 'lt-cron';
@@ -63,6 +87,8 @@ class LTCronRegistry {
    */
   async startCron(config: LTWorkflowConfig): Promise<void> {
     if (!config.cron_schedule || !config.task_queue) return;
+
+    validateCronSchedule(config.cron_schedule);
 
     const connection = getConnection();
     const topic = `${CRON_TOPIC_PREFIX}.${config.workflow_type}`;
@@ -188,6 +214,8 @@ class LTCronRegistry {
    */
   async startYamlCron(wf: LTYamlWorkflowRecord): Promise<void> {
     if (!wf.cron_schedule) return;
+
+    validateCronSchedule(wf.cron_schedule);
 
     const connection = getConnection();
     const topic = `${YAML_CRON_TOPIC_PREFIX}.${wf.id}`;

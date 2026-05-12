@@ -49,6 +49,7 @@ export function CredentialsPage() {
     <div>
       <PageHeader
         title="Credentials"
+        docsHash="#docs:dashboard.md:credentials"
         actions={
           <button
             onClick={() => setAddOpen((o) => !o)}

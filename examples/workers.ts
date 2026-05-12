@@ -9,16 +9,25 @@ import * as stepIteratorWorkflow from './workflows/assembly-line/iterator';
 import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
 
-// ── Shared role sets ────────────────────────────────────────────────────────
+// ── Role constants ──────────────────────────────────────────────────────────
 
-const CERTIFIED_ROLES = ['reviewer', 'engineer', 'admin'];
+const REVIEWER = 'reviewer';
+const ENGINEER = 'engineer';
+const ADMIN = 'admin';
+const SUPERADMIN = 'superadmin';
+const GRINDER = 'grinder';
+const GLUER = 'gluer';
+
+const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
+const INVOCATION_ROLES = [SUPERADMIN, ENGINEER];
 
 // ── Workflow configs ────────────────────────────────────────────────────────
 
 const reviewContentConfig: LTWorkerConfig = {
   description: 'Content review — AI-powered moderation with human escalation for low-confidence results',
   invocable: true,
-  defaultRole: 'reviewer',
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   toolTags: ['document-processing', 'vision', 'ocr', 'translation'],
   envelopeSchema: {
@@ -34,7 +43,8 @@ const reviewContentConfig: LTWorkerConfig = {
 const kitchenSinkConfig: LTWorkerConfig = {
   description: 'Kitchen sink — demonstrates sleep, signals, parallel activities, escalation, and every durable primitive',
   invocable: true,
-  defaultRole: 'reviewer',
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
     data: { name: 'World', mode: 'full' },
@@ -45,6 +55,7 @@ const kitchenSinkConfig: LTWorkerConfig = {
 const basicEchoConfig: LTWorkerConfig = {
   description: 'Basic echo — sleeps, then echoes input with identity context. Minimal durable workflow.',
   invocable: true,
+  invocationRoles: INVOCATION_ROLES,
   envelopeSchema: {
     data: { message: 'Hello, Long Tail!', sleepSeconds: 1 },
     metadata: { source: 'dashboard' },
@@ -54,9 +65,10 @@ const basicEchoConfig: LTWorkerConfig = {
 const basicSignalConfig: LTWorkerConfig = {
   description: 'Signal-based escalation — workflow stays running while waiting for human input via conditionLT',
   invocable: true,
-  defaultRole: 'reviewer',
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
   envelopeSchema: {
-    data: { message: 'Deployment approval needed for v2.1.0', role: 'reviewer' },
+    data: { message: 'Deployment approval needed for v2.1.0', role: REVIEWER },
     metadata: { certified: false, source: 'dashboard' },
   },
   resolverSchema: {
@@ -70,14 +82,15 @@ const basicSignalConfig: LTWorkerConfig = {
 const assemblyLineConfig: LTWorkerConfig = {
   description: 'Assembly line — orchestrates sequential stations with parallel child workflows and human escalation at each step',
   invocable: true,
-  defaultRole: 'reviewer',
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
     data: {
       productName: 'Widget A',
       stations: [
-        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
-        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components. Verify bond strength.' },
+        { stationName: GRINDER, role: GRINDER, instructions: 'Grind widget to spec.' },
+        { stationName: GLUER, role: GLUER, instructions: 'Bond components. Verify bond strength.' },
       ],
     },
     metadata: { source: 'dashboard' },
@@ -87,14 +100,15 @@ const assemblyLineConfig: LTWorkerConfig = {
 const stepIteratorConfig: LTWorkerConfig = {
   description: 'Step iterator — walks a list of stations sequentially, spawning a child workstation for each step',
   invocable: true,
-  defaultRole: 'reviewer',
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
     data: {
       name: 'Widget B',
       steps: [
-        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
-        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components. Verify bond strength.' },
+        { stationName: GRINDER, role: GRINDER, instructions: 'Grind widget to spec.' },
+        { stationName: GLUER, role: GLUER, instructions: 'Bond components. Verify bond strength.' },
       ],
     },
     metadata: { source: 'dashboard' },
@@ -104,14 +118,15 @@ const stepIteratorConfig: LTWorkerConfig = {
 const reverterConfig: LTWorkerConfig = {
   description: 'Reverter — like stepIterator but supports revert-on-rejection, stepping backwards through the assembly line',
   invocable: true,
-  defaultRole: 'reviewer',
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
     data: {
       name: 'Widget C',
       steps: [
-        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
-        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components. Verify bond strength.' },
+        { stationName: GRINDER, role: GRINDER, instructions: 'Grind widget to spec.' },
+        { stationName: GLUER, role: GLUER, instructions: 'Bond components. Verify bond strength.' },
       ],
     },
     metadata: { source: 'dashboard' },
@@ -125,11 +140,11 @@ const reverterConfig: LTWorkerConfig = {
 const workstationConfig: LTWorkerConfig = {
   description: 'Workstation — child workflow for a single assembly station. Creates escalation, waits for human, signals parent.',
   invocable: false,
-  defaultRole: 'grinder',
-  roles: [...CERTIFIED_ROLES, 'grinder', 'gluer'],
+  defaultRole: GRINDER,
+  roles: [...CERTIFIED_ROLES, GRINDER, GLUER],
   resolverSchema: {
     approved: true,
-    station: 'grinder',
+    station: GRINDER,
   },
 };
 

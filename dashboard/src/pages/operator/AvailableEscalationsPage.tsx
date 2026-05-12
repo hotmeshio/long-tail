@@ -195,7 +195,7 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="All Escalations" />
+      <PageHeader title="All Escalations" docsHash="#docs:dashboard.md:all-escalations" />
 
       <EscalationFilterBar
         filters={filters}

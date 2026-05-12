@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInvokeWorkflow } from '../../../api/workflows';
-import { SectionLabel } from '../../../components/common/layout/SectionLabel';
-import { Pill } from '../../../components/common/display/Pill';
 import { useAuth } from '../../../hooks/useAuth';
 import type { LTWorkflowConfig } from '../../../api/types';
 import {
@@ -117,16 +115,9 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center justify-between">
-          <SectionLabel>{selected.workflow_type}</SectionLabel>
-          <div className="flex gap-2">
-            {selected.roles.map((r) => (
-              <Pill key={r}>{r}</Pill>
-            ))}
-          </div>
-        </div>
+        <h2 className="text-lg font-mono font-medium text-text-primary">{selected.workflow_type}</h2>
         {selected.description && (
-          <p className="text-sm text-text-secondary mt-2 leading-relaxed">
+          <p className="text-xs text-text-quaternary mt-1 leading-relaxed">
             {selected.description}
           </p>
         )}

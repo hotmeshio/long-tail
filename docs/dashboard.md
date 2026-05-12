@@ -4,34 +4,40 @@ The Long Tail dashboard is a React single-page application for managing durable 
 
 ## Sidebar Navigation
 
-The sidebar organizes pages into three groups.
+The sidebar organizes pages into five groups.
 
 ### Durable Workflows
 
-| Page | Purpose |
-|------|---------|
-| **Workflow Registry** | Lists all discovered workflows. Each row shows a Certified (ShieldCheck icon, accent blue), Pipeline (Wand2 icon, purple), or Durable badge. Certify or de-certify workflows from this page. |
-| **Invoke Workflow** | Unified launch page for all durable workflows. Start a workflow immediately or schedule it on a cron. Certified and durable workflows appear together with visual distinction. |
-| **All Escalations** | Queue of pending, claimed, and resolved escalations. Claim an escalation to lock it, then resolve with a payload that triggers a workflow re-run. |
-| **Durable Executions** | All workflow runs. Filter by tier: All, Certified, or Durable. Each row shows duration and links to execution details, task records, and escalation history. |
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Workflow Registry** | `/workflows/registry` | All discovered workflows with tier, queue, and access columns. Configure, certify, or invoke from here. |
+| **Invoke Workflow** | `/workflows/start` | Start a workflow immediately or schedule it on a cron. Two-panel layout with workflow selector and envelope editor. |
+| **Durable Executions** | `/workflows/executions` | All workflow runs with status, duration, and tier. Click through to task records and escalation history. |
 
 ### MCP Workflows
 
-| Page | Purpose |
-|------|---------|
-| **MCP Server Tools** | Browse all registered MCP servers and their exposed tools. Click "Register Server" to open a guided wizard (Transport, Discovery, Test, Review). Click any server row to edit. View tool schemas, tags, compile hints, and credential providers. |
-| **MCP Pipeline Tools** | Tools available within MCP pipelines. Shows which tools the pipeline orchestrator can discover and invoke. |
-| **Pipeline Designer** | Six-step compilation wizard. Submit a query, review the dynamic execution, compile to a deterministic pipeline, deploy, test, and verify end-to-end routing. Detailed below. |
-| **Pipeline Executions** | Execution history for MCP pipelines. Shows both dynamic (agentic) and compiled (deterministic) runs, with duration for each. |
+| Page | Route | Purpose |
+|------|-------|---------|
+| **MCP Tool Designer** | `/mcp/queries` | Design and compile MCP tools. Three modes: Plan (multi-workflow sets), Builder (single tool from execution), and Composer (manual tool design). |
+| **MCP Server Tools** | `/mcp/servers` | Browse registered MCP servers and their tools. Register new servers via guided wizard. |
+| **MCP Pipeline Tools** | `/mcp/workflows` | YAML pipeline tools available to the orchestrator. Shows compiled deterministic workflows. |
+| **Pipeline Executions** | `/mcp/executions` | Execution history for MCP pipelines — both dynamic (agentic) and compiled (deterministic) runs. |
+
+### Storage
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Files** | `/files` | Browse and manage files in connected storage (MinIO/S3/GCS). |
+| **Knowledge** | `/knowledge` | Knowledge base entries for workflow context and retrieval. |
 
 ### Admin
 
-| Page | Purpose |
-|------|---------|
-| **Accounts** | Unified management for User Accounts and Service Accounts, toggled by tab. Create, edit, and assign roles. Service accounts get API keys for programmatic access. |
-| **Roles & Permissions** | Define roles and assign them to users. Roles control which escalations a user can see and claim. |
-| **DB Maintenance** | Database housekeeping. Vacuum, reindex, and view table statistics. |
-| **Task Queues** | View active task queues, connected workers, and queue depth. |
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Accounts** | `/admin/users` | User accounts and service accounts (bots). Create, edit, assign roles, manage API keys. |
+| **Roles & Permissions** | `/admin/roles` | Define roles and escalation chains. Roles control escalation visibility and invocation access. |
+| **DB Maintenance** | `/admin/maintenance` | Database housekeeping — vacuum, reindex, table statistics. |
+| **Task Queues** | `/admin/controlplane` | Active task queues, connected workers, queue depth, and worker health. |
 
 ### Header
 
@@ -39,7 +45,7 @@ The top navigation bar contains:
 
 - **Home logo** — links to the home page (`/`), which shows all business processes.
 - **Quick Query** — a search/prompt field for launching MCP queries directly from the header.
-- **Documentation** (BookOpen icon) — toggles an in-app documentation drawer.
+- **Documentation** (BookOpen icon) — toggles an in-app documentation drawer. Each page also has a contextual docs link next to its title that opens the drawer to the relevant section.
 - **Inbox** (Inbox icon) — links to `/escalations/queue` (My Escalations). Shows a badge count of pending escalations for the current user's roles.
 - **NATS status indicator** — shows connection health.
 - **User menu** (User icon) — dropdown with Credentials and Sign Out options.
@@ -48,98 +54,252 @@ The top navigation bar contains:
 
 ### Workflow Registry
 
-Shows every workflow the system has discovered across all registered workers. Each workflow displays one of three badges:
+Shows every workflow the system has discovered across all registered workers. Each workflow displays one of three tiers:
 
-- **Certified** (ShieldCheck icon, accent blue) -- has an `lt_config_workflows` entry. Full interceptor tracking, escalation chains, and invocation controls.
-- **Pipeline** (Wand2 icon, purple) -- a compiled deterministic workflow deployed from a successful MCP execution.
-- **Durable** (Workflow icon, muted) -- registered as a HotMesh worker but not certified. Checkpointed execution and retries, but no interceptor wrapping.
+- **Certified** (ShieldCheck icon) — has an `lt_config_workflows` entry with roles or consumes. Full interceptor tracking, escalation chains, and invocation controls.
+- **Configured** (Settings icon) — has a config entry but no roles. Invocation controls and schema-driven forms, but no automatic escalation routing.
+- **Durable** (Wrench icon) — registered as a HotMesh worker but not configured. Checkpointed execution and retries, but no interceptor wrapping.
 
-Click a workflow to view its config. Certify a durable workflow by creating a config entry; de-certify by removing it. The workflow itself does not change -- only the infrastructure wrapping it.
+**Columns:** Workflow (pill + description), Queue (bordered pill), Tier (icon + label), Access (escalation roles with shield icon, invocation roles with user-check icon).
+
+**Row actions** (on hover): Play (invoke), Wrench (configure durable), ShieldPlus (certify configured), ShieldOff (de-certify).
+
+**Inline config via `start()`:** Developers can declare workflow profiles directly in the `start()` config by adding a `config` block to any worker entry. This auto-seeds the workflow into `lt_config_workflows` at startup — no manual API calls or dashboard wizard needed. Roles referenced in the config are auto-created.
+
+```typescript
+workers: [
+  {
+    taskQueue: 'my-queue',
+    workflow: myWorkflow,
+    config: {
+      description: 'My workflow description',
+      invocable: true,
+      roles: ['reviewer', 'admin'],
+      envelopeSchema: { data: { field1: '', field2: 0 } },
+      resolverSchema: { approved: true, notes: '' },
+    },
+  },
+]
+```
+
+**API:** `GET /api/workflows/discovered` returns the unified list. `PUT /api/workflows/:type/config` creates or updates a config entry. `DELETE /api/workflows/:type/config` removes it.
 
 ### Invoke Workflow
 
-A single page for starting any durable workflow. Select the workflow, provide input data as JSON, and choose:
+A two-panel page for starting any invocable workflow. The left sidebar lists invocable workflows using the same pill styling as the registry. Workflows with active cron schedules show a clock icon. The right panel changes based on the selected mode.
 
-- **Start Now** -- immediate execution.
-- **Schedule** -- provide a cron expression for recurring execution.
+**Mode toggle** (top right): Switch between **Start Now** and **Schedule**.
 
-Certified and durable workflows both appear in the list. Certified workflows show the shield icon so operators can distinguish which runs will have full tracking and escalation support.
+**Start Now** — immediate invocation:
+- **Identity summary** — shows who will execute (current user, configured bot, or admin override).
+- **Envelope editor** — dual-mode input: a structured form view (when `envelope_schema.data` has scalar fields) or a raw JSON editor. The form auto-generates fields from the schema with inferred types.
+- **Start Workflow** button — invokes the workflow and navigates to the executions page.
 
-### Pipeline Designer
+**Schedule** — recurring cron execution:
+- **Cron expression** — enter a standard cron expression (e.g., `0 9 * * 1-5`). A human-readable description appears below the input. Expressions firing more often than once per minute are rejected.
+- **Common patterns** — clickable presets for frequent schedules.
+- **Cron envelope** — template payload sent on each scheduled invocation.
+- **Recent executions** — table showing the last 10 runs of the selected workflow.
 
-The Pipeline Designer page lists previous MCP query runs and provides a prompt to start new ones. Click into a completed run to open the six-step **Compilation Wizard**:
+**API:** `POST /api/workflows/:type/invoke` starts a workflow. `PUT /api/workflows/:type/config` with `cron_schedule` sets up recurring execution.
 
-1. **Describe** -- View the original dynamic execution: input envelope and structured output side by side.
-2. **Discover** -- Swimlane timeline of tool calls, grouped by MCP server, positioned on a time axis.
-3. **Compile** -- Define the deterministic workflow: namespace, tool name, description, tags. Triggers the five-stage compilation pipeline.
-4. **Deploy** -- Review the compiled YAML DAG, input/output schemas, and version history. Deploy and activate.
-5. **Test** -- Run the compiled workflow and compare results side-by-side against the original dynamic execution.
-6. **Verify** -- End-to-end routing verification. Submit the original prompt through `mcpQueryRouter` to confirm the deterministic path is discovered and used.
+### MCP Tool Designer
 
-Steps unlock sequentially. Compiled pipelines appear in **Pipeline Executions** as deterministic runs, which are faster and cheaper than their dynamic counterparts. See the [Compilation Pipeline](compilation.md) guide for the full walkthrough.
+The MCP Tool Designer page lists previous tool design sessions and provides entry points for creating new MCP tools. Three design modes are available:
+
+**Plan mode** — decomposes a specification into a multi-workflow set. Four-step wizard:
+1. **Plan** — submit a specification; the planner breaks it into individual tools.
+2. **Profile** — configure each tool's namespace, name, description, and tags.
+3. **Deploy** — review compiled YAML DAGs and deploy as a set.
+4. **Test** — run the compiled workflows and verify results.
+
+**Builder mode** — compiles a single tool from a completed dynamic execution. Four-step wizard:
+1. **Describe** — view the original dynamic execution: input and structured output.
+2. **Profile** — configure the tool's namespace, name, description, and tags.
+3. **Deploy** — review the compiled YAML DAG, input/output schemas. Deploy and activate.
+4. **Test** — run the compiled workflow and compare against the original execution.
+
+**Composer mode** — manual tool design for building tools from scratch using the visual DAG editor.
+
+Steps unlock sequentially in each wizard. Compiled tools appear in **MCP Pipeline Tools** and **Pipeline Executions**. See the [Compilation Pipeline](compilation.md) guide for details.
+
+### MCP Server Tools
+
+Browse all registered MCP servers and their exposed tools.
+
+- **Server list** — each row shows server name, transport type (stdio, SSE, streamable HTTP), status (connected/disconnected), and tool count.
+- **Register Server** button — opens a guided wizard: choose transport, configure connection, discover tools, review and save.
+- **Server detail** — click any row to view and edit. Shows all exposed tools with their input schemas, tags, compile hints, and credential providers. Tools are the building blocks that the MCP Tool Designer compiles into deterministic pipelines.
+
+**API:** `GET /api/mcp-servers` lists servers. `POST /api/mcp-servers` registers a new one. `GET /api/mcp-servers/:id/tools` lists tools for a server.
+
+### MCP Pipeline Tools
+
+Lists all YAML pipeline tools compiled from dynamic MCP executions. These are the deterministic workflows that the `mcpQueryRouter` can discover and route to instead of running expensive dynamic executions.
+
+- **Columns:** Tool name, namespace, status (draft/deployed/active/archived), deployment version, and tags.
+- **Click any row** to view the compiled YAML DAG, input/output schemas, and activity manifest.
+- **Create new** — links to the MCP Tool Designer to start a new compilation.
+
+Compiled tools go through a lifecycle: draft → deployed → active. Only active tools are discoverable by the router. Archived tools are hidden but retained for history.
+
+**API:** `GET /api/yaml-workflows` lists pipeline tools. `POST /api/yaml-workflows/:id/deploy` deploys. `POST /api/yaml-workflows/:id/activate` activates.
+
+### Pipeline Executions
+
+Execution history for all MCP pipeline runs — both dynamic (agentic LLM loops) and compiled (deterministic YAML DAGs).
+
+- **Columns:** Workflow ID, type (dynamic/deterministic), status, duration, and start time.
+- **Duration comparison** — deterministic runs are typically faster and cheaper than their dynamic counterparts. Use this page to verify that compiled tools match or exceed the quality of dynamic executions.
+- **Click any row** to view the full execution detail: input envelope, output, tool call timeline, and activity checkpoints.
+
+**API:** `GET /api/mcp-runs` lists executions with status, type, and pagination filters.
 
 ### Durable Executions
 
-Lists all workflow runs across the system. The tier filter at the top switches between:
+Lists all durable workflow runs across the system.
 
-- **All** -- every execution.
-- **Certified** -- only workflows with `lt_config_workflows` entries.
-- **Durable** -- only uncertified durable workflows.
+- **Tier filter** (top) — switch between All, Certified, and Durable to focus on specific workflow types.
+- **Columns:** Workflow name, workflow ID, status (running/completed/failed), start time, and duration.
+- **Click any row** to see the full execution detail: task record with milestones, activity checkpoints, resolver payloads, and any associated escalations.
+- **Duration** is computed from start to completion — useful for identifying slow workflows or comparing performance across versions.
 
-Each row shows workflow name, status, start time, and duration (computed from start to completion). Click through to see the full task record, activity checkpoints, milestones, and any associated escalations.
+**API:** `GET /api/workflows/executions` lists runs with tier, status, and pagination filters.
 
 ### Accounts
 
 User Accounts and Service Accounts live on the same page, separated by a tab toggle.
 
-- **User Accounts** -- human operators. Assign roles, set display names, manage access.
-- **Service Accounts** -- programmatic callers (bots, CI pipelines, external systems). Each service account has an API key for authentication. Assign roles to control which workflows a service account can invoke and which escalations it can interact with.
+- **User Accounts** — human operators. Create users, assign display names, and grant roles. Roles determine which escalations a user can see and claim, and which workflows they can invoke from the dashboard.
+- **Service Accounts** — programmatic callers (bots, CI pipelines, external systems). Each service account has an API key for authentication. Assign roles to control access just like human users. Service accounts with the `reviewer` role can claim and resolve escalations programmatically.
+- **Role assignment** — both account types participate in the same role system. Click any account to edit roles, change display name, or manage credentials.
 
-Both account types participate in the same role system. A service account with the `reviewer` role can claim and resolve escalations just like a human user.
+**API:** `GET /api/users` lists accounts. `POST /api/users` creates. `PUT /api/users/:id/roles` assigns roles.
 
-### Escalation Detail
+### Roles and Permissions
 
-Click any escalation to open a full-page detail view. The page has a hero section summarizing the escalation, an action bar (Claim, Resolve, Escalate, Triage options), a resolver form when claimed, a timeline of events, and the full context data. Triage options are available when the MCP escalation strategy is configured.
+Define roles and configure escalation chains that control how work flows between teams.
+
+- **Role list** — all roles in the system with their type (admin, operator, custom). Click to view assigned users.
+- **Create Role** — add a new role. Roles referenced in workflow configs are auto-created, but you can also create them here for organizational clarity.
+- **Escalation chains** — define source → target role mappings. When a reviewer escalates, the chain determines which roles receive the escalation next. Chains are directional (reviewer → engineer → admin) and support multiple targets per source.
+
+**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
+
+### DB Maintenance
+
+Database housekeeping tools for keeping PostgreSQL healthy under sustained workflow load.
+
+- **Manual mode** — run vacuum, reindex, or analyze on individual tables. Useful after bulk operations or large data imports. Each operation shows estimated duration and last-run timestamp.
+- **Scheduled mode** — configure automatic maintenance windows. Set a cron schedule for nightly vacuum and analyze runs so the database stays healthy without manual intervention.
+- **Table statistics** — view row counts, dead tuple counts, table size, and last vacuum/analyze times for all tables. High dead tuple counts indicate tables that need vacuuming.
+
+**API:** `POST /api/maintenance/vacuum`, `POST /api/maintenance/reindex`, `POST /api/maintenance/analyze`. `GET /api/maintenance/stats` returns table statistics.
+
+### Task Queues
+
+View active task queues and the workers connected to them.
+
+- **Header stats** — total queues, total workers, and aggregate queue depth at a glance.
+- **Queue list** — each row shows queue name, connected worker count, pending message depth, and consumer group health.
+- **Worker detail** — expand a queue to see individual workers: their ID, connection status, uptime, and message processing rate.
+- **Emergency controls** — admin actions for queue management when workers need intervention.
+
+This page is useful for verifying that workers started correctly after deployment and for diagnosing processing backlogs.
+
+**API:** `GET /api/workers` lists active workers. `GET /api/workers/queues` lists queue statistics.
+
+### All Escalations
+
+The central queue for all escalation activity across every workflow.
+
+- **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
+- **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
+- **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations.
+- **Resolve** — after claiming, submit a resolver payload (pre-filled from the workflow's `resolver_schema` if configured). Resolution triggers a workflow re-run with the resolver data injected.
+- **Escalate** — forward a claimed escalation to a higher-tier role via the escalation chain.
+
+**API:** `GET /api/escalations` lists with filters. `POST /api/escalations/:id/claim` claims. `POST /api/escalations/:id/resolve` resolves.
 
 ### Escalations Overview
 
-Accessible at `/escalations`, the overview page shows summary statistics across configurable time windows (1h, 24h, 7d, 30d): open, claimed, created, and resolved counts. A breakdown table groups escalations by role.
+Accessible at `/escalations`. A statistics dashboard for escalation health across the system.
 
-### Workflows Overview
+- **Time window selector** — toggle between 1h, 24h, 7d, and 30d views.
+- **Summary cards** — open (pending), claimed (in progress), created (new), and resolved counts for the selected window.
+- **Role breakdown table** — groups escalations by role so you can see which teams have the most pending work. Useful for identifying bottlenecks and rebalancing workload.
 
-Accessible at `/workflows`, the overview page shows workflow statistics across time windows (1h, 24h, 7d, 30d): total, running, completed, failed counts, and average duration grouped by workflow type.
+### Processes Overview
 
-### MCP Overview
+Accessible at `/` (home page) and `/processes`. Shows all tracked business processes — each process is a group of related workflow executions sharing an origin ID.
 
-Accessible at `/mcp`, the overview page shows MCP server and tool statistics alongside pipeline execution history across time windows.
+- **Process list** — each row shows the origin workflow, status, number of child tasks, escalation count, and overall duration.
+- **Time window selector** — filter by 1h, 24h, 7d, 30d to focus on recent activity.
+- **Click any process** to drill into the Process Detail page.
+
+A process represents the full lifecycle of a business operation — from initial invocation through all child workflows, escalations, and resolutions.
 
 ### Process Detail
 
-Click any process on the home page (`/`) to open a detail view at `/processes/detail/:originId`. This shows a swimlane timeline of all tasks and escalations sharing the same origin, giving a unified view of a multi-step workflow's progress.
+Full detail view for a single business process, showing every workflow execution and escalation that shares the same origin.
+
+- **Swimlane timeline** — visual timeline of all tasks and escalations, grouped by workflow type. Shows start/end times, durations, and dependencies between steps.
+- **Header stats** — total tasks, active escalations, completed steps, and overall process duration.
+- **Messages** — if the process includes human communication (escalation notes, resolver payloads), these appear in a conversation-style layout.
+- **Task list** — every task in the process with status, workflow type, and links to individual execution details.
+
+This is the primary view for understanding how a multi-step workflow progresses end-to-end.
+
+### Files
+
+Browse and manage files in connected storage backends (MinIO locally, S3/GCS in production).
+
+- **File browser** — navigate directories with breadcrumbs. View files in a list with name, size, type, and last modified date.
+- **Preview panel** — click a file to preview it in the side panel. Supports images, text, JSON, and PDF.
+- **Upload** — drag and drop or click to upload files to the current directory.
+- **Sidebar** — collapsible file tree for quick navigation across the storage hierarchy.
+
+Storage backend is selected by the `STORAGE_BACKEND` env var. The same interface works against MinIO (local dev), S3, or GCS — no code changes needed.
+
+**API:** `GET /api/files` lists files. `POST /api/files/upload` uploads. `GET /api/files/download/:path` downloads.
+
+### Knowledge
+
+Knowledge base for storing and retrieving domain-specific information used by workflows and MCP tools.
+
+- **Entry list** — browse knowledge entries by domain and key. Each entry stores structured data that workflows can query at runtime.
+- **Create/Edit** — add or update knowledge entries with a domain, key, and JSON value.
+- **Search** — filter entries by domain or key prefix.
+
+Knowledge entries are accessed by workflows via the `get_knowledge` MCP tool. This is how workflows retrieve domain context (product catalogs, configuration data, reference tables) without hardcoding values.
+
+**API:** `GET /api/knowledge` lists entries. `PUT /api/knowledge/:domain/:key` creates or updates. `DELETE /api/knowledge/:domain/:key` removes.
 
 ### Credentials
 
-Accessible via the user menu in the header (or at `/credentials`), this page lets users manage their OAuth provider connections and API keys. Status, credential type, and expiry are visible. Users connect or revoke providers here.
+Accessible via the user menu (or at `/credentials`). Manage OAuth provider connections and API keys for the current user.
+
+- **Provider list** — shows all configured OAuth providers (Google, Anthropic, etc.) with connection status, credential type, and expiry.
+- **Connect** — initiate an OAuth flow to link a provider. Tokens are stored encrypted and refreshed automatically.
+- **Revoke** — disconnect a provider and delete stored tokens.
+- **API keys** — view and manage service account API keys for programmatic access.
+
+Credentials flow through the system via the `_scope` identity context — workflows inherit the invoking user's credentials for authenticated tool calls.
 
 ## Global Features
 
 ### Inbox
 
-The Inbox icon in the header shows a badge count when the current user has pending escalations assigned to their roles. The count updates live via a NATS subscription — no polling or page refresh needed.
-
-Click the icon to jump to **My Escalations** (`/escalations/queue`) — the operator dashboard showing claimed escalations with time-remaining columns, filter bar, and release actions.
+The Inbox icon in the header shows a badge count when the current user has pending escalations assigned to their roles. The count updates live via NATS — no polling needed.
 
 ### Event Feed
 
-The bottom bar contains a collapsible live event stream. Click the radio icon to toggle it open or closed. When open, it displays a real-time feed of:
+The bottom bar contains a collapsible live event stream showing workflow start/completion events, task state transitions, escalation activity, and activity checkpoints. Events stream via NATS subscription.
 
-- Workflow start and completion events
-- Task state transitions
-- Escalation creation, claim, and resolution
-- Activity checkpoint events
+### Contextual Documentation
 
-Events stream in via NATS subscription. The feed is useful during development and debugging to watch workflow execution unfold in real time.
+Each page header includes a documentation icon that opens the in-app docs drawer to the relevant section. The drawer supports navigation history, anchor linking, and markdown rendering.
 
 ### Page Transitions
 
-Navigation between pages uses a smooth fade transition. This keeps the UI responsive during client-side routing and prevents visual jarring when switching contexts.
+Navigation between pages uses a smooth fade transition for responsive feel during client-side routing.

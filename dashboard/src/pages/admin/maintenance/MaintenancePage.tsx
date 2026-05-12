@@ -36,6 +36,7 @@ export function MaintenancePage() {
     <div>
       <PageHeader
         title="DB Maintenance"
+        docsHash="#docs:dashboard.md:db-maintenance"
         actions={<ModeToggle mode={mode} onChange={setMode} />}
       />
 

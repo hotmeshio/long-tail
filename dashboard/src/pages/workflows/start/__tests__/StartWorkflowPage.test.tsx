@@ -119,7 +119,7 @@ describe('StartWorkflowPage', () => {
 
   it('shows prompt to select a workflow when none is selected', () => {
     renderPage();
-    expect(screen.getByText('Select a workflow to begin')).toBeInTheDocument();
+    expect(screen.getByText('Ready when you are')).toBeInTheDocument();
   });
 
   it('shows loading skeleton when configs are loading', () => {
@@ -179,10 +179,11 @@ describe('StartWorkflowPage', () => {
     expect(screen.getByText('lt-system')).toBeInTheDocument();
   });
 
-  it('shows roles in StartNowPanel', () => {
+  it('shows workflow heading in StartNowPanel', () => {
     renderPage(['/workflows/start?type=reviewContent&mode=now']);
-    expect(screen.getByText('reviewer')).toBeInTheDocument();
-    expect(screen.getByText('admin')).toBeInTheDocument();
+    // Heading appears as h2 in the panel (also in sidebar as pill text)
+    const headings = screen.getAllByText('reviewContent');
+    expect(headings.length).toBeGreaterThanOrEqual(2); // sidebar + panel heading
   });
 
   it('shows identity summary in StartNowPanel', () => {
@@ -201,7 +202,7 @@ describe('StartWorkflowPage', () => {
     renderPage();
     // With a single invocable workflow, it should auto-select it
     // and show the StartNowPanel instead of "Select a workflow"
-    expect(screen.queryByText('Select a workflow to begin')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ready when you are')).not.toBeInTheDocument();
     expect(screen.getByText('Start Workflow')).toBeInTheDocument();
   });
 });

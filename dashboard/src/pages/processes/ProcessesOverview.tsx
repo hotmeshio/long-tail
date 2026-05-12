@@ -58,7 +58,7 @@ export function ProcessesOverview() {
 
   return (
     <div>
-      <PageHeader title="Processes" />
+      <PageHeader title="Processes" docsHash="#docs:dashboard.md:processes-overview" />
 
       {/* Duration tabs */}
       <div className="flex items-center gap-1 mb-6">

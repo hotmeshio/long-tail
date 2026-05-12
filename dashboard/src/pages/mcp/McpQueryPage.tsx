@@ -196,6 +196,7 @@ export function McpQueryPage() {
     <>
       <PageHeader
         title="MCP Tool Designer"
+        docsHash="#docs:dashboard.md:mcp-tool-designer"
         actions={
           <button
             onClick={() => navigate('/mcp/queries/new')}

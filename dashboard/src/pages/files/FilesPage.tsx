@@ -89,7 +89,7 @@ export function FilesPage() {
     <div className="flex gap-0">
       {/* Main content */}
       <div className="flex-1 min-w-0 overflow-hidden">
-        <PageHeader title="Files" />
+        <PageHeader title="Files" docsHash="#docs:dashboard.md:files" />
 
         <FileBreadcrumbs prefix={prefix} onNavigate={navigateTo} />
 

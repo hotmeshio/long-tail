@@ -47,6 +47,7 @@ export function UsersPage() {
     <div>
       <PageHeader
         title="Accounts"
+        docsHash="#docs:dashboard.md:accounts"
         actions={<AccountTabToggle active={activeTab} onChange={handleTabChange} />}
       />
       {activeTab === 'users' ? <UserAccountsPanel /> : <BotsPage embedded />}

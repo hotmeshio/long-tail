@@ -194,7 +194,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
 
   return (
     <div>
-      <PageHeader title={pageTitle} />
+      <PageHeader title={pageTitle} docsHash="#docs:dashboard.md:durable-executions" />
 
       <FilterBar actions={
         <ListToolbar

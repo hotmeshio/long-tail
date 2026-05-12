@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bot } from 'lucide-react';
 import { useSetCronSchedule, useJobs } from '../../../api/workflows';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
-import { Pill } from '../../../components/common/display/Pill';
+import { Pill } from '../../../components/common/display/Pill';  // kept for active/inactive badge
 import { DataTable } from '../../../components/common/data/DataTable';
 import type { LTWorkflowConfig } from '../../../api/types';
 import { DEFAULT_ENVELOPE } from './helpers';
@@ -102,7 +102,7 @@ export function SchedulePanel({
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <SectionLabel>{selected.workflow_type}</SectionLabel>
+          <h2 className="text-lg font-mono font-medium text-text-primary">{selected.workflow_type}</h2>
           {selected.cron_schedule && (
             <Pill className={activeTypes.has(selected.workflow_type)
               ? 'bg-status-success/10 text-status-success'
@@ -113,7 +113,7 @@ export function SchedulePanel({
           )}
         </div>
         {selected.description && (
-          <p className="text-xs text-text-tertiary mt-2 leading-relaxed">
+          <p className="text-xs text-text-quaternary mt-1 leading-relaxed">
             {selected.description}
           </p>
         )}

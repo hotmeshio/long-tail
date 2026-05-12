@@ -58,7 +58,7 @@ export function EscalationsOverview() {
 
   return (
     <div>
-      <PageHeader title="Escalations" />
+      <PageHeader title="Escalations" docsHash="#docs:dashboard.md:escalations-overview" />
 
       {/* Duration tabs */}
       <div className="flex items-center gap-1 mb-6">
