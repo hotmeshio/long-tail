@@ -135,15 +135,23 @@ Browse all registered MCP servers and their exposed tools.
 
 ### MCP Pipeline Tools
 
-Lists all YAML pipeline tools compiled from dynamic MCP executions. These are the deterministic workflows that the `mcpQueryRouter` can discover and route to instead of running expensive dynamic executions.
+Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DAG that the `mcpQueryRouter` discovers and invokes automatically — faster and cheaper than re-running the original agentic loop.
 
-- **Columns:** Tool name, namespace, status (draft/deployed/active/archived), deployment version, and tags.
-- **Click any row** to view the compiled YAML DAG, input/output schemas, and activity manifest.
-- **Create new** — links to the MCP Tool Designer to start a new compilation.
+**Page layout:** Tools are grouped by namespace (app_id). Expand a namespace to see its individual tools. Each tool row shows name, status, and action buttons.
 
-Compiled tools go through a lifecycle: draft → deployed → active. Only active tools are discoverable by the router. Archived tools are hidden but retained for history.
+**Tool lifecycle:** draft → deployed → active → archived. Only active tools are discoverable by the router. Archived tools are hidden but retained for history.
 
-**API:** `GET /api/yaml-workflows` lists pipeline tools. `POST /api/yaml-workflows/:id/deploy` deploys. `POST /api/yaml-workflows/:id/activate` activates.
+**Source workflows:** Tools originate from dynamic MCP executions (mcpQuery, mcpTriage) or the planner/builder wizards (mcpWorkflowPlanner, mcpWorkflowBuilder). Click "Design Pipeline" to start a new compilation in the MCP Tool Designer.
+
+**Row actions:**
+- **Try** — opens a side panel to invoke the tool with test input and see results.
+- **Cron** — opens a side panel to configure a recurring schedule for the tool.
+- **Wizard** — navigates back to the compilation wizard that produced the tool.
+- **Workbench** — for plan-mode sets, navigates to the planner workbench.
+
+**Empty state:** When no tools have been compiled yet, a Wand2 icon prompts users to visit the MCP Tool Designer to create their first deterministic tool.
+
+**API:** `GET /api/yaml-workflows` lists pipeline tools. `POST /api/yaml-workflows/:id/deploy` deploys. `POST /api/yaml-workflows/:id/activate` activates. `POST /api/yaml-workflows/:id/invoke` invokes.
 
 ### Pipeline Executions
 

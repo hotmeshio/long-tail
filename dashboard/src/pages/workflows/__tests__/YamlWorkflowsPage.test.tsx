@@ -81,7 +81,7 @@ describe('YamlWorkflowsPage', () => {
 
   it('renders description text', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText(/Compiled from successful triage runs/)).toBeInTheDocument();
+    expect(screen.getByText(/Deterministic tools compiled from dynamic MCP executions/)).toBeInTheDocument();
   });
 
   it('groups workflows by app_id as server rows', () => {

@@ -5,6 +5,7 @@ import { useWorkflowSets } from '../../api/workflow-sets';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useExpandedRows } from '../../hooks/useExpandedRows';
 
+import { Wand2 } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
@@ -83,15 +84,16 @@ export function YamlWorkflowsPage() {
     <div>
       <PageHeader
         title="MCP Pipeline Tools"
+        docsHash="#docs:dashboard.md:mcp-pipeline-tools"
         actions={
-          <button onClick={() => navigate('/mcp/queries')} className="btn-primary text-xs">
+          <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
             Design Pipeline
           </button>
         }
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Compiled from successful triage runs. Each workflow is a deterministic tool.
+        Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DAG that the router discovers and invokes automatically.
       </p>
 
       <FilterBar>
@@ -125,7 +127,9 @@ export function YamlWorkflowsPage() {
       <div className="flex gap-0">
         <div className={`${sidebarWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
           {filteredServers.length === 0 ? (
-            <EmptyState title="No pipelines yet" description="Use the MCP Tool Designer to create your first MCP tool." />
+            <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
+              <EmptyState icon={Wand2} title="No pipelines yet" description="Click to open the MCP Tool Designer and create your first deterministic tool." />
+            </div>
           ) : (
             <table className="w-full">
               <thead>
