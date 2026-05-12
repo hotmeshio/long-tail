@@ -77,4 +77,5 @@ export const builtinMcpServerFactories: Record<string, () => Promise<any>> = {
   'long-tail-admin': () => import('./mcp-servers/admin').then((m) => m.createAdminServer()),
   'long-tail-knowledge': () => import('./mcp-servers/knowledge').then((m) => m.createKnowledgeServer()),
   'long-tail-schema-exchange': () => import('./mcp-servers/schema-exchange').then((m) => m.createSchemaExchangeServer()),
+  'long-tail-gmail': () => import('./mcp-servers/gmail').then((m) => m.createGmailServer()),
 };

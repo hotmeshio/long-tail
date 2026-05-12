@@ -10,6 +10,7 @@ import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './tool-manifests-browser
 import { CLAUDE_CODE_TOOLS } from './tool-manifests-workflows';
 import { ADMIN_TOOLS } from './tool-manifests-admin';
 import { KNOWLEDGE_TOOLS } from './tool-manifests-knowledge';
+import { GMAIL_TOOLS } from './tool-manifests-gmail';
 
 export const SEED_MCP_SERVERS = [
   {
@@ -235,5 +236,21 @@ export const SEED_MCP_SERVERS = [
       'The tool resolves the credential from the calling principal\'s stored connections at the last mile — no token input needed, auto-refreshes expired tokens. ' +
       'Use auth_scheme for non-Bearer schemes (e.g. "Basic", "Token") and auth_header for APIs that use X-API-Key instead of Authorization.',
     credential_providers: [],
+  },
+  {
+    name: 'long-tail-gmail',
+    description: 'Gmail tools — search, read, summarize, extract, and draft emails using your connected Google account.',
+    transport_type: 'stdio',
+    transport_config: { builtin: true, process: 'in-memory' },
+    tool_manifest: GMAIL_TOOLS,
+    metadata: { builtin: true, category: 'email' },
+    tags: ['gmail', 'email', 'messaging', 'google'],
+    compile_hints:
+      'Requires a connected Google account (OAuth). ' +
+      'Use gmail_search to find messages by query, gmail_read to get full content, gmail_summarize for thread overviews. ' +
+      'gmail_extract returns structured data suitable for knowledge store ingestion. ' +
+      'gmail_draft creates drafts for review before sending. ' +
+      'All tools resolve the Google access token automatically from the calling user\'s stored connection.',
+    credential_providers: ['google'],
   },
 ];

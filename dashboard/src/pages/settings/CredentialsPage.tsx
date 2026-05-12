@@ -12,7 +12,7 @@ interface ConnectionToRevoke {
   label: string;
 }
 
-const PROVIDERS: Record<string, { name: string; helpText: string; placeholder: string }> = {
+const PROVIDERS: Record<string, { name: string; helpText: string; placeholder: string; oauth?: boolean }> = {
   anthropic: {
     name: 'Anthropic',
     helpText: 'Run "claude setup-token" for an OAuth token, or use an API key from console.anthropic.com.',
@@ -22,6 +22,12 @@ const PROVIDERS: Record<string, { name: string; helpText: string; placeholder: s
     name: 'OpenAI',
     helpText: 'Create an API key at platform.openai.com/api-keys.',
     placeholder: 'sk-...',
+  },
+  google: {
+    name: 'Google',
+    helpText: 'Connect your Google account for Gmail, Calendar, and Drive access.',
+    placeholder: '',
+    oauth: true,
   },
 };
 
