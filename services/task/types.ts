@@ -25,6 +25,8 @@ export interface CreateTaskInput {
   principal_type?: string;
   /** Executing principal (bot external_id) when proxy invocation is used. */
   executing_as?: string;
+  /** Initial status. Default: 'pending'. */
+  status?: string;
 }
 
 export interface UpdateTaskInput {

@@ -93,6 +93,7 @@ export const SEED_ENVELOPES: Array<{
         contentType: 'article',
       } satisfies ReviewContentEnvelopeData,
       metadata: {
+        certified: true,
         source: 'seed',
         process: 'clean-review',
         description: 'Happy path — AI auto-approves high-quality content',
@@ -112,6 +113,7 @@ export const SEED_ENVELOPES: Array<{
         contentType: 'blog_post',
       } satisfies ReviewContentEnvelopeData,
       metadata: {
+        certified: true,
         source: 'seed',
         process: 'flagged-review',
         description: 'AI flags content for human review. Log in as reviewer (reviewer/l0ngt@1l) and approve or reject.',
@@ -131,6 +133,7 @@ export const SEED_ENVELOPES: Array<{
         contentType: 'article',
       } satisfies ReviewContentEnvelopeData,
       metadata: {
+        certified: true,
         source: 'seed',
         process: 'wrong-language',
         description: 'Content arrived in the wrong language. Walk the escalation chain: reviewer → admin → engineer. As engineer, check "Request AI Triage" and describe: "Content is in Spanish, needs translation to English."',
@@ -149,6 +152,7 @@ export const SEED_ENVELOPES: Array<{
         mode: 'full',
       } satisfies KitchenSinkEnvelopeData,
       metadata: {
+        certified: true,
         source: 'seed',
         process: 'dynamic-triage',
         description: 'As reviewer, check "Request AI Triage" and write: "This looks fine, just approve it."',
@@ -185,7 +189,6 @@ export const SEED_ENVELOPES: Array<{
         role: 'reviewer',
       } satisfies BasicSignalEnvelopeData,
       metadata: {
-        certified: false,
         source: 'seed',
         process: 'basic-signal',
         description: 'Lightweight signal-based escalation — workflow stays running, no interceptor. Claim the escalation, fill the form, and resolve to resume the workflow.',

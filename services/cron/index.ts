@@ -102,6 +102,12 @@ class LTCronRegistry {
     if (!defaultEnvelope.metadata) defaultEnvelope.metadata = {};
     defaultEnvelope.metadata.source = 'cron';
 
+    // Auto-certify if the workflow config has roles or consumes
+    const isCertified = (config.roles?.length ?? 0) > 0 || (config.consumes?.length ?? 0) > 0;
+    if (isCertified) {
+      defaultEnvelope.metadata.certified = true;
+    }
+
     // Resolve executing principal: per-config execute_as, or system bot fallback
     if (!defaultEnvelope.lt) defaultEnvelope.lt = {};
     if (!defaultEnvelope.lt.principal) {
@@ -135,6 +141,7 @@ class LTCronRegistry {
             workflowId,
             expire: JOB_EXPIRE_SECS,
             entity: workflowType,
+            signalIn: false,
           } as any);
         } catch (err: any) {
           loggerRegistry.error(`[lt-cron] ${workflowType} failed: ${err?.message}`);

@@ -37,6 +37,7 @@ export async function ltCreateTask(input: {
   initiatedBy?: string;
   principalType?: string;
   executingAs?: string;
+  status?: string;
 }): Promise<string> {
   const initiatedByUuid = await resolveUserUuid(input.initiatedBy);
 
@@ -56,6 +57,7 @@ export async function ltCreateTask(input: {
     initiated_by: initiatedByUuid,
     principal_type: input.principalType,
     executing_as: input.executingAs,
+    status: input.status,
   });
 
   publishTaskEvent({
@@ -66,7 +68,7 @@ export async function ltCreateTask(input: {
     taskQueue: input.taskQueue || 'unknown',
     taskId: task.id,
     originId: input.originId,
-    status: 'pending',
+    status: input.status || 'pending',
   });
 
   return task.id;

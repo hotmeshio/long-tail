@@ -103,10 +103,10 @@ export function createLTInterceptor(options: {
 
       const envelope = extractEnvelope(ctx);
 
-      // 2. Fast path: envelope.metadata.certified === false skips the DB
-      //    lookup entirely. Use this for configured (non-certified) workflows
-      //    that manage their own escalation lifecycle via conditionLT.
-      if (envelope?.metadata?.certified === false) {
+      // 2. Fast path: certification is opt-in. Only workflows with
+      //    metadata.certified === true pay for the config lookup,
+      //    task creation, and escalation wiring.
+      if (envelope?.metadata?.certified !== true) {
         const toolCtx = buildToolContextFromEnvelope(
           envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
         );

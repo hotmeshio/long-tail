@@ -63,6 +63,7 @@ export async function reverter(envelope: LTEnvelope): Promise<any> {
             step: stepIndex,
             attempt,
             totalSteps: steps.length,
+            ...(envelope.metadata?.certified === true ? { certified: true } : {}),
           },
         },
       ],
@@ -70,6 +71,7 @@ export async function reverter(envelope: LTEnvelope): Promise<any> {
       workflowId: childWorkflowId,
       expire: JOB_EXPIRE_SECS,
       entity: 'workstation',
+      signalIn: false,
     });
 
     const result = await Durable.workflow.condition<StationResult>(

@@ -66,6 +66,7 @@ export async function startMcpQuery(input: McpQueryInput): Promise<McpQueryResul
     workflowId,
     expire: JOB_EXPIRE_SECS,
     entity,
+    signalIn: false,
   } as any);
 
   if (wait === false) {
@@ -115,6 +116,7 @@ export async function startWorkflowBuilder(input: WorkflowBuilderInput): Promise
     workflowId,
     expire: JOB_EXPIRE_SECS,
     entity: 'mcpWorkflowBuilder',
+    signalIn: false,
   } as any);
 
   if (wait === false) {
@@ -164,6 +166,7 @@ export async function startWorkflowPlanner(input: WorkflowPlannerInput): Promise
     workflowId,
     expire: JOB_EXPIRE_SECS,
     entity: 'mcpWorkflowPlanner',
+    signalIn: false,
   } as any);
 
   if (wait === false) {

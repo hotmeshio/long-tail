@@ -79,6 +79,7 @@ export async function seedExamples(client: any): Promise<void> {
         workflowId,
         expire: JOB_EXPIRE_SECS,
         entity: workflowName,
+        signalIn: false,
       } as any);
       loggerRegistry.info(`[examples] seeded: ${label} (${workflowId})`);
     } catch (err: any) {

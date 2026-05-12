@@ -102,9 +102,17 @@ export async function invokeWorkflow(
 
   // 4. Resolve principals and build envelope
   const wfConfig = await configService.getWorkflowConfig(workflowType);
+  const isCertified = !!(
+    wfConfig &&
+    ((wfConfig.roles?.length ?? 0) > 0 || (wfConfig.consumes?.length ?? 0) > 0)
+  );
+  const resolvedMetadata = { ...(metadata ?? {}) };
+  if (isCertified && resolvedMetadata.certified !== false) {
+    resolvedMetadata.certified = true;
+  }
   const envelope = await buildEnvelope(
     data,
-    metadata ?? {},
+    resolvedMetadata,
     auth.userId,
     executeAsOverride,
     wfConfig?.execute_as ?? undefined,
@@ -123,6 +131,7 @@ export async function invokeWorkflow(
     workflowId,
     expire: callerOpts.expire ?? JOB_EXPIRE_SECS,
     entity: callerOpts.entity ?? workflowType,
+    signalIn: false,
   } as any);
 
   return { workflowId };

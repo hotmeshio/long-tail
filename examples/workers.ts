@@ -69,7 +69,7 @@ const basicSignalConfig: LTWorkerConfig = {
   defaultRole: REVIEWER,
   envelopeSchema: {
     data: { message: 'Deployment approval needed for v2.1.0', role: REVIEWER },
-    metadata: { certified: false, source: 'dashboard' },
+    metadata: { source: 'dashboard' },
   },
   resolverSchema: {
     properties: {

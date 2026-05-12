@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
 import { useInvokeWorkflow } from '../../../api/workflows';
 import { useAuth } from '../../../hooks/useAuth';
 import type { LTWorkflowConfig } from '../../../api/types';
@@ -22,6 +23,8 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
   const [formFields, setFormFields] = useState<Record<string, unknown>>({});
   const [isJsonMode, setIsJsonMode] = useState(false);
   const [overrideBot, setOverrideBot] = useState('');
+  const isCertifiable = (selected.roles?.length ?? 0) > 0 || (selected.consumes?.length ?? 0) > 0;
+  const [certified, setCertified] = useState(isCertifiable);
 
   const dataFields = useMemo(
     () => extractDataFields(selected.envelope_schema ?? null),
@@ -64,6 +67,7 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
     }
     setIsJsonMode(!extractDataFields(selected.envelope_schema ?? null).length);
     setOverrideBot('');
+    setCertified(isCertifiable);
   }, [selected.workflow_type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleMode = () => {
@@ -102,10 +106,12 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
       return;
     }
     try {
+      const resolvedMetadata = { ...((metadata as Record<string, unknown>) ?? {}) };
+      if (certified) resolvedMetadata.certified = true;
       await invokeMutation.mutateAsync({
         workflowType: selected.workflow_type,
         data: data as Record<string, unknown>,
-        metadata: (metadata as Record<string, unknown>) ?? undefined,
+        metadata: resolvedMetadata,
         ...(overrideBot ? { execute_as: overrideBot } : {}),
       });
       navigate(executionsPath);
@@ -129,6 +135,19 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
         onOverrideChange={setOverrideBot}
         showOverride={isAdmin}
       />
+
+      {isCertifiable && (
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={certified}
+            onChange={(e) => setCertified(e.target.checked)}
+            className="rounded border-surface-border text-accent focus:ring-accent/30"
+          />
+          <ShieldCheck className="w-3.5 h-3.5 text-text-tertiary" />
+          <span className="text-xs text-text-secondary">Enable task tracking and escalation routing</span>
+        </label>
+      )}
 
       <EnvelopeEditor
         selectedConfig={selected}

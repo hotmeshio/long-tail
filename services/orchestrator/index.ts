@@ -120,6 +120,10 @@ export async function executeLT<T = any>(
   if (envelope) {
     const userId = envelope.lt?.userId || orchCtx?.userId;
     envelope.lt = { ...envelope.lt, taskId, originId, parentId, userId };
+    // Propagate certified flag from parent to child
+    if (envelope0?.metadata?.certified === true && envelope.metadata) {
+      envelope.metadata.certified = true;
+    }
   }
 
   // 5. Start child workflow (fire-and-forget — only the start is awaited)
@@ -130,6 +134,7 @@ export async function executeLT<T = any>(
     workflowId: childWorkflowId,
     expire: expire || JOB_EXPIRE_SECS,
     entity: workflowName,
+    signalIn: false,
   });
 
   // 6. Wait for the child's interceptor to signal back with the result
