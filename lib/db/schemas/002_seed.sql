@@ -1,19 +1,6 @@
 -- System seed data: built-in MCP server, system workflow configs, escalation chains.
 -- Example workflow configs are seeded at runtime when examples: true.
 
--- ─── Built-in MCP server ───────────────────────────────────────────────────
-
-INSERT INTO lt_mcp_servers (name, description, transport_type, transport_config, auto_connect, status)
-VALUES (
-  'long-tail-db-query',
-  'Built-in read-only query server for tasks, escalations, processes, and system health',
-  'stdio',
-  '{"builtin": true}'::jsonb,
-  false,
-  'connected'
-)
-ON CONFLICT (name) DO NOTHING;
-
 -- ─── Escalation chains ─────────────────────────────────────────────────────
 
 INSERT INTO lt_config_role_escalations (source_role, target_role) VALUES

@@ -137,10 +137,13 @@ export function YamlWorkflowsPage() {
                   <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                     Server / Tool
                   </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-20">
+                    Version
+                  </th>
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
                     Status
                   </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface w-20" />
+                  <th className="sticky top-[2.75rem] z-10 bg-surface w-16" />
                 </tr>
               </thead>
               <tbody>
@@ -151,9 +154,6 @@ export function YamlWorkflowsPage() {
                     expanded={expandedIds.has(server.appId)}
                     onToggle={() => toggleExpand(server.appId)}
                     onTryTool={(wf) => { setCronWorkflow(null); setTryWorkflow(wf); }}
-                    onWizard={(wf) => {
-                      if (wf.source_workflow_id) navigate(`/mcp/queries/${wf.source_workflow_id}?step=4`);
-                    }}
                     onWorkbench={() => {
                       if (server.setId) {
                         const plannerWfId = setSourceMap.get(server.setId);

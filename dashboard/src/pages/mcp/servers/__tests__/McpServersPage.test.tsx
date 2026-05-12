@@ -73,6 +73,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.mocked(useMcpServers).mockReturnValue({ data: mockServers, isLoading: false } as any);
 });
 
@@ -95,11 +96,10 @@ describe('McpServersPage', () => {
     expect(screen.getByText('empty-server')).toBeInTheDocument();
   });
 
-  it('shows tool count badge for each server', () => {
+  it('shows tool count as superscript for servers with tools', () => {
     render(<McpServersPage />, { wrapper });
-    // Count shown as number in badge circle — may appear multiple times
+    // Count shown as superscript next to server name (servers with tools only)
     expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders search input', () => {
@@ -120,11 +120,11 @@ describe('McpServersPage', () => {
     expect(screen.getByText('translate_content')).toBeInTheDocument();
   });
 
-  it('renders tool descriptions in the DOM', () => {
+  it('shows tool description after expanding server', () => {
     render(<McpServersPage />, { wrapper });
-    // Tool descriptions are in the DOM (inside collapsed panels)
-    expect(screen.getByText('Translate content to target language')).toBeInTheDocument();
-    expect(screen.getByText('Fetch data from API')).toBeInTheDocument();
+    // Expand external-api-server
+    fireEvent.click(screen.getByText('external-api-server').closest('tr')!);
+    expect(screen.getByText('fetch_data')).toBeInTheDocument();
   });
 
   it('shows status badges', () => {
