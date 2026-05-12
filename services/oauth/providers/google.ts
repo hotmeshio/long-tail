@@ -16,8 +16,13 @@ export function createGoogleHandler(cfg: LTOAuthProviderConfig): ProviderHandler
     config: cfg,
     async createAuthorizationURL(state, codeVerifier) {
       const google = await getClient();
-      const scopes = cfg.scopes.length > 0 ? cfg.scopes : ['openid', 'email', 'profile'];
-      return google.createAuthorizationURL(state, codeVerifier, scopes);
+      const scopes = cfg.scopes.length > 0
+        ? cfg.scopes
+        : ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly'];
+      const url = google.createAuthorizationURL(state, codeVerifier, scopes);
+      url.searchParams.set('access_type', 'offline');
+      url.searchParams.set('prompt', 'consent');
+      return url;
     },
     async validateAuthorizationCode(code, codeVerifier) {
       const google = await getClient();

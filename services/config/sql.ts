@@ -59,6 +59,24 @@ export const DELETE_WORKFLOW = `\
 DELETE FROM lt_config_workflows WHERE workflow_type = $1`;
 
 // ------------------------------------------------------------------ //
+// Seed (insert-if-absent — used at startup, DB is source of truth)   //
+// ------------------------------------------------------------------ //
+
+export const SEED_WORKFLOW_CONFIG = `\
+INSERT INTO lt_config_workflows
+  (workflow_type, invocable, task_queue, default_role, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags, execute_as)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (workflow_type) DO NOTHING`;
+
+export const SEED_CONFIG_ROLE = `\
+INSERT INTO lt_config_roles (workflow_type, role) VALUES ($1, $2)
+ON CONFLICT (workflow_type, role) DO NOTHING`;
+
+export const SEED_INVOCATION_ROLE = `\
+INSERT INTO lt_config_invocation_roles (workflow_type, role) VALUES ($1, $2)
+ON CONFLICT (workflow_type, role) DO NOTHING`;
+
+// ------------------------------------------------------------------ //
 // Provider queries                                                   //
 // ------------------------------------------------------------------ //
 

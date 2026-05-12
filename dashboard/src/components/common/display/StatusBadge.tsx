@@ -14,6 +14,10 @@ const statusStyles: Record<string, string> = {
   deployed: 'bg-status-active',
   active: 'bg-status-success',
   archived: 'bg-text-tertiary',
+  connected: 'bg-status-success',
+  registered: 'bg-status-pending',
+  disconnected: 'bg-text-tertiary',
+  error: 'bg-status-error',
 };
 
 const statusLabels: Record<string, string> = {
@@ -28,6 +32,10 @@ const statusLabels: Record<string, string> = {
   deployed: 'Deployed',
   active: 'Active',
   archived: 'Archived',
+  connected: 'connected',
+  registered: 'registered',
+  disconnected: 'disconnected',
+  error: 'error',
 };
 
 export function StatusBadge({ status }: { status: Status }) {

@@ -277,6 +277,34 @@ describe('WorkflowConfigsPage', () => {
     const certifyButtons = screen.getAllByTitle('Certify workflow');
     expect(certifyButtons.length).toBe(1);
   });
+
+  it('shows invoke action for invocable workflows', () => {
+    renderPage();
+    const invokeButtons = screen.getAllByTitle('Invoke workflow');
+    // review-content + kitchen-sink + basic-echo are invocable
+    expect(invokeButtons.length).toBe(3);
+  });
+
+  it('renders docs link in page header', () => {
+    renderPage();
+    expect(screen.getByTitle('Open docs for this page')).toBeInTheDocument();
+  });
+
+  it('renders escalation role icons for certified workflows', () => {
+    renderPage();
+    const escIcons = screen.getAllByTitle('Escalation roles');
+    // review-content + kitchen-sink have escalation roles
+    expect(escIcons.length).toBe(2);
+  });
+
+  it('renders invocation role icons when invocation_roles are set', () => {
+    vi.mocked(useDiscoveredWorkflows).mockReturnValue({
+      data: [makeWorkflow({ invocation_roles: ['engineer', 'superadmin'] })],
+      isLoading: false,
+    } as any);
+    renderPage();
+    expect(screen.getByTitle('Invocation roles')).toBeInTheDocument();
+  });
 });
 
 // ── matchesSearch unit tests (tested via rendering) ──

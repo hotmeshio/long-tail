@@ -157,6 +157,7 @@ async function resolveViaTriage(
     workflowId: triageWorkflowId,
     expire: JOB_EXPIRE_SECS,
     entity: 'mcpTriageRouter',
+    signalIn: false,
   } as any);
 
   await escalationService.resolveEscalation(escalation.id, {

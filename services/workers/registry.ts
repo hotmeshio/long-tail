@@ -16,10 +16,12 @@ export function getRegisteredWorkers(): Map<string, { taskQueue: string }> {
 /** System workflows excluded from the overview by default. */
 export const SYSTEM_WORKFLOWS = new Set([
   'mcpQuery',
-  'mcpDeterministic',
   'mcpQueryRouter',
+  'mcpDeterministic',
   'mcpTriage',
   'mcpTriageRouter',
   'mcpTriageDeterministic',
+  'mcpWorkflowBuilder',
+  'mcpWorkflowPlanner',
   'insightQuery',
 ]);

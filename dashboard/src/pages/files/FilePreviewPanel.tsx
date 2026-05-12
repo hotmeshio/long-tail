@@ -7,7 +7,7 @@ import {
   Check,
   Trash2,
 } from 'lucide-react';
-import { useFileMetadata, getFilePreviewUrl, useGenerateSignedUrl, useDeleteFile } from '../../api/files';
+import { useFileMetadata, useFilePreviewUrl, useGenerateSignedUrl, useDeleteFile } from '../../api/files';
 import { fileName, triggerDownload, TextPreview, FileMetadataDisplay } from './FilePreviewContent';
 import { isImagePath } from './FileListViews';
 
@@ -33,9 +33,13 @@ export function FilePreviewPanel({ filePath, onClose, onDeleted }: FilePreviewPa
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const previewUrl = getFilePreviewUrl(filePath);
+  const { data: previewUrl } = useFilePreviewUrl(filePath);
   const isImage = metadata?.content_type?.startsWith('image/') || isImagePath(filePath);
-  const isText = metadata?.content_type?.startsWith('text/') || metadata?.content_type === 'application/json';
+  const TEXT_EXTENSIONS = /\.(ts|tsx|js|jsx|json|md|yaml|yml|toml|xml|csv|sql|sh|py|rb|go|rs|java|c|cpp|h|css|scss|html|txt|log|env|ini|cfg|conf)$/i;
+  const isText = metadata?.content_type?.startsWith('text/')
+    || metadata?.content_type === 'application/json'
+    || metadata?.content_type === 'application/xml'
+    || (metadata?.content_type === 'application/octet-stream' && TEXT_EXTENSIONS.test(filePath));
   const isPdf = metadata?.content_type === 'application/pdf';
 
   async function handleDownload() {
@@ -188,7 +192,7 @@ export function FilePreviewPanel({ filePath, onClose, onDeleted }: FilePreviewPa
             </div>
           ) : (
             <>
-              {isImage && (
+              {isImage && previewUrl && (
                 <div
                   className="mb-5 rounded-md border border-surface-border bg-surface-sunken overflow-hidden"
                   style={{ maxHeight: '400px' }}
@@ -202,13 +206,13 @@ export function FilePreviewPanel({ filePath, onClose, onDeleted }: FilePreviewPa
                 </div>
               )}
 
-              {isText && (
+              {isText && previewUrl && (
                 <div className="mb-5">
                   <TextPreview url={previewUrl} />
                 </div>
               )}
 
-              {isPdf && (
+              {isPdf && previewUrl && (
                 <div className="mb-5 p-4 bg-surface-sunken rounded-md text-center">
                   <a
                     href={previewUrl}

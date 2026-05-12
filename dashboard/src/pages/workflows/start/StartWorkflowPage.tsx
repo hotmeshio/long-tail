@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Play, Clock } from 'lucide-react';
 import { useWorkflowConfigs, useDiscoveredWorkflows, useCronStatus } from '../../../api/workflows';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
@@ -59,6 +60,22 @@ export function StartWorkflowPage() {
 
   const executionsPath = '/workflows/executions';
 
+  // Fade transition when selection or mode changes
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelVisible, setPanelVisible] = useState(true);
+  const panelKey = `${selectedType}:${mode}`;
+  const prevKeyRef = useRef(panelKey);
+  useEffect(() => {
+    if (prevKeyRef.current !== panelKey) {
+      setPanelVisible(false);
+      const timer = setTimeout(() => {
+        prevKeyRef.current = panelKey;
+        setPanelVisible(true);
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [panelKey]);
+
   useEffect(() => {
     if (invocableConfigs.length === 1 && !searchParams.get('type')) {
       setSearchParams({ type: invocableConfigs[0].workflow_type, mode }, { replace: true });
@@ -88,6 +105,7 @@ export function StartWorkflowPage() {
     <div>
       <PageHeader
         title="Invoke Workflow"
+        docsHash="#docs:dashboard.md:invoke-workflow"
         actions={<ModeToggle mode={mode} onChange={setMode} />}
       />
 
@@ -97,15 +115,21 @@ export function StartWorkflowPage() {
           <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <WorkflowSelector
             configs={invocableConfigs}
             selectedType={selectedType}
             onSelect={handleSelect}
             tierMap={tierMap}
+            activeTypes={activeTypes}
           />
 
-          <div className="lg:col-span-2">
+          <div
+            ref={panelRef}
+            className={`lg:col-span-2 transition-all duration-200 ease-out ${
+              panelVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
+            }`}
+          >
             {selectedType && selectedConfig ? (
               mode === 'now' ? (
                 <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
@@ -113,9 +137,19 @@ export function StartWorkflowPage() {
                 <SchedulePanel selected={selectedConfig} activeTypes={activeTypes} />
               )
             ) : (
-              <div className="py-16 text-center">
-                <p className="text-sm text-text-tertiary">
-                  Select a workflow to begin
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="w-12 h-12 rounded-full bg-accent/[0.06] flex items-center justify-center mb-4">
+                  {mode === 'schedule'
+                    ? <Clock className="w-5 h-5 text-accent/50" />
+                    : <Play className="w-5 h-5 text-accent/50" />}
+                </div>
+                <p className="text-sm text-text-secondary mb-1">
+                  {mode === 'schedule' ? 'Automate on a schedule' : 'Ready when you are'}
+                </p>
+                <p className="text-xs text-text-quaternary">
+                  {mode === 'schedule'
+                    ? 'Choose a workflow to configure its schedule'
+                    : 'Choose a workflow from the list to get started'}
                 </p>
               </div>
             )}

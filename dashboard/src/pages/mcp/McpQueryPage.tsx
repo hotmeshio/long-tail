@@ -196,6 +196,7 @@ export function McpQueryPage() {
     <>
       <PageHeader
         title="MCP Tool Designer"
+        docsHash="#docs:dashboard.md:mcp-tool-designer"
         actions={
           <button
             onClick={() => navigate('/mcp/queries/new')}
@@ -258,7 +259,9 @@ export function McpQueryPage() {
       />
 
       {!isLoading && jobs.length === 0 && (
-        <EmptyState title="No tool designs yet" description="Click &quot;Create New MCP Tool&quot; to start" />
+        <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
+          <EmptyState icon={Wand2} title="No tool designs yet" description="Click to create your first MCP tool" />
+        </div>
       )}
 
       <StickyPagination

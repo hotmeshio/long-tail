@@ -1,13 +1,16 @@
 import { getPool } from '../../lib/db';
 import type { LTMcpServerRecord, LTMcpServerStatus, LTMcpToolManifest } from '../../types';
+import { loggerRegistry } from '../../lib/logger';
 import {
   CREATE_MCP_SERVER,
+  SEED_MCP_SERVER,
   GET_MCP_SERVER,
   GET_MCP_SERVER_BY_NAME,
   DELETE_MCP_SERVER,
   UPDATE_STATUS_CONNECTED,
   UPDATE_STATUS,
   GET_AUTO_CONNECT_SERVERS,
+  DELETE_STALE_BUILTIN_SERVERS,
 } from './sql';
 
 import type { CreateMcpServerInput } from './types';
@@ -196,4 +199,60 @@ export async function findServersByTags(
     [tags],
   );
   return rows;
+}
+
+/**
+ * Seed an MCP server at startup (insert-if-absent).
+ * DB is the source of truth — if the row already exists, log drift warnings
+ * but do not overwrite. Returns true if inserted, false if already existed.
+ */
+export async function seedMcpServer(input: {
+  name: string;
+  description?: string;
+  tags?: string[];
+  compileHints?: string;
+  credentialProviders?: string[];
+  toolManifest?: any[];
+}): Promise<boolean> {
+  const pool = getPool();
+  const { rowCount } = await pool.query(SEED_MCP_SERVER, [
+    input.name,
+    input.description || null,
+    'stdio',
+    JSON.stringify({ builtin: true, process: 'in-memory' }),
+    JSON.stringify(input.toolManifest || []),
+    JSON.stringify({ builtin: true }),
+    input.tags || [],
+    input.compileHints || null,
+    input.credentialProviders || [],
+  ]);
+
+  const inserted = (rowCount ?? 0) > 0;
+
+  if (!inserted) {
+    // Drift detection
+    const existing = await getMcpServerByName(input.name);
+    if (existing) {
+      const drifts: string[] = [];
+      if (input.description && existing.description !== input.description) drifts.push('description');
+      if (input.compileHints && existing.compile_hints !== input.compileHints) drifts.push('compile_hints');
+      if (JSON.stringify(input.tags || []) !== JSON.stringify(existing.tags || [])) drifts.push('tags');
+      if (drifts.length) {
+        loggerRegistry.warn(`[long-tail] MCP server drift: ${input.name} — ${drifts.join(', ')} differ between code and DB`);
+      }
+    }
+  }
+
+  return inserted;
+}
+
+/**
+ * Remove builtin MCP servers that are no longer declared in factory config.
+ */
+export async function cleanStaleBuiltinServers(activeNames: string[]): Promise<void> {
+  const pool = getPool();
+  const { rows } = await pool.query(DELETE_STALE_BUILTIN_SERVERS, [activeNames]);
+  for (const row of rows) {
+    loggerRegistry.info(`[long-tail] removed stale builtin MCP server: ${row.name}`);
+  }
 }

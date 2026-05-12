@@ -4,6 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../../../api/files', () => ({
   useFileMetadata: vi.fn(),
+  useFilePreviewUrl: vi.fn((path: string) => ({ data: path ? `/api/files/${path}?token=mock` : undefined })),
   useGenerateSignedUrl: vi.fn(() => ({
     mutateAsync: vi.fn(),
     isError: false,

@@ -105,6 +105,7 @@ export function ProcessDetailPage() {
     <div>
       <PageHeaderWithStats
         title="Process Detail"
+        docsHash="#docs:dashboard.md:process-detail"
         subtitle={originId}
         stats={inlineStats}
       />

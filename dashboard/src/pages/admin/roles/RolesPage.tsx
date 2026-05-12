@@ -31,6 +31,7 @@ export function RolesPage() {
     <div>
       <PageHeader
         title="Roles"
+        docsHash="#docs:dashboard.md:roles-and-permissions"
         actions={
           <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
             Add Role

@@ -50,6 +50,7 @@ export async function ltStartWorkflow(input: {
     taskQueue: input.taskQueue,
     workflowId: input.workflowId,
     expire: input.expire ?? JOB_EXPIRE_SECS,
+    signalIn: false,
   });
   loggerRegistry.info(
     `[ltStartWorkflow] started ${input.workflowName} (${input.workflowId})`,

@@ -39,13 +39,14 @@ export async function stepIterator(envelope: LTEnvelope): Promise<any> {
             parentWorkflowType: 'stepIterator',
             parentWorkflowId: ctx.workflowId,
           },
-          metadata: { source: 'step-iterator', step: i },
+          metadata: { source: 'step-iterator', step: i, ...(envelope.metadata?.certified === true ? { certified: true } : {}) },
         },
       ],
       taskQueue: 'long-tail-examples',
       workflowId: childWorkflowId,
       expire: JOB_EXPIRE_SECS,
       entity: 'workstation',
+      signalIn: false,
     });
 
     const result = await Durable.workflow.condition<StationResult>(

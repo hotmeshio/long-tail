@@ -5,6 +5,7 @@ import { useWorkflowSets } from '../../api/workflow-sets';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useExpandedRows } from '../../hooks/useExpandedRows';
 
+import { Wand2 } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
@@ -67,7 +68,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="MCP Pipeline Tools" />
+        <PageHeader title="MCP Pipeline Tools" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -83,15 +84,16 @@ export function YamlWorkflowsPage() {
     <div>
       <PageHeader
         title="MCP Pipeline Tools"
+        docsHash="#docs:dashboard.md:mcp-pipeline-tools"
         actions={
-          <button onClick={() => navigate('/mcp/queries')} className="btn-primary text-xs">
+          <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
             Design Pipeline
           </button>
         }
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Compiled from successful triage runs. Each workflow is a deterministic tool.
+        Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DAG that the router discovers and invokes automatically.
       </p>
 
       <FilterBar>
@@ -125,7 +127,9 @@ export function YamlWorkflowsPage() {
       <div className="flex gap-0">
         <div className={`${sidebarWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
           {filteredServers.length === 0 ? (
-            <EmptyState title="No pipelines yet" description="Use the MCP Tool Designer to create your first MCP tool." />
+            <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
+              <EmptyState icon={Wand2} title="No pipelines yet" description="Click to open the MCP Tool Designer and create your first deterministic tool." />
+            </div>
           ) : (
             <table className="w-full">
               <thead>
@@ -133,10 +137,13 @@ export function YamlWorkflowsPage() {
                   <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                     Server / Tool
                   </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-20">
+                    Version
+                  </th>
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
                     Status
                   </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface w-20" />
+                  <th className="sticky top-[2.75rem] z-10 bg-surface w-16" />
                 </tr>
               </thead>
               <tbody>
@@ -147,9 +154,6 @@ export function YamlWorkflowsPage() {
                     expanded={expandedIds.has(server.appId)}
                     onToggle={() => toggleExpand(server.appId)}
                     onTryTool={(wf) => { setCronWorkflow(null); setTryWorkflow(wf); }}
-                    onWizard={(wf) => {
-                      if (wf.source_workflow_id) navigate(`/mcp/queries/${wf.source_workflow_id}?step=4`);
-                    }}
                     onWorkbench={() => {
                       if (server.setId) {
                         const plannerWfId = setSourceMap.get(server.setId);

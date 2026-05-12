@@ -13,7 +13,7 @@ app:
   id: longtail
   version: '1'
   graphs:
-    - subscribes: factory.floor
+    - subscribes: factory_floor
       expire: 432000
 
       input:
@@ -41,7 +41,7 @@ app:
 
         ingest_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -56,7 +56,7 @@ app:
 
         classify_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -71,7 +71,7 @@ app:
 
         prepress_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -86,7 +86,7 @@ app:
 
         print_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -101,7 +101,7 @@ app:
 
         scan_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -120,7 +120,7 @@ app:
         # Station 1: QC Inspector
         esc_qc_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -151,7 +151,7 @@ app:
 
         resolve_qc_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -169,7 +169,7 @@ app:
         # Station 2: Packaging
         esc_pack_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -199,7 +199,7 @@ app:
 
         resolve_pack_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -217,7 +217,7 @@ app:
         # Station 3: Shipping
         esc_ship_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -247,7 +247,7 @@ app:
 
         resolve_ship_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -265,7 +265,7 @@ app:
         # Station 4: Loading Dock
         esc_dock_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -295,7 +295,7 @@ app:
 
         resolve_dock_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -313,7 +313,7 @@ app:
         # Station 5: Final Sign-off
         esc_signoff_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -343,7 +343,7 @@ app:
 
         resolve_signoff_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -362,7 +362,7 @@ app:
 
         complete_ff:
           type: worker
-          topic: factory.floor
+          topic: factory_floor
           input:
             schema:
               type: object
@@ -425,31 +425,31 @@ app:
           - to: done_ff
 
       hooks:
-        factory.qc.ack:
+        factory_qc_ack:
           - to: wait_qc_ff
             conditions:
               match:
                 - expected: '{$job.metadata.jid}'
                   actual: '{$self.hook.data.job_id}'
-        factory.pack.ack:
+        factory_pack_ack:
           - to: wait_pack_ff
             conditions:
               match:
                 - expected: '{$job.metadata.jid}'
                   actual: '{$self.hook.data.job_id}'
-        factory.ship.ack:
+        factory_ship_ack:
           - to: wait_ship_ff
             conditions:
               match:
                 - expected: '{$job.metadata.jid}'
                   actual: '{$self.hook.data.job_id}'
-        factory.dock.ack:
+        factory_dock_ack:
           - to: wait_dock_ff
             conditions:
               match:
                 - expected: '{$job.metadata.jid}'
                   actual: '{$self.hook.data.job_id}'
-        factory.signoff.ack:
+        factory_signoff_ack:
           - to: wait_signoff_ff
             conditions:
               match:

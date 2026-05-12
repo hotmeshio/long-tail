@@ -45,13 +45,14 @@ export async function assemblyLine(envelope: LTEnvelope): Promise<any> {
             parentWorkflowType: 'assemblyLine',
             parentWorkflowId: ctx.workflowId,
           },
-          metadata: { source: 'assembly-line', station: station.stationName },
+          metadata: { source: 'assembly-line', station: station.stationName, ...(envelope.metadata?.certified === true ? { certified: true } : {}) },
         },
       ],
       taskQueue: 'long-tail-examples',
       workflowId: childWorkflowId,
       expire: JOB_EXPIRE_SECS,
       entity: 'workstation',
+      signalIn: false,
     });
 
     // Pause until the child signals back with its result

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { BookOpen } from 'lucide-react';
 
 export interface InlineStat {
   label: string;
@@ -11,6 +12,7 @@ interface PageHeaderWithStatsProps {
   subtitle?: string;
   stats?: InlineStat[];
   actions?: ReactNode;
+  docsHash?: string;
 }
 
 export function PageHeaderWithStats({
@@ -18,11 +20,23 @@ export function PageHeaderWithStats({
   subtitle,
   stats,
   actions,
+  docsHash,
 }: PageHeaderWithStatsProps) {
   return (
     <div className="flex items-baseline justify-between mb-10">
       <div className="flex items-center gap-4">
-        <h1 className="text-3xl font-light text-text-primary">{title}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-light text-text-primary">{title}</h1>
+          {docsHash && (
+            <button
+              onClick={() => { window.location.hash = docsHash; }}
+              className="text-text-quaternary hover:text-accent transition-colors mt-1"
+              title="Open docs for this page"
+            >
+              <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
         {subtitle && (
           <span className="text-sm text-text-tertiary font-light">{subtitle}</span>
         )}

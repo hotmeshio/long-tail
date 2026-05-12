@@ -74,6 +74,12 @@ export async function upsertWorkflowConfig(input: {
   cron_schedule?: string | null;
 }): Promise<LTApiResult> {
   try {
+    // Validate cron expression before persisting
+    if (input.cron_schedule) {
+      const { validateCronSchedule } = await import('../../services/cron');
+      validateCronSchedule(input.cron_schedule);
+    }
+
     const config = await configService.upsertWorkflowConfig({
       workflow_type: input.type,
       invocable: input.invocable ?? false,

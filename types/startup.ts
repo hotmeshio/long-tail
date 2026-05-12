@@ -9,6 +9,58 @@ import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
 import type { LTEscalationStrategy } from './escalation-strategy';
 
+/**
+ * Inline workflow profile declared alongside a worker registration.
+ * When present, the config is upserted into `lt_config_workflows` at startup
+ * so the dashboard shows forms, roles, and tier badges on first boot.
+ *
+ * `workflow_type` and `task_queue` are derived automatically from the worker entry.
+ * Roles referenced here are auto-created if they don't already exist.
+ */
+export interface LTWorkerConfig {
+  description?: string;
+  /** Allow invocation from the dashboard / API. Default: false. */
+  invocable?: boolean;
+  /** Roles allowed to invoke this workflow. */
+  invocationRoles?: string[];
+  /** Default role for escalations. Default: 'reviewer'. */
+  defaultRole?: string;
+  /** Roles that can claim and resolve escalations (certifies the workflow for HITL). */
+  roles?: string[];
+  /** JSON template that pre-fills the dashboard invocation form. */
+  envelopeSchema?: Record<string, any>;
+  /** JSON template that pre-fills the escalation resolution form. */
+  resolverSchema?: Record<string, any>;
+  /** Upstream workflow types whose output is injected into this workflow's envelope. */
+  consumes?: string[];
+  /** MCP tool tags for discovery routing. */
+  toolTags?: string[];
+  /** Cron expression for scheduled execution. */
+  cronSchedule?: string;
+  /** Bot identity to run as (proxy invocation). */
+  executeAs?: string;
+}
+
+/**
+ * Inline MCP server profile declared alongside a server factory.
+ * When present, the config is upserted into `lt_mcp_servers` at startup
+ * so the dashboard shows tools, tags, and compile hints on first boot.
+ */
+export interface LTMcpServerConfig {
+  description?: string;
+  tags?: string[];
+  /** Hints for the MCP orchestrator when compiling deterministic pipelines. */
+  compileHints?: string;
+  /** OAuth providers required by this server's tools (e.g., ['google']). */
+  credentialProviders?: string[];
+  /** Tool manifest — static JSON schema definitions for each tool. */
+  toolManifest?: Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, any>;
+  }>;
+}
+
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
@@ -54,6 +106,8 @@ export interface LTStartConfig {
      * `retry` (stream-level retry policy with backoff).
      */
     connection?: { readonly?: boolean; retry?: Record<string, unknown> };
+    /** Inline workflow profile — auto-seeds dashboard forms, roles, and tier on startup. */
+    config?: LTWorkerConfig;
   }>;
 
   /** Interceptor defaults applied when a workflow escalates. */
@@ -128,9 +182,11 @@ export interface LTStartConfig {
     autoConnect?: string[];
     /**
      * Custom MCP server factories to register alongside the built-in ones.
-     * Key = server name, value = factory function returning an McpServer instance.
+     * Key = server name, value = factory function or `{ factory, config }` object.
+     * When `config` is provided, the server definition is auto-seeded into
+     * `lt_mcp_servers` at startup (tags, compile hints, credential providers, tool manifest).
      */
-    serverFactories?: Record<string, () => any>;
+    serverFactories?: Record<string, (() => any) | { factory: () => any; config: LTMcpServerConfig }>;
     /** Replace the built-in MCP adapter entirely. */
     adapter?: LTMcpAdapter;
   };

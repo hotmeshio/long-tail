@@ -53,11 +53,14 @@ export function initializeOAuth(config?: LTOAuthStartConfig): void {
   }
 
   // Auto-detect providers from environment variables
+  const port = process.env.PORT || '3000';
+  const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
   for (const { provider, idVar, secretVar } of ENV_PROVIDERS) {
     const clientId = process.env[idVar];
     const clientSecret = process.env[secretVar];
     if (clientId && clientSecret && !getProvider(provider)) {
-      registerProvider({ provider, clientId, clientSecret, scopes: [] });
+      const redirectUri = `${baseUrl}/api/auth/oauth/${provider}/callback`;
+      registerProvider({ provider, clientId, clientSecret, scopes: [], redirectUri });
     }
   }
 

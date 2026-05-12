@@ -19,7 +19,7 @@ export function FileBreadcrumbs({ prefix, onNavigate }: FileBreadcrumbsProps) {
         }`}
       >
         <FolderOpen className="w-4 h-4 text-accent/75" strokeWidth={1.5} />
-        <span>Files</span>
+        <span>Root</span>
       </button>
 
       {segments.map((segment, i) => {
