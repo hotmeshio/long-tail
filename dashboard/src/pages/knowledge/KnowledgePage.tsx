@@ -84,7 +84,7 @@ export function KnowledgePage() {
           }`}
         >
           <Brain className="w-4 h-4 text-accent/75" strokeWidth={1.5} />
-          <span>Knowledge</span>
+          <span>All Domains</span>
         </button>
         {domain && (
           <>

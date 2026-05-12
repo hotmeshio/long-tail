@@ -3,20 +3,20 @@ import { vi, describe, it, expect } from 'vitest';
 import { FileBreadcrumbs } from '../FileBreadcrumbs';
 
 describe('FileBreadcrumbs', () => {
-  it('renders root "Files" label at empty prefix', () => {
+  it('renders root label at empty prefix', () => {
     render(<FileBreadcrumbs prefix="" onNavigate={vi.fn()} />);
-    expect(screen.getByText('Files')).toBeInTheDocument();
+    expect(screen.getByText('Root')).toBeInTheDocument();
   });
 
   it('highlights root as active when prefix is empty', () => {
     render(<FileBreadcrumbs prefix="" onNavigate={vi.fn()} />);
-    const filesButton = screen.getByText('Files').closest('button')!;
+    const filesButton = screen.getByText('Root').closest('button')!;
     expect(filesButton.className).toContain('font-medium');
   });
 
   it('renders breadcrumb segments for nested prefix', () => {
     render(<FileBreadcrumbs prefix="images/screenshots/" onNavigate={vi.fn()} />);
-    expect(screen.getByText('Files')).toBeInTheDocument();
+    expect(screen.getByText('Root')).toBeInTheDocument();
     expect(screen.getByText('images')).toBeInTheDocument();
     expect(screen.getByText('screenshots')).toBeInTheDocument();
   });
@@ -33,7 +33,7 @@ describe('FileBreadcrumbs', () => {
   it('calls onNavigate with empty string when root is clicked', () => {
     const onNavigate = vi.fn();
     render(<FileBreadcrumbs prefix="docs/" onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByText('Files'));
+    fireEvent.click(screen.getByText('Root'));
     expect(onNavigate).toHaveBeenCalledWith('');
   });
 

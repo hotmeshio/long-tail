@@ -90,6 +90,7 @@ export type {
   LTStartConfig,
   LTInstance,
   LTWorkerConfig,
+  LTMcpServerConfig,
 } from './startup';
 
 export type {

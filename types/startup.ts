@@ -41,6 +41,26 @@ export interface LTWorkerConfig {
   executeAs?: string;
 }
 
+/**
+ * Inline MCP server profile declared alongside a server factory.
+ * When present, the config is upserted into `lt_mcp_servers` at startup
+ * so the dashboard shows tools, tags, and compile hints on first boot.
+ */
+export interface LTMcpServerConfig {
+  description?: string;
+  tags?: string[];
+  /** Hints for the MCP orchestrator when compiling deterministic pipelines. */
+  compileHints?: string;
+  /** OAuth providers required by this server's tools (e.g., ['google']). */
+  credentialProviders?: string[];
+  /** Tool manifest — static JSON schema definitions for each tool. */
+  toolManifest?: Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, any>;
+  }>;
+}
+
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
@@ -162,9 +182,11 @@ export interface LTStartConfig {
     autoConnect?: string[];
     /**
      * Custom MCP server factories to register alongside the built-in ones.
-     * Key = server name, value = factory function returning an McpServer instance.
+     * Key = server name, value = factory function or `{ factory, config }` object.
+     * When `config` is provided, the server definition is auto-seeded into
+     * `lt_mcp_servers` at startup (tags, compile hints, credential providers, tool manifest).
      */
-    serverFactories?: Record<string, () => any>;
+    serverFactories?: Record<string, (() => any) | { factory: () => any; config: LTMcpServerConfig }>;
     /** Replace the built-in MCP adapter entirely. */
     adapter?: LTMcpAdapter;
   };

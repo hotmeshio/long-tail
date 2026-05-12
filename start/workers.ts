@@ -130,16 +130,16 @@ export async function startWorkers(
       `[long-tail] workers started on queues: ${workers.map((w) => w.taskQueue).join(', ')}`,
     );
 
-    // Seed inline workflow configs declared on workers
+    // Seed workflow configs (insert-if-absent — DB is source of truth)
     const workersWithConfig = workers.filter((w) => w.config);
     if (workersWithConfig.length) {
-      const { upsertWorkflowConfig } = await import('../services/config/write');
+      const { seedWorkflowConfig } = await import('../services/config/write');
       const { ltConfig } = await import('../modules/ltconfig');
       for (const w of workersWithConfig) {
         const workflowType = w.workflow.name;
         const c = w.config!;
         try {
-          await upsertWorkflowConfig({
+          const inserted = await seedWorkflowConfig({
             workflow_type: workflowType,
             task_queue: w.taskQueue,
             invocable: c.invocable ?? false,
@@ -154,11 +154,9 @@ export async function startWorkers(
             cron_schedule: c.cronSchedule ?? null,
             execute_as: c.executeAs ?? null,
           });
-          loggerRegistry.info(`[long-tail] config seeded: ${workflowType}`);
+          if (inserted) loggerRegistry.info(`[long-tail] config seeded: ${workflowType}`);
         } catch (err: any) {
-          loggerRegistry.warn(
-            `[long-tail] config seed failed for ${workflowType}: ${err.message}`,
-          );
+          loggerRegistry.warn(`[long-tail] config seed failed for ${workflowType}: ${err.message}`);
         }
       }
       ltConfig.invalidate();
@@ -180,15 +178,47 @@ export async function startWorkers(
     }
 
     // Register MCP server factories: built-in (from system/) + user-provided
+    // Both system and user factories can carry inline config for DB seeding.
     const { registerBuiltinServer } = await import('../services/mcp/client');
-    const allFactories = {
+    const { seedMcpServer, cleanStaleBuiltinServers } = await import('../services/mcp/db');
+    const userFactories = startConfig.mcp?.serverFactories ?? {};
+
+    // Resolve user factories — plain function or { factory, config }
+    const resolvedUserFactories: Record<string, { factory: () => any; config?: import('../types/startup').LTMcpServerConfig }> = {};
+    for (const [name, entry] of Object.entries(userFactories)) {
+      if (typeof entry === 'function') {
+        resolvedUserFactories[name] = { factory: entry };
+      } else {
+        resolvedUserFactories[name] = entry;
+      }
+    }
+
+    // Merge system (always have config) + user factories
+    const allFactories: Record<string, { factory: () => any; config?: import('../types/startup').LTMcpServerConfig }> = {
       ...builtinMcpServerFactories,
-      ...(startConfig.mcp?.serverFactories ?? {}),
+      ...resolvedUserFactories,
     };
-    for (const [name, factory] of Object.entries(allFactories)) {
-      registerBuiltinServer(name, factory);
+
+    // 1. Register all factories (runtime — always applied)
+    for (const [name, entry] of Object.entries(allFactories)) {
+      registerBuiltinServer(name, entry.factory);
     }
     loggerRegistry.info(`[long-tail] ${Object.keys(allFactories).length} MCP server factories registered`);
+
+    // 2. Seed MCP server configs (insert-if-absent + drift log)
+    for (const [name, entry] of Object.entries(allFactories)) {
+      if (entry.config) {
+        try {
+          const inserted = await seedMcpServer({ name, ...entry.config });
+          if (inserted) loggerRegistry.info(`[long-tail] MCP server seeded: ${name}`);
+        } catch (err: any) {
+          loggerRegistry.warn(`[long-tail] MCP server seed failed for ${name}: ${err.message}`);
+        }
+      }
+    }
+
+    // 3. Clean stale builtin servers no longer in factory list
+    await cleanStaleBuiltinServers(Object.keys(allFactories));
 
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();
@@ -200,10 +230,6 @@ export async function startWorkers(
     await eventRegistry.connect();
     loggerRegistry.info('[long-tail] event adapters connected');
   }
-
-  // Seed system MCP servers (always)
-  const { seedSystemMcpServers } = await import('../system/seed');
-  await seedSystemMcpServers();
 
   // Ensure system bot account exists for cron/system-initiated workflows
   const { ensureSystemBot } = await import('../services/iam/bots');

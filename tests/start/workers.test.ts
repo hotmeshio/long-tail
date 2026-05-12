@@ -21,6 +21,7 @@ vi.mock('@hotmeshio/hotmesh', () => ({
 
 vi.mock('../../lib/db', () => ({
   getConnection: () => ({ class: Object, options: {} }),
+  getPool: () => ({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) }),
 }));
 
 vi.mock('../../lib/db/migrate', () => ({
@@ -73,13 +74,21 @@ vi.mock('../../services/mcp/client', () => ({
   registerBuiltinServer: vi.fn(),
 }));
 
+vi.mock('../../services/mcp/db', () => ({
+  seedMcpServer: vi.fn().mockResolvedValue(true),
+  cleanStaleBuiltinServers: vi.fn(),
+}));
+
+vi.mock('../../services/config/write', () => ({
+  seedWorkflowConfig: vi.fn().mockResolvedValue(true),
+  upsertWorkflowConfig: vi.fn(),
+}));
+
 vi.mock('../../services/yaml-workflow/workers', () => ({
   registerAllActiveWorkers: vi.fn(),
 }));
 
-vi.mock('../../system/seed', () => ({
-  seedSystemMcpServers: vi.fn(),
-}));
+vi.mock('../../system/seed', () => ({}));
 
 vi.mock('../../system', () => ({
   getSystemWorkers: () => [],

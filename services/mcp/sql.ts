@@ -96,7 +96,8 @@ export const DELETE_STALE_BUILTIN_SERVERS = `
     AND name != ALL($1)
   RETURNING name`;
 
-export const SEED_MCP_SERVER = `
+/** Upsert — used by dashboard/API writes (overwrites intentionally). */
+export const UPSERT_MCP_SERVER = `
   INSERT INTO lt_mcp_servers
     (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, last_connected_at)
   VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, $9, NOW())
@@ -109,3 +110,10 @@ export const SEED_MCP_SERVER = `
     credential_providers = EXCLUDED.credential_providers,
     status = 'connected',
     last_connected_at = NOW()`;
+
+/** Seed — insert-if-absent. DB is source of truth after first boot. */
+export const SEED_MCP_SERVER = `
+  INSERT INTO lt_mcp_servers
+    (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, last_connected_at)
+  VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, $9, NOW())
+  ON CONFLICT (name) DO NOTHING`;
