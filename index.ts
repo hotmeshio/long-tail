@@ -45,7 +45,11 @@ export { registerMcpTool } from './services/mcp/register-tool';
 export { getSystemWorkers, builtinMcpServerFactories } from './system';
 export { CallbackEventAdapter } from './lib/events/callback';
 export { createClient } from './sdk';
-export { getFreshAccessToken } from './services/oauth';
+export { getFreshAccessToken, listOAuthConnections } from './services/oauth';
+export { getStorageBackend } from './lib/storage';
+export { mimeFromPath } from './lib/storage/mime';
+export { resolveCredential } from './services/iam/credentials';
+export * as KnowledgeApi from './api/knowledge';
 export type { LTClient, LTClientOptions } from './sdk';
 export * as api from './api';
 
