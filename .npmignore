@@ -18,8 +18,9 @@ tests/
 **/*.test.tsx
 vitest.config.ts
 
-# Examples (not needed at runtime)
+# Examples (not needed at runtime — development/testing only)
 examples/
+build/examples/
 
 # Docker
 Dockerfile
