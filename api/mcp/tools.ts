@@ -53,13 +53,18 @@ export async function callMcpTool(
     if (!adapter) {
       return { status: 400, error: 'MCP adapter not registered' };
     }
-    const authContext = (input.execute_as || auth?.userId)
-      ? { userId: input.execute_as || auth?.userId }
-      : undefined;
+    const effectiveUserId = input.execute_as || auth?.userId;
+    const authContext = effectiveUserId ? { userId: effectiveUserId } : undefined;
+    // Inject user_id into arguments so builtin tools can resolve
+    // the calling user's credentials (OAuth tokens, etc.)
+    const args = { ...(input.arguments || {}) };
+    if (effectiveUserId && !args.user_id) {
+      args.user_id = effectiveUserId;
+    }
     const result = await adapter.callTool(
       input.id,
       input.toolName,
-      input.arguments || {},
+      args,
       authContext,
     );
     return { status: 200, data: { result } };
