@@ -15,7 +15,10 @@ import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './seed/tool-manifests-br
 import { CLAUDE_CODE_TOOLS } from './seed/tool-manifests-workflows';
 import { ADMIN_TOOLS } from './seed/tool-manifests-admin';
 import { KNOWLEDGE_TOOLS } from './seed/tool-manifests-knowledge';
-import { GMAIL_TOOLS } from './seed/tool-manifests-gmail';
+
+// Gmail is an example connector — loaded conditionally (not in npm package)
+let GMAIL_TOOLS: any[] = [];
+try { GMAIL_TOOLS = require('../examples/seed/tool-manifests-gmail').GMAIL_TOOLS; } catch { /* not available */ }
 
 // ── Role constants ──────────────────────────────────────────────────────────
 
@@ -258,8 +261,12 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
       toolManifest: SCHEMA_EXCHANGE_TOOLS,
     },
   },
-  'long-tail-gmail': {
-    factory: () => import('./mcp-servers/gmail').then((m) => m.createGmailServer()),
+};
+
+// Gmail is an example connector — only register when available (not in npm package)
+if (GMAIL_TOOLS.length > 0) {
+  builtinMcpServerFactories['long-tail-gmail'] = {
+    factory: () => import('../examples/mcp-servers/gmail').then((m) => m.createGmailServer()),
     config: {
       description: 'Gmail tools — search, read, summarize, extract, and draft emails using your connected Google account.',
       tags: ['gmail', 'email', 'messaging', 'google'],
@@ -269,5 +276,5 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
       credentialProviders: ['google'],
       toolManifest: GMAIL_TOOLS,
     },
-  },
-};
+  };
+}

@@ -13,6 +13,7 @@
   },
   "files": [
     "build/",
+    "!build/examples/",
     "docs/",
     "!docs/img/",
     "dashboard/dist/",
