@@ -1,10 +1,9 @@
 import { Radio } from 'lucide-react';
 
 /**
- * Event topic pill — displays a dot-delimited event type with a color-coded
- * Radio icon. Color is derived from the event category (first segment).
- *
- * Mirrors the WorkflowPill pattern but for the event topic space.
+ * Universal event topic display — Radio icon + monotype text.
+ * Used everywhere an event subscription topic is rendered.
+ * No border, no background — matches CronLabel's simplicity.
  */
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -24,13 +23,12 @@ interface EventTopicPillProps {
 
 export function EventTopicPill({ topic }: EventTopicPillProps) {
   const category = topic.split('.')[0];
-  const iconColor = CATEGORY_COLORS[category] ?? 'text-text-tertiary';
-  // Show the last two segments for compactness: "workflow.completed", "activity.started"
+  const iconColor = CATEGORY_COLORS[category] ?? 'text-text-quaternary';
   const shortTopic = topic.split('.').slice(-2).join('.');
 
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-px text-[11px] font-mono text-text-secondary border border-surface-border rounded-lg">
-      <Radio className={`w-2 h-2 shrink-0 ${iconColor}`} strokeWidth={2} />
+    <span className="inline-flex items-center gap-1 text-[11px] font-mono text-text-secondary">
+      <Radio className={`w-2.5 h-2.5 shrink-0 ${iconColor}`} strokeWidth={1.5} />
       {shortTopic}
     </span>
   );

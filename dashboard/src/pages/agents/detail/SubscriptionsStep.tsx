@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Plus, Trash2, Radio, BookOpen } from 'lucide-react';
+import { RunAsSelector } from '../../../components/common/form/RunAsSelector';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import type { AgentFormState, SubscriptionFormState } from './agent-form-types';
-import { EMPTY_SUBSCRIPTION, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
+import { EMPTY_SUBSCRIPTION, sectionCls, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
 const TOPIC_EXAMPLES = [
   'workflow.failed',
@@ -79,19 +80,20 @@ export function SubscriptionsStep({ form, set }: Props) {
         {/* Sub-index */}
         <div className="w-52 shrink-0 space-y-0.5">
           {subs.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => setSelected(i)}
-              className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                selected === i ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
-              }`}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isComplete(s) ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-                <span className="text-[11px] font-mono truncate">{s.topic || 'new subscription'}</span>
-              </div>
-              <span className="text-[9px] text-text-quaternary ml-3">→ {s.workflow_type || s.reaction_type}</span>
-            </button>
+            <div key={i} className={`group/sub flex items-center rounded-md transition-colors ${
+              selected === i ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
+            }`}>
+              <button onClick={() => setSelected(i)} className="flex-1 text-left px-3 py-2 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isComplete(s) ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                  <span className="text-[11px] font-mono truncate">{s.topic || 'new subscription'}</span>
+                </div>
+                <span className="text-[9px] text-text-quaternary ml-3">→ {s.workflow_type || s.reaction_type}</span>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove subscription "${s.topic || 'new'}"?\n\nThis takes effect when you save.`)) removeSub(i); }} className="opacity-0 group-hover/sub:opacity-100 px-2 text-text-quaternary hover:text-red-400 transition-all" title="Remove">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           ))}
           <button onClick={addSub} className="w-full flex items-center gap-1.5 px-3 py-2 text-[11px] text-accent hover:text-accent-hover transition-colors">
             <Plus className="w-3 h-3" /> Add
@@ -100,40 +102,32 @@ export function SubscriptionsStep({ form, set }: Props) {
 
         {/* Detail form */}
         {sub && (
-          <div className="flex-1 min-w-0 space-y-7">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-text-secondary">Subscription {selected + 1}</span>
-              <button onClick={() => removeSub(selected)} className="text-text-quaternary hover:text-red-400 transition-colors" title="Remove">
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
+          <div className="flex-1 min-w-0 space-y-12">
 
-            {/* Topic + shortcut chips */}
+            {/* When — topic + shortcut links */}
             <div>
-              <label className={labelCls}>When this event fires</label>
+              <label className={sectionCls}>When this event fires</label>
               <input type="text" value={sub.topic} onChange={(e) => updateSub(selected, 'topic', e.target.value)} placeholder="workflow.failed" className={`${inputCls} font-mono`} />
-              <div className="flex gap-1.5 mt-2 overflow-x-auto">
+              <div className="flex gap-3 mt-2 overflow-x-auto">
                 {TOPIC_EXAMPLES.map((ex) => (
                   <button key={ex} type="button" onClick={() => updateSub(selected, 'topic', ex)}
-                    className={`px-2 py-0.5 text-[9px] font-mono rounded whitespace-nowrap transition-colors ${sub.topic === ex ? 'bg-accent/20 text-accent' : 'text-text-quaternary hover:text-text-secondary border border-surface-border/40'}`}
+                    className={`text-[10px] font-mono whitespace-nowrap transition-colors ${sub.topic === ex ? 'text-accent font-medium' : 'text-accent/50 hover:text-accent'}`}
                   >{ex}</button>
                 ))}
               </div>
             </div>
 
-            {/* Reaction: type + target + filter — 2-col */}
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-5">
-                <div>
-                  <label className={labelCls}>Run this</label>
-                  <div className="flex gap-3 mt-1.5">
-                    {(['durable', 'pipeline', 'mcp_query'] as const).map((rt) => (
-                      <label key={rt} className="flex items-center gap-1 text-[11px] text-text-secondary cursor-pointer">
-                        <input type="radio" name="reaction" checked={sub.reaction_type === rt} onChange={() => updateSub(selected, 'reaction_type', rt)} className="accent-accent w-3 h-3" />
-                        {rt === 'durable' ? 'Workflow' : rt === 'pipeline' ? 'Pipeline' : 'MCP Query'}
-                      </label>
-                    ))}
-                  </div>
+            {/* Run this workflow + As identity + But only if — 3 col */}
+            <div className="grid grid-cols-3 gap-6">
+              <div className="space-y-4">
+                <label className={sectionCls}>Run this workflow</label>
+                <div className="flex gap-3">
+                  {(['durable', 'pipeline', 'mcp_query'] as const).map((rt) => (
+                    <label key={rt} className="flex items-center gap-1 text-[11px] text-text-secondary cursor-pointer">
+                      <input type="radio" name="reaction" checked={sub.reaction_type === rt} onChange={() => updateSub(selected, 'reaction_type', rt)} className="accent-accent w-3 h-3" />
+                      {rt === 'durable' ? 'Workflow' : rt === 'pipeline' ? 'Pipeline' : 'MCP Query'}
+                    </label>
+                  ))}
                 </div>
                 {sub.reaction_type === 'durable' && (
                   <div>
@@ -157,24 +151,22 @@ export function SubscriptionsStep({ form, set }: Props) {
                   </div>
                 )}
               </div>
-              <div className="space-y-5">
-                <div>
-                  <label className={labelCls}>Only when</label>
-                  <input type="text" value={sub.filter} onChange={(e) => updateSub(selected, 'filter', e.target.value)} placeholder="No filter (all matching events)" className={`${inputCls} font-mono text-xs`} />
-                  <p className={hintCls}>JSON filter against event.data, e.g. {`{"status": 422}`}</p>
-                </div>
-                <div>
-                  <label className={labelCls}>Run As</label>
-                  <input type="text" value={sub.execute_as} onChange={(e) => updateSub(selected, 'execute_as', e.target.value)} placeholder="Agent's service account" className={`${inputCls} text-xs`} />
-                  <p className={hintCls}>Override identity for this subscription.</p>
-                </div>
+              <div>
+                <label className={sectionCls}>As identity</label>
+                <RunAsSelector selected={sub.execute_as} onChange={(v) => updateSub(selected, 'execute_as', v)} />
+                <p className={hintCls}>Identity used when invoking the workflow.</p>
+              </div>
+              <div>
+                <label className={sectionCls}>But only if</label>
+                <input type="text" value={sub.filter} onChange={(e) => updateSub(selected, 'filter', e.target.value)} placeholder="No filter (all matching events)" className={`${inputCls} font-mono text-xs`} />
+                <p className={hintCls}>JSON filter against event.data, e.g. {`{"status": 422}`}</p>
               </div>
             </div>
 
             {/* Input Mapping full width */}
             <div>
-              <label className={labelCls}>With this data</label>
-              <textarea value={sub.input_mapping} onChange={(e) => updateSub(selected, 'input_mapping', e.target.value)} rows={5} className={jsonCls} placeholder={'{\n  "data": {\n    "orderId": "{event.data.orderId}",\n    "error": "{event.data.error}"\n  }\n}'} />
+              <label className={sectionCls}>With this data</label>
+              <textarea value={sub.input_mapping} onChange={(e) => updateSub(selected, 'input_mapping', e.target.value)} rows={10} className={jsonCls} placeholder={'{\n  "data": {\n    "orderId": "{event.data.orderId}",\n    "error": "{event.data.error}"\n  }\n}'} />
               <p className={hintCls}>Maps event fields to workflow input. {'{event.data.fieldName}'} resolves at runtime.</p>
             </div>
           </div>

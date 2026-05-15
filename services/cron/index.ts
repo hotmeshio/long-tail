@@ -6,7 +6,7 @@ import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
 import * as configService from '../config';
 import { resolvePrincipal } from '../iam/principal';
-import type { LTWorkflowConfig } from '../../types';
+import type { LTWorkflowConfig, LTAgent, AgentSchedule } from '../../types';
 import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
 import type { LTEnvelopePrincipal } from '../../types/envelope';
 
@@ -298,15 +298,175 @@ class LTCronRegistry {
     }
   }
 
+  // ── Agent schedule crons ──────────────────────────────────────────────
+
+  /**
+   * Start a single agent schedule cron.
+   */
+  async startAgentCron(
+    agent: LTAgent,
+    schedule: AgentSchedule,
+    idx: number,
+  ): Promise<void> {
+    const key = `agent:${agent.id}-${idx}`;
+    if (this.activeCrons.has(key)) return;
+
+    validateCronSchedule(schedule.cron);
+
+    const connection = getConnection();
+    const topic = `lt.cron.agent.${agent.id}.${idx}`;
+    const cronId = `lt-cron-agent-${agent.id}-${idx}`;
+
+    const executeAs = schedule.execute_as || agent.user_id || undefined;
+    let principal: LTEnvelopePrincipal | null | undefined;
+    if (executeAs) {
+      try { principal = await resolvePrincipal(executeAs); } catch { /* use system */ }
+    }
+    if (!principal) {
+      principal = this.systemPrincipal ?? undefined;
+    }
+
+    const envelope = {
+      data: schedule.envelope ?? {},
+      metadata: { source: 'agent-cron', agentId: agent.id, agentName: agent.name, certified: true },
+      lt: {
+        userId: principal?.id ?? 'lt-system',
+        principal,
+        scopes: ['workflow:invoke'],
+      },
+    };
+
+    const isPipeline = schedule.reaction_type === 'pipeline' && schedule.pipeline_id;
+
+    // Resolve the actual task queue from workflow config (durable only)
+    let taskQueue: string | undefined;
+    if (!isPipeline) {
+      const wfConfig = await configService.getWorkflowConfig(schedule.workflow_type!);
+      taskQueue = wfConfig?.task_queue || schedule.workflow_type;
+    }
+
+    const targetLabel = isPipeline ? `pipeline:${schedule.pipeline_id}` : schedule.workflow_type;
+
+    await Virtual.cron({
+      topic,
+      connection,
+      callback: async () => {
+        try {
+          if (isPipeline) {
+            const { invokeYamlWorkflow } = await import('../yaml-workflow/invoke');
+            const { getYamlWorkflow } = await import('../yaml-workflow/db');
+            const wf = await getYamlWorkflow(schedule.pipeline_id!);
+            if (!wf) throw new Error(`Pipeline ${schedule.pipeline_id} not found`);
+            loggerRegistry.info(`[lt-cron] agent invoking pipeline ${schedule.pipeline_id}`);
+            await invokeYamlWorkflow(wf, {
+              data: envelope.data ?? {},
+              execute_as: executeAs,
+            });
+          } else {
+            const client = new Durable.Client({ connection });
+            const workflowId = `agent-cron-${agent.id}-${idx}-${Durable.guid()}`;
+            loggerRegistry.info(`[lt-cron] agent invoking ${schedule.workflow_type} on ${taskQueue} (${workflowId})`);
+            await client.workflow.start({
+              args: [envelope],
+              taskQueue,
+              workflowName: schedule.workflow_type,
+              workflowId,
+              expire: JOB_EXPIRE_SECS,
+              entity: schedule.workflow_type,
+              signalIn: false,
+            } as any);
+          }
+        } catch (err: any) {
+          loggerRegistry.error(`[lt-cron] agent ${agent.name}/${targetLabel} failed: ${err?.message}`);
+        }
+      },
+      args: [],
+      options: { id: cronId, interval: schedule.cron },
+    });
+
+    this.activeCrons.set(key, cronId);
+    loggerRegistry.info(`[lt-cron] agent schedule started: ${agent.name}/${targetLabel} (${schedule.cron})`);
+  }
+
+  /**
+   * Stop all cron schedules for an agent.
+   */
+  async stopAgentCrons(agentId: string): Promise<void> {
+    const connection = getConnection();
+    const toRemove: string[] = [];
+
+    for (const [key, cronId] of this.activeCrons) {
+      if (key.startsWith(`agent:${agentId}-`)) {
+        const idx = key.split('-').pop();
+        const topic = `lt.cron.agent.${agentId}.${idx}`;
+        try {
+          await Virtual.interrupt({ topic, connection, options: { id: cronId } });
+        } catch { /* already stopped */ }
+        toRemove.push(key);
+      }
+    }
+
+    for (const key of toRemove) this.activeCrons.delete(key);
+    if (toRemove.length) {
+      loggerRegistry.info(`[lt-cron] stopped ${toRemove.length} agent schedule(s) for ${agentId}`);
+    }
+  }
+
+  /**
+   * Restart all cron schedules for an agent (after config change or pause/resume).
+   */
+  async restartAgentCrons(agent: LTAgent): Promise<void> {
+    await this.stopAgentCrons(agent.id);
+
+    if (agent.status !== 'active') return;
+
+    const schedules = agent.behaviors?.schedules ?? [];
+    for (let i = 0; i < schedules.length; i++) {
+      const sched = schedules[i];
+      if (sched.cron && (sched.workflow_type || sched.pipeline_id)) {
+        await this.startAgentCron(agent, sched, i);
+      }
+    }
+  }
+
+  /**
+   * Arm all cron schedules for active agents. Called at startup.
+   */
+  async connectAgentCrons(): Promise<void> {
+    const { listAgents } = await import('../agent');
+    const { agents } = await listAgents({ status: 'active', limit: 1000 });
+    let armed = 0;
+
+    for (const agent of agents) {
+      const schedules = agent.behaviors?.schedules ?? [];
+      for (let i = 0; i < schedules.length; i++) {
+        const sched = schedules[i];
+        if (sched.cron && (sched.workflow_type || sched.pipeline_id)) {
+          try {
+            await this.startAgentCron(agent, sched, i);
+            armed++;
+          } catch (err: any) {
+            loggerRegistry.warn(`[lt-cron] agent schedule failed: ${agent.name}/${sched.cron}: ${err.message}`);
+          }
+        }
+      }
+    }
+
+    loggerRegistry.info(`[lt-cron] ${armed} agent schedule(s) armed`);
+  }
+
   /**
    * Stop all active crons. Call during graceful shutdown.
    */
   async disconnect(): Promise<void> {
-    for (const workflowType of [...this.activeCrons.keys()]) {
-      if (workflowType.startsWith('yaml:')) {
-        await this.stopYamlCron(workflowType.replace('yaml:', ''));
+    for (const key of [...this.activeCrons.keys()]) {
+      if (key.startsWith('agent:')) {
+        const agentId = key.split(':')[1].split('-')[0];
+        await this.stopAgentCrons(agentId);
+      } else if (key.startsWith('yaml:')) {
+        await this.stopYamlCron(key.replace('yaml:', ''));
       } else {
-        await this.stopCron(workflowType);
+        await this.stopCron(key);
       }
     }
     this.connected = false;

@@ -55,8 +55,8 @@ interface ToolTestPanelProps {
   onClose: () => void;
 }
 
-const INPUT_CLS = 'w-full bg-transparent border-b border-surface-border/60 px-1 py-1.5 text-xs text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors';
-const LABEL_CLS = 'block text-xs font-medium text-text-tertiary mb-0.5';
+const INPUT_CLS = 'input text-xs';
+const LABEL_CLS = 'label';
 
 /** Text input for array fields — commits on blur or Enter, allows commas while typing */
 function ArrayInput({ value, onChange, className }: { value: any[]; onChange: (v: string[]) => void; className: string }) {
@@ -162,7 +162,7 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
             <textarea
               value={argsJson}
               onChange={(e) => setArgsJson(e.target.value)}
-              className="w-full bg-transparent border border-surface-border/40 rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:border-accent/50 resize-y transition-colors"
+              className="input-json w-full"
               rows={6}
               spellCheck={false}
             />

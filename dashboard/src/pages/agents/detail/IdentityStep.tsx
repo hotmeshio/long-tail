@@ -1,5 +1,4 @@
 import { BookOpen } from 'lucide-react';
-import { RunAsSelector } from '../../../components/common/form/RunAsSelector';
 import type { AgentFormState } from './agent-form-types';
 import { labelCls, hintCls, inputCls } from './agent-form-types';
 
@@ -18,17 +17,10 @@ export function IdentityStep({ form, set }: Props) {
         <button onClick={() => { window.location.hash = '#docs:agents.md:identity'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Identity"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
-        <div>
-          <label className={labelCls}>Name *</label>
-          <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="health-monitor" className={inputCls} />
-          <p className={hintCls}>Lowercase, kebab-case. This appears everywhere.</p>
-        </div>
-        <div>
-          <label className={labelCls}>Run As</label>
-          <RunAsSelector selected={form.user_id} onChange={(v) => set('user_id', v)} />
-          <p className={hintCls}>Service account. Controls credentials and permissions.</p>
-        </div>
+      <div>
+        <label className={labelCls}>Name *</label>
+        <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="health-monitor" className={inputCls} />
+        <p className={hintCls}>Lowercase, kebab-case. This appears everywhere.</p>
       </div>
 
       <div>

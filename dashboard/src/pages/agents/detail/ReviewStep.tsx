@@ -1,5 +1,6 @@
 import { Bot, Compass, Brain, Radio, Clock } from 'lucide-react';
 import { EventTopicPill } from '../../../components/common/display/EventTopicPill';
+import { CronLabel } from '../../../components/common/display/CronLabel';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 import type { AgentFormState } from './agent-form-types';
 
@@ -9,7 +10,7 @@ interface Props {
 
 function Section({ icon: Icon, color, title, children }: { icon: React.ElementType; color: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-5">
+    <div className="mb-10">
       <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-surface-border/40">
         <Icon className={`w-3.5 h-3.5 ${color}`} strokeWidth={1.5} />
         <h3 className="text-xs font-semibold uppercase tracking-widest text-accent/80">{title}</h3>
@@ -71,7 +72,7 @@ export function ReviewStep({ form }: Props) {
             <div className="divide-y divide-surface-border/30">
               {form.schedules.map((s, i) => (
                 <div key={i} className="flex items-center py-1.5">
-                  <div className="flex-1 min-w-0"><span className="text-xs font-mono text-text-primary">{s.cron}</span></div>
+                  <div className="flex-1 min-w-0"><CronLabel cron={s.cron} /></div>
                   <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span>{s.workflow_type ? <WorkflowPill type={s.workflow_type} /> : <span className="text-[11px] text-text-quaternary">no workflow</span>}</div>
                 </div>
               ))}

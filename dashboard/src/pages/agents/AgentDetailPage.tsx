@@ -10,6 +10,7 @@ import { useAgentEvents } from '../../hooks/useEventHooks';
 import { useEventSubscription } from '../../hooks/useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { EventTopicPill } from '../../components/common/display/EventTopicPill';
+import { CronLabel } from '../../components/common/display/CronLabel';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -208,14 +209,14 @@ export function AgentDetailPage() {
             <div className="divide-y divide-surface-border/30">
               {schedules.map((s: any, i: number) => (
                 <div key={i} className="flex items-center py-2">
-                  <div className="flex-1 min-w-0"><span className="text-sm font-mono text-text-primary">{s.cron}</span></div>
+                  <div className="flex-1 min-w-0"><CronLabel cron={s.cron} /></div>
                   <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span><WorkflowPill type={s.workflow_type || 'workflow'} /></div>
                 </div>
               ))}
             </div>
           ) : legacyCron ? (
             <div className="flex items-center py-1">
-              <div className="flex-1 min-w-0"><span className="text-sm font-mono text-text-primary">{legacyCron}</span></div>
+              <div className="flex-1 min-w-0"><CronLabel cron={legacyCron} /></div>
               {agent.workflow_type && <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span><WorkflowPill type={agent.workflow_type} /></div>}
             </div>
           ) : (

@@ -295,11 +295,11 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <EventTransportProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <EventTransportProvider>
           <RouterProvider router={router} />
-        </AuthProvider>
-      </EventTransportProvider>
+        </EventTransportProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

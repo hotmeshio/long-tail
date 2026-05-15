@@ -18,6 +18,8 @@ import * as namespacesApi from '../api/namespaces';
 import * as maintenanceApi from '../api/maintenance';
 import * as filesApi from '../api/files';
 import * as knowledgeApi from '../api/knowledge';
+import * as agentsApi from '../api/agents';
+import * as agentSubsApi from '../api/agent-subscriptions';
 import { eventRegistry } from '../lib/events';
 import { CallbackEventAdapter } from '../lib/events/callback';
 import type { LTApiAuth, LTApiResult } from '../types/sdk';
@@ -297,6 +299,19 @@ export function createClient(options: LTClientOptions = {}) {
       setField: knowledgeApi.setField,
       removeField: knowledgeApi.removeField,
       deleteEntry: knowledgeApi.deleteEntry,
+    },
+
+    // ── Agents ──────────────────────────────────────────────────────────────
+    agents: {
+      list: (input?: Parameters<typeof agentsApi.listAgents>[0]) => agentsApi.listAgents(input ?? {}),
+      get: agentsApi.getAgent,
+      create: (input: Parameters<typeof agentsApi.createAgent>[0]) => agentsApi.createAgent(input, auth),
+      update: agentsApi.updateAgent,
+      delete: agentsApi.deleteAgent,
+      listSubscriptions: agentSubsApi.listSubscriptions,
+      createSubscription: agentSubsApi.createSubscription,
+      updateSubscription: agentSubsApi.updateSubscription,
+      deleteSubscription: agentSubsApi.deleteSubscription,
     },
 
     // ── Events ─────────────────────────────────────────────────────────────

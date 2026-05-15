@@ -56,7 +56,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
                 type="text"
                 onChange={(e) => set('workflow_type', e.target.value)}
                 placeholder="Enter a workflow type manually"
-                className="input font-mono text-xs flex-1"
+                className="input font-mono flex-1"
               />
             </div>
           </div>
@@ -68,7 +68,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
               onChange={(e) => set('workflow_type', e.target.value)}
               disabled={editing}
               placeholder="reviewContent"
-              className="input font-mono text-xs w-full"
+              className="input font-mono w-full"
             />
             {!editing && form.workflow_type && durableTypes.length > 0 && (
               <button
@@ -103,7 +103,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
           value={form.task_queue}
           onChange={(e) => set('task_queue', e.target.value)}
           placeholder="lt-review"
-          className="input font-mono text-xs w-full"
+          className="input font-mono w-full"
         />
         <p className={hintCls}>
           Durable task queue this workflow listens on

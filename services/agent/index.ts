@@ -108,19 +108,25 @@ export async function updateAgent(
       data: { previous: oldAgent.status },
     });
   }
-  // Restart event triggers if status or behaviors changed
+  // Restart event triggers and cron schedules if status or behaviors changed
   if (updated && (data.status || data.behaviors)) {
     import('./trigger-registry').then(({ agentTriggerRegistry }) =>
       agentTriggerRegistry.restartAgent(id),
+    ).catch(() => {});
+    import('../cron').then(({ cronRegistry }) =>
+      cronRegistry.restartAgentCrons(updated),
     ).catch(() => {});
   }
   return updated;
 }
 
 export async function deleteAgent(id: string): Promise<boolean> {
-  // Stop event triggers before deleting (cascade will remove subscription rows)
+  // Stop event triggers and cron schedules before deleting
   import('./trigger-registry').then(({ agentTriggerRegistry }) =>
     agentTriggerRegistry.stopAgent(id),
+  ).catch(() => {});
+  import('../cron').then(({ cronRegistry }) =>
+    cronRegistry.stopAgentCrons(id),
   ).catch(() => {});
   const pool = getPool();
   const { rowCount } = await pool.query(DELETE_AGENT, [id]);

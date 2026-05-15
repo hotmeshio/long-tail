@@ -5,6 +5,7 @@ import {
   INSERT_SUBSCRIPTION,
   UPDATE_SUBSCRIPTION,
   DELETE_SUBSCRIPTION,
+  SEED_SUBSCRIPTION,
   LIST_ACTIVE_SUBSCRIPTIONS,
 } from './subscription-sql';
 
@@ -91,4 +92,27 @@ export async function listActiveSubscriptions(): Promise<ActiveSubscription[]> {
   const pool = getPool();
   const { rows } = await pool.query(LIST_ACTIVE_SUBSCRIPTIONS);
   return rows;
+}
+
+/**
+ * Seed a subscription at startup (insert-if-absent).
+ * Conflict on (agent_id, topic) — DB is source of truth after first boot.
+ */
+export async function seedSubscription(
+  agentId: string,
+  data: Partial<AgentSubscription>,
+): Promise<boolean> {
+  const pool = getPool();
+  const { rowCount } = await pool.query(SEED_SUBSCRIPTION, [
+    agentId,
+    data.topic,
+    data.filter ? JSON.stringify(data.filter) : null,
+    data.reaction_type,
+    data.workflow_type ?? null,
+    data.pipeline_id ?? null,
+    data.mcp_prompt ?? null,
+    JSON.stringify(data.input_mapping ?? {}),
+    data.execute_as ?? null,
+  ]);
+  return (rowCount ?? 0) > 0;
 }

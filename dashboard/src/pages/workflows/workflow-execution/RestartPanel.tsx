@@ -121,7 +121,7 @@ export function RestartPanel({ execution, forceOpen, onClose }: RestartPanelProp
               setJsonInput(e.target.value);
               setParseError('');
             }}
-            className="input font-mono text-xs"
+            className="input-json"
             rows={8}
             spellCheck={false}
           />

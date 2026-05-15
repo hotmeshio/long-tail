@@ -109,14 +109,14 @@ export function WorkflowConfigsPage() {
         return (
           <div className="space-y-1.5">
             {escRoles.length > 0 && (
-              <div className="flex items-start gap-1.5">
-                <span title="Escalation roles" className="mt-0.5"><ShieldCheck className="w-3 h-3 text-text-quaternary" /></span>
+              <div className="flex items-center gap-1.5">
+                <span title="Escalation roles"><ShieldCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
                 <div className="flex gap-1 flex-wrap">{escRoles.map((r) => <RolePill key={`e-${r}`} role={r} />)}</div>
               </div>
             )}
             {invokeRoles.length > 0 && (
-              <div className="flex items-start gap-1.5">
-                <span title="Invocation roles" className="mt-0.5"><UserCheck className="w-3 h-3 text-text-quaternary" /></span>
+              <div className="flex items-center gap-1.5">
+                <span title="Invocation roles"><UserCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
                 <div className="flex gap-1 flex-wrap">{invokeRoles.map((r) => <RolePill key={`i-${r}`} role={r} />)}</div>
               </div>
             )}

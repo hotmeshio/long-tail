@@ -134,7 +134,7 @@ export function CronEnvelopeEditor({
             setEnvelopeInput(e.target.value);
             setEnvelopeError('');
           }}
-          className="input font-mono text-xs w-full"
+          className="input-json w-full"
           rows={10}
           spellCheck={false}
         />

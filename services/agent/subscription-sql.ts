@@ -35,6 +35,14 @@ export const DELETE_SUBSCRIPTION = `
   DELETE FROM lt_agent_subscriptions WHERE id = $1
 `;
 
+export const SEED_SUBSCRIPTION = `
+  INSERT INTO lt_agent_subscriptions
+    (agent_id, topic, filter, reaction_type, workflow_type, pipeline_id, mcp_prompt,
+     input_mapping, execute_as, enabled)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+  ON CONFLICT (agent_id, topic) DO NOTHING
+`;
+
 export const LIST_ACTIVE_SUBSCRIPTIONS = `
   SELECT s.*, a.name AS agent_name, a.user_id AS agent_user_id
   FROM lt_agent_subscriptions s

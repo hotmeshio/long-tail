@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   Search, Play,
   MessageSquare, Eye, Database, Cog, Code2, Shield, BookOpen,
-  LayoutGrid,
+  LayoutGrid, Image,
 } from 'lucide-react';
 import { useCapabilities, type CapabilityTool } from '../../api/capabilities';
 import { ToolTestPanel } from '../../components/common/test/ToolTestPanel';
@@ -16,6 +16,7 @@ import type { LucideIcon } from 'lucide-react';
 const CATEGORY_META: Record<string, { icon: LucideIcon; color: string }> = {
   Communication: { icon: MessageSquare, color: 'text-blue-400' },
   Analysis:      { icon: Eye,            color: 'text-violet-400' },
+  Media:         { icon: Image,          color: 'text-pink-400' },
   Data:          { icon: Database,       color: 'text-emerald-400' },
   Automation:    { icon: Cog,            color: 'text-amber-400' },
   Development:   { icon: Code2,          color: 'text-cyan-400' },
@@ -193,24 +194,22 @@ function ToolRow({
       onClick={onTry}
       className="group w-full py-2 px-2 rounded-md hover:bg-surface-hover transition-colors text-left flex gap-4 items-start"
     >
-      {/* Col 1: tool name */}
-      <div className="w-44 shrink-0">
+      {/* Col 1: tool name — wider */}
+      <div className="w-56 shrink-0">
         <ToolPill name={tool.name} size="md" />
       </div>
-      {/* Col 2: params */}
-      <div className="w-36 shrink-0">
+      {/* Col 2: params — inline with middot delimiter */}
+      <div className="w-44 shrink-0 pt-0.5">
         {params.length > 0 && (
-          <div className="flex flex-wrap gap-x-0.5 gap-y-0 pt-1">
-            {params.map((p, i) => (
-              <span key={p} className="text-[8px] font-mono text-text-quaternary/70">
-                {i > 0 && <span className="text-surface-border mr-0.5">·</span>}
-                {p}
-              </span>
-            ))}
-          </div>
+          <p className="text-[9px] font-mono text-text-quaternary/70 leading-relaxed">
+            {params.map((p, i) => i < params.length - 1
+              ? <span key={p}><span className="whitespace-nowrap">{p} ·</span> </span>
+              : <span key={p}>{p}</span>
+            )}
+          </p>
         )}
       </div>
-      {/* Col 3: description */}
+      {/* Col 3: description — takes remaining */}
       <p className="text-[11px] text-text-tertiary leading-relaxed flex-1 pt-0.5">{tool.description}</p>
       {/* Col 4: server */}
       <div className="shrink-0 flex items-center gap-1.5 pt-0.5">

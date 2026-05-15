@@ -5,7 +5,7 @@
  * DB is the source of truth after seeding — startup never overwrites.
  */
 
-import type { LTWorkerConfig, LTMcpServerConfig } from '../types/startup';
+import type { LTWorkerConfig, LTMcpServerConfig, LTAgentConfig } from '../types/startup';
 
 // ── Tool manifests (static JSON schema data) ────────────────────────────────
 
@@ -17,9 +17,11 @@ import { ADMIN_TOOLS } from './seed/tool-manifests-admin';
 import { KNOWLEDGE_TOOLS } from './seed/tool-manifests-knowledge';
 import { EVENTS_TOOLS } from './seed/tool-manifests-events';
 
-// Gmail is an example connector — loaded conditionally (not in npm package)
+// Example connectors — loaded conditionally (not in npm package)
 let GMAIL_TOOLS: any[] = [];
 try { GMAIL_TOOLS = require('../examples/seed/tool-manifests-gmail').GMAIL_TOOLS; } catch { /* not available */ }
+let IMAGE_TOOLS: any[] = [];
+try { IMAGE_TOOLS = require('../examples/mcp-servers/tool-manifests-image').IMAGE_TOOLS; } catch { /* not available */ }
 
 // ── Role constants ──────────────────────────────────────────────────────────
 
@@ -304,4 +306,67 @@ if (GMAIL_TOOLS.length > 0) {
       toolManifest: GMAIL_TOOLS,
     },
   };
+}
+
+// Image tools — example connector for image processing via sharp
+if (IMAGE_TOOLS.length > 0) {
+  builtinMcpServerFactories['long-tail-image-tools'] = {
+    factory: () => import('../examples/mcp-servers/image-tools').then((m) => m.createImageToolsServer()),
+    config: {
+      description: 'Image processing tools — resize, crop, rotate, convert, blur, compress, and more.',
+      tags: ['image', 'processing', 'vision'],
+      category: 'Media',
+      compileHints: 'Image tools accept file paths from storage. Use file_storage tools to upload images first.',
+      toolManifest: IMAGE_TOOLS,
+    },
+  };
+}
+
+// ── System agents ──────────────────────────────────────────────────────────
+
+export function getSystemAgents(): LTAgentConfig[] {
+  return [
+    {
+      name: 'health-monitor',
+      description: 'Watches for workflow failures and schema drift',
+      goals: 'Detect failures early, capture diagnostics, and alert before cascading issues',
+      rules: 'Do not restart failed workflows automatically. Capture state and escalate.',
+      status: 'active',
+      knowledge_domain: 'system-health',
+      schedules: [
+        { cron: '0 * * * *', workflow_type: 'basicEcho' },
+      ],
+      subscriptions: [
+        { topic: 'workflow.failed', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } } },
+        { topic: 'activity.failed', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { activity: '{event.activityName}', workflowId: '{event.workflowId}' } } },
+        { topic: 'app.*.*.error', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { error: '{event.data}', source: '{event.source}' } } },
+      ],
+    },
+    {
+      name: 'event-coordinator',
+      description: 'Coordinates cross-system events and routes them to workflows',
+      goals: 'Serve as the central nervous system for event-driven automation',
+      rules: 'Route critical events within 5 seconds. Never drop events.',
+      status: 'active',
+      knowledge_domain: 'event-routing',
+      subscriptions: [
+        { topic: 'app.>', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { topic: '{event.type}', source: '{event.source}', payload: '{event.data}' } } },
+        { topic: 'knowledge.stored', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { domain: '{event.data.domain}', key: '{event.data.key}' } } },
+      ],
+    },
+    {
+      name: 'content-triage',
+      description: 'Auto-resolves low-confidence content review escalations',
+      goals: 'Reduce human review burden by auto-triaging content below confidence thresholds',
+      rules: 'Never auto-approve content flagged for legal review.',
+      status: 'active',
+      knowledge_domain: 'content-review',
+      schedules: [
+        { cron: '*/15 * * * *', workflow_type: 'reviewContent' },
+      ],
+      subscriptions: [
+        { topic: 'escalation.created', reaction_type: 'durable', workflow_type: 'reviewContent', filter: { workflowName: 'reviewContent' }, input_mapping: { data: { escalationId: '{event.escalationId}', workflowId: '{event.workflowId}' } } },
+      ],
+    },
+  ];
 }

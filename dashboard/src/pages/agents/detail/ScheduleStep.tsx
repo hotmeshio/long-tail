@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
+import { RunAsSelector } from '../../../components/common/form/RunAsSelector';
 import { useWorkflowConfigs } from '../../../api/workflows';
+import { useYamlWorkflows } from '../../../api/yaml-workflows';
 import type { AgentFormState, ScheduleFormState } from './agent-form-types';
-import { EMPTY_SCHEDULE, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
+import { EMPTY_SCHEDULE, sectionCls, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
 const CRON_PRESETS = [
   '*/5 * * * *',
@@ -35,6 +37,8 @@ interface Props {
 export function ScheduleStep({ form, set }: Props) {
   const { data: configs } = useWorkflowConfigs();
   const invocableWorkflows = (configs ?? []).filter((c: any) => c.invocable).map((c: any) => c.workflow_type);
+  const { data: pipelineData } = useYamlWorkflows({ status: 'active' });
+  const pipelines = (pipelineData?.workflows ?? []).map((w: any) => ({ id: w.id, name: w.graph_topic || w.id }));
   const [selected, setSelected] = useState(0);
 
   const updateSched = (index: number, field: keyof ScheduleFormState, value: any) => {
@@ -92,16 +96,17 @@ export function ScheduleStep({ form, set }: Props) {
         {/* Sub-index */}
         <div className="w-48 shrink-0 space-y-0.5">
           {scheds.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => setSelected(i)}
-              className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                selected === i ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
-              }`}
-            >
-              <span className="text-[11px] font-mono block">{s.cron || 'new schedule'}</span>
-              <span className="text-[9px] text-text-quaternary">{s.workflow_type || 'no workflow'} · {describeCron(s.cron)}</span>
-            </button>
+            <div key={i} className={`group/sched flex items-center rounded-md transition-colors ${
+              selected === i ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
+            }`}>
+              <button onClick={() => setSelected(i)} className="flex-1 text-left px-3 py-2 min-w-0">
+                <span className="text-[11px] font-mono block">{s.cron || 'new schedule'}</span>
+                <span className="text-[9px] text-text-quaternary">{(s.reaction_type === 'pipeline' ? s.pipeline_id : s.workflow_type) || 'no target'} · {describeCron(s.cron)}</span>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove schedule "${s.cron || 'new'}"?\n\nThis takes effect when you save.`)) removeSched(i); }} className="opacity-0 group-hover/sched:opacity-100 px-2 text-text-quaternary hover:text-red-400 transition-all" title="Remove">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           ))}
           <button onClick={addSched} className="w-full flex items-center gap-1.5 px-3 py-2 text-[11px] text-accent hover:text-accent-hover transition-colors">
             <Plus className="w-3 h-3" /> Add
@@ -110,49 +115,65 @@ export function ScheduleStep({ form, set }: Props) {
 
         {/* Detail form */}
         {sched && (
-          <div className="flex-1 min-w-0 space-y-7">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-text-secondary">Schedule {selected + 1}</span>
-              <button onClick={() => removeSched(selected)} className="text-text-quaternary hover:text-red-400 transition-colors" title="Remove">
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
+          <div className="flex-1 min-w-0 space-y-12">
 
-            {/* Cron + presets */}
+            {/* Every — cron + presets */}
             <div>
-              <label className={labelCls}>Cron Expression *</label>
+              <label className={sectionCls}>Run every</label>
               <input type="text" value={sched.cron} onChange={(e) => updateSched(selected, 'cron', e.target.value)} placeholder="0 * * * *" className={`${inputCls} font-mono`} />
               {sched.cron && <p className="text-[11px] text-accent/80 mt-1">{describeCron(sched.cron)}</p>}
-              <div className="flex gap-1.5 mt-2 overflow-x-auto">
+              <div className="flex gap-3 mt-2 overflow-x-auto">
                 {CRON_PRESETS.map((p) => (
                   <button key={p} type="button" onClick={() => updateSched(selected, 'cron', p)}
-                    className={`px-2 py-0.5 text-[9px] font-mono rounded whitespace-nowrap transition-colors ${sched.cron === p ? 'bg-accent/20 text-accent' : 'text-text-quaternary hover:text-text-secondary border border-surface-border/40'}`}
+                    className={`text-[10px] font-mono whitespace-nowrap transition-colors ${sched.cron === p ? 'text-accent font-medium' : 'text-accent/50 hover:text-accent'}`}
                   >{describeCron(p)}</button>
                 ))}
               </div>
             </div>
 
-            {/* Workflow + Run As — 2 col */}
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <label className={labelCls}>Workflow *</label>
-                <select value={sched.workflow_type} onChange={(e) => updateSched(selected, 'workflow_type', e.target.value)} className={inputCls}>
-                  <option value="">Select...</option>
-                  {invocableWorkflows.map((wt: string) => <option key={wt} value={wt}>{wt}</option>)}
-                </select>
-                <p className={hintCls}>The workflow invoked on each cron tick.</p>
+            {/* Run this workflow + As identity — 2 col */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <label className={sectionCls}>Run this workflow</label>
+                <div className="flex gap-3">
+                  {(['durable', 'pipeline'] as const).map((rt) => (
+                    <label key={rt} className="flex items-center gap-1 text-[11px] text-text-secondary cursor-pointer">
+                      <input type="radio" name={`sched-reaction-${selected}`} checked={sched.reaction_type === rt} onChange={() => updateSched(selected, 'reaction_type', rt)} className="accent-accent w-3 h-3" />
+                      {rt === 'durable' ? 'Workflow' : 'Pipeline'}
+                    </label>
+                  ))}
+                </div>
+                {sched.reaction_type === 'pipeline' ? (
+                  <div>
+                    <label className={labelCls}>Pipeline *</label>
+                    <select value={sched.pipeline_id} onChange={(e) => updateSched(selected, 'pipeline_id', e.target.value)} className={inputCls}>
+                      <option value="">Select...</option>
+                      {pipelines.map((p: { id: string; name: string }) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    <p className={hintCls}>YAML pipeline invoked on each cron tick.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className={labelCls}>Workflow *</label>
+                    <select value={sched.workflow_type} onChange={(e) => updateSched(selected, 'workflow_type', e.target.value)} className={inputCls}>
+                      <option value="">Select...</option>
+                      {invocableWorkflows.map((wt: string) => <option key={wt} value={wt}>{wt}</option>)}
+                    </select>
+                    <p className={hintCls}>Invoked on each cron tick.</p>
+                  </div>
+                )}
               </div>
               <div>
-                <label className={labelCls}>Run As</label>
-                <input type="text" value={sched.execute_as} onChange={(e) => updateSched(selected, 'execute_as', e.target.value)} placeholder="Agent's service account" className={`${inputCls} text-xs`} />
-                <p className={hintCls}>Override identity for this schedule.</p>
+                <label className={sectionCls}>As identity</label>
+                <RunAsSelector selected={sched.execute_as} onChange={(v) => updateSched(selected, 'execute_as', v)} />
+                <p className={hintCls}>Identity used when invoking.</p>
               </div>
             </div>
 
             {/* Envelope */}
             <div>
-              <label className={labelCls}>Envelope</label>
-              <textarea value={sched.envelope} onChange={(e) => updateSched(selected, 'envelope', e.target.value)} rows={4} className={jsonCls} placeholder={'{\n  "data": { "source": "cron" }\n}'} />
+              <label className={sectionCls}>With this data</label>
+              <textarea value={sched.envelope} onChange={(e) => updateSched(selected, 'envelope', e.target.value)} rows={10} className={jsonCls} placeholder={'{\n  "data": { "source": "cron" }\n}'} />
               <p className={hintCls}>Static payload passed to the workflow on each invocation.</p>
             </div>
           </div>

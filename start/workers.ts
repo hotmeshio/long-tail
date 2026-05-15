@@ -224,6 +224,52 @@ export async function startWorkers(
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
+  // Seed agents (from startConfig + system agents)
+  const { getSystemAgents } = await import('../system');
+  const allAgentConfigs = [...(startConfig.agents ?? []), ...getSystemAgents()];
+  if (allAgentConfigs.length > 0) {
+    const { seedAgent, getAgentByName } = await import('../services/agent');
+    const { seedSubscription } = await import('../services/agent/subscriptions');
+    for (const agentConfig of allAgentConfigs) {
+      try {
+        // Map flat schedules into behaviors.schedules for DB storage
+        const behaviors: Record<string, any> = {};
+        if (agentConfig.schedules?.length) {
+          behaviors.schedules = agentConfig.schedules;
+          behaviors.cron = agentConfig.schedules[0].cron;
+        }
+        const inserted = await seedAgent({
+          name: agentConfig.name,
+          description: agentConfig.description,
+          goals: agentConfig.goals,
+          rules: agentConfig.rules,
+          status: (agentConfig.status ?? 'active') as any,
+          knowledge_domain: agentConfig.knowledge_domain,
+          behaviors,
+          workflow_type: agentConfig.schedules?.[0]?.workflow_type,
+        });
+        if (inserted) loggerRegistry.info(`[long-tail] agent seeded: ${agentConfig.name}`);
+
+        // Seed subscriptions for this agent
+        if (agentConfig.subscriptions?.length) {
+          const agent = await getAgentByName(agentConfig.name);
+          if (agent) {
+            for (const sub of agentConfig.subscriptions) {
+              try {
+                const subInserted = await seedSubscription(agent.id, sub);
+                if (subInserted) loggerRegistry.info(`[long-tail] subscription seeded: ${agentConfig.name}/${sub.topic}`);
+              } catch (subErr: any) {
+                loggerRegistry.warn(`[long-tail] subscription seed failed: ${agentConfig.name}/${sub.topic}: ${subErr.message}`);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        loggerRegistry.warn(`[long-tail] agent seed failed for ${agentConfig.name}: ${err.message}`);
+      }
+    }
+  }
+
   // Register the in-process callback adapter for agent event triggers
   const { CallbackEventAdapter } = await import('../lib/events/callback');
   const { agentTriggerRegistry } = await import('../services/agent/trigger-registry');
@@ -242,6 +288,13 @@ export async function startWorkers(
     await agentTriggerRegistry.connect(callbackAdapter);
   } catch (err: any) {
     loggerRegistry.warn(`[long-tail] agent trigger registry: ${err.message}`);
+  }
+
+  // Arm agent cron schedules
+  try {
+    await cronRegistry.connectAgentCrons();
+  } catch (err: any) {
+    loggerRegistry.warn(`[long-tail] agent cron schedules: ${err.message}`);
   }
 
   // Ensure system bot account exists for cron/system-initiated workflows

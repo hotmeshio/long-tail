@@ -63,6 +63,42 @@ export interface LTMcpServerConfig {
   }>;
 }
 
+/**
+ * Declarative agent configuration for startup seeding.
+ * Schedules and subscriptions are peers — both are "when X, run Y as Z".
+ */
+export interface LTAgentConfig {
+  name: string;
+  description?: string;
+  goals?: string;
+  rules?: string;
+  /** Default: 'active' */
+  status?: string;
+  knowledge_domain?: string;
+
+  /** Cron-triggered reactions */
+  schedules?: Array<{
+    cron: string;
+    reaction_type?: 'durable' | 'pipeline';
+    workflow_type?: string;
+    pipeline_id?: string;
+    envelope?: Record<string, any>;
+    execute_as?: string;
+  }>;
+
+  /** Event-triggered reactions */
+  subscriptions?: Array<{
+    topic: string;
+    reaction_type: 'durable' | 'pipeline' | 'mcp_query';
+    workflow_type?: string;
+    pipeline_id?: string;
+    mcp_prompt?: string;
+    input_mapping?: Record<string, any>;
+    filter?: Record<string, any>;
+    execute_as?: string;
+  }>;
+}
+
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
@@ -170,6 +206,9 @@ export interface LTStartConfig {
    * a few sample workflows so the dashboard has data immediately.
    */
   examples?: boolean;
+
+  /** Declarative agent configurations. Seeded on first boot (insert-if-absent). */
+  agents?: LTAgentConfig[];
 
   /** MCP (Model Context Protocol) integration. */
   mcp?: {

@@ -19,9 +19,26 @@ export interface AgentTrigger {
   filter?: Record<string, any>;
 }
 
+export interface AgentSchedule {
+  /** Cron expression */
+  cron: string;
+  /** Execution mode: durable workflow or YAML pipeline. Default: 'durable'. */
+  reaction_type?: 'durable' | 'pipeline';
+  /** Durable workflow to invoke on each tick (when reaction_type is 'durable' or omitted) */
+  workflow_type?: string;
+  /** YAML pipeline to invoke on each tick (when reaction_type is 'pipeline') */
+  pipeline_id?: string;
+  /** Static envelope payload */
+  envelope?: Record<string, any>;
+  /** Bot identity override */
+  execute_as?: string;
+}
+
 export interface AgentBehaviors {
-  /** Cron expression for scheduled runs */
+  /** Legacy single cron (use schedules[] instead) */
   cron?: string;
+  /** Multiple cron schedules */
+  schedules?: AgentSchedule[];
   /** Event-driven triggers */
   triggers?: AgentTrigger[];
   /** Escalation routing rules */

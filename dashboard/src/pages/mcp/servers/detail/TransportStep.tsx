@@ -148,7 +148,7 @@ export function TransportStep({ form, set, isBuiltin }: Props) {
             <textarea
               value={form.env_vars}
               onChange={(e) => set('env_vars', e.target.value)}
-              className="input font-mono text-[11px] w-full leading-relaxed"
+              className="input-json w-full"
               rows={3}
               spellCheck={false}
             />

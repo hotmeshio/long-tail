@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertCircle, Inbox, ListChecks, Wand2, Layers, Radio, ExternalLink, BookOpen,
+  AlertCircle, Inbox, ListChecks, Wand2, Layers, Radio, ExternalLink, BookOpen, ChevronDown,
 } from 'lucide-react';
 import { useEscalations } from '../../api/escalations';
 import { useJobs } from '../../api/workflows';
@@ -17,6 +17,7 @@ import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { EventTopicPill } from '../../components/common/display/EventTopicPill';
+import { JsonViewer } from '../../components/common/data/JsonViewer';
 
 const STATUS_DOT: Record<string, string> = {
   completed: 'bg-status-success',
@@ -35,10 +36,10 @@ function statusDotClass(status: string): string {
 
 // ── Live Feed ───────────────────────────────────────────────────────────────
 
-interface FeedEvent { id: number; type: string; timestamp: string; label: string; }
+interface FeedEvent { id: number; type: string; timestamp: string; label: string; data: Record<string, unknown>; }
 let feedCounter = 0;
 
-function useLiveFeed(maxItems = 15) {
+function useLiveFeed(maxItems = 5) {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [pulse, setPulse] = useState(false);
   const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -46,7 +47,7 @@ function useLiveFeed(maxItems = 15) {
   const handler = useCallback((event: any) => {
     if (event.type?.startsWith('mesh.')) return;
     const label = event.activityName || event.workflowName || event.data?.domain || event.workflowId?.slice(0, 16) || '';
-    setEvents((prev) => [{ id: ++feedCounter, type: event.type, timestamp: event.timestamp, label }, ...prev].slice(0, maxItems));
+    setEvents((prev) => [{ id: ++feedCounter, type: event.type, timestamp: event.timestamp, label, data: event }, ...prev].slice(0, maxItems));
     setPulse(true);
     if (pulseTimer.current) clearTimeout(pulseTimer.current);
     pulseTimer.current = setTimeout(() => setPulse(false), 2000);
@@ -105,8 +106,8 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-        <span className="text-[12px] text-text-primary font-mono truncate flex-1">{midEllipsis(id)}</span>
-        <span className="text-[10px] text-text-quaternary shrink-0"><DateValue date={date} /></span>
+        <span className="text-[12px] text-text-primary font-mono truncate max-w-[60%]">{midEllipsis(id)}</span>
+        <span className="text-[10px] text-text-quaternary shrink-0 ml-auto whitespace-nowrap"><DateValue date={date} /></span>
       </div>
       <div className="pl-3.5 flex items-center gap-1 overflow-hidden">{pill}</div>
     </button>
@@ -177,6 +178,27 @@ function AppPicker({ appIds, selected, onSelect }: {
   );
 }
 
+// ── Event stream row (expandable) ───────────────────────────────────────────
+
+function EventStreamRow({ event }: { event: FeedEvent }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setExpanded(!expanded)} className="w-full text-left px-1 py-2 hover:bg-surface-hover/50 rounded-md transition-colors flex items-center gap-2">
+        <ChevronDown className={`w-2.5 h-2.5 text-text-quaternary shrink-0 transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`} />
+        <EventTopicPill topic={event.type} />
+        <span className="text-[11px] text-text-secondary font-mono truncate flex-1">{event.label || '—'}</span>
+        <span className="text-[10px] text-text-quaternary shrink-0"><DateValue date={event.timestamp} format="time" /></span>
+      </button>
+      {expanded && (
+        <div className="pl-5 pb-2">
+          <JsonViewer data={event.data} defaultCollapsed={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function HomePage() {
@@ -197,14 +219,14 @@ export function HomePage() {
   useProcessListEvents();
 
   const procQ = useProcesses({ limit: 5 });
-  const jobsQ = useJobs({ limit: 5, sort_by: 'started_at', order: 'desc', namespace: durableNs });
+  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs });
   const { data: cpData } = useControlPlaneApps();
   const allAppIds = (cpData?.apps ?? []).map((a: any) => a.appId);
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
-  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs });
-  const allEscQ = useEscalations({ status: 'pending', limit: 5, sort_by: 'priority', order: 'asc' });
-  const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc' });
+  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' });
+  const allEscQ = useEscalations({ status: 'pending', limit: 5, sort_by: 'updated_at', order: 'desc' });
+  const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'updated_at', order: 'desc' });
   const { events: liveEvents, pulse } = useLiveFeed();
 
   const processes = procQ.data?.processes ?? [];
@@ -215,7 +237,7 @@ export function HomePage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-light text-text-primary mb-10">Activity</h1>
+      <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
 
       {/* ── Row 1: Processes | Durable Executions | Pipeline Executions ──── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 gap-y-14">
@@ -231,7 +253,7 @@ export function HomePage() {
             Certified Processes
           </SectionHeader>
           <div className="mb-3 -mt-2">
-            <span className="px-2 py-0.5 text-[10px] rounded text-text-quaternary">all namespaces</span>
+            <span className="px-2 py-0.5 text-[10px] rounded text-text-quaternary uppercase tracking-widest">all namespaces</span>
           </div>
           {processes.length === 0 ? (
             <EmptyPanel icon={Layers} text="No recent processes" />
@@ -241,7 +263,7 @@ export function HomePage() {
                 <ExecutionRow
                   key={p.origin_id}
                   dot={(p.task_count ?? 0) > 0 && (p.completed ?? 0) >= (p.task_count ?? 0) ? 'bg-status-success' : (p.escalated ?? 0) > 0 ? 'border border-status-error' : 'bg-status-active'}
-                  pill={<>{(p.workflow_types ?? [p.workflow_type]).filter(Boolean).map((wt: string) => <WorkflowPill key={wt} type={wt} />)}</>}
+                  pill={<>{(p.workflow_types ?? [p.workflow_type]).filter(Boolean).map((wt: string) => <WorkflowPill key={wt} type={wt} size="xs" />)}</>}
                   id={p.origin_id}
                   date={p.last_activity ?? p.started_at}
                   onClick={() => navigate(`/processes/detail/${p.origin_id}`)}
@@ -270,7 +292,7 @@ export function HomePage() {
                 <ExecutionRow
                   key={job.workflow_id}
                   dot={statusDotClass(job.status)}
-                  pill={<WorkflowPill type={job.entity || job.type || 'workflow'} />}
+                  pill={<WorkflowPill type={job.entity || job.type || 'workflow'} size="xs" />}
                   id={job.workflow_id}
                   date={job.updated_at ?? job.created_at}
                   onClick={() => navigate(`/workflows/executions/${job.workflow_id}`)}
@@ -299,7 +321,7 @@ export function HomePage() {
                 <ExecutionRow
                   key={run.workflow_id}
                   dot={statusDotClass(run.status)}
-                  pill={<WorkflowPill type={run.entity || run.workflow_name || 'pipeline'} variant="pipeline" />}
+                  pill={<WorkflowPill type={run.entity || run.workflow_name || 'pipeline'} variant="pipeline" size="xs" />}
                   id={run.workflow_id}
                   date={run.updated_at ?? run.created_at}
                   onClick={() => navigate(`/mcp/executions/${run.workflow_id}?namespace=${pipelineNs}`)}
@@ -335,11 +357,11 @@ export function HomePage() {
                 >
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[9px] text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-[12px] text-text-primary truncate flex-1">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0"><DateValue date={esc.created_at} /></span>
+                    <span className="text-[12px] text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
+                    <span className="text-[10px] text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
                   </div>
                   <div className="flex items-center gap-2 pl-5">
-                    <WorkflowPill type={esc.type || 'unknown'} />
+                    <WorkflowPill type={esc.type || 'unknown'} size="xs" />
                     <span className="flex-1" />
                     <RolePill role={esc.role} />
                   </div>
@@ -371,11 +393,11 @@ export function HomePage() {
                 >
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[9px] text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-[12px] text-text-primary truncate flex-1">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0"><DateValue date={esc.created_at} /></span>
+                    <span className="text-[12px] text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
+                    <span className="text-[10px] text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
                   </div>
                   <div className="flex items-center gap-2 pl-5">
-                    <WorkflowPill type={esc.type || 'unknown'} />
+                    <WorkflowPill type={esc.type || 'unknown'} size="xs" />
                     <span className="flex-1" />
                     <RolePill role={esc.role} />
                   </div>
@@ -387,11 +409,17 @@ export function HomePage() {
 
         {/* Col 3: Event Stream */}
         <div>
-          <SectionHeader icon={Radio} color="text-cyan-400"
+          <SectionHeader icon={Radio} color="text-emerald-400"
             actions={
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-500 ${pulse ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-                <span className="text-[10px] text-text-quaternary">live</span>
+                <button
+                  onClick={() => { const btn = document.querySelector('[title="Fullscreen"]') as HTMLButtonElement; btn?.click(); }}
+                  className="text-text-quaternary hover:text-accent transition-colors"
+                  title="View all events"
+                >
+                  <ExternalLink className="w-2.5 h-2.5" strokeWidth={1.5} />
+                </button>
               </div>
             }
           >
@@ -400,19 +428,9 @@ export function HomePage() {
           {liveEvents.length === 0 ? (
             <EmptyPanel icon={Radio} text="Events appear here in real time" />
           ) : (
-            <div className="space-y-1">
+            <div className="divide-y divide-surface-border/20">
               {liveEvents.map((ev) => (
-                <div key={ev.id} className="px-1 py-1.5 hover:bg-surface-hover/50 rounded-md transition-colors">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[12px] text-text-primary font-mono truncate flex-1">{ev.label || '—'}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0">
-                      <DateValue date={ev.timestamp} format="time" />
-                    </span>
-                  </div>
-                  <div className="pl-0">
-                    <EventTopicPill topic={ev.type} />
-                  </div>
-                </div>
+                <EventStreamRow key={ev.id} event={ev} />
               ))}
             </div>
           )}

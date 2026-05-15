@@ -91,6 +91,7 @@ export type {
   LTInstance,
   LTWorkerConfig,
   LTMcpServerConfig,
+  LTAgentConfig,
 } from './startup';
 
 export type {
@@ -143,5 +144,6 @@ export type {
   LTAgentStats,
   AgentCapability,
   AgentBehaviors,
+  AgentSchedule,
   AgentTrigger,
 } from './agent';

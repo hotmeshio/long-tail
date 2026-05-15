@@ -43,7 +43,7 @@ const TAG_FALLBACK: Record<string, string> = {
   'development': 'Development',
 };
 
-const CATEGORY_ORDER = ['Communication', 'Analysis', 'Data', 'Automation', 'Development', 'System', 'Reference', 'Other'];
+const CATEGORY_ORDER = ['Communication', 'Analysis', 'Media', 'Data', 'Automation', 'Development', 'System', 'Reference', 'Other'];
 
 function resolveCategory(server: { category?: string; tags?: string[] }): string {
   if (server.category) return server.category;

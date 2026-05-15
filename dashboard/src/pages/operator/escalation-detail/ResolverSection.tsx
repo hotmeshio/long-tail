@@ -75,7 +75,7 @@ export function ResolverSection({
             <textarea
               value={json}
               onChange={(e) => onJsonChange(e.target.value)}
-              className="input font-mono text-xs w-full"
+              className="input-json w-full"
               rows={8}
               spellCheck={false}
               data-testid="resolve-json"

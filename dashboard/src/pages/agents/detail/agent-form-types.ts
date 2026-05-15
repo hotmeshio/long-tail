@@ -16,7 +16,9 @@ export interface SubscriptionFormState {
 
 export interface ScheduleFormState {
   cron: string;
+  reaction_type: 'durable' | 'pipeline';
   workflow_type: string;
+  pipeline_id: string;
   envelope: string; // JSON string
   execute_as: string;
 }
@@ -59,7 +61,9 @@ export const EMPTY_SUBSCRIPTION: SubscriptionFormState = {
 
 export const EMPTY_SCHEDULE: ScheduleFormState = {
   cron: '0 * * * *',
+  reaction_type: 'durable',
   workflow_type: '',
+  pipeline_id: '',
   envelope: '{}',
   execute_as: '',
 };
@@ -79,7 +83,11 @@ export function isStepValid(step: number, form: AgentFormState): boolean {
       });
     }
     case 5: {
-      return form.schedules.every((s) => !!s.cron && !!s.workflow_type);
+      return form.schedules.every((s) => {
+        if (!s.cron) return false;
+        if (s.reaction_type === 'pipeline') return !!s.pipeline_id;
+        return !!s.workflow_type;
+      });
     }
     case 6: return true;
     default: return true;
@@ -94,12 +102,14 @@ export function agentToForm(
   const schedules: ScheduleFormState[] = agent.behaviors?.schedules?.length
     ? (agent.behaviors.schedules as any[]).map((s: any) => ({
         cron: s.cron || '',
+        reaction_type: s.reaction_type || 'durable',
         workflow_type: s.workflow_type || '',
+        pipeline_id: s.pipeline_id || '',
         envelope: s.envelope ? JSON.stringify(s.envelope, null, 2) : '{}',
         execute_as: s.execute_as || '',
       }))
     : agent.behaviors?.cron
-      ? [{ cron: agent.behaviors.cron, workflow_type: agent.workflow_type ?? '', envelope: '{}', execute_as: '' }]
+      ? [{ cron: agent.behaviors.cron, reaction_type: 'durable' as const, workflow_type: agent.workflow_type ?? '', pipeline_id: '', envelope: '{}', execute_as: '' }]
       : [];
 
   return {
@@ -131,7 +141,9 @@ export function formToAgentPayload(form: AgentFormState): Record<string, any> {
   if (form.schedules.length > 0) {
     (behaviors as any).schedules = form.schedules.map((s) => ({
       cron: s.cron,
-      workflow_type: s.workflow_type,
+      reaction_type: s.reaction_type || 'durable',
+      workflow_type: s.reaction_type === 'pipeline' ? undefined : s.workflow_type,
+      pipeline_id: s.reaction_type === 'pipeline' ? s.pipeline_id : undefined,
       envelope: tryParseJson(s.envelope) ?? {},
       execute_as: s.execute_as || undefined,
     }));
@@ -183,7 +195,8 @@ function tryParseJson(s: string): Record<string, any> | undefined {
   try { return JSON.parse(s); } catch { return undefined; }
 }
 
-export const labelCls = 'block text-xs font-medium text-text-tertiary mb-0.5';
-export const hintCls = 'text-[9px] text-text-quaternary/70 mt-1 leading-snug';
-export const inputCls = 'w-full bg-transparent border-b border-surface-border/60 px-1 py-1.5 text-sm text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors';
-export const jsonCls = 'w-full bg-transparent border border-surface-border/40 rounded-md px-3 py-2 text-[11px] font-mono text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 leading-relaxed tabular-nums resize-y transition-colors';
+export const sectionCls = 'section-header mt-[3em] first:mt-0';
+export const labelCls = 'label';
+export const hintCls = 'hint';
+export const inputCls = 'input';
+export const jsonCls = 'input-json w-full';
