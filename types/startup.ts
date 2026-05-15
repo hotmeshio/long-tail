@@ -49,6 +49,8 @@ export interface LTWorkerConfig {
 export interface LTMcpServerConfig {
   description?: string;
   tags?: string[];
+  /** Capability category for the Capabilities view (e.g., 'Communication', 'Analysis', 'Data'). */
+  category?: string;
   /** Hints for the MCP orchestrator when compiling deterministic pipelines. */
   compileHints?: string;
   /** OAuth providers required by this server's tools (e.g., ['google']). */

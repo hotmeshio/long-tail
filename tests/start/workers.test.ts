@@ -55,7 +55,15 @@ const { eventConnectMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/events', () => ({
-  eventRegistry: { hasAdapters: true, connect: eventConnectMock },
+  eventRegistry: { hasAdapters: true, connect: eventConnectMock, register: vi.fn() },
+}));
+
+vi.mock('../../lib/events/callback', () => ({
+  CallbackEventAdapter: vi.fn(() => ({ on: vi.fn(), connect: vi.fn(), disconnect: vi.fn() })),
+}));
+
+vi.mock('../../services/agent/trigger-registry', () => ({
+  agentTriggerRegistry: { connect: vi.fn(), disconnect: vi.fn() },
 }));
 
 vi.mock('../../services/maintenance', () => ({

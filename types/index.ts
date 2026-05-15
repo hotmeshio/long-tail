@@ -136,3 +136,12 @@ export type {
   LTApiResult,
   LTApiAuth,
 } from './sdk';
+
+export type {
+  LTAgent,
+  LTAgentStatus,
+  LTAgentStats,
+  AgentCapability,
+  AgentBehaviors,
+  AgentTrigger,
+} from './agent';

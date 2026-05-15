@@ -41,6 +41,7 @@ export interface McpServerRecord {
   metadata: Record<string, unknown> | null;
   tags: string[];
   credential_providers: string[];
+  category: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -12,12 +12,9 @@ export function RunAsSelector({ selected, onChange }: RunAsSelectorProps) {
   const isAdmin = isSuperAdmin || hasRoleType('admin');
 
   return (
-    <div className="px-2.5 py-2 rounded-md bg-accent/[0.06] border border-accent/20">
+    <div>
       {isAdmin ? (
-        <div className="space-y-1">
-          <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Run as</label>
-          <BotPicker selected={selected} onChange={onChange} />
-        </div>
+        <BotPicker selected={selected} onChange={onChange} />
       ) : (
         <div className="flex items-center gap-1.5">
           {selected ? (

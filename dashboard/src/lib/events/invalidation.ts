@@ -64,6 +64,14 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
       keys.push(['tasks']);
       break;
 
+    case 'knowledge':
+      keys.push(['knowledge']);
+      break;
+
+    case 'agent':
+      keys.push(['agents']);
+      break;
+
     default:
       keys.push(['jobs']);
       keys.push(['tasks']);

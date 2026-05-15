@@ -4,10 +4,10 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
+import { WorkSidebar } from './WorkSidebar';
+import { BuildSidebar } from './BuildSidebar';
+import { StorageSidebar } from './StorageSidebar';
 import { AdminSidebar } from './AdminSidebar';
-import { EngineerSidebar } from './EngineerSidebar';
-import { McpSidebar } from './McpSidebar';
-import { FilesSidebar } from './FilesSidebar';
 import { EventFeed } from './EventFeed';
 import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
@@ -55,9 +55,9 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <EngineerSidebar />}
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <McpSidebar />}
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <FilesSidebar />}
+            <WorkSidebar />
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <BuildSidebar />}
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <StorageSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
 

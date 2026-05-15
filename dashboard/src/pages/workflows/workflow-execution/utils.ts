@@ -40,6 +40,7 @@ export const MCP_ACTIVITY_NAMES = new Set([
 
 /** Truncate a string in the middle, keeping the start and end visible. */
 export function middleTruncate(str: string, maxLen: number): string {
+  if (!str || typeof str !== 'string') return str ?? '';
   if (str.length <= maxLen) return str;
   const keep = Math.floor((maxLen - 1) / 2);
   return `${str.slice(0, keep)}…${str.slice(str.length - keep)}`;
@@ -97,10 +98,11 @@ export function buildTimelineSpans(events: WorkflowExecutionEvent[]): TimelineSp
     // Determine the representative event for this span
     const primary = completed || started || evt;
     const cat = primary.category;
-    const name = primary.attributes.activity_type
+    const name = String(primary.attributes.activity_type
       || primary.attributes.signal_name
       || primary.attributes.child_workflow_id
-      || primary.event_type;
+      || primary.event_type
+      || 'unknown');
 
     const startEvt = started || primary;
     const endEvt = completed;

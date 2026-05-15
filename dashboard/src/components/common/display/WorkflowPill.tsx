@@ -26,7 +26,7 @@ const VARIANT_FIXED_COLOR: Record<string, string> = {
 export function WorkflowPill({ type, size = 'sm', certified, variant }: WorkflowPillProps) {
   const sizeClass = size === 'md'
     ? 'px-2.5 py-0.5 text-[13px] gap-1.5'
-    : 'px-2 py-0.5 text-[10px] gap-1';
+    : 'px-1.5 py-px text-[11px] gap-1';
   const iconClass = size === 'md' ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5';
 
   const resolved = variant ?? (certified ? 'certified' : 'durable');
@@ -37,10 +37,9 @@ export function WorkflowPill({ type, size = 'sm', certified, variant }: Workflow
   const fixedColor = VARIANT_FIXED_COLOR[resolved];
   const derived = fixedColor ? null : typeColor(type);
   const iconColor = fixedColor || (derived?.text ?? 'text-accent/75');
-  const bgColor = derived?.bg ?? 'bg-accent/[0.06]';
 
   return (
-    <span className={`inline-flex items-center ${sizeClass} font-mono ${bgColor} text-text-secondary rounded-lg`}>
+    <span className={`inline-flex items-center ${sizeClass} font-mono text-text-secondary border border-surface-border rounded-lg`}>
       <Icon className={`${iconClass} shrink-0 ${iconColor}`} />
       {type}
     </span>

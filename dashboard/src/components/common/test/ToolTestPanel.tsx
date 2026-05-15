@@ -4,6 +4,8 @@ import { X, RotateCcw, Play, ExternalLink, KeyRound } from 'lucide-react';
 import { useCallMcpTool } from '../../../api/mcp';
 import { JsonViewer } from '../data/JsonViewer';
 import { RunAsSelector } from '../form/RunAsSelector';
+import { ToolPill } from '../display/ToolPill';
+import { ServerName } from '../display/ServerName';
 import type { McpToolManifest } from '../../../api/types';
 import { buildSkeleton } from '../../../pages/mcp/mcp-query-detail/helpers';
 
@@ -53,6 +55,28 @@ interface ToolTestPanelProps {
   onClose: () => void;
 }
 
+const INPUT_CLS = 'w-full bg-transparent border-b border-surface-border/60 px-1 py-1.5 text-xs text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors';
+const LABEL_CLS = 'block text-xs font-medium text-text-tertiary mb-0.5';
+
+/** Text input for array fields — commits on blur or Enter, allows commas while typing */
+function ArrayInput({ value, onChange, className }: { value: any[]; onChange: (v: string[]) => void; className: string }) {
+  const [raw, setRaw] = useState(value.join(', '));
+  const commit = () => onChange(raw.split(',').map((s) => s.trim()).filter(Boolean));
+  // Sync if parent value changes externally
+  useEffect(() => { setRaw(value.join(', ')); }, [JSON.stringify(value)]); // eslint-disable-line
+  return (
+    <input
+      type="text"
+      value={raw}
+      onChange={(e) => setRaw(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+      placeholder="comma-separated values"
+      className={className}
+    />
+  );
+}
+
 export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestPanelProps) {
   const callTool = useCallMcpTool();
   const [jsonMode, setJsonMode] = useState(false);
@@ -99,31 +123,37 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
   };
 
   return (
-    <div className="border-l border-surface-border bg-surface-raised flex flex-col h-full">
+    <div className="border-l border-surface-border bg-surface-raised">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-text-primary truncate">{serverName}</p>
-          <code className="text-[11px] font-mono text-accent truncate block">{tool.name}</code>
+      <div className="flex items-start justify-between px-4 py-3 border-b border-surface-border/50 shrink-0">
+        <div className="min-w-0 space-y-1">
+          <ServerName name={serverName} serverId={serverId} short={false} />
+          <div><ToolPill name={tool.name} size="md" /></div>
         </div>
-        <button onClick={onClose} className="p-1 text-text-tertiary hover:text-text-primary shrink-0 ml-2">
-          <X className="w-4 h-4" />
+        <button onClick={onClose} className="p-1 text-text-quaternary hover:text-text-primary shrink-0 ml-2">
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        <RunAsSelector selected={executeAs} onChange={setExecuteAs} />
-
+      <div className="px-4 py-4 space-y-5">
         {tool.description && (
-          <p className="text-[11px] text-text-secondary leading-relaxed">{tool.description}</p>
+          <div className="border-l-2 border-accent/30 pl-3 py-1">
+            <p className="text-[11px] text-text-secondary leading-relaxed italic">{tool.description}</p>
+          </div>
         )}
+
+        {/* Run as */}
+        <div>
+          <label className={LABEL_CLS}>run as</label>
+          <RunAsSelector selected={executeAs} onChange={setExecuteAs} />
+        </div>
 
         {/* Form / JSON toggle input */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Request</label>
-            <button onClick={toggleMode} className="text-[10px] text-accent hover:underline">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] text-text-quaternary">Parameters</span>
+            <button onClick={toggleMode} className="text-[10px] text-accent/70 hover:text-accent transition-colors">
               {jsonMode ? 'Form view' : 'JSON view'}
             </button>
           </div>
@@ -132,42 +162,58 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
             <textarea
               value={argsJson}
               onChange={(e) => setArgsJson(e.target.value)}
-              className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
+              className="w-full bg-transparent border border-surface-border/40 rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:border-accent/50 resize-y transition-colors"
               rows={6}
               spellCheck={false}
             />
           ) : (
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {Object.entries(fields).map(([key, value]) => (
-                <div key={key}>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
-                  {typeof value === 'boolean' ? (
-                    <select
-                      value={String(value)}
-                      onChange={(e) => setFields({ ...fields, [key]: e.target.value === 'true' })}
-                      className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-                    >
-                      <option value="true">true</option>
-                      <option value="false">false</option>
-                    </select>
-                  ) : typeof value === 'object' ? (
-                    <textarea
-                      value={JSON.stringify(value, null, 2)}
-                      onChange={(e) => { try { setFields({ ...fields, [key]: JSON.parse(e.target.value) }); } catch { /* invalid */ } }}
-                      className="w-full min-h-[60px] px-3 py-1.5 bg-surface-sunken border border-surface-border rounded-md font-mono text-xs text-text-primary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-                    />
-                  ) : (
-                    <input
-                      type={typeof value === 'number' ? 'number' : 'text'}
-                      value={String(value ?? '')}
-                      onChange={(e) => setFields({ ...fields, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value })}
-                      className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary"
-                    />
-                  )}
-                </div>
-              ))}
+            <div className="space-y-3">
+              {Object.entries(fields).map(([key, value]) => {
+                const propSchema = tool.inputSchema?.properties?.[key];
+                const hint = propSchema?.description;
+                const isRequired = (tool.inputSchema?.required ?? []).includes(key);
+                return (
+                  <div key={key}>
+                    <label className={LABEL_CLS}>
+                      {key}
+                      {isRequired && <span className="text-accent/50 ml-0.5">*</span>}
+                    </label>
+                    {typeof value === 'boolean' ? (
+                      <select
+                        value={String(value)}
+                        onChange={(e) => setFields({ ...fields, [key]: e.target.value === 'true' })}
+                        className={INPUT_CLS}
+                      >
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                      </select>
+                    ) : Array.isArray(value) ? (
+                      <ArrayInput
+                        value={value as any[]}
+                        onChange={(v) => setFields({ ...fields, [key]: v })}
+                        className={INPUT_CLS}
+                      />
+                    ) : typeof value === 'object' && value !== null ? (
+                      <textarea
+                        value={JSON.stringify(value, null, 2)}
+                        onChange={(e) => { try { setFields({ ...fields, [key]: JSON.parse(e.target.value) }); } catch { /* invalid */ } }}
+                        className={`${INPUT_CLS} min-h-[48px] font-mono resize-y`}
+                      />
+                    ) : (
+                      <input
+                        type={typeof value === 'number' ? 'number' : 'text'}
+                        value={String(value ?? '')}
+                        onChange={(e) => setFields({ ...fields, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value })}
+                        className={INPUT_CLS}
+                        placeholder={propSchema?.type === 'string' ? propSchema?.example || '' : ''}
+                      />
+                    )}
+                    {hint && <p className="text-[9px] text-text-quaternary/70 mt-0.5 leading-snug">{hint}</p>}
+                  </div>
+                );
+              })}
               {Object.keys(fields).length === 0 && (
-                <p className="text-[11px] text-text-tertiary italic">No input fields defined</p>
+                <p className="text-[11px] text-text-quaternary">No parameters</p>
               )}
             </div>
           )}
@@ -192,8 +238,8 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
         {/* Response */}
         {callTool.isPending && (
           <div className="animate-pulse">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
-            <div className="h-20 bg-surface-sunken rounded-md" />
+            <p className="text-[10px] text-text-quaternary mb-1">Response</p>
+            <div className="h-20 bg-surface-sunken/50 rounded-md" />
           </div>
         )}
         {callTool.data ? (
@@ -204,7 +250,7 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
         ) : null}
         {callTool.error ? (
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
+            <p className="text-[10px] text-text-quaternary mb-1">Response</p>
             <ToolErrorDisplay error={callTool.error as Error | null} />
           </div>
         ) : null}

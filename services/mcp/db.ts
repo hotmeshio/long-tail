@@ -210,6 +210,7 @@ export async function seedMcpServer(input: {
   name: string;
   description?: string;
   tags?: string[];
+  category?: string;
   compileHints?: string;
   credentialProviders?: string[];
   toolManifest?: any[];
@@ -225,6 +226,7 @@ export async function seedMcpServer(input: {
     input.tags || [],
     input.compileHints || null,
     input.credentialProviders || [],
+    input.category || null,
   ]);
 
   const inserted = (rowCount ?? 0) > 0;

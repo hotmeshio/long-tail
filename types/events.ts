@@ -23,7 +23,20 @@ export type LTEventType =
   | 'activity.started'
   | 'activity.completed'
   | 'activity.failed'
+  | 'knowledge.stored'
+  | 'knowledge.deleted'
+  | 'agent.started'
+  | 'agent.completed'
+  | 'agent.failed'
+  | 'agent.status_changed'
   | 'milestone';
+
+/**
+ * Application-defined event type.
+ * Convention: `app.{namespace}.{entity}.{action}`
+ * Examples: `app.epic.apis.createorder.error`, `app.vendor.schema.drift`
+ */
+export type LTAppEventType = `app.${string}`;
 
 /**
  * Payload published through the events system.

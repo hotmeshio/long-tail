@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 
 import { getConnection } from '../../lib/db';
+import { publishKnowledgeEvent } from '../../lib/events/publish';
 import {
   UPSERT_KNOWLEDGE,
   REPLACE_KNOWLEDGE,
@@ -40,7 +41,9 @@ export async function storeKnowledge(args: {
       sql,
       [args.domain, args.key, JSON.stringify(args.data), args.tags || []],
     );
-    return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
+    const result = { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
+    publishKnowledgeEvent({ type: 'knowledge.stored', domain: args.domain, key: args.key });
+    return result;
   });
 }
 
@@ -167,7 +170,11 @@ export async function deleteKnowledge(args: {
 }): Promise<{ deleted: boolean }> {
   return withClient(async (client) => {
     const { rowCount } = await client.query(DELETE_KNOWLEDGE, [args.domain, args.key]);
-    return { deleted: (rowCount ?? 0) > 0 };
+    const deleted = (rowCount ?? 0) > 0;
+    if (deleted) {
+      publishKnowledgeEvent({ type: 'knowledge.deleted', domain: args.domain, key: args.key });
+    }
+    return { deleted };
   });
 }
 

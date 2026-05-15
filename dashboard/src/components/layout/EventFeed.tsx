@@ -31,6 +31,12 @@ const TYPE_COLORS: Record<string, string> = {
   'activity.started': 'text-blue-400',
   'activity.completed': 'text-status-success',
   'activity.failed': 'text-status-error',
+  'knowledge.stored': 'text-violet-400',
+  'knowledge.deleted': 'text-text-tertiary',
+  'agent.started': 'text-accent',
+  'agent.completed': 'text-status-success',
+  'agent.failed': 'text-status-error',
+  'agent.status_changed': 'text-blue-400',
   milestone: 'text-violet-400',
 };
 

@@ -199,7 +199,7 @@ export function McpServersPage() {
 
         {/* Test panel — slides in from right */}
         {tryTool && (
-          <div className="w-[380px] shrink-0 sticky top-0 h-[calc(100vh-12rem)]">
+          <div className="w-[380px] shrink-0 sticky top-0 max-h-screen overflow-y-auto">
             <ToolTestPanel
               serverId={tryTool.serverId}
               serverName={tryTool.serverName}

@@ -35,6 +35,8 @@ export interface LTMcpServerRecord {
   compile_hints: string | null;
   /** Credential providers required by this server's tools (e.g., ['anthropic']) */
   credential_providers: string[];
+  /** Capability category for grouping (e.g., 'Communication', 'Analysis', 'Data') */
+  category: string | null;
   status: LTMcpServerStatus;
   last_connected_at: Date | null;
   created_at: Date;

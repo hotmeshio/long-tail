@@ -12,7 +12,7 @@ export function RolePill({ role, size = 'sm' }: RolePillProps) {
   const iconClass = size === 'md' ? 'w-3 h-3' : 'w-2.5 h-2.5';
 
   return (
-    <span className={`inline-flex items-center ${sizeClass} bg-accent/[0.06] text-text-secondary rounded-lg`}>
+    <span className={`inline-flex items-center ${sizeClass} text-text-secondary`}>
       <User className={`${iconClass} shrink-0 text-accent/75`} />
       {role}
     </span>

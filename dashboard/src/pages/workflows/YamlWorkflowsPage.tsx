@@ -172,7 +172,7 @@ export function YamlWorkflowsPage() {
         </div>
 
         {tryWorkflow && (
-          <div className="w-[380px] shrink-0 sticky top-0 h-[calc(100vh-12rem)]">
+          <div className="w-[380px] shrink-0 sticky top-0 max-h-screen overflow-y-auto">
             <WorkflowTestPanel
               workflow={tryWorkflow}
               onClose={() => setTryWorkflow(null)}
@@ -181,7 +181,7 @@ export function YamlWorkflowsPage() {
         )}
 
         {cronWorkflow && (
-          <div className="w-[380px] shrink-0 sticky top-0 h-[calc(100vh-12rem)]">
+          <div className="w-[380px] shrink-0 sticky top-0 max-h-screen overflow-y-auto">
             <CronPanel
               workflow={cronWorkflow}
               onClose={() => setCronWorkflow(null)}

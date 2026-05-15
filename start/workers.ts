@@ -224,11 +224,24 @@ export async function startWorkers(
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
+  // Register the in-process callback adapter for agent event triggers
+  const { CallbackEventAdapter } = await import('../lib/events/callback');
+  const { agentTriggerRegistry } = await import('../services/agent/trigger-registry');
+  const callbackAdapter = new CallbackEventAdapter();
+  eventRegistry.register(callbackAdapter);
+
   // Connect event adapters (outside workers guard so API-only containers
   // still connect to NATS and can publish/receive events)
   if (eventRegistry.hasAdapters) {
     await eventRegistry.connect();
     loggerRegistry.info('[long-tail] event adapters connected');
+  }
+
+  // Arm agent event subscriptions (after event adapters are connected)
+  try {
+    await agentTriggerRegistry.connect(callbackAdapter);
+  } catch (err: any) {
+    loggerRegistry.warn(`[long-tail] agent trigger registry: ${err.message}`);
   }
 
   // Ensure system bot account exists for cron/system-initiated workflows
