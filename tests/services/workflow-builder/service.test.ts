@@ -22,6 +22,11 @@ vi.mock('@hotmeshio/hotmesh', () => ({
 
 vi.mock('../../../lib/db', () => ({
   getConnection: vi.fn().mockReturnValue({}),
+  getPool: vi.fn().mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
+}));
+
+vi.mock('../../../services/iam/principal', () => ({
+  resolvePrincipal: vi.fn().mockResolvedValue({ id: 'test-user', type: 'user', roles: [] }),
 }));
 
 vi.mock('../../../services/llm', () => ({
