@@ -6,6 +6,7 @@ import { StickyPagination } from '../../components/common/data/StickyPagination'
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { TryToolModal } from './TryToolModal';
+import { ToolPill } from '../../components/common/display/ToolPill';
 import type { McpToolManifest } from '../../api/types';
 
 interface ToolRow {
@@ -21,7 +22,7 @@ const columns: Column<ToolRow>[] = [
     key: 'name',
     label: 'Tool',
     render: (row) => (
-      <code className="text-xs font-mono text-accent-primary">{row.tool.name}</code>
+      <ToolPill name={row.tool.name} />
     ),
   },
   {

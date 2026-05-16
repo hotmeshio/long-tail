@@ -50,7 +50,7 @@ export function InvokeSidebar({
               setInvokeJson(e.target.value);
               setInvokeParseError('');
             }}
-            className="input font-mono text-[11px] w-full leading-relaxed"
+            className="input-json w-full"
             rows={10}
             spellCheck={false}
           />

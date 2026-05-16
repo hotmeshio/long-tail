@@ -174,6 +174,28 @@ export function useEscalationDetailEvents(escalationId: string | undefined): voi
 }
 
 /**
+ * Invalidate agent queries on agent lifecycle events.
+ */
+export function useAgentEvents(): void {
+  const invalidate = useDebouncedInvalidation(300);
+
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.agent.>`, () => {
+    invalidate([['agents']]);
+  });
+}
+
+/**
+ * Invalidate knowledge queries on knowledge events.
+ */
+export function useKnowledgeEvents(): void {
+  const invalidate = useDebouncedInvalidation(300);
+
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.knowledge.>`, () => {
+    invalidate([['knowledge']]);
+  });
+}
+
+/**
  * Invalidate process list (ProcessesListPage) on task/workflow events.
  */
 export function useProcessListEvents(): void {

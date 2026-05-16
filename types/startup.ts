@@ -49,6 +49,8 @@ export interface LTWorkerConfig {
 export interface LTMcpServerConfig {
   description?: string;
   tags?: string[];
+  /** Capability category for the Capabilities view (e.g., 'Communication', 'Analysis', 'Data'). */
+  category?: string;
   /** Hints for the MCP orchestrator when compiling deterministic pipelines. */
   compileHints?: string;
   /** OAuth providers required by this server's tools (e.g., ['google']). */
@@ -58,6 +60,42 @@ export interface LTMcpServerConfig {
     name: string;
     description: string;
     inputSchema: Record<string, any>;
+  }>;
+}
+
+/**
+ * Declarative agent configuration for startup seeding.
+ * Schedules and subscriptions are peers — both are "when X, run Y as Z".
+ */
+export interface LTAgentConfig {
+  name: string;
+  description?: string;
+  goals?: string;
+  rules?: string;
+  /** Default: 'active' */
+  status?: string;
+  knowledge_domain?: string;
+
+  /** Cron-triggered reactions */
+  schedules?: Array<{
+    cron: string;
+    reaction_type?: 'durable' | 'pipeline';
+    workflow_type?: string;
+    pipeline_id?: string;
+    envelope?: Record<string, any>;
+    execute_as?: string;
+  }>;
+
+  /** Event-triggered reactions */
+  subscriptions?: Array<{
+    topic: string;
+    reaction_type: 'durable' | 'pipeline' | 'mcp_query';
+    workflow_type?: string;
+    pipeline_id?: string;
+    mcp_prompt?: string;
+    input_mapping?: Record<string, any>;
+    filter?: Record<string, any>;
+    execute_as?: string;
   }>;
 }
 
@@ -168,6 +206,9 @@ export interface LTStartConfig {
    * a few sample workflows so the dashboard has data immediately.
    */
   examples?: boolean;
+
+  /** Declarative agent configurations. Seeded on first boot (insert-if-absent). */
+  agents?: LTAgentConfig[];
 
   /** MCP (Model Context Protocol) integration. */
   mcp?: {

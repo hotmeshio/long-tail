@@ -1,10 +1,12 @@
-import { ChevronRight, Pencil, Trash2, Plug, Unplug, Play, Wrench } from 'lucide-react';
+import { ChevronRight, Pencil, Trash2, Plug, Unplug, Play } from 'lucide-react';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import {
   useConnectMcpServer,
   useDisconnectMcpServer,
 } from '../../../api/mcp';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { ToolPill } from '../../../components/common/display/ToolPill';
+import { ServerName } from '../../../components/common/display/ServerName';
 
 import type { McpServerRecord, McpToolManifest } from '../../../api/types';
 import { isBuiltIn } from './helpers';
@@ -49,12 +51,12 @@ export function ServerRow({
             <span className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''} ${allTools.length === 0 ? 'opacity-0' : 'text-text-tertiary'}`}>
               <ChevronRight size={14} />
             </span>
-            <p className="text-sm text-text-primary font-medium">
-              {server.name}
+            <span className="flex items-center gap-1.5">
+              <ServerName name={server.name} serverId={server.id} short={false} />
               {allTools.length > 0 && (
-                <sup className="ml-1 text-[9px] font-normal text-accent/70">{allTools.length}</sup>
+                <sup className="text-[9px] font-normal text-accent/70">{allTools.length}</sup>
               )}
-            </p>
+            </span>
             {tags.length > 0 && (
               <div className="flex gap-1 ml-auto shrink-0">
                 {tags.slice(0, 3).map((tag) => (
@@ -120,10 +122,7 @@ export function ServerRow({
         >
           {/* Tool name + description */}
           <td className="pl-14 pr-6 py-2.5">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[13px] font-mono bg-accent/[0.06] text-text-secondary rounded-lg">
-              <Wrench className="w-3 h-3 shrink-0 text-accent/75" />
-              {tool.name}
-            </span>
+            <ToolPill name={tool.name} size="md" />
             {tool.description && (
               <p className="text-[11px] leading-snug text-text-quaternary mt-0.5">{tool.description}</p>
             )}

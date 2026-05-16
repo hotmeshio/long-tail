@@ -125,6 +125,27 @@ const KnowledgePage = lazy(() =>
   import('./pages/knowledge').then((m) => ({ default: m.KnowledgePage })),
 );
 
+// Home page (overview)
+const HomePage = lazy(() =>
+  import('./pages/home/HomePage').then((m) => ({ default: m.HomePage })),
+);
+
+// Agent pages (all authenticated users)
+const AgentsPage = lazy(() =>
+  import('./pages/agents/AgentsPage').then((m) => ({ default: m.AgentsPage })),
+);
+const AgentDetailPage = lazy(() =>
+  import('./pages/agents/AgentDetailPage').then((m) => ({ default: m.AgentDetailPage })),
+);
+const AgentConfigPage = lazy(() =>
+  import('./pages/agents/detail/AgentConfigPage').then((m) => ({ default: m.AgentConfigPage })),
+);
+
+// Capabilities (all authenticated users)
+const CapabilitiesPage = lazy(() =>
+  import('./pages/capabilities/CapabilitiesPage').then((m) => ({ default: m.CapabilitiesPage })),
+);
+
 // ---------------------------------------------------------------------------
 // Suspense fallback
 // ---------------------------------------------------------------------------
@@ -184,8 +205,8 @@ const router = createBrowserRouter([
     path: '/',
     element: <Shell />,
     children: [
-      // Default -> processes overview (home page)
-      { index: true, element: <Lazy><ProcessesListPage /></Lazy> },
+      // Home — outcome-driven overview
+      { index: true, element: <Lazy><HomePage /></Lazy> },
 
       // Processes section (all authenticated users)
       { path: 'processes/all', element: <Lazy><ProcessesListPage /></Lazy> },
@@ -200,6 +221,15 @@ const router = createBrowserRouter([
       { path: 'escalations/available', element: <Lazy><AvailableEscalationsPage /></Lazy> },
       { path: 'escalations/queue', element: <Lazy><OperatorDashboard /></Lazy> },
       { path: 'escalations/detail/:id', element: <Lazy><EscalationDetailPage /></Lazy> },
+
+      // Capabilities (all authenticated users)
+      { path: 'capabilities', element: <Lazy><CapabilitiesPage /></Lazy> },
+
+      // Agents section (all authenticated users)
+      { path: 'agents', element: <Lazy><AgentsPage /></Lazy> },
+      { path: 'agents/new', element: <Lazy><AgentConfigPage /></Lazy> },
+      { path: 'agents/:id', element: <Lazy><AgentDetailPage /></Lazy> },
+      { path: 'agents/:id/edit', element: <Lazy><AgentConfigPage /></Lazy> },
 
       // Workflows section (engineer, admin, or superadmin)
       {
@@ -265,11 +295,11 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <EventTransportProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <EventTransportProvider>
           <RouterProvider router={router} />
-        </AuthProvider>
-      </EventTransportProvider>
+        </EventTransportProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

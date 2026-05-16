@@ -1,5 +1,6 @@
 import type { ActivityManifestEntry } from '../../../api/types';
 import type { ActivityStep } from '../../../hooks/useYamlActivityEvents';
+import { ToolPill } from '../../../components/common/display/ToolPill';
 
 const TOOL_SOURCE_COLORS: Record<string, { border: string; text: string; icon: string }> = {
   mcp:       { border: 'border-blue-500', text: 'text-blue-500', icon: 'MCP' },
@@ -79,7 +80,7 @@ export function LiveActivityTimeline({
                     {step.colors.icon}
                   </span>
                   {step.toolName && (
-                    <span className="text-[10px] text-text-tertiary font-mono">{step.toolName}</span>
+                    <ToolPill name={step.toolName} />
                   )}
                 </div>
                 {step.error && (

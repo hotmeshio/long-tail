@@ -1,29 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, Inbox, User, BookOpen } from 'lucide-react';
+import { AlertCircle, Inbox, User, BookOpen, Radio } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalationCounts } from '../../hooks/useEscalationCounts';
-import { NatsStatus } from '../common/display/NatsStatus';
+import { useEventStatus } from '../../hooks/useEventContext';
 import { AppLogo } from '../common/display/AppLogo';
-
-function CountBadge({ count, active, color = 'bg-blue-500', textColor = 'text-blue-500' }: { count: number; active: boolean; color?: string; textColor?: string }) {
-  return (
-    <>
-      <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${active ? color : 'bg-text-tertiary/40'}`} />
-      <span className={`absolute -top-2.5 -right-3 text-[8px] font-bold tabular-nums ${active ? textColor : 'text-text-tertiary'}`}>
-        {count}
-      </span>
-    </>
-  );
-}
 
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
   const { available, mine } = useEscalationCounts();
+  const { connected } = useEventStatus();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
@@ -43,41 +32,59 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         </Link>
       </div>
 
-      {/* Right: escalation indicators | separator | docs, events, user */}
-      <div className="flex items-center gap-4">
-        {/* Escalation indicators — leftmost */}
+      <div className="flex items-center gap-5">
+        {/* Escalations: all */}
         <Link
           to="/escalations/available"
-          className="relative text-text-tertiary hover:text-accent transition-colors"
-          aria-label="Available escalations"
+          className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+            available > 0 ? 'text-blue-400 hover:text-blue-300' : 'text-text-quaternary hover:text-text-secondary'
+          }`}
           title="Available escalations"
         >
-          <AlertCircle className="w-4 h-4" strokeWidth={1.5} />
-          <CountBadge count={available} active={available > 0} />
+          <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
+          all{available > 0 && <span className="tabular-nums font-medium">{available}</span>}
         </Link>
+
+        {/* Escalations: mine */}
         <Link
           to="/escalations/queue"
-          className="relative text-text-tertiary hover:text-accent transition-colors"
-          aria-label="My escalation queue"
+          className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+            mine > 0 ? 'text-status-warning hover:text-amber-300' : 'text-text-quaternary hover:text-text-secondary'
+          }`}
           title="My escalation queue"
         >
-          <Inbox className="w-4 h-4" strokeWidth={1.5} />
-          <CountBadge count={mine} active={mine > 0} color="bg-status-warning" textColor="text-status-warning" />
+          <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
+          mine{mine > 0 && <span className="tabular-nums font-medium">{mine}</span>}
         </Link>
 
-        {/* Separator */}
-        <div className="w-px h-5 bg-surface-border" />
+        <div className="w-px h-4 bg-surface-border" />
 
-        {/* Events, docs, user */}
-        <NatsStatus onClick={onToggleEventFeed} />
+        {/* Events */}
+        <button
+          type="button"
+          onClick={onToggleEventFeed}
+          className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+            connected ? 'text-emerald-400 hover:text-emerald-300' : 'text-text-quaternary hover:text-text-secondary'
+          }`}
+          title={connected ? 'Live events — click to toggle feed' : 'Events disconnected'}
+        >
+          <Radio className="w-3.5 h-3.5" strokeWidth={1.5} />
+          events
+        </button>
+
+        {/* Docs */}
         <button
           onClick={onToggleDocs}
-          className="text-text-tertiary hover:text-accent transition-colors"
-          aria-label="Documentation"
+          className="flex items-center gap-1.5 text-[11px] text-text-quaternary hover:text-text-secondary transition-colors"
           title="Documentation"
         >
-          <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+          <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+          docs
         </button>
+
+        <div className="w-px h-4 bg-surface-border" />
+
+        {/* User menu */}
         {user && (
           <div className="relative" ref={menuRef}>
             <button

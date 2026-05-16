@@ -37,12 +37,18 @@ export type NatsLTEventType =
   | 'activity.started'
   | 'activity.completed'
   | 'activity.failed'
+  | 'knowledge.stored'
+  | 'knowledge.deleted'
+  | 'agent.started'
+  | 'agent.completed'
+  | 'agent.failed'
+  | 'agent.status_changed'
   | 'milestone';
 
 /**
  * Event type category prefixes for pattern matching.
  */
-export type NatsLTEventCategory = 'task' | 'escalation' | 'workflow' | 'activity' | 'milestone';
+export type NatsLTEventCategory = 'task' | 'escalation' | 'workflow' | 'activity' | 'knowledge' | 'agent' | 'milestone';
 
 /**
  * Callback signature for event subscribers.

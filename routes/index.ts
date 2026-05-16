@@ -25,6 +25,8 @@ import botAccountsRouter from './bot-accounts';
 import docsRouter from './docs';
 import workflowSetsRouter from './workflow-sets';
 import knowledgeRouter from './knowledge';
+import agentsRouter from './agents';
+import capabilitiesRouter from './capabilities';
 import natsCredentialsRouter from './nats-credentials';
 
 const router = Router();
@@ -59,5 +61,7 @@ router.use('/bot-accounts', botAccountsRouter);
 router.use('/docs', docsRouter);
 router.use('/workflow-sets', workflowSetsRouter);
 router.use('/knowledge', knowledgeRouter);
+router.use('/agents', agentsRouter);
+router.use('/capabilities', capabilitiesRouter);
 
 export default router;

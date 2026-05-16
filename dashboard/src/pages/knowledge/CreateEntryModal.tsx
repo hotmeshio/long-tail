@@ -111,7 +111,7 @@ export function CreateEntryModal({ open, onClose, onCreated, prefillData, prefil
                 value={dataInput}
                 onChange={(e) => setDataInput(e.target.value)}
                 rows={8}
-                className="input font-mono text-[11px] w-full max-h-[30vh] resize-y"
+                className="input-json w-full max-h-[30vh]"
               />
             </div>
 

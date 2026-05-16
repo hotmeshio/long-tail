@@ -160,7 +160,7 @@ export function KnowledgeDetailPanel({ domain, entryKey, onClose, onDeleted }: K
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   placeholder="Value (string or JSON)"
-                  className="input text-xs w-full mb-2 font-mono"
+                  className="input-json w-full mb-2"
                   rows={3}
                 />
                 <div className="flex gap-2">
@@ -200,7 +200,7 @@ export function KnowledgeDetailPanel({ domain, entryKey, onClose, onDeleted }: K
                               <textarea
                                 value={editValue}
                                 onChange={(e) => setEditValue(e.target.value)}
-                                className="input text-xs w-full font-mono mb-2"
+                                className="input-json w-full mb-2"
                                 rows={isSimple(value) ? 2 : 5}
                                 autoFocus
                               />

@@ -9,6 +9,7 @@ import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS, LLM_MODEL_SECONDARY } from '../../modules/defaults';
 import { sanitizeToolName } from '../../modules/utils';
 import { callLLM, hasLLMApiKey } from '../llm';
+import { resolvePrincipal } from '../iam/principal';
 import { DESCRIBE_WORKFLOW_SYSTEM_PROMPT } from './prompts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -55,11 +56,14 @@ export async function startMcpQuery(input: McpQueryInput): Promise<McpQueryResul
   const prefix = direct ? 'mcp-query-direct' : 'mcp-query';
   const workflowId = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+  // Resolve the full principal so ToolContext carries identity to tool calls
+  const principal = userId ? await resolvePrincipal(userId) : undefined;
+
   const handle = await client.workflow.start({
     args: [{
       data: { prompt, tags, context },
-      metadata: { source: 'dashboard' },
-      lt: { userId },
+      metadata: { source: 'dashboard', certified: true },
+      lt: { userId, principal, scopes: ['workflow:invoke', 'mcp:tool:call'] },
     }],
     taskQueue: 'long-tail-system',
     workflowName: wfName,
@@ -105,11 +109,13 @@ export async function startWorkflowBuilder(input: WorkflowBuilderInput): Promise
 
   const workflowId = `wf-builder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+  const principal = userId ? await resolvePrincipal(userId) : undefined;
+
   const handle = await client.workflow.start({
     args: [{
       data: { prompt, tags, feedback, prior_yaml, answers, prior_questions },
-      metadata: { source: 'dashboard' },
-      lt: { userId },
+      metadata: { source: 'dashboard', certified: true },
+      lt: { userId, principal, scopes: ['workflow:invoke', 'mcp:tool:call'] },
     }],
     taskQueue: 'long-tail-system',
     workflowName: 'mcpWorkflowBuilder',
@@ -155,11 +161,13 @@ export async function startWorkflowPlanner(input: WorkflowPlannerInput): Promise
 
   const workflowId = `wf-planner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+  const principal = userId ? await resolvePrincipal(userId) : undefined;
+
   const handle = await client.workflow.start({
     args: [{
       data: { specification, setId, existingPlan, existingSchemas },
-      metadata: { source: 'dashboard' },
-      lt: { userId },
+      metadata: { source: 'dashboard', certified: true },
+      lt: { userId, principal, scopes: ['workflow:invoke', 'mcp:tool:call'] },
     }],
     taskQueue: 'long-tail-system',
     workflowName: 'mcpWorkflowPlanner',

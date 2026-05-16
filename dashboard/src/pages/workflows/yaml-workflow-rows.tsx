@@ -1,5 +1,7 @@
-import { ChevronRight, Clock, Play, Wand2, Wrench } from 'lucide-react';
+import { ChevronRight, Clock, Play, Wrench } from 'lucide-react';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
+import { ToolPill } from '../../components/common/display/ToolPill';
+import { ServerName } from '../../components/common/display/ServerName';
 import type { ProcessServer } from './yaml-helpers';
 import type { LTYamlWorkflowRecord } from '../../api/types';
 
@@ -20,10 +22,7 @@ export function ToolRow({ wf, onTry, onCron }: {
     >
       {/* Tool name + description */}
       <td className="pl-14 pr-6 py-2.5">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[13px] font-mono bg-accent/[0.06] text-text-secondary rounded-lg">
-          <Wand2 className="w-3 h-3 shrink-0 text-accent/75" />
-          {wf.graph_topic}
-        </span>
+        <ToolPill name={wf.graph_topic} size="md" />
         {wf.description && (
           <p className="text-[11px] leading-snug text-text-quaternary mt-0.5">{wf.description}</p>
         )}
@@ -97,10 +96,10 @@ export function ServerRow({
             <span className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''} text-text-tertiary`}>
               <ChevronRight size={14} />
             </span>
-            <p className="text-sm text-text-primary font-medium font-mono">
-              {server.appId}
-              <sup className="ml-1 text-[9px] font-normal text-accent/70">{server.toolCount}</sup>
-            </p>
+            <span className="flex items-center gap-1.5">
+              <ServerName name={server.appId} short={false} />
+              <sup className="text-[9px] font-normal text-accent/70">{server.toolCount}</sup>
+            </span>
           </div>
         </td>
 

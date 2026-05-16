@@ -55,7 +55,24 @@ const { eventConnectMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/events', () => ({
-  eventRegistry: { hasAdapters: true, connect: eventConnectMock },
+  eventRegistry: { hasAdapters: true, connect: eventConnectMock, register: vi.fn() },
+}));
+
+vi.mock('../../lib/events/callback', () => ({
+  CallbackEventAdapter: vi.fn(() => ({ on: vi.fn(), connect: vi.fn(), disconnect: vi.fn() })),
+}));
+
+vi.mock('../../services/agent/trigger-registry', () => ({
+  agentTriggerRegistry: { connect: vi.fn(), disconnect: vi.fn() },
+}));
+
+vi.mock('../../services/agent', () => ({
+  seedAgent: vi.fn().mockResolvedValue(false),
+  getAgentByName: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('../../services/agent/subscriptions', () => ({
+  seedSubscription: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('../../services/maintenance', () => ({
@@ -63,7 +80,7 @@ vi.mock('../../services/maintenance', () => ({
 }));
 
 vi.mock('../../services/cron', () => ({
-  cronRegistry: { connect: vi.fn() },
+  cronRegistry: { connect: vi.fn(), connectAgentCrons: vi.fn() },
 }));
 
 vi.mock('../../services/mcp', () => ({
@@ -92,6 +109,7 @@ vi.mock('../../system/seed', () => ({}));
 
 vi.mock('../../system', () => ({
   getSystemWorkers: () => [],
+  getSystemAgents: () => [],
   builtinMcpServerFactories: {},
 }));
 
@@ -103,6 +121,8 @@ vi.mock('../../services/iam/bots', () => ({
 import { startWorkers, collectWorkers } from '../../start/workers';
 import { registerWorker, getRegisteredWorkers } from '../../services/workers/registry';
 import { eventRegistry } from '../../lib/events';
+import { seedAgent, getAgentByName } from '../../services/agent';
+import { seedSubscription } from '../../services/agent/subscriptions';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const baseConfig = { workers: [], interceptor: { defaultRole: 'reviewer' as const } };
@@ -249,6 +269,84 @@ describe('collectWorkers — string workflow names', () => {
     expect(spy).not.toHaveBeenCalled();
     expect(workerCreateMock).not.toHaveBeenCalled();
     expect(getRegisteredWorkers().has('orderPipeline')).toBe(true);
+  });
+});
+
+describe('startWorkers — agent schedule seeding', () => {
+  it('seeds agents from startConfig.agents with schedules mapped into behaviors', async () => {
+    const config = {
+      ...baseConfig,
+      agents: [
+        {
+          name: 'health-bot',
+          description: 'Monitors health',
+          status: 'active',
+          schedules: [
+            { cron: '0 * * * *', workflow_type: 'basicEcho', envelope: { data: { src: 'cron' } }, execute_as: 'bot-1' },
+            { cron: '*/15 * * * *', workflow_type: 'reviewContent' },
+          ],
+          subscriptions: [],
+        },
+      ],
+    };
+
+    await startWorkers(config as any, [], {});
+
+    expect(seedAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'health-bot',
+        description: 'Monitors health',
+        status: 'active',
+        behaviors: expect.objectContaining({
+          schedules: [
+            { cron: '0 * * * *', workflow_type: 'basicEcho', envelope: { data: { src: 'cron' } }, execute_as: 'bot-1' },
+            { cron: '*/15 * * * *', workflow_type: 'reviewContent' },
+          ],
+          cron: '0 * * * *', // legacy compat from first schedule
+        }),
+        workflow_type: 'basicEcho',
+      }),
+    );
+  });
+
+  it('seeds agent subscriptions when agent exists', async () => {
+    (seedAgent as any).mockResolvedValueOnce(true);
+    (getAgentByName as any).mockResolvedValueOnce({ id: 'agent-123', name: 'event-bot' });
+
+    const config = {
+      ...baseConfig,
+      agents: [
+        {
+          name: 'event-bot',
+          subscriptions: [
+            { topic: 'workflow.failed', reaction_type: 'durable', workflow_type: 'basicEcho', execute_as: 'bot-1' },
+          ],
+        },
+      ],
+    };
+
+    await startWorkers(config as any, [], {});
+
+    expect(seedSubscription).toHaveBeenCalledWith('agent-123', expect.objectContaining({
+      topic: 'workflow.failed',
+      reaction_type: 'durable',
+      workflow_type: 'basicEcho',
+      execute_as: 'bot-1',
+    }));
+  });
+
+  it('skips subscription seeding when agent has no subscriptions', async () => {
+    (seedAgent as any).mockResolvedValueOnce(true);
+
+    const config = {
+      ...baseConfig,
+      agents: [{ name: 'cron-only', schedules: [{ cron: '0 * * * *', workflow_type: 'basicEcho' }] }],
+    };
+
+    await startWorkers(config as any, [], {});
+
+    expect(seedAgent).toHaveBeenCalled();
+    expect(seedSubscription).not.toHaveBeenCalled();
   });
 });
 

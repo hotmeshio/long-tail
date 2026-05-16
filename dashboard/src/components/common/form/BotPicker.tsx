@@ -30,7 +30,7 @@ export function BotPicker({ selected, onChange, placeholder }: BotPickerProps) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 w-full min-h-[34px] px-2 py-1.5 bg-surface-sunken border border-surface-border rounded-md text-left cursor-pointer hover:border-accent/40 transition-colors focus:ring-1 focus:ring-accent focus:outline-none"
+        className="flex items-center gap-1.5 w-full px-1 py-1.5 bg-transparent border-b border-surface-border/60 text-left cursor-pointer hover:border-accent/50 transition-colors focus:outline-none focus:border-accent/50"
       >
         {selected && selectedBot ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/[0.08] text-text-secondary text-[11px]">
@@ -54,7 +54,7 @@ export function BotPicker({ selected, onChange, placeholder }: BotPickerProps) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-20 mt-1 w-full bg-surface-raised border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {/* Default: invoking user */}
           <button
             type="button"

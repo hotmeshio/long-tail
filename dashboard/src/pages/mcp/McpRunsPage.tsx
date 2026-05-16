@@ -47,14 +47,14 @@ function buildColumns(
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
           <div className="flex items-start gap-2 min-w-0">
-            <span className={`w-[9px] h-[9px] shrink-0 rounded-full mt-1 ${dotClass}${pulseClass}`} title={row.status} />
+            <span className={`w-1.5 h-1.5 shrink-0 rounded-full mt-1.5 ${dotClass}${pulseClass}`} title={row.status} />
             <div className="min-w-0">
               <span className="font-mono text-xs text-text-primary truncate block">
                 {row.workflow_id}
               </span>
               <div className="mt-0.5">
                 {row.entity
-                  ? <WorkflowPill type={row.entity} variant="pipeline" />
+                  ? <WorkflowPill type={row.entity} variant="pipeline" size="xs" />
                   : <span className="text-[10px] text-text-tertiary">—</span>}
               </div>
             </div>

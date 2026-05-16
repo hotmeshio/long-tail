@@ -32,7 +32,7 @@ export function CronScheduleEditor({
                 setCron.reset();
               }}
               placeholder="0 */6 * * *"
-              className="input font-mono text-sm w-full"
+              className="input-json w-full"
             />
             {cronInput.trim() && describeCron(cronInput.trim()) && (
               <p className="text-xs text-text-secondary mt-1.5">

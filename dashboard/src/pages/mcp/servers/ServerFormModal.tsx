@@ -151,7 +151,7 @@ export function ServerFormModal({
           <textarea
             value={form.transport_config}
             onChange={(e) => set('transport_config', e.target.value)}
-            className="input font-mono text-xs w-full"
+            className="input-json w-full"
             rows={6}
             spellCheck={false}
           />

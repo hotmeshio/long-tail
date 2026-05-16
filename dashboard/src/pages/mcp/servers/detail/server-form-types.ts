@@ -98,5 +98,5 @@ export function isStepValid(step: number, form: ServerFormState): boolean {
   return true;
 }
 
-export const labelCls = 'block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1';
-export const hintCls = 'text-[10px] text-text-tertiary mt-2 leading-relaxed';
+export const labelCls = 'label';
+export const hintCls = 'hint';

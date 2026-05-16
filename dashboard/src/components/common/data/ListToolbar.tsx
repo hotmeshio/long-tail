@@ -41,23 +41,23 @@ export function ListToolbar({ onRefresh, isFetching = false, apiPath }: ListTool
     copyToClipboard(cmd, 'curl');
   };
 
-  const BTN_SECONDARY = 'p-1.5 text-text-tertiary/70 hover:text-text-secondary transition-colors rounded';
-  const ICON_SM = 'w-2.5 h-2.5';
+  const BTN = 'p-1 text-text-quaternary hover:text-accent transition-colors rounded';
+  const ICON = 'w-2.5 h-2.5';
 
   return (
     <div className="flex items-center gap-0.5">
       {apiPath && (
         <>
-          <button onClick={handleCopyUrl} className={BTN_SECONDARY} title="Copy API URL">
-            {copied === 'url' ? <Check className={`${ICON_SM} text-status-success`} /> : <Link2 className={ICON_SM} />}
+          <button onClick={handleCopyUrl} className={BTN} title="Copy API URL">
+            {copied === 'url' ? <Check className={`${ICON} text-status-success`} /> : <Link2 className={ICON} />}
           </button>
-          <button onClick={handleCopyCurl} className={BTN_SECONDARY} title="Copy curl (includes auth token)">
-            {copied === 'curl' ? <Check className={`${ICON_SM} text-status-success`} /> : <Terminal className={ICON_SM} />}
+          <button onClick={handleCopyCurl} className={BTN} title="Copy curl (includes auth token)">
+            {copied === 'curl' ? <Check className={`${ICON} text-status-success`} /> : <Terminal className={ICON} />}
           </button>
         </>
       )}
-      <button onClick={onRefresh} disabled={isFetching} className="p-1.5 text-accent/75 hover:text-accent transition-colors disabled:opacity-50 rounded" title="Refresh">
-        <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+      <button onClick={onRefresh} disabled={isFetching} className={`${BTN} disabled:opacity-50`} title="Refresh">
+        <RefreshCw className={`${ICON} ${isFetching ? 'animate-spin' : ''}`} />
       </button>
     </div>
   );

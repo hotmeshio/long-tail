@@ -125,6 +125,49 @@ export function publishActivityEvent(params: {
 }
 
 /**
+ * Publish a knowledge lifecycle event (stored, deleted).
+ * Lightweight — no workflow context required since knowledge writes
+ * happen both inside and outside workflows.
+ */
+export function publishKnowledgeEvent(params: {
+  type: 'knowledge.stored' | 'knowledge.deleted';
+  domain: string;
+  key: string;
+}): Promise<void> {
+  return fireAndForget({
+    type: params.type,
+    source: 'knowledge',
+    workflowId: '',
+    workflowName: '',
+    taskQueue: '',
+    data: { domain: params.domain, key: params.key },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Publish an agent lifecycle event.
+ */
+export function publishAgentEvent(params: {
+  type: 'agent.started' | 'agent.completed' | 'agent.failed' | 'agent.status_changed';
+  agentId: string;
+  agentName: string;
+  status?: string;
+  data?: Record<string, any>;
+}): Promise<void> {
+  return fireAndForget({
+    type: params.type,
+    source: 'agent',
+    workflowId: params.agentId,
+    workflowName: params.agentName,
+    taskQueue: '',
+    status: params.status,
+    data: params.data,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
  * Publish a workflow lifecycle event (started, completed, failed).
  */
 export function publishWorkflowEvent(params: {

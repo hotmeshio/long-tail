@@ -71,7 +71,7 @@ export function EnvelopeEditor({
         <textarea
           value={jsonInput}
           onChange={(e) => onJsonChange(e.target.value)}
-          className="input font-mono text-xs"
+          className="input-json"
           rows={12}
           spellCheck={false}
         />
@@ -129,7 +129,7 @@ export function EnvelopeEditor({
                         });
                       }
                     }}
-                    className="input font-mono text-[11px] w-full leading-relaxed"
+                    className="input-json w-full"
                     rows={textareaRows}
                     spellCheck={false}
                   />

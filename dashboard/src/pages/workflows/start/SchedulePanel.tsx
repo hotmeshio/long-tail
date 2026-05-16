@@ -143,7 +143,7 @@ export function SchedulePanel({
               value={cronInput}
               onChange={(e) => { setCronInput(e.target.value); setCron.reset(); }}
               placeholder="0 */6 * * *"
-              className="input font-mono text-sm w-full"
+              className="input font-mono w-full"
             />
             {cronInput.trim() && describeCron(cronInput.trim()) && (
               <p className="text-xs text-text-secondary mt-1.5">
@@ -224,7 +224,7 @@ export function SchedulePanel({
           <textarea
             value={envelopeInput}
             onChange={(e) => { setEnvelopeInput(e.target.value); setEnvelopeError(''); }}
-            className="input font-mono text-xs w-full"
+            className="input-json w-full"
             rows={10}
             spellCheck={false}
           />

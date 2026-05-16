@@ -1,5 +1,6 @@
 import { loggerRegistry } from '../logger';
 import type { LTEvent, LTEventAdapter, LTEventType } from '../../types';
+import { subjectMatchesPattern } from './matching';
 
 type EventCallback = (event: LTEvent) => void;
 
@@ -10,25 +11,11 @@ type EventCallback = (event: LTEvent) => void;
  * SDK callers subscribe with `.on()` and receive events as direct
  * function calls — no network transport, no serialization overhead.
  *
- * Supports:
- * - Exact type matching: `on('task.created', cb)`
- * - Category wildcards: `on('task.*', cb)` — matches all task.* events
+ * Supports NATS-style pattern matching:
+ * - Exact: `on('task.created', cb)`
+ * - Single-token wildcard: `on('task.*', cb)` — matches task.created, task.failed, etc.
+ * - Multi-token wildcard: `on('app.epic.>', cb)` — matches app.epic.apis.createorder.error
  * - Global wildcard: `on('*', cb)` — matches every event
- *
- * Usage:
- * ```typescript
- * import { CallbackEventAdapter } from '@hotmeshio/long-tail';
- * import { eventRegistry } from '@hotmeshio/long-tail';
- *
- * const adapter = new CallbackEventAdapter();
- * eventRegistry.register(adapter);
- *
- * const unsub = adapter.on('escalation.claimed', (event) => {
- *   console.log('claimed:', event.escalationId);
- * });
- *
- * // Later: unsub() to remove the listener
- * ```
  */
 export class CallbackEventAdapter implements LTEventAdapter {
   private listeners = new Map<string, Set<EventCallback>>();
@@ -58,31 +45,11 @@ export class CallbackEventAdapter implements LTEventAdapter {
   }
 
   async publish(event: LTEvent): Promise<void> {
-    // Exact match listeners
-    const exact = this.listeners.get(event.type);
-    if (exact) {
-      for (const cb of exact) {
-        try { cb(event); } catch { /* fire-and-forget */ }
-      }
-    }
-
-    // Category wildcard listeners (e.g. 'task.*' matches 'task.created')
-    const dotIdx = event.type.indexOf('.');
-    if (dotIdx > 0) {
-      const category = event.type.slice(0, dotIdx) + '.*';
-      const catListeners = this.listeners.get(category);
-      if (catListeners) {
-        for (const cb of catListeners) {
+    for (const [pattern, callbacks] of this.listeners) {
+      if (subjectMatchesPattern(event.type, pattern)) {
+        for (const cb of callbacks) {
           try { cb(event); } catch { /* fire-and-forget */ }
         }
-      }
-    }
-
-    // Global wildcard listeners
-    const global = this.listeners.get('*');
-    if (global) {
-      for (const cb of global) {
-        try { cb(event); } catch { /* fire-and-forget */ }
       }
     }
   }

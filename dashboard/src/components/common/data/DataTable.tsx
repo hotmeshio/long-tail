@@ -116,7 +116,7 @@ export function DataTable<T>({
             {columns.map((col) => (
               <td
                 key={col.key}
-                className={`px-6 py-3.5 text-sm ${col.className ?? ''}`}
+                className={`px-6 py-2.5 text-sm ${col.className ?? ''}`}
               >
                 {col.render(row, index)}
               </td>

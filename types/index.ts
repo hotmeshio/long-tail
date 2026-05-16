@@ -91,6 +91,7 @@ export type {
   LTInstance,
   LTWorkerConfig,
   LTMcpServerConfig,
+  LTAgentConfig,
 } from './startup';
 
 export type {
@@ -136,3 +137,13 @@ export type {
   LTApiResult,
   LTApiAuth,
 } from './sdk';
+
+export type {
+  LTAgent,
+  LTAgentStatus,
+  LTAgentStats,
+  AgentCapability,
+  AgentBehaviors,
+  AgentSchedule,
+  AgentTrigger,
+} from './agent';

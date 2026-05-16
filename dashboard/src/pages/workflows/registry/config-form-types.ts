@@ -67,8 +67,8 @@ export function isStepValid(step: number, form: ConfigFormState): boolean {
   return true;
 }
 
-export const labelCls = 'block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1';
-export const hintCls = 'text-[10px] text-text-tertiary mt-2 leading-relaxed';
-export const jsonCls = 'input font-mono text-[11px] w-full leading-relaxed tabular-nums';
+export const labelCls = 'label';
+export const hintCls = 'hint';
+export const jsonCls = 'input-json w-full';
 
 export const DEFAULT_ENVELOPE = '{\n  "data": {},\n  "metadata": {}\n}';

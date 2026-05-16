@@ -114,6 +114,6 @@ export const UPSERT_MCP_SERVER = `
 /** Seed — insert-if-absent. DB is source of truth after first boot. */
 export const SEED_MCP_SERVER = `
   INSERT INTO lt_mcp_servers
-    (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, last_connected_at)
-  VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, $9, NOW())
+    (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, category, last_connected_at)
+  VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, $9, $10, NOW())
   ON CONFLICT (name) DO NOTHING`;

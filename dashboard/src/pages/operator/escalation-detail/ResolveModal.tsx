@@ -63,7 +63,7 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
         <textarea
           value={resolverJson}
           onChange={(e) => setResolverJson(e.target.value)}
-          className="input font-mono text-xs"
+          className="input-json"
           rows={10}
           spellCheck={false}
         />
