@@ -465,19 +465,16 @@ class LTCronRegistry {
   }
 
   /**
-   * Stop all active crons. Call during graceful shutdown.
+   * Disconnect on graceful shutdown. Clears the local registry so this
+   * container stops consuming cron streams. Does NOT call Virtual.interrupt()
+   * — cron jobs are durable rows shared across the fleet. Another container
+   * (or this one on restart) will continue servicing them.
+   *
+   * Use stopCron/stopAgentCrons/stopYamlCron for intentional permanent kills
+   * (e.g. user deletes an agent or changes a schedule via the dashboard).
    */
   async disconnect(): Promise<void> {
-    for (const key of [...this.activeCrons.keys()]) {
-      if (key.startsWith('agent:')) {
-        const agentId = key.split(':')[1].split('-')[0];
-        await this.stopAgentCrons(agentId);
-      } else if (key.startsWith('yaml:')) {
-        await this.stopYamlCron(key.replace('yaml:', ''));
-      } else {
-        await this.stopCron(key);
-      }
-    }
+    this.activeCrons.clear();
     this.connected = false;
   }
 
