@@ -132,7 +132,8 @@ class LTCronRegistry {
       callback: async () => {
         try {
           const client = new Durable.Client({ connection });
-          const workflowId = `${workflowType}-cron-${Durable.guid()}`;
+          const { guid } = Virtual.getContext();
+          const workflowId = `${workflowType}-cron-${guid}`;
           loggerRegistry.info(`[lt-cron] invoking ${workflowType} (${workflowId})`);
           await client.workflow.start({
             args: [defaultEnvelope],
@@ -318,27 +319,9 @@ class LTCronRegistry {
     const cronId = `lt-cron-agent-${agent.id}-${idx}`;
 
     const executeAs = schedule.execute_as || agent.user_id || undefined;
-    let principal: LTEnvelopePrincipal | null | undefined;
-    if (executeAs) {
-      try { principal = await resolvePrincipal(executeAs); } catch { /* use system */ }
-    }
-    if (!principal) {
-      principal = this.systemPrincipal ?? undefined;
-    }
-
-    const envelope = {
-      data: schedule.envelope ?? {},
-      metadata: { source: 'agent-cron', agentId: agent.id, agentName: agent.name, certified: true },
-      lt: {
-        userId: principal?.id ?? 'lt-system',
-        principal,
-        scopes: ['workflow:invoke'],
-      },
-    };
-
     const isPipeline = schedule.reaction_type === 'pipeline' && schedule.pipeline_id;
 
-    // Resolve the actual task queue from workflow config (durable only)
+    // Resolve task queue at arm time (static — doesn't change between ticks)
     let taskQueue: string | undefined;
     if (!isPipeline) {
       const wfConfig = await configService.getWorkflowConfig(schedule.workflow_type!);
@@ -352,6 +335,26 @@ class LTCronRegistry {
       connection,
       callback: async () => {
         try {
+          // Resolve principal at fire time so users seeded after startup are found
+          let principal: LTEnvelopePrincipal | null | undefined;
+          if (executeAs) {
+            try { principal = await resolvePrincipal(executeAs); } catch { /* use system */ }
+          }
+          if (!principal) {
+            principal = this.systemPrincipal ?? undefined;
+          }
+          loggerRegistry.info(`[lt-cron] agent ${agent.name} principal: ${principal?.id ?? 'NONE'} (executeAs=${executeAs ?? 'unset'})`);
+
+          const envelope = {
+            data: schedule.envelope ?? {},
+            metadata: { source: 'agent-cron', agentId: agent.id, agentName: agent.name, certified: true },
+            lt: {
+              userId: principal?.id ?? 'lt-system',
+              principal,
+              scopes: ['workflow:invoke'],
+            },
+          };
+
           if (isPipeline) {
             const { invokeYamlWorkflow } = await import('../yaml-workflow/invoke');
             const { getYamlWorkflow } = await import('../yaml-workflow/db');
@@ -364,7 +367,8 @@ class LTCronRegistry {
             });
           } else {
             const client = new Durable.Client({ connection });
-            const workflowId = `agent-cron-${agent.id}-${idx}-${Durable.guid()}`;
+            const { guid } = Virtual.getContext();
+            const workflowId = `agent-cron-${agent.id}-${idx}-${guid}`;
             loggerRegistry.info(`[lt-cron] agent invoking ${schedule.workflow_type} on ${taskQueue} (${workflowId})`);
             await client.workflow.start({
               args: [envelope],
@@ -377,7 +381,12 @@ class LTCronRegistry {
             } as any);
           }
         } catch (err: any) {
-          loggerRegistry.error(`[lt-cron] agent ${agent.name}/${targetLabel} failed: ${err?.message}`);
+          const msg = err?.message ?? '';
+          if (msg.includes('Duplicate job')) {
+            // Expected — deterministic ID dedup when cron fires multiple consumers
+          } else {
+            loggerRegistry.error(`[lt-cron] agent ${agent.name}/${targetLabel} failed: ${msg}`);
+          }
         }
       },
       args: [],
