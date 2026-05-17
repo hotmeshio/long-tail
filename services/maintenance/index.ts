@@ -115,22 +115,11 @@ class LTMaintenanceRegistry {
   }
 
   /**
-   * Interrupt the running cron. Call during graceful shutdown.
+   * Disconnect on graceful shutdown. Stops consuming but leaves the cron
+   * row alive — it's a durable job shared across the fleet. Another
+   * container (or this one on restart) will continue servicing it.
    */
   async disconnect(): Promise<void> {
-    if (!this.connected) return;
-
-    try {
-      const connection = getConnection();
-      await Virtual.interrupt({
-        topic: CRON_TOPIC,
-        connection,
-        options: { id: CRON_ID },
-      });
-    } catch (err: any) {
-      loggerRegistry.warn(`[lt-maintenance] interrupt failed (may not be running): ${err?.message}`);
-    }
-
     this.connected = false;
   }
 
