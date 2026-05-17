@@ -224,9 +224,11 @@ export async function startWorkers(
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
-  // Seed agents (from startConfig + system agents)
-  const { getSystemAgents } = await import('../system');
-  const allAgentConfigs = [...(startConfig.agents ?? []), ...getSystemAgents()];
+  // Seed agents (from startConfig + example system agents when enabled)
+  const systemAgents = startConfig.examples
+    ? (await import('../system')).getSystemAgents()
+    : [];
+  const allAgentConfigs = [...(startConfig.agents ?? []), ...systemAgents];
   if (allAgentConfigs.length > 0) {
     const { seedAgent, getAgentByName } = await import('../services/agent');
     const { seedSubscription } = await import('../services/agent/subscriptions');
