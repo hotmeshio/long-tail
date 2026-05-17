@@ -15,6 +15,7 @@ const { workerCreateMock } = vi.hoisted(() => ({
 vi.mock('@hotmeshio/hotmesh', () => ({
   Durable: {
     Worker: { create: workerCreateMock },
+    Client: vi.fn().mockImplementation(() => ({})),
     guid: () => 'test-guid',
   },
 }));
@@ -107,9 +108,16 @@ vi.mock('../../services/yaml-workflow/workers', () => ({
 
 vi.mock('../../system/seed', () => ({}));
 
+vi.mock('../../examples', () => ({
+  exampleWorkers: [],
+  seedExamples: vi.fn(),
+}));
+
+const getSystemAgentsMock = vi.fn(() => []);
+
 vi.mock('../../system', () => ({
   getSystemWorkers: () => [],
-  getSystemAgents: () => [],
+  getSystemAgents: getSystemAgentsMock,
   builtinMcpServerFactories: {},
 }));
 
@@ -347,6 +355,22 @@ describe('startWorkers — agent schedule seeding', () => {
 
     expect(seedAgent).toHaveBeenCalled();
     expect(seedSubscription).not.toHaveBeenCalled();
+  });
+});
+
+describe('startWorkers — system agents gated behind examples', () => {
+  it('does not load system agents when examples is falsy', async () => {
+    await startWorkers(baseConfig as any, [], {});
+
+    expect(getSystemAgentsMock).not.toHaveBeenCalled();
+  });
+
+  it('loads system agents when examples is true', async () => {
+    const config = { ...baseConfig, examples: true };
+
+    await startWorkers(config as any, [], {});
+
+    expect(getSystemAgentsMock).toHaveBeenCalled();
   });
 });
 
