@@ -188,13 +188,22 @@ export async function ensureSystemBot(): Promise<string> {
   const { rows } = await pool.query(GET_USER_BY_EXTERNAL_ID, [SYSTEM_BOT_NAME]);
   if (rows.length > 0) return rows[0].id;
 
-  const bot = await createBot({
-    name: SYSTEM_BOT_NAME,
-    display_name: 'System',
-    description: 'System bot for cron and system-initiated workflows',
-    roles: [{ role: 'system', type: 'superadmin' as const }],
-  });
-  return bot.id;
+  try {
+    const bot = await createBot({
+      name: SYSTEM_BOT_NAME,
+      display_name: 'System',
+      description: 'System bot for cron and system-initiated workflows',
+      roles: [{ role: 'system', type: 'superadmin' as const }],
+    });
+    return bot.id;
+  } catch (err: any) {
+    // Concurrent container already created it — re-read
+    if (err.code === '23505') {
+      const { rows: retry } = await pool.query(GET_USER_BY_EXTERNAL_ID, [SYSTEM_BOT_NAME]);
+      if (retry.length > 0) return retry[0].id;
+    }
+    throw err;
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

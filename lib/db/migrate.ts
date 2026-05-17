@@ -11,35 +11,47 @@ const SCHEMAS_DIR = path.join(__dirname, 'schemas');
 export async function migrate(): Promise<void> {
   const pool = getPool();
 
-  // ensure migration tracking table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS lt_migrations (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+  // Advisory lock prevents concurrent containers from racing on migrations.
+  // Uses a dedicated client so the lock is held for the entire sequence.
+  const client = await pool.connect();
+  try {
+    await client.query('SELECT pg_advisory_lock(8675309)');
 
-  // find and sort migration files
-  const files = fs.readdirSync(SCHEMAS_DIR)
-    .filter(f => f.endsWith('.sql'))
-    .sort();
+    // ensure migration tracking table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS lt_migrations (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
 
-  for (const file of files) {
-    const { rows } = await pool.query(
-      'SELECT 1 FROM lt_migrations WHERE name = $1',
-      [file],
-    );
+    // find and sort migration files
+    const files = fs.readdirSync(SCHEMAS_DIR)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
 
-    if (rows.length === 0) {
-      const sql = fs.readFileSync(path.join(SCHEMAS_DIR, file), 'utf-8');
-      await pool.query(sql);
-      await pool.query(
-        'INSERT INTO lt_migrations (name) VALUES ($1)',
+    for (const file of files) {
+      const { rows } = await client.query(
+        'SELECT 1 FROM lt_migrations WHERE name = $1',
         [file],
       );
-      loggerRegistry.info(`[migrate] applied: ${file}`);
+
+      if (rows.length === 0) {
+        const sql = fs.readFileSync(path.join(SCHEMAS_DIR, file), 'utf-8');
+        await client.query(sql);
+        await client.query(
+          'INSERT INTO lt_migrations (name) VALUES ($1)',
+          [file],
+        );
+        loggerRegistry.info(`[migrate] applied: ${file}`);
+      }
     }
+  } finally {
+    // Advisory lock released when client is released (session-scoped),
+    // but release explicitly for clarity
+    await client.query('SELECT pg_advisory_unlock(8675309)').catch(() => {});
+    client.release();
   }
 }
 

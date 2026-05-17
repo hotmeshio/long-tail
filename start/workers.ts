@@ -93,6 +93,11 @@ export async function startWorkers(
 
   const connection = buildConnection();
 
+  // Readonly mode: all user-provided workers are observers — skip crons, triggers, and agent seeding.
+  // System workers (mcpQuery, etc.) are always added by collectWorkers, so check the original config.
+  const userWorkers = startConfig.workers ?? [];
+  const isReadonly = userWorkers.length > 0 && userWorkers.every((w) => w.connection?.readonly);
+
   if (workers.length) {
     // Connect telemetry before HotMesh starts
     if (telemetryRegistry.hasAdapter) {
@@ -162,14 +167,16 @@ export async function startWorkers(
       ltConfig.invalidate();
     }
 
-    // Start maintenance cron
-    if (maintenanceRegistry.hasConfig) {
+    // Start maintenance cron (skip in readonly/API mode)
+    if (maintenanceRegistry.hasConfig && !isReadonly) {
       await maintenanceRegistry.connect();
       loggerRegistry.info('[long-tail] maintenance cron started');
     }
 
-    // Start workflow cron schedules
-    await cronRegistry.connect();
+    // Start workflow cron schedules (skip in readonly/API mode)
+    if (!isReadonly) {
+      await cronRegistry.connect();
+    }
 
     // Connect MCP adapter
     if (mcpRegistry.hasAdapter) {
@@ -285,18 +292,19 @@ export async function startWorkers(
     loggerRegistry.info('[long-tail] event adapters connected');
   }
 
-  // Arm agent event subscriptions (after event adapters are connected)
-  try {
-    await agentTriggerRegistry.connect(callbackAdapter);
-  } catch (err: any) {
-    loggerRegistry.warn(`[long-tail] agent trigger registry: ${err.message}`);
-  }
+  // Arm agent event subscriptions and crons (skip in readonly/API mode)
+  if (!isReadonly) {
+    try {
+      await agentTriggerRegistry.connect(callbackAdapter);
+    } catch (err: any) {
+      loggerRegistry.warn(`[long-tail] agent trigger registry: ${err.message}`);
+    }
 
-  // Arm agent cron schedules
-  try {
-    await cronRegistry.connectAgentCrons();
-  } catch (err: any) {
-    loggerRegistry.warn(`[long-tail] agent cron schedules: ${err.message}`);
+    try {
+      await cronRegistry.connectAgentCrons();
+    } catch (err: any) {
+      loggerRegistry.warn(`[long-tail] agent cron schedules: ${err.message}`);
+    }
   }
 
   // Ensure system bot account exists for cron/system-initiated workflows
