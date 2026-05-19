@@ -1,6 +1,6 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -70,7 +70,7 @@
     "@anthropic-ai/sdk": "^0.92.0",
     "@aws-sdk/client-s3": "^3.1017.0",
     "@aws-sdk/s3-request-presigner": "^3.1045.0",
-    "@hotmeshio/hotmesh": "^0.16.5",
+    "@hotmeshio/hotmesh": "^0.16.6",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.215.0",
     "@opentelemetry/resources": "^2.5.1",
