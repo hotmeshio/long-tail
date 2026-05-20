@@ -100,7 +100,7 @@ export const TIME_LEFT_COLUMN: Column<LTEscalationRecord> = {
     ) : (
       <span className="text-xs text-text-tertiary">—</span>
     ),
-  className: 'w-10',
+  className: 'w-16 whitespace-nowrap',
 };
 
 /** Status icon column — color-coded filled circle, or bell for ACK/notification escalations. */
