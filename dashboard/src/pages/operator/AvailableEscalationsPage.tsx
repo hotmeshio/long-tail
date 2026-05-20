@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
+  useAvailableEscalations,
   useEscalationTypes,
   useClaimEscalation,
   useSetEscalationPriority,
@@ -60,13 +61,13 @@ export function AvailableEscalationsPage() {
   }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
 
   const statusFilter = filters.status || '';
-  const apiStatus = statusFilter === 'available' ? 'pending'
-    : statusFilter === 'claimed' ? 'pending'
+  const isAvailable = statusFilter === 'available';
+  const apiStatus = statusFilter === 'claimed' ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
+    : isAvailable ? undefined
     : undefined;
 
-  const { data, isLoading, error: queryError, refetch, isFetching } = useEscalations({
-    status: apiStatus,
+  const sharedFilters = {
     role: filters.role || undefined,
     type: filters.type || undefined,
     priority: filters.priority ? parseInt(filters.priority) : undefined,
@@ -74,16 +75,28 @@ export function AvailableEscalationsPage() {
     offset: pagination.offset,
     sort_by: sort.sort_by || undefined,
     order: sort.sort_by ? sort.order : undefined,
+  };
+
+  const availableQuery = useAvailableEscalations({
+    ...sharedFilters,
+    enabled: isAvailable,
   });
+
+  const escalationsQuery = useEscalations({
+    status: apiStatus,
+    ...sharedFilters,
+    enabled: !isAvailable,
+  });
+
+  const activeQuery = isAvailable ? availableQuery : escalationsQuery;
+  const { data, isLoading, error: queryError, refetch, isFetching } = activeQuery;
 
   const now = new Date();
   const rawEscalations = data?.escalations ?? [];
-  const escalations = statusFilter === 'available'
-    ? rawEscalations.filter((e) => !e.assigned_to || !e.assigned_until || new Date(e.assigned_until) <= now)
-    : statusFilter === 'claimed'
+  const escalations = statusFilter === 'claimed'
     ? rawEscalations.filter((e) => e.assigned_to && e.assigned_until && new Date(e.assigned_until) > now)
     : rawEscalations;
-  const total = statusFilter === 'available' || statusFilter === 'claimed'
+  const total = statusFilter === 'claimed'
     ? escalations.length
     : data?.total ?? 0;
   const canBulkManage = isSuperAdmin || user?.roles.some((r) => r.type === 'admin');
@@ -207,7 +220,7 @@ export function AvailableEscalationsPage() {
           <ListToolbar
             onRefresh={() => refetch()}
             isFetching={isFetching}
-            apiPath={`/escalations?limit=${pagination.pageSize}&offset=${pagination.offset}${apiStatus ? `&status=${apiStatus}` : ''}${filters.role ? `&role=${filters.role}` : ''}${filters.type ? `&type=${filters.type}` : ''}${filters.priority ? `&priority=${filters.priority}` : ''}`}
+            apiPath={`/escalations${isAvailable ? '/available' : ''}?limit=${pagination.pageSize}&offset=${pagination.offset}${apiStatus ? `&status=${apiStatus}` : ''}${filters.role ? `&role=${filters.role}` : ''}${filters.type ? `&type=${filters.type}` : ''}${filters.priority ? `&priority=${filters.priority}` : ''}`}
           />
         }
       />

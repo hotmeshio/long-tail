@@ -18,6 +18,7 @@ interface EscalationFilters {
   offset?: number;
   sort_by?: string;
   order?: string;
+  enabled?: boolean;
 }
 
 export interface EscalationStats {
@@ -45,38 +46,42 @@ export function useEscalationTypes() {
 }
 
 export function useEscalations(filters: EscalationFilters) {
+  const { enabled = true, ...rest } = filters;
   const params = new URLSearchParams();
-  if (filters.status) params.set('status', filters.status);
-  if (filters.role) params.set('role', filters.role);
-  if (filters.type) params.set('type', filters.type);
-  if (filters.subtype) params.set('subtype', filters.subtype);
-  if (filters.assigned_to) params.set('assigned_to', filters.assigned_to);
-  if (filters.priority) params.set('priority', String(filters.priority));
-  if (filters.limit) params.set('limit', String(filters.limit));
-  if (filters.offset !== undefined) params.set('offset', String(filters.offset));
-  if (filters.sort_by) params.set('sort_by', filters.sort_by);
-  if (filters.order) params.set('order', filters.order);
+  if (rest.status) params.set('status', rest.status);
+  if (rest.role) params.set('role', rest.role);
+  if (rest.type) params.set('type', rest.type);
+  if (rest.subtype) params.set('subtype', rest.subtype);
+  if (rest.assigned_to) params.set('assigned_to', rest.assigned_to);
+  if (rest.priority) params.set('priority', String(rest.priority));
+  if (rest.limit) params.set('limit', String(rest.limit));
+  if (rest.offset !== undefined) params.set('offset', String(rest.offset));
+  if (rest.sort_by) params.set('sort_by', rest.sort_by);
+  if (rest.order) params.set('order', rest.order);
 
   return useQuery<EscalationListResponse>({
-    queryKey: ['escalations', filters],
+    queryKey: ['escalations', rest],
     queryFn: () => apiFetch(`/escalations?${params}`),
+    enabled,
   });
 }
 
 export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status'>) {
+  const { enabled = true, ...rest } = filters;
   const params = new URLSearchParams();
-  if (filters.role) params.set('role', filters.role);
-  if (filters.type) params.set('type', filters.type);
-  if (filters.subtype) params.set('subtype', filters.subtype);
-  if (filters.priority) params.set('priority', String(filters.priority));
-  if (filters.limit) params.set('limit', String(filters.limit));
-  if (filters.offset !== undefined) params.set('offset', String(filters.offset));
-  if (filters.sort_by) params.set('sort_by', filters.sort_by);
-  if (filters.order) params.set('order', filters.order);
+  if (rest.role) params.set('role', rest.role);
+  if (rest.type) params.set('type', rest.type);
+  if (rest.subtype) params.set('subtype', rest.subtype);
+  if (rest.priority) params.set('priority', String(rest.priority));
+  if (rest.limit) params.set('limit', String(rest.limit));
+  if (rest.offset !== undefined) params.set('offset', String(rest.offset));
+  if (rest.sort_by) params.set('sort_by', rest.sort_by);
+  if (rest.order) params.set('order', rest.order);
 
   return useQuery<EscalationListResponse>({
-    queryKey: ['escalations', 'available', filters],
+    queryKey: ['escalations', 'available', rest],
     queryFn: () => apiFetch(`/escalations/available?${params}`),
+    enabled,
   });
 }
 

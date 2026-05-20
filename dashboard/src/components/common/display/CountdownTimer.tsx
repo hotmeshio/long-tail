@@ -7,7 +7,7 @@ const COUNTDOWN_THRESHOLDS = [
   { maxMs: 0,              color: 'text-status-error' },
   { maxMs: 5 * 60 * 1000,  color: 'text-status-error' },
   { maxMs: 15 * 60 * 1000, color: 'text-status-warning' },
-  { maxMs: Infinity,        color: 'text-accent' },
+  { maxMs: Infinity,        color: 'text-text-secondary' },
 ] as const;
 
 function countdownColor(remainingMs: number): string {
