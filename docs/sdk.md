@@ -81,6 +81,21 @@ The client mirrors the REST route structure:
 | `lt.namespaces` | `/api/namespaces` | `list`, `register` |
 | `lt.maintenance` | `/api/config/maintenance` | `getConfig`, `updateConfig` |
 
+### Direct imports
+
+Some services are exported as namespaces for direct import rather than through the client:
+
+```typescript
+import { TopicService } from '@hotmeshio/long-tail';
+
+const { topics, total } = await TopicService.listTopics({ category: 'task' });
+const detail = await TopicService.getTopic('task.created');
+```
+
+| Import | Key operations | Docs |
+|--------|---------------|------|
+| `TopicService` | `listTopics`, `getTopic`, `createTopic`, `updateTopic`, `deleteTopic`, `seedTopic`, `resetTopic` | [TopicService](api/sdk/topics.md) |
+
 ## Events
 
 The SDK includes a callback-based event adapter. Subscribe to events directly — no socket.io client, no WebSocket connection.

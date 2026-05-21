@@ -146,6 +146,14 @@ const CapabilitiesPage = lazy(() =>
   import('./pages/capabilities/CapabilitiesPage').then((m) => ({ default: m.CapabilitiesPage })),
 );
 
+// Topics (all authenticated users)
+const TopicsPage = lazy(() =>
+  import('./pages/topics/TopicsPage').then((m) => ({ default: m.TopicsPage })),
+);
+const TopicDetailPage = lazy(() =>
+  import('./pages/topics/TopicDetailPage').then((m) => ({ default: m.TopicDetailPage })),
+);
+
 // ---------------------------------------------------------------------------
 // Suspense fallback
 // ---------------------------------------------------------------------------
@@ -230,6 +238,10 @@ const router = createBrowserRouter([
       { path: 'agents/new', element: <Lazy><AgentConfigPage /></Lazy> },
       { path: 'agents/:id', element: <Lazy><AgentDetailPage /></Lazy> },
       { path: 'agents/:id/edit', element: <Lazy><AgentConfigPage /></Lazy> },
+
+      // Topics section (all authenticated users)
+      { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
+      { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
 
       // Workflows section (engineer, admin, or superadmin)
       {

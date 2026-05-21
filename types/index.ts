@@ -48,6 +48,7 @@ export type {
 export type {
   LTEvent,
   LTEventType,
+  LTAppEventType,
   LTEventAdapter,
 } from './events';
 
@@ -92,6 +93,7 @@ export type {
   LTWorkerConfig,
   LTMcpServerConfig,
   LTAgentConfig,
+  LTTopicConfig,
 } from './startup';
 
 export type {

@@ -23,6 +23,15 @@ The sidebar organizes pages into five groups.
 | **MCP Pipeline Tools** | `/mcp/workflows` | YAML pipeline tools available to the orchestrator. Shows compiled deterministic workflows. |
 | **Pipeline Executions** | `/mcp/executions` | Execution history for MCP pipelines — both dynamic (agentic) and compiled (deterministic) runs. |
 
+### Work
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Recent Activity** | `/` | Live event stream and business process overview. |
+| **Capabilities** | `/capabilities` | Browse MCP servers grouped by capability category. |
+| **Agents** | `/agents` | Autonomous event-driven agents. Configure subscriptions, schedules, and knowledge domains. |
+| **Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
+
 ### Storage
 
 | Page | Route | Purpose |
@@ -282,6 +291,19 @@ Knowledge base for storing and retrieving domain-specific information used by wo
 Knowledge entries are accessed by workflows via the `get_knowledge` MCP tool. This is how workflows retrieve domain context (product catalogs, configuration data, reference tables) without hardcoding values.
 
 **API:** `GET /api/knowledge` lists entries. `PUT /api/knowledge/:domain/:key` creates or updates. `DELETE /api/knowledge/:domain/:key` removes.
+
+### Topic Catalog
+
+The persistent registry of all known event topics. Browse, search, and inspect what the event bus carries.
+
+- **Topic list** — all registered topics with category pills, descriptions, subscriber counts, and last-seen timestamps. Filter by category (task, workflow, escalation, activity, knowledge, agent, app, milestone).
+- **Topic detail** — click any topic to see its full payload schema (JSON Schema), example payload, tags, and a list of agents whose subscription patterns match the topic.
+- **Subscriber discovery** — the detail page uses NATS-style pattern matching to show all agents that would receive this event. An agent subscribed to `task.*` appears on every `task.created`, `task.failed`, etc. detail page.
+- **Schema preview in subscriptions** — when editing an agent's subscriptions, selecting a topic from the catalog shows its payload schema inline, so you know what `{event.data.*}` fields are available for input mapping.
+
+Topics enter the catalog three ways: system topics are seeded at startup (22 built-in), config topics are declared in `startConfig.topics[]`, and runtime topics are auto-discovered when `publish_event` fires for the first time.
+
+**API:** `GET /api/topics` lists topics. `GET /api/topics/by-name/:topic` returns detail with subscribers. `POST /api/topics` registers a new topic. See [Topics HTTP API](api/http/topics.md) and [TopicService SDK](api/sdk/topics.md).
 
 ### Credentials
 

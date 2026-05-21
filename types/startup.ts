@@ -99,6 +99,32 @@ export interface LTAgentConfig {
   }>;
 }
 
+/**
+ * Declarative topic catalog entry for startup seeding.
+ * Apps declare what they publish so agents can discover and subscribe.
+ */
+export interface LTTopicConfig {
+  topic: string;
+  description?: string;
+  /** Defaults to first segment of topic, or 'app' for app.* topics. */
+  category?: string;
+  /** JSON Schema describing the event.data shape. */
+  payload_schema?: Record<string, any>;
+  /** Concrete example of event.data. */
+  example_payload?: Record<string, any>;
+  tags?: string[];
+  /**
+   * When `true`, overwrite the DB entry from config on every boot.
+   * Config becomes source of truth — description, schema, tags are
+   * reset to match what's declared in code. Without this flag, the
+   * DB owns the record after first insert (insert-if-absent).
+   *
+   * Use this when the topic definition lives in git and should be
+   * managed through the CI/CD lifecycle.
+   */
+  reset?: boolean;
+}
+
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
@@ -206,6 +232,9 @@ export interface LTStartConfig {
    * a few sample workflows so the dashboard has data immediately.
    */
   examples?: boolean;
+
+  /** Declarative topic catalog entries. Seeded on first boot (insert-if-absent). */
+  topics?: LTTopicConfig[];
 
   /** Declarative agent configurations. Seeded on first boot (insert-if-absent). */
   agents?: LTAgentConfig[];
