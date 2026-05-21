@@ -113,6 +113,12 @@ When multiple instances of the platform run in parallel, the same event might re
 
 Optional shallow key-value match against `event.data`. The subscription only fires when all filter keys match. Example: `{"status": 422}` only fires for events where `event.data.status === 422`.
 
+### Topic catalog
+
+The [Topic Catalog](topics.md) is a persistent registry of all known topics. Browse it in the dashboard at `/topics` to see every topic with its description, payload schema, and active subscribers. When creating subscriptions, the topic field shows a searchable dropdown from the catalog with schema previews — so you know what `{event.data.*}` fields are available for input mapping.
+
+Topics can be declared in code via `startConfig.topics[]`, auto-discovered at runtime, or registered manually through the API. See [Topics](topics.md) for the full guide.
+
 ## schedule
 
 Agents can run on one or more cron schedules. Each schedule targets a specific workflow with a static envelope payload.

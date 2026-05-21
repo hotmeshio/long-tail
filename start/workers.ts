@@ -231,6 +231,11 @@ export async function startWorkers(
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
+  // Seed topic catalog (system topics + user-declared topics)
+  const { seedSystemTopics, seedConfigTopics } = await import('../services/topics/system-topics');
+  await seedSystemTopics();
+  if (startConfig.topics?.length) await seedConfigTopics(startConfig.topics);
+
   // Seed agents (from startConfig + example system agents when enabled)
   const systemAgents = startConfig.examples
     ? (await import('../system')).getSystemAgents()

@@ -1,18 +1,21 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Radio, BookOpen } from 'lucide-react';
 import { RunAsSelector } from '../../../components/common/form/RunAsSelector';
 import { useWorkflowConfigs } from '../../../api/workflows';
+import { useTopics, type TopicCatalogEntry } from '../../../api/topics';
 import type { AgentFormState, SubscriptionFormState } from './agent-form-types';
 import { EMPTY_SUBSCRIPTION, sectionCls, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
-const TOPIC_EXAMPLES = [
-  'workflow.failed',
-  'activity.failed',
-  'escalation.created',
-  'knowledge.stored',
-  'app.>',
-  'app.*.*.error',
-];
+const CATEGORY_COLORS: Record<string, string> = {
+  task:       'bg-blue-400/15 text-blue-400',
+  workflow:   'bg-accent/15 text-accent',
+  escalation: 'bg-amber-400/15 text-amber-400',
+  activity:   'bg-cyan-400/15 text-cyan-400',
+  knowledge:  'bg-violet-400/15 text-violet-400',
+  agent:      'bg-emerald-400/15 text-emerald-400',
+  app:        'bg-rose-400/15 text-rose-400',
+  milestone:  'bg-violet-400/15 text-violet-400',
+};
 
 interface Props {
   form: AgentFormState;
@@ -21,6 +24,9 @@ interface Props {
 
 export function SubscriptionsStep({ form, set }: Props) {
   const { data: configs } = useWorkflowConfigs();
+  const { data: topicsData } = useTopics({ limit: 200 });
+  const catalogTopics = topicsData?.topics ?? [];
+
   const invocableWorkflows = (configs ?? []).filter((c: any) => c.invocable).map((c: any) => c.workflow_type);
   const [selected, setSelected] = useState(0);
 
@@ -43,6 +49,9 @@ export function SubscriptionsStep({ form, set }: Props) {
   const subs = form.subscriptions;
   const sub = subs[selected];
   const isComplete = (s: SubscriptionFormState) => !!s.topic && (s.reaction_type === 'durable' ? !!s.workflow_type : s.reaction_type === 'pipeline' ? !!s.pipeline_id : !!s.mcp_prompt);
+
+  // Find the selected topic's catalog entry for schema preview
+  const selectedCatalogEntry = sub ? catalogTopics.find((t) => t.topic === sub.topic) : undefined;
 
   if (subs.length === 0) {
     return (
@@ -104,17 +113,27 @@ export function SubscriptionsStep({ form, set }: Props) {
         {sub && (
           <div className="flex-1 min-w-0 space-y-12">
 
-            {/* When — topic + shortcut links */}
+            {/* When — topic combobox */}
             <div>
               <label className={sectionCls}>When this event fires</label>
-              <input type="text" value={sub.topic} onChange={(e) => updateSub(selected, 'topic', e.target.value)} placeholder="workflow.failed" className={`${inputCls} font-mono`} />
-              <div className="flex gap-3 mt-2 overflow-x-auto">
-                {TOPIC_EXAMPLES.map((ex) => (
-                  <button key={ex} type="button" onClick={() => updateSub(selected, 'topic', ex)}
-                    className={`text-[10px] font-mono whitespace-nowrap transition-colors ${sub.topic === ex ? 'text-accent font-medium' : 'text-accent/50 hover:text-accent'}`}
-                  >{ex}</button>
-                ))}
-              </div>
+              <TopicCombobox
+                value={sub.topic}
+                onChange={(v) => updateSub(selected, 'topic', v)}
+                topics={catalogTopics}
+              />
+
+              {/* Schema preview when a catalog topic is selected */}
+              {selectedCatalogEntry?.payload_schema && (
+                <div className="mt-3 p-3 rounded-md bg-surface-sunken border border-surface-border">
+                  <p className="text-[10px] text-text-quaternary mb-1 uppercase tracking-wider font-medium">Payload Schema</p>
+                  <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap overflow-x-auto max-h-40">
+                    {JSON.stringify(selectedCatalogEntry.payload_schema.properties ?? selectedCatalogEntry.payload_schema, null, 2)}
+                  </pre>
+                  {selectedCatalogEntry.description && (
+                    <p className="text-[10px] text-text-tertiary mt-2 italic">{selectedCatalogEntry.description}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Run this workflow + As identity + But only if — 3 col */}
@@ -172,6 +191,83 @@ export function SubscriptionsStep({ form, set }: Props) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Topic Combobox ──────────────────────────────────────────────────────────
+
+function TopicCombobox({ value, onChange, topics }: {
+  value: string;
+  onChange: (v: string) => void;
+  topics: TopicCatalogEntry[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const filterText = open ? filter : value;
+  const filtered = topics.filter((t) =>
+    t.topic.toLowerCase().includes((open ? filter : '').toLowerCase()) ||
+    (t.description ?? '').toLowerCase().includes((open ? filter : '').toLowerCase()),
+  );
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={filterText}
+        onFocus={() => { setOpen(true); setFilter(value); }}
+        onChange={(e) => {
+          const v = e.target.value;
+          setFilter(v);
+          onChange(v);
+          if (!open) setOpen(true);
+        }}
+        placeholder="workflow.failed or app.>"
+        className={`${inputCls} font-mono`}
+      />
+
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
+          {filtered.map((t) => {
+            const catCls = CATEGORY_COLORS[t.category] ?? 'bg-zinc-400/15 text-zinc-400';
+            return (
+              <button
+                key={t.topic}
+                type="button"
+                onClick={() => {
+                  onChange(t.topic);
+                  setFilter(t.topic);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors flex items-center gap-3 ${
+                  value === t.topic ? 'bg-accent/5' : ''
+                }`}
+              >
+                <span className="text-[11px] font-mono text-text-primary shrink-0">{t.topic}</span>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0 ${catCls}`}>{t.category}</span>
+                {t.description && (
+                  <span className="text-[10px] text-text-quaternary truncate">{t.description}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
