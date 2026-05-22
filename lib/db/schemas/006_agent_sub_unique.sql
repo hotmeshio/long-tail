@@ -6,4 +6,5 @@ DO $$ BEGIN
     ADD CONSTRAINT uq_agent_sub_topic UNIQUE (agent_id, topic);
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+  WHEN duplicate_table THEN NULL;
 END $$;

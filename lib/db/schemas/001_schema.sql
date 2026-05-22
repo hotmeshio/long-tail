@@ -92,7 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_lt_users_oauth
   ON lt_users (oauth_provider, oauth_provider_id)
   WHERE oauth_provider IS NOT NULL;
 
-CREATE TRIGGER lt_users_updated_at
+CREATE OR REPLACE TRIGGER lt_users_updated_at
   BEFORE UPDATE ON lt_users
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS lt_config_workflows (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER lt_config_workflows_updated_at
+CREATE OR REPLACE TRIGGER lt_config_workflows_updated_at
   BEFORE UPDATE ON lt_config_workflows
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
@@ -463,7 +463,7 @@ CREATE INDEX IF NOT EXISTS idx_lt_knowledge_domain ON lt_knowledge (domain);
 CREATE INDEX IF NOT EXISTS idx_lt_knowledge_tags ON lt_knowledge USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_lt_knowledge_data ON lt_knowledge USING GIN (data);
 
-CREATE TRIGGER lt_knowledge_updated_at
+CREATE OR REPLACE TRIGGER lt_knowledge_updated_at
   BEFORE UPDATE ON lt_knowledge
   FOR EACH ROW EXECUTE FUNCTION lt_set_updated_at();
 
