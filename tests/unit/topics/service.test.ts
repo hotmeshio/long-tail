@@ -78,18 +78,18 @@ describe('getTopic', () => {
     expect(result!.subscribers[0].agent_name).toBe('watcher');
   });
 
-  it('filters subscribers by pattern match', async () => {
+  it('passes topic to subscriber query for SQL-level filtering', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ topic: 'task.created', category: 'task' }] })
       .mockResolvedValueOnce({ rows: [
         { id: 's1', agent_id: 'a1', agent_name: 'all-tasks', topic: 'task.*', reaction_type: 'durable' },
-        { id: 's2', agent_id: 'a2', agent_name: 'app-watcher', topic: 'app.>', reaction_type: 'durable' },
       ] });
 
     const result = await getTopic('task.created');
-    // task.* matches, app.> does not
     expect(result!.subscribers).toHaveLength(1);
     expect(result!.subscribers[0].agent_name).toBe('all-tasks');
+    // Verify the topic was passed as a parameter to the subscriber query
+    expect(mockQuery.mock.calls[1][1]).toEqual(['task.created']);
   });
 });
 

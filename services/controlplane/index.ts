@@ -3,8 +3,14 @@ import type { QuorumProfile, ThrottleOptions } from '@hotmeshio/hotmesh/build/ty
 
 import { getPool, getConnection } from '../../lib/db';
 import { LIST_APPS, COUNT_PENDING, COUNT_PROCESSED_SINCE, VOLUME_BY_STREAM } from './sql';
+import {
+  LIST_STREAM_MESSAGES,
+  COUNT_STREAM_MESSAGES,
+  VALID_SORT_COLUMNS,
+  VALID_SORT_ORDERS,
+} from './stream-messages-sql';
 import { startQuorumBridge } from './quorum-bridge';
-import type { ControlPlaneApp, StreamStats } from './types';
+import type { ControlPlaneApp, StreamStats, StreamMessagesParams, StreamMessagesResult, StreamMessage } from './types';
 
 // Re-export for consumers
 export type { QuorumProfile, ThrottleOptions };
@@ -119,6 +125,58 @@ export async function getStreamStats(
     pending: pendingRes.rows[0]?.count ?? 0,
     processed: processedRes.rows[0]?.count ?? 0,
     byStream: byStreamRes.rows,
+  };
+}
+
+// ─── Stream message browsing ────────────────────────────────────────────
+
+/**
+ * Browse stream messages across engine_streams and worker_streams tables
+ * with pagination, filtering, and sorting.
+ *
+ * @param schema — the Postgres schema (namespace, e.g. "durable")
+ * @param params — pagination, filter, and sort options
+ */
+export async function getStreamMessages(
+  schema: string,
+  params: StreamMessagesParams,
+): Promise<StreamMessagesResult> {
+  const limit = Math.min(Math.max(params.limit ?? 25, 1), 100);
+  const offset = Math.max(params.offset ?? 0, 0);
+
+  const sortColumn = VALID_SORT_COLUMNS[params.sort_by ?? 'created_at'];
+  if (!sortColumn) throw new Error(`Invalid sort_by: ${params.sort_by}`);
+
+  const sortOrder = (params.order ?? 'desc').toLowerCase();
+  if (!VALID_SORT_ORDERS.has(sortOrder)) throw new Error(`Invalid order: ${params.order}`);
+
+  const { source } = params;
+  const streamName = params.stream_name ? `%${params.stream_name}%` : null;
+  const status = params.status ?? null;
+  const msgType = params.msg_type ?? null;
+  const topic = params.topic ?? null;
+  const workflowName = params.workflow_name ?? null;
+  const jid = params.jid ?? null;
+  const aid = params.aid ?? null;
+
+  const pool = getPool();
+  const queryParams = [streamName, status, msgType, topic, workflowName, jid, aid, limit, offset];
+  const countParams = [streamName, status, msgType, topic, workflowName, jid, aid];
+
+  const [messagesRes, countRes] = await Promise.all([
+    pool.query<StreamMessage>(
+      LIST_STREAM_MESSAGES(schema, sortColumn, sortOrder, source),
+      queryParams,
+    ),
+    pool.query<{ count: number }>(
+      COUNT_STREAM_MESSAGES(schema, source),
+      countParams,
+    ),
+  ]);
+
+  return {
+    messages: messagesRes.rows,
+    total: countRes.rows[0]?.count ?? 0,
   };
 }
 

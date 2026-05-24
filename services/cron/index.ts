@@ -343,11 +343,11 @@ class LTCronRegistry {
           if (!principal) {
             principal = this.systemPrincipal ?? undefined;
           }
-          loggerRegistry.info(`[lt-cron] agent ${agent.name} principal: ${principal?.id ?? 'NONE'} (executeAs=${executeAs ?? 'unset'})`);
+          loggerRegistry.info(`[lt-cron] agent ${agent.id} principal: ${principal?.id ?? 'NONE'} (executeAs=${executeAs ?? 'unset'})`);
 
           const envelope = {
             data: schedule.envelope ?? {},
-            metadata: { source: 'agent-cron', agentId: agent.id, agentName: agent.name, certified: true },
+            metadata: { source: 'agent-cron', agentId: agent.id, agentName: agent.id, certified: true },
             lt: {
               userId: principal?.id ?? 'lt-system',
               principal,
@@ -385,7 +385,7 @@ class LTCronRegistry {
           if (msg.includes('Duplicate job')) {
             // Expected — deterministic ID dedup when cron fires multiple consumers
           } else {
-            loggerRegistry.error(`[lt-cron] agent ${agent.name}/${targetLabel} failed: ${msg}`);
+            loggerRegistry.error(`[lt-cron] agent ${agent.id}/${targetLabel} failed: ${msg}`);
           }
         }
       },
@@ -394,7 +394,7 @@ class LTCronRegistry {
     });
 
     this.activeCrons.set(key, cronId);
-    loggerRegistry.info(`[lt-cron] agent schedule started: ${agent.name}/${targetLabel} (${schedule.cron})`);
+    loggerRegistry.info(`[lt-cron] agent schedule started: ${agent.id}/${targetLabel} (${schedule.cron})`);
   }
 
   /**
@@ -455,7 +455,7 @@ class LTCronRegistry {
             await this.startAgentCron(agent, sched, i);
             armed++;
           } catch (err: any) {
-            loggerRegistry.warn(`[lt-cron] agent schedule failed: ${agent.name}/${sched.cron}: ${err.message}`);
+            loggerRegistry.warn(`[lt-cron] agent schedule failed: ${agent.id}/${sched.cron}: ${err.message}`);
           }
         }
       }

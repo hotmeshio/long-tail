@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS lt_agent_subscriptions (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id        UUID NOT NULL REFERENCES lt_agents(id) ON DELETE CASCADE,
+  agent_id        TEXT NOT NULL REFERENCES lt_agents(id) ON DELETE CASCADE,
 
   -- What to listen for
   topic           TEXT NOT NULL,

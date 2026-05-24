@@ -205,7 +205,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const pipelineNs = searchParams.get('pipelinenamespace') || 'longtail';
+  const pipelineNs = searchParams.get('pipelinenamespace') || 'hmsh';
   const durableNs = searchParams.get('durablenamespace') || 'durable';
   const setNs = useCallback((key: string, ns: string) => {
     setSearchParams((prev) => {

@@ -66,7 +66,7 @@ describe('isStepValid', () => {
 describe('agentToForm', () => {
   it('maps agent with behaviors.schedules to form state', () => {
     const agent = {
-      id: '1', name: 'health-monitor', description: 'Monitors health',
+      id: 'health-monitor', description: 'Monitors health',
       status: 'active', goals: 'Detect failures', rules: 'No auto-restart',
       user_id: 'bot-1', knowledge_domain: 'system-health',
       behaviors: {
@@ -153,7 +153,7 @@ describe('formToAgentPayload', () => {
 
     const payload = formToAgentPayload(form);
 
-    expect(payload.name).toBe('test-agent');
+    expect(payload.id).toBe('test-agent');
     expect(payload.behaviors.schedules).toHaveLength(2);
     expect(payload.behaviors.schedules[0]).toEqual({
       cron: '0 * * * *',

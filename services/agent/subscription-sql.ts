@@ -44,7 +44,7 @@ export const SEED_SUBSCRIPTION = `
 `;
 
 export const LIST_ACTIVE_SUBSCRIPTIONS = `
-  SELECT s.*, a.name AS agent_name, a.user_id AS agent_user_id
+  SELECT s.*, a.id AS agent_name, a.user_id AS agent_user_id
   FROM lt_agent_subscriptions s
   JOIN lt_agents a ON s.agent_id = a.id
   WHERE s.enabled = true AND a.status = 'active'

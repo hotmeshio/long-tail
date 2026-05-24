@@ -242,7 +242,7 @@ export async function startWorkers(
     : [];
   const allAgentConfigs = [...(startConfig.agents ?? []), ...systemAgents];
   if (allAgentConfigs.length > 0) {
-    const { seedAgent, getAgentByName } = await import('../services/agent');
+    const { seedAgent } = await import('../services/agent');
     const { seedSubscription } = await import('../services/agent/subscriptions');
     for (const agentConfig of allAgentConfigs) {
       try {
@@ -253,7 +253,7 @@ export async function startWorkers(
           behaviors.cron = agentConfig.schedules[0].cron;
         }
         const inserted = await seedAgent({
-          name: agentConfig.name,
+          id: agentConfig.name,
           description: agentConfig.description,
           goals: agentConfig.goals,
           rules: agentConfig.rules,
@@ -264,17 +264,14 @@ export async function startWorkers(
         });
         if (inserted) loggerRegistry.info(`[long-tail] agent seeded: ${agentConfig.name}`);
 
-        // Seed subscriptions for this agent
+        // Seed subscriptions for this agent — id IS the name
         if (agentConfig.subscriptions?.length) {
-          const agent = await getAgentByName(agentConfig.name);
-          if (agent) {
-            for (const sub of agentConfig.subscriptions) {
-              try {
-                const subInserted = await seedSubscription(agent.id, sub);
-                if (subInserted) loggerRegistry.info(`[long-tail] subscription seeded: ${agentConfig.name}/${sub.topic}`);
-              } catch (subErr: any) {
-                loggerRegistry.warn(`[long-tail] subscription seed failed: ${agentConfig.name}/${sub.topic}: ${subErr.message}`);
-              }
+          for (const sub of agentConfig.subscriptions) {
+            try {
+              const subInserted = await seedSubscription(agentConfig.name, sub);
+              if (subInserted) loggerRegistry.info(`[long-tail] subscription seeded: ${agentConfig.name}/${sub.topic}`);
+            } catch (subErr: any) {
+              loggerRegistry.warn(`[long-tail] subscription seed failed: ${agentConfig.name}/${sub.topic}: ${subErr.message}`);
             }
           }
         }

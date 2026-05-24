@@ -139,9 +139,9 @@ export function McpRunsPage() {
     return [...set].sort();
   }, [appIdData?.app_ids, nsData?.namespaces]);
 
-  // Default: URL param > 'longtail' (if exists) > first in list
-  const defaultNamespace = allNamespaceNames.includes('longtail')
-    ? 'longtail'
+  // Default: URL param > 'hmsh' (if exists) > first in list
+  const defaultNamespace = allNamespaceNames.includes('hmsh')
+    ? 'hmsh'
     : allNamespaceNames[0] ?? '';
   const activeNamespace = filters.namespace || defaultNamespace;
   const { data: entitiesData } = useMcpEntities(activeNamespace);

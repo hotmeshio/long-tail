@@ -232,7 +232,7 @@ function inferCategory(topic: string): string {
 export async function seedSystemTopics(): Promise<void> {
   for (const def of SYSTEM_TOPICS) {
     try {
-      const inserted = await seedTopic({
+      await resetTopic({
         topic: def.topic,
         description: def.description ?? '',
         category: def.category ?? inferCategory(def.topic),
@@ -241,7 +241,7 @@ export async function seedSystemTopics(): Promise<void> {
         source: 'system',
         tags: def.tags ?? [],
       });
-      if (inserted) loggerRegistry.info(`[long-tail] topic seeded: ${def.topic}`);
+      loggerRegistry.info(`[long-tail] topic seeded: ${def.topic}`);
     } catch (err: any) {
       loggerRegistry.warn(`[long-tail] topic seed failed for ${def.topic}: ${err.message}`);
     }

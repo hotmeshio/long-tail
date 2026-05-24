@@ -6,7 +6,10 @@ export const LIST_TOPICS = `
     SELECT COUNT(*)::int AS sub_count
     FROM lt_agent_subscriptions
     WHERE enabled = true
-      AND (topic = t.topic OR topic LIKE '%>%' OR topic LIKE '%*%')
+      AND (
+        topic = t.topic
+        OR t.topic LIKE REPLACE(REPLACE(topic, '*', '%'), '>', '%')
+      )
   ) s ON true
   WHERE ($1::text IS NULL OR t.category = $1)
     AND ($2::text IS NULL OR t.topic ILIKE '%' || $2 || '%' OR t.description ILIKE '%' || $2 || '%')
@@ -78,9 +81,13 @@ export const RESET_TOPIC = `
 
 export const LIST_SUBSCRIBERS = `
   SELECT s.id, s.agent_id, s.topic, s.reaction_type,
-    a.name AS agent_name
+    a.id AS agent_name
   FROM lt_agent_subscriptions s
   JOIN lt_agents a ON s.agent_id = a.id
   WHERE s.enabled = true AND a.status = 'active'
+    AND (
+      s.topic = $1
+      OR $1 LIKE REPLACE(REPLACE(s.topic, '*', '%'), '>', '%')
+    )
   ORDER BY s.created_at
 `;

@@ -1,5 +1,4 @@
 import { getPool } from '../../lib/db';
-import { subjectMatchesPattern } from '../../lib/events/matching';
 import {
   LIST_TOPICS,
   COUNT_TOPICS,
@@ -65,11 +64,7 @@ export async function getTopic(topic: string): Promise<(TopicCatalogEntry & { su
   const { rows } = await pool.query(GET_TOPIC, [topic]);
   if (!rows[0]) return null;
 
-  // Find all active subscriptions whose pattern matches this topic
-  const { rows: allSubs } = await pool.query(LIST_SUBSCRIBERS);
-  const subscribers = allSubs.filter(
-    (sub: any) => subjectMatchesPattern(topic, sub.topic),
-  );
+  const { rows: subscribers } = await pool.query(LIST_SUBSCRIBERS, [topic]);
 
   return { ...rows[0], subscribers };
 }

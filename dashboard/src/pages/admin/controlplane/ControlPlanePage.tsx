@@ -181,7 +181,7 @@ export function ControlPlanePage() {
   return (
     <div>
       <PageHeaderWithStats
-        title="Task Queues"
+        title="Queues"
         docsHash="#docs:dashboard.md:task-queues"
         stats={headerStats}
         actions={<EmergencyControls />}

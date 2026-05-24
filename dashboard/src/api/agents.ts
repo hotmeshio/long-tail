@@ -26,8 +26,8 @@ export interface AgentBehaviors {
 }
 
 export interface Agent {
+  /** Agent identifier — human-readable kebab-case name (e.g. 'content-triage') */
   id: string;
-  name: string;
   description?: string;
   status: 'inactive' | 'active' | 'paused' | 'error';
   user_id?: string;
@@ -87,7 +87,7 @@ export function useAgent(id: string | null) {
 
 export function useCreateAgent() {
   const queryClient = useQueryClient();
-  return useMutation<Agent, Error, Partial<Agent> & { name: string }>({
+  return useMutation<Agent, Error, Partial<Agent> & { id: string }>({
     mutationFn: (body) =>
       apiFetch('/agents', {
         method: 'POST',

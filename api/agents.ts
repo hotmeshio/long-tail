@@ -26,7 +26,7 @@ export async function getAgent(input: { id: string }): Promise<LTApiResult> {
 }
 
 export async function createAgent(
-  input: { name: string; [key: string]: any },
+  input: { id: string; [key: string]: any },
   _auth?: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -34,7 +34,7 @@ export async function createAgent(
     return { status: 201, data: agent };
   } catch (err: any) {
     if (err.code === '23505') {
-      return { status: 409, error: `Agent "${input.name}" already exists` };
+      return { status: 409, error: `Agent "${input.id}" already exists` };
     }
     return { status: 500, error: err.message };
   }

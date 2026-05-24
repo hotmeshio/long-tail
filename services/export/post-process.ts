@@ -133,16 +133,20 @@ export function postProcessExecution(execution: WorkflowExecution): WorkflowExec
     }
   }
 
-  if (toAdd.length === 0 && !enriched) return execution;
-
-  if (toAdd.length === 0) {
-    return { ...execution, events };
+  if (toAdd.length > 0) {
+    events.push(...toAdd);
   }
 
-  events.push(...toAdd);
-
-  // Re-sort chronologically and re-number
+  // Sort by execution_index first — it reflects the true workflow sequence.
+  // Timestamps are unreliable for ordering (e.g. signal_wait_started gets
+  // the workflow start time). Fall back to timestamp only when index is absent.
   events.sort((a, b) => {
+    const idxA = (a.attributes as any).execution_index ?? -1;
+    const idxB = (b.attributes as any).execution_index ?? -1;
+    if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+    if (idxA !== -1 && idxB === -1) return 1;  // indexed after non-indexed (workflow_started)
+    if (idxA === -1 && idxB !== -1) return -1;
+    // Same index (scheduled/completed pairs) — sort by timestamp
     const cmp = a.event_time.localeCompare(b.event_time);
     return cmp !== 0 ? cmp : a.event_id - b.event_id;
   });

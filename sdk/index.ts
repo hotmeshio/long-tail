@@ -236,6 +236,7 @@ export function createClient(options: LTClientOptions = {}) {
       rollCall: controlplaneApi.rollCall,
       throttle: controlplaneApi.applyThrottle,
       getStreamStats: controlplaneApi.getStreamStats,
+      listStreamMessages: controlplaneApi.listStreamMessages,
       subscribe: controlplaneApi.subscribeMesh,
     },
 
