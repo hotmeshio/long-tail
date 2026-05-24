@@ -105,9 +105,15 @@ function assembleExport(
   const completed = events.filter((e) => e.event_type === 'activity_task_completed').length;
   const failed = events.filter((e) => e.event_type === 'activity_task_failed').length;
 
+  // Derive close_time from the last event when available — meta.ju (job updated)
+  // often equals meta.jc (job created), producing 0ms duration.
+  const lastEventTime = events.length > 0 ? events[events.length - 1].event_time : null;
+  const closeTime = lastEventTime || ctx.closeTime || null;
+  const startTime = ctx.startTime || null;
+
   let durationMs: number | null = null;
-  if (ctx.startTime && ctx.closeTime) {
-    const diff = new Date(ctx.closeTime).getTime() - new Date(ctx.startTime).getTime();
+  if (startTime && closeTime) {
+    const diff = new Date(closeTime).getTime() - new Date(startTime).getTime();
     if (diff >= 0) durationMs = diff;
   }
 
@@ -117,8 +123,8 @@ function assembleExport(
     workflow_name: ctx.workflowName,
     task_queue: ctx.appId,
     status: ctx.job.status > 0 ? 'running' : ctx.job.status === 0 ? 'completed' : 'failed',
-    start_time: ctx.startTime || null,
-    close_time: ctx.closeTime || null,
+    start_time: startTime,
+    close_time: closeTime,
     duration_ms: durationMs,
     trace_id: ctx.traceId,
     result: ctx.workflowResult,
