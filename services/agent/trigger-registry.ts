@@ -172,7 +172,7 @@ class AgentTriggerRegistry {
       .update(`${event.timestamp}:${event.type}:${JSON.stringify(event.data ?? {})}`)
       .digest('hex')
       .slice(0, 12);
-    return `agent-${sub.agent_id.slice(0, 8)}-${sub.id.slice(0, 8)}-${uniquePart}`;
+    return `agent-${sub.agent_id}-${sub.id.slice(0, 8)}-${uniquePart}`;
   }
 
   private async executeReaction(

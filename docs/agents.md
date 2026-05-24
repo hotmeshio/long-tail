@@ -36,7 +36,7 @@ An agent without motivation is pure automation. An agent with motivation has jud
 
 ## knowledge
 
-Assign a knowledge domain — the agent's memory. It stores context here over time, learning from every interaction.
+Assign a knowledge domain — the agent's memory. It stores context here over time.
 
 Knowledge domains are shared — multiple agents can read from the same domain. But typically one agent owns a domain and accumulates into it, while others read from it.
 

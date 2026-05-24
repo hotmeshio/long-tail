@@ -2,6 +2,7 @@ import * as controlplane from '../services/controlplane';
 import { eventRegistry } from '../lib/events';
 import type { LTEvent } from '../types';
 import type { LTApiResult } from '../types/sdk';
+import type { StreamMessageSource, StreamMessageStatus } from '../services/controlplane/types';
 
 /**
  * List all registered application namespaces.
@@ -132,6 +133,57 @@ export async function subscribeMesh(input: {
     const appId = input.appId || 'durable';
     await controlplane.subscribeMesh(appId);
     return { status: 200, data: { subscribed: true, appId } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Browse stream messages across engine and worker streams.
+ *
+ * Returns paginated, filterable, sortable results from the Postgres
+ * engine_streams and worker_streams tables. Messages are schema-isolated
+ * by namespace.
+ *
+ * @param input.namespace — Postgres schema (required, e.g. "durable")
+ * @param input.limit — page size (1–100, default 25)
+ * @param input.offset — pagination offset (default 0)
+ * @param input.sort_by — sort column: created_at, stream_name, priority, id
+ * @param input.order — sort direction: asc | desc (default desc)
+ * @param input.source — filter by source: engine | worker (default all)
+ * @param input.status — filter by status: pending | claimed | processed | dead_lettered
+ * @param input.stream_name — partial match on stream name (ILIKE)
+ * @param input.msg_type — filter by message type (worker streams only)
+ */
+export async function listStreamMessages(input: {
+  namespace: string;
+  source: string;
+  limit?: number;
+  offset?: number;
+  sort_by?: string;
+  order?: 'asc' | 'desc';
+  status?: StreamMessageStatus | null;
+  stream_name?: string | null;
+  msg_type?: string | null;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.namespace) {
+      return { status: 400, error: 'namespace is required' };
+    }
+    if (input.source !== 'engine' && input.source !== 'worker') {
+      return { status: 400, error: 'source is required (engine or worker)' };
+    }
+    const result = await controlplane.getStreamMessages(input.namespace, {
+      source: input.source,
+      limit: input.limit,
+      offset: input.offset,
+      sort_by: input.sort_by,
+      order: input.order,
+      status: input.status,
+      stream_name: input.stream_name,
+      msg_type: input.msg_type,
+    });
+    return { status: 200, data: result };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

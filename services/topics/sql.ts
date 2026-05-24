@@ -78,7 +78,7 @@ export const RESET_TOPIC = `
 
 export const LIST_SUBSCRIBERS = `
   SELECT s.id, s.agent_id, s.topic, s.reaction_type,
-    a.name AS agent_name
+    a.id AS agent_name
   FROM lt_agent_subscriptions s
   JOIN lt_agents a ON s.agent_id = a.id
   WHERE s.enabled = true AND a.status = 'active'

@@ -69,7 +69,6 @@ vi.mock('../../services/agent/trigger-registry', () => ({
 
 vi.mock('../../services/agent', () => ({
   seedAgent: vi.fn().mockResolvedValue(false),
-  getAgentByName: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../../services/agent/subscriptions', () => ({
@@ -129,7 +128,7 @@ vi.mock('../../services/iam/bots', () => ({
 import { startWorkers, collectWorkers } from '../../start/workers';
 import { registerWorker, getRegisteredWorkers } from '../../services/workers/registry';
 import { eventRegistry } from '../../lib/events';
-import { seedAgent, getAgentByName } from '../../services/agent';
+import { seedAgent } from '../../services/agent';
 import { seedSubscription } from '../../services/agent/subscriptions';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -302,7 +301,7 @@ describe('startWorkers — agent schedule seeding', () => {
 
     expect(seedAgent).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: 'health-bot',
+        id: 'health-bot',
         description: 'Monitors health',
         status: 'active',
         behaviors: expect.objectContaining({
@@ -317,9 +316,8 @@ describe('startWorkers — agent schedule seeding', () => {
     );
   });
 
-  it('seeds agent subscriptions when agent exists', async () => {
+  it('seeds agent subscriptions using agent name as id', async () => {
     (seedAgent as any).mockResolvedValueOnce(true);
-    (getAgentByName as any).mockResolvedValueOnce({ id: 'agent-123', name: 'event-bot' });
 
     const config = {
       ...baseConfig,
@@ -335,7 +333,7 @@ describe('startWorkers — agent schedule seeding', () => {
 
     await startWorkers(config as any, [], {});
 
-    expect(seedSubscription).toHaveBeenCalledWith('agent-123', expect.objectContaining({
+    expect(seedSubscription).toHaveBeenCalledWith('event-bot', expect.objectContaining({
       topic: 'workflow.failed',
       reaction_type: 'durable',
       workflow_type: 'basicEcho',

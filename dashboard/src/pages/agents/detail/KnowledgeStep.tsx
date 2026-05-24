@@ -17,7 +17,7 @@ export function KnowledgeStep({ form, set }: Props) {
     <div className="space-y-6">
       <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between">
         <p className="text-[12px] text-text-secondary italic leading-relaxed">
-          Assign a knowledge domain — the agent's memory. It stores context here over time, learning from every interaction.
+          Assign a knowledge domain — the agent's memory. It stores context here over time.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:knowledge'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Knowledge"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
       </div>

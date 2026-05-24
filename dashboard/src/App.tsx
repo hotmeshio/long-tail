@@ -114,6 +114,9 @@ const MaintenancePage = lazy(() =>
 const ControlPlanePage = lazy(() =>
   import('./pages/admin/controlplane').then((m) => ({ default: m.ControlPlanePage })),
 );
+const StreamMessagesPage = lazy(() =>
+  import('./pages/admin/streams').then((m) => ({ default: m.StreamMessagesPage })),
+);
 // BotsPage is now embedded in the unified Accounts page (UsersPage)
 const CredentialsPage = lazy(() =>
   import('./pages/settings/CredentialsPage').then((m) => ({ default: m.CredentialsPage })),
@@ -298,6 +301,7 @@ const router = createBrowserRouter([
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
           { path: 'admin/controlplane', element: <Lazy><ControlPlanePage /></Lazy> },
+          { path: 'admin/streams', element: <Lazy><StreamMessagesPage /></Lazy> },
         ],
       },
     ],

@@ -25,8 +25,7 @@ Returns agents with subscription counts and topic lists (via JOIN).
 {
   "agents": [
     {
-      "id": "uuid",
-      "name": "health-monitor",
+      "id": "health-monitor",
       "description": "Watches for workflow failures",
       "status": "active",
       "knowledge_domain": "system-health",
@@ -53,8 +52,7 @@ Returns an agent with aggregated stats (knowledge entry count, escalation count)
 
 ```json
 {
-  "id": "uuid",
-  "name": "health-monitor",
+  "id": "health-monitor",
   "stats": { "knowledge_count": 3, "escalation_count": 0 },
   ...
 }
@@ -70,7 +68,7 @@ POST /api/agents
 
 ```json
 {
-  "name": "health-monitor",
+  "id": "health-monitor",
   "description": "Watches for workflow failures and schema drift",
   "goals": "Detect failures early, capture diagnostics",
   "rules": "Never auto-restart failed workflows",
@@ -86,7 +84,7 @@ POST /api/agents
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | `string` | Yes | Unique kebab-case identifier |
+| `id` | `string` | Yes | Unique kebab-case identifier (e.g. `health-monitor`). Serves as primary key. |
 | `description` | `string` | No | One-sentence summary |
 | `goals` | `string` | No | Agent's primary motivation |
 | `rules` | `string` | No | Guardrails and constraints |
@@ -136,7 +134,7 @@ GET /api/agents/:agentId/subscriptions
   "subscriptions": [
     {
       "id": "uuid",
-      "agent_id": "uuid",
+      "agent_id": "health-monitor",
       "topic": "workflow.failed",
       "filter": { "status": 422 },
       "reaction_type": "durable",

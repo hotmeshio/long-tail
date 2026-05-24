@@ -114,6 +114,103 @@ describe('Control plane routes', () => {
     });
   });
 
+  describe('GET /api/controlplane/stream-messages', () => {
+    it('returns 401 without auth', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker`);
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 for member role', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker`, {
+        headers: authHeaders(ctx.memberToken),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 400 when namespace is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?source=worker`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('namespace');
+    });
+
+    it('returns 400 when source is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('source');
+    });
+
+    it('returns 400 when source is invalid', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=both`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('source');
+    });
+
+    it('returns messages array and total for admin (worker)', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body).toHaveProperty('messages');
+      expect(Array.isArray(body.messages)).toBe(true);
+      expect(typeof body.total).toBe('number');
+      for (const msg of body.messages) {
+        expect(msg.source).toBe('worker');
+      }
+    });
+
+    it('returns messages array and total for admin (engine)', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=engine`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body).toHaveProperty('messages');
+      expect(Array.isArray(body.messages)).toBe(true);
+      for (const msg of body.messages) {
+        expect(msg.source).toBe('engine');
+      }
+    });
+
+    it('respects limit and offset parameters', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker&limit=5&offset=0`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.messages.length).toBeLessThanOrEqual(5);
+    });
+
+    it('filters by status', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker&status=processed`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      for (const msg of body.messages) {
+        expect(msg.status).toBe('processed');
+      }
+    });
+
+    it('supports sort_by and order parameters', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker&sort_by=priority&order=asc`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body).toHaveProperty('messages');
+    });
+  });
+
   describe('POST /api/controlplane/subscribe', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/subscribe`, {

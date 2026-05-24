@@ -113,7 +113,7 @@ export function agentToForm(
       : [];
 
   return {
-    name: agent.name,
+    name: agent.id,
     description: agent.description ?? '',
     goals: agent.goals ?? '',
     rules: agent.rules ?? '',
@@ -152,7 +152,7 @@ export function formToAgentPayload(form: AgentFormState): Record<string, any> {
   }
 
   return {
-    name: form.name,
+    id: form.name,
     description: form.description || undefined,
     goals: form.goals || undefined,
     rules: form.rules || undefined,

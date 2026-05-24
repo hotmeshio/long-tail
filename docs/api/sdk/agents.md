@@ -26,18 +26,18 @@ Each agent includes `subscription_count` and `sub_topics[]` from a JOIN on `lt_a
 Get a single agent with stats.
 
 ```typescript
-const result = await lt.agents.get({ id: 'uuid' });
+const result = await lt.agents.get({ id: 'health-monitor' });
 ```
 
 **Returns:** `LTApiResult<LTAgent & { stats: LTAgentStats }>`
 
 ## create
 
-Create an agent.
+Create an agent. The `id` is the agent's human-readable name (kebab-case, URL-safe) and serves as the primary key.
 
 ```typescript
 const result = await lt.agents.create({
-  name: 'health-monitor',
+  id: 'health-monitor',
   description: 'Watches for workflow failures',
   goals: 'Detect failures early',
   rules: 'Never auto-restart',
@@ -58,7 +58,7 @@ const result = await lt.agents.create({
 Partial update. Changing `status` or `behaviors` automatically restarts event subscriptions and cron schedules.
 
 ```typescript
-await lt.agents.update({ id: 'uuid', status: 'paused' });
+await lt.agents.update({ id: 'health-monitor', status: 'paused' });
 ```
 
 **Returns:** `LTApiResult<LTAgent>`
@@ -68,7 +68,7 @@ await lt.agents.update({ id: 'uuid', status: 'paused' });
 Delete an agent. Stops subscriptions and schedules. Knowledge and workflow history preserved.
 
 ```typescript
-await lt.agents.delete({ id: 'uuid' });
+await lt.agents.delete({ id: 'health-monitor' });
 ```
 
 **Returns:** `LTApiResult<{ deleted: true }>`

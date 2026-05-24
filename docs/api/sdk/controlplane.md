@@ -84,6 +84,42 @@ const result = await lt.controlplane.getStreamStats({ app_id: 'durable', duratio
 
 ---
 
+## listStreamMessages
+
+Browse messages from a single stream table. Engine and worker streams are separate tables with different schemas — both `namespace` and `source` are required.
+
+```typescript
+const result = await lt.controlplane.listStreamMessages({
+  namespace: 'durable',
+  source: 'worker',
+  limit: 25,
+  offset: 0,
+  sort_by: 'created_at',
+  order: 'desc',
+  status: 'pending',
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `namespace` | `string` | **Yes** | Postgres schema / application namespace |
+| `source` | `string` | **Yes** | Stream type: `engine` or `worker` |
+| `limit` | `number` | No | Page size, 1–100 (default `25`) |
+| `offset` | `number` | No | Pagination offset (default `0`) |
+| `sort_by` | `string` | No | Sort column: `created_at`, `stream_name`, `priority`, `id` |
+| `order` | `string` | No | Sort direction: `asc` or `desc` (default `desc`) |
+| `status` | `string` | No | Filter: `pending`, `claimed`, `processed`, `dead_lettered` |
+| `stream_name` | `string` | No | Partial match on stream name |
+| `msg_type` | `string` | No | Filter by message type (worker streams only) |
+
+**Returns:** `LTApiResult<{ messages: StreamMessage[], total: number }>`
+
+**Auth:** Not required
+
+---
+
 ## subscribe
 
 Subscribe to mesh events for an application so they are captured and forwarded.

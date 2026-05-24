@@ -19,6 +19,7 @@ import * as pip from '../lib/cli/commands/pipelines';
 import * as kb from '../lib/cli/commands/knowledge';
 import * as mcp from '../lib/cli/commands/mcp';
 import * as usr from '../lib/cli/commands/users';
+import * as streams from '../lib/cli/commands/streams';
 
 const pkg = require('../package.json');
 const envPath = path.resolve(process.cwd(), '.env');
@@ -228,6 +229,24 @@ usrCmd.command('list')
 usrCmd.command('get <id>')
   .option('--json', 'JSON output')
   .action(wrap(usr.getUser));
+
+// ── Streams ─────────────────────────────────────────────────────────────
+
+const streamsCmd = program.command('streams').description('Browse stream messages (admin)');
+
+streamsCmd.command('list')
+  .requiredOption('-n, --namespace <ns>', 'Schema namespace (e.g. durable)')
+  .requiredOption('-s, --source <source>', 'Stream type (engine or worker)')
+  .option('--status <status>', 'Filter by status (pending, claimed, processed, dead_lettered)')
+  .option('--stream <name>', 'Filter by stream name (partial match)')
+  .option('--type <type>', 'Filter by message type (worker only)')
+  .option('--limit <n>', 'Max results (default 25)')
+  .option('--offset <n>', 'Pagination offset')
+  .option('--sort <col>', 'Sort column (created_at, stream_name, priority, id)')
+  .option('--order <dir>', 'Sort direction (asc, desc)')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'IDs only')
+  .action(wrap(streams.listMessages));
 
 // ── Parse ────────────────────────────────────────────────────────────────
 

@@ -46,8 +46,8 @@ export interface AgentBehaviors {
 }
 
 export interface LTAgent {
+  /** Agent identifier — a human-readable kebab-case name (e.g. 'content-triage') */
   id: string;
-  name: string;
   description?: string;
   status: LTAgentStatus;
 

@@ -3,8 +3,7 @@
 -- behaviors, and goals atop existing primitives.
 
 CREATE TABLE IF NOT EXISTS lt_agents (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name              TEXT UNIQUE NOT NULL,
+  id                TEXT PRIMARY KEY,
   description       TEXT,
   status            TEXT NOT NULL DEFAULT 'inactive'
                       CHECK (status IN ('inactive', 'active', 'paused', 'error')),

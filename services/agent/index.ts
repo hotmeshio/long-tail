@@ -6,7 +6,6 @@ import {
   LIST_AGENTS,
   COUNT_AGENTS,
   GET_AGENT,
-  GET_AGENT_BY_NAME,
   INSERT_AGENT,
   UPDATE_AGENT,
   DELETE_AGENT,
@@ -48,18 +47,12 @@ export async function getAgent(id: string): Promise<LTAgent | null> {
   return rows[0] ?? null;
 }
 
-export async function getAgentByName(name: string): Promise<LTAgent | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(GET_AGENT_BY_NAME, [name]);
-  return rows[0] ?? null;
-}
-
 export async function createAgent(
-  data: Partial<LTAgent> & { name: string },
+  data: Partial<LTAgent> & { id: string },
 ): Promise<LTAgent> {
   const pool = getPool();
   const { rows } = await pool.query(INSERT_AGENT, [
-    data.name,
+    data.id,
     data.description ?? null,
     data.status ?? 'inactive',
     data.user_id ?? null,
@@ -84,7 +77,6 @@ export async function updateAgent(
   const oldAgent = data.status ? await getAgent(id) : null;
   const { rows } = await pool.query(UPDATE_AGENT, [
     id,
-    data.name ?? null,
     data.description ?? null,
     data.status ?? null,
     data.user_id ?? null,
@@ -103,7 +95,7 @@ export async function updateAgent(
     publishAgentEvent({
       type: 'agent.status_changed',
       agentId: updated.id,
-      agentName: updated.name,
+      agentName: updated.id,
       status: updated.status,
       data: { previous: oldAgent.status },
     });
@@ -139,11 +131,11 @@ export async function deleteAgent(id: string): Promise<boolean> {
  * but do not overwrite.
  */
 export async function seedAgent(
-  data: Partial<LTAgent> & { name: string },
+  data: Partial<LTAgent> & { id: string },
 ): Promise<boolean> {
   const pool = getPool();
   const { rowCount } = await pool.query(SEED_AGENT, [
-    data.name,
+    data.id,
     data.description ?? null,
     data.status ?? 'inactive',
     data.user_id ?? null,
@@ -160,14 +152,14 @@ export async function seedAgent(
   const inserted = (rowCount ?? 0) > 0;
 
   if (!inserted) {
-    const existing = await getAgentByName(data.name);
+    const existing = await getAgent(data.id);
     if (existing) {
       const drifts: string[] = [];
       if (data.description && existing.description !== data.description) drifts.push('description');
       if (data.status && existing.status !== data.status) drifts.push('status');
       if (data.knowledge_domain && existing.knowledge_domain !== data.knowledge_domain) drifts.push('knowledge_domain');
       if (drifts.length) {
-        loggerRegistry.warn(`[long-tail] agent drift: ${data.name} — ${drifts.join(', ')} differ between code and DB`);
+        loggerRegistry.warn(`[long-tail] agent drift: ${data.id} — ${drifts.join(', ')} differ between code and DB`);
       }
     }
   }

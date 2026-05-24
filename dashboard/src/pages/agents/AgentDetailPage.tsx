@@ -90,7 +90,7 @@ export function AgentDetailPage() {
 
   const handlePause = () => {
     const msg = [
-      `Pause "${agent.name}"?`,
+      `Pause "${agent.id}"?`,
       '',
       'This will:',
       subs.length > 0 ? `• Stop ${subs.length} event subscription${subs.length !== 1 ? 's' : ''}` : null,
@@ -103,7 +103,7 @@ export function AgentDetailPage() {
 
   const handleDelete = () => {
     const msg = [
-      `Delete "${agent.name}"?`,
+      `Delete "${agent.id}"?`,
       '',
       'This permanently removes:',
       '• The agent configuration',
@@ -120,7 +120,7 @@ export function AgentDetailPage() {
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-light text-text-primary">Agent: {agent.name}</h1>
+          <h1 className="text-3xl font-light text-text-primary">Agent: {agent.id}</h1>
           <button onClick={() => { window.location.hash = '#docs:agents.md'; }} className="text-text-quaternary hover:text-accent transition-colors mt-1" title="Agent docs">
             <BookOpen className="w-4 h-4" strokeWidth={1.5} />
           </button>

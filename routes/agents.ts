@@ -34,9 +34,9 @@ router.get('/:id', async (req, res) => {
  * Create a new agent.
  */
 router.post('/', async (req, res) => {
-  const { name } = req.body;
-  if (!name) {
-    res.status(400).json({ error: 'name is required' });
+  const { id } = req.body;
+  if (!id) {
+    res.status(400).json({ error: 'id is required (kebab-case agent name, e.g. "content-triage")' });
     return;
   }
   const auth = { userId: (req as any).userId, roles: (req as any).roles };

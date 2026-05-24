@@ -81,7 +81,7 @@ export function JsonViewer({
   const [fullscreen, setFullscreen] = useState(false);
   // Bumping generation forces all JsonNodes to re-evaluate collapse state.
   // Even (incl. 0) = collapsed, odd = fully expanded.
-  const [generation, setGeneration] = useState(defaultCollapsed ? 0 : 0);
+  const [generation, setGeneration] = useState(defaultCollapsed ? 0 : 1);
   // Separate generation for fullscreen (always starts expanded)
   const [fsGeneration, setFsGeneration] = useState(1);
   const isGlobalCollapsed = generation % 2 === 0;

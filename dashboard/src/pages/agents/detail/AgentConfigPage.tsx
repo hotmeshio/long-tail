@@ -115,7 +115,7 @@ export function AgentConfigPage() {
   return (
     <div>
       <PageHeader
-        title={isNew ? 'New Agent' : `Agent: ${existing?.name ?? ''}`}
+        title={isNew ? 'New Agent' : `Agent: ${existing?.id ?? ''}`}
         docsHash="#docs:agents.md"
       />
 
