@@ -1,3 +1,4 @@
+import { Filter } from 'lucide-react';
 import type { StreamMessage } from '../../../api/stream-messages';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import { DateValue } from '../../../components/common/display/DateValue';
@@ -26,6 +27,38 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
+/** A field value that can be clicked to filter the master list. */
+function FilterableField({ label, value, onFilter }: {
+  label: string;
+  value: string | null | undefined;
+  onFilter?: (value: string) => void;
+}) {
+  if (!value) return null;
+  return (
+    <div>
+      <span className="text-text-tertiary">{label}</span>
+      <button
+        onClick={() => onFilter?.(value)}
+        className="flex items-center gap-1 group text-left w-full"
+        title={`Filter by ${label.toLowerCase()}: ${value}`}
+      >
+        <p className="text-xs text-text-primary font-mono break-all group-hover:text-accent transition-colors">{value}</p>
+        <Filter className="w-2.5 h-2.5 shrink-0 text-text-quaternary opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+    </div>
+  );
+}
+
+export interface StreamMessageDetailFilters {
+  onFilterStatus?: (value: string) => void;
+  onFilterStreamName?: (value: string) => void;
+  onFilterMsgType?: (value: string) => void;
+  onFilterTopic?: (value: string) => void;
+  onFilterWorkflow?: (value: string) => void;
+  onFilterJid?: (value: string) => void;
+  onFilterAid?: (value: string) => void;
+}
+
 /**
  * Standard stream message detail view.
  *
@@ -34,7 +67,10 @@ function Field({ label, value }: { label: string; value: string | null | undefin
  * timestamp formatting (via DateValue with ms/UTC/local tooltip), and
  * payload viewer are the standard.
  */
-export function StreamMessageDetail({ message }: { message: StreamMessage | null }) {
+export function StreamMessageDetail({ message, filters }: {
+  message: StreamMessage | null;
+  filters?: StreamMessageDetailFilters;
+}) {
   if (!message) return null;
 
   return (
@@ -43,12 +79,18 @@ export function StreamMessageDetail({ message }: { message: StreamMessage | null
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[message.status]}`} />
-          <span className="text-xs font-medium text-text-primary">
-            {STATUS_LABEL[message.status]}
-          </span>
+          <FilterableField
+            label=""
+            value={STATUS_LABEL[message.status]}
+            onFilter={() => filters?.onFilterStatus?.(message.status)}
+          />
           <span className={SOURCE_BADGE}>{message.source}</span>
         </div>
-        <p className="text-xs font-mono text-text-secondary break-all mt-1">{message.stream_name}</p>
+        <FilterableField
+          label=""
+          value={message.stream_name}
+          onFilter={() => filters?.onFilterStreamName?.(message.stream_name)}
+        />
         <p className="text-[10px] text-text-tertiary mt-0.5">ID: {message.id}</p>
       </div>
 
@@ -73,17 +115,17 @@ export function StreamMessageDetail({ message }: { message: StreamMessage | null
         </div>
       </div>
 
-      {/* Worker-specific fields */}
+      {/* Worker-specific fields — clickable to filter */}
       {message.source === 'worker' && (
         <div className="space-y-2">
           <SectionLabel>Worker Details</SectionLabel>
           <div className="grid grid-cols-1 gap-2">
-            <Field label="Workflow" value={message.workflow_name} />
-            <Field label="Job ID" value={message.jid} />
-            <Field label="Activity" value={message.aid} />
+            <FilterableField label="Workflow" value={message.workflow_name} onFilter={filters?.onFilterWorkflow} />
+            <FilterableField label="Job ID" value={message.jid} onFilter={filters?.onFilterJid} />
+            <FilterableField label="Activity" value={message.aid} onFilter={filters?.onFilterAid} />
             <Field label="Dimension" value={message.dad} />
-            <Field label="Type" value={message.msg_type} />
-            <Field label="Topic" value={message.topic} />
+            <FilterableField label="Type" value={message.msg_type} onFilter={filters?.onFilterMsgType} />
+            <FilterableField label="Topic" value={message.topic} onFilter={filters?.onFilterTopic} />
           </div>
         </div>
       )}

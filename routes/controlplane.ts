@@ -80,6 +80,10 @@ router.get('/stream-messages', requireAdmin, async (req, res) => {
     status: (req.query.status as any) || undefined,
     stream_name: (req.query.stream_name as string) || undefined,
     msg_type: (req.query.msg_type as string) || undefined,
+    topic: (req.query.topic as string) || undefined,
+    workflow_name: (req.query.workflow_name as string) || undefined,
+    jid: (req.query.jid as string) || undefined,
+    aid: (req.query.aid as string) || undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

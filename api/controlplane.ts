@@ -165,6 +165,10 @@ export async function listStreamMessages(input: {
   status?: StreamMessageStatus | null;
   stream_name?: string | null;
   msg_type?: string | null;
+  topic?: string | null;
+  workflow_name?: string | null;
+  jid?: string | null;
+  aid?: string | null;
 }): Promise<LTApiResult> {
   try {
     if (!input.namespace) {
@@ -182,6 +186,10 @@ export async function listStreamMessages(input: {
       status: input.status,
       stream_name: input.stream_name,
       msg_type: input.msg_type,
+      topic: input.topic,
+      workflow_name: input.workflow_name,
+      jid: input.jid,
+      aid: input.aid,
     });
     return { status: 200, data: result };
   } catch (err: any) {

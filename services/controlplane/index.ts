@@ -154,10 +154,14 @@ export async function getStreamMessages(
   const streamName = params.stream_name ? `%${params.stream_name}%` : null;
   const status = params.status ?? null;
   const msgType = params.msg_type ?? null;
+  const topic = params.topic ?? null;
+  const workflowName = params.workflow_name ?? null;
+  const jid = params.jid ?? null;
+  const aid = params.aid ?? null;
 
   const pool = getPool();
-  const queryParams = [streamName, status, msgType, limit, offset];
-  const countParams = [streamName, status, msgType];
+  const queryParams = [streamName, status, msgType, topic, workflowName, jid, aid, limit, offset];
+  const countParams = [streamName, status, msgType, topic, workflowName, jid, aid];
 
   const [messagesRes, countRes] = await Promise.all([
     pool.query<StreamMessage>(

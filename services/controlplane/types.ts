@@ -49,6 +49,11 @@ export interface StreamMessagesParams {
   stream_name?: string | null;
   status?: StreamMessageStatus | null;
   msg_type?: string | null;
+  /** Worker-only filters */
+  topic?: string | null;
+  workflow_name?: string | null;
+  jid?: string | null;
+  aid?: string | null;
 }
 
 export interface StreamMessagesResult {

@@ -44,6 +44,10 @@ export interface StreamMessagesParams {
   status?: StreamMessageStatus | '';
   stream_name?: string;
   msg_type?: string;
+  topic?: string;
+  workflow_name?: string;
+  jid?: string;
+  aid?: string;
 }
 
 // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -59,6 +63,10 @@ function fetchStreamMessages(params: StreamMessagesParams) {
   if (params.status) qs.set('status', params.status);
   if (params.stream_name) qs.set('stream_name', params.stream_name);
   if (params.msg_type) qs.set('msg_type', params.msg_type);
+  if (params.topic) qs.set('topic', params.topic);
+  if (params.workflow_name) qs.set('workflow_name', params.workflow_name);
+  if (params.jid) qs.set('jid', params.jid);
+  if (params.aid) qs.set('aid', params.aid);
   return apiFetch<StreamMessagesResponse>(`/controlplane/stream-messages?${qs}`);
 }
 

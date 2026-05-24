@@ -109,7 +109,7 @@ describe('StreamMessagesPage', () => {
   it('renders page header', () => {
     mockApiFetch();
     render(<StreamMessagesPage />, { wrapper: createWrapper() });
-    expect(screen.getByText('Stream Messages')).toBeDefined();
+    expect(screen.getByText('Messages')).toBeDefined();
   });
 
   it('renders filter controls', () => {

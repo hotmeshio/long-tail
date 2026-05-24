@@ -226,6 +226,19 @@ This page is useful for verifying that workers started correctly after deploymen
 
 **API:** `GET /api/workers` lists active workers. `GET /api/workers/queues` lists queue statistics.
 
+### Messages
+
+Browse individual stream messages from the Postgres engine and worker stream tables. Messages are schema-isolated by namespace and separated by source (engine or worker).
+
+- **Namespace & Source** — required filters. Engine streams carry internal orchestration messages; worker streams carry task messages with workflow metadata (job ID, activity, message type).
+- **Filters** — narrow by status (pending, claimed, processed, dead-lettered) and stream name (partial match).
+- **Message detail** — click any row to open the inspector panel. Shows timestamps, retry info, worker metadata, and the full JSON payload with expandable tree view.
+- **Pagination & sorting** — standard controls. Sort by created time, stream name, or priority.
+
+Messages are read-only. Status is derived from timestamps: pending (no timestamps set), claimed (reserved), processed (expired), or dead-lettered.
+
+**API:** `GET /api/controlplane/stream-messages?namespace=durable&source=worker` with optional `status`, `stream_name`, `sort_by`, `order`, `limit`, `offset` parameters.
+
 ### All Escalations
 
 The central queue for all escalation activity across every workflow.

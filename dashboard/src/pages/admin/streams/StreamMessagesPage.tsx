@@ -9,12 +9,13 @@ import { StickyPagination } from '../../../components/common/data/StickyPaginati
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { TimestampCell } from '../../../components/common/display/TimestampCell';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { StreamMessageDetail } from './StreamMessageDetail';
 import { STATUS_DOT, STATUS_LABEL, STATUS_OPTIONS, SOURCE_OPTIONS, SOURCE_BADGE } from './constants';
 
 export function StreamMessagesPage() {
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { namespace: 'durable', source: 'worker', status: '', stream_name: '', msg_type: '' },
+    filters: { namespace: 'durable', source: 'worker', status: '', stream_name: '', msg_type: '', topic: '', workflow_name: '', jid: '', aid: '' },
   });
 
   const [selected, setSelected] = useState<StreamMessage | null>(null);
@@ -25,7 +26,7 @@ export function StreamMessagesPage() {
     [appsData],
   );
 
-  const { data, isLoading } = useStreamMessages({
+  const { data, isLoading, refetch, isFetching } = useStreamMessages({
     namespace: filters.namespace || 'durable',
     source: (filters.source as 'engine' | 'worker') || 'worker',
     limit: pagination.pageSize,
@@ -35,6 +36,10 @@ export function StreamMessagesPage() {
     status: (filters.status as any) || undefined,
     stream_name: filters.stream_name || undefined,
     msg_type: filters.msg_type || undefined,
+    topic: filters.topic || undefined,
+    workflow_name: filters.workflow_name || undefined,
+    jid: filters.jid || undefined,
+    aid: filters.aid || undefined,
   });
 
   const messages = data?.messages ?? [];
@@ -123,9 +128,15 @@ export function StreamMessagesPage() {
 
   return (
     <div>
-      <PageHeader title="Stream Messages" />
+      <PageHeader title="Messages" docsHash="#docs:dashboard.md:messages" />
 
-      <FilterBar>
+      <FilterBar actions={
+        <ListToolbar
+          onRefresh={() => refetch()}
+          isFetching={isFetching}
+          apiPath={`/controlplane/stream-messages?namespace=${filters.namespace || 'durable'}&source=${filters.source || 'worker'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.status ? `&status=${filters.status}` : ''}${filters.stream_name ? `&stream_name=${filters.stream_name}` : ''}`}
+        />
+      }>
         <FilterSelect
           label="Namespace"
           value={filters.namespace}
@@ -152,6 +163,24 @@ export function StreamMessagesPage() {
           onChange={(v) => setFilter('stream_name', v)}
           placeholder="Filter by stream name…"
         />
+        {/* Active dimension filter pills — inline in the sticky bar */}
+        {[
+          { key: 'topic', label: 'Topic', value: filters.topic },
+          { key: 'workflow_name', label: 'Workflow', value: filters.workflow_name },
+          { key: 'jid', label: 'Job', value: filters.jid },
+          { key: 'aid', label: 'Activity', value: filters.aid },
+          { key: 'msg_type', label: 'Type', value: filters.msg_type },
+        ].filter((f) => f.value).map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key as any, '')}
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+            title={`Clear ${f.label} filter`}
+          >
+            {f.label}: {f.value}
+            <X className="w-2.5 h-2.5" />
+          </button>
+        ))}
       </FilterBar>
 
       <DataTable
@@ -189,7 +218,18 @@ export function StreamMessagesPage() {
             </button>
           </div>
           <div className="px-4 py-4">
-            <StreamMessageDetail message={activeMessage} />
+            <StreamMessageDetail
+              message={activeMessage}
+              filters={{
+                onFilterStatus: (v) => setFilter('status', v),
+                onFilterStreamName: (v) => setFilter('stream_name', v),
+                onFilterMsgType: (v) => setFilter('msg_type', v),
+                onFilterTopic: (v) => setFilter('topic', v),
+                onFilterWorkflow: (v) => setFilter('workflow_name', v),
+                onFilterJid: (v) => setFilter('jid', v),
+                onFilterAid: (v) => setFilter('aid', v),
+              }}
+            />
           </div>
         </div>,
         document.body,

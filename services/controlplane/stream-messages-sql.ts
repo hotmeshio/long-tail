@@ -37,6 +37,10 @@ const STATUS_CASE = `
  *   $1 = stream_name filter (NULL = all, otherwise ILIKE pattern)
  *   $2 = status filter (NULL = all, otherwise exact match)
  *   $3 = msg_type filter (NULL = all, worker-only)
+ *   $4 = topic filter (NULL = all, worker-only)
+ *   $5 = workflow_name filter (NULL = all, worker-only)
+ *   $6 = jid filter (NULL = all, worker-only)
+ *   $7 = aid filter (NULL = all, worker-only)
  */
 const WHERE_CLAUSE = `
   WHERE ($1::text IS NULL OR stream_name ILIKE $1)
@@ -45,7 +49,11 @@ const WHERE_CLAUSE = `
 const WORKER_WHERE_CLAUSE = `
   WHERE ($1::text IS NULL OR stream_name ILIKE $1)
     AND ($2::text IS NULL OR ${STATUS_CASE} = $2)
-    AND ($3::text IS NULL OR msg_type = $3)`;
+    AND ($3::text IS NULL OR msg_type = $3)
+    AND ($4::text IS NULL OR topic = $4)
+    AND ($5::text IS NULL OR workflow_name = $5)
+    AND ($6::text IS NULL OR jid = $6)
+    AND ($7::text IS NULL OR aid = $7)`;
 
 /**
  * List stream messages with pagination, filtering, and sorting.
@@ -53,7 +61,9 @@ const WORKER_WHERE_CLAUSE = `
  * Source is required — engine and worker streams are separate tables
  * with different schemas and must never be commingled in a single query.
  *
- * Parameters: $1 = stream_name, $2 = status, $3 = msg_type, $4 = limit, $5 = offset
+ * Parameters: $1 = stream_name, $2 = status, $3 = msg_type,
+ *             $4 = topic, $5 = workflow_name, $6 = jid, $7 = aid,
+ *             $8 = limit, $9 = offset
  */
 export function LIST_STREAM_MESSAGES(
   schema: string,
@@ -72,7 +82,11 @@ export function LIST_STREAM_MESSAGES(
         NULL AS dad, NULL AS msg_type, NULL AS topic
       FROM "${schema}".engine_streams
       ${WHERE_CLAUSE}
-        AND ($3::text IS NULL)`
+        AND ($3::text IS NULL)
+        AND ($4::text IS NULL)
+        AND ($5::text IS NULL)
+        AND ($6::text IS NULL)
+        AND ($7::text IS NULL)`
     : `SELECT
         id, 'worker' AS source, stream_name,
         message, ${STATUS_CASE} AS status,
@@ -86,7 +100,7 @@ export function LIST_STREAM_MESSAGES(
   return `
     SELECT * FROM (${select}) AS q
     ORDER BY ${sortColumn} ${sortOrder}, id DESC
-    LIMIT $4::int OFFSET $5::int`;
+    LIMIT $8::int OFFSET $9::int`;
 }
 
 /**
@@ -100,7 +114,7 @@ export function COUNT_STREAM_MESSAGES(
 ): string {
   const table = source === 'engine' ? 'engine_streams' : 'worker_streams';
   const where = source === 'engine'
-    ? `${WHERE_CLAUSE} AND ($3::text IS NULL)`
+    ? `${WHERE_CLAUSE} AND ($3::text IS NULL) AND ($4::text IS NULL) AND ($5::text IS NULL) AND ($6::text IS NULL) AND ($7::text IS NULL)`
     : WORKER_WHERE_CLAUSE;
 
   return `SELECT COUNT(*)::int AS count FROM "${schema}".${table} ${where}`;

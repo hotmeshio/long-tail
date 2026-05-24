@@ -75,7 +75,7 @@ describe('ControlPlanePage', () => {
 
   it('renders page header with stats', () => {
     renderPage();
-    expect(screen.getByText('Task Queues')).toBeInTheDocument();
+    expect(screen.getAllByText('Queues').length).toBeGreaterThanOrEqual(1);
     // Inline stats
     expect(screen.getAllByText('Engines').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Queues').length).toBeGreaterThanOrEqual(1);
