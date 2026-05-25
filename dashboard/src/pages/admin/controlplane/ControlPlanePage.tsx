@@ -13,11 +13,9 @@ import {
   DURATIONS,
   isWorker,
   isThrottled,
-  rowKey,
   groupByQueue,
   type Duration,
 } from './helpers';
-import { getEngineColumns } from './columns';
 import { useMeshSelection } from './useMeshSelection';
 import { ThrottleModal } from './ThrottleModal';
 import { EmergencyControls } from './EmergencyControls';
@@ -99,56 +97,17 @@ export function ControlPlanePage() {
 
   // ── Selection + throttle logic ─────────────────────────────
   const {
-    selectedIds,
-    setSelectedIds,
-    toggleCheckbox,
     throttleModalOpen,
     throttleTargets,
     selectedThrottleTargets,
     throttleMutation,
     handleBulkThrottle,
     handleRowClick,
-    handleBulkThrottleOpen,
     handleResumeThrottle,
     handleResumeQueue,
     handleQueueThrottle,
     closeThrottleModal,
   } = useMeshSelection({ activeAppId, allProfiles, profiles: allProfiles });
-
-  // ── Engine-scoped toggle ───────────────────────────────────────
-  const toggleAllEngines = useCallback(() => {
-    const engineKeys = new Set(engines.map(rowKey));
-    const allSelected = engines.length > 0 && engines.every((e) => selectedIds.has(rowKey(e)));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (const k of engineKeys) {
-        if (allSelected) next.delete(k);
-        else next.add(k);
-      }
-      return next;
-    });
-  }, [engines, selectedIds, setSelectedIds]);
-
-  // ── Engine bulk throttle (header icon) ─────────────────────────
-  const handleEngineBulkThrottle = useCallback(() => {
-    const selected = engines.filter((e) => selectedIds.has(rowKey(e)));
-    if (selected.length === 0) return;
-    handleBulkThrottleOpen();
-  }, [engines, selectedIds, handleBulkThrottleOpen]);
-
-  // ── Engine column definitions ─────────────────────────────────
-  const engineColumns = useMemo(
-    () => getEngineColumns({
-      profiles: engines,
-      selectedIds,
-      toggleAll: toggleAllEngines,
-      toggleCheckbox,
-      onRowThrottle: handleRowClick,
-      onResumeThrottle: handleResumeThrottle,
-      onBulkThrottle: handleEngineBulkThrottle,
-    }),
-    [engines, selectedIds, toggleAllEngines, toggleCheckbox, handleRowClick, handleResumeThrottle, handleEngineBulkThrottle],
-  );
 
   // ── Header stats ──────────────────────────────────────────────
   const headerStats = useMemo((): InlineStat[] => {
@@ -248,7 +207,6 @@ export function ControlPlanePage() {
         handleResumeThrottle={handleResumeThrottle}
         handleQueueThrottle={handleQueueThrottle}
         handleResumeQueue={handleResumeQueue}
-        engineColumns={engineColumns}
         engines={engines}
         bridgeActive={bridgeActive}
       />

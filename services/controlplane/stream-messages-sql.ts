@@ -42,9 +42,15 @@ const STATUS_CASE = `
  *   $6 = jid filter (NULL = all, worker-only)
  *   $7 = aid filter (NULL = all, worker-only)
  */
-const WHERE_CLAUSE = `
+/** Engine WHERE: supports stream_name, status, and jid (v0.18.0). */
+const ENGINE_WHERE_CLAUSE = `
   WHERE ($1::text IS NULL OR stream_name ILIKE $1)
-    AND ($2::text IS NULL OR ${STATUS_CASE} = $2)`;
+    AND ($2::text IS NULL OR ${STATUS_CASE} = $2)
+    AND ($3::text IS NULL)
+    AND ($4::text IS NULL)
+    AND ($5::text IS NULL)
+    AND ($6::text IS NULL OR jid = $6)
+    AND ($7::text IS NULL)`;
 
 const WORKER_WHERE_CLAUSE = `
   WHERE ($1::text IS NULL OR stream_name ILIKE $1)
@@ -78,15 +84,10 @@ export function LIST_STREAM_MESSAGES(
         created_at, reserved_at, reserved_by, expired_at,
         dead_lettered_at, priority, visible_at,
         retry_attempt, max_retry_attempts,
-        NULL AS workflow_name, NULL AS jid, NULL AS aid,
+        NULL AS workflow_name, jid, NULL AS aid,
         NULL AS dad, NULL AS msg_type, NULL AS topic
       FROM "${schema}".engine_streams
-      ${WHERE_CLAUSE}
-        AND ($3::text IS NULL)
-        AND ($4::text IS NULL)
-        AND ($5::text IS NULL)
-        AND ($6::text IS NULL)
-        AND ($7::text IS NULL)`
+      ${ENGINE_WHERE_CLAUSE}`
     : `SELECT
         id, 'worker' AS source, stream_name,
         message, ${STATUS_CASE} AS status,
@@ -113,9 +114,7 @@ export function COUNT_STREAM_MESSAGES(
   source: 'engine' | 'worker',
 ): string {
   const table = source === 'engine' ? 'engine_streams' : 'worker_streams';
-  const where = source === 'engine'
-    ? `${WHERE_CLAUSE} AND ($3::text IS NULL) AND ($4::text IS NULL) AND ($5::text IS NULL) AND ($6::text IS NULL) AND ($7::text IS NULL)`
-    : WORKER_WHERE_CLAUSE;
+  const where = source === 'engine' ? ENGINE_WHERE_CLAUSE : WORKER_WHERE_CLAUSE;
 
   return `SELECT COUNT(*)::int AS count FROM "${schema}".${table} ${where}`;
 }

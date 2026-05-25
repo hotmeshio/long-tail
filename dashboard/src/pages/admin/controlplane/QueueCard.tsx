@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
-import { ChevronRight, Gauge, CirclePlay, Activity, Clock } from 'lucide-react';
+import { ChevronRight, Gauge, CirclePlay, Activity, Clock, Inbox } from 'lucide-react';
 import { TaskQueuePill } from '../../../components/common/display/TaskQueuePill';
 import { DataTable } from '../../../components/common/data/DataTable';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { QuorumProfile } from '../../../api/controlplane';
-import { isThrottled, formatThrottleHuman, formatMemory, rowKey, stripStreamPrefix } from './helpers';
+import { isThrottled, formatThrottleHuman, formatMemory, rowKey, stripStreamPrefix, queueHealth, totalPending, sumCounts } from './helpers';
 import type { Column } from '../../../components/common/data/DataTable';
 import type { Duration } from './helpers';
 
@@ -46,6 +46,16 @@ export function QueueCard({
     );
     return match?.count ?? 0;
   }, [byStream, queue]);
+
+  const health = useMemo(() => queueHealth(workers), [workers]);
+  const pending = useMemo(() => totalPending(workers), [workers]);
+  const { errors } = useMemo(() => sumCounts(workers), [workers]);
+
+  const healthDot = health === 'paused'
+    ? 'bg-status-error'
+    : health === 'degraded'
+      ? 'bg-status-warning'
+      : 'bg-status-success';
 
   const columns = useMemo((): Column<QuorumProfile>[] => [
     {
@@ -109,6 +119,7 @@ export function QueueCard({
         onClick={() => onToggle(queue)}
         className="group/row relative flex items-center gap-3 w-full py-2 hover:bg-surface-hover transition-colors text-left rounded"
       >
+        <span className={`w-2 h-2 rounded-full shrink-0 ${healthDot}`} title={health} />
         <ChevronRight
           className={`w-3.5 h-3.5 text-text-tertiary/50 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
           strokeWidth={2}
@@ -116,6 +127,19 @@ export function QueueCard({
         <TaskQueuePill queue={queue} size="sm" />
 
         <span className="flex-1" />
+
+        {errors > 0 && (
+          <span className="text-[10px] text-status-error font-medium mr-2">
+            {errors} errors
+          </span>
+        )}
+
+        {pending > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-status-warning w-20">
+            <Inbox className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+            <span className="font-mono tabular-nums">{pending.toLocaleString()}</span>
+          </span>
+        )}
 
         <span className={`flex items-center gap-1 text-xs w-24 ${workers.some(isThrottled) ? 'text-status-warning' : 'text-text-tertiary'}`}>
           <Activity className="w-3 h-3 shrink-0" strokeWidth={1.5} />

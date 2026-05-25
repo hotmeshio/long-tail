@@ -115,13 +115,22 @@ export function StreamMessageDetail({ message, filters }: {
         </div>
       </div>
 
+      {/* Job ID — available on both engine and worker streams */}
+      {message.jid && (
+        <div className="space-y-2">
+          <SectionLabel>Job</SectionLabel>
+          <div className="grid grid-cols-1 gap-2">
+            <FilterableField label="Job ID" value={message.jid} onFilter={filters?.onFilterJid} />
+          </div>
+        </div>
+      )}
+
       {/* Worker-specific fields — clickable to filter */}
       {message.source === 'worker' && (
         <div className="space-y-2">
           <SectionLabel>Worker Details</SectionLabel>
           <div className="grid grid-cols-1 gap-2">
             <FilterableField label="Workflow" value={message.workflow_name} onFilter={filters?.onFilterWorkflow} />
-            <FilterableField label="Job ID" value={message.jid} onFilter={filters?.onFilterJid} />
             <FilterableField label="Activity" value={message.aid} onFilter={filters?.onFilterAid} />
             <Field label="Dimension" value={message.dad} />
             <FilterableField label="Type" value={message.msg_type} onFilter={filters?.onFilterMsgType} />

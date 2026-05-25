@@ -5,6 +5,7 @@ import { Collapsible } from '../../../components/common/layout/Collapsible';
 import { useEventSubscription } from '../../../hooks/useEventContext';
 import {
   EVENT_TYPE_COLORS,
+  EVENT_TYPE_LABELS,
   QUORUM_CHANNELS,
   MAX_EVENTS,
   formatThrottleHuman,
@@ -12,6 +13,88 @@ import {
 } from './helpers';
 
 let eventCounter = 0;
+
+// ── Human-readable event summaries ─────────────────────────────────────────
+
+function humanizeEvent(event: QuorumEvent): string {
+  const d = event.data || {};
+  const topic = d.topic ? String(d.topic) : '';
+  const guid = d.guid ? String(d.guid).slice(0, 8) : '';
+
+  switch (event.type) {
+    case 'pong':
+      return topic
+        ? `Worker ${guid}... on "${topic}" responded`
+        : `Engine ${guid}... responded`;
+    case 'ping':
+      return 'Roll call broadcast';
+    case 'throttle': {
+      const ms = d.throttle as number;
+      const target = topic ? `queue "${topic}"` : guid ? `node ${guid}...` : 'all nodes';
+      return `${formatThrottleHuman(ms)} applied to ${target}`;
+    }
+    case 'job':
+      return `Job ${guid ? guid + '...' : ''} ${d.status || 'updated'}`;
+    case 'work':
+      return `Dispatched to "${topic || 'worker'}" ${guid ? '(' + guid + '...)' : ''}`;
+    case 'activate':
+      return `Worker "${topic || 'unknown'}" activated`;
+    case 'cron':
+      return `Cron triggered ${topic ? '"' + topic + '"' : ''}`;
+    default:
+      return topic || guid || event.type;
+  }
+}
+
+// ── Aggregate display items ───────────────────────────────────────────────
+
+interface DisplayItem {
+  kind: 'single';
+  event: QuorumEvent;
+}
+
+interface DisplayGroup {
+  kind: 'group';
+  type: string;
+  count: number;
+  firstTimestamp: string;
+  lastTimestamp: string;
+  events: QuorumEvent[];
+}
+
+type FeedItem = DisplayItem | DisplayGroup;
+
+/** Collapse consecutive pong events into a summary row. */
+function collapseEvents(events: QuorumEvent[]): FeedItem[] {
+  const items: FeedItem[] = [];
+  let i = 0;
+  while (i < events.length) {
+    const evt = events[i];
+    // Group consecutive pong events
+    if (evt.type === 'pong') {
+      let j = i + 1;
+      while (j < events.length && events[j].type === 'pong') j++;
+      const batch = events.slice(i, j);
+      if (batch.length >= 3) {
+        items.push({
+          kind: 'group',
+          type: 'pong',
+          count: batch.length,
+          firstTimestamp: batch[batch.length - 1].timestamp,
+          lastTimestamp: batch[0].timestamp,
+          events: batch,
+        });
+      } else {
+        for (const e of batch) items.push({ kind: 'single', event: e });
+      }
+      i = j;
+    } else {
+      items.push({ kind: 'single', event: evt });
+      i++;
+    }
+  }
+  return items;
+}
 
 // ── Event row ───────────────────────────────────────────────────────────────
 
@@ -28,12 +111,10 @@ function QuorumEventRow({ event }: { event: QuorumEvent }) {
           {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
         <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${EVENT_TYPE_COLORS[event.type] || 'text-text-tertiary'} bg-surface-sunken whitespace-nowrap shrink-0`}>
-          {event.type}
+          {EVENT_TYPE_LABELS[event.type] || event.type}
         </span>
-        <span className="text-[9px] text-text-tertiary font-mono flex-1 min-w-0 break-all">
-          {event.data?.guid ? String(event.data.guid) : ''}
-          {event.data?.topic ? ` ${String(event.data.topic)}` : ''}
-          {event.type === 'throttle' ? ` → ${formatThrottleHuman(event.data?.throttle as number)}` : ''}
+        <span className="text-[9px] text-text-secondary flex-1 min-w-0 truncate">
+          {humanizeEvent(event)}
         </span>
         <svg
           className={`w-2.5 h-2.5 text-text-tertiary shrink-0 transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
@@ -45,6 +126,50 @@ function QuorumEventRow({ event }: { event: QuorumEvent }) {
       <Collapsible open={expanded}>
         <div className="pb-2">
           <JsonViewer data={event.data} />
+        </div>
+      </Collapsible>
+    </div>
+  );
+}
+
+/** Collapsed group row for consecutive pong events. */
+function QuorumGroupRow({ group }: { group: DisplayGroup }) {
+  const [expanded, setExpanded] = useState(false);
+  const engines = group.events.filter((e) => !e.data?.topic).length;
+  const workers = group.count - engines;
+
+  return (
+    <div className="border-b border-surface-border/50 last:border-b-0">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 py-1.5 w-full text-left hover:bg-surface-hover/50 transition-colors"
+      >
+        <span className="text-[9px] font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0">
+          {new Date(group.lastTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </span>
+        <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${EVENT_TYPE_COLORS.pong} bg-surface-sunken whitespace-nowrap shrink-0`}>
+          roll call
+        </span>
+        <span className="text-[9px] text-text-secondary flex-1 min-w-0 truncate">
+          {group.count} nodes responded
+          {engines > 0 && workers > 0
+            ? ` (${engines} engine${engines !== 1 ? 's' : ''}, ${workers} worker${workers !== 1 ? 's' : ''})`
+            : engines > 0
+              ? ` (${engines} engine${engines !== 1 ? 's' : ''})`
+              : ` (${workers} worker${workers !== 1 ? 's' : ''})`}
+        </span>
+        <svg
+          className={`w-2.5 h-2.5 text-text-tertiary shrink-0 transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <Collapsible open={expanded}>
+        <div className="ml-4">
+          {group.events.map((evt) => (
+            <QuorumEventRow key={evt.id} event={evt} />
+          ))}
         </div>
       </Collapsible>
     </div>
@@ -234,9 +359,13 @@ export function QuorumFeed({ bridgeActive }: QuorumFeedProps) {
             {bridgeActive ? 'Waiting for events...' : 'Subscribing...'}
           </p>
         ) : (
-          events.map((evt) => (
-            <QuorumEventRow key={evt.id} event={evt} />
-          ))
+          collapseEvents(events).map((item, idx) =>
+            item.kind === 'group' ? (
+              <QuorumGroupRow key={`grp-${idx}`} group={item} />
+            ) : (
+              <QuorumEventRow key={item.event.id} event={item.event} />
+            ),
+          )
         )}
       </div>
     </div>
