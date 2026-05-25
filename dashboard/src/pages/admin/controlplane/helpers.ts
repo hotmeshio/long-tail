@@ -28,6 +28,18 @@ export const EVENT_TYPE_COLORS: Record<string, string> = {
   user: 'text-text-secondary',
 };
 
+/** Human-friendly labels for quorum event types. */
+export const EVENT_TYPE_LABELS: Record<string, string> = {
+  pong: 'roll call',
+  ping: 'ping',
+  throttle: 'throttle',
+  job: 'job',
+  work: 'work',
+  activate: 'activate',
+  cron: 'cron',
+  user: 'user',
+};
+
 export const MAX_EVENTS = 250;
 
 export function isWorker(p: QuorumProfile): boolean {
@@ -48,6 +60,34 @@ export function formatThrottleHuman(ms?: number): string {
   return `${ms}ms`;
 }
 
+export function parseTimestamp(ts?: string): Date | null {
+  if (!ts) return null;
+  // Handle YYYYMMDDHHMMSS.mmm format (quorum timestamps)
+  const match = ts.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(\d+)$/);
+  if (match) {
+    const [, y, mo, d, h, mi, s, ms] = match;
+    return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}.${ms}Z`);
+  }
+  // Fallback to standard Date parsing
+  const date = new Date(ts);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+export function formatUptime(inited?: string): string {
+  const date = parseTimestamp(inited);
+  if (!date) return '--';
+  const ms = Date.now() - date.getTime();
+  if (ms < 0 || isNaN(ms)) return '--';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
 export function formatMemory(total?: string, free?: string): string {
   if (!total || !free) return '—';
   const t = parseFloat(total);
@@ -65,12 +105,27 @@ export function isEngineStream(streamName: string): boolean {
   return stripStreamPrefix(streamName) === '(engine)';
 }
 
+/** Extract a human-friendly label from engine_id like "controlplane::durable-Hxyz..." → "durable" */
+export function engineLabel(engineId: string): string {
+  // Format: {source}::{name}-{guid}
+  const match = engineId.match(/^([^:]+)::(.+?)-[A-Za-z0-9_]{10,}$/);
+  if (match) return match[2];
+  // Fallback: just truncate
+  return engineId.length > 20 ? engineId.slice(0, 20) + '...' : engineId;
+}
+
+/** Extract the source/app prefix from engine_id like "controlplane::durable-Hxyz..." → "controlplane" */
+export function engineSource(engineId: string): string {
+  const match = engineId.match(/^([^:]+)::/);
+  return match?.[1] || '';
+}
+
 export type NodeFilter = 'all' | 'workers' | 'engines';
 
 /** Known quorum message types published via the bridge. */
 export const QUORUM_CHANNELS = [
-  { key: 'pong', label: 'Pong', description: 'Roll call responses' },
-  { key: 'ping', label: 'Ping', description: 'Roll call broadcasts' },
+  { key: 'pong', label: 'Roll Call', description: 'Node health check responses' },
+  { key: 'ping', label: 'Ping', description: 'Health check broadcasts' },
   { key: 'throttle', label: 'Throttle', description: 'Throttle commands' },
   { key: 'job', label: 'Job', description: 'Job lifecycle events' },
   { key: 'work', label: 'Work', description: 'Worker dispatch events' },

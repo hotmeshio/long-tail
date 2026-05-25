@@ -2,7 +2,7 @@ import { Gauge, CirclePlay } from 'lucide-react';
 import type { Column } from '../../../components/common/data/DataTable';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { QuorumProfile } from '../../../api/controlplane';
-import { isThrottled, formatThrottleHuman, formatMemory, rowKey, sumCounts } from './helpers';
+import { isThrottled, formatThrottleHuman, formatMemory, rowKey, sumCounts, formatUptime, engineLabel, engineSource } from './helpers';
 
 interface ColumnOptions {
   profiles: QuorumProfile[];
@@ -68,6 +68,10 @@ function actionColumn(
 /** Columns for the Engines section DataTable. */
 export function getEngineColumns(opts: ColumnOptions): Column<QuorumProfile>[] {
   const hasSelection = opts.profiles.some((p) => opts.selectedIds.has(rowKey(p)));
+
+  // Calculate total processed across all engines for workload share
+  const totalProcessed = opts.profiles.reduce((sum, p) => sum + sumCounts([p]).total, 0);
+
   return [
     {
       key: 'select',
@@ -97,25 +101,68 @@ export function getEngineColumns(opts: ColumnOptions): Column<QuorumProfile>[] {
           className="rounded"
         />
       ),
-      className: 'w-16',
+      className: 'w-10',
     },
     {
       key: 'engine_id',
-      label: 'Engine ID',
-      render: (row) => (
-        <span className="text-xs font-mono text-text-tertiary">{row.engine_id}</span>
-      ),
-      className: 'w-48',
+      label: 'Engine',
+      render: (row) => {
+        const label = engineLabel(row.engine_id);
+        const source = engineSource(row.engine_id);
+        return (
+          <div className="flex flex-col" title={row.engine_id}>
+            <span className="text-xs text-text-secondary truncate max-w-[160px]">{label}</span>
+            {source && <span className="text-[9px] text-text-tertiary/60">{source}</span>}
+          </div>
+        );
+      },
+      className: 'w-44',
     },
     throttleColumn(),
     {
-      key: 'processed',
-      label: 'Processed',
+      key: 'workload',
+      label: 'Workload',
       render: (row) => {
         const c = sumCounts([row]);
-        return <span className="text-xs font-mono text-text-tertiary">{c.total.toLocaleString()}</span>;
+        const pct = totalProcessed > 0 ? (c.total / totalProcessed) * 100 : 0;
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-20 h-2 bg-surface-sunken rounded overflow-hidden" title={`${c.total.toLocaleString()} messages (${pct.toFixed(0)}%)`}>
+              <div
+                className={`h-full rounded transition-all duration-500 ${c.errors > 0 ? 'bg-status-error/70' : 'bg-blue-500/60'}`}
+                style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%` }}
+              />
+            </div>
+            <span className="text-[10px] font-mono tabular-nums text-text-tertiary w-16">
+              {c.total > 0 ? `${c.total.toLocaleString()}` : '--'}
+            </span>
+          </div>
+        );
       },
-      className: 'w-24',
+      className: 'w-44',
+    },
+    {
+      key: 'depth',
+      label: 'Pending',
+      render: (row) => {
+        const depth = row.stream_depth ?? 0;
+        return (
+          <span className={`text-xs font-mono tabular-nums ${depth > 100 ? 'text-status-warning' : 'text-text-tertiary'}`}>
+            {depth > 0 ? depth.toLocaleString() : '--'}
+          </span>
+        );
+      },
+      className: 'w-20',
+    },
+    {
+      key: 'uptime',
+      label: 'Uptime',
+      render: (row) => (
+        <span className="text-[10px] font-mono text-text-tertiary">
+          {formatUptime(row.inited)}
+        </span>
+      ),
+      className: 'w-20',
     },
     memoryColumn(),
     actionColumn(opts.onRowThrottle, opts.onResumeThrottle),

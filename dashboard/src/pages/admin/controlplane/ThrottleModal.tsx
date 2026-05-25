@@ -38,7 +38,7 @@ function TargetPill({ target }: { target: ThrottleTarget }) {
 }
 
 export function ThrottleModal({ open, onClose, targets, onApply, isPending }: ThrottleModalProps) {
-  const [seconds, setSeconds] = useState('0');
+  const [seconds, setSeconds] = useState('');
 
   return (
     <Modal open={open} onClose={onClose} title="Adjust Throttle">
@@ -58,7 +58,7 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
             {PRESETS.map((p) => (
               <button
                 key={p.label}
-                onClick={() => { setSeconds(p.ms === -1 ? '-1' : String(p.ms / 1000)); onApply(p.ms); }}
+                onClick={() => onApply(p.ms)}
                 disabled={isPending}
                 className={`px-3 py-1.5 text-xs rounded transition-colors ${
                   p.ms === -1
@@ -76,22 +76,23 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
 
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
-            Custom (seconds between messages)
+            Custom delay (seconds)
           </p>
           <div className="flex items-center gap-3">
             <input
               type="number"
               step="0.1"
-              min="-1"
+              min="0"
               value={seconds}
               onChange={(e) => setSeconds(e.target.value)}
+              placeholder="e.g. 2.5"
               className="input text-xs py-1.5 px-3 w-28"
             />
             <button
               onClick={() => {
                 const s = parseFloat(seconds);
-                if (isNaN(s)) return;
-                onApply(s === -1 ? -1 : Math.round(s * 1000));
+                if (isNaN(s) || s < 0) return;
+                onApply(Math.round(s * 1000));
               }}
               disabled={isPending}
               className="btn-primary text-xs py-1.5 px-4 disabled:opacity-50"
@@ -99,9 +100,6 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
               Apply
             </button>
           </div>
-          <p className="text-[10px] text-text-tertiary mt-1">
-            0 = resume, -1 = pause indefinitely
-          </p>
         </div>
       </div>
     </Modal>

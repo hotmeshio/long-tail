@@ -1,11 +1,9 @@
-import { DataTable } from '../../../components/common/data/DataTable';
 import { CollapsibleSection } from '../../../components/common/layout/CollapsibleSection';
 import { StreamVolumeChart } from './StreamVolumeChart';
 import { QueueCard } from './QueueCard';
 import { QuorumFeed } from './QuorumFeed';
-import { rowKey } from './helpers';
+import { EngineCluster } from './EngineCluster';
 import type { Duration } from './helpers';
-import type { Column } from '../../../components/common/data/DataTable';
 
 interface ControlPlaneContentProps {
   collapsed: Record<string, boolean>;
@@ -22,7 +20,6 @@ interface ControlPlaneContentProps {
   handleResumeThrottle: (profile: any) => void;
   handleQueueThrottle: (queue: string) => void;
   handleResumeQueue: (queue: string) => void;
-  engineColumns: Column<any>[];
   engines: Array<any>;
   bridgeActive: boolean;
 }
@@ -42,7 +39,6 @@ export function ControlPlaneContent({
   handleResumeThrottle,
   handleQueueThrottle,
   handleResumeQueue,
-  engineColumns,
   engines,
   bridgeActive,
 }: ControlPlaneContentProps) {
@@ -104,22 +100,19 @@ export function ControlPlaneContent({
           )}
         </CollapsibleSection>
 
-        {/* Engines section */}
+        {/* Engine cluster */}
         <CollapsibleSection
-          title="Engines"
+          title={`Engine Cluster (${engines.length})`}
           sectionKey="engines"
           isCollapsed={!!collapsed.engines}
           onToggle={toggleSection}
           contentClassName="mt-4 ml-7"
         >
-          <DataTable
-            columns={engineColumns}
-            data={engines}
-            keyFn={rowKey}
-            onRowClick={handleRowClick}
+          <EngineCluster
+            engines={engines}
+            onThrottle={handleRowClick}
+            onResumeThrottle={handleResumeThrottle}
             isLoading={isLoading}
-            emptyMessage={isLoading ? 'Discovering engines...' : 'No engines found.'}
-            inline
           />
         </CollapsibleSection>
       </div>
