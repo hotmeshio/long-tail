@@ -141,6 +141,8 @@ export interface ThrottleTarget {
   topic?: string;
   /** API param: guid-based throttle (single engine/worker) */
   guid?: string;
+  /** API param: scope — target engines only, workers only, or both */
+  scope?: 'engines' | 'workers' | 'all';
 }
 
 export const NODE_FILTER_OPTIONS = [

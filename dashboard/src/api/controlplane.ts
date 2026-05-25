@@ -29,6 +29,7 @@ export interface QuorumProfile {
     CPULoad: Array<Record<string, string>>;
     NetworkStats: Array<Record<string, unknown>>;
   };
+  is_scout?: boolean;
   signature?: string;
 }
 
@@ -42,7 +43,7 @@ function fetchRollCall(appId: string) {
   return apiFetch<{ profiles: QuorumProfile[] }>(`/controlplane/rollcall?app_id=${encodeURIComponent(appId)}`);
 }
 
-function postThrottle(body: { appId: string; throttle: number; topic?: string; guid?: string }) {
+function postThrottle(body: { appId: string; throttle: number; topic?: string; guid?: string; scope?: 'engines' | 'workers' | 'all' }) {
   return apiFetch<{ success: boolean }>('/controlplane/throttle', {
     method: 'POST',
     body: JSON.stringify(body),

@@ -67,7 +67,7 @@ export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartP
             className={`${labelCls} text-blue-500/70 hover:text-blue-500`}
             onClick={() => onNodeFilter?.('engines')}
           >
-            Engine Message Volume
+            Engine Stream
           </p>
           {engineStreams.map(renderBar)}
           {workerStreams.length > 0 && <div className="h-2" />}
@@ -79,7 +79,7 @@ export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartP
             className={`${labelCls} text-accent/70 hover:text-accent`}
             onClick={() => onNodeFilter?.('workers')}
           >
-            Worker Message Volume
+            Worker Streams
           </p>
           {workerStreams.map(renderBar)}
         </>

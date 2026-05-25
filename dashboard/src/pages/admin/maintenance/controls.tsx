@@ -1,27 +1,38 @@
-import { Info } from 'lucide-react';
+import { Info, ShieldCheck, ShieldAlert, ShieldOff } from 'lucide-react';
 import { RETENTION_PERIOD_OPTIONS } from '../../../lib/constants';
 
 // ── Retention row (checkbox + label + select) ───────────────────────────────
 
-export function RetentionRow({ checked, onToggle, label, hint, value, onChange }: {
+export function RetentionRow({ checked, onToggle, label, hint, safety, value, onChange }: {
   checked: boolean;
   onToggle: (v: boolean) => void;
   label: string;
   hint: string;
+  safety: 'safe' | 'moderate' | 'destructive';
   value: string;
   onChange: (v: string) => void;
 }) {
+  const SafetyIcon = safety === 'safe' ? ShieldCheck : safety === 'moderate' ? ShieldAlert : ShieldOff;
+  const safetyColor = safety === 'safe' ? 'text-status-success' : safety === 'moderate' ? 'text-status-warning' : 'text-status-error';
+  const safetyLabel = safety === 'safe' ? 'Safe' : safety === 'moderate' ? 'Careful' : 'Permanent';
+
   return (
     <div className="flex items-center gap-4">
-      <label className="flex items-center gap-2.5 cursor-pointer w-64 shrink-0">
+      <label className="flex items-center gap-2.5 cursor-pointer w-80 shrink-0">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onToggle(e.target.checked)}
           className="w-4 h-4 rounded border-border accent-accent shrink-0"
         />
-        <div>
-          <span className="text-xs text-text-primary">{label}</span>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-primary">{label}</span>
+            <span className={`flex items-center gap-0.5 text-[9px] ${safetyColor}`}>
+              <SafetyIcon className="w-3 h-3" strokeWidth={1.5} />
+              {safetyLabel}
+            </span>
+          </div>
           <p className="text-[10px] text-text-tertiary">{hint}</p>
         </div>
       </label>
@@ -41,12 +52,17 @@ export function RetentionRow({ checked, onToggle, label, hint, value, onChange }
 
 // ── Cleanup checkbox ────────────────────────────────────────────────────────
 
-export function CleanupCheck({ checked, onChange, label, description }: {
+export function CleanupCheck({ checked, onChange, label, description, safety }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   description: string;
+  safety: 'safe' | 'moderate' | 'destructive';
 }) {
+  const SafetyIcon = safety === 'safe' ? ShieldCheck : safety === 'moderate' ? ShieldAlert : ShieldOff;
+  const safetyColor = safety === 'safe' ? 'text-status-success' : safety === 'moderate' ? 'text-status-warning' : 'text-status-error';
+  const safetyLabel = safety === 'safe' ? 'Safe' : safety === 'moderate' ? 'Careful' : 'Permanent';
+
   return (
     <label className="flex items-start gap-2.5 cursor-pointer">
       <input
@@ -56,7 +72,13 @@ export function CleanupCheck({ checked, onChange, label, description }: {
         className="w-4 h-4 mt-0.5 rounded border-border accent-accent shrink-0"
       />
       <div>
-        <span className="text-xs text-text-primary">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-primary">{label}</span>
+          <span className={`flex items-center gap-0.5 text-[9px] ${safetyColor}`}>
+            <SafetyIcon className="w-3 h-3" strokeWidth={1.5} />
+            {safetyLabel}
+          </span>
+        </div>
         <p className="text-[10px] text-text-tertiary">{description}</p>
       </div>
     </label>
@@ -115,49 +137,126 @@ export function PruneFieldsEditor({ fields, onChange }: {
     onChange({ ...fields, [key]: value });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-10">
-      {/* Left: delete data — the aligned 3 */}
+    <div className="space-y-8">
+      {/* Stream messages — always safe to prune */}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
-          Delete Expired Data
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          Stream Messages
+        </p>
+        <p className="text-[10px] text-text-tertiary mb-4">
+          Processed routing messages. Already consumed — safe to remove after a short retention window.
         </p>
         <div className="space-y-3">
           <RetentionRow
-            checked={fields.pruneJobs} onToggle={(v) => set('pruneJobs', v)}
-            label="Jobs" hint="Hard-delete completed job rows"
-            value={fields.expire} onChange={(v) => set('expire', v)}
-          />
-          <RetentionRow
             checked={fields.engineStreams} onToggle={(v) => set('engineStreams', v)}
-            label="Engine streams" hint="Internal routing (prune aggressively)"
+            label="Engine messages" hint="Internal orchestration signals"
+            safety="safe"
             value={fields.engineStreamsExpire} onChange={(v) => set('engineStreamsExpire', v)}
           />
           <RetentionRow
             checked={fields.workerStreams} onToggle={(v) => set('workerStreams', v)}
-            label="Worker streams" hint="Activity payloads for execution playback"
+            label="Worker messages" hint="Activity dispatch and response payloads"
+            safety="safe"
             value={fields.workerStreamsExpire} onChange={(v) => set('workerStreamsExpire', v)}
           />
         </div>
       </div>
 
-      {/* Right: cleanup operations */}
-      <div className="lg:w-72">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
-          Cleanup
+      {/* Workflow data — mutually exclusive: reduce OR delete */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          Completed Workflows
         </p>
-        <div className="space-y-4">
-          <CleanupCheck
-            checked={fields.stripAttributes} onChange={(v) => set('stripAttributes', v)}
-            label="Strip execution artifacts"
-            description="Remove step-level detail from completed jobs. Return data and export history are preserved."
-          />
-          <CleanupCheck
-            checked={fields.pruneTransient} onChange={(v) => set('pruneTransient', v)}
-            label="Delete transient jobs"
-            description="Orphaned jobs without an entity type. Usually safe to remove."
-          />
-          <CleanupCallout />
+        <p className="text-[10px] text-text-tertiary mb-4">
+          Choose how to handle completed workflow records. Reducing strips step-level detail
+          but keeps the workflow and its results. Deleting removes the record entirely.
+        </p>
+        <div className="space-y-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="workflow-cleanup"
+              checked={!fields.stripAttributes && !fields.pruneJobs}
+              onChange={() => onChange({ ...fields, stripAttributes: false, pruneJobs: false })}
+              className="w-4 h-4 mt-0.5 accent-accent shrink-0"
+            />
+            <div>
+              <span className="text-xs text-text-primary">Keep as-is</span>
+              <p className="text-[10px] text-text-tertiary">No changes to completed workflow records.</p>
+            </div>
+          </label>
+
+          <div className="flex items-start gap-2.5">
+            <label className="flex items-start gap-2.5 cursor-pointer w-80 shrink-0">
+              <input
+                type="radio"
+                name="workflow-cleanup"
+                checked={fields.stripAttributes && !fields.pruneJobs}
+                onChange={() => onChange({ ...fields, stripAttributes: true, pruneJobs: false })}
+                className="w-4 h-4 mt-0.5 accent-accent shrink-0"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-primary">Reduce completed workflows</span>
+                  <span className="flex items-center gap-0.5 text-[9px] text-status-warning">
+                    <ShieldAlert className="w-3 h-3" strokeWidth={1.5} />
+                    Careful
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-tertiary">
+                  Strips step-level execution detail (activity inputs/outputs, internal state).
+                  Workflow results and timeline are preserved.
+                </p>
+              </div>
+            </label>
+            <select
+              value={fields.expire}
+              onChange={(e) => set('expire', e.target.value)}
+              disabled={!fields.stripAttributes || fields.pruneJobs}
+              className={`select text-xs w-36 transition-opacity mt-0.5 ${!fields.stripAttributes || fields.pruneJobs ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              {RETENTION_PERIOD_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-start gap-2.5">
+            <label className="flex items-start gap-2.5 cursor-pointer w-80 shrink-0">
+              <input
+                type="radio"
+                name="workflow-cleanup"
+                checked={fields.pruneJobs}
+                onChange={() => onChange({ ...fields, pruneJobs: true, stripAttributes: false })}
+                className="w-4 h-4 mt-0.5 accent-accent shrink-0"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-primary">Delete completed workflows</span>
+                  <span className="flex items-center gap-0.5 text-[9px] text-status-error">
+                    <ShieldOff className="w-3 h-3" strokeWidth={1.5} />
+                    Permanent
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-tertiary">
+                  Permanently removes workflow records. Results, timeline, and all
+                  execution data are deleted and cannot be recovered.
+                </p>
+              </div>
+            </label>
+            <select
+              value={fields.expire}
+              onChange={(e) => set('expire', e.target.value)}
+              disabled={!fields.pruneJobs}
+              className={`select text-xs w-36 transition-opacity mt-0.5 ${!fields.pruneJobs ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              {RETENTION_PERIOD_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
+        <CleanupCallout />
       </div>
     </div>
   );

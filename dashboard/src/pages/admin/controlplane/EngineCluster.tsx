@@ -1,81 +1,130 @@
 import { useMemo, useState } from 'react';
-import { Zap, Server, CirclePause, ChevronRight, Gauge } from 'lucide-react';
+import { Zap, CirclePause, ChevronRight, Gauge } from 'lucide-react';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
 import type { QuorumProfile } from '../../../api/controlplane';
-import { sumCounts, formatUptime, engineLabel, engineSource, formatMemory, isThrottled, formatThrottleHuman } from './helpers';
+import { sumCounts, formatUptime, engineLabel, engineSource, isThrottled, formatThrottleHuman } from './helpers';
 
 interface EngineClusterProps {
   engines: QuorumProfile[];
   onThrottle: (profile: QuorumProfile) => void;
-  onResumeThrottle: (profile: QuorumProfile) => void;
   isLoading: boolean;
 }
 
-/** Identify the active engine: the non-paused engine with the most processed messages. */
-function findActive(engines: QuorumProfile[]): QuorumProfile | null {
-  if (engines.length === 0) return null;
-  // Only consider engines that aren't paused/throttled
-  const candidates = engines.filter((e) => !isThrottled(e));
-  // If all are paused, there is no active engine
-  if (candidates.length === 0) return null;
-  let active: QuorumProfile | null = null;
-  let maxCount = -1;
-  for (const e of candidates) {
-    const total = sumCounts([e]).total;
-    if (total > maxCount) {
-      maxCount = total;
-      active = e;
+function categorize(engines: QuorumProfile[]) {
+  const active: QuorumProfile[] = [];
+  const idle: QuorumProfile[] = [];
+  const paused: QuorumProfile[] = [];
+
+  for (const e of engines) {
+    if (isThrottled(e)) {
+      paused.push(e);
+    } else if (e.is_scout || sumCounts([e]).total > 0) {
+      active.push(e);
+    } else {
+      idle.push(e);
     }
   }
-  return active || candidates[0];
+
+  // Sort active by processed descending; scout first if tied
+  active.sort((a, b) => {
+    if (a.is_scout && !b.is_scout) return -1;
+    if (!a.is_scout && b.is_scout) return 1;
+    return sumCounts([b]).total - sumCounts([a]).total;
+  });
+
+  idle.sort((a, b) => engineLabel(a.engine_id).localeCompare(engineLabel(b.engine_id)));
+  paused.sort((a, b) => engineLabel(a.engine_id).localeCompare(engineLabel(b.engine_id)));
+
+  return { active, idle, paused };
 }
 
-function Stat({ value, label, warn, title }: { value: string | number; label: string; warn?: boolean; title?: string }) {
+function EngineRow({ engine, isFirst, onThrottle }: {
+  engine: QuorumProfile;
+  isFirst?: boolean;
+  onThrottle: (p: QuorumProfile) => void;
+}) {
+  const label = engineLabel(engine.engine_id);
+  const source = engineSource(engine.engine_id);
+  const counts = sumCounts([engine]);
+  const pending = engine.stream_depth ?? 0;
+  const paused = isThrottled(engine);
+
   return (
-    <div title={title}>
-      <p className={`text-sm font-mono tabular-nums ${warn ? 'text-status-warning' : 'text-text-primary'}`}>
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </p>
-      <p className="text-[9px] text-text-tertiary uppercase tracking-widest">{label}</p>
+    <div className="group/row flex items-center gap-3 py-2 hover:bg-surface-hover/50 transition-colors rounded px-1">
+      {paused ? (
+        <CirclePause className="w-3.5 h-3.5 text-status-warning shrink-0" strokeWidth={1.5} />
+      ) : (
+        <Zap className={`w-3.5 h-3.5 shrink-0 ${counts.total > 0 || engine.is_scout ? 'text-status-success' : 'text-text-tertiary/30'}`} strokeWidth={1.5} />
+      )}
+
+      <span className={`${isFirst ? 'text-base font-medium' : 'text-xs'} text-text-primary truncate max-w-[180px]`} title={engine.engine_id}>
+        {label}
+      </span>
+      {source && <span className="text-[10px] text-text-tertiary/50">{source}</span>}
+
+      {engine.is_scout && (
+        <span className="text-[9px] text-amber-500 uppercase tracking-widest">scout</span>
+      )}
+
+      <span className="flex-1" />
+
+      {paused && (
+        <span className="text-[10px] text-status-warning">{engine.throttle === -1 ? 'Paused' : formatThrottleHuman(engine.throttle)}</span>
+      )}
+
+      {counts.total > 0 && (
+        <span className="text-[10px] font-mono tabular-nums text-text-tertiary w-16 text-right">{counts.total.toLocaleString()}</span>
+      )}
+
+      {pending > 0 && (
+        <span className={`text-[10px] font-mono tabular-nums w-14 text-right ${pending > 100 ? 'text-status-warning' : 'text-text-tertiary/50'}`}>{pending.toLocaleString()} q</span>
+      )}
+
+      <span className="text-[10px] font-mono text-text-tertiary/40 w-12 text-right">{formatUptime(engine.inited)}</span>
+
+      <span className="opacity-0 group-hover/row:opacity-100 transition-opacity">
+        <button
+          onClick={(e) => { e.stopPropagation(); onThrottle(engine); }}
+          className="text-text-tertiary hover:text-accent transition-colors"
+          title={paused ? 'Resume / adjust throttle' : 'Pause / throttle'}
+        >
+          <Gauge className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      </span>
     </div>
   );
 }
 
-function StandbyRow({ engine }: { engine: QuorumProfile }) {
-  const label = engineLabel(engine.engine_id);
-  const source = engineSource(engine.engine_id);
-  const paused = isThrottled(engine);
+function CollapsibleGroup({ label, engines, onThrottle }: {
+  label: string;
+  engines: QuorumProfile[];
+  onThrottle: (p: QuorumProfile) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (engines.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 py-1.5">
-      <Server className="w-3 h-3 text-text-tertiary/40 shrink-0" strokeWidth={1.5} />
-      <span className="text-xs text-text-secondary truncate max-w-[180px]" title={engine.engine_id}>{label}</span>
-      {source && <span className="text-[10px] text-text-tertiary/50">{source}</span>}
-      <span className="flex-1" />
-      {paused && (
-        <span className="text-[10px] text-status-warning">{engine.throttle === -1 ? 'Paused' : formatThrottleHuman(engine.throttle)}</span>
-      )}
-      <span className="text-[10px] font-mono text-text-tertiary/50">{formatUptime(engine.inited)}</span>
+    <div className="mt-1">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors py-1"
+      >
+        <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} strokeWidth={2} />
+        {engines.length} {label}
+      </button>
+      <Collapsible open={open}>
+        <div className="ml-1">
+          {engines.map((e) => (
+            <EngineRow key={e.engine_id} engine={e} onThrottle={onThrottle} />
+          ))}
+        </div>
+      </Collapsible>
     </div>
   );
 }
 
 export function EngineCluster({ engines, onThrottle, isLoading }: EngineClusterProps) {
-  const [showStandby, setShowStandby] = useState(false);
-
-  const active = useMemo(() => findActive(engines), [engines]);
-  const rest = useMemo(
-    () => engines.filter((e) => e !== active).sort((a, b) => {
-      // Paused engines first in the standby list (they're notable)
-      const ap = isThrottled(a) ? 0 : 1;
-      const bp = isThrottled(b) ? 0 : 1;
-      if (ap !== bp) return ap - bp;
-      return engineLabel(a.engine_id).localeCompare(engineLabel(b.engine_id));
-    }),
-    [engines, active],
-  );
-
-  const pausedCount = engines.filter(isThrottled).length;
+  const { active, idle, paused } = useMemo(() => categorize(engines), [engines]);
 
   if (isLoading) {
     return <p className="text-xs text-text-tertiary">Discovering engines...</p>;
@@ -85,84 +134,36 @@ export function EngineCluster({ engines, onThrottle, isLoading }: EngineClusterP
     return <p className="text-xs text-text-tertiary">No engines found.</p>;
   }
 
-  // All engines paused — no active processor
-  if (!active) {
+  // All paused — no active processor
+  if (active.length === 0 && idle.length === 0) {
     return (
       <div>
         <div className="flex items-center gap-3 py-2">
           <CirclePause className="w-4 h-4 text-status-error shrink-0" strokeWidth={1.5} />
           <span className="text-base text-status-error font-medium">All {engines.length} engines paused</span>
-          <span className="text-[10px] text-text-tertiary">Messages are accumulating. Resume at least one engine to restore processing.</span>
         </div>
-        <div className="mt-2">
-          {engines.map((e) => (
-            <StandbyRow key={e.engine_id} engine={e} />
+        <p className="text-[10px] text-text-tertiary ml-7">Messages are accumulating. Resume at least one engine to restore processing.</p>
+        <div className="ml-1 mt-2">
+          {paused.map((e) => (
+            <EngineRow key={e.engine_id} engine={e} onThrottle={onThrottle} />
           ))}
         </div>
       </div>
     );
   }
 
-  const label = engineLabel(active.engine_id);
-  const source = engineSource(active.engine_id);
-  const counts = sumCounts([active]);
-  const pending = active.stream_depth ?? 0;
-
   return (
     <div>
-      {/* Active engine */}
-      <div className="flex items-center gap-3 py-2">
-        <Zap className="w-4 h-4 text-status-success shrink-0" strokeWidth={1.5} />
-        <span className="text-base text-text-primary font-medium">{label}</span>
-        {source && <span className="text-[10px] text-text-tertiary/60">{source}</span>}
-        <span className="text-[9px] text-status-success uppercase tracking-widest">active</span>
-        <span className="flex-1" />
+      {/* Active engines — shown individually */}
+      {active.map((e, i) => (
+        <EngineRow key={e.engine_id} engine={e} isFirst={i === 0} onThrottle={onThrottle} />
+      ))}
 
-        <button
-          onClick={() => onThrottle(active)}
-          className="flex items-center gap-1 text-[10px] text-text-tertiary hover:text-status-warning transition-colors"
-          title="Pause to force failover to standby"
-        >
-          <CirclePause className="w-3.5 h-3.5" />
-          Pause
-        </button>
-        <button
-          onClick={() => onThrottle(active)}
-          className="text-text-tertiary hover:text-accent transition-colors"
-          title="Adjust throttle"
-        >
-          <Gauge className="w-3.5 h-3.5" strokeWidth={1.5} />
-        </button>
-      </div>
+      {/* Idle — collapsed */}
+      <CollapsibleGroup label="idle" engines={idle} onThrottle={onThrottle} />
 
-      {/* Stats row */}
-      <div className="flex items-center gap-8 ml-7 mt-1">
-        <Stat value={counts.total} label="processed" />
-        <Stat value={pending} label="queued" warn={pending > 100} title="Total messages waiting in the engine stream (shared across all engines)" />
-        {counts.errors > 0 && <Stat value={counts.errors} label="errors" warn />}
-        <Stat value={formatUptime(active.inited)} label="uptime" />
-        <Stat value={formatMemory(active.system?.TotalMemoryGB, active.system?.FreeMemoryGB)} label="memory" />
-      </div>
-
-      {/* Standby / paused list */}
-      {rest.length > 0 && (
-        <div className="mt-4 ml-7">
-          <button
-            onClick={() => setShowStandby(!showStandby)}
-            className="flex items-center gap-1.5 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
-          >
-            <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStandby ? 'rotate-90' : ''}`} strokeWidth={2} />
-            {rest.length} standby{pausedCount > 0 ? ` (${pausedCount} paused)` : ''}
-          </button>
-          <Collapsible open={showStandby}>
-            <div className="mt-1">
-              {rest.map((e) => (
-                <StandbyRow key={e.engine_id} engine={e} />
-              ))}
-            </div>
-          </Collapsible>
-        </div>
-      )}
+      {/* Paused — collapsed */}
+      <CollapsibleGroup label="paused" engines={paused} onThrottle={onThrottle} />
     </div>
   );
 }

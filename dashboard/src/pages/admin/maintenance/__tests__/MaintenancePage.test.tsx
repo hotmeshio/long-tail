@@ -72,38 +72,35 @@ describe('MaintenancePage', () => {
 
   it('renders the info callout', () => {
     renderPage();
-    expect(screen.getByText(/Completed process data grows indefinitely/)).toBeInTheDocument();
+    expect(screen.getByText(/Workflow data grows as jobs complete/)).toBeInTheDocument();
   });
 
   it('defaults to Schedule mode and shows schedule section', () => {
     renderPage();
-    // Schedule section has a cron expression input
     expect(screen.getByPlaceholderText('0 2 * * *')).toBeInTheDocument();
-    // Active status shown
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
   it('switches to Prune Now mode when clicked', () => {
     renderPage();
     fireEvent.click(screen.getByText('Prune Now'));
-    // Prune section has a "Prune Now" action button (distinct from the toggle)
     const pruneButtons = screen.getAllByText('Prune Now');
-    expect(pruneButtons.length).toBeGreaterThanOrEqual(2); // toggle + action button
+    expect(pruneButtons.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('renders Delete Expired Data fields in both modes', () => {
+  it('renders Stream Messages section', () => {
     renderPage();
-    expect(screen.getByText('Delete Expired Data')).toBeInTheDocument();
-    expect(screen.getByText('Jobs')).toBeInTheDocument();
-    expect(screen.getByText('Engine streams')).toBeInTheDocument();
-    expect(screen.getByText('Worker streams')).toBeInTheDocument();
+    expect(screen.getByText('Stream Messages')).toBeInTheDocument();
+    expect(screen.getByText('Engine messages')).toBeInTheDocument();
+    expect(screen.getByText('Worker messages')).toBeInTheDocument();
   });
 
-  it('renders Cleanup section in both modes', () => {
+  it('renders Completed Workflows section with radio options', () => {
     renderPage();
-    expect(screen.getByText('Cleanup')).toBeInTheDocument();
-    expect(screen.getByText('Strip execution artifacts')).toBeInTheDocument();
-    expect(screen.getByText('Delete transient jobs')).toBeInTheDocument();
+    expect(screen.getByText('Completed Workflows')).toBeInTheDocument();
+    expect(screen.getByText('Keep as-is')).toBeInTheDocument();
+    expect(screen.getByText('Reduce completed workflows')).toBeInTheDocument();
+    expect(screen.getByText('Delete completed workflows')).toBeInTheDocument();
   });
 
   it('renders cron preset pills in Schedule mode', () => {
@@ -151,7 +148,6 @@ describe('MaintenancePage - Prune mode', () => {
 
   it('opens confirm modal when Prune Now button is clicked', () => {
     renderPruneMode();
-    // Find the action button (not the toggle)
     const actionButtons = screen.getAllByText('Prune Now');
     const actionButton = actionButtons[actionButtons.length - 1];
     fireEvent.click(actionButton);
