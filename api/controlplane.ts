@@ -59,6 +59,7 @@ export async function applyThrottle(input: {
   throttle: number;
   topic?: string;
   guid?: string;
+  scope?: 'engines' | 'workers' | 'all';
 }): Promise<LTApiResult> {
   try {
     const appId = input.appId || 'durable';
@@ -71,6 +72,7 @@ export async function applyThrottle(input: {
       throttle: input.throttle,
       topic: input.topic,
       guid: input.guid,
+      scope: input.scope,
     });
 
     // Publish a synthetic event so the dashboard event stream sees it

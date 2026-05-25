@@ -37,8 +37,8 @@ router.get('/rollcall', requireAdmin, async (req, res) => {
  *   throttle: ms delay (-1 = pause, 0 = resume, >0 = delay per msg)
  */
 router.post('/throttle', requireAdmin, async (req, res) => {
-  const { appId = 'durable', throttle, topic, guid } = req.body;
-  const result = await api.applyThrottle({ appId, throttle, topic, guid });
+  const { appId = 'durable', throttle, topic, guid, scope } = req.body;
+  const result = await api.applyThrottle({ appId, throttle, topic, guid, scope });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

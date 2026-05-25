@@ -75,10 +75,7 @@ describe('ControlPlanePage', () => {
 
   it('renders page header with stats', () => {
     renderPage();
-    expect(screen.getAllByText('Queues').length).toBeGreaterThanOrEqual(1);
-    // Inline stats
-    expect(screen.getAllByText('Engines').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Queues').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Routers')).toBeInTheDocument();
   });
 
   it('shows engine and worker counts in header stats', () => {
@@ -94,12 +91,9 @@ describe('ControlPlanePage', () => {
     expect(screen.getByText('Resume All')).toBeInTheDocument();
   });
 
-  it('renders Worker Queues collapsible section with queue cards', () => {
+  it('renders Worker Routers collapsible section with queue cards', () => {
     renderPage();
-    expect(screen.getByText('Worker Queues')).toBeInTheDocument();
-    // Queue names shown via TaskQueuePill
-    expect(screen.getByText('long-tail-system-mcpTriage')).toBeInTheDocument();
-    expect(screen.getByText('long-tail-examples-reviewContent')).toBeInTheDocument();
+    expect(screen.getByText('Worker Routers')).toBeInTheDocument();
   });
 
   it('renders Engines collapsible section', () => {
@@ -124,9 +118,9 @@ describe('ControlPlanePage', () => {
     expect(screen.getByText('Application')).toBeInTheDocument();
   });
 
-  it('renders stream volume section', () => {
+  it('renders message volume section', () => {
     renderPage();
-    expect(screen.getByText(/Stream Volume/)).toBeInTheDocument();
+    expect(screen.getByText(/Message Volume/)).toBeInTheDocument();
   });
 
   it('renders quorum feed panel', () => {

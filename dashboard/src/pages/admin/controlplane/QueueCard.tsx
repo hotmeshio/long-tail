@@ -5,7 +5,7 @@ import { DataTable } from '../../../components/common/data/DataTable';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { QuorumProfile } from '../../../api/controlplane';
-import { isThrottled, formatThrottleHuman, formatMemory, rowKey, stripStreamPrefix, queueHealth, totalPending, sumCounts } from './helpers';
+import { isThrottled, formatThrottleHuman, rowKey, stripStreamPrefix, queueHealth, totalPending, sumCounts } from './helpers';
 import type { Column } from '../../../components/common/data/DataTable';
 import type { Duration } from './helpers';
 
@@ -57,16 +57,34 @@ export function QueueCard({
       ? 'bg-status-warning'
       : 'bg-status-success';
 
+  const sortedWorkers = useMemo(() =>
+    [...workers].sort((a, b) => sumCounts([b]).total - sumCounts([a]).total),
+    [workers],
+  );
+
   const columns = useMemo((): Column<QuorumProfile>[] => [
     {
       key: 'engine_id',
-      label: 'Worker ID',
-      render: (row) => (
-        <span className="text-xs font-mono text-text-tertiary">
-          {row.engine_id}
-        </span>
-      ),
-      className: 'w-48',
+      label: 'Router',
+      render: (row) => {
+        const label = row.engine_id.replace(/^[^:]+::/, '').replace(/-[A-Za-z0-9_]{10,}$/, '') || row.engine_id;
+        const source = row.engine_id.match(/^([^:]+)::/)?.[1] || '';
+        return (
+          <div className="flex items-center gap-2" title={row.engine_id}>
+            <span className="text-xs text-text-secondary truncate max-w-[180px]">{label}</span>
+            {source && <span className="text-[9px] text-text-tertiary/50">{source}</span>}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'processed',
+      label: 'Processed',
+      render: (row) => {
+        const c = sumCounts([row]);
+        return <span className="text-xs font-mono tabular-nums text-text-tertiary">{c.total > 0 ? c.total.toLocaleString() : '--'}</span>;
+      },
+      className: 'w-24',
     },
     {
       key: 'throttle',
@@ -78,16 +96,6 @@ export function QueueCard({
         return <span className="text-xs text-text-tertiary">0</span>;
       },
       className: 'w-24',
-    },
-    {
-      key: 'memory',
-      label: 'Memory',
-      render: (row) => (
-        <span className="text-xs font-mono text-text-tertiary">
-          {formatMemory(row.system?.TotalMemoryGB, row.system?.FreeMemoryGB)}
-        </span>
-      ),
-      className: 'w-36',
     },
     {
       key: 'actions',
@@ -184,7 +192,7 @@ export function QueueCard({
         <div className="ml-6">
           <DataTable
             columns={columns}
-            data={workers}
+            data={sortedWorkers}
             keyFn={rowKey}
             onRowClick={onWorkerClick}
             emptyMessage="No workers"

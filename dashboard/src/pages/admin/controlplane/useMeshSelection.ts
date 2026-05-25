@@ -63,9 +63,9 @@ export function useMeshSelection({
     const workers = selected.filter(isWorker);
     const targets: ThrottleTarget[] = [];
 
-    // Engines — always guid-per-engine (each engine subscribes to its own guid channel)
+    // Engines — always guid-per-engine, scoped to engines only
     for (const e of engines) {
-      targets.push({ label: `Engine ${e.engine_id}`, guid: e.engine_id });
+      targets.push({ label: `Engine ${e.engine_id}`, guid: e.engine_id, scope: 'engines' });
     }
 
     // Workers — topic targets the queue; guid targets a single instance
@@ -98,18 +98,22 @@ export function useMeshSelection({
         throttle: ms,
         ...(t.topic ? { topic: t.topic } : {}),
         ...(t.guid ? { guid: t.guid } : {}),
+        ...(t.scope ? { scope: t.scope } : {}),
       });
     }
     setThrottleModalOpen(false);
     setThrottleTargets([]);
   };
 
-  const handleRowClick = (profile: QuorumProfile) => {
+  const handleRowClick = (profile: QuorumProfile, scope?: 'engines' | 'workers') => {
     const label = isWorker(profile)
       ? `${profile.worker_topic} ${profile.engine_id}`
       : `Engine ${profile.engine_id}`;
-    // guid-only: workers and engines both subscribe to their own guid channel
-    setThrottleTargets([{ label, guid: profile.engine_id }]);
+    setThrottleTargets([{
+      label,
+      guid: profile.engine_id,
+      scope: scope || (isWorker(profile) ? 'workers' : 'engines'),
+    }]);
     setThrottleModalOpen(true);
   };
 
@@ -118,9 +122,9 @@ export function useMeshSelection({
     setThrottleModalOpen(true);
   };
 
-  const handleResumeThrottle = (profile: QuorumProfile) => {
-    // guid-only: both engines and workers subscribe to their own guid channel
-    throttleMutation.mutate({ appId: activeAppId, throttle: 0, guid: profile.engine_id });
+  const handleResumeThrottle = (profile: QuorumProfile, scope?: 'engines' | 'workers') => {
+    const resolvedScope = scope || (isWorker(profile) ? 'workers' : 'engines');
+    throttleMutation.mutate({ appId: activeAppId, throttle: 0, guid: profile.engine_id, scope: resolvedScope });
   };
 
   const handleResumeQueue = (queueName: string) => {

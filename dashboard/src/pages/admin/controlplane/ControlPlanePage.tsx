@@ -114,7 +114,7 @@ export function ControlPlanePage() {
     const stats: InlineStat[] = [
       { label: 'Engines', value: engines.length, dotClass: 'bg-blue-500' },
       { label: 'Workers', value: workers.length, dotClass: 'bg-text-secondary' },
-      { label: 'Queues', value: queueMap.size },
+      { label: 'Topics', value: queueMap.size },
     ];
     if (throttledCount > 0) {
       stats.push({ label: 'Throttled', value: throttledCount, dotClass: 'bg-status-warning' });
@@ -140,7 +140,7 @@ export function ControlPlanePage() {
   return (
     <div>
       <PageHeaderWithStats
-        title="Queues"
+        title="Routers"
         docsHash="#docs:dashboard.md:task-queues"
         stats={headerStats}
         actions={<EmergencyControls />}

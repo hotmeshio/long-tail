@@ -43,9 +43,8 @@ export function MaintenancePage() {
       <div className="flex items-start gap-2 px-4 py-3 mb-8 rounded-md bg-accent/5 border border-accent/10">
         <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
         <p className="text-xs text-text-secondary leading-relaxed">
-          Completed process data grows indefinitely.
-          Schedule regular pruning to keep the database lean and queries fast.
-          Worker streams are retained longer than engine streams to preserve execution playback.
+          Workflow data grows as jobs complete. Operations are ordered safest-first: stream messages are
+          always safe to prune, workflow reduction preserves results, and deletion is permanent.
         </p>
       </div>
 

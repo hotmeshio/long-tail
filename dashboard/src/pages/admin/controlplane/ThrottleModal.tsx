@@ -27,12 +27,14 @@ function TargetPill({ target }: { target: ThrottleTarget }) {
     : isEngine
       ? 'bg-blue-500/10 text-blue-500'
       : 'bg-accent/[0.06] text-text-secondary';
-  const scope = target.guid ? 'guid' : target.topic ? 'topic' : 'mesh';
+  const scopeLabel = target.scope === 'engines' ? 'engine only'
+    : target.scope === 'workers' ? 'worker only'
+    : target.guid ? 'guid' : target.topic ? 'topic' : 'mesh';
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium rounded-lg ${color}`}>
       {target.label}
-      <span className="text-[8px] opacity-50">{scope}</span>
+      <span className="text-[8px] opacity-50">{scopeLabel}</span>
     </span>
   );
 }

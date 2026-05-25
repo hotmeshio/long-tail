@@ -45,9 +45,9 @@ export function ControlPlaneContent({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
       <div className="flex flex-col gap-12 mt-10">
-        {/* Stream Volume section */}
+        {/* Stream Volume */}
         <CollapsibleSection
-          title={`Stream Volume (${activeDuration})`}
+          title={`Message Volume (${activeDuration})`}
           sectionKey="volume"
           isCollapsed={!!collapsed.volume}
           onToggle={toggleSection}
@@ -60,9 +60,24 @@ export function ControlPlaneContent({
           />
         </CollapsibleSection>
 
-        {/* Task Queues section */}
+        {/* Engine Routers — nervous system, shown first */}
         <CollapsibleSection
-          title="Worker Queues"
+          title={`Engine Routers (${engines.length})`}
+          sectionKey="engines"
+          isCollapsed={!!collapsed.engines}
+          onToggle={toggleSection}
+          contentClassName="mt-4 ml-7"
+        >
+          <EngineCluster
+            engines={engines}
+            onThrottle={handleRowClick}
+            isLoading={isLoading}
+          />
+        </CollapsibleSection>
+
+        {/* Worker Routers */}
+        <CollapsibleSection
+          title="Worker Routers"
           sectionKey="queues"
           isCollapsed={!!collapsed.queues}
           onToggle={toggleSection}
@@ -71,7 +86,7 @@ export function ControlPlaneContent({
           {isLoading ? (
             <p className="text-xs text-text-tertiary">Discovering mesh nodes...</p>
           ) : queueMap.size === 0 ? (
-            <p className="text-xs text-text-tertiary">No worker queues found. Click "Roll Call" to discover.</p>
+            <p className="text-xs text-text-tertiary">No worker routers found. Click "Roll Call" to discover.</p>
           ) : (
             <>
               <div className="flex justify-end mb-2">
@@ -98,22 +113,6 @@ export function ControlPlaneContent({
                 ))}
             </>
           )}
-        </CollapsibleSection>
-
-        {/* Engine cluster */}
-        <CollapsibleSection
-          title={`Engine Cluster (${engines.length})`}
-          sectionKey="engines"
-          isCollapsed={!!collapsed.engines}
-          onToggle={toggleSection}
-          contentClassName="mt-4 ml-7"
-        >
-          <EngineCluster
-            engines={engines}
-            onThrottle={handleRowClick}
-            onResumeThrottle={handleResumeThrottle}
-            isLoading={isLoading}
-          />
         </CollapsibleSection>
       </div>
 
