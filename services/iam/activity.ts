@@ -51,16 +51,13 @@ export interface ActivityIdentity {
 }
 
 /**
- * Returns the identity context for the current proxy activity.
- * @throws Error if called outside an interceptor-wrapped activity.
+ * Returns the identity context for the current proxy activity,
+ * or `null` when called outside an interceptor-wrapped context
+ * (e.g., cron-invoked or agent-triggered workflows).
  */
-export function getActivityIdentity(): ActivityIdentity {
+export function getActivityIdentity(): ActivityIdentity | null {
   const ctx = getToolContext();
-  if (!ctx) {
-    throw new Error(
-      'No IAM context available. Is this running inside a proxy activity with the LT interceptor?',
-    );
-  }
+  if (!ctx) return null;
 
   return {
     principal: ctx.principal,
