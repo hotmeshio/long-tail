@@ -107,7 +107,35 @@ Templates resolve at runtime. `{event.data.orderId}` becomes the actual orderId 
 
 ### Distributed safety
 
-When multiple instances of the platform run in parallel, the same event might reach multiple subscribers. The system derives a deterministic workflow ID from each event, ensuring the reaction runs exactly once regardless of how many subscribers receive it.
+When multiple containers run in parallel, every container receives every published event. Without coordination, a subscription would fire the same workflow N times — once per container. The system prevents this with **deterministic workflow IDs** and **HotMesh's idempotent start**.
+
+#### How it works
+
+1. **Each container** receives the event through its `CallbackEventAdapter`.
+2. **Each container** independently computes a deterministic workflow ID from the event:
+
+```
+agent-{agentId}-{subscriptionId[0:8]}-{eventKey}
+```
+
+The `eventKey` is derived from the event's originating workflow ID, task ID, or escalation ID when available. For custom application events (which don't carry these IDs), the system hashes the event timestamp + type + payload to produce a stable 12-character key.
+
+3. **Each container** calls `Durable.Client.workflow.start({ workflowId })` with this ID.
+4. **HotMesh rejects duplicates** — the first container to reach the durable engine wins. All others receive a "Duplicate job" error, which is caught and silently ignored.
+
+The result: exactly one workflow execution per event, regardless of container count.
+
+#### Comparison with cron
+
+Cron schedules use a different mechanism. `Virtual.cron()` is a durable HotMesh construct that uses JetStream consumer groups internally. Only one container picks up each tick — the deduplication happens at the scheduling layer, not the invocation layer. The callback executes on exactly one container per tick.
+
+#### What's NOT deduplicated
+
+Agent lifecycle events (`agent.started`, `agent.completed`) are still emitted by every container that processes the event. These are observability side effects, not workflow state — duplicate lifecycle events are harmless and expected.
+
+#### Custom application events
+
+When publishing custom events from your workflows (e.g., `app.orders.created`), include a stable identifier in `event.data` whenever possible. The deterministic ID derivation uses `event.workflowId` first, but for custom events published outside a workflow context, the system falls back to hashing the full payload. If two events have identical payloads and timestamps, they produce the same hash — which is correct (same event, same reaction) but worth understanding.
 
 ### Filters
 
