@@ -16,16 +16,76 @@ export function EscalationHero({
   claimed,
   isTerminal,
   traceUrl,
+  isDevMode,
 }: {
   esc: LTEscalationRecord;
   claimedByMe: boolean;
   claimed: boolean;
   isTerminal: boolean;
   traceUrl: string | null;
+  isDevMode: boolean;
 }) {
   const [showDetails, setShowDetails] = useState(false);
   const isAck = isAckEscalation(esc);
 
+  // ── User mode: clean typography + lines, no cards ──
+  if (!isDevMode) {
+    return (
+      <div className="mb-2">
+        {/* Description — large, the focal point */}
+        {esc.description && (
+          <p className="text-2xl font-light text-text-primary leading-relaxed mb-6">
+            {esc.description}
+          </p>
+        )}
+
+        {/* Meta grid — labeled values, single bottom border */}
+        <div className="flex flex-wrap gap-x-8 gap-y-4 pb-5 border-b border-surface-border">
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Status</p>
+            <StatusBadge status={esc.status} />
+          </div>
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Assigned to Role</p>
+            <RolePill role={esc.role} size="md" />
+          </div>
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
+            <span className="text-xs text-text-secondary"><DateValue date={esc.created_at} /></span>
+          </div>
+          {claimed && esc.assigned_to && (
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Claimed By</p>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-primary">
+                <User className="w-3 h-3 text-accent/75" />
+                <UserName userId={esc.assigned_to} />
+              </span>
+            </div>
+          )}
+          {claimed && esc.claimed_at && (
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Claimed</p>
+              <span className="text-xs text-text-secondary"><DateValue date={esc.claimed_at} /></span>
+            </div>
+          )}
+          {claimed && !isTerminal && esc.assigned_until && (
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Time Remaining</p>
+              <span className="text-xs"><CountdownTimer until={esc.assigned_until} /></span>
+            </div>
+          )}
+          {esc.resolved_at && (
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Completed</p>
+              <span className="text-xs text-status-success"><DateValue date={esc.resolved_at} /></span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Dev mode: original layout ──
   return (
     <>
       {/* Title */}
@@ -45,27 +105,20 @@ export function EscalationHero({
 
       {/* Meta bar — labeled sections, baseline-aligned values */}
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3 mt-4 mb-2">
-        {/* Status */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Status</p>
           <span className="mb-1 inline-block"><StatusBadge status={esc.status} /></span>
         </div>
-
-        {/* Role */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Role</p>
           <RolePill role={esc.role} size="md" />
         </div>
-
-        {/* Created */}
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Created</p>
           <span className="inline-flex items-center mb-1 text-xs text-text-secondary">
             <DateValue date={esc.created_at} />
           </span>
         </div>
-
-        {/* Claimed by */}
         {esc.assigned_to && (
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Claimed by</p>
@@ -75,16 +128,12 @@ export function EscalationHero({
             </span>
           </div>
         )}
-
-        {/* Time left */}
         {claimed && !isTerminal && esc.assigned_until && (
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Time left</p>
             <span className="inline-flex items-center h-5"><CountdownTimer until={esc.assigned_until} /></span>
           </div>
         )}
-
-        {/* Resolved */}
         {esc.resolved_at && (
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Resolved</p>
@@ -93,8 +142,6 @@ export function EscalationHero({
             </span>
           </div>
         )}
-
-        {/* Details toggle */}
         <div>
           <button
             onClick={() => setShowDetails(!showDetails)}
@@ -121,11 +168,11 @@ export function EscalationHero({
           {esc.task_id && (
             <CopyableId label="Task" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />
           )}
-          <CopyableId label="Workflow" value={esc.workflow_type} />
-          <CopyableId label="Workflow ID" value={esc.workflow_id} />
-          <CopyableId label="Task Queue" value={esc.task_queue} />
+          <CopyableId label="Workflow" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/registry/${esc.workflow_type}` : undefined} />
+          <CopyableId label="Workflow ID" value={esc.workflow_id} href={esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
+          <CopyableId label="Task Queue" value={esc.task_queue} href={esc.task_queue ? `/topics/${esc.task_queue}` : undefined} />
           {esc.origin_id && esc.origin_id !== esc.workflow_id && (
-            <CopyableId label="Origin" value={esc.origin_id} />
+            <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
           )}
           {esc.trace_id && (
             <CopyableId

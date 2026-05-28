@@ -12,6 +12,7 @@ export type {
   KitchenSinkEnvelopeData,
   BasicEchoEnvelopeData,
   BasicSignalEnvelopeData,
+  RichFormEnvelopeData,
   AssemblyLineEnvelopeData,
   StepIteratorEnvelopeData,
   ReverterEnvelopeData,

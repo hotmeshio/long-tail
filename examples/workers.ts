@@ -8,6 +8,7 @@ import * as workstationWorkflow from './workflows/assembly-line/worker';
 import * as stepIteratorWorkflow from './workflows/assembly-line/iterator';
 import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
+import * as richFormWorkflow from './workflows/rich-form';
 
 // ── Role constants ──────────────────────────────────────────────────────────
 
@@ -76,6 +77,17 @@ const basicSignalConfig: LTWorkerConfig = {
       approved: { type: 'boolean', default: false, description: 'Approve this deployment?' },
       notes: { type: 'string', default: '', description: 'Reviewer notes — visible to the workflow author' },
     },
+  },
+};
+
+const richFormConfig: LTWorkerConfig = {
+  description: 'Rich form showcase — exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, read-only, ordering',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  envelopeSchema: {
+    data: { role: REVIEWER },
+    metadata: { source: 'dashboard' },
   },
 };
 
@@ -164,4 +176,5 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: stepIteratorWorkflow.stepIterator, config: stepIteratorConfig },
   { taskQueue: 'long-tail-examples', workflow: reverterWorkflow.reverter, config: reverterConfig },
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
+  { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
 ];

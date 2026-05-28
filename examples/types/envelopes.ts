@@ -44,6 +44,12 @@ export interface BasicSignalEnvelopeData {
   role?: string;
 }
 
+/** Rich form — showcases every HITL form feature. */
+export interface RichFormEnvelopeData {
+  /** Role to assign the escalation to. */
+  role?: string;
+}
+
 // ── assemblyLine ─────────────────────────────────────────────
 
 /** Assembly line — durable orchestrator with sequential human task queues. */
@@ -85,6 +91,7 @@ export type WorkflowEnvelopeMap = {
   kitchenSink: KitchenSinkEnvelopeData;
   basicEcho: BasicEchoEnvelopeData;
   basicSignal: BasicSignalEnvelopeData;
+  richForm: RichFormEnvelopeData;
   assemblyLine: AssemblyLineEnvelopeData;
   stepIterator: StepIteratorEnvelopeData;
   reverter: ReverterEnvelopeData;
