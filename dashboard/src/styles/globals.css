@@ -91,6 +91,21 @@
   animation: pageFade 200ms ease-out both;
 }
 
+/* Form field validation animations */
+@keyframes field-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-4px); }
+  30% { transform: translateX(3px); }
+  45% { transform: translateX(-2px); }
+  60% { transform: translateX(1px); }
+  75% { transform: translateX(0); }
+}
+
+@keyframes field-error-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Striped pattern for pending timeline bars */
 .bg-stripes {
   background-image: repeating-linear-gradient(

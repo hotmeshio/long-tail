@@ -297,9 +297,16 @@ The activity interceptor inspects every activity result. If the result contains 
 
 All three call sites use `publishMilestoneEvent()`, which is fire-and-forget. It returns immediately, never throws, and swallows errors. Events are a non-durable side effect: they are not replayed on workflow recovery. If the process crashes between task completion and event publication, the event is lost. Design downstream consumers accordingly.
 
+## Multi-Container Idempotency
+
+In a multi-container deployment, every container receives every published event. Agent subscriptions that react to events use **deterministic workflow IDs** to ensure exactly-once execution across the fleet. See [Agents: Distributed Safety](agents.md#distributed-safety) for the full mechanism.
+
+Cron schedules use a different approach — HotMesh's `Virtual.cron()` uses internal JetStream consumer groups to elect a single container per tick.
+
 ## Related
 
 - [Topic Catalog](topics.md) — persistent registry of known topics with schemas and discovery
 - [Agents: Subscriptions](agents.md#subscriptions) — wiring topics to reactive workflows
+- [Agents: Distributed Safety](agents.md#distributed-safety) — how deterministic IDs prevent duplicate reactions
 - [Topics HTTP API](api/http/topics.md) — REST endpoints for the catalog
 - [Topics SDK](api/sdk/topics.md) — `TopicService` programmatic access

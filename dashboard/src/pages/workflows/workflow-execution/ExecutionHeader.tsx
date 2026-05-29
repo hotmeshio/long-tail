@@ -55,9 +55,15 @@ interface ExecutionHeaderProps {
 }
 
 export function ExecutionHeader({ execution, task, escalations }: ExecutionHeaderProps) {
-  // Determine parent relationship
+  // Determine parent relationship — prefer execution-level pj (from HotMesh
+  // raw state), fall back to lt_tasks record. When the SDK adds
+  // parent_workflow_id natively, it flows through automatically.
+  const executionParent = (execution as any).parent_workflow_id as string | undefined;
   const isLeaf = task && task.workflow_id === execution.workflow_id;
-  const parentWorkflowId = isLeaf ? task.parent_workflow_id : null;
+  const taskParent = isLeaf ? task.parent_workflow_id : null;
+  const rawParent = executionParent || taskParent || null;
+  // Filter self-references — cron-invoked workflows store themselves as parent
+  const parentWorkflowId = rawParent && rawParent !== execution.workflow_id ? rawParent : null;
 
   // Split compound HotMesh keys into separate task queue / workflow type
   const { taskQueue, workflowType } = splitEntityKey(execution.workflow_type);

@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { PageHeaderWithStats, type InlineStat } from '../../../components/common/layout/PageHeaderWithStats';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
@@ -64,13 +65,27 @@ export function ControlPlanePage() {
     return [...ids].sort().map((id) => ({ value: id, label: id }));
   }, [apps, activeAppId]);
 
+  // ── Deep-link: auto-expand a queue from ?queue= param ──────────
+  const [searchParams] = useSearchParams();
+  const deepLinkQueue = searchParams.get('queue');
+
   // ── Queue card expand/collapse state ───────────────────────────
-  const [expandedQueues, setExpandedQueues] = useState<Set<string>>(new Set());
+  const [expandedQueues, setExpandedQueues] = useState<Set<string>>(
+    () => deepLinkQueue ? new Set([deepLinkQueue]) : new Set(),
+  );
   const toggleQueue = useCallback((queue: string) => {
     setExpandedQueues((prev) => {
-      const next = new Set(prev);
-      if (next.has(queue)) next.delete(queue);
-      else next.add(queue);
+      const closing = prev.has(queue);
+      const next = closing ? new Set<string>() : new Set([queue]);
+      // Sync URL — add or remove ?queue= param
+      const params = new URLSearchParams(window.location.search);
+      if (closing) {
+        params.delete('queue');
+      } else {
+        params.set('queue', queue);
+      }
+      const qs = params.toString();
+      window.history.pushState(null, '', qs ? `?${qs}` : window.location.pathname);
       return next;
     });
   }, []);
@@ -84,7 +99,10 @@ export function ControlPlanePage() {
   const STORAGE_KEY = 'lt:controlplane:collapsed';
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      // When deep-linking to a queue, ensure Worker Routers section is open
+      if (deepLinkQueue) saved.queues = false;
+      return saved;
     } catch { return {}; }
   });
   const toggleSection = useCallback((key: string) => {

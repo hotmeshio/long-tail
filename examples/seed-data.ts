@@ -4,6 +4,7 @@ import type {
   KitchenSinkEnvelopeData,
   BasicEchoEnvelopeData,
   BasicSignalEnvelopeData,
+  RichFormEnvelopeData,
 } from './types';
 
 // ── Seed users ───────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -192,6 +193,23 @@ export const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'basic-signal',
         description: 'Lightweight signal-based escalation — workflow stays running, no interceptor. Claim the escalation, fill the form, and resolve to resume the workflow.',
+      },
+    },
+  },
+
+  // -- Process 7: Rich Form
+  {
+    label: 'Process 7 — Rich Form',
+    workflowName: 'richForm',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: {
+        role: 'reviewer',
+      } satisfies RichFormEnvelopeData,
+      metadata: {
+        source: 'seed',
+        process: 'rich-form',
+        description: 'Showcases every HITL form feature: date pickers, email, file upload, two-column layout, required fields, and ordering.',
       },
     },
   },

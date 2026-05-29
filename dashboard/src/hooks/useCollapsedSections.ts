@@ -40,5 +40,31 @@ export function useCollapsedSections(pageKey: string) {
     [pageKey],
   );
 
-  return { isCollapsed, toggle };
+  const collapse = useCallback(
+    (section: string) => {
+      setCollapsed((prev) => {
+        if (prev.has(section)) return prev;
+        const next = new Set(prev);
+        next.add(section);
+        save(pageKey, next);
+        return next;
+      });
+    },
+    [pageKey],
+  );
+
+  const expand = useCallback(
+    (section: string) => {
+      setCollapsed((prev) => {
+        if (!prev.has(section)) return prev;
+        const next = new Set(prev);
+        next.delete(section);
+        save(pageKey, next);
+        return next;
+      });
+    },
+    [pageKey],
+  );
+
+  return { isCollapsed, toggle, collapse, expand };
 }

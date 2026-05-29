@@ -4,8 +4,11 @@ import { CollapsibleSection } from '../../../components/common/layout/Collapsibl
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { TriageContext } from '../../../components/escalation/TriageContext';
+import { IframeViewport } from '../../../components/escalation/IframeViewport';
+import { ResolverForm } from '../../../components/escalation/ResolverForm';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
+import type { LTEscalationRecord } from '../../../api/types';
 
 interface EscalationContextProps {
   isRoundsExhausted: boolean;
@@ -64,13 +67,9 @@ export function EscalationContextBlocks({
 }
 
 interface CollapsibleSectionsProps {
-  collapsed: Record<string, boolean>;
+  isCollapsed: (key: string) => boolean;
   toggleSection: (key: string) => void;
-  esc: {
-    envelope?: unknown;
-    workflow_type?: string | null;
-    metadata?: unknown;
-  };
+  esc: LTEscalationRecord;
   escalationPayload: unknown;
   resolverPayload: unknown;
   triageData?: Record<string, unknown>;
@@ -85,10 +84,14 @@ interface CollapsibleSectionsProps {
   onRequestTriageChange: (v: boolean) => void;
   triageNotes: string;
   onTriageNotesChange: (v: string) => void;
+  isDevMode: boolean;
+  onResolve?: (payload: Record<string, unknown>) => void;
+  onEscalate?: (targetRole: string) => void;
+  submitAttempted?: boolean;
 }
 
 export function EscalationCollapsibleSections({
-  collapsed,
+  isCollapsed,
   toggleSection,
   esc,
   escalationPayload,
@@ -105,45 +108,51 @@ export function EscalationCollapsibleSections({
   onRequestTriageChange,
   triageNotes,
   onTriageNotesChange,
+  isDevMode,
+  onResolve,
+  onEscalate,
+  submitAttempted,
 }: CollapsibleSectionsProps) {
   return (
     <div className="mt-8 space-y-6">
-      {/* Input/Output */}
-      <CollapsibleSection
-        title="Input / Output"
-        sectionKey="context"
-        isCollapsed={collapsed.context ?? true}
-        onToggle={toggleSection}
-        contentClassName="mt-4 ml-9"
-      >
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {!!esc.envelope && (
-              <div>
-                <JsonViewer data={esc.envelope} label="Input Envelope" />
-              </div>
-            )}
-            {escalationPayload != null && (
-              <div>
-                <JsonViewer data={escalationPayload} label="Escalation Context" />
+      {/* Input/Output — dev mode only */}
+      {isDevMode && (
+        <CollapsibleSection
+          title="Input / Output"
+          sectionKey="context"
+          isCollapsed={isCollapsed('context')}
+          onToggle={toggleSection}
+          contentClassName="mt-4 ml-9"
+        >
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!!esc.envelope && (
+                <div>
+                  <JsonViewer data={esc.envelope} label="Input Envelope" />
+                </div>
+              )}
+              {escalationPayload != null && (
+                <div>
+                  <JsonViewer data={escalationPayload} label="Escalation Context" />
+                </div>
+              )}
+            </div>
+
+            {resolverPayload != null && (
+              <div className="max-w-xl">
+                <JsonViewer data={resolverPayload} label="Resolver Payload" />
               </div>
             )}
           </div>
+        </CollapsibleSection>
+      )}
 
-          {resolverPayload != null && (
-            <div className="max-w-xl">
-              <JsonViewer data={resolverPayload} label="Resolver Payload" />
-            </div>
-          )}
-        </div>
-      </CollapsibleSection>
-
-      {/* Triage context */}
-      {triageData && payloadObj && (
+      {/* Triage context — dev mode only */}
+      {isDevMode && triageData && payloadObj && (
         <CollapsibleSection
           title="AI Triage"
           sectionKey="triage"
-          isCollapsed={!!collapsed.triage}
+          isCollapsed={isCollapsed('triage')}
           onToggle={toggleSection}
           contentClassName="mt-4 ml-9"
         >
@@ -151,25 +160,93 @@ export function EscalationCollapsibleSections({
         </CollapsibleSection>
       )}
 
-      {/* Resolver form */}
-      {!isTerminal && claimedByMe && activeView === 'resolve' && !!(esc.workflow_type || metadataFormSchema) && (
-        <CollapsibleSection
-          title="Submit Your Resolution"
-          sectionKey="resolver"
-          isCollapsed={!!collapsed.resolver}
-          onToggle={toggleSection}
-          contentClassName="mt-4 ml-9"
-        >
-          <ResolverSection
-            json={json}
-            onJsonChange={onJsonChange}
-            requestTriage={requestTriage}
-            onRequestTriageChange={onRequestTriageChange}
-            triageNotes={triageNotes}
-            onTriageNotesChange={onTriageNotesChange}
-          />
-        </CollapsibleSection>
-      )}
+      {/* User mode: show read-only resolver payload when terminal */}
+      {!isDevMode && isTerminal && resolverPayload != null && (() => {
+        const payload = typeof resolverPayload === 'object' && resolverPayload !== null
+          ? resolverPayload as Record<string, unknown>
+          : {};
+        const schema = metadataFormSchema as Record<string, unknown> | null;
+        const merged = schema ? { ...payload, _form_schema: schema } : payload;
+        return (
+          <div className="pt-6">
+            <ResolverForm
+              value={JSON.stringify(merged, null, 2)}
+              onChange={() => {}}
+              disabled
+            />
+          </div>
+        );
+      })()}
+
+      {/* Resolver form or iframe viewport — in user mode, show even before claiming */}
+      {!isTerminal && (claimedByMe || !isDevMode) && activeView === 'resolve' && !!(esc.workflow_type || metadataFormSchema) && (() => {
+        const schema = metadataFormSchema as Record<string, unknown> | null;
+        const viewport = schema?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
+        const isIframeViewport = viewport?.type === 'iframe' && !!viewport.src && onResolve && onEscalate;
+
+        // ── User mode: clean section with divider ──
+        if (!isDevMode) {
+          return (
+            <div className="pt-6">
+
+              {/* Form */}
+              {isIframeViewport ? (
+                <IframeViewport
+                  src={viewport!.src!}
+                  escalation={esc}
+                  schema={schema!}
+                  onResolve={onResolve!}
+                  onEscalate={onEscalate!}
+                />
+              ) : (
+                <ResolverSection
+                  json={json}
+                  onJsonChange={onJsonChange}
+                  requestTriage={requestTriage}
+                  onRequestTriageChange={onRequestTriageChange}
+                  triageNotes={triageNotes}
+                  onTriageNotesChange={onTriageNotesChange}
+                  isDevMode={isDevMode}
+                  disabled={!claimedByMe}
+                  submitAttempted={submitAttempted}
+                />
+              )}
+            </div>
+          );
+        }
+
+        // ── Dev mode: collapsible section ──
+        return (
+          <CollapsibleSection
+            title="Submit Your Resolution"
+            sectionKey="resolver"
+            isCollapsed={isCollapsed('resolver')}
+            onToggle={toggleSection}
+            contentClassName="mt-4 ml-9"
+          >
+            {isIframeViewport ? (
+              <IframeViewport
+                src={viewport!.src!}
+                escalation={esc}
+                schema={schema!}
+                onResolve={onResolve!}
+                onEscalate={onEscalate!}
+              />
+            ) : (
+              <ResolverSection
+                json={json}
+                onJsonChange={onJsonChange}
+                requestTriage={requestTriage}
+                onRequestTriageChange={onRequestTriageChange}
+                triageNotes={triageNotes}
+                onTriageNotesChange={onTriageNotesChange}
+                isDevMode={isDevMode}
+                submitAttempted={submitAttempted}
+              />
+            )}
+          </CollapsibleSection>
+        );
+      })()}
     </div>
   );
 }

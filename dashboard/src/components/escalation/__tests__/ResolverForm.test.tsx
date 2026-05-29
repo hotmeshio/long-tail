@@ -1,0 +1,234 @@
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { ResolverForm } from '../ResolverForm';
+
+function formJson(fields: Record<string, unknown>, schema?: Record<string, unknown>) {
+  const data: Record<string, unknown> = { ...fields };
+  if (schema) data._form_schema = schema;
+  return JSON.stringify(data, null, 2);
+}
+
+describe('ResolverForm', () => {
+  // ── Basic rendering ──
+  it('renders string fields as text inputs', () => {
+    const json = formJson({ name: 'Alice' });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
+  });
+
+  it('renders boolean fields as checkboxes', () => {
+    const json = formJson({ approved: false });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    const checkbox = screen.getByRole('checkbox');
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it('renders number fields as number inputs', () => {
+    const json = formJson({ count: 42 });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue('42')).toBeInTheDocument();
+  });
+
+  it('renders enum strings as select dropdowns', () => {
+    const json = formJson({ tier: 'free' }, {
+      properties: { tier: { type: 'string', enum: ['free', 'pro', 'enterprise'] } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    const select = screen.getByRole('combobox');
+    expect(select).toBeInTheDocument();
+    expect(screen.getByText('pro')).toBeInTheDocument();
+    expect(screen.getByText('enterprise')).toBeInTheDocument();
+  });
+
+  it('hides keys starting with underscore', () => {
+    const json = JSON.stringify({ visible: 'yes', _internal: 'hidden' });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue('yes')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('hidden')).not.toBeInTheDocument();
+  });
+
+  it('shows empty state when no fields', () => {
+    render(<ResolverForm value="{}" onChange={vi.fn()} />);
+    expect(screen.getByText('No resolver fields defined.')).toBeInTheDocument();
+  });
+
+  it('shows parse error for invalid JSON', () => {
+    render(<ResolverForm value="not json" onChange={vi.fn()} />);
+    expect(screen.getByText(/unable to parse/i)).toBeInTheDocument();
+  });
+
+  // ── Format extensions ──
+  it('renders format=date as date input', () => {
+    const json = formJson({ start: '' }, {
+      properties: { start: { type: 'string', format: 'date' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('input[type="date"]')).toBeInTheDocument();
+  });
+
+  it('renders format=email as email input', () => {
+    const json = formJson({ email: '' }, {
+      properties: { email: { type: 'string', format: 'email' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('input[type="email"]')).toBeInTheDocument();
+  });
+
+  it('renders format=datetime-local for date-time', () => {
+    const json = formJson({ ts: '' }, {
+      properties: { ts: { type: 'string', format: 'date-time' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('input[type="datetime-local"]')).toBeInTheDocument();
+  });
+
+  it('renders format=uri as url input', () => {
+    const json = formJson({ link: '' }, {
+      properties: { link: { type: 'string', format: 'uri' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('input[type="url"]')).toBeInTheDocument();
+  });
+
+  it('renders format=textarea as textarea', () => {
+    const json = formJson({ notes: 'short' }, {
+      properties: { notes: { type: 'string', format: 'textarea' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('textarea')).toBeInTheDocument();
+  });
+
+  it('renders format=password as password input', () => {
+    const json = formJson({ secret: '' }, {
+      properties: { secret: { type: 'string', format: 'password' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('input[type="password"]')).toBeInTheDocument();
+  });
+
+  // ── Required fields ──
+  it('shows asterisk for required fields', () => {
+    const json = formJson({ name: '' }, {
+      required: ['name'],
+      properties: { name: { type: 'string' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('*')).toBeInTheDocument();
+  });
+
+  // ── ReadOnly fields ──
+  it('renders readOnly fields as static text', () => {
+    const json = formJson({ amount: 100 }, {
+      properties: { amount: { type: 'number', readOnly: true } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('100')).not.toBeInTheDocument();
+  });
+
+  // ── Field ordering ──
+  it('orders fields by x-lt-order', () => {
+    const json = formJson({ c: '3', a: '1', b: '2' }, {
+      'x-lt-order': ['a', 'b', 'c'],
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'string' },
+        c: { type: 'string' },
+      },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    const inputs = container.querySelectorAll('input[type="text"]');
+    expect((inputs[0] as HTMLInputElement).value).toBe('1');
+    expect((inputs[1] as HTMLInputElement).value).toBe('2');
+    expect((inputs[2] as HTMLInputElement).value).toBe('3');
+  });
+
+  // ── Layout ──
+  it('renders two-column layout when x-lt-layout is two-column', () => {
+    const json = formJson({ a: '1', b: '2' }, {
+      'x-lt-layout': 'two-column',
+      properties: { a: { type: 'string' }, b: { type: 'string' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    const grid = container.querySelector('.grid');
+    expect(grid).toBeInTheDocument();
+    expect(grid!.className).toContain('grid-cols-2');
+  });
+
+  // ── Schema title and description ──
+  it('renders schema title and description', () => {
+    const json = formJson({ name: '' }, {
+      title: 'Customer Intake',
+      description: 'Fill out the form carefully.',
+      properties: { name: { type: 'string' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('Customer Intake')).toBeInTheDocument();
+    expect(screen.getByText('Fill out the form carefully.')).toBeInTheDocument();
+  });
+
+  // ── Disabled mode ──
+  it('applies disabled styling when disabled', () => {
+    const json = formJson({ name: 'Alice' });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} disabled />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper!.className).toContain('opacity-60');
+    expect(wrapper!.className).toContain('pointer-events-none');
+  });
+
+  it('does not apply disabled styling when not disabled', () => {
+    const json = formJson({ name: 'Alice' });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper!.className).not.toContain('opacity-60');
+  });
+
+  // ── onChange ──
+  it('calls onChange with updated JSON when field changes', () => {
+    const onChange = vi.fn();
+    const json = formJson({ name: 'Alice' });
+    render(<ResolverForm value={json} onChange={onChange} />);
+
+    fireEvent.change(screen.getByDisplayValue('Alice'), { target: { value: 'Bob' } });
+    expect(onChange).toHaveBeenCalled();
+    const emitted = JSON.parse(onChange.mock.calls[0][0]);
+    expect(emitted.name).toBe('Bob');
+  });
+
+  // ── x-lt-widget ──
+  it('renders file-upload widget for x-lt-widget=file-upload', () => {
+    const json = formJson({ doc: '' }, {
+      properties: { doc: { type: 'string', 'x-lt-widget': 'file-upload' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('Choose file')).toBeInTheDocument();
+  });
+
+  it('renders code-editor widget for x-lt-widget=code-editor', () => {
+    const json = formJson({ script: 'SELECT 1' }, {
+      properties: { script: { type: 'string', 'x-lt-widget': 'code-editor' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    const textarea = container.querySelector('textarea');
+    expect(textarea).toBeInTheDocument();
+    expect(textarea!.className).toContain('font-mono');
+  });
+
+  it('renders signature widget for x-lt-widget=signature', () => {
+    const json = formJson({ sig: '' }, {
+      properties: { sig: { type: 'string', 'x-lt-widget': 'signature' } },
+    });
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(container.querySelector('canvas')).toBeInTheDocument();
+    expect(screen.getByText('Clear')).toBeInTheDocument();
+  });
+
+  // ── Helper text ──
+  it('renders field description as helper text', () => {
+    const json = formJson({ email: '' }, {
+      properties: { email: { type: 'string', description: 'Your work email' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('Your work email')).toBeInTheDocument();
+  });
+});
