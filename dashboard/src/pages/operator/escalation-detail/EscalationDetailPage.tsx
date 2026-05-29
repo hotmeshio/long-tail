@@ -71,6 +71,7 @@ export function EscalationDetailPage() {
 
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const resolverSchema = wfConfig?.resolver_schema ?? null;
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
@@ -237,6 +238,7 @@ export function EscalationDetailPage() {
         isDevMode={isDevMode}
         onResolve={handleResolve}
         onEscalate={handleEscalate}
+        submitAttempted={submitAttempted}
       />
 
       <div className="flex-1" />
@@ -263,6 +265,7 @@ export function EscalationDetailPage() {
         releasePending={claim.isPending}
         assignedTo={esc.assigned_to}
         assignedUntil={esc.assigned_until}
+        onSubmitAttempt={() => setSubmitAttempted(true)}
       />
     </div>
   );

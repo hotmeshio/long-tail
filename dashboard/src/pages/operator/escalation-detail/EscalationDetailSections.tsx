@@ -87,6 +87,7 @@ interface CollapsibleSectionsProps {
   isDevMode: boolean;
   onResolve?: (payload: Record<string, unknown>) => void;
   onEscalate?: (targetRole: string) => void;
+  submitAttempted?: boolean;
 }
 
 export function EscalationCollapsibleSections({
@@ -110,6 +111,7 @@ export function EscalationCollapsibleSections({
   isDevMode,
   onResolve,
   onEscalate,
+  submitAttempted,
 }: CollapsibleSectionsProps) {
   return (
     <div className="mt-8 space-y-6">
@@ -206,6 +208,7 @@ export function EscalationCollapsibleSections({
                   onTriageNotesChange={onTriageNotesChange}
                   isDevMode={isDevMode}
                   disabled={!claimedByMe}
+                  submitAttempted={submitAttempted}
                 />
               )}
             </div>
@@ -238,6 +241,7 @@ export function EscalationCollapsibleSections({
                 triageNotes={triageNotes}
                 onTriageNotesChange={onTriageNotesChange}
                 isDevMode={isDevMode}
+                submitAttempted={submitAttempted}
               />
             )}
           </CollapsibleSection>

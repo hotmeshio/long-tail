@@ -8,7 +8,8 @@ import type { LTEscalationRecord } from '../../api/types';
 /** Messages sent from the parent to the iframe. */
 type ParentMessage =
   | { type: 'lt:init'; escalation: IframeEscalationData; schema: Record<string, unknown> }
-  | { type: 'lt:requestSubmit' };
+  | { type: 'lt:requestSubmit' }
+  | { type: 'lt:validate' };
 
 /** Messages received from the iframe. */
 type ChildMessage =
@@ -39,13 +40,14 @@ interface IframeViewportProps {
   schema: Record<string, unknown>;
   onResolve: (payload: Record<string, unknown>) => void;
   onEscalate: (targetRole: string) => void;
+  submitAttempted?: boolean;
 }
 
 /**
  * Renders a sandboxed iframe for fully custom HITL UIs.
  *
  * The iframe communicates with the parent via postMessage:
- * - Parent → iframe: `lt:init` (escalation data + schema)
+ * - Parent → iframe: `lt:init` (escalation data + schema), `lt:validate`
  * - Iframe → parent: `lt:submit`, `lt:escalate`, `lt:resize`
  *
  * Security:
@@ -53,7 +55,7 @@ interface IframeViewportProps {
  * - Origin validation on incoming messages
  * - Envelope data is NOT sent to the iframe (may contain secrets)
  */
-export function IframeViewport({ src, escalation, schema, onResolve, onEscalate }: IframeViewportProps) {
+export function IframeViewport({ src, escalation, schema, onResolve, onEscalate, submitAttempted }: IframeViewportProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const iframeOrigin = useRef<string>('');
 
@@ -127,6 +129,15 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate 
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, [sendInit, onResolve, onEscalate]);
+
+  // Send lt:validate to iframe when parent triggers submit validation
+  useEffect(() => {
+    if (!submitAttempted) return;
+    const iframe = iframeRef.current;
+    if (iframe?.contentWindow && iframeOrigin.current) {
+      iframe.contentWindow.postMessage({ type: 'lt:validate' } as ParentMessage, iframeOrigin.current);
+    }
+  }, [submitAttempted]);
 
   return (
     <div className="rounded-md border border-surface-border overflow-hidden bg-white">

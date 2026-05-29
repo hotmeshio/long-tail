@@ -16,15 +16,17 @@ type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string
  *
  * Calls `onChange` with the full JSON string on every edit.
  */
-export function ResolverForm({ value, onChange, disabled }: {
+export function ResolverForm({ value, onChange, disabled, submitAttempted }: {
   value: string;
   onChange: (json: string) => void;
   disabled?: boolean;
+  submitAttempted?: boolean;
 }) {
   const [data, setData] = useState<Record<string, JsonValue>>({});
   const [hidden, setHidden] = useState<Record<string, JsonValue>>({});
   const [formSchema, setFormSchema] = useState<Record<string, any> | null>(null);
   const [parseError, setParseError] = useState(false);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
 
   // Parse incoming JSON
   useEffect(() => {
@@ -63,6 +65,15 @@ export function ResolverForm({ value, onChange, disabled }: {
     emitChange({ ...data, [key]: val });
   }, [data, emitChange]);
 
+  const markTouched = useCallback((key: string) => {
+    setTouched((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
   if (parseError) {
     return (
       <p className="text-xs text-status-error">
@@ -99,6 +110,28 @@ export function ResolverForm({ value, onChange, disabled }: {
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
     const isReadOnly = fieldSchema?.readOnly === true;
     const span = (fieldSchema?.['x-lt-span'] as number) ?? 1;
+    const isReq = requiredFields.has(key);
+    const isTouched = touched.has(key) || !!submitAttempted;
+
+    // Derive inline error for touched required fields
+    let error: string | undefined;
+    if (isReq && isTouched) {
+      if (val === undefined || val === null) {
+        error = 'Required';
+      } else if (typeof val === 'string' && val.trim() === '') {
+        error = 'Required';
+      }
+    }
+    // Format-specific validation for touched fields
+    if (isTouched && typeof val === 'string' && val.trim() !== '' && fieldSchema) {
+      const fmt = fieldSchema.format as string | undefined;
+      if (fmt === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        error = 'Enter a valid email address';
+      }
+      if (fmt === 'uri' && !/^https?:\/\/.+/.test(val)) {
+        error = 'Enter a valid URL';
+      }
+    }
 
     return (
       <div
@@ -109,9 +142,11 @@ export function ResolverForm({ value, onChange, disabled }: {
           fieldKey={key}
           value={val}
           onChange={(v) => updateField(key, v)}
+          onBlur={() => markTouched(key)}
           schema={formSchema}
-          isRequired={requiredFields.has(key)}
+          isRequired={isReq}
           isReadOnly={isReadOnly}
+          error={error}
         />
       </div>
     );
@@ -141,13 +176,15 @@ export function ResolverForm({ value, onChange, disabled }: {
 // Field row — renders appropriate input per type
 // ---------------------------------------------------------------------------
 
-function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }: {
+function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isReadOnly, error }: {
   fieldKey: string;
   value: JsonValue;
   onChange: (v: JsonValue) => void;
+  onBlur?: () => void;
   schema?: Record<string, any> | null;
   isRequired?: boolean;
   isReadOnly?: boolean;
+  error?: string;
 }) {
   const label = fieldKey.replace(/[_-]/g, ' ');
   const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
@@ -175,18 +212,21 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
   // Boolean → checkbox
   if (typeof value === 'boolean') {
     return (
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={value}
-          onChange={(e) => onChange(e.target.checked)}
-          className="w-3.5 h-3.5 rounded accent-accent"
-        />
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-          {label}
-          {isRequired && <span className="text-status-error ml-0.5">*</span>}
-        </span>
-      </label>
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={value}
+            onChange={(e) => { onChange(e.target.checked); onBlur?.(); }}
+            className="w-3.5 h-3.5 rounded accent-accent"
+          />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+            {label}
+            {isRequired && <span className="text-status-error ml-0.5">*</span>}
+          </span>
+        </label>
+        <FieldError error={error} />
+      </div>
     );
   }
 
@@ -199,9 +239,11 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
           type="number"
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          onBlur={onBlur}
           step="any"
-          className="input text-sm w-full mt-1"
+          className={inputClass(!!error)}
         />
+        <FieldError error={error} />
       </div>
     );
   }
@@ -220,12 +262,14 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
           <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="input text-sm w-full mt-1"
+            onBlur={onBlur}
+            className={inputClass(!!error)}
           >
             {enumValues.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
+          <FieldError error={error} />
         </div>
       );
     }
@@ -239,9 +283,11 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
             type="password"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="input text-sm w-full mt-1"
+            onBlur={onBlur}
+            className={inputClass(!!error)}
             autoComplete="off"
           />
+          <FieldError error={error} />
         </div>
       );
     }
@@ -263,8 +309,10 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
             type={FORMAT_INPUT_TYPES[format]}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="input text-sm w-full mt-1"
+            onBlur={onBlur}
+            className={inputClass(!!error)}
           />
+          <FieldError error={error} />
         </div>
       );
     }
@@ -278,9 +326,11 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="input text-sm w-full mt-1 leading-relaxed"
+            onBlur={onBlur}
+            className={`${inputClass(!!error)} leading-relaxed`}
             rows={Math.min(6, Math.max(3, Math.ceil(value.length / 60)))}
           />
+          <FieldError error={error} />
         </div>
       );
     }
@@ -293,8 +343,10 @@ function FieldRow({ fieldKey, value, onChange, schema, isRequired, isReadOnly }:
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="input text-sm w-full mt-1"
+          onBlur={onBlur}
+          className={inputClass(!!error)}
         />
+        <FieldError error={error} />
       </div>
     );
   }
@@ -358,4 +410,19 @@ function FieldLabel({ children, isRequired }: { children: React.ReactNode; isReq
       {isRequired && <span className="text-status-error ml-0.5">*</span>}
     </label>
   );
+}
+
+function FieldError({ error }: { error?: string }) {
+  if (!error) return null;
+  return (
+    <p className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
+      {error}
+    </p>
+  );
+}
+
+function inputClass(hasError?: boolean): string {
+  return hasError
+    ? 'input text-sm w-full mt-1 border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
+    : 'input text-sm w-full mt-1';
 }

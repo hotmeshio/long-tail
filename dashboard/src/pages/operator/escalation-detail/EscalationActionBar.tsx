@@ -45,6 +45,8 @@ export interface EscalationActionBarProps {
   // Other user
   assignedTo?: string | null;
   assignedUntil?: string | null;
+  // Validation
+  onSubmitAttempt?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +62,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     currentRole, escalationTargets, onEscalate, escalatePending, escalateError,
     onRelease, releasePending,
     assignedTo, assignedUntil,
+    onSubmitAttempt,
   } = props;
 
   const claimDurations = useClaimDurations();
@@ -102,6 +105,28 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
       setParseError('Invalid JSON');
       return;
     }
+
+    // Validate required fields from embedded _form_schema
+    const schema = payload._form_schema as Record<string, unknown> | undefined;
+    const required = schema?.required as string[] | undefined;
+    if (required?.length) {
+      const missing = required.filter((field) => {
+        const val = payload[field];
+        if (val === undefined || val === null) return true;
+        if (typeof val === 'string' && val.trim() === '') return true;
+        return false;
+      });
+      if (missing.length > 0) {
+        onSubmitAttempt?.();
+        const labels = missing.map((f) => f.replace(/[_-]/g, ' '));
+        const display = labels.length <= 2
+          ? labels.join(', ')
+          : `${labels.slice(0, 2).join(', ')}...`;
+        setParseError(`Required: ${display}`);
+        return;
+      }
+    }
+
     onResolve(payload);
   };
 

@@ -10,6 +10,7 @@ export function ResolverSection({
   onTriageNotesChange,
   isDevMode = true,
   disabled = false,
+  submitAttempted = false,
 }: {
   json: string;
   onJsonChange: (v: string) => void;
@@ -19,6 +20,7 @@ export function ResolverSection({
   onTriageNotesChange: (v: string) => void;
   isDevMode?: boolean;
   disabled?: boolean;
+  submitAttempted?: boolean;
 }) {
   const [resolverView, setResolverView] = useState<'form' | 'json'>('form');
 
@@ -76,7 +78,7 @@ export function ResolverSection({
         {/* Form controls */}
         <div className={requestTriage ? 'pointer-events-none select-none' : ''}>
           {resolverView === 'form' ? (
-            <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} />
+            <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} />
           ) : (
             <textarea
               value={json}
