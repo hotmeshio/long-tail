@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Bell, User } from 'lucide-react';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { RolePill } from '../../../components/common/display/RolePill';
@@ -17,6 +16,8 @@ export function EscalationHero({
   isTerminal,
   traceUrl,
   isDevMode,
+  showDetails,
+  onToggleDetails,
 }: {
   esc: LTEscalationRecord;
   claimedByMe: boolean;
@@ -24,8 +25,9 @@ export function EscalationHero({
   isTerminal: boolean;
   traceUrl: string | null;
   isDevMode: boolean;
+  showDetails: boolean;
+  onToggleDetails: () => void;
 }) {
-  const [showDetails, setShowDetails] = useState(false);
   const isAck = isAckEscalation(esc);
 
   // ── User mode: clean typography + lines, no cards ──
@@ -144,7 +146,7 @@ export function EscalationHero({
         )}
         <div>
           <button
-            onClick={() => setShowDetails(!showDetails)}
+            onClick={onToggleDetails}
             className="inline-flex items-center gap-1 h-5 text-xs text-text-tertiary hover:text-accent transition-colors"
           >
             Details
@@ -170,7 +172,7 @@ export function EscalationHero({
           )}
           <CopyableId label="Workflow" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/registry/${esc.workflow_type}` : undefined} />
           <CopyableId label="Workflow ID" value={esc.workflow_id} href={esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
-          <CopyableId label="Task Queue" value={esc.task_queue} href={esc.task_queue ? `/topics/${esc.task_queue}` : undefined} />
+          <CopyableId label="Task Queue" value={esc.task_queue} href={esc.task_queue ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />
           {esc.origin_id && esc.origin_id !== esc.workflow_id && (
             <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
           )}

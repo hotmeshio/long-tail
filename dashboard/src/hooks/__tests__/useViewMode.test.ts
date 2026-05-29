@@ -4,7 +4,7 @@ import { useViewMode } from '../useViewMode';
 
 describe('useViewMode', () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('defaults to the provided default when no stored value', () => {
@@ -28,24 +28,24 @@ describe('useViewMode', () => {
     expect(result.current.isDevMode).toBe(true);
   });
 
-  it('persists preference to sessionStorage', () => {
+  it('persists preference to localStorage', () => {
     const { result } = renderHook(() => useViewMode(true));
 
     act(() => result.current.toggleMode());
-    expect(sessionStorage.getItem('lt_view_mode')).toBe('user');
+    expect(localStorage.getItem('lt_view_mode')).toBe('user');
 
     act(() => result.current.toggleMode());
-    expect(sessionStorage.getItem('lt_view_mode')).toBe('dev');
+    expect(localStorage.getItem('lt_view_mode')).toBe('dev');
   });
 
-  it('restores preference from sessionStorage', () => {
-    sessionStorage.setItem('lt_view_mode', 'user');
+  it('restores preference from localStorage', () => {
+    localStorage.setItem('lt_view_mode', 'user');
     const { result } = renderHook(() => useViewMode(true));
     expect(result.current.isDevMode).toBe(false);
   });
 
-  it('restores dev preference from sessionStorage', () => {
-    sessionStorage.setItem('lt_view_mode', 'dev');
+  it('restores dev preference from localStorage', () => {
+    localStorage.setItem('lt_view_mode', 'dev');
     const { result } = renderHook(() => useViewMode(false));
     expect(result.current.isDevMode).toBe(true);
   });

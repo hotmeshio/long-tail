@@ -88,12 +88,51 @@ export async function exportWorkflowExecution(
 ): Promise<WorkflowExecution> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
-    const execution = await handle.exportExecution({ ...options, enrich_inputs: true });
-    return postProcessExecution(execution);
+    const [execution, raw] = await Promise.all([
+      handle.exportExecution({ ...options, enrich_inputs: true }),
+      handle.export({ allow: ['state'], values: true }),
+    ]);
+    const processed = postProcessExecution(execution);
+
+    // Extract parent_workflow_id from the raw state metadata (HotMesh's `pj` field).
+    // The SDK's WorkflowExecution doesn't surface this yet; when it does,
+    // the SDK value takes precedence (defensive: only set if absent).
+    if (!(processed as any).parent_workflow_id) {
+      const pj = extractParentJobId(raw);
+      if (pj && pj !== workflowId) {
+        (processed as any).parent_workflow_id = pj;
+      }
+    }
+
+    return processed;
   } catch (err: any) {
     if (err instanceof WorkflowNotFoundError) throw err;
     throw new WorkflowNotFoundError(workflowId);
   }
+}
+
+/**
+ * Walk the raw export state looking for the `pj` (parent job ID) field.
+ * HotMesh stores it at `state.output.metadata.pj` after symbol inflation.
+ * Returns undefined if not found (workflow has no parent).
+ */
+function extractParentJobId(raw: LTWorkflowExport | { state?: any }): string | undefined {
+  const state = raw?.state;
+  if (!state || typeof state !== 'object') return undefined;
+
+  // Typical path: state.output.metadata.pj
+  const output = state.output ?? state;
+  const metadata = output?.metadata;
+  if (metadata?.pj && typeof metadata.pj === 'string') {
+    return metadata.pj;
+  }
+
+  // Fallback: walk top-level state keys (older export shapes)
+  if (state.pj && typeof state.pj === 'string') {
+    return state.pj;
+  }
+
+  return undefined;
 }
 
 /**

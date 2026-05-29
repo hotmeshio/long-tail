@@ -203,6 +203,8 @@ export function EscalationDetailPage() {
         isTerminal={isTerminal}
         traceUrl={traceUrl}
         isDevMode={isDevMode}
+        showDetails={!isCollapsed('details')}
+        onToggleDetails={() => toggleSection('details')}
       />
 
       <EscalationContextBlocks
