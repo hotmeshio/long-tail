@@ -168,7 +168,15 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
             />
           ) : (
             <div className="space-y-3">
-              {Object.entries(fields).map(([key, value]) => {
+              {Object.entries(fields).sort(([a], [b]) => {
+                const req = (tool.inputSchema?.required ?? []) as string[];
+                const ai = req.indexOf(a);
+                const bi = req.indexOf(b);
+                if (ai !== -1 && bi !== -1) return ai - bi;
+                if (ai !== -1) return -1;
+                if (bi !== -1) return 1;
+                return a.localeCompare(b);
+              }).map(([key, value]) => {
                 const propSchema = tool.inputSchema?.properties?.[key];
                 const hint = propSchema?.description;
                 const isRequired = (tool.inputSchema?.required ?? []).includes(key);

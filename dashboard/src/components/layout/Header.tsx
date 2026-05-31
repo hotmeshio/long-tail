@@ -11,7 +11,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   const { user, logout } = useAuth();
   const { available, mine } = useEscalationCounts();
   const { connected } = useEventStatus();
-  const { aiOverrideActive, toggleAIOverride } = useAIOverride();
+  const { toggleAIOverride } = useAIOverride();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +39,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
             }
           }}
         >
-          <AppLogo className={aiOverrideActive ? 'grayscale opacity-60' : ''} />
+          <AppLogo />
         </Link>
       </div>
 

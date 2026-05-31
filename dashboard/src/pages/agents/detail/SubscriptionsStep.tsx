@@ -230,12 +230,17 @@ function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
   const required = (tool?.inputSchema?.required as string[]) ?? [];
   const allFields = Object.entries(props).filter(([k]) => !k.startsWith('_'));
 
-  // Required fields first, then optional
-  const fields = useMemo(() => {
-    const req = allFields.filter(([k]) => required.includes(k));
-    const opt = allFields.filter(([k]) => !required.includes(k));
-    return [...req, ...opt];
-  }, [allFields, required]);
+  // Required fields first (in declared required-array order), then optional alphabetically
+  const fields = useMemo(() =>
+    [...allFields].sort(([a], [b]) => {
+      const ai = required.indexOf(a);
+      const bi = required.indexOf(b);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b);
+    }),
+  [allFields, required]);
 
   // Build event field suggestions from the topic's payload schema
   const eventSuggestions = useMemo(() => {
