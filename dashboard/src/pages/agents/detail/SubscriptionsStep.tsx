@@ -156,7 +156,23 @@ export function SubscriptionsStep({ form, set }: Props) {
                 onPipelineIdChange={(v) => updateSub(selected, 'pipeline_id', v)}
                 serverId={sub.server_id}
                 toolName={sub.tool_name}
-                onCapabilityChange={(sid, tn) => { updateSub(selected, 'server_id', sid); updateSub(selected, 'tool_name', tn); }}
+                onCapabilityChange={(sid, tn) => {
+                  const next = [...form.subscriptions];
+                  const entry = { ...next[selected], server_id: sid, tool_name: tn };
+                  // Auto-generate mapping template from tool schema
+                  const tool = allTools.find((t) => t.serverId === sid && t.name === tn);
+                  const props = tool?.inputSchema?.properties as Record<string, any> | undefined;
+                  if (props && tn) {
+                    const template: Record<string, string> = {};
+                    for (const key of Object.keys(props)) {
+                      if (key.startsWith('_')) continue;
+                      template[key] = `{event.data.${key}}`;
+                    }
+                    entry.input_mapping = JSON.stringify(template, null, 2);
+                  }
+                  next[selected] = entry;
+                  set('subscriptions', next);
+                }}
                 mcpPrompt={sub.mcp_prompt}
                 onMcpPromptChange={(v) => updateSub(selected, 'mcp_prompt', v)}
 
@@ -180,56 +196,201 @@ export function SubscriptionsStep({ form, set }: Props) {
             {/* Input Mapping full width */}
             <div>
               <label className={sectionCls}>With this data</label>
-              {/* Capability schema hint + generate template */}
-              {sub.reaction_type === 'capability' && sub.tool_name && (() => {
-                const tool = allTools.find((t) => t.serverId === sub.server_id && t.name === sub.tool_name);
-                const props = tool?.inputSchema?.properties as Record<string, any> | undefined;
-                if (!props) return null;
-                const required = (tool?.inputSchema?.required as string[]) ?? [];
-                const generateTemplate = () => {
-                  const template: Record<string, string> = {};
-                  for (const key of Object.keys(props)) {
-                    if (key.startsWith('_')) continue;
-                    template[key] = `{event.data.${key}}`;
-                  }
-                  updateSub(selected, 'input_mapping', JSON.stringify(template, null, 2));
-                };
-                return (
-                  <div className="mb-3 p-3 rounded-md bg-surface-sunken border border-surface-border">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] text-text-quaternary uppercase tracking-wider font-medium">Required Inputs</p>
-                      <button type="button" onClick={generateTemplate} className="text-[10px] text-accent hover:text-accent-hover transition-colors">
-                        Generate template
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {Object.entries(props).filter(([k]) => !k.startsWith('_')).map(([key, def]) => (
-                        <span key={key} className="text-[11px] font-mono">
-                          <span className={required.includes(key) ? 'text-text-primary' : 'text-text-tertiary'}>{key}</span>
-                          {(def as any).description && (
-                            <span className="text-text-quaternary ml-1">— {(def as any).description}</span>
-                          )}
-                          {required.includes(key) && <span className="text-status-error ml-0.5">*</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-              <textarea value={sub.input_mapping} onChange={(e) => updateSub(selected, 'input_mapping', e.target.value)} rows={10} className={jsonCls} placeholder={sub.reaction_type === 'capability'
-                ? '{\n  "domain": "{event.data.domain}",\n  "key": "{event.data.key}",\n  "data": { "source": "{event.source}" }\n}'
-                : '{\n  "data": {\n    "orderId": "{event.data.orderId}",\n    "error": "{event.data.error}"\n  }\n}'
-              } />
-              <p className={hintCls}>
-                {sub.reaction_type === 'capability'
-                  ? <>Maps event fields to capability inputs. {'{event.data.fieldName}'} resolves at runtime. Use "Generate template" to scaffold from the tool's schema.</>
-                  : <>Maps event fields to workflow input. {'{event.data.fieldName}'} resolves at runtime.</>
-                }
-              </p>
+              {sub.reaction_type === 'capability' && sub.tool_name ? (
+                <CapabilityMappingForm
+                  tool={allTools.find((t) => t.serverId === sub.server_id && t.name === sub.tool_name)}
+                  value={sub.input_mapping}
+                  onChange={(v) => updateSub(selected, 'input_mapping', v)}
+                  eventSchema={selectedCatalogEntry?.payload_schema}
+                />
+              ) : (
+                <>
+                  <textarea value={sub.input_mapping} onChange={(e) => updateSub(selected, 'input_mapping', e.target.value)} rows={10} className={jsonCls} placeholder={'{\n  "data": {\n    "orderId": "{event.data.orderId}",\n    "error": "{event.data.error}"\n  }\n}'} />
+                  <p className={hintCls}>Maps event fields to workflow input. {'{event.data.fieldName}'} resolves at runtime.</p>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Capability Mapping Form ─────────────────────────────────────────────────
+
+function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
+  tool?: { name: string; description?: string; inputSchema: Record<string, any> };
+  value: string;
+  onChange: (v: string) => void;
+  eventSchema?: Record<string, any>;
+}) {
+  const [jsonMode, setJsonMode] = useState(false);
+  const props = (tool?.inputSchema?.properties ?? {}) as Record<string, any>;
+  const required = (tool?.inputSchema?.required as string[]) ?? [];
+  const allFields = Object.entries(props).filter(([k]) => !k.startsWith('_'));
+
+  // Required fields first, then optional
+  const fields = useMemo(() => {
+    const req = allFields.filter(([k]) => required.includes(k));
+    const opt = allFields.filter(([k]) => !required.includes(k));
+    return [...req, ...opt];
+  }, [allFields, required]);
+
+  // Build event field suggestions from the topic's payload schema
+  const eventSuggestions = useMemo(() => {
+    const suggestions: Array<{ value: string; label: string }> = [
+      { value: '{event.type}', label: 'event type' },
+      { value: '{event.source}', label: 'event source' },
+      { value: '{event.timestamp}', label: 'ISO timestamp' },
+      { value: '{event.workflowId}', label: 'workflow ID' },
+      { value: '{event.workflowName}', label: 'workflow name' },
+    ];
+    const schemaProps = eventSchema?.properties as Record<string, any> | undefined;
+    if (schemaProps) {
+      for (const [key, def] of Object.entries(schemaProps)) {
+        suggestions.push({
+          value: `{event.data.${key}}`,
+          label: (def as any).description || key,
+        });
+      }
+    }
+    return suggestions;
+  }, [eventSchema]);
+
+  const parsed = useMemo(() => {
+    try { return JSON.parse(value) as Record<string, any>; }
+    catch { return {} as Record<string, any>; }
+  }, [value]);
+
+  const updateField = (key: string, fieldValue: any) => {
+    const next = { ...parsed, [key]: fieldValue };
+    onChange(JSON.stringify(next, null, 2));
+  };
+
+  if (fields.length === 0 || jsonMode) {
+    return (
+      <div>
+        {fields.length > 0 && (
+          <div className="flex justify-end mb-1">
+            <button type="button" onClick={() => setJsonMode(false)} className="text-[10px] text-accent hover:text-accent-hover transition-colors">Form view</button>
+          </div>
+        )}
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={8} className={jsonCls} placeholder={'{\n  "domain": "{event.data.name}",\n  "key": "{event.data.path}"\n}'} />
+        <p className={hintCls}>Maps event fields to capability inputs. {'{event.data.fieldName}'} resolves at runtime.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] text-text-tertiary">
+          Map each input to an event field or enter a static value.
+        </p>
+        <button type="button" onClick={() => setJsonMode(true)} className="text-[10px] text-text-tertiary hover:text-accent transition-colors">Raw JSON</button>
+      </div>
+
+      <div className="space-y-4">
+        {fields.map(([key, def]) => {
+          const isReq = required.includes(key);
+          const desc = (def as any).description;
+          const fieldType = (def as any).type;
+          const currentVal = typeof parsed[key] === 'string' ? parsed[key]
+            : typeof parsed[key] === 'object' ? JSON.stringify(parsed[key])
+            : parsed[key] != null ? String(parsed[key]) : '';
+
+          return (
+            <div key={key} className="bg-surface-sunken/30 rounded-md px-4 py-3">
+              <div className="flex items-baseline gap-2 mb-0.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+                  {key.replace(/[_-]/g, ' ')}
+                  {isReq && <span className="text-status-error ml-0.5">*</span>}
+                </label>
+                {fieldType && <span className="text-[9px] text-text-quaternary">{fieldType}</span>}
+              </div>
+              {desc && <p className="text-[10px] text-text-quaternary mb-2">{desc}</p>}
+              <MappingFieldInput
+                value={currentVal}
+                onChange={(v) => updateField(key, v)}
+                suggestions={eventSuggestions}
+                fieldType={fieldType}
+                placeholder={`{event.data.${key}}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Input with dropdown suggestions for event field references */
+function MappingFieldInput({ value, onChange, suggestions, fieldType, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  suggestions: Array<{ value: string; label: string }>;
+  fieldType?: string;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const filtered = suggestions.filter((s) =>
+    s.value.toLowerCase().includes(filter.toLowerCase()) ||
+    s.label.toLowerCase().includes(filter.toLowerCase()),
+  );
+
+  if (fieldType === 'object') {
+    return (
+      <textarea
+        value={value}
+        onChange={(e) => {
+          try { onChange(JSON.parse(e.target.value)); }
+          catch { onChange(e.target.value); }
+        }}
+        rows={3}
+        className={`${jsonCls} text-xs`}
+        placeholder={`{ "source": "{event.source}" }`}
+      />
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={value}
+        onFocus={() => { setOpen(true); setFilter(''); }}
+        onChange={(e) => { onChange(e.target.value); setFilter(e.target.value); if (!open) setOpen(true); }}
+        className="input font-mono text-xs w-full"
+        placeholder={placeholder}
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
+          {filtered.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => { onChange(s.value); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-surface-hover transition-colors flex items-center gap-3 ${value === s.value ? 'bg-accent/5' : ''}`}
+            >
+              <span className="text-[11px] font-mono text-accent shrink-0">{s.value}</span>
+              <span className="text-[10px] text-text-quaternary truncate">{s.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

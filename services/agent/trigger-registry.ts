@@ -222,7 +222,7 @@ class AgentTriggerRegistry {
           data: {
             serverId: sub.server_id!,
             toolName: sub.tool_name!,
-            arguments: mapped.data ?? mapped,
+            arguments: mapped,
           },
           metadata: { source: 'agent', certified: true },
           executeAs: sub.execute_as ?? sub.agent_user_id ?? undefined,

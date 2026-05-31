@@ -39,6 +39,7 @@ const SYSTEM_WORKFLOW_BASE: Partial<LTWorkerConfig> = {
 const systemWorkflowConfigs: Record<string, LTWorkerConfig> = {
   capabilityInvoke: {
     ...SYSTEM_WORKFLOW_BASE,
+    invocable: true,
     description: 'Late-binding MCP tool invocation — calls a single capability with idempotent execution',
   },
   mcpTriageRouter: {

@@ -93,7 +93,8 @@ describe('capability reaction — trigger registry dispatch', () => {
     expect(call.workflowType).toBe('capabilityInvoke');
     expect(call.data.serverId).toBe('srv-gmail-001');
     expect(call.data.toolName).toBe('gmail_send');
-    expect(call.data.arguments.to).toBe('user@example.com');
+    // Capability gets the full mapped object as arguments (not mapped.data)
+    expect(call.data.arguments.data.to).toBe('user@example.com');
     expect(call.metadata).toEqual({ source: 'agent', certified: true });
   });
 
@@ -163,9 +164,11 @@ describe('capability reaction — trigger registry dispatch', () => {
     await handler(event);
 
     const call = invokeWorkflowMock.mock.calls[0][0];
-    // When no mapping, default envelope is { data: {...}, metadata: {...} }
-    // The capability case extracts mapped.data as arguments
-    expect(call.data.arguments).toEqual({ foo: 'bar' });
+    // When no mapping, the full default envelope is passed as arguments
+    expect(call.data.arguments).toEqual({
+      data: { foo: 'bar' },
+      metadata: { source: 'agent', agentName: 'test-agent' },
+    });
   });
 });
 

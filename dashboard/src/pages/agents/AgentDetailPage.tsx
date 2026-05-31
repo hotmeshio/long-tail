@@ -198,7 +198,10 @@ export function AgentDetailPage() {
                   <div className="flex-1 min-w-0"><EventTopicPill topic={sub.topic} /></div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-text-quaternary text-[10px]">→</span>
-                    <WorkflowPill type={sub.workflow_type || 'mcp-query'} variant={sub.reaction_type === 'pipeline' ? 'pipeline' : 'durable'} />
+                    <WorkflowPill
+                      type={sub.reaction_type === 'capability' ? sub.tool_name : sub.workflow_type || sub.reaction_type}
+                      variant={sub.reaction_type === 'pipeline' ? 'pipeline' : sub.reaction_type === 'capability' ? 'capability' : 'durable'}
+                    />
                   </div>
                 </div>
               ))}

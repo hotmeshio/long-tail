@@ -21,6 +21,7 @@ const EXPECTED_SYSTEM_TOPICS = [
   'escalation.created', 'escalation.resolved', 'escalation.claimed', 'escalation.released',
   'activity.started', 'activity.completed', 'activity.failed',
   'knowledge.stored', 'knowledge.deleted',
+  'file.stored', 'file.deleted',
   'agent.started', 'agent.completed', 'agent.failed', 'agent.status_changed',
   'milestone',
 ];
@@ -34,9 +35,9 @@ describe('seedSystemTopics', () => {
     (getPool as any).mockReturnValue({ query: mockQuery });
   });
 
-  it('seeds all 22 built-in topics', async () => {
+  it('seeds all 24 built-in topics', async () => {
     await seedSystemTopics();
-    expect(mockQuery).toHaveBeenCalledTimes(22);
+    expect(mockQuery).toHaveBeenCalledTimes(24);
   });
 
   it('seeds every expected topic name', async () => {
@@ -63,7 +64,7 @@ describe('seedSystemTopics', () => {
   });
 
   it('every topic has a valid category', async () => {
-    const validCategories = ['task', 'workflow', 'escalation', 'activity', 'knowledge', 'agent', 'milestone'];
+    const validCategories = ['task', 'workflow', 'escalation', 'activity', 'knowledge', 'file', 'agent', 'milestone'];
     await seedSystemTopics();
     for (const call of mockQuery.mock.calls) {
       const category = call[1][2]; // 3rd param
@@ -93,15 +94,15 @@ describe('seedSystemTopics', () => {
 
   it('logs seeded topics', async () => {
     await seedSystemTopics();
-    expect(loggerRegistry.info).toHaveBeenCalledTimes(22);
+    expect(loggerRegistry.info).toHaveBeenCalledTimes(24);
   });
 
   it('continues seeding after individual failure', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db error'));
     mockQuery.mockResolvedValue({ rowCount: 1, rows: [] });
     await seedSystemTopics();
-    // 1 failed + 21 succeeded = 22 calls
-    expect(mockQuery).toHaveBeenCalledTimes(22);
+    // 1 failed + 23 succeeded = 24 calls
+    expect(mockQuery).toHaveBeenCalledTimes(24);
     expect(loggerRegistry.warn).toHaveBeenCalledTimes(1);
   });
 });
