@@ -18,9 +18,11 @@ export interface SubscriptionFormState {
 
 export interface ScheduleFormState {
   cron: string;
-  reaction_type: 'durable' | 'pipeline';
+  reaction_type: 'durable' | 'pipeline' | 'capability';
   workflow_type: string;
   pipeline_id: string;
+  server_id: string;
+  tool_name: string;
   envelope: string; // JSON string
   execute_as: string;
 }
@@ -68,6 +70,8 @@ export const EMPTY_SCHEDULE: ScheduleFormState = {
   reaction_type: 'durable',
   workflow_type: '',
   pipeline_id: '',
+  server_id: '',
+  tool_name: '',
   envelope: '{}',
   execute_as: '',
 };
@@ -91,6 +95,7 @@ export function isStepValid(step: number, form: AgentFormState): boolean {
       return form.schedules.every((s) => {
         if (!s.cron) return false;
         if (s.reaction_type === 'pipeline') return !!s.pipeline_id;
+        if (s.reaction_type === 'capability') return !!s.server_id && !!s.tool_name;
         return !!s.workflow_type;
       });
     }
@@ -110,11 +115,13 @@ export function agentToForm(
         reaction_type: s.reaction_type || 'durable',
         workflow_type: s.workflow_type || '',
         pipeline_id: s.pipeline_id || '',
+        server_id: s.server_id || '',
+        tool_name: s.tool_name || '',
         envelope: s.envelope ? JSON.stringify(s.envelope, null, 2) : '{}',
         execute_as: s.execute_as || '',
       }))
     : agent.behaviors?.cron
-      ? [{ cron: agent.behaviors.cron, reaction_type: 'durable' as const, workflow_type: agent.workflow_type ?? '', pipeline_id: '', envelope: '{}', execute_as: '' }]
+      ? [{ cron: agent.behaviors.cron, reaction_type: 'durable' as const, workflow_type: agent.workflow_type ?? '', pipeline_id: '', server_id: '', tool_name: '', envelope: '{}', execute_as: '' }]
       : [];
 
   return {

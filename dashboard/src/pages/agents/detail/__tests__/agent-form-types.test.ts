@@ -146,8 +146,8 @@ describe('formToAgentPayload', () => {
       ...EMPTY_FORM,
       name: 'test-agent',
       schedules: [
-        { cron: '0 * * * *', reaction_type: 'durable', workflow_type: 'basicEcho', pipeline_id: '', envelope: '{"data":{"source":"cron"}}', execute_as: 'bot-1' },
-        { cron: '*/15 * * * *', reaction_type: 'durable', workflow_type: 'reviewContent', pipeline_id: '', envelope: '{}', execute_as: '' },
+        { cron: '0 * * * *', reaction_type: 'durable', workflow_type: 'basicEcho', pipeline_id: '', server_id: '', tool_name: '', envelope: '{"data":{"source":"cron"}}', execute_as: 'bot-1' },
+        { cron: '*/15 * * * *', reaction_type: 'durable', workflow_type: 'reviewContent', pipeline_id: '', server_id: '', tool_name: '', envelope: '{}', execute_as: '' },
       ],
     };
 
@@ -180,7 +180,7 @@ describe('formToAgentPayload', () => {
       ...EMPTY_FORM,
       name: 'pipe-agent',
       schedules: [
-        { cron: '*/5 * * * *', reaction_type: 'pipeline', workflow_type: '', pipeline_id: 'pipe-abc', envelope: '{}', execute_as: '' },
+        { cron: '*/5 * * * *', reaction_type: 'pipeline', workflow_type: '', pipeline_id: 'pipe-abc', server_id: '', tool_name: '', envelope: '{}', execute_as: '' },
       ],
     };
 

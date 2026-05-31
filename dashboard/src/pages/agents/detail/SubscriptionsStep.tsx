@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Radio, BookOpen } from 'lucide-react';
 import { RunAsSelector } from '../../../components/common/form/RunAsSelector';
-import { useWorkflowConfigs } from '../../../api/workflows';
+import { ReactionSelector } from '../../../components/common/form/ReactionSelector';
 import { useTopics, type TopicCatalogEntry } from '../../../api/topics';
 import { useCapabilities } from '../../../api/capabilities';
 import type { AgentFormState, SubscriptionFormState } from './agent-form-types';
-import { EMPTY_SUBSCRIPTION, sectionCls, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
+import { EMPTY_SUBSCRIPTION, sectionCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
 const CATEGORY_COLORS: Record<string, string> = {
   task:       'bg-blue-400/15 text-blue-400',
@@ -24,11 +24,10 @@ interface Props {
 }
 
 export function SubscriptionsStep({ form, set }: Props) {
-  const { data: configs } = useWorkflowConfigs();
   const { data: topicsData } = useTopics({ limit: 200 });
+  const { data: capData } = useCapabilities();
   const catalogTopics = topicsData?.topics ?? [];
-
-  const invocableWorkflows = (configs ?? []).filter((c: any) => c.invocable).map((c: any) => c.workflow_type);
+  const allTools = useMemo(() => capData?.categories?.flatMap((c) => c.tools) ?? [], [capData]);
   const [selected, setSelected] = useState(0);
 
   const updateSub = (index: number, field: keyof SubscriptionFormState, value: any) => {
@@ -144,48 +143,27 @@ export function SubscriptionsStep({ form, set }: Props) {
               )}
             </div>
 
-            {/* Run this workflow + As identity + But only if — 3 col */}
-            <div className="grid grid-cols-3 gap-6">
-              <div className="space-y-4">
-                <label className={sectionCls}>Run this reaction</label>
-                <div className="flex flex-wrap gap-3">
-                  {(['durable', 'pipeline', 'capability', 'mcp_query'] as const).map((rt) => (
-                    <label key={rt} className="flex items-center gap-1 text-[11px] text-text-secondary cursor-pointer">
-                      <input type="radio" name="reaction" checked={sub.reaction_type === rt} onChange={() => updateSub(selected, 'reaction_type', rt)} className="accent-accent w-3 h-3" />
-                      {rt === 'durable' ? 'Workflow' : rt === 'pipeline' ? 'Pipeline' : rt === 'capability' ? 'Capability' : 'MCP Query'}
-                    </label>
-                  ))}
-                </div>
-                {sub.reaction_type === 'durable' && (
-                  <div>
-                    <label className={labelCls}>Workflow *</label>
-                    <select value={sub.workflow_type} onChange={(e) => updateSub(selected, 'workflow_type', e.target.value)} className={inputCls}>
-                      <option value="">Select...</option>
-                      {invocableWorkflows.map((wt: string) => <option key={wt} value={wt}>{wt}</option>)}
-                    </select>
-                  </div>
-                )}
-                {sub.reaction_type === 'pipeline' && (
-                  <div>
-                    <label className={labelCls}>Pipeline ID *</label>
-                    <input type="text" value={sub.pipeline_id} onChange={(e) => updateSub(selected, 'pipeline_id', e.target.value)} placeholder="UUID" className={`${inputCls} font-mono text-xs`} />
-                  </div>
-                )}
-                {sub.reaction_type === 'capability' && (
-                  <CapabilitySelector
-                    serverId={sub.server_id}
-                    toolName={sub.tool_name}
-                    onServerChange={(v) => { updateSub(selected, 'server_id', v); updateSub(selected, 'tool_name', ''); }}
-                    onToolChange={(v) => updateSub(selected, 'tool_name', v)}
-                  />
-                )}
-                {sub.reaction_type === 'mcp_query' && (
-                  <div>
-                    <label className={labelCls}>Prompt *</label>
-                    <textarea value={sub.mcp_prompt} onChange={(e) => updateSub(selected, 'mcp_prompt', e.target.value)} placeholder="Analyze the error..." rows={2} className={`${inputCls} resize-none`} />
-                  </div>
-                )}
-              </div>
+            {/* Reaction selector — full width */}
+            <div>
+              <label className={sectionCls}>Run this reaction</label>
+              <ReactionSelector
+                reactionType={sub.reaction_type}
+                onReactionTypeChange={(v) => updateSub(selected, 'reaction_type', v)}
+                workflowType={sub.workflow_type}
+                onWorkflowTypeChange={(v) => updateSub(selected, 'workflow_type', v)}
+                pipelineId={sub.pipeline_id}
+                onPipelineIdChange={(v) => updateSub(selected, 'pipeline_id', v)}
+                serverId={sub.server_id}
+                toolName={sub.tool_name}
+                onCapabilityChange={(sid, tn) => { updateSub(selected, 'server_id', sid); updateSub(selected, 'tool_name', tn); }}
+                mcpPrompt={sub.mcp_prompt}
+                onMcpPromptChange={(v) => updateSub(selected, 'mcp_prompt', v)}
+
+              />
+            </div>
+
+            {/* Identity + Filter — 2 col */}
+            <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className={sectionCls}>As identity</label>
                 <RunAsSelector selected={sub.execute_as} onChange={(v) => updateSub(selected, 'execute_as', v)} />
@@ -201,62 +179,56 @@ export function SubscriptionsStep({ form, set }: Props) {
             {/* Input Mapping full width */}
             <div>
               <label className={sectionCls}>With this data</label>
-              <textarea value={sub.input_mapping} onChange={(e) => updateSub(selected, 'input_mapping', e.target.value)} rows={10} className={jsonCls} placeholder={'{\n  "data": {\n    "orderId": "{event.data.orderId}",\n    "error": "{event.data.error}"\n  }\n}'} />
-              <p className={hintCls}>Maps event fields to workflow input. {'{event.data.fieldName}'} resolves at runtime.</p>
+              {/* Capability schema hint + generate template */}
+              {sub.reaction_type === 'capability' && sub.tool_name && (() => {
+                const tool = allTools.find((t) => t.serverId === sub.server_id && t.name === sub.tool_name);
+                const props = tool?.inputSchema?.properties as Record<string, any> | undefined;
+                if (!props) return null;
+                const required = (tool?.inputSchema?.required as string[]) ?? [];
+                const generateTemplate = () => {
+                  const template: Record<string, string> = {};
+                  for (const key of Object.keys(props)) {
+                    if (key.startsWith('_')) continue;
+                    template[key] = `{event.data.${key}}`;
+                  }
+                  updateSub(selected, 'input_mapping', JSON.stringify(template, null, 2));
+                };
+                return (
+                  <div className="mb-3 p-3 rounded-md bg-surface-sunken border border-surface-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] text-text-quaternary uppercase tracking-wider font-medium">Required Inputs</p>
+                      <button type="button" onClick={generateTemplate} className="text-[10px] text-accent hover:text-accent-hover transition-colors">
+                        Generate template
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {Object.entries(props).filter(([k]) => !k.startsWith('_')).map(([key, def]) => (
+                        <span key={key} className="text-[11px] font-mono">
+                          <span className={required.includes(key) ? 'text-text-primary' : 'text-text-tertiary'}>{key}</span>
+                          {(def as any).description && (
+                            <span className="text-text-quaternary ml-1">— {(def as any).description}</span>
+                          )}
+                          {required.includes(key) && <span className="text-status-error ml-0.5">*</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+              <textarea value={sub.input_mapping} onChange={(e) => updateSub(selected, 'input_mapping', e.target.value)} rows={10} className={jsonCls} placeholder={sub.reaction_type === 'capability'
+                ? '{\n  "domain": "{event.data.domain}",\n  "key": "{event.data.key}",\n  "data": { "source": "{event.source}" }\n}'
+                : '{\n  "data": {\n    "orderId": "{event.data.orderId}",\n    "error": "{event.data.error}"\n  }\n}'
+              } />
+              <p className={hintCls}>
+                {sub.reaction_type === 'capability'
+                  ? <>Maps event fields to capability inputs. {'{event.data.fieldName}'} resolves at runtime. Use "Generate template" to scaffold from the tool's schema.</>
+                  : <>Maps event fields to workflow input. {'{event.data.fieldName}'} resolves at runtime.</>
+                }
+              </p>
             </div>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── Capability Selector ─────────────────────────────────────────────────────
-
-function CapabilitySelector({ serverId, toolName, onServerChange, onToolChange }: {
-  serverId: string;
-  toolName: string;
-  onServerChange: (v: string) => void;
-  onToolChange: (v: string) => void;
-}) {
-  const { data } = useCapabilities();
-  const allTools = data?.categories?.flatMap((c) => c.tools) ?? [];
-
-  const servers = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of allTools) map.set(t.serverId, t.serverName);
-    return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [allTools]);
-
-  const tools = useMemo(
-    () => serverId ? allTools.filter((t) => t.serverId === serverId) : [],
-    [allTools, serverId],
-  );
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className={labelCls}>Server *</label>
-        <select value={serverId} onChange={(e) => onServerChange(e.target.value)} className={inputCls}>
-          <option value="">Select server...</option>
-          {servers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </div>
-      {serverId && (
-        <div>
-          <label className={labelCls}>Tool *</label>
-          <select value={toolName} onChange={(e) => onToolChange(e.target.value)} className={inputCls}>
-            <option value="">Select tool...</option>
-            {tools.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
-          </select>
-          {toolName && (() => {
-            const tool = tools.find((t) => t.name === toolName);
-            return tool?.description ? (
-              <p className={hintCls}>{tool.description}</p>
-            ) : null;
-          })()}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
 import { RunAsSelector } from '../../../components/common/form/RunAsSelector';
-import { useWorkflowConfigs } from '../../../api/workflows';
-import { useYamlWorkflows } from '../../../api/yaml-workflows';
+import { ReactionSelector } from '../../../components/common/form/ReactionSelector';
 import type { AgentFormState, ScheduleFormState } from './agent-form-types';
-import { EMPTY_SCHEDULE, sectionCls, labelCls, hintCls, inputCls, jsonCls } from './agent-form-types';
+import { EMPTY_SCHEDULE, sectionCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
 const CRON_PRESETS = [
   '*/5 * * * *',
@@ -35,10 +34,6 @@ interface Props {
 }
 
 export function ScheduleStep({ form, set }: Props) {
-  const { data: configs } = useWorkflowConfigs();
-  const invocableWorkflows = (configs ?? []).filter((c: any) => c.invocable).map((c: any) => c.workflow_type);
-  const { data: pipelineData } = useYamlWorkflows({ status: 'active' });
-  const pipelines = (pipelineData?.workflows ?? []).map((w: any) => ({ id: w.id, name: w.graph_topic || w.id }));
   const [selected, setSelected] = useState(0);
 
   const updateSched = (index: number, field: keyof ScheduleFormState, value: any) => {
@@ -131,43 +126,29 @@ export function ScheduleStep({ form, set }: Props) {
               </div>
             </div>
 
-            {/* Run this workflow + As identity — 2 col */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <label className={sectionCls}>Run this workflow</label>
-                <div className="flex gap-3">
-                  {(['durable', 'pipeline'] as const).map((rt) => (
-                    <label key={rt} className="flex items-center gap-1 text-[11px] text-text-secondary cursor-pointer">
-                      <input type="radio" name={`sched-reaction-${selected}`} checked={sched.reaction_type === rt} onChange={() => updateSched(selected, 'reaction_type', rt)} className="accent-accent w-3 h-3" />
-                      {rt === 'durable' ? 'Workflow' : 'Pipeline'}
-                    </label>
-                  ))}
-                </div>
-                {sched.reaction_type === 'pipeline' ? (
-                  <div>
-                    <label className={labelCls}>Pipeline *</label>
-                    <select value={sched.pipeline_id} onChange={(e) => updateSched(selected, 'pipeline_id', e.target.value)} className={inputCls}>
-                      <option value="">Select...</option>
-                      {pipelines.map((p: { id: string; name: string }) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <p className={hintCls}>YAML pipeline invoked on each cron tick.</p>
-                  </div>
-                ) : (
-                  <div>
-                    <label className={labelCls}>Workflow *</label>
-                    <select value={sched.workflow_type} onChange={(e) => updateSched(selected, 'workflow_type', e.target.value)} className={inputCls}>
-                      <option value="">Select...</option>
-                      {invocableWorkflows.map((wt: string) => <option key={wt} value={wt}>{wt}</option>)}
-                    </select>
-                    <p className={hintCls}>Invoked on each cron tick.</p>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className={sectionCls}>As identity</label>
-                <RunAsSelector selected={sched.execute_as} onChange={(v) => updateSched(selected, 'execute_as', v)} />
-                <p className={hintCls}>Identity used when invoking.</p>
-              </div>
+            {/* Run this reaction */}
+            <div>
+              <label className={sectionCls}>Run this reaction</label>
+              <ReactionSelector
+                reactionType={sched.reaction_type}
+                onReactionTypeChange={(v) => updateSched(selected, 'reaction_type', v)}
+                workflowType={sched.workflow_type}
+                onWorkflowTypeChange={(v) => updateSched(selected, 'workflow_type', v)}
+                pipelineId={sched.pipeline_id}
+                onPipelineIdChange={(v) => updateSched(selected, 'pipeline_id', v)}
+                serverId={sched.server_id}
+                toolName={sched.tool_name}
+                onCapabilityChange={(sid, tn) => { updateSched(selected, 'server_id', sid); updateSched(selected, 'tool_name', tn); }}
+                availableTypes={['durable', 'pipeline', 'capability']}
+
+              />
+            </div>
+
+            {/* As identity */}
+            <div>
+              <label className={sectionCls}>As identity</label>
+              <RunAsSelector selected={sched.execute_as} onChange={(v) => updateSched(selected, 'execute_as', v)} />
+              <p className={hintCls}>Identity used when invoking.</p>
             </div>
 
             {/* Envelope */}

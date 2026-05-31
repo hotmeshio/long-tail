@@ -25,6 +25,8 @@ export type LTEventType =
   | 'activity.failed'
   | 'knowledge.stored'
   | 'knowledge.deleted'
+  | 'file.stored'
+  | 'file.deleted'
   | 'agent.started'
   | 'agent.completed'
   | 'agent.failed'
