@@ -24,8 +24,13 @@ export function applyDatabaseConfig(db: LTStartConfig['database']): void {
       port: db.port ?? postgres_options.port,
       user: db.user ?? postgres_options.user,
       password: db.password ?? postgres_options.password,
-      database: db.database ?? (postgres_options as any).database,
+      database: db.database ?? postgres_options.database,
     });
+  }
+
+  // SSL passthrough — applies to both connectionString and individual-field modes
+  if (db.ssl !== undefined) {
+    postgres_options.ssl = db.ssl;
   }
 }
 

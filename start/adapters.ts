@@ -36,24 +36,26 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     telemetryRegistry.register(new HoneycombTelemetryAdapter(startConfig.telemetry.honeycomb));
   }
 
-  // Events — always register socket.io (zero-cost until HTTP server attaches).
-  // NATS is additive: when configured, events publish to both transports.
+  // Events — register the configured transport.
+  // Socket.IO is the default for single-container ("nothing but Postgres").
+  // When NATS or custom adapters are configured, Socket.IO is NOT registered —
+  // the dashboard auto-detects the transport via GET /api/settings and connects
+  // directly (e.g., NATS WebSocket). Socket.IO never interferes in production.
   if (startConfig.events?.adapters) {
     for (const adapter of startConfig.events.adapters) {
       eventRegistry.register(adapter);
     }
+  } else if (startConfig.events?.nats) {
+    eventRegistry.register(new NatsEventAdapter(startConfig.events.nats));
   } else {
-    if (startConfig.events?.nats) {
-      eventRegistry.register(new NatsEventAdapter(startConfig.events.nats));
-    }
     eventRegistry.register(new SocketIOEventAdapter({
       authenticate: createSocketIOAuthenticator(startConfig),
     }));
   }
 
-  // Always register the callback adapter for SDK event subscriptions.
-  // Zero-cost when no listeners are registered.
-  eventRegistry.register(new CallbackEventAdapter());
+  // CallbackEventAdapter is registered later in start/workers.ts
+  // so it can be wired to the NATS bridge before connect().
+  // Do NOT register a duplicate here.
 
   // Maintenance
   if (startConfig.maintenance === false) {

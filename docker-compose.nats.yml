@@ -1,0 +1,34 @@
+# NATS event bus override.
+#
+# Adds NATS for cross-container event delivery and dashboard WebSocket.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.nats.yml up -d --build
+#
+# When active, Socket.IO is not registered — the dashboard connects
+# directly to NATS via WebSocket (port 9222).
+
+services:
+  nats:
+    image: nats:2-alpine
+    ports:
+      - "${LT_NATS_PORT:-4222}:4222"
+      - "${LT_NATS_MONITOR_PORT:-8222}:8222"
+      - "${LT_NATS_WS_PORT:-9222}:9222"
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf:ro
+    command: ["-c", "/etc/nats/nats.conf", "--auth", "dev_api_secret"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  long-tail:
+    environment:
+      - NATS_URL=nats://nats:4222
+      - NATS_TOKEN=dev_api_secret
+      - NATS_WS_URL=ws://localhost:9222
+      - EVENT_TRANSPORT=nats
+    depends_on:
+      nats:
+        condition: service_healthy

@@ -67,6 +67,22 @@ class LTEventRegistry {
   getAdapter<T extends LTEventAdapter>(ctor: new (...args: any[]) => T): T | undefined {
     return this.adapters.find((a): a is T => a instanceof ctor);
   }
+
+  /**
+   * Bridge cross-container events to the in-process callback adapter.
+   *
+   * Iterates all registered adapters and calls `setCallbackBridge()` on
+   * any that implement it. This is the generic contract — any transport
+   * adapter (NATS, SNS, GCP Pub/Sub, Kafka) that supports cross-process
+   * delivery implements `setCallbackBridge` on the LTEventAdapter interface.
+   */
+  bridgeCallbackAdapter(callbackAdapter: LTEventAdapter): void {
+    for (const adapter of this.adapters) {
+      if (adapter !== callbackAdapter && typeof adapter.setCallbackBridge === 'function') {
+        adapter.setCallbackBridge(callbackAdapter);
+      }
+    }
+  }
 }
 
 /** Singleton event registry */

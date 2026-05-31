@@ -1,8 +1,17 @@
+import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { publishFileEvent } from '../../lib/events/publish';
 import * as fileStorage from '../activities/file-storage';
+
+const MIME_MAP: Record<string, string> = {
+  '.json': 'application/json', '.txt': 'text/plain', '.html': 'text/html',
+  '.csv': 'text/csv', '.xml': 'application/xml', '.png': 'image/png',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.pdf': 'application/pdf', '.svg': 'image/svg+xml',
+};
 
 const writeFileSchema = z.object({
   path: z.string().describe('File path relative to storage root'),
@@ -43,6 +52,13 @@ export async function createFileStorageServer(options?: {
     },
     async (args: z.infer<typeof writeFileSchema>) => {
       const result = await fileStorage.writeFile(args);
+      const ext = path.extname(args.path).toLowerCase();
+      publishFileEvent({
+        type: 'file.stored',
+        path: args.path,
+        size: result.size,
+        mime: MIME_MAP[ext] || 'application/octet-stream',
+      });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );
@@ -86,6 +102,9 @@ export async function createFileStorageServer(options?: {
     },
     async (args: z.infer<typeof deleteFileSchema>) => {
       const result = await fileStorage.deleteFile(args);
+      if (result.deleted) {
+        publishFileEvent({ type: 'file.deleted', path: args.path });
+      }
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );

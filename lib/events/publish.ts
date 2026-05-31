@@ -146,6 +146,40 @@ export function publishKnowledgeEvent(params: {
 }
 
 /**
+ * Publish a file storage event (stored, deleted).
+ * Includes rich metadata: path, name, extension, mime type, size.
+ */
+export function publishFileEvent(params: {
+  type: 'file.stored' | 'file.deleted';
+  path: string;
+  size?: number;
+  mime?: string;
+}): Promise<void> {
+  const parsed = params.path.split('/');
+  const filename = parsed[parsed.length - 1] || '';
+  const dotIdx = filename.lastIndexOf('.');
+  const name = dotIdx > 0 ? filename.slice(0, dotIdx) : filename;
+  const extension = dotIdx > 0 ? filename.slice(dotIdx + 1) : '';
+
+  return fireAndForget({
+    type: params.type,
+    source: 'file-storage',
+    workflowId: '',
+    workflowName: '',
+    taskQueue: '',
+    data: {
+      path: params.path,
+      name,
+      extension,
+      filename,
+      mime: params.mime,
+      size: params.size,
+    },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
  * Publish an agent lifecycle event.
  */
 export function publishAgentEvent(params: {

@@ -25,6 +25,8 @@ export type LTEventType =
   | 'activity.failed'
   | 'knowledge.stored'
   | 'knowledge.deleted'
+  | 'file.stored'
+  | 'file.deleted'
   | 'agent.started'
   | 'agent.completed'
   | 'agent.failed'
@@ -94,4 +96,16 @@ export interface LTEventAdapter {
   publish(event: LTEvent): Promise<void>;
   /** Graceful shutdown */
   disconnect(): Promise<void>;
+  /**
+   * Bridge cross-container events to the in-process callback adapter.
+   *
+   * Implemented by transport adapters that support cross-process delivery
+   * (NATS, SNS, GCP Pub/Sub, Kafka, etc.). When set, the adapter subscribes
+   * to all events on the bus and forwards events from other containers to
+   * the local callback adapter for agent trigger dispatch.
+   *
+   * The adapter must de-duplicate its own events (e.g., via an origin ID)
+   * to prevent the publishing container from re-processing its own events.
+   */
+  setCallbackBridge?(adapter: LTEventAdapter): void;
 }

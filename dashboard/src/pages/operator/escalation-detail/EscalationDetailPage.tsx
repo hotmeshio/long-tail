@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useViewMode } from '../../../hooks/useViewMode';
@@ -59,7 +59,7 @@ export function EscalationDetailPage() {
   const { data: settings } = useSettings();
 
   const isPrivilegedUser = hasRoleType('admin') || hasRoleType('superadmin') || hasRole('engineer');
-  const { isDevMode, toggleMode } = useViewMode(isPrivilegedUser);
+  const { isDevMode, toggleMode } = useViewMode(false);
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
@@ -75,17 +75,24 @@ export function EscalationDetailPage() {
   const resolverSchema = wfConfig?.resolver_schema ?? null;
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
+
+  // Initialize json from schema exactly once. Subsequent esc refetches
+  // (claim events, real-time updates) must NOT reset user edits.
+  const jsonInitialized = useRef(false);
   useEffect(() => {
+    if (jsonInitialized.current) return;
     const formSchema = metadataFormSchema ?? (resolverSchema?.properties ? resolverSchema : null);
     if (formSchema?.properties) {
+      jsonInitialized.current = true;
       const initial: Record<string, any> = { _form_schema: formSchema };
       for (const [key, def] of Object.entries(formSchema.properties)) {
         const fieldDef = def as Record<string, any>;
         initial[key] = fieldDef.default ?? '';
       }
       setJson(JSON.stringify(initial, null, 2));
-    } else {
-      setJson(effectiveSchema ? JSON.stringify(effectiveSchema, null, 2) : '{}');
+    } else if (effectiveSchema) {
+      jsonInitialized.current = true;
+      setJson(JSON.stringify(effectiveSchema, null, 2));
     }
   }, [effectiveSchema, metadataFormSchema, resolverSchema]);
 
@@ -122,6 +129,9 @@ export function EscalationDetailPage() {
 
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
+  const envelopeObj = safeParse(esc.envelope) as Record<string, any> | null;
+  const isCertified = !!(envelopeObj?.metadata?.certified);
+  const hasAI = !!(settings as any)?.ai?.enabled;
 
   const payloadObj = (typeof escalationPayload === 'object' && escalationPayload !== null && !Array.isArray(escalationPayload))
     ? escalationPayload as Record<string, unknown>
@@ -239,6 +249,8 @@ export function EscalationDetailPage() {
         onResolve={handleResolve}
         onEscalate={handleEscalate}
         submitAttempted={submitAttempted}
+        isCertified={isCertified}
+        hasAI={hasAI}
       />
 
       <div className="flex-1" />

@@ -1,7 +1,7 @@
-import { Workflow, ShieldCheck, Settings, Wand2 } from 'lucide-react';
+import { Workflow, ShieldCheck, Settings, Wand2, Zap } from 'lucide-react';
 import { typeColor } from '../../../lib/type-color';
 
-type WorkflowVariant = 'durable' | 'configured' | 'certified' | 'pipeline';
+type WorkflowVariant = 'durable' | 'configured' | 'certified' | 'pipeline' | 'capability';
 
 interface WorkflowPillProps {
   type: string;
@@ -15,6 +15,7 @@ const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
   certified:  ShieldCheck,
   configured: Settings,
   pipeline:   Wand2,
+  capability: Zap,
   durable:    Workflow,
 };
 

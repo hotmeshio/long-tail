@@ -202,6 +202,7 @@ class AgentTriggerRegistry {
           data: mapped.data ?? mapped,
           execute_as: sub.execute_as ?? sub.agent_user_id ?? undefined,
           source: 'agent',
+          jobId: deterministicId,
         });
         break;
       }
@@ -211,6 +212,25 @@ class AgentTriggerRegistry {
           prompt: sub.mcp_prompt!,
           wait: false,
           userId: sub.agent_user_id ?? undefined,
+        });
+        break;
+      }
+      case 'capability': {
+        loggerRegistry.info(
+          `[long-tail] agent capability: ${sub.agent_name} → ${sub.tool_name} on ${sub.server_id} (id=${deterministicId})`,
+        );
+        const { invokeWorkflow } = await import('../workflow-invocation');
+        await invokeWorkflow({
+          workflowType: 'capabilityInvoke',
+          data: {
+            serverId: sub.server_id!,
+            toolName: sub.tool_name!,
+            arguments: mapped,
+          },
+          metadata: { source: 'agent' },
+          executeAs: sub.execute_as ?? sub.agent_user_id ?? undefined,
+          options: { workflowId: deterministicId },
+          auth: { userId: sub.agent_user_id || 'lt-system', role: 'admin' },
         });
         break;
       }

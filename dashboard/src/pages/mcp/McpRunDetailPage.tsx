@@ -101,7 +101,7 @@ export function McpRunDetailPage() {
       />
 
       {/* ── Header card ─────────────────────────────────── */}
-      <div className="bg-surface-raised border border-surface-border rounded-md p-5 mb-8">
+      <div className="bg-surface-sunken/50 rounded-md p-5 mb-8">
         {/* Row 1: Job ID + stats + status */}
         <div className="flex items-center gap-4 mb-4">
           <h2 className="text-sm font-mono text-text-primary truncate flex-1">{execution.workflow_id}</h2>

@@ -5,6 +5,7 @@ import {
   Radio, Clock, Brain, Compass,
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useDeleteAgent } from '../../api/agents';
+import { useSettings } from '../../api/settings';
 import { useAgentSubscriptions } from '../../api/agent-subscriptions';
 import { useAgentEvents } from '../../hooks/useEventHooks';
 import { useEventSubscription } from '../../hooks/useEventContext';
@@ -60,6 +61,9 @@ function useAgentFeed(workflowName?: string) {
 export function AgentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { data: settings } = useSettings();
+  const aiEnabled = !!settings?.ai?.enabled;
+  const label = aiEnabled ? 'Agent' : 'Automation';
   const { data: agent, isLoading } = useAgent(id ?? null);
   const { data: subsData } = useAgentSubscriptions(id ?? null);
   const updateMutation = useUpdateAgent();
@@ -75,8 +79,8 @@ export function AgentDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <Bot className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
-        <h2 className="text-lg font-medium text-text-primary mb-2">Agent not found</h2>
-        <button onClick={() => navigate('/agents')} className="text-sm text-accent hover:text-accent-hover transition-colors">Back to agents</button>
+        <h2 className="text-lg font-medium text-text-primary mb-2">{label} not found</h2>
+        <button onClick={() => navigate('/agents')} className="text-sm text-accent hover:text-accent-hover transition-colors">Back to {label.toLowerCase()}s</button>
       </div>
     );
   }
@@ -120,8 +124,8 @@ export function AgentDetailPage() {
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-light text-text-primary">Agent: {agent.id}</h1>
-          <button onClick={() => { window.location.hash = '#docs:agents.md'; }} className="text-text-quaternary hover:text-accent transition-colors mt-1" title="Agent docs">
+          <h1 className="text-3xl font-light text-text-primary">{label}: {agent.id}</h1>
+          <button onClick={() => { window.location.hash = '#docs:agents.md'; }} className="text-text-quaternary hover:text-accent transition-colors mt-1" title="Docs">
             <BookOpen className="w-4 h-4" strokeWidth={1.5} />
           </button>
         </div>
@@ -194,7 +198,10 @@ export function AgentDetailPage() {
                   <div className="flex-1 min-w-0"><EventTopicPill topic={sub.topic} /></div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-text-quaternary text-[10px]">→</span>
-                    <WorkflowPill type={sub.workflow_type || 'mcp-query'} variant={sub.reaction_type === 'pipeline' ? 'pipeline' : 'durable'} />
+                    <WorkflowPill
+                      type={sub.reaction_type === 'capability' ? sub.tool_name : sub.workflow_type || sub.reaction_type}
+                      variant={sub.reaction_type === 'pipeline' ? 'pipeline' : sub.reaction_type === 'capability' ? 'capability' : 'durable'}
+                    />
                   </div>
                 </div>
               ))}

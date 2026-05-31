@@ -19,7 +19,7 @@ export const config = {
   HONEYCOMB_API_KEY: process.env.HONEYCOMB_API_KEY || '',
 };
 
-export const postgres_options = {
+export const postgres_options: Record<string, unknown> = {
   host: config.POSTGRES_HOST,
   port: config.POSTGRES_PORT,
   user: config.POSTGRES_USER,

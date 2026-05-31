@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { CopyableId } from '../../../components/common/display/CopyableId';
 import type { WorkflowExecution, LTTaskRecord, LTEscalationRecord } from '../../../api/types';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { DurationValue } from '../../../components/common/display/DurationValue';
@@ -69,10 +70,10 @@ export function ExecutionHeader({ execution, task, escalations }: ExecutionHeade
   const { taskQueue, workflowType } = splitEntityKey(execution.workflow_type);
 
   return (
-    <div className="px-6 py-6 mb-6">
+    <div className="bg-surface-sunken/50 rounded-md px-6 py-5 mb-6">
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-8">
-        <MetadataField label="Workflow Type" value={workflowType} mono />
+        <CopyableId label="Workflow Type" value={workflowType} href={`/workflows/executions?entity=${encodeURIComponent(workflowType)}`} />
         <MetadataField label="Task Queue" value={taskQueue} mono />
         <MetadataField label="Start Time">
           {execution.start_time
@@ -96,7 +97,7 @@ export function ExecutionHeader({ execution, task, escalations }: ExecutionHeade
           value={`${execution.summary.activities.completed} / ${execution.summary.activities.total}`}
         />
         <MetadataField
-          label="Run ID"
+          label="Workflow ID"
           value={execution.workflow_id}
           mono
           truncate
@@ -104,8 +105,8 @@ export function ExecutionHeader({ execution, task, escalations }: ExecutionHeade
       </div>
 
       {/* Related links */}
-      {(parentWorkflowId || task || (escalations && escalations.length > 0)) && (
-        <div className="mt-5 pt-4 border-t border-surface-border space-y-3">
+      {(parentWorkflowId || (escalations && escalations.length > 0)) && (
+      <div className="mt-5 pt-4 border-t border-surface-border/50 space-y-3">
           {/* Parent navigation */}
           {parentWorkflowId && (
             <div className="flex items-center gap-2">
@@ -157,7 +158,7 @@ export function ExecutionHeader({ execution, task, escalations }: ExecutionHeade
               </div>
             </div>
           )}
-        </div>
+      </div>
       )}
     </div>
   );

@@ -6,9 +6,102 @@ import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExh
 import { TriageContext } from '../../../components/escalation/TriageContext';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ResolverForm } from '../../../components/escalation/ResolverForm';
+import { CopyableId } from '../../../components/common/display/CopyableId';
+import { DateValue } from '../../../components/common/display/DateValue';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
 import type { LTEscalationRecord } from '../../../api/types';
+
+// ── Dev-mode record summary ─────────────────────────────────────────────
+
+function MetaLabel({ children }: { children: React.ReactNode }) {
+  return <span className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">{children}</span>;
+}
+
+function MetaValue({ children }: { children: React.ReactNode }) {
+  return <p className="text-[12px] text-text-secondary mt-0.5 font-mono">{children}</p>;
+}
+
+function EscalationRecordSummary({ esc }: { esc: LTEscalationRecord }) {
+  return (
+    <div className="space-y-6">
+      {/* Identity + Classification */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-accent/60 mb-3">Classification</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
+          <div>
+            <MetaLabel>Type</MetaLabel>
+            <MetaValue>{esc.type}</MetaValue>
+          </div>
+          {esc.subtype && (
+            <div>
+              <MetaLabel>Subtype</MetaLabel>
+              <MetaValue>{esc.subtype}</MetaValue>
+            </div>
+          )}
+          <div>
+            <MetaLabel>Priority</MetaLabel>
+            <MetaValue>P{esc.priority}</MetaValue>
+          </div>
+          <div>
+            <MetaLabel>Status</MetaLabel>
+            <MetaValue>{esc.status}</MetaValue>
+          </div>
+        </div>
+      </div>
+
+      {/* References */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-accent/60 mb-3">References</p>
+        <div className="flex flex-wrap gap-x-8 gap-y-4">
+          <CopyableId label="Escalation ID" value={esc.id} />
+          {esc.task_id && <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />}
+          {esc.workflow_type && <CopyableId label="Workflow Name" value={esc.workflow_type} href={`/workflows/registry/${esc.workflow_type}`} />}
+          {esc.workflow_id && <CopyableId label="Workflow ID" value={esc.workflow_id} href={`/workflows/executions/${esc.workflow_id}`} />}
+          {esc.task_queue && <CopyableId label="Task Queue" value={esc.task_queue} />}
+          {esc.origin_id && esc.origin_id !== esc.workflow_id && <CopyableId label="Origin ID" value={esc.origin_id} />}
+          {esc.parent_id && <CopyableId label="Parent ID" value={esc.parent_id} />}
+          {esc.trace_id && <CopyableId label="Trace ID" value={esc.trace_id} />}
+          {esc.span_id && <CopyableId label="Span ID" value={esc.span_id} />}
+        </div>
+      </div>
+
+      {/* Timestamps */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-accent/60 mb-3">Timeline</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
+          <div>
+            <MetaLabel>Created</MetaLabel>
+            <p className="text-[12px] text-text-secondary mt-0.5"><DateValue date={esc.created_at} /></p>
+          </div>
+          {esc.claimed_at && (
+            <div>
+              <MetaLabel>Claimed</MetaLabel>
+              <p className="text-[12px] text-text-secondary mt-0.5"><DateValue date={esc.claimed_at} /></p>
+            </div>
+          )}
+          {esc.resolved_at && (
+            <div>
+              <MetaLabel>Resolved</MetaLabel>
+              <p className="text-[12px] text-text-secondary mt-0.5"><DateValue date={esc.resolved_at} /></p>
+            </div>
+          )}
+          <div>
+            <MetaLabel>Updated</MetaLabel>
+            <p className="text-[12px] text-text-secondary mt-0.5"><DateValue date={esc.updated_at} /></p>
+          </div>
+        </div>
+      </div>
+
+      {/* Metadata (raw JSON) */}
+      {esc.metadata && Object.keys(esc.metadata).length > 0 && (
+        <div>
+          <JsonViewer data={esc.metadata} label="Metadata" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface EscalationContextProps {
   isRoundsExhausted: boolean;
@@ -88,6 +181,8 @@ interface CollapsibleSectionsProps {
   onResolve?: (payload: Record<string, unknown>) => void;
   onEscalate?: (targetRole: string) => void;
   submitAttempted?: boolean;
+  isCertified?: boolean;
+  hasAI?: boolean;
 }
 
 export function EscalationCollapsibleSections({
@@ -112,9 +207,24 @@ export function EscalationCollapsibleSections({
   onResolve,
   onEscalate,
   submitAttempted,
+  isCertified,
+  hasAI,
 }: CollapsibleSectionsProps) {
   return (
     <div className="mt-8 space-y-6">
+      {/* Escalation Record — dev mode only, always visible by default */}
+      {isDevMode && (
+        <CollapsibleSection
+          title="Escalation Record"
+          sectionKey="record"
+          isCollapsed={isCollapsed('record')}
+          onToggle={toggleSection}
+          contentClassName="mt-4 ml-9"
+        >
+          <EscalationRecordSummary esc={esc} />
+        </CollapsibleSection>
+      )}
+
       {/* Input/Output — dev mode only */}
       {isDevMode && (
         <CollapsibleSection
@@ -209,6 +319,7 @@ export function EscalationCollapsibleSections({
                   isDevMode={isDevMode}
                   disabled={!claimedByMe}
                   submitAttempted={submitAttempted}
+                  showTriage={!!isCertified && !!hasAI}
                 />
               )}
             </div>
@@ -242,6 +353,7 @@ export function EscalationCollapsibleSections({
                 onTriageNotesChange={onTriageNotesChange}
                 isDevMode={isDevMode}
                 submitAttempted={submitAttempted}
+                showTriage={!!isCertified && !!hasAI}
               />
             )}
           </CollapsibleSection>

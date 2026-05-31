@@ -12,7 +12,7 @@ const result = await lt.settings.get();
 
 **Parameters:** None
 
-**Returns:** `LTApiResult<{ telemetry, escalation, events }>`
+**Returns:** `LTApiResult<{ telemetry, escalation, events, ai }>`
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -21,5 +21,6 @@ const result = await lt.settings.get();
 | `events.transport` | `'socketio' \| 'nats' \| 'none'` | Dashboard event transport (default: `socketio`; `nats` when `EVENT_TRANSPORT=nats`) |
 | `events.natsWsUrl` | `string \| null` | NATS WebSocket URL (present when NATS adapter registered) |
 | `events.natsToken` | `string \| null` | NATS auth token (present when NATS adapter registered) |
+| `ai.enabled` | `boolean` | Whether an LLM API key is configured |
 
 **Auth:** Not required

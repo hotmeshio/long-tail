@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAgent, useCreateAgent, useUpdateAgent } from '../../../api/agents';
 import { useAgentSubscriptions, useCreateSubscription, useUpdateSubscription, useDeleteSubscription } from '../../../api/agent-subscriptions';
+import { useSettings } from '../../../api/settings';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import {
   EMPTY_FORM,
@@ -33,6 +34,9 @@ export function AgentConfigPage() {
   const { id } = useParams<{ id: string }>();
   const isNew = !id;
   const navigate = useNavigate();
+  const { data: settings } = useSettings();
+  const aiEnabled = !!settings?.ai?.enabled;
+  const noun = aiEnabled ? 'Agent' : 'Automation';
   const { data: existing, isLoading } = useAgent(isNew ? null : id!);
   const { data: subsData } = useAgentSubscriptions(isNew ? null : id!);
 
@@ -115,7 +119,7 @@ export function AgentConfigPage() {
   return (
     <div>
       <PageHeader
-        title={isNew ? 'New Agent' : `Agent: ${existing?.id ?? ''}`}
+        title={isNew ? `New ${noun}` : `${noun}: ${existing?.id ?? ''}`}
         docsHash="#docs:agents.md"
       />
 
@@ -150,7 +154,7 @@ export function AgentConfigPage() {
               disabled={!form.name.trim() || isPending}
               className="w-full btn-primary text-xs disabled:opacity-50"
             >
-              {isPending ? 'Saving...' : isNew ? 'Create Agent' : 'Save'}
+              {isPending ? 'Saving...' : isNew ? `Create ${noun}` : 'Save'}
             </button>
             <button
               onClick={() => navigate(isNew ? '/agents' : `/agents/${id}`)}

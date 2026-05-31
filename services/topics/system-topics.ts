@@ -166,6 +166,36 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
     tags: ['lifecycle', 'knowledge'],
   },
 
+  // File storage
+  {
+    topic: 'file.stored',
+    description: 'A file has been written to storage.',
+    category: 'file',
+    payload_schema: objectSchema({
+      path: { type: 'string', description: 'File path in storage' },
+      name: { type: 'string', description: 'File name without extension' },
+      extension: { type: 'string', description: 'File extension (without dot)' },
+      filename: { type: 'string', description: 'Full filename with extension' },
+      mime: { type: 'string', description: 'MIME type' },
+      size: { type: 'number', description: 'File size in bytes' },
+    }),
+    example_payload: { path: '/images/photo.jpg', name: 'photo', extension: 'jpg', filename: 'photo.jpg', mime: 'image/jpeg', size: 245760 },
+    tags: ['lifecycle', 'file', 'storage'],
+  },
+  {
+    topic: 'file.deleted',
+    description: 'A file has been removed from storage.',
+    category: 'file',
+    payload_schema: objectSchema({
+      path: { type: 'string', description: 'File path in storage' },
+      name: { type: 'string', description: 'File name without extension' },
+      extension: { type: 'string', description: 'File extension (without dot)' },
+      filename: { type: 'string', description: 'Full filename with extension' },
+    }),
+    example_payload: { path: '/images/photo.jpg', name: 'photo', extension: 'jpg', filename: 'photo.jpg' },
+    tags: ['lifecycle', 'file', 'storage'],
+  },
+
   // Agent lifecycle
   {
     topic: 'agent.started',
