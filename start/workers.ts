@@ -281,11 +281,22 @@ export async function startWorkers(
     }
   }
 
-  // Register the in-process callback adapter for agent event triggers
+  // Register the in-process callback adapter for agent event triggers.
+  // Reuse existing instance if already registered (e.g., from SDK createClient).
   const { CallbackEventAdapter } = await import('../lib/events/callback');
   const { agentTriggerRegistry } = await import('../services/agent/trigger-registry');
-  const callbackAdapter = new CallbackEventAdapter();
-  eventRegistry.register(callbackAdapter);
+
+  let callbackAdapter = eventRegistry.getAdapter(CallbackEventAdapter);
+  if (!callbackAdapter) {
+    callbackAdapter = new CallbackEventAdapter();
+    eventRegistry.register(callbackAdapter);
+  }
+
+  // Bridge cross-container events to the local callback adapter.
+  // Any transport adapter (NATS, SNS, GCP Pub/Sub, etc.) that implements
+  // setCallbackBridge() will subscribe to the bus and forward events
+  // from other containers so agent triggers fire locally.
+  eventRegistry.bridgeCallbackAdapter(callbackAdapter);
 
   // Connect event adapters (outside workers guard so API-only containers
   // still connect to NATS and can publish/receive events)

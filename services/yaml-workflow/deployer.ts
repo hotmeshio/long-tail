@@ -119,9 +119,10 @@ export async function invokeYamlWorkflow(
   topic: string,
   data: Record<string, unknown>,
   entity?: string,
+  context?: Record<string, any>,
 ): Promise<string> {
   const engine = await getEngine(appId);
-  return engine.pub(topic, data, undefined, entity ? { entity } : undefined);
+  return engine.pub(topic, data, context as any, entity ? { entity } : undefined);
 }
 
 /**

@@ -202,6 +202,7 @@ class AgentTriggerRegistry {
           data: mapped.data ?? mapped,
           execute_as: sub.execute_as ?? sub.agent_user_id ?? undefined,
           source: 'agent',
+          jobId: deterministicId,
         });
         break;
       }

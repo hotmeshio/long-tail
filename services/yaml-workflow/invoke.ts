@@ -10,6 +10,8 @@ interface InvokeOptions {
   userId?: string;
   /** Source identifier for metadata injection (e.g., 'cron') */
   source?: string;
+  /** Deterministic job ID for idempotent execution (agent subscriptions) */
+  jobId?: string;
 }
 
 /**
@@ -52,6 +54,11 @@ export async function invokeYamlWorkflow(
     (data._metadata as Record<string, unknown>).source = options.source;
   }
 
+  // Build context with deterministic job ID when provided (agent subscriptions)
+  const context = options.jobId
+    ? { metadata: { jid: options.jobId } } as any
+    : undefined;
+
   if (options.sync) {
     const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
       wf.app_id,
@@ -68,6 +75,7 @@ export async function invokeYamlWorkflow(
     wf.graph_topic,
     data,
     wf.graph_topic,
+    context,
   );
   return { job_id: jobId };
 }

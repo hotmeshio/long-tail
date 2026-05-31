@@ -56,7 +56,7 @@ const { eventConnectMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/events', () => ({
-  eventRegistry: { hasAdapters: true, connect: eventConnectMock, register: vi.fn() },
+  eventRegistry: { hasAdapters: true, connect: eventConnectMock, register: vi.fn(), getAdapter: vi.fn(), bridgeCallbackAdapter: vi.fn() },
 }));
 
 vi.mock('../../lib/events/callback', () => ({
