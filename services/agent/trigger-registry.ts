@@ -216,6 +216,9 @@ class AgentTriggerRegistry {
         break;
       }
       case 'capability': {
+        loggerRegistry.info(
+          `[long-tail] agent capability: ${sub.agent_name} → ${sub.tool_name} on ${sub.server_id} (id=${deterministicId})`,
+        );
         const { invokeWorkflow } = await import('../workflow-invocation');
         await invokeWorkflow({
           workflowType: 'capabilityInvoke',
@@ -224,7 +227,7 @@ class AgentTriggerRegistry {
             toolName: sub.tool_name!,
             arguments: mapped,
           },
-          metadata: { source: 'agent', certified: true },
+          metadata: { source: 'agent' },
           executeAs: sub.execute_as ?? sub.agent_user_id ?? undefined,
           options: { workflowId: deterministicId },
           auth: { userId: sub.agent_user_id || 'lt-system', role: 'admin' },

@@ -95,7 +95,7 @@ describe('capability reaction — trigger registry dispatch', () => {
     expect(call.data.toolName).toBe('gmail_send');
     // Capability gets the full mapped object as arguments (not mapped.data)
     expect(call.data.arguments.data.to).toBe('user@example.com');
-    expect(call.metadata).toEqual({ source: 'agent', certified: true });
+    expect(call.metadata).toEqual({ source: 'agent' });
   });
 
   it('uses deterministic workflow ID for idempotent execution', async () => {

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { CopyableId } from '../../../components/common/display/CopyableId';
 import type { WorkflowExecution, LTTaskRecord, LTEscalationRecord } from '../../../api/types';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { DurationValue } from '../../../components/common/display/DurationValue';
@@ -72,7 +73,7 @@ export function ExecutionHeader({ execution, task, escalations }: ExecutionHeade
     <div className="bg-surface-sunken/50 rounded-md px-6 py-5 mb-6">
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-8">
-        <MetadataField label="Workflow Type" value={workflowType} mono />
+        <CopyableId label="Workflow Type" value={workflowType} href={`/workflows/executions?entity=${encodeURIComponent(workflowType)}`} />
         <MetadataField label="Task Queue" value={taskQueue} mono />
         <MetadataField label="Start Time">
           {execution.start_time
