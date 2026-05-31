@@ -134,6 +134,13 @@ export interface LTStartConfig {
     password?: string;
     database?: string;
     connectionString?: string;
+    /**
+     * SSL/TLS configuration for the PostgreSQL connection.
+     * Pass `true` to enable with defaults, `false` to disable, or an object
+     * matching Node `tls.connect()` options (e.g. `{ rejectUnauthorized: false }`
+     * for VPC connections without a certificate).
+     */
+    ssl?: boolean | Record<string, unknown>;
   };
 
   /** Embedded API server. Default: enabled on port 3000. */

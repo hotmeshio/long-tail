@@ -1,4 +1,4 @@
-import { Bell, User } from 'lucide-react';
+import { Bell, User, Info } from 'lucide-react';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
@@ -33,16 +33,16 @@ export function EscalationHero({
   // ── User mode: clean typography + lines, no cards ──
   if (!isDevMode) {
     return (
-      <div className="mb-2">
+      <div className="-mt-6 mb-2">
         {/* Description — large, the focal point */}
         {esc.description && (
-          <p className="text-2xl font-light text-text-primary leading-relaxed mb-6">
+          <p className="text-2xl font-light text-text-primary leading-relaxed mb-5">
             {esc.description}
           </p>
         )}
 
-        {/* Meta grid — labeled values, single bottom border */}
-        <div className="flex flex-wrap gap-x-8 gap-y-4 pb-5 border-b border-surface-border">
+        {/* Meta grid — subtle background band */}
+        <div className="bg-surface-sunken/50 rounded-md px-5 py-4 flex flex-wrap gap-x-8 gap-y-4 items-end">
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Status</p>
             <StatusBadge status={esc.status} />
@@ -82,7 +82,43 @@ export function EscalationHero({
               <span className="text-xs text-status-success"><DateValue date={esc.resolved_at} /></span>
             </div>
           )}
+          <div>
+            <button
+              onClick={onToggleDetails}
+              className="text-text-tertiary/50 hover:text-accent transition-colors"
+              title={showDetails ? 'Hide details' : 'Show details'}
+            >
+              <Info className={`w-3.5 h-3.5 transition-opacity duration-200 ${showDetails ? 'opacity-100 text-accent' : 'opacity-60'}`} />
+            </button>
+          </div>
         </div>
+
+        <Collapsible open={showDetails}>
+          <div className="mt-px bg-surface-sunken/30 rounded-b-md px-5 py-4 flex flex-wrap gap-x-8 gap-y-4 border-t border-surface-border/30">
+            <div className="text-left">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">Priority</span>
+              <p className="text-[12px] text-text-secondary mt-0.5">P{esc.priority}</p>
+            </div>
+            <CopyableId label="Escalation ID" value={esc.id} />
+            {esc.task_id && (
+              <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />
+            )}
+            <CopyableId label="Workflow Name" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/registry/${esc.workflow_type}` : undefined} />
+            <CopyableId label="Workflow ID" value={esc.workflow_id} href={esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
+            <CopyableId label="Task Queue" value={esc.task_queue} />
+            {esc.origin_id && esc.origin_id !== esc.workflow_id && (
+              <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
+            )}
+            {esc.trace_id && (
+              <CopyableId
+                label="Trace"
+                value={esc.trace_id}
+                href={traceUrl ? traceUrl.replace('{traceId}', esc.trace_id) : undefined}
+                external
+              />
+            )}
+          </div>
+        </Collapsible>
       </div>
     );
   }
@@ -144,48 +180,7 @@ export function EscalationHero({
             </span>
           </div>
         )}
-        <div>
-          <button
-            onClick={onToggleDetails}
-            className="inline-flex items-center gap-1 h-5 text-xs text-text-tertiary hover:text-accent transition-colors"
-          >
-            Details
-            <svg
-              className={`w-3 h-3 transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
       </div>
-
-      <Collapsible open={showDetails}>
-        <div className="mt-4 bg-surface-raised border border-surface-border rounded-md p-4 flex flex-wrap gap-x-8 gap-y-4">
-          <div className="text-left">
-            <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Priority</span>
-            <p className="text-[12px] text-text-primary mt-0.5">P{esc.priority}</p>
-          </div>
-          <CopyableId label="Escalation ID" value={esc.id} />
-          {esc.task_id && (
-            <CopyableId label="Task" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />
-          )}
-          <CopyableId label="Workflow" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/registry/${esc.workflow_type}` : undefined} />
-          <CopyableId label="Workflow ID" value={esc.workflow_id} href={esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
-          <CopyableId label="Task Queue" value={esc.task_queue} href={esc.task_queue ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />
-          {esc.origin_id && esc.origin_id !== esc.workflow_id && (
-            <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
-          )}
-          {esc.trace_id && (
-            <CopyableId
-              label="Trace"
-              value={esc.trace_id}
-              href={traceUrl ? traceUrl.replace('{traceId}', esc.trace_id) : undefined}
-              external
-            />
-          )}
-        </div>
-      </Collapsible>
     </>
   );
 }

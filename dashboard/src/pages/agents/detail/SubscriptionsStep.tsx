@@ -58,7 +58,7 @@ export function SubscriptionsStep({ form, set }: Props) {
       <div className="max-w-xl">
         <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between mb-8">
           <p className="text-[12px] text-text-secondary italic leading-relaxed">
-            Optional. When a matching event is published, the agent runs the configured workflow with the event payload.
+            Optional. When a matching event is published, the automation runs the configured workflow with the event payload.
           </p>
           <button onClick={() => { window.location.hash = '#docs:agents.md:subscriptions'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Subscriptions"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
         </div>
@@ -80,7 +80,7 @@ export function SubscriptionsStep({ form, set }: Props) {
     <div>
       <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between mb-6">
         <p className="text-[12px] text-text-secondary italic leading-relaxed">
-          Optional. When a matching event is published, the agent runs the configured workflow with the event payload.
+          Optional. When a matching event is published, the automation runs the configured workflow with the event payload.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:subscriptions'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Subscriptions"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
       </div>

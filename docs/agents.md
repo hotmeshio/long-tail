@@ -1,10 +1,10 @@
-# Agents
+# Agent Automations
 
-## What is an agent?
+## What is an agent automation?
 
-An agent is an autonomous persona that reacts to events and takes action on your behalf. When an event happens, it runs a workflow with the right context — automatically, reliably, at scale.
+An agent automation is an autonomous persona that reacts to events and takes action on your behalf. When an event happens, it runs a workflow with the right context — automatically, reliably, at scale.
 
-Every agent has:
+Every automation has:
 
 - **Identity** — a name, a purpose, and optionally a service account it runs as
 - **Motivation** — goals that drive it and rules that constrain it
@@ -180,15 +180,15 @@ When an agent is paused:
 
 ## Examples
 
-### Content triage agent
+### Content triage automation
 Monitors content review escalations. Subscribes to `escalation.created` filtered by `reviewContent`. Auto-resolves low-confidence items. Runs every 15 minutes to catch stragglers. Knowledge domain: `content-review`.
 
-### Health monitor agent
+### Health monitor automation
 Subscribes to `workflow.failed`, `activity.failed`, `app.*.*.error`, and `task.failed`. Captures diagnostics into `system-health` knowledge. Runs hourly for proactive checks. Rules: never auto-restart — capture and escalate.
 
-### Event coordinator agent
+### Event coordinator automation
 Subscribes to `app.>` (all application events), `workflow.completed`, `knowledge.stored`, and `escalation.resolved`. Routes events to appropriate workflows. Purely event-driven — no schedule.
 
-## What makes agents different from workflows?
+## What makes agent automations different from workflows?
 
-A workflow is a sequence of steps. An agent is a persona that *uses* workflows. The agent decides *when* to run, *what* to run, and *why*. It has goals, rules, memory, and reactive wiring. The workflow is the tool. The agent is the motivation.
+A workflow is a sequence of steps. An agent automation is a persona that *uses* workflows. The automation decides *when* to run, *what* to run, and *why*. It has goals, rules, memory, and reactive wiring. The workflow is the tool. The automation is the motivation.

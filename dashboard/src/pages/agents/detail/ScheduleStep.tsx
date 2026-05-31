@@ -87,7 +87,7 @@ export function ScheduleStep({ form, set }: Props) {
     <div>
       <div className="border-l-2 border-accent/30 pl-3 py-1 mb-6 flex items-start justify-between">
         <p className="text-[12px] text-text-secondary italic leading-relaxed">
-          Each schedule runs a workflow on a timer. An agent can have multiple schedules targeting different workflows.
+          Each schedule runs a workflow on a timer. An automation can have multiple schedules targeting different workflows.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:schedule'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Schedule"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
       </div>

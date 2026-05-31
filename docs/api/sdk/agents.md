@@ -1,6 +1,6 @@
 # lt.agents
 
-Agent operations — create, configure, and manage autonomous event-driven agents.
+Agent automation operations — create, configure, and manage autonomous event-driven automations.
 
 ## list
 

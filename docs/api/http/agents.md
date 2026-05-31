@@ -1,10 +1,10 @@
-# Agents API
+# Agent Automations API
 
-CRUD operations for agents — autonomous personas that react to events and run workflows on schedules. Each agent has an identity, motivation (goals/rules), event subscriptions, cron schedules, and a knowledge domain.
+CRUD operations for agent automations — autonomous personas that react to events and run workflows on schedules. Each automation has an identity, motivation (goals/rules), event subscriptions, cron schedules, and a knowledge domain.
 
 All endpoints require authentication.
 
-## List agents
+## List agent automations
 
 ```
 GET /api/agents?status=active&knowledge_domain=system-health&limit=25&offset=0
@@ -40,7 +40,7 @@ Returns agents with subscription counts and topic lists (via JOIN).
 }
 ```
 
-## Get agent
+## Get agent automation
 
 ```
 GET /api/agents/:id
@@ -58,7 +58,7 @@ Returns an agent with aggregated stats (knowledge entry count, escalation count)
 }
 ```
 
-## Create agent
+## Create agent automation
 
 ```
 POST /api/agents
@@ -95,7 +95,7 @@ POST /api/agents
 
 **Response 201:** The created agent.
 
-## Update agent
+## Update agent automation
 
 ```
 PUT /api/agents/:id
@@ -105,7 +105,7 @@ Partial update — only include fields to change. Changing `status` or `behavior
 
 **Response 200:** The updated agent.
 
-## Delete agent
+## Delete agent automation
 
 ```
 DELETE /api/agents/:id
@@ -117,9 +117,9 @@ Permanently removes the agent. Event subscriptions are cascade-deleted. Cron sch
 
 ---
 
-## Agent Subscriptions
+## Automation Subscriptions
 
-Subscriptions wire events to workflows. When an event matches the topic pattern, the agent invokes the configured workflow.
+Subscriptions wire events to workflows. When an event matches the topic pattern, the automation invokes the configured workflow.
 
 ### List subscriptions
 

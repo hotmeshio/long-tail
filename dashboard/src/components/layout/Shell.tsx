@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useSettings } from '../../api/settings';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
 import { WorkSidebar } from './WorkSidebar';
@@ -16,6 +17,8 @@ import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 
 function ShellLayout() {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
+  const { data: settings } = useSettings();
+  const aiEnabled = !!settings?.ai?.enabled;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(() => window.location.hash.startsWith('#docs'));
@@ -55,8 +58,8 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <WorkSidebar />
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <BuildSidebar />}
+            <WorkSidebar aiEnabled={aiEnabled} />
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <BuildSidebar aiEnabled={aiEnabled} />}
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <StorageSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>
@@ -88,8 +91,8 @@ function ShellLayout() {
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} />
       <DocsDrawer open={docsOpen} onClose={() => { setDocsOpen(false); history.replaceState(null, '', window.location.pathname + window.location.search); }} />
-      <HelpButton />
-      <HelpPanel />
+      {aiEnabled && <HelpButton />}
+      {aiEnabled && <HelpPanel />}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { eventRegistry } from '../lib/events';
 import { NatsEventAdapter } from '../lib/events/nats';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
+import { hasLLMApiKey } from '../services/llm';
 import type { LTApiResult } from '../types/sdk';
 
 /**
@@ -39,6 +40,9 @@ export async function getSettings(): Promise<LTApiResult> {
           natsWsUrl: hasNats
             ? (process.env.VITE_NATS_WS_URL || process.env.NATS_WS_URL || null)
             : null,
+        },
+        ai: {
+          enabled: hasLLMApiKey(),
         },
       },
     };

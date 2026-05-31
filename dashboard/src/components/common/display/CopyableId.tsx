@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const ELLIPSIS_MAX = 20;
+
+function centerEllipsis(s: string, max = ELLIPSIS_MAX): string {
+  if (s.length <= max) return s;
+  const side = Math.floor((max - 1) / 2);
+  return `${s.slice(0, side)}…${s.slice(-side)}`;
+}
+
 interface CopyableIdProps {
   label: string;
   value: string | null | undefined;
@@ -36,10 +44,10 @@ export function CopyableId({ label, value, href, external }: CopyableIdProps) {
       <span className="flex items-center gap-1 mt-0.5">
         <button
           onClick={handleCopy}
-          title={`Copy ${label}`}
-          className="text-[12px] font-mono text-text-primary group-hover:text-accent transition-colors truncate max-w-[280px]"
+          title={value}
+          className="text-[12px] font-mono text-text-primary group-hover:text-accent transition-colors"
         >
-          {value}
+          {centerEllipsis(value)}
         </button>
         <button onClick={handleCopy} title="Copy" className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5">
           <svg className={`w-3 h-3 transition-colors ${copied ? 'text-status-success' : 'text-text-tertiary hover:text-text-primary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

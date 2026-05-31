@@ -4,12 +4,14 @@ import { AlertCircle, Inbox, User, BookOpen, Radio } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalationCounts } from '../../hooks/useEscalationCounts';
 import { useEventStatus } from '../../hooks/useEventContext';
+import { useAIOverride } from '../../api/settings';
 import { AppLogo } from '../common/display/AppLogo';
 
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
   const { available, mine } = useEscalationCounts();
   const { connected } = useEventStatus();
+  const { aiOverrideActive, toggleAIOverride } = useAIOverride();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -27,8 +29,17 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   return (
     <header className="h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between px-5 relative z-30">
       <div className="flex items-center gap-4">
-        <Link to="/" aria-label="Home">
-          <AppLogo />
+        <Link
+          to="/"
+          aria-label="Home"
+          onClick={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              toggleAIOverride();
+            }
+          }}
+        >
+          <AppLogo className={aiOverrideActive ? 'grayscale opacity-60' : ''} />
         </Link>
       </div>
 

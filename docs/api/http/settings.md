@@ -22,6 +22,9 @@ GET /api/settings
     "transport": "socketio",
     "natsWsUrl": null,
     "natsToken": null
+  },
+  "ai": {
+    "enabled": true
   }
 }
 ```
@@ -33,3 +36,4 @@ GET /api/settings
 | `events.transport` | `'socketio' \| 'nats' \| 'none'` | Dashboard event transport. Defaults to `socketio`. Reports `nats` only when `EVENT_TRANSPORT=nats` is set and a NATS adapter is registered. |
 | `events.natsWsUrl` | `string \| null` | NATS WebSocket URL for browser connections. Only present when a NATS adapter is registered. Read from `VITE_NATS_WS_URL` or `NATS_WS_URL`. |
 | `events.natsToken` | `string \| null` | NATS auth token for browser connections. Only present when a NATS adapter is registered. Read from `NATS_TOKEN`. |
+| `ai.enabled` | `boolean` | Whether an LLM API key is configured. When `false`, the dashboard hides AI-specific features (pipelines designer, AI assistant, triage). |

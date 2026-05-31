@@ -83,7 +83,7 @@ export function ReviewStep({ form }: Props) {
 
       <div className="border-l-2 border-emerald-400/30 pl-3 py-2 mt-6">
         <p className="text-[11px] text-text-tertiary leading-relaxed">
-          After saving, subscriptions and schedules activate immediately. You can pause the agent anytime.
+          After saving, subscriptions and schedules activate immediately. You can pause the automation anytime.
         </p>
       </div>
     </div>

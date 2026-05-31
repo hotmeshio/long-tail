@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useAgents, type Agent } from '../../api/agents';
+import { useSettings } from '../../api/settings';
 import { useAgentEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -74,6 +75,10 @@ const columns: Column<Agent>[] = [
 
 export function AgentsPage() {
   const navigate = useNavigate();
+  const { data: settings } = useSettings();
+  const aiEnabled = !!settings?.ai?.enabled;
+  const label = aiEnabled ? 'Agent' : 'Automation';
+  const labelPlural = aiEnabled ? 'Agents' : 'Automations';
   useAgentEvents();
 
   const { filters, setFilter, pagination } = useFilterParams({
@@ -91,14 +96,14 @@ export function AgentsPage() {
   return (
     <div>
       <PageHeader
-        title="Agents"
+        title={labelPlural}
         docsHash="#docs:agents.md"
         actions={
           <button
             onClick={() => navigate('/agents/new')}
             className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors"
           >
-            <Plus className="w-4 h-4" /> Create Agent
+            <Plus className="w-4 h-4" /> Create {label}
           </button>
         }
       />

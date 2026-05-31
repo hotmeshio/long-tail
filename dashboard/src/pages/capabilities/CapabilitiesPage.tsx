@@ -190,9 +190,12 @@ function ToolRow({
   const params = Object.keys(tool.inputSchema?.properties ?? {});
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onTry}
-      className="group w-full py-2 px-2 rounded-md hover:bg-surface-hover transition-colors text-left flex gap-4 items-start"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTry(); }}
+      className="group w-full py-2 px-2 rounded-md hover:bg-surface-hover transition-colors text-left flex gap-4 items-start cursor-pointer"
     >
       {/* Col 1: tool name — wider */}
       <div className="w-56 shrink-0">
@@ -216,6 +219,6 @@ function ToolRow({
         <ServerName name={tool.serverName} serverId={tool.serverId} />
         <Play className="w-2.5 h-2.5 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
-    </button>
+    </div>
   );
 }

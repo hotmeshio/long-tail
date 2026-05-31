@@ -29,7 +29,7 @@ The sidebar organizes pages into five groups.
 |------|-------|---------|
 | **Recent Activity** | `/` | Live event stream and business process overview. |
 | **Capabilities** | `/capabilities` | Browse MCP servers grouped by capability category. |
-| **Agents** | `/agents` | Autonomous event-driven agents. Configure subscriptions, schedules, and knowledge domains. |
+| **Agent Automations** | `/agents` | Autonomous event-driven automations. Configure subscriptions, schedules, and knowledge domains. |
 | **Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
 
 ### Storage

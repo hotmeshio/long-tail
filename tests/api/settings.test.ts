@@ -10,6 +10,7 @@ vi.mock('../../lib/telemetry', () => ({
 
 // ── Imports (after mocks) ────────────────────────────────────────────
 import { getSettings } from '../../api/settings';
+import { hasLLMApiKey } from '../../services/llm';
 
 // ── Tests ────────────────────────────────────────────────────────────
 
@@ -117,5 +118,58 @@ describe('getSettings — NATS credentials excluded', () => {
 
     const result = await getSettings();
     expect(result.data.events.natsWsUrl).toBeNull();
+  });
+});
+
+describe('getSettings — AI availability', () => {
+  const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  const originalLtKey = process.env.LT_LLM_API_KEY;
+  const originalOpenAIKey = process.env.OPENAI_API_KEY;
+
+  afterEach(() => {
+    // Restore original env
+    if (originalAnthropicKey !== undefined) process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+    else delete process.env.ANTHROPIC_API_KEY;
+    if (originalLtKey !== undefined) process.env.LT_LLM_API_KEY = originalLtKey;
+    else delete process.env.LT_LLM_API_KEY;
+    if (originalOpenAIKey !== undefined) process.env.OPENAI_API_KEY = originalOpenAIKey;
+    else delete process.env.OPENAI_API_KEY;
+  });
+
+  it('returns ai.enabled: true when an LLM API key is configured', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test-key';
+    const result = await getSettings();
+    expect(result.status).toBe(200);
+    expect(result.data.ai).toEqual({ enabled: true });
+  });
+
+  it('returns ai.enabled: false when no LLM API key is configured', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.LT_LLM_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    const result = await getSettings();
+    expect(result.status).toBe(200);
+    expect(result.data.ai).toEqual({ enabled: false });
+  });
+
+  it('returns ai.enabled: false when key is the placeholder "xxx"', async () => {
+    delete process.env.LT_LLM_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    process.env.ANTHROPIC_API_KEY = 'xxx';
+    const result = await getSettings();
+    expect(result.status).toBe(200);
+    expect(result.data.ai.enabled).toBe(false);
+  });
+
+  it('hasLLMApiKey returns true for real key', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-real-key';
+    expect(hasLLMApiKey()).toBe(true);
+  });
+
+  it('hasLLMApiKey returns false for missing key', () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.LT_LLM_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    expect(hasLLMApiKey()).toBe(false);
   });
 });

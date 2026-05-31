@@ -2,6 +2,8 @@ interface AppLogoProps {
   size?: 'sm' | 'lg';
   /** Hide the wordmark (used during login launch animation). */
   hideLabel?: boolean;
+  /** Extra CSS classes on the outer container. */
+  className?: string;
 }
 
 /**
@@ -12,7 +14,7 @@ interface AppLogoProps {
  * - `sm` (default) — toolbar height
  * - `lg` — login page hero
  */
-export function AppLogo({ size = 'sm', hideLabel = false }: AppLogoProps) {
+export function AppLogo({ size = 'sm', hideLabel = false, className = '' }: AppLogoProps) {
   const isLarge = size === 'lg';
 
   const imgClass = isLarge
@@ -24,7 +26,7 @@ export function AppLogo({ size = 'sm', hideLabel = false }: AppLogoProps) {
     : 'text-[36px] font-normal text-text-primary tracking-[0.15em] -ml-[9.75rem]';
 
   return (
-    <div className="flex items-center" style={{ height: '50px' }}>
+    <div className={`flex items-center ${className}`} style={{ height: '50px' }}>
       <img
         src="/logo512.png"
         alt="LongTail"
