@@ -14,10 +14,12 @@ export interface AgentSubscription {
   agent_id: string;
   topic: string;
   filter?: Record<string, any>;
-  reaction_type: 'durable' | 'pipeline' | 'mcp_query';
+  reaction_type: 'durable' | 'pipeline' | 'mcp_query' | 'capability';
   workflow_type?: string;
   pipeline_id?: string;
   mcp_prompt?: string;
+  server_id?: string;
+  tool_name?: string;
   input_mapping: Record<string, any>;
   execute_as?: string;
   enabled: boolean;
@@ -58,6 +60,8 @@ export async function createSubscription(
     JSON.stringify(data.input_mapping ?? {}),
     data.execute_as ?? null,
     data.enabled !== false,
+    data.server_id ?? null,
+    data.tool_name ?? null,
   ]);
   return rows[0];
 }
@@ -78,6 +82,8 @@ export async function updateSubscription(
     data.input_mapping ? JSON.stringify(data.input_mapping) : null,
     data.execute_as ?? null,
     data.enabled ?? null,
+    data.server_id ?? null,
+    data.tool_name ?? null,
   ]);
   return rows[0] ?? null;
 }
@@ -113,6 +119,8 @@ export async function seedSubscription(
     data.mcp_prompt ?? null,
     JSON.stringify(data.input_mapping ?? {}),
     data.execute_as ?? null,
+    data.server_id ?? null,
+    data.tool_name ?? null,
   ]);
   return (rowCount ?? 0) > 0;
 }

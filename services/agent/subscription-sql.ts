@@ -11,8 +11,8 @@ export const GET_SUBSCRIPTION = `
 export const INSERT_SUBSCRIPTION = `
   INSERT INTO lt_agent_subscriptions
     (agent_id, topic, filter, reaction_type, workflow_type, pipeline_id, mcp_prompt,
-     input_mapping, execute_as, enabled)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     input_mapping, execute_as, enabled, server_id, tool_name)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
   RETURNING *
 `;
 
@@ -26,7 +26,9 @@ export const UPDATE_SUBSCRIPTION = `
     mcp_prompt = COALESCE($7, mcp_prompt),
     input_mapping = COALESCE($8, input_mapping),
     execute_as = COALESCE($9, execute_as),
-    enabled = COALESCE($10, enabled)
+    enabled = COALESCE($10, enabled),
+    server_id = COALESCE($11, server_id),
+    tool_name = COALESCE($12, tool_name)
   WHERE id = $1
   RETURNING *
 `;
@@ -38,8 +40,8 @@ export const DELETE_SUBSCRIPTION = `
 export const SEED_SUBSCRIPTION = `
   INSERT INTO lt_agent_subscriptions
     (agent_id, topic, filter, reaction_type, workflow_type, pipeline_id, mcp_prompt,
-     input_mapping, execute_as, enabled)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+     input_mapping, execute_as, enabled, server_id, tool_name)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11)
   ON CONFLICT (agent_id, topic) DO NOTHING
 `;
 

@@ -5,10 +5,12 @@ export interface SubscriptionFormState {
   id?: string;
   topic: string;
   filter: string;
-  reaction_type: 'durable' | 'pipeline' | 'mcp_query';
+  reaction_type: 'durable' | 'pipeline' | 'mcp_query' | 'capability';
   workflow_type: string;
   pipeline_id: string;
   mcp_prompt: string;
+  server_id: string;
+  tool_name: string;
   input_mapping: string;
   execute_as: string;
   enabled: boolean;
@@ -54,6 +56,8 @@ export const EMPTY_SUBSCRIPTION: SubscriptionFormState = {
   workflow_type: '',
   pipeline_id: '',
   mcp_prompt: '',
+  server_id: '',
+  tool_name: '',
   input_mapping: '{}',
   execute_as: '',
   enabled: true,
@@ -79,6 +83,7 @@ export function isStepValid(step: number, form: AgentFormState): boolean {
         if (s.reaction_type === 'durable' && !s.workflow_type) return false;
         if (s.reaction_type === 'pipeline' && !s.pipeline_id) return false;
         if (s.reaction_type === 'mcp_query' && !s.mcp_prompt) return false;
+        if (s.reaction_type === 'capability' && (!s.server_id || !s.tool_name)) return false;
         return true;
       });
     }
@@ -127,6 +132,8 @@ export function agentToForm(
       workflow_type: s.workflow_type ?? '',
       pipeline_id: s.pipeline_id ?? '',
       mcp_prompt: s.mcp_prompt ?? '',
+      server_id: s.server_id ?? '',
+      tool_name: s.tool_name ?? '',
       input_mapping: JSON.stringify(s.input_mapping ?? {}, null, 2),
       execute_as: s.execute_as ?? '',
       enabled: s.enabled,
@@ -184,6 +191,8 @@ export function formToSubscriptionPayloads(form: AgentFormState): Array<{
     workflow_type: s.workflow_type || undefined,
     pipeline_id: s.pipeline_id || undefined,
     mcp_prompt: s.mcp_prompt || undefined,
+    server_id: s.server_id || undefined,
+    tool_name: s.tool_name || undefined,
     input_mapping: tryParseJson(s.input_mapping) ?? {},
     execute_as: s.execute_as || undefined,
     enabled: s.enabled,

@@ -169,10 +169,12 @@ POST /api/agents/:agentId/subscriptions
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `topic` | `string` | Yes | Event topic pattern. Supports `*` (one token) and `>` (rest of subject). |
-| `reaction_type` | `string` | Yes | `durable`, `pipeline`, or `mcp_query` |
+| `reaction_type` | `string` | Yes | `durable`, `pipeline`, `mcp_query`, or `capability` |
 | `workflow_type` | `string` | For durable | Registered workflow name |
 | `pipeline_id` | `string` | For pipeline | YAML workflow UUID |
 | `mcp_prompt` | `string` | For mcp_query | Dynamic query prompt |
+| `server_id` | `string` | For capability | MCP server UUID |
+| `tool_name` | `string` | For capability | MCP tool name |
 | `input_mapping` | `object` | No | Maps event fields to workflow envelope. Templates: `{event.data.field}` |
 | `filter` | `object` | No | Shallow key-value match against `event.data` |
 | `execute_as` | `string` | No | Identity override for this subscription |

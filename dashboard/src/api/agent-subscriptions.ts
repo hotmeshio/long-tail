@@ -6,10 +6,12 @@ export interface AgentSubscription {
   agent_id: string;
   topic: string;
   filter?: Record<string, any>;
-  reaction_type: 'durable' | 'pipeline' | 'mcp_query';
+  reaction_type: 'durable' | 'pipeline' | 'mcp_query' | 'capability';
   workflow_type?: string;
   pipeline_id?: string;
   mcp_prompt?: string;
+  server_id?: string;
+  tool_name?: string;
   input_mapping: Record<string, any>;
   execute_as?: string;
   enabled: boolean;

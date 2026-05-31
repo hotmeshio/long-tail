@@ -103,10 +103,12 @@ const result = await lt.agents.createSubscription({
 |-----------|------|----------|-------------|
 | `agentId` | `string` | Yes | Agent ID |
 | `topic` | `string` | Yes | Event topic pattern (`*` = one token, `>` = rest) |
-| `reaction_type` | `string` | Yes | `durable`, `pipeline`, or `mcp_query` |
+| `reaction_type` | `string` | Yes | `durable`, `pipeline`, `mcp_query`, or `capability` |
 | `workflow_type` | `string` | For durable | Workflow name |
 | `pipeline_id` | `string` | For pipeline | YAML workflow UUID |
 | `mcp_prompt` | `string` | For mcp_query | Query prompt |
+| `server_id` | `string` | For capability | MCP server UUID |
+| `tool_name` | `string` | For capability | MCP tool name |
 | `input_mapping` | `object` | No | Event-to-envelope field mapping |
 | `filter` | `object` | No | Shallow match against `event.data` |
 | `execute_as` | `string` | No | Identity override |

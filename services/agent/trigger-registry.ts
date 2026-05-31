@@ -214,6 +214,22 @@ class AgentTriggerRegistry {
         });
         break;
       }
+      case 'capability': {
+        const { invokeWorkflow } = await import('../workflow-invocation');
+        await invokeWorkflow({
+          workflowType: 'capabilityInvoke',
+          data: {
+            serverId: sub.server_id!,
+            toolName: sub.tool_name!,
+            arguments: mapped.data ?? mapped,
+          },
+          metadata: { source: 'agent', certified: true },
+          executeAs: sub.execute_as ?? sub.agent_user_id ?? undefined,
+          options: { workflowId: deterministicId },
+          auth: { userId: sub.agent_user_id || 'lt-system', role: 'admin' },
+        });
+        break;
+      }
     }
   }
 }

@@ -37,6 +37,10 @@ const SYSTEM_WORKFLOW_BASE: Partial<LTWorkerConfig> = {
 };
 
 const systemWorkflowConfigs: Record<string, LTWorkerConfig> = {
+  capabilityInvoke: {
+    ...SYSTEM_WORKFLOW_BASE,
+    description: 'Late-binding MCP tool invocation — calls a single capability with idempotent execution',
+  },
   mcpTriageRouter: {
     ...SYSTEM_WORKFLOW_BASE,
     description: 'Triage router — discovers compiled workflows for remediation, routes to deterministic or dynamic triage',
@@ -85,6 +89,17 @@ export type SystemWorkerEntry = {
 
 export function getSystemWorkers(): SystemWorkerEntry[] {
   const workers: SystemWorkerEntry[] = [];
+
+  // Capability invoke — always available (no LLM required)
+  try {
+    const { capabilityInvoke } = require('./workflows/capability-invoke');
+    workers.push({
+      taskQueue: 'long-tail-system',
+      workflow: capabilityInvoke,
+      config: systemWorkflowConfigs.capabilityInvoke,
+    });
+  } catch { /* module not available */ }
+
   const hasLLM = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
 
   if (hasLLM) {
