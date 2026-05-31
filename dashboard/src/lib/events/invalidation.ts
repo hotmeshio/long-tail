@@ -68,6 +68,10 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
       keys.push(['knowledge']);
       break;
 
+    case 'file':
+      keys.push(['files']);
+      break;
+
     case 'agent':
       keys.push(['agents']);
       break;

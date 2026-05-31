@@ -13,6 +13,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   escalation: 'bg-amber-400/15 text-amber-400',
   activity:   'bg-cyan-400/15 text-cyan-400',
   knowledge:  'bg-violet-400/15 text-violet-400',
+  file:       'bg-orange-400/15 text-orange-400',
   agent:      'bg-emerald-400/15 text-emerald-400',
   app:        'bg-rose-400/15 text-rose-400',
   milestone:  'bg-violet-400/15 text-violet-400',
