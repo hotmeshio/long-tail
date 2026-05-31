@@ -214,7 +214,7 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
                   return (
                     <div
                       key={seg.eventId}
-                      className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 origin-center ${outline ? 'border-2' : ''} ${
+                      className={`absolute top-2 h-6 rounded-sm cursor-pointer transition-all duration-200 origin-center ${
                         isSelected
                           ? `${barColor(lane.category, seg.pending)} ring-2 ring-accent ring-offset-1`
                           : `${barColor(lane.category, seg.pending)} hover:opacity-80`

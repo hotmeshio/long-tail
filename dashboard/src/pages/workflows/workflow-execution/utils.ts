@@ -23,10 +23,10 @@ export interface Lane {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 export const CATEGORY_COLORS: Record<string, { bar: string; outline: string; text: string; label: string }> = {
-  activity:       { bar: 'bg-blue-500',       outline: 'border-blue-500 bg-transparent',      text: 'text-blue-500',      label: 'Activities' },
-  signal:         { bar: 'bg-emerald-500',    outline: 'border-emerald-500 bg-transparent',   text: 'text-emerald-500',   label: 'Signals' },
-  timer:          { bar: 'bg-status-warning', outline: 'border-status-warning bg-transparent', text: 'text-status-warning', label: 'Timers' },
-  child_workflow: { bar: 'bg-violet-500',     outline: 'border-violet-500 bg-transparent',    text: 'text-violet-500',    label: 'Child Workflows' },
+  activity:       { bar: 'bg-blue-500',       outline: 'border border-blue-400/40 bg-blue-400/15',       text: 'text-blue-500',      label: 'Activities' },
+  signal:         { bar: 'bg-emerald-500',    outline: 'border border-emerald-400/40 bg-emerald-400/15', text: 'text-emerald-500',   label: 'Signals' },
+  timer:          { bar: 'bg-status-warning', outline: 'border border-amber-400/40 bg-amber-400/15',    text: 'text-status-warning', label: 'Timers' },
+  child_workflow: { bar: 'bg-violet-500',     outline: 'border border-violet-400/40 bg-violet-400/15',  text: 'text-violet-500',    label: 'Child Workflows' },
 };
 
 export const PENDING_CLASS = 'bg-stripes animate-pulse opacity-70';

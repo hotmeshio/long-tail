@@ -64,6 +64,13 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
               Compile into Pipeline
             </Link>
           )}
+          <Link
+            to={`/mcp/executions/${encodeURIComponent(workflowId)}?namespace=durable`}
+            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+            onClick={() => setOpen(false)}
+          >
+            View Raw Execution
+          </Link>
         </div>
       )}
     </div>
