@@ -31,6 +31,7 @@ export type LTEventType =
   | 'agent.completed'
   | 'agent.failed'
   | 'agent.status_changed'
+  | 'agent.triggers_changed'
   | 'milestone';
 
 /**

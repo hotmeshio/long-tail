@@ -23,14 +23,34 @@ class AgentTriggerRegistry {
 
   /**
    * Load all active subscriptions from DB and arm event listeners.
+   * Also subscribes to `agent.triggers_changed` so other containers
+   * can signal this one to re-arm after subscription CRUD.
    */
   async connect(adapter: CallbackEventAdapter): Promise<void> {
     this.adapter = adapter;
 
     const subs = await listActiveSubscriptions();
     for (const sub of subs) {
+      loggerRegistry.info(
+        `[long-tail] arming trigger: ${sub.agent_name}/${sub.topic} → ${sub.reaction_type}:${sub.tool_name || sub.workflow_type || sub.mcp_prompt?.slice(0, 20) || '?'}`,
+      );
       this.armSubscription(sub);
     }
+
+    // Listen for cross-container trigger sync signals
+    adapter.on('agent.triggers_changed', (event: LTEvent) => {
+      const agentId = event.data?.agentId;
+      const action = event.data?.action;
+      if (!agentId) return;
+      if (action === 'deleted') {
+        this.stopAgent(agentId);
+        loggerRegistry.info(`[long-tail] agent triggers stopped (remote): ${agentId}`);
+      } else {
+        this.restartAgent(agentId).then(() => {
+          loggerRegistry.info(`[long-tail] agent triggers synced (remote): ${agentId}`);
+        }).catch(() => {});
+      }
+    });
 
     this.connected = true;
     loggerRegistry.info(`[long-tail] agent trigger registry: ${subs.length} subscription(s) armed`);
@@ -101,8 +121,13 @@ class AgentTriggerRegistry {
   private buildHandler(sub: ActiveSubscription): (event: LTEvent) => void {
     return async (event: LTEvent) => {
       try {
+        loggerRegistry.info(
+          `[long-tail] trigger matched: ${sub.agent_name}/${sub.topic} for event ${event.type}`,
+        );
+
         // 1. Evaluate optional filter
         if (sub.filter && !this.matchesFilter(event, sub.filter)) {
+          loggerRegistry.info(`[long-tail] trigger filtered out: ${sub.agent_name}/${sub.topic}`);
           return;
         }
 
@@ -137,14 +162,21 @@ class AgentTriggerRegistry {
           last_run_at: new Date().toISOString(),
         }).catch(() => {}); // best-effort
       } catch (err: any) {
-        publishAgentEvent({
-          type: 'agent.failed',
-          agentId: sub.agent_id,
-          agentName: sub.agent_name,
-          status: 'error',
-          data: { topic: sub.topic, error: err.message },
-        });
-        loggerRegistry.warn(`[long-tail] agent trigger failed: ${sub.agent_name}/${sub.topic}: ${err.message}`);
+        // Duplicate job errors are expected in multi-container — another
+        // container won the race. Log as info and continue.
+        const isDuplicate = err.message?.includes('already exists');
+        if (isDuplicate) {
+          loggerRegistry.info(`[long-tail] agent trigger dedup (another container handled): ${sub.agent_name}/${sub.topic}`);
+        } else {
+          publishAgentEvent({
+            type: 'agent.failed',
+            agentId: sub.agent_id,
+            agentName: sub.agent_name,
+            status: 'error',
+            data: { topic: sub.topic, error: err.message },
+          });
+          loggerRegistry.warn(`[long-tail] agent trigger failed: ${sub.agent_name}/${sub.topic}: ${err.message}`);
+        }
       }
     };
   }

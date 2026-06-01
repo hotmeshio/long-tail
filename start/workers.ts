@@ -318,6 +318,8 @@ export async function startWorkers(
     } catch (err: any) {
       loggerRegistry.warn(`[long-tail] agent cron schedules: ${err.message}`);
     }
+  } else {
+    loggerRegistry.info('[long-tail] readonly mode — agent triggers and crons skipped');
   }
 
   // Ensure system bot account exists for cron/system-initiated workflows

@@ -108,6 +108,13 @@ export async function updateAgent(
     import('../cron').then(({ cronRegistry }) =>
       cronRegistry.restartAgentCrons(updated),
     ).catch(() => {});
+    // Signal other containers to re-arm triggers for this agent
+    publishAgentEvent({
+      type: 'agent.triggers_changed' as any,
+      agentId: id,
+      agentName: id,
+      data: { action: 'updated' },
+    });
   }
   return updated;
 }
@@ -120,6 +127,13 @@ export async function deleteAgent(id: string): Promise<boolean> {
   import('../cron').then(({ cronRegistry }) =>
     cronRegistry.stopAgentCrons(id),
   ).catch(() => {});
+  // Signal other containers to stop triggers for this agent
+  publishAgentEvent({
+    type: 'agent.triggers_changed' as any,
+    agentId: id,
+    agentName: id,
+    data: { action: 'deleted' },
+  });
   const pool = getPool();
   const { rowCount } = await pool.query(DELETE_AGENT, [id]);
   return (rowCount ?? 0) > 0;

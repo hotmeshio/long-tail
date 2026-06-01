@@ -77,11 +77,14 @@ class LTEventRegistry {
    * delivery implements `setCallbackBridge` on the LTEventAdapter interface.
    */
   bridgeCallbackAdapter(callbackAdapter: LTEventAdapter): void {
+    let bridged = 0;
     for (const adapter of this.adapters) {
       if (adapter !== callbackAdapter && typeof adapter.setCallbackBridge === 'function') {
         adapter.setCallbackBridge(callbackAdapter);
+        bridged++;
       }
     }
+    loggerRegistry.info(`[lt-events] callback bridge wired to ${bridged} transport adapter(s)`);
   }
 }
 

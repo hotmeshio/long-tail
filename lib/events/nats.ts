@@ -69,6 +69,7 @@ export class NatsEventAdapter implements LTEventAdapter {
             const event = JSON.parse(sc.decode(msg.data)) as LTEvent & { _originId?: string };
             // Skip events that originated from this container
             if (event._originId === this.originId) continue;
+            loggerRegistry.info(`[lt-events:nats] bridge received: ${event.type} from ${event._originId?.slice(0, 8)}`);
             adapter.publish(event);
           } catch {
             // Malformed message — skip
@@ -83,6 +84,7 @@ export class NatsEventAdapter implements LTEventAdapter {
     const subject = `${this.subjectPrefix}.${event.type}`;
     const enriched = { ...event, _originId: this.originId };
     this.nc.publish(subject, sc.encode(JSON.stringify(enriched)));
+    loggerRegistry.info(`[lt-events:nats] published: ${subject} (origin=${this.originId.slice(0, 8)})`);
   }
 
   async disconnect(): Promise<void> {
