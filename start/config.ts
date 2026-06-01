@@ -10,27 +10,37 @@ import type { LTStartConfig } from '../types/startup';
  */
 export function applyDatabaseConfig(db: LTStartConfig['database']): void {
   if (db.connectionString) {
-    Object.assign(postgres_options, {
-      connectionString: db.connectionString,
-      host: undefined,
-      port: undefined,
-      user: undefined,
-      password: undefined,
-      database: undefined,
-    });
+    // Infer SSL from sslmode in connection string when not explicitly provided
+    if (!db.ssl) {
+      try {
+        const sslmode = new URL(db.connectionString).searchParams.get('sslmode');
+        if (sslmode === 'require') {
+          postgres_options.ssl = { rejectUnauthorized: false };
+          loggerRegistry.info('[long-tail] database SSL inferred from sslmode=require');
+        }
+      } catch { /* not a parseable URL — skip inference */ }
+    }
+
+    // Clear individual fields — connectionString takes precedence.
+    // Delete stale keys so pg doesn't see conflicting host/port/etc.
+    delete postgres_options.host;
+    delete postgres_options.port;
+    delete postgres_options.user;
+    delete postgres_options.password;
+    delete postgres_options.database;
+    postgres_options.connectionString = db.connectionString;
   } else {
-    Object.assign(postgres_options, {
-      host: db.host ?? postgres_options.host,
-      port: db.port ?? postgres_options.port,
-      user: db.user ?? postgres_options.user,
-      password: db.password ?? postgres_options.password,
-      database: db.database ?? postgres_options.database,
-    });
+    postgres_options.host = db.host ?? postgres_options.host;
+    postgres_options.port = db.port ?? postgres_options.port;
+    postgres_options.user = db.user ?? postgres_options.user;
+    postgres_options.password = db.password ?? postgres_options.password;
+    postgres_options.database = db.database ?? postgres_options.database;
   }
 
   // SSL passthrough — applies to both connectionString and individual-field modes
   if (db.ssl !== undefined) {
     postgres_options.ssl = db.ssl;
+    loggerRegistry.info(`[long-tail] database SSL configured: ${typeof db.ssl === 'object' ? JSON.stringify(db.ssl) : db.ssl}`);
   }
 }
 
