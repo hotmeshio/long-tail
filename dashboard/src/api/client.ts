@@ -1,6 +1,7 @@
 import { isTokenExpired } from '../lib/jwt';
+import { LT_BASE } from '../lib/base-path';
 
-const BASE_URL = '/api';
+const BASE_URL = `${LT_BASE}/api`;
 
 let authToken: string | null = null;
 

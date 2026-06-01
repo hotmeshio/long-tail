@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { AppLogo } from '../components/common/display/AppLogo';
 import { OAuthIcon } from '../components/common/OAuthIcon';
+import { LT_BASE } from '../lib/base-path';
 
 /**
  * Credential entry page for the Anthropic provider.
@@ -56,7 +57,7 @@ export function ConnectAnthropicPage() {
     setError('');
 
     // Redirect to the OAuth callback with the credential as the "code"
-    const callbackUrl = `/api/auth/oauth/anthropic/callback?code=${encodeURIComponent(trimmed)}&state=${encodeURIComponent(state)}`;
+    const callbackUrl = `${LT_BASE}/api/auth/oauth/anthropic/callback?code=${encodeURIComponent(trimmed)}&state=${encodeURIComponent(state)}`;
     window.location.href = callbackUrl;
   };
 

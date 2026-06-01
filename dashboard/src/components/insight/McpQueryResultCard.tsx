@@ -1,4 +1,5 @@
 import type { McpQueryResult } from '../../api/insight';
+import { LT_BASE } from '../../lib/base-path';
 
 interface McpQueryResultCardProps {
   result: McpQueryResult;
@@ -66,13 +67,13 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
           {images.map((imgPath) => (
             <div key={imgPath}>
               <a
-                href={`/api/files/${imgPath}`}
+                href={`${LT_BASE}/api/files/${imgPath}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block"
               >
                 <img
-                  src={`/api/files/${imgPath}`}
+                  src={`${LT_BASE}/api/files/${imgPath}`}
                   alt={imgPath}
                   className="max-w-full max-h-80 rounded-md border border-surface-border"
                 />
@@ -93,7 +94,7 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
             {otherFiles.map((fp) => (
               <a
                 key={fp}
-                href={`/api/files/${fp}`}
+                href={`${LT_BASE}/api/files/${fp}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-xs text-accent hover:underline font-mono"

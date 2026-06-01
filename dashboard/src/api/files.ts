@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiFetch } from './client';
+import { LT_BASE } from '../lib/base-path';
 
 export interface FileEntry {
   path: string;
@@ -94,9 +95,9 @@ export function useFilePreviewUrl(filePath: string | null) {
 
 /** @deprecated Use useFilePreviewUrl() for signed access */
 export function getFilePreviewUrl(filePath: string): string {
-  return `/api/files/${filePath.replace(/^\/+/, '')}`;
+  return `${LT_BASE}/api/files/${filePath.replace(/^\/+/, '')}`;
 }
 
 export function getFileDownloadUrl(filePath: string): string {
-  return `/api/file-browser/download/${filePath.replace(/^\/+/, '')}`;
+  return `${LT_BASE}/api/file-browser/download/${filePath.replace(/^\/+/, '')}`;
 }
