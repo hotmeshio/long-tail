@@ -101,7 +101,7 @@ export class LTExpressAdapter {
     // Dashboard static assets
     const dashboardDist = this.resolveDashboardDist();
     if (dashboardDist) {
-      router.use(express.static(dashboardDist));
+      router.use(express.static(dashboardDist, { index: false }));
 
       // SPA fallback — inject base path into index.html
       const indexHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');
