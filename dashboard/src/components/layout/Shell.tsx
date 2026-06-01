@@ -21,6 +21,7 @@ function ShellLayout() {
   const aiEnabled = !!settings?.ai?.enabled;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
+  const [feedConfigOpen, setFeedConfigOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(() => window.location.hash.startsWith('#docs'));
   const location = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -44,7 +45,7 @@ function ShellLayout() {
   }, []);
 
   return (
-    <div className="h-screen bg-surface flex flex-col" style={{ '--feed-height': feedOpen ? '224px' : '32px' } as React.CSSProperties}>
+    <div className="h-screen bg-surface flex flex-col">
       {/* Full-width header */}
       <Header onToggleEventFeed={() => setFeedOpen((v) => !v)} onToggleDocs={() => setDocsOpen((v) => !v)} />
 
@@ -82,14 +83,14 @@ function ShellLayout() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div ref={contentRef} className={`max-w-dashboard mx-auto px-10 py-10 animate-page-in ${feedOpen ? 'pb-60' : 'pb-16'}`}>
+          <div ref={contentRef} className="max-w-dashboard mx-auto px-10 py-10 pb-16 animate-page-in">
             <Outlet />
           </div>
         </main>
       </div>
 
       {/* Global event feed */}
-      <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} />
+      <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} configOpen={feedConfigOpen} onToggleConfig={() => setFeedConfigOpen((v) => !v)} />
       <DocsDrawer open={docsOpen} onClose={() => { setDocsOpen(false); history.replaceState(null, '', window.location.pathname + window.location.search); }} />
       {aiEnabled && <HelpButton />}
       {aiEnabled && <HelpPanel />}

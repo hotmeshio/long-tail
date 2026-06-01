@@ -1,5 +1,6 @@
 import { getStorageBackend } from '../lib/storage';
 import { mimeFromPath } from '../lib/storage/mime';
+import { publishFileEvent } from '../lib/events/publish';
 import type { LTApiResult } from '../types/sdk';
 
 const ALLOWED_EXPIRY = [3600, 21600, 86400, 604800, 2592000]; // 1h, 6h, 24h, 7d, 30d
@@ -46,6 +47,7 @@ export async function deleteFile(input: {
     if (!result.deleted) {
       return { status: 404, error: 'File not found' };
     }
+    publishFileEvent({ type: 'file.deleted', path: input.filePath });
     return { status: 200, data: { deleted: true, path: input.filePath } };
   } catch (err: any) {
     return { status: 500, error: err.message };
@@ -59,6 +61,12 @@ export async function uploadFile(input: {
   try {
     const result = await getStorageBackend().write(input.path, input.buffer);
     const contentType = mimeFromPath(input.path);
+    publishFileEvent({
+      type: 'file.stored',
+      path: input.path,
+      size: result.size,
+      mime: contentType,
+    });
     return {
       status: 200,
       data: { path: input.path, size: result.size, content_type: contentType },

@@ -100,3 +100,13 @@ export function useDeleteTopic() {
     },
   });
 }
+
+export function usePublishTopic() {
+  return useMutation<{ published: boolean; topic: string; timestamp: string }, Error, { topic: string; data: Record<string, any> }>({
+    mutationFn: ({ topic, data }) =>
+      apiFetch(`/topics/by-name/${encodeURIComponent(topic)}/publish`, {
+        method: 'POST',
+        body: JSON.stringify({ data }),
+      }),
+  });
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Bot, Tag, Pencil, Trash2, Save, X, BookOpen } from 'lucide-react';
-import { useTopic, useUpdateTopic, useDeleteTopic } from '../../api/topics';
+import { Radio, Bot, Tag, Pencil, Trash2, Save, X, BookOpen, Send } from 'lucide-react';
+import { useTopic, useUpdateTopic, useDeleteTopic, usePublishTopic } from '../../api/topics';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
 import { DateValue } from '../../components/common/display/DateValue';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
@@ -33,8 +33,11 @@ export function TopicDetailPage() {
   const { data: topic, isLoading, refetch, isFetching } = useTopic(topicKey);
   const updateMutation = useUpdateTopic();
   const deleteMutation = useDeleteTopic();
+  const publishMutation = usePublishTopic();
 
   const [editing, setEditing] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishPayload, setPublishPayload] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState('');
   const [editSchema, setEditSchema] = useState('');
@@ -119,6 +122,22 @@ export function TopicDetailPage() {
             isFetching={isFetching}
             apiPath={`/topics/by-name/${encodeURIComponent(topic.topic)}`}
           />
+          {!editing && (
+            <button
+              onClick={() => {
+                const payload = topic.example_payload
+                  ? JSON.stringify(topic.example_payload, null, 2)
+                  : topic.payload_schema?.properties
+                    ? JSON.stringify(Object.fromEntries(Object.keys(topic.payload_schema.properties).map(k => [k, ''])), null, 2)
+                    : '{}';
+                setPublishPayload(payload);
+                setPublishing(!publishing);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${publishing ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-accent hover:bg-surface-hover'}`}
+            >
+              <Send className="w-3 h-3" /> Publish
+            </button>
+          )}
           {!editing && editable && (
             <>
               <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors">
@@ -143,6 +162,40 @@ export function TopicDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Publish panel */}
+      {publishing && (
+        <div className="mb-6 bg-surface-sunken/50 rounded-md p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-accent/60 mb-2">Publish test event</p>
+          <textarea
+            value={publishPayload}
+            onChange={(e) => setPublishPayload(e.target.value)}
+            className="input-json w-full text-xs"
+            rows={6}
+            spellCheck={false}
+            placeholder='{ "key": "value" }'
+          />
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              onClick={() => {
+                try {
+                  const data = JSON.parse(publishPayload);
+                  publishMutation.mutate({ topic: topic.topic, data }, {
+                    onSuccess: () => setPublishing(false),
+                  });
+                } catch { /* invalid JSON */ }
+              }}
+              disabled={publishMutation.isPending}
+              className="btn-primary text-xs"
+            >
+              {publishMutation.isPending ? 'Publishing...' : 'Publish'}
+            </button>
+            <button onClick={() => setPublishing(false)} className="text-xs text-text-tertiary hover:text-text-primary">Cancel</button>
+            {publishMutation.isSuccess && <span className="text-xs text-status-success">Published</span>}
+            {publishMutation.isError && <span className="text-xs text-status-error">{publishMutation.error.message}</span>}
+          </div>
+        </div>
+      )}
 
       {/* Description */}
       <div className="mb-8">
