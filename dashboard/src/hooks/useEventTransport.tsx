@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { getToken } from '../api/client';
+import { LT_BASE } from '../lib/base-path';
 import { NatsProvider } from './useNats';
 import { SocketIOProvider } from './useSocketIO';
 
@@ -29,7 +30,7 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
     async function detect() {
       try {
         console.log('[lt-transport] detecting event transport...');
-        const res = await fetch('/api/settings');
+        const res = await fetch(`${LT_BASE}/api/settings`);
         if (!res.ok) {
           console.warn('[lt-transport] settings fetch failed, falling back to socketio');
           if (!cancelled) setTransport('socketio');
@@ -47,7 +48,7 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
             const jwt = getToken();
             if (jwt) {
               try {
-                const credRes = await fetch('/api/nats-credentials', {
+                const credRes = await fetch(`${LT_BASE}/api/nats-credentials`, {
                   headers: { Authorization: `Bearer ${jwt}` },
                 });
                 if (credRes.ok) {

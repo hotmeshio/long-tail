@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { OAuthIcon } from '../../components/common/OAuthIcon';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { ConfirmDeleteModal } from '../../components/common/modal/ConfirmDeleteModal';
+import { LT_BASE } from '../../lib/base-path';
 
 interface ConnectionToRevoke {
   provider: string;
@@ -28,7 +29,7 @@ export function ConnectionsPage() {
   };
 
   const connectUrl = (provider: string) =>
-    `/api/auth/oauth/connect/${provider}?token=${encodeURIComponent(getToken() || '')}&returnTo=/connections`;
+    `${LT_BASE}/api/auth/oauth/connect/${provider}?token=${encodeURIComponent(getToken() || '')}&returnTo=/connections`;
 
   return (
     <div>

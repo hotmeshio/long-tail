@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import { LT_BASE } from '../lib/base-path';
 
 import { getToken } from '../api/client';
 import { subjectMatchesPattern } from '../lib/events/matching';
@@ -111,7 +112,7 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
     // - Dev (Vite): proxy in vite.config.ts forwards /socket.io to backend
     const authToken = getToken();
     const socket = io({
-      path: '/socket.io',
+      path: `${LT_BASE}/socket.io`,
       transports: ['polling', 'websocket'],
       upgrade: true,
       reconnection: true,

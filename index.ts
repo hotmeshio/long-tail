@@ -54,6 +54,7 @@ export { resolveCredential } from './services/iam/credentials';
 export * as KnowledgeApi from './api/knowledge';
 export type { LTClient, LTClientOptions } from './sdk';
 export * as api from './api';
+export { LTExpressAdapter } from './adapters/express';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 

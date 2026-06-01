@@ -10,6 +10,7 @@ import {
 import { setToken } from '../api/client';
 import { decodeJwtPayload, getTokenExpiry, isTokenExpired } from '../lib/jwt';
 import type { LTUserRole, LTRoleType } from '../api/types';
+import { LT_BASE } from '../lib/base-path';
 
 interface AuthUser {
   userId: string;
@@ -85,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!creds) return;
       try {
         const { username, password } = JSON.parse(creds);
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(`${LT_BASE}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),

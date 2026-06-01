@@ -39,6 +39,7 @@ export class SocketIOEventAdapter implements LTEventAdapter {
   private io: SocketIOServer | null = null;
   private httpServer: HttpServer | null = null;
   private authenticate: SocketIOAuthenticator | null;
+  private socketPath = '/socket.io';
 
   constructor(options?: { authenticate?: SocketIOAuthenticator }) {
     this.authenticate = options?.authenticate ?? null;
@@ -49,6 +50,11 @@ export class SocketIOEventAdapter implements LTEventAdapter {
     this.httpServer = server;
   }
 
+  /** Override the socket.io path (for subpath-mounted deployments). */
+  setPath(socketPath: string): void {
+    this.socketPath = socketPath;
+  }
+
   async connect(): Promise<void> {
     if (!this.httpServer) {
       loggerRegistry.warn('[lt-events:socketio] no HTTP server attached — skipping');
@@ -56,7 +62,7 @@ export class SocketIOEventAdapter implements LTEventAdapter {
     }
     this.io = new SocketIOServer(this.httpServer, {
       cors: { origin: '*', methods: ['GET', 'POST'] },
-      path: '/socket.io',
+      path: this.socketPath,
       transports: ['polling', 'websocket'],
       allowEIO3: true,
     });

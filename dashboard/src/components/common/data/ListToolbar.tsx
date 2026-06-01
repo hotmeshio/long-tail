@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RefreshCw, Link2, Terminal, Check } from 'lucide-react';
 import { getToken } from '../../../api/client';
+import { LT_BASE } from '../../../lib/base-path';
 
 interface ListToolbarProps {
   onRefresh: () => void;
@@ -27,13 +28,13 @@ export function ListToolbar({ onRefresh, isFetching = false, apiPath }: ListTool
 
   const handleCopyUrl = () => {
     if (!apiPath) return;
-    const url = `${window.location.origin}/api${apiPath}`;
+    const url = `${window.location.origin}${LT_BASE}/api${apiPath}`;
     copyToClipboard(url, 'url');
   };
 
   const handleCopyCurl = () => {
     if (!apiPath) return;
-    const url = `${window.location.origin}/api${apiPath}`;
+    const url = `${window.location.origin}${LT_BASE}/api${apiPath}`;
     const token = getToken();
     const cmd = token
       ? `curl -H "Authorization: Bearer ${token}" "${url}"`

@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { AppLogo } from '../components/common/display/AppLogo';
 import { OAuthIcon } from '../components/common/OAuthIcon';
 import { fetchOAuthProviders, type OAuthProvider } from '../api/oauth';
+import { LT_BASE } from '../lib/base-path';
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
@@ -64,7 +65,7 @@ export function LoginPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${LT_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
@@ -159,7 +160,7 @@ export function LoginPage() {
                 {oauthProviders.filter((p) => p.provider !== 'anthropic').map((p) => (
                   <a
                     key={p.provider}
-                    href={`/api/auth/oauth/${p.provider}?returnTo=${encodeURIComponent(returnTo)}`}
+                    href={`${LT_BASE}/api/auth/oauth/${p.provider}?returnTo=${encodeURIComponent(returnTo)}`}
                     className="btn-secondary w-full flex items-center justify-center gap-2"
                   >
                     <OAuthIcon provider={p.provider} />
