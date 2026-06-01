@@ -156,6 +156,54 @@ describe('capability reaction — trigger registry dispatch', () => {
     expect(invokeWorkflowMock).toHaveBeenCalledOnce();
   });
 
+  it('$ne filter: skips when field equals negated value', async () => {
+    const sub = makeCapabilitySub({ filter: { extension: { $ne: 'png' } } });
+    const event = makeEvent({ data: { extension: 'png' } });
+    const handler = (agentTriggerRegistry as any).buildHandler(sub);
+    await handler(event);
+    expect(invokeWorkflowMock).not.toHaveBeenCalled();
+  });
+
+  it('$ne filter: invokes when field differs from negated value', async () => {
+    const sub = makeCapabilitySub({ filter: { extension: { $ne: 'png' } } });
+    const event = makeEvent({ data: { extension: 'txt' } });
+    const handler = (agentTriggerRegistry as any).buildHandler(sub);
+    await handler(event);
+    expect(invokeWorkflowMock).toHaveBeenCalledOnce();
+  });
+
+  it('$in filter: invokes when field is in list', async () => {
+    const sub = makeCapabilitySub({ filter: { extension: { $in: ['png', 'jpg', 'gif'] } } });
+    const event = makeEvent({ data: { extension: 'jpg' } });
+    const handler = (agentTriggerRegistry as any).buildHandler(sub);
+    await handler(event);
+    expect(invokeWorkflowMock).toHaveBeenCalledOnce();
+  });
+
+  it('$in filter: skips when field is not in list', async () => {
+    const sub = makeCapabilitySub({ filter: { extension: { $in: ['png', 'jpg'] } } });
+    const event = makeEvent({ data: { extension: 'txt' } });
+    const handler = (agentTriggerRegistry as any).buildHandler(sub);
+    await handler(event);
+    expect(invokeWorkflowMock).not.toHaveBeenCalled();
+  });
+
+  it('$exists filter: invokes when field exists', async () => {
+    const sub = makeCapabilitySub({ filter: { trace_id: { $exists: true } } });
+    const event = makeEvent({ data: { trace_id: 'abc123' } });
+    const handler = (agentTriggerRegistry as any).buildHandler(sub);
+    await handler(event);
+    expect(invokeWorkflowMock).toHaveBeenCalledOnce();
+  });
+
+  it('$exists filter: skips when field is missing', async () => {
+    const sub = makeCapabilitySub({ filter: { trace_id: { $exists: true } } });
+    const event = makeEvent({ data: { other: 'field' } });
+    const handler = (agentTriggerRegistry as any).buildHandler(sub);
+    await handler(event);
+    expect(invokeWorkflowMock).not.toHaveBeenCalled();
+  });
+
   it('uses raw event data when no input_mapping is configured', async () => {
     const sub = makeCapabilitySub({ input_mapping: {} });
     const event = makeEvent({ data: { foo: 'bar' } });

@@ -71,7 +71,7 @@ export function HelpPanel() {
 
   const positionStyle = isFull
     ? {}
-    : { bottom: 'calc(var(--feed-height, 32px) + 76px)' };
+    : { bottom: '108px' };
 
   return (
     <div

@@ -60,4 +60,17 @@ router.delete('/by-name/:topic', async (req, res) => {
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
+/**
+ * POST /api/topics/by-name/:topic/publish
+ * Publish a test event to the event bus with the given topic and payload.
+ */
+router.post('/by-name/:topic/publish', async (req, res) => {
+  const result = await api.publishTopic({
+    topic: decodeURIComponent(req.params.topic),
+    data: req.body.data ?? {},
+    source: req.body.source ?? 'dashboard',
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
 export default router;

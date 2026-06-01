@@ -185,10 +185,29 @@ class AgentTriggerRegistry {
    * Shallow key-value match: every key in filter must match the corresponding
    * key in event.data. Missing keys in event.data fail the match.
    */
+  /**
+   * Match event.data against a filter object.
+   *
+   * Supports:
+   * - Equality:  { "extension": "png" }
+   * - Negation:  { "extension": { "$ne": "png" } }
+   * - In-list:   { "extension": { "$in": ["png", "jpg"] } }
+   * - Exists:    { "trace_id": { "$exists": true } }
+   */
   private matchesFilter(event: LTEvent, filter: Record<string, any>): boolean {
     const data = event.data ?? {};
     for (const [key, expected] of Object.entries(filter)) {
-      if (data[key] !== expected) return false;
+      const actual = data[key];
+      if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
+        if ('$ne' in expected && actual === expected.$ne) return false;
+        if ('$in' in expected && !expected.$in.includes(actual)) return false;
+        if ('$exists' in expected) {
+          const exists = actual !== undefined && actual !== null;
+          if (expected.$exists !== exists) return false;
+        }
+      } else {
+        if (actual !== expected) return false;
+      }
     }
     return true;
   }

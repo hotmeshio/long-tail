@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Eraser, Maximize2, Minimize2 } from 'lucide-react';
-import { useEventSubscription } from '../../hooks/useEventContext';
+import { useState, useCallback, useRef, useEffect, useContext } from 'react';
+import { ChevronUp, ChevronDown, Eraser, Maximize2, Minimize2, Settings2, X, Plus } from 'lucide-react';
+import { EventContext } from '../../hooks/useEventContext';
+import { useEventFeedPatterns } from '../../hooks/useEventFeedPatterns';
 import { JsonViewer } from '../common/data/JsonViewer';
 import { Collapsible } from '../common/layout/Collapsible';
 import { FullscreenOverlay } from '../common/layout/FullscreenOverlay';
@@ -87,13 +88,16 @@ function EventRow({ event, forceExpanded = false }: { event: FeedEvent; forceExp
   );
 }
 
-export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open: boolean; onToggle: () => void; configOpen: boolean; onToggleConfig: () => void }) {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
+  const [newPattern, setNewPattern] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const recentRef = useRef<Map<string, number>>(new Map());
+  const { subscribe } = useContext(EventContext);
+  const { patterns, pagePattern, userPatterns, addPattern, removePattern } = useEventFeedPatterns();
 
-  useEventSubscription('lt.events.>', useCallback((raw: any) => {
+  const handler = useCallback((raw: any) => {
     const type = String(raw.type || 'unknown');
     if (type.startsWith('mesh.')) return;
 
@@ -120,7 +124,15 @@ export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => v
       }, ...prev];
       return next.slice(0, MAX_EVENTS);
     });
-  }, []));
+  }, []);
+
+  // Subscribe to all active patterns — cleanup on pattern change
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  useEffect(() => {
+    const unsubs = patterns.map((p) => subscribe(p, (e) => handlerRef.current(e)));
+    return () => unsubs.forEach((u) => u());
+  }, [subscribe, patterns.join(',')]);
 
   // Auto-scroll to top on new events when open
   useEffect(() => {
@@ -130,7 +142,7 @@ export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => v
   }, [events.length, open]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-surface-border bg-surface-raised">
+    <div className="shrink-0 border-t border-surface-border bg-surface-raised">
       {/* Toggle bar */}
       <button
         onClick={onToggle}
@@ -150,25 +162,66 @@ export function EventFeed({ open, onToggle }: { open: boolean; onToggle: () => v
             {events[0].type}
           </span>
         )}
-        {events.length > 0 && (
-          <span className="ml-auto flex items-center gap-1">
-            <span
-              className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
-              title="Fullscreen"
-              onClick={(e) => { e.stopPropagation(); setFullscreen(true); }}
-            >
-              <Maximize2 className="w-3 h-3" />
-            </span>
-            <span
-              className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
-              title="Clear events"
-              onClick={(e) => { e.stopPropagation(); setEvents([]); }}
-            >
-              <Eraser className="w-3 h-3" />
-            </span>
+        <span className="ml-auto flex items-center gap-1">
+          <span
+            className={`p-0.5 cursor-pointer ${configOpen ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'}`}
+            title="Subscription config"
+            onClick={(e) => { e.stopPropagation(); onToggleConfig(); }}
+          >
+            <Settings2 className="w-3 h-3" />
           </span>
-        )}
+          {events.length > 0 && (
+            <>
+              <span
+                className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
+                title="Fullscreen"
+                onClick={(e) => { e.stopPropagation(); setFullscreen(true); }}
+              >
+                <Maximize2 className="w-3 h-3" />
+              </span>
+              <span
+                className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
+                title="Clear events"
+                onClick={(e) => { e.stopPropagation(); setEvents([]); }}
+              >
+                <Eraser className="w-3 h-3" />
+              </span>
+            </>
+          )}
+        </span>
       </button>
+
+      {/* Subscription config — always visible when toggled, independent of feed open/close */}
+      {configOpen && (
+        <div className="px-4 py-2 border-t border-surface-border/50 bg-surface-sunken/30">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+            <span className="text-[9px] text-text-quaternary uppercase tracking-wider shrink-0">Subscribed:</span>
+            <span className="text-[9px] font-mono text-accent px-1.5 py-0.5 bg-accent/10 rounded">{pagePattern.replace('lt.events.', '')}</span>
+            {userPatterns.map((p) => (
+              <span key={p} className="inline-flex items-center gap-1 text-[9px] font-mono text-text-secondary px-1.5 py-0.5 bg-surface-sunken rounded">
+                {p.replace('lt.events.', '')}
+                <button onClick={() => removePattern(p)} className="text-text-quaternary hover:text-status-error"><X className="w-2 h-2" /></button>
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newPattern}
+              onChange={(e) => setNewPattern(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newPattern.trim()) { addPattern(newPattern.trim()); setNewPattern(''); } }}
+              placeholder="task.> or file.stored"
+              className="input text-[10px] font-mono flex-1 py-1"
+            />
+            <button
+              onClick={() => { if (newPattern.trim()) { addPattern(newPattern.trim()); setNewPattern(''); } }}
+              className="text-[10px] text-accent hover:text-accent-hover flex items-center gap-0.5"
+            >
+              <Plus className="w-2.5 h-2.5" /> Add
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Event list */}
       <Collapsible open={open}>

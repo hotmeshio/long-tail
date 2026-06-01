@@ -8,7 +8,7 @@ export function HelpButton() {
     <button
       onClick={toggleHelp}
       className="fixed right-3 z-[45] flex items-center justify-center w-10 h-10 rounded-full bg-surface-raised shadow-lg hover:scale-110 transition-transform duration-150 border border-accent/30"
-      style={{ bottom: 'calc(var(--feed-height, 32px) + 12px)' }}
+      style={{ bottom: '44px' }}
       aria-label={helpOpen ? 'Close help' : 'Ask for help'}
     >
       {helpOpen ? (

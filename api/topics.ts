@@ -1,4 +1,6 @@
 import * as topicService from '../services/topics';
+import { eventRegistry } from '../lib/events';
+import type { LTEvent } from '../types';
 import type { LTApiResult } from '../types/sdk';
 
 export async function listTopics(
@@ -65,6 +67,28 @@ export async function deleteTopic(input: { topic: string }): Promise<LTApiResult
     }
     await topicService.deleteTopic(input.topic);
     return { status: 200, data: { deleted: true } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+export async function publishTopic(input: {
+  topic: string;
+  data: Record<string, any>;
+  source?: string;
+}): Promise<LTApiResult> {
+  try {
+    const event: LTEvent = {
+      type: input.topic,
+      source: input.source || 'dashboard',
+      workflowId: '',
+      workflowName: '',
+      taskQueue: '',
+      data: input.data,
+      timestamp: new Date().toISOString(),
+    };
+    await eventRegistry.publish(event);
+    return { status: 200, data: { published: true, topic: input.topic, timestamp: event.timestamp } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

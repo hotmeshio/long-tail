@@ -188,8 +188,13 @@ export function SubscriptionsStep({ form, set }: Props) {
               </div>
               <div>
                 <label className={sectionCls}>But only if</label>
-                <input type="text" value={sub.filter} onChange={(e) => updateSub(selected, 'filter', e.target.value)} placeholder="No filter (all matching events)" className={`${inputCls} font-mono text-xs`} />
-                <p className={hintCls}>JSON filter against event.data, e.g. {`{"status": 422}`}</p>
+                <input type="text" value={sub.filter} onChange={(e) => updateSub(selected, 'filter', e.target.value)} placeholder='{"extension": "png"}' className={`${inputCls} font-mono text-xs`} />
+                <p className={hintCls}>
+                  JSON filter against event.data. Operators: equality <code className="text-accent">{`{"key":"val"}`}</code>,
+                  negation <code className="text-accent">{`{"key":{"$ne":"val"}}`}</code>,
+                  in-list <code className="text-accent">{`{"key":{"$in":["a","b"]}}`}</code>,
+                  exists <code className="text-accent">{`{"key":{"$exists":true}}`}</code>
+                </p>
               </div>
             </div>
 
