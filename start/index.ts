@@ -72,7 +72,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
 
   // 4-5. Collect workers, run migrations, start workers, seed data
   const { workers, builtinMcpServerFactories } = await collectWorkers(startConfig);
-  await startWorkers(startConfig, workers, builtinMcpServerFactories);
+  const { adminUserId } = await startWorkers(startConfig, workers, builtinMcpServerFactories);
 
   // 6. Start embedded server (if enabled)
   const serverEnabled = startConfig.server?.enabled !== false;
@@ -117,5 +117,5 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     loggerRegistry.info('[long-tail] shutdown complete');
   };
 
-  return { client, shutdown };
+  return { client, shutdown, adminUserId };
 }

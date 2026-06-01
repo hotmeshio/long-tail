@@ -86,10 +86,20 @@ export async function startWorkers(
   startConfig: LTStartConfig,
   workers: WorkerEntry[],
   builtinMcpServerFactories: Record<string, any>,
-): Promise<void> {
+): Promise<{ adminUserId?: string }> {
   // Run migrations
   loggerRegistry.info('[long-tail] running migrations...');
   await migrate();
+
+  // Seed admin user from config (idempotent, runs before workers)
+  let adminUserId: string | undefined;
+  if (startConfig.seed?.admin) {
+    const { seedAdmin } = await import('../services/user/seed-admin');
+    adminUserId = await seedAdmin(startConfig.seed.admin).catch((err: any) => {
+      loggerRegistry.warn(`[long-tail] seed admin error: ${err.message}`);
+      return undefined;
+    });
+  }
 
   const connection = buildConnection();
 
@@ -338,4 +348,6 @@ export async function startWorkers(
       );
     }, 2000);
   }
+
+  return { adminUserId };
 }

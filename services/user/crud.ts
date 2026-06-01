@@ -111,6 +111,10 @@ export async function updateUser(
     sets.push(`status = $${idx++}`);
     values.push(input.status);
   }
+  if (input.password !== undefined) {
+    sets.push(`password_hash = $${idx++}`);
+    values.push(await bcrypt.hash(input.password, 10));
+  }
   if (input.metadata !== undefined) {
     sets.push(`metadata = $${idx++}`);
     values.push(JSON.stringify(input.metadata));

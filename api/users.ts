@@ -64,6 +64,7 @@ export async function createUser(input: {
   external_id?: string;
   email?: string;
   display_name?: string;
+  password?: string;
   roles?: { role: string; type: string }[];
   metadata?: Record<string, any>;
 }): Promise<LTApiResult> {
@@ -85,6 +86,7 @@ export async function createUser(input: {
       external_id: input.external_id,
       email: input.email,
       display_name: input.display_name,
+      password: input.password,
       roles: input.roles as any,
       metadata: input.metadata,
     });
@@ -113,6 +115,7 @@ export async function updateUser(input: {
   id: string;
   email?: string;
   display_name?: string;
+  password?: string;
   status?: string;
   metadata?: Record<string, any>;
 }): Promise<LTApiResult> {

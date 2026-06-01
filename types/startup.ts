@@ -234,6 +234,43 @@ export interface LTStartConfig {
   };
 
   /**
+   * Seed data applied after migrations, before workers start.
+   *
+   * `admin` creates a superadmin user on first boot (idempotent).
+   * The seeded user's UUID is returned as `LTInstance.adminUserId`
+   * so callers can pass it directly to `createClient()`.
+   *
+   * @example
+   * ```typescript
+   * const lt = await start({
+   *   database: { connectionString: dbUrl },
+   *   seed: {
+   *     admin: {
+   *       externalId: 'system',
+   *       displayName: 'System',
+   *       email: 'system@app.internal',
+   *     },
+   *   },
+   *   workers: [...],
+   * });
+   *
+   * const client = createClient({ auth: { userId: lt.adminUserId } });
+   * ```
+   */
+  seed?: {
+    admin?: {
+      /** Unique external identifier for the admin user. */
+      externalId: string;
+      /** Display name. Defaults to externalId if omitted. */
+      displayName?: string;
+      /** Email address. Optional. */
+      email?: string;
+      /** Initial password. Optional — omit for service accounts that never log in. */
+      password?: string;
+    };
+  };
+
+  /**
    * Load example workflows and seed sample data on startup.
    * When `true`, appends the built-in example workers and starts
    * a few sample workflows so the dashboard has data immediately.
@@ -274,4 +311,9 @@ export interface LTInstance {
   client: any;
   /** Graceful shutdown — stops workers, server, and adapters. */
   shutdown: () => Promise<void>;
+  /**
+   * UUID of the seeded admin user (when `seed.admin` was provided).
+   * Pass to `createClient({ auth: { userId: adminUserId } })`.
+   */
+  adminUserId?: string;
 }

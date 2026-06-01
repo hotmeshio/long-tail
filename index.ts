@@ -71,6 +71,14 @@ async function main() {
     server: {
       port: config.PORT,
     },
+    seed: {
+      admin: {
+        externalId: 'superadmin',
+        displayName: 'Super Admin',
+        email: 'admin@longtail.local',
+        password: 'l0ngt@1l',
+      },
+    },
     examples: true,
     mcp: {
       server: { enabled: true },

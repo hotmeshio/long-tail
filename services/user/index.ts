@@ -18,3 +18,4 @@ export {
 } from './roles';
 export { isSuperAdmin, isGroupAdmin, canManageRole } from './rbac';
 export { verifyPassword } from './auth';
+export { seedAdmin } from './seed-admin';

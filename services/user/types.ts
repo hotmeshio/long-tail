@@ -20,6 +20,7 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   email?: string;
   display_name?: string;
+  password?: string;
   status?: LTUserStatus;
   metadata?: Record<string, any>;
 }
