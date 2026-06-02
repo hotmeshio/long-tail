@@ -13,6 +13,12 @@ import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { StreamMessageDetail } from './StreamMessageDetail';
 import { STATUS_DOT, STATUS_LABEL, STATUS_OPTIONS, SOURCE_OPTIONS, SOURCE_BADGE } from './constants';
 
+function truncateMiddle(str: string, max: number): string {
+  if (str.length <= max) return str;
+  const half = Math.floor((max - 1) / 2);
+  return `${str.slice(0, half)}…${str.slice(-half)}`;
+}
+
 export function StreamMessagesPage() {
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { namespace: 'durable', source: 'worker', status: '', stream_name: '', msg_type: '', topic: '', workflow_name: '', jid: '', aid: '' },
@@ -163,11 +169,16 @@ export function StreamMessagesPage() {
           onChange={(v) => setFilter('stream_name', v)}
           placeholder="Filter by stream name…"
         />
+        <FilterInput
+          label="Job ID"
+          value={filters.jid}
+          onChange={(v) => setFilter('jid', v)}
+          placeholder="Filter by jid…"
+        />
         {/* Active dimension filter pills — inline in the sticky bar */}
         {[
           { key: 'topic', label: 'Topic', value: filters.topic },
           { key: 'workflow_name', label: 'Workflow', value: filters.workflow_name },
-          { key: 'jid', label: 'Job', value: filters.jid },
           { key: 'aid', label: 'Activity', value: filters.aid },
           { key: 'msg_type', label: 'Type', value: filters.msg_type },
         ].filter((f) => f.value).map((f) => (
@@ -175,9 +186,9 @@ export function StreamMessagesPage() {
             key={f.key}
             onClick={() => setFilter(f.key as any, '')}
             className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
-            title={`Clear ${f.label} filter`}
+            title={`Clear ${f.label} filter: ${f.value}`}
           >
-            {f.label}: {f.value}
+            {f.label}: {truncateMiddle(f.value, 12)}
             <X className="w-2.5 h-2.5" />
           </button>
         ))}

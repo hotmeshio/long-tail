@@ -71,6 +71,20 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
           >
             View Raw Execution
           </Link>
+          <Link
+            to={`/admin/streams?source=worker&jid=${encodeURIComponent(workflowId)}`}
+            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+            onClick={() => setOpen(false)}
+          >
+            Worker Messages
+          </Link>
+          <Link
+            to={`/admin/streams?source=engine&jid=${encodeURIComponent(workflowId)}`}
+            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+            onClick={() => setOpen(false)}
+          >
+            Engine Messages
+          </Link>
         </div>
       )}
     </div>

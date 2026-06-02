@@ -57,12 +57,10 @@ export function registerAdapters(startConfig: LTStartConfig): void {
   // so it can be wired to the NATS bridge before connect().
   // Do NOT register a duplicate here.
 
-  // Maintenance
-  if (startConfig.maintenance === false) {
-    // Disabled
-  } else if (startConfig.maintenance === true || startConfig.maintenance === undefined) {
+  // Maintenance — opt-in only. Pass `true` for defaults or a config object.
+  if (startConfig.maintenance === true) {
     maintenanceRegistry.register(defaultMaintenanceConfig);
-  } else {
+  } else if (startConfig.maintenance) {
     maintenanceRegistry.register(startConfig.maintenance);
   }
 
