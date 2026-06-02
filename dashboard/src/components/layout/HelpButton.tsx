@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useHelpAssistant } from '../../hooks/useHelpAssistant';
+import { LT_BASE } from '../../lib/base-path';
 
 export function HelpButton() {
   const { helpOpen, toggleHelp } = useHelpAssistant();
@@ -14,7 +15,7 @@ export function HelpButton() {
       {helpOpen ? (
         <X className="w-5 h-5 text-text-tertiary" strokeWidth={1.5} />
       ) : (
-        <img src="/logo512.png" alt="Help" className="w-8 h-8 -rotate-[120deg]" />
+        <img src={`${LT_BASE}/logo512.png`} alt="Help" className="w-8 h-8 -rotate-[120deg]" />
       )}
     </button>
   );

@@ -1,3 +1,5 @@
+import { LT_BASE } from '../../../lib/base-path';
+
 interface AppLogoProps {
   size?: 'sm' | 'lg';
   /** Hide the wordmark (used during login launch animation). */
@@ -28,7 +30,7 @@ export function AppLogo({ size = 'sm', hideLabel = false, className = '' }: AppL
   return (
     <div className={`flex items-center ${className}`} style={{ height: '50px' }}>
       <img
-        src="/logo512.png"
+        src={`${LT_BASE}/logo512.png`}
         alt="LongTail"
         className={`shrink-0 z-0 ${imgClass}`}
       />
