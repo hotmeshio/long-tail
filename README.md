@@ -1,41 +1,14 @@
 # Long Tail
 
-Long Tail turns your PostgreSQL database into a workflow engine where human and AI work share the same durable execution path. Hand off, pull back, escalate, automate — without rewriting systems or losing continuity.
+Write durable workflows in TypeScript. When they need a human, they escalate. When they need AI, they orchestrate. When a pattern repeats, they compile it away. Postgres is the engine.
 
 ```bash
 npm install @hotmeshio/long-tail
 ```
 
-## Use Long Tail for
+## How it works
 
-- **Durable execution** — Your functions run as workflows and checkpoint to Postgres. If the process crashes, execution resumes from the last completed step.
-- **Identity everywhere** — Workflows know who started them, whose credentials govern their execution, and what permissions are in play. IAM is not bolted on — it's woven into every activity call.
-- **Human-in-the-loop** — When confidence is low, the workflow escalates. RBAC-scoped escalation chains route work to the right reviewer. Approval workflows, content review, document verification — the pattern is the same.
-- **AI triage** — When human-in-the-loop teams can't resolve a request, AI takes over. Its tool calls are checkpointed. And when the fix works, it compiles into a deterministic pipeline for next time.
-- **MCP tool orchestration** — Describe what you need. If you've registered the tools, the Pipeline Designer builds the workflow. Every compiled pipeline deploys as a reusable MCP tool.
-
-A dashboard, REST API, and live event stream ship with the package. Use what you need.
-
-## Start
-
-Point at Postgres. Everything else is optional.
-
-```typescript
-import { start } from '@hotmeshio/long-tail';
-import * as myWorkflow from './workflows/my-workflow';
-
-const lt = await start({
-  database: { host: 'localhost', port: 5432, user: 'postgres', password: 'password', database: 'mydb' },
-  workers: [{ taskQueue: 'default', workflow: myWorkflow.reviewContent }],
-  auth: { secret: process.env.JWT_SECRET },
-});
-```
-
-Dashboard at [http://localhost:3000](http://localhost:3000). The [boilerplate](https://github.com/hotmeshio/long-tail-boilerplate) has a working project with custom MCP servers, MinIO, and example workflows.
-
-## Write a Durable Workflow
-
-A workflow receives an envelope and returns a result. Each activity call checkpoints — no work is lost, no step runs twice.
+You write a workflow function. Each activity call checkpoints to Postgres — if the process crashes, it resumes from the last completed step.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -51,6 +24,7 @@ export async function reviewContent(envelope: LTEnvelope) {
     return { type: 'return' as const, data: { approved: true, analysis } };
   }
 
+  // Low confidence — escalate to a human reviewer
   return {
     type: 'escalation' as const,
     role: 'reviewer',
@@ -60,32 +34,39 @@ export async function reviewContent(envelope: LTEnvelope) {
 }
 ```
 
-Activities are plain functions with side effects — API calls, LLM invocations, database queries. The `proxyActivities` call wraps them so the engine can checkpoint each result.
+That's a complete workflow. It runs, checkpoints, and when confidence is low, it hands off to a human. The human resolves it through the dashboard or API, and the workflow completes. No separate queue system, no webhook callbacks — the escalation is part of the execution.
+
+Activities are plain functions:
 
 ```typescript
-// activities.ts
 export async function analyzeContent(content: string) {
   const result = await llm.classify(content);
   return { confidence: result.confidence, flags: result.flags };
 }
 ```
 
-## Compile Workflows
+## Start
 
-Write durable workflows in TypeScript. Compile to YAML DAGs that run without replay overhead. `ltc` is the compiler — like `tsc` for workflows.
+Point at Postgres. Everything else is optional.
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+```typescript
+import { start } from '@hotmeshio/long-tail';
 
-npx ltc compile workflows/              # scan and compile all workflow files
-npx ltc compile --dry-run               # discover without compiling
+const lt = await start({
+  database: { host: 'localhost', port: 5432, user: 'postgres', password: 'password', database: 'mydb' },
+  workers: [{ taskQueue: 'default', workflow: reviewContent }],
+});
 ```
 
-The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
+Dashboard at [http://localhost:3000](http://localhost:3000). The [boilerplate](https://github.com/hotmeshio/long-tail-boilerplate) has a working project with workflows, MCP servers, and MinIO.
 
-## Certify a Workflow
+## The pattern
 
-Any durable workflow can be promoted to **certified** through the dashboard or API. A certified workflow gains interceptor guarantees: failures escalate instead of throwing, escalation chains route through roles, and every error is either handled or surfaced. It cannot silently fail.
+Most systems start with a durable workflow and stop there. Long Tail keeps going.
+
+**Step 1 — Author a durable workflow.** Your function checkpoints to Postgres. It can sleep, branch, call child workflows, wait for signals. Standard durable execution.
+
+**Step 2 — Certify it.** Promotion to certified adds interceptor guarantees: failures escalate instead of throwing, escalation chains route through RBAC-scoped roles, and every error is either handled or surfaced. It cannot silently fail.
 
 ```bash
 curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
@@ -93,13 +74,17 @@ curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
   -d '{ "invocable": true, "task_queue": "default", "default_role": "reviewer" }'
 ```
 
-De-certifying removes the interceptor. The workflow continues as a standard durable workflow — same code, different guarantees.
+**Step 3 — React to events.** Workflows publish topics. Agents subscribe. When `activity.failed` fires, an automation can re-run the step, notify a team, or trigger a different workflow. The choreography is dynamic — add subscribers through the dashboard without changing code.
 
-## Register MCP Servers
+**Step 4 — Compile what repeats.** The Pipeline Designer takes a working execution and compiles it into a deterministic YAML DAG. No LLM at runtime, no replay overhead, typed inputs and outputs. It deploys as a reusable tool that any workflow or API call can invoke.
 
-Long Tail connects to any MCP server — an npm package, a remote service, or one you write yourself. Registered tools become durable activities and are available to the Pipeline Designer.
+Over time, the system accumulates compiled tools. Problems that once required a human, then required AI reasoning, eventually require neither.
 
-**Use an existing package** — no code, just register:
+## Register MCP tools
+
+Long Tail connects to any MCP server. Registered tools become durable activities and are available to the Pipeline Designer.
+
+**Existing package — no code:**
 
 ```bash
 curl -X POST http://localhost:3000/api/mcp/servers \
@@ -113,21 +98,14 @@ curl -X POST http://localhost:3000/api/mcp/servers \
   }'
 ```
 
-**Connect a remote server** — point at a URL:
+**Remote server — point at a URL:**
 
 ```bash
 curl -X POST http://localhost:3000/api/mcp/servers \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "my-python-server",
-    "transport_type": "sse",
-    "transport_config": { "url": "http://python-service:8000/mcp" },
-    "tags": ["ml", "classification"],
-    "compile_hints": "Returns confidence scores. Use threshold 0.85 for auto-approve."
-  }'
+  -d '{ "name": "my-python-server", "transport_type": "sse", "transport_config": { "url": "http://python-service:8000/mcp" } }'
 ```
 
-**Write your own** and register it in-process:
+**In-process — write your own:**
 
 ```typescript
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -139,8 +117,8 @@ export function createImageToolsServer(): McpServer {
 
   registerMcpTool(server, 'resize_image', 'Resize an image.', {
     path: z.string().describe('Path to the image'),
-    width: z.number().optional().describe('Target width'),
-    height: z.number().optional().describe('Target height'),
+    width: z.number().optional(),
+    height: z.number().optional(),
   }, async (args: any) => ({
     content: [{ type: 'text', text: JSON.stringify(await resize(args)) }],
   }));
@@ -152,36 +130,33 @@ export function createImageToolsServer(): McpServer {
 ```typescript
 const lt = await start({
   // ...
-  mcp: {
-    serverFactories: { 'image-tools': createImageToolsServer },
-  },
+  mcp: { serverFactories: { 'image-tools': createImageToolsServer } },
 });
 ```
 
-All three paths produce the same outcome: tools callable as durable activities. Tags enable discovery. Compile hints guide the compiler when tools are compiled into deterministic pipelines. See the [MCP guide](docs/mcp.md) for the full registration lifecycle.
+All three paths produce the same outcome: tools callable as durable activities. See the [MCP guide](docs/mcp.md).
 
-## Ask It Anything
+## Compile workflows
 
-Once your tools are registered, the Pipeline Designer orchestrates them. Describe what you need in plain language:
+The `ltc` compiler scans TypeScript workflow files and compiles them to YAML DAGs — like `tsc` for workflows.
 
-> *"Log into localhost:3000 as superadmin, navigate to every page in the sidebar, and save a screenshot of each."*
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+npx ltc compile workflows/
+```
 
-The system discovers the right MCP servers, calls the tools, chains the results. If it works, the compilation wizard converts the execution into a deterministic pipeline — parameterized inputs, typed schema, no LLM at runtime. It deploys as a new MCP tool that any workflow, agent, or API call can invoke.
+The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
 
-The inventory of compiled tools grows over time. The need for LLM reasoning shrinks. Problems that once required a human, then required an AI, eventually require neither.
-
-## Full Configuration
+## Full configuration
 
 ```typescript
 const lt = await start({
   database: { connectionString: process.env.DATABASE_URL },
-  workers: [{ taskQueue: 'default', workflow: myWorkflow.reviewContent }],
+  workers: [{ taskQueue: 'default', workflow: reviewContent }],
 
   // Everything below is optional
-  mcp: {
-    server: { enabled: true },
-    serverFactories: { 'my-tools': createMyToolsServer },
-  },
+  seed: { admin: { externalId: 'admin', password: process.env.ADMIN_PASSWORD } },
+  mcp: { server: { enabled: true }, serverFactories: { 'my-tools': createMyToolsServer } },
   escalation: { strategy: 'mcp' },
   auth: { secret: process.env.JWT_SECRET },
   telemetry: { honeycomb: { apiKey: process.env.HNY } },
@@ -190,56 +165,57 @@ const lt = await start({
 });
 ```
 
-## Use as a Package (No HTTP Server)
+## Embed in an existing app
 
-Long Tail can run as an embedded package inside your existing application — no Express server, no socket.io, no extra ports. The same API surface is available as direct function calls.
+Long Tail runs as an embedded package inside NestJS, Express, or any Node.js application. No extra HTTP server, no extra ports.
 
 ```typescript
 import { start, createClient } from '@hotmeshio/long-tail';
 
-await start({
+const lt = await start({
   database: { connectionString: process.env.DATABASE_URL },
   server: { enabled: false },
-  workers: [{ taskQueue: 'default', workflow: reviewContent.reviewContent }],
+  seed: { admin: { externalId: 'system' } },
+  workers: [{ taskQueue: 'default', workflow: reviewContent }],
 });
 
-const lt = createClient({ auth: { userId: 'system' } });
+const client = createClient({ auth: { userId: lt.adminUserId } });
 
-// Same operations as the REST API — no HTTP overhead
-const tasks = await lt.tasks.list({ status: 'completed', limit: 10 });
-const result = await lt.escalations.claim({ id: 'esc_123', durationMinutes: 30 });
+const tasks = await client.tasks.list({ status: 'completed', limit: 10 });
+const result = await client.escalations.claim({ id: 'esc_123', durationMinutes: 30 });
 ```
 
-Subscribe to events with callbacks instead of socket.io:
+Mount the dashboard at a subpath:
 
 ```typescript
-lt.events.on('task.completed', (event) => {
-  console.log('done:', event.workflowId);
-});
+import { LTExpressAdapter } from '@hotmeshio/long-tail';
 
-lt.events.on('escalation.*', (event) => {
-  notifyTeam(event);
-});
+const adapter = new LTExpressAdapter();
+adapter.setBasePath('/admin/longtail');
+app.use('/admin/longtail', adapter.getRouter());
 ```
 
-Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. The transport is the only thing that changes. See the [SDK guide](docs/sdk.md) for the full API reference.
+Subscribe to events with callbacks:
+
+```typescript
+client.events.on('task.completed', (event) => console.log('done:', event.workflowId));
+client.events.on('escalation.*', (event) => notifyTeam(event));
+```
+
+Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. See the [SDK guide](docs/sdk.md).
 
 ## Deployment
 
 Three modes from the same codebase:
 
 ```typescript
-// 1. Standalone — dashboard + REST API + workers
+// Standalone — dashboard + API + workers
 await start({ database: { connectionString: process.env.DATABASE_URL } });
 
-// 2. Worker-only — workflow execution, no HTTP server
-await start({
-  database: { connectionString: process.env.DATABASE_URL },
-  server: { enabled: false },
-  workers: [{ taskQueue: 'default', workflow: reviewContent.reviewContent }],
-});
+// Worker-only — no HTTP server
+await start({ database: { connectionString: process.env.DATABASE_URL }, server: { enabled: false }, workers: [...] });
 
-// 3. Embedded — inside your NestJS/Next.js/Express app, SDK calls only
+// Embedded — inside your app, SDK calls only
 await start({ database: { connectionString: process.env.DATABASE_URL }, server: { enabled: false } });
 const lt = createClient({ auth: { userId: 'service' } });
 ```
@@ -250,12 +226,12 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/
 
 | Guide | What it covers |
 |-------|---------------|
-| [The Long Tail Story](docs/story.md) | Why this exists, what accumulates over time, what you own |
+| [The Long Tail Story](docs/story.md) | Why this exists, what accumulates over time |
 | [Workflows](docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
 | [IAM](docs/iam.md) | Identity propagation, service accounts, credential exchange |
 | [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
 | [MCP](docs/mcp.md) | Server registration, tool calls, human queue |
-| [Compilation](docs/compilation.md) | Dynamic → deterministic pipeline wizard |
+| [Compilation](docs/compilation.md) | Dynamic to deterministic pipeline wizard |
 | [Compiler](docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
 | [CLI](docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
 | [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
