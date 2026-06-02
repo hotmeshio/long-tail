@@ -105,13 +105,19 @@ export class LTExpressAdapter {
 
       // SPA fallback — inject base path into index.html
       const indexHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');
+      const basePath = this.basePath;
+
+      // Serve __LT_BASE__ as external script (CSP-safe, no inline scripts)
+      router.get('/config.js', (_req, res) => {
+        res.type('application/javascript').send(`window.__LT_BASE__="${basePath}";`);
+      });
 
       router.get('/{*splat}', (_req, res) => {
         const html = indexHtml.replace(
           '<head>',
           '<head>' +
-          `<base href="${this.basePath}/">` +
-          `<script>window.__LT_BASE__="${this.basePath}"</script>`,
+          `<base href="${basePath}/">` +
+          `<script src="./config.js"></script>`,
         );
         res.type('html').send(html);
       });
