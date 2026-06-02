@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter } from 'lucide-react';
-import { useMcpRuns, useMcpEntities } from '../../api/mcp-runs';
+import { useMcpRuns, useMcpEntities } from '../../api/pipelines';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
 import { useNamespaces } from '../../api/namespaces';
 import { useFilterParams } from '../../hooks/useFilterParams';
@@ -185,7 +185,7 @@ export function McpRunsPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/mcp-runs?app_id=${activeNamespace || 'longtail'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+          apiPath={`/pipelines?app_id=${activeNamespace || 'longtail'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
         />
       }>
         <FilterSelect

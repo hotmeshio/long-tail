@@ -80,7 +80,7 @@ beforeEach(() => {
 describe('McpServersPage', () => {
   it('renders page header', () => {
     render(<McpServersPage />, { wrapper });
-    expect(screen.getByText('MCP Server Tools')).toBeInTheDocument();
+    expect(screen.getByText('Servers & Tools')).toBeInTheDocument();
   });
 
   it('renders filter bar', () => {

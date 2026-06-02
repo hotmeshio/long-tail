@@ -1,4 +1,4 @@
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import express from 'express';
 
@@ -32,9 +32,13 @@ export function startServer(): ReturnType<typeof express.application.listen> {
   if (existsSync(dashboardDist)) {
     app.use(express.static(dashboardDist));
 
-    // SPA fallback — all non-API routes serve index.html
+    // SPA fallback — inject <base href="/"> so relative asset paths
+    // resolve from root regardless of route depth (e.g. /admin/users).
+    const rawHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');
+    const indexHtml = rawHtml.replace('<head>', '<head><base href="/">');
+
     app.get('/{*splat}', (_req, res) => {
-      res.sendFile(path.join(dashboardDist, 'index.html'));
+      res.type('html').send(indexHtml);
     });
 
     loggerRegistry.info(`[long-tail] Dashboard: http://localhost:${config.PORT}/`);

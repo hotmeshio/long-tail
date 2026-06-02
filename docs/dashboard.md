@@ -170,7 +170,7 @@ Execution history for all MCP pipeline runs — both dynamic (agentic LLM loops)
 - **Duration comparison** — deterministic runs are typically faster and cheaper than their dynamic counterparts. Use this page to verify that compiled tools match or exceed the quality of dynamic executions.
 - **Click any row** to view the full execution detail: input envelope, output, tool call timeline, and activity checkpoints.
 
-**API:** `GET /api/mcp-runs` lists executions with status, type, and pagination filters.
+**API:** `GET /api/pipelines` lists executions with status, type, and pagination filters.
 
 ### Durable Executions
 

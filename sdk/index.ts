@@ -6,7 +6,7 @@ import * as usersApi from '../api/users';
 import * as rolesApi from '../api/roles';
 import * as authApi from '../api/auth';
 import * as mcpApi from '../api/mcp';
-import * as mcpRunsApi from '../api/mcp-runs';
+import * as pipelinesApi from '../api/pipelines';
 import * as insightApi from '../api/insight';
 import * as settingsApi from '../api/settings';
 import * as exportsApi from '../api/exports';
@@ -201,11 +201,18 @@ export function createClient(options: LTClientOptions = {}) {
       callTool: bindOptionalAuth(mcpApi.callMcpTool, auth),
     },
 
-    // ── MCP Runs ───────────────────────────────────────────────────────────
+    // ── Pipelines ──────────────────────────────────────────────────────────
+    pipelines: {
+      listEntities: pipelinesApi.listEntities,
+      listJobs: pipelinesApi.listJobs,
+      getExecution: pipelinesApi.getJobExecution,
+      interrupt: pipelinesApi.interruptJob,
+    },
+    /** @deprecated Use `pipelines` */
     mcpRuns: {
-      listEntities: mcpRunsApi.listEntities,
-      listJobs: mcpRunsApi.listJobs,
-      getExecution: mcpRunsApi.getJobExecution,
+      listEntities: pipelinesApi.listEntities,
+      listJobs: pipelinesApi.listJobs,
+      getExecution: pipelinesApi.getJobExecution,
     },
 
     // ── Insight ────────────────────────────────────────────────────────────

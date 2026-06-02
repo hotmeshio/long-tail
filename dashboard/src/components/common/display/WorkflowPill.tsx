@@ -1,4 +1,4 @@
-import { Workflow, ShieldCheck, Settings, Wand2, Zap } from 'lucide-react';
+import { Workflow, ShieldCheck, SlidersHorizontal, Wand2, Zap } from 'lucide-react';
 import { typeColor } from '../../../lib/type-color';
 
 type WorkflowVariant = 'durable' | 'configured' | 'certified' | 'pipeline' | 'capability';
@@ -13,39 +13,46 @@ interface WorkflowPillProps {
 
 const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
   certified:  ShieldCheck,
-  configured: Settings,
+  configured: SlidersHorizontal,
   pipeline:   Wand2,
   capability: Zap,
   durable:    Workflow,
 };
 
-const VARIANT_FIXED_COLOR: Record<string, string> = {
-  certified:  'text-status-success',
-  configured: 'text-status-info',
+const VARIANT_FIXED_COLOR: Record<string, { text: string; bg: string }> = {
+  certified:  { text: 'text-status-success', bg: 'bg-status-success/10' },
+  configured: { text: 'text-amber-500/70', bg: 'bg-amber-200/[0.12]' },
 };
 
-export function WorkflowPill({ type, size = 'sm', certified, variant }: WorkflowPillProps) {
-  const sizeClass = size === 'md'
-    ? 'px-2.5 py-0.5 gap-1.5'
-    : size === 'xs'
-      ? 'px-1 py-px gap-0.5'
-      : 'px-1.5 py-px gap-1';
-  const fontSize = size === 'md' ? '13px' : size === 'xs' ? '9px' : '11px';
-  const iconClass = size === 'md' ? 'w-3.5 h-3.5' : size === 'xs' ? 'w-2 h-2' : 'w-2.5 h-2.5';
+const SIZE_CONFIG = {
+  xs: { bulb: 'w-4 h-4', icon: 'w-2 h-2', text: 'text-[9px]', pad: 'pr-1.5 pl-0.5', gap: '-ml-1' },
+  sm: { bulb: 'w-5 h-5', icon: 'w-2.5 h-2.5', text: 'text-[11px]', pad: 'pr-2 pl-1', gap: '-ml-1.5' },
+  md: { bulb: 'w-6 h-6', icon: 'w-3 h-3', text: 'text-[13px]', pad: 'pr-2.5 pl-1.5', gap: '-ml-2' },
+} as const;
 
+export function WorkflowPill({ type, size = 'sm', certified, variant }: WorkflowPillProps) {
   const resolved = variant ?? (certified ? 'certified' : 'durable');
   const Icon = VARIANT_ICON[resolved];
+  const s = SIZE_CONFIG[size];
 
-  // Pipeline and durable variants get a type-name-derived color.
-  // Certified and configured keep their fixed semantic colors.
-  const fixedColor = VARIANT_FIXED_COLOR[resolved];
-  const derived = fixedColor ? null : typeColor(type);
-  const iconColor = fixedColor || (derived?.text ?? 'text-accent/75');
+  const fixed = VARIANT_FIXED_COLOR[resolved];
+  const derived = fixed ? null : typeColor(type);
+  const iconColor = fixed?.text ?? derived?.text ?? 'text-accent/75';
+  const bgColor = fixed?.bg ?? derived?.bg ?? 'bg-accent/[0.08]';
 
   return (
-    <span className={`inline-flex items-center ${sizeClass} font-mono text-text-secondary border border-surface-border rounded-lg`} style={{ fontSize, lineHeight: 1.1 }}>
-      <Icon className={`${iconClass} shrink-0 ${iconColor}`} />
-      {type}
+    <span className="inline-flex items-center">
+      {/* Bulb — circular icon container */}
+      <span className={`${s.bulb} rounded-full ${bgColor} inline-flex items-center justify-center shrink-0 z-[1]`}>
+        <Icon className={`${s.icon} ${iconColor}`} />
+      </span>
+      {/* Label — extends right, overlapping the bulb */}
+      <span
+        className={`${s.gap} ${s.pad} ${bgColor} rounded-r-full font-mono text-text-secondary`}
+        style={{ fontSize: s.text === 'text-[9px]' ? '9px' : s.text === 'text-[11px]' ? '11px' : '13px', lineHeight: 1.4 }}
+      >
+        {type}
+      </span>
     </span>
   );
 }

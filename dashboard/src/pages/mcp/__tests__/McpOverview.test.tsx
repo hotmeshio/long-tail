@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('../../../api/mcp-runs', () => ({
+vi.mock('../../../api/pipelines', () => ({
   useMcpRuns: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ vi.mock('../../../api/yaml-workflows', () => ({
 }));
 
 import { McpOverview } from '../McpOverview';
-import { useMcpRuns } from '../../../api/mcp-runs';
+import { useMcpRuns } from '../../../api/pipelines';
 import { useMcpServers } from '../../../api/mcp';
 import { useNamespaces } from '../../../api/namespaces';
 import { useYamlWorkflows } from '../../../api/yaml-workflows';

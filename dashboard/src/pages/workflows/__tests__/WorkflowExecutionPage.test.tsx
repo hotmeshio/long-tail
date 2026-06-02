@@ -176,7 +176,7 @@ describe('WorkflowExecutionPage', () => {
     expect(screen.getByText('Completed')).toBeInTheDocument();
   });
 
-  it('renders page header as Durable Execution for durable path', () => {
+  it('renders page header as Workflow Execution', () => {
     vi.mocked(useWorkflowExecution).mockReturnValue({
       data: mockExecution,
       isLoading: false,
@@ -186,7 +186,7 @@ describe('WorkflowExecutionPage', () => {
     } as any);
 
     renderPage('/workflows/durable/mcpQuery-abc123def456');
-    expect(screen.getByText('Durable Execution')).toBeInTheDocument();
+    expect(screen.getByText('Workflow Execution')).toBeInTheDocument();
   });
 
   it('renders collapsible sections for details, timeline, and events', () => {

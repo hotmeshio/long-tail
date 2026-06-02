@@ -16,7 +16,7 @@ import mcpRouter from './mcp';
 import insightRouter from './insight';
 import yamlWorkflowsRouter from './yaml-workflows';
 import settingsRouter from './settings';
-import mcpRunsRouter from './mcp-runs';
+import pipelinesRouter from './pipelines';
 import namespacesRouter from './namespaces';
 import filesRouter from './files';
 import fileBrowserRouter from './file-browser';
@@ -54,7 +54,8 @@ router.use('/dba', dbaRouter);
 router.use('/mcp', mcpRouter);
 router.use('/insight', insightRouter);
 router.use('/yaml-workflows', yamlWorkflowsRouter);
-router.use('/mcp-runs', mcpRunsRouter);
+router.use('/pipelines', pipelinesRouter);
+router.use('/mcp-runs', pipelinesRouter); // backward-compat alias
 router.use('/namespaces', namespacesRouter);
 router.use('/file-browser', fileBrowserRouter);
 router.use('/controlplane', controlplaneRouter);

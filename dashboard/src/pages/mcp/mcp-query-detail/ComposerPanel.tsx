@@ -70,7 +70,7 @@ export function ComposerPanel() {
 
   return (
     <div>
-      <PageHeader title="MCP Tool Designer" docsHash="#docs:dashboard.md:mcp-tool-designer" />
+      <PageHeader title="Designer" docsHash="#docs:dashboard.md:mcp-tool-designer" />
       <p className="text-sm text-text-secondary mb-6 leading-relaxed max-w-xl">
         Create deterministic MCP tools from natural language. Choose how to get there.
       </p>

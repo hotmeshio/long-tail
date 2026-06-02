@@ -241,7 +241,7 @@ async function main() {
 
     // 3c. Wait for workflow completion
     await sleep(2000);
-    const exec = await api('GET', `/mcp-runs/${jobId}/execution?app_id=longtail`, undefined, token);
+    const exec = await api('GET', `/pipelines/${jobId}/execution?app_id=longtail`, undefined, token);
     const status = exec?.status;
     console.log(`   Final: status=${status}\n`);
     if (status !== 'completed') allPassed = false;

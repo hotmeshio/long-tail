@@ -205,7 +205,7 @@ async function main() {
     while (true) {
       await sleep(5000);
       try {
-        const running = await api('GET', '/mcp-runs?app_id=longtail&status=running&limit=1&offset=0', undefined, token);
+        const running = await api('GET', '/pipelines?app_id=longtail&status=running&limit=1&offset=0', undefined, token);
         const runningCount = running?.total ?? 0;
         completed = submitted - runningCount;
         if (completed < 0) completed = 0;

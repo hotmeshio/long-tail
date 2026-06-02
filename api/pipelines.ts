@@ -1,5 +1,6 @@
 import { sanitizeAppId, quoteSchema } from '../services/hotmesh-utils';
-import { buildExecution, listEntities as listEntitiesService, listJobs as listJobsService } from '../services/mcp-runs';
+import { buildExecution, listEntities as listEntitiesService, listJobs as listJobsService } from '../services/pipelines';
+import { getEngine } from '../services/controlplane';
 import type { LTApiResult } from '../types/sdk';
 
 /**
@@ -97,5 +98,39 @@ export async function getJobExecution(input: {
       return { status: 404, error: msg };
     }
     return { status: 500, error: msg };
+  }
+}
+
+/**
+ * Interrupt a running pipeline job via HotMesh.interrupt().
+ *
+ * This is the pipeline equivalent of the durable terminate endpoint.
+ * Pipelines run as raw HotMesh YAML DAGs, not through the Durable
+ * abstraction, so they require the app_id (namespace) and topic
+ * to locate the correct engine instance.
+ *
+ * @param input.jobId — HotMesh job ID (workflow_id)
+ * @param input.topic — workflow entity/topic name
+ * @param input.app_id — HotMesh namespace (e.g. "hmsh", "longtail")
+ * @returns `{ status: 200, data: { interrupted: true } }` or error
+ */
+export async function interruptJob(input: {
+  jobId: string;
+  topic: string;
+  app_id: string;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.app_id) {
+      return { status: 400, error: 'app_id is required' };
+    }
+    if (!input.topic) {
+      return { status: 400, error: 'topic is required' };
+    }
+    const appId = sanitizeAppId(input.app_id);
+    const engine = await getEngine(appId);
+    await engine.interrupt(input.topic, input.jobId);
+    return { status: 200, data: { interrupted: true, jobId: input.jobId } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
   }
 }

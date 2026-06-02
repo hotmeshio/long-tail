@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('../../../api/mcp-runs', () => ({
+vi.mock('../../../api/pipelines', () => ({
   useMcpRuns: vi.fn(),
   useMcpEntities: vi.fn(),
 }));
@@ -13,7 +13,7 @@ vi.mock('../../../api/yaml-workflows', () => ({
 }));
 
 import { McpRunsPage } from '../McpRunsPage';
-import { useMcpRuns, useMcpEntities } from '../../../api/mcp-runs';
+import { useMcpRuns, useMcpEntities } from '../../../api/pipelines';
 import { useYamlWorkflowAppIds } from '../../../api/yaml-workflows';
 
 const now = new Date().toISOString();

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useEscalations } from '../../api/escalations';
 import { useJobs } from '../../api/workflows';
-import { useMcpRuns } from '../../api/mcp-runs';
+import { useMcpRuns } from '../../api/pipelines';
 import { useControlPlaneApps } from '../../api/controlplane';
 import { useProcesses } from '../../api/tasks';
 import { useAuth } from '../../hooks/useAuth';
@@ -306,7 +306,7 @@ export function HomePage() {
         <div>
           <SectionHeader icon={Wand2} color="text-violet-400" docsHash="#docs:dashboard.md:mcp-pipeline-tools" actions={
             <div className="flex items-center gap-2">
-              <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/mcp-runs?app_id=${pipelineNs}&limit=5`} />
+              <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
               <NavIcon to="/mcp/executions" icon={ExternalLink} title="All pipeline executions" />
             </div>
           }>

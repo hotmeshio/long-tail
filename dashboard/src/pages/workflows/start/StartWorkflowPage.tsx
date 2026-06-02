@@ -104,7 +104,7 @@ export function StartWorkflowPage() {
   return (
     <div>
       <PageHeader
-        title="Invoke Workflow"
+        title="Invoke"
         docsHash="#docs:dashboard.md:invoke-workflow"
         actions={<ModeToggle mode={mode} onChange={setMode} />}
       />
@@ -144,12 +144,12 @@ export function StartWorkflowPage() {
                     : <Play className="w-5 h-5 text-accent/50" />}
                 </div>
                 <p className="text-sm text-text-secondary mb-1">
-                  {mode === 'schedule' ? 'Automate on a schedule' : 'Ready when you are'}
+                  {mode === 'schedule' ? 'Schedule' : 'Invoke'}
                 </p>
                 <p className="text-xs text-text-quaternary">
                   {mode === 'schedule'
                     ? 'Choose a workflow to configure its schedule'
-                    : 'Choose a workflow from the list to get started'}
+                    : 'Choose a workflow to get started'}
                 </p>
               </div>
             )}

@@ -266,7 +266,7 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/
 
 **Adapters:** [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [Maintenance](docs/maintenance.md) · [OAuth](docs/oauth-and-delegation.md)
 
-**HTTP API:** [Workflows](docs/api/http/workflows.md) · [Tasks](docs/api/http/tasks.md) · [Escalations](docs/api/http/escalations.md) · [YAML Workflows](docs/api/http/yaml-workflows.md) · [Users](docs/api/http/users.md) · [Roles](docs/api/http/roles.md) · [Service Accounts](docs/api/http/service-accounts.md) · [MCP Servers](docs/api/http/mcp-servers.md) · [MCP Runs](docs/api/http/mcp-runs.md) · [Exports](docs/api/http/exports.md)
+**HTTP API:** [Workflows](docs/api/http/workflows.md) · [Tasks](docs/api/http/tasks.md) · [Escalations](docs/api/http/escalations.md) · [YAML Workflows](docs/api/http/yaml-workflows.md) · [Users](docs/api/http/users.md) · [Roles](docs/api/http/roles.md) · [Service Accounts](docs/api/http/service-accounts.md) · [MCP Servers](docs/api/http/mcp-servers.md) · [Pipelines](docs/api/http/pipelines.md) · [Exports](docs/api/http/exports.md)
 
 **SDK:** [Overview](docs/sdk.md) · [Workflows](docs/api/sdk/workflows.md) · [Tasks](docs/api/sdk/tasks.md) · [Escalations](docs/api/sdk/escalations.md) · [YAML Workflows](docs/api/sdk/yaml-workflows.md) · [MCP](docs/api/sdk/mcp.md) · [Events](docs/api/sdk/events.md)
 

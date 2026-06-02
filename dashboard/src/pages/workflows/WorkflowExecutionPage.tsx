@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useWorkflowExecution, useTerminateWorkflow } from '../../api/workflows';
 import { useWorkflowDetailEvents } from '../../hooks/useEventHooks';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
@@ -69,7 +69,7 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
             className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
             onClick={() => setOpen(false)}
           >
-            View Raw Execution
+            View Pipeline Execution
           </Link>
           <Link
             to={`/admin/streams?source=worker&jid=${encodeURIComponent(workflowId)}`}
@@ -93,12 +93,9 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
 
 export function WorkflowExecutionPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
-  const { pathname } = useLocation();
   useWorkflowDetailEvents(workflowId);
 
-  const executionTitle = pathname.startsWith('/workflows/durable/')
-    ? 'Durable Execution'
-    : 'Durable Execution';
+  const executionTitle = 'Workflow Execution';
   const { data: execution, isLoading, error, refetch, isFetching } = useWorkflowExecution(workflowId!);
   const { data: task } = useTaskByWorkflowId(workflowId!);
   const { data: childTasksData } = useChildTasks(workflowId!);
