@@ -11,7 +11,7 @@ export { createLTActivityInterceptor } from './services/interceptor/activity-int
 export { executeLT } from './services/orchestrator';
 export { conditionLT } from './services/orchestrator/condition';
 export type { ExecuteLTOptions } from './services/orchestrator/types';
-export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken } from './modules/auth';
+export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken, setAuthAdapter } from './modules/auth';
 export * from './types';
 export * as TaskService from './services/task';
 export * as EscalationService from './services/escalation';

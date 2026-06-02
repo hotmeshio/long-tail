@@ -203,8 +203,10 @@ window.addEventListener('auth:unauthorized', () => {
   sessionStorage.removeItem('lt_token');
   sessionStorage.removeItem('lt_credentials');
   sessionStorage.removeItem('lt_user_info');
-  if (window.location.pathname !== '/login') {
-    window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+  const base = (window as any).__LT_BASE__ || '';
+  const loginPath = `${base}/login`;
+  if (window.location.pathname !== loginPath) {
+    window.location.href = `${loginPath}?returnTo=${encodeURIComponent(window.location.pathname)}`;
   }
 });
 
@@ -306,7 +308,7 @@ const router = createBrowserRouter([
       },
     ],
   },
-]);
+], { basename: (window as any).__LT_BASE__ || '/' });
 
 export function App() {
   return (
