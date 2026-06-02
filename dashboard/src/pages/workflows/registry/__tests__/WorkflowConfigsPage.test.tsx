@@ -88,7 +88,7 @@ describe('WorkflowConfigsPage', () => {
 
   it('renders page header and Register Workflow button', () => {
     renderPage();
-    expect(screen.getByText('Workflow Registry')).toBeInTheDocument();
+    expect(screen.getByText('Configure')).toBeInTheDocument();
     expect(screen.getByText('Register Workflow')).toBeInTheDocument();
   });
 

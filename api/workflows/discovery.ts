@@ -2,7 +2,7 @@ import * as configService from '../../services/config';
 import { cronRegistry } from '../../services/cron';
 import { getPool } from '../../lib/db';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../services/workers/registry';
-import { DISTINCT_ENTITIES_DURABLE } from '../../services/mcp-runs/sql';
+import { DISTINCT_ENTITIES_DURABLE } from '../../services/pipelines/sql';
 import type { LTApiResult } from '../../types/sdk';
 
 /**

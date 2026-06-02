@@ -1,7 +1,7 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMcpRunExecution } from '../../api/mcp-runs';
+import { useMcpRunExecution, useInterruptJob } from '../../api/pipelines';
 import { useSettings } from '../../api/settings';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
@@ -26,6 +26,45 @@ const statusMap: Record<string, string> = {
   failed: 'failed',
 };
 
+// ── Actions dropdown ────────────────────────────────────────────────────────
+
+function ActionsDropdown({ isRunning, onTerminate }: {
+  isRunning: boolean;
+  onTerminate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  if (!isRunning) return null;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)} className="btn-primary text-xs">
+        Actions
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-10">
+          <button
+            onClick={() => { onTerminate(); setOpen(false); }}
+            className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
+          >
+            Terminate
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function McpRunDetailPage() {
@@ -34,6 +73,7 @@ export function McpRunDetailPage() {
   const namespace = searchParams.get('namespace') || 'longtail';
   const queryClient = useQueryClient();
   const { data: execution, isLoading, error, refetch, isFetching } = useMcpRunExecution(jobId!, namespace);
+  const interruptMutation = useInterruptJob();
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
 
@@ -92,11 +132,24 @@ export function McpRunDetailPage() {
       <PageHeader
         title="Pipeline Execution"
         actions={
-          <ListToolbar
-            onRefresh={() => refetch()}
-            isFetching={isFetching}
-            apiPath={`/mcp-runs/${jobId}/execution?app_id=${namespace}`}
-          />
+          <div className="flex items-center gap-2">
+            <ListToolbar
+              onRefresh={() => refetch()}
+              isFetching={isFetching}
+              apiPath={`/pipelines/${jobId}/execution?app_id=${namespace}`}
+            />
+            <ActionsDropdown
+              isRunning={execution.status === 'running'}
+              onTerminate={() => {
+                if (confirm('Interrupt this pipeline execution? This cannot be undone.')) {
+                  interruptMutation.mutate(
+                    { jobId: execution.workflow_id, topic: execution.workflow_type, appId: namespace },
+                    { onSuccess: () => refetch() },
+                  );
+                }
+              }}
+            />
+          </div>
         }
       />
 

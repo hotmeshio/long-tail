@@ -215,9 +215,9 @@ export interface LTStartConfig {
   };
 
   /**
-   * Database maintenance schedule.
-   * - `true` or `undefined` → default nightly 2 AM cleanup
-   * - `false` → disabled
+   * Database maintenance schedule (opt-in).
+   * - `true` → default weekly Sunday 2 AM cleanup
+   * - `false` or `undefined` → disabled (default)
    * - `LTMaintenanceConfig` → custom schedule and rules
    */
   maintenance?: LTMaintenanceConfig | boolean;

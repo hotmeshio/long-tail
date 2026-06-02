@@ -129,7 +129,7 @@ export function AgentsPage() {
         keyFn={(row) => row.id}
         onRowClick={(row) => navigate(`/agents/${row.id}`)}
         isLoading={isLoading}
-        emptyMessage="No agents found"
+        emptyMessage={`No ${labelPlural.toLowerCase()} found`}
       />
 
       <StickyPagination

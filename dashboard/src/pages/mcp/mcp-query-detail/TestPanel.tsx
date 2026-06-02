@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SecondaryAction } from '../../../components/common/display/SecondaryAction';
 import { WizardNav } from '../../../components/common/layout/WizardNav';
 import { useYamlWorkflow, useInvokeYamlWorkflow } from '../../../api/yaml-workflows';
-import { useMcpRuns, useMcpRunExecution } from '../../../api/mcp-runs';
+import { useMcpRuns, useMcpRunExecution } from '../../../api/pipelines';
 import { useWorkflowExecution } from '../../../api/workflows';
 import { useTaskByWorkflowId } from '../../../api/tasks';
 import { useYamlActivityEvents } from '../../../hooks/useYamlActivityEvents';

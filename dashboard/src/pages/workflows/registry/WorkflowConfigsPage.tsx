@@ -185,7 +185,7 @@ export function WorkflowConfigsPage() {
   return (
     <div>
       <PageHeader
-        title="Workflow Registry"
+        title="Configure"
         docsHash="#docs:dashboard.md:workflow-registry"
         actions={
           <button

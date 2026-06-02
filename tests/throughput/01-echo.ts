@@ -73,7 +73,7 @@ async function main() {
   console.log('Polling for completion...');
   for (let tick = 0; tick < 240; tick++) {
     await new Promise((r) => setTimeout(r, 500));
-    const result = await fetchJson('/api/mcp-runs?app_id=echo01&limit=1&offset=0&status=running');
+    const result = await fetchJson('/api/pipelines?app_id=echo01&limit=1&offset=0&status=running');
     const running = result?.total ?? 0;
     const elapsed = (performance.now() - t0) / 1000;
     process.stdout.write(`  running=${running}  ${elapsed.toFixed(1)}s\r`);

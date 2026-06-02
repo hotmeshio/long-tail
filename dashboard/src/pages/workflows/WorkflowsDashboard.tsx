@@ -184,7 +184,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     return [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
   }, [configs]);
 
-  const pageTitle = 'Durable Executions';
+  const pageTitle = 'Workflow Executions';
 
   const emptyMessage = activeTier === 'certified'
     ? 'No certified workflow executions found'

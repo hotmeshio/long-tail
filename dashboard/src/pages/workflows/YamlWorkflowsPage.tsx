@@ -68,7 +68,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="MCP Pipeline Tools" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
+        <PageHeader title="Pipeline Tools" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -83,7 +83,7 @@ export function YamlWorkflowsPage() {
   return (
     <div>
       <PageHeader
-        title="MCP Pipeline Tools"
+        title="Pipeline Tools"
         docsHash="#docs:dashboard.md:mcp-pipeline-tools"
         actions={
           <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">

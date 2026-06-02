@@ -1,4 +1,4 @@
-// SQL templates for mcp-runs queries.
+// SQL templates for pipeline queries.
 // Schema placeholders (${schema}) are interpolated at call time
 // because Postgres does not support parameterized schema names.
 

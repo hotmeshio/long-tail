@@ -6,7 +6,8 @@ export * as users from './users';
 export * as roles from './roles';
 export * as auth from './auth';
 export * as mcp from './mcp';
-export * as mcpRuns from './mcp-runs';
+export * as pipelines from './pipelines';
+export * as mcpRuns from './pipelines'; // backward-compat alias
 export * as insight from './insight';
 export * as settings from './settings';
 export * as exports from './exports';

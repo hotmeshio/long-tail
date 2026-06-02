@@ -209,18 +209,16 @@ describe('start() declarative API', () => {
       clearRegistries();
     }, 30_000);
 
-    it('should register default maintenance when omitted', async () => {
+    it('should NOT register maintenance when omitted (opt-in)', async () => {
       clearRegistries();
 
       const lt = await start({
         database: TEST_DB,
         server: { enabled: false },
-        // maintenance not specified — defaults to true
+        // maintenance not specified — disabled by default
       });
 
-      expect(maintenanceRegistry.hasConfig).toBe(true);
-      expect(maintenanceRegistry.config?.schedule).toBe('0 2 * * 0');
-      expect(maintenanceRegistry.config?.rules.length).toBeGreaterThanOrEqual(4);
+      expect(maintenanceRegistry.hasConfig).toBe(false);
 
       await lt.shutdown();
       clearRegistries();

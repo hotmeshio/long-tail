@@ -5,6 +5,7 @@ import { useTopic, useUpdateTopic, useDeleteTopic, usePublishTopic } from '../..
 import { JsonViewer } from '../../components/common/data/JsonViewer';
 import { DateValue } from '../../components/common/display/DateValue';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { useSettings } from '../../api/settings';
 
 const CATEGORY_COLORS: Record<string, string> = {
   task:       'bg-blue-400/15 text-blue-400',
@@ -31,12 +32,13 @@ export function TopicDetailPage() {
   const topicKey = encodedTopic ? decodeURIComponent(encodedTopic) : null;
   const navigate = useNavigate();
   const { data: topic, isLoading, refetch, isFetching } = useTopic(topicKey);
+  const { data: settings } = useSettings();
+  const subscriberLabel = settings?.ai?.enabled ? 'agents' : 'automations';
   const updateMutation = useUpdateTopic();
   const deleteMutation = useDeleteTopic();
   const publishMutation = usePublishTopic();
 
   const [editing, setEditing] = useState(false);
-  const [publishing, setPublishing] = useState(false);
   const [publishPayload, setPublishPayload] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState('');
@@ -60,6 +62,15 @@ export function TopicDetailPage() {
   const isManaged = topic.managed;
   const editable = !isManaged;
   const categoryPillCls = CATEGORY_COLORS[topic.category] ?? 'bg-zinc-400/15 text-zinc-400';
+
+  const defaultPayload = topic.example_payload
+    ? JSON.stringify(topic.example_payload, null, 2)
+    : topic.payload_schema?.properties
+      ? JSON.stringify(Object.fromEntries(Object.keys(topic.payload_schema.properties).map(k => [k, ''])), null, 2)
+      : '{}';
+  if (!publishPayload && defaultPayload !== '{}') {
+    setPublishPayload(defaultPayload);
+  }
 
   const startEdit = () => {
     setEditDescription(topic.description ?? '');
@@ -96,59 +107,33 @@ export function TopicDetailPage() {
   };
 
   return (
-    <div className="max-w-3xl">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+    <div>
+      {/* ── Header ───────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between mb-4">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-1">
             <Radio className="w-5 h-5 text-accent" strokeWidth={1.5} />
             <h1 className="text-lg font-mono font-medium text-text-primary">{topic.topic}</h1>
             <button onClick={() => { window.location.hash = '#docs:topics.md'; }} className="text-text-quaternary hover:text-accent transition-colors" title="Topic docs">
               <BookOpen className="w-4 h-4" strokeWidth={1.5} />
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${categoryPillCls}`}>{topic.category}</span>
-            <span className="text-[10px] font-mono text-text-quaternary">source: {topic.source}</span>
-            {topic.last_seen_at && (
-              <span className="text-[10px] text-text-quaternary">last seen <DateValue date={topic.last_seen_at} /></span>
-            )}
-          </div>
+          {!editing && topic.description ? (
+            <p className="text-sm text-text-secondary leading-relaxed">{topic.description}</p>
+          ) : !editing ? (
+            <p className="text-sm text-text-quaternary italic">No description</p>
+          ) : null}
         </div>
-
-        <div className="flex items-center gap-2">
-          <ListToolbar
-            onRefresh={() => refetch()}
-            isFetching={isFetching}
-            apiPath={`/topics/by-name/${encodeURIComponent(topic.topic)}`}
-          />
-          {!editing && (
-            <button
-              onClick={() => {
-                const payload = topic.example_payload
-                  ? JSON.stringify(topic.example_payload, null, 2)
-                  : topic.payload_schema?.properties
-                    ? JSON.stringify(Object.fromEntries(Object.keys(topic.payload_schema.properties).map(k => [k, ''])), null, 2)
-                    : '{}';
-                setPublishPayload(payload);
-                setPublishing(!publishing);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${publishing ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-accent hover:bg-surface-hover'}`}
-            >
-              <Send className="w-3 h-3" /> Publish
+        <div className="flex items-center gap-2 shrink-0">
+          {!editing && editable && (
+            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors">
+              <Pencil className="w-3 h-3" /> Edit
             </button>
           )}
-          {!editing && editable && (
-            <>
-              <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors">
-                <Pencil className="w-3 h-3" /> Edit
-              </button>
-              {!isSystem && (
-                <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors">
-                  <Trash2 className="w-3 h-3" /> Delete
-                </button>
-              )}
-            </>
+          {!editing && !isSystem && editable && (
+            <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors">
+              <Trash2 className="w-3 h-3" /> Delete
+            </button>
           )}
           {editing && (
             <>
@@ -163,43 +148,145 @@ export function TopicDetailPage() {
         </div>
       </div>
 
-      {/* Publish panel */}
-      {publishing && (
-        <div className="mb-6 bg-surface-sunken/50 rounded-md p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-accent/60 mb-2">Publish test event</p>
-          <textarea
-            value={publishPayload}
-            onChange={(e) => setPublishPayload(e.target.value)}
-            className="input-json w-full text-xs"
-            rows={6}
-            spellCheck={false}
-            placeholder='{ "key": "value" }'
-          />
-          <div className="flex items-center gap-3 mt-3">
-            <button
-              onClick={() => {
-                try {
-                  const data = JSON.parse(publishPayload);
-                  publishMutation.mutate({ topic: topic.topic, data }, {
-                    onSuccess: () => setPublishing(false),
-                  });
-                } catch { /* invalid JSON */ }
-              }}
-              disabled={publishMutation.isPending}
-              className="btn-primary text-xs"
-            >
-              {publishMutation.isPending ? 'Publishing...' : 'Publish'}
-            </button>
-            <button onClick={() => setPublishing(false)} className="text-xs text-text-tertiary hover:text-text-primary">Cancel</button>
-            {publishMutation.isSuccess && <span className="text-xs text-status-success">Published</span>}
-            {publishMutation.isError && <span className="text-xs text-status-error">{publishMutation.error.message}</span>}
+      {/* ── Details band ─────────────────────────────────────────── */}
+      <div className="bg-surface-sunken/50 rounded-md px-5 py-3 flex flex-wrap gap-x-6 gap-y-3 items-start mb-5 relative">
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Category</p>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${categoryPillCls}`}>{topic.category}</span>
+        </div>
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Source</p>
+          <span className="text-xs font-mono text-text-secondary">{topic.source}</span>
+        </div>
+        {topic.tags?.length > 0 && (
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</p>
+            <div className="flex items-center gap-1.5">
+              <Tag className="w-2.5 h-2.5 text-text-quaternary" strokeWidth={1.5} />
+              {topic.tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-text-tertiary bg-surface-sunken">{tag}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
+          <span className="text-xs text-text-secondary"><DateValue date={topic.created_at} /></span>
+        </div>
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Updated</p>
+          <span className="text-xs text-text-secondary"><DateValue date={topic.updated_at} /></span>
+        </div>
+        {topic.last_seen_at && (
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Last Seen</p>
+            <span className="text-xs text-text-secondary"><DateValue date={topic.last_seen_at} /></span>
+          </div>
+        )}
+        <div className="ml-auto self-center">
+          <ListToolbar onRefresh={() => refetch()} isFetching={isFetching} apiPath={`/topics/by-name/${encodeURIComponent(topic.topic)}`} />
+        </div>
+      </div>
+
+      {/* ── Three-column layout: Payloads | Activity (pub/sub) ─── */}
+      {!editing && (
+        <div className="flex gap-5">
+          {/* Left — Payloads */}
+          <div className="flex-1 min-w-0">
+            {(topic.payload_schema || topic.example_payload) ? (
+              <div className={`grid gap-5 ${topic.payload_schema && topic.example_payload ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {topic.payload_schema && (
+                  <div className="min-w-0">
+                    <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
+                    <JsonViewer data={topic.payload_schema} />
+                  </div>
+                )}
+                {topic.example_payload && (
+                  <div className="min-w-0">
+                    <SectionHeader icon={Radio} color="text-cyan-400">Example Payload</SectionHeader>
+                    <JsonViewer data={topic.example_payload} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
+                <p className="text-[11px] text-text-quaternary">No schema defined. Click Edit to add one.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Right — Activity: Subscribers + Publish */}
+          <div className="w-64 shrink-0 space-y-4 animate-page-enter">
+            {/* Subscribers */}
+            <div className="bg-surface-sunken/30 rounded-md px-4 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Bot className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.5} />
+                <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                  Subscribers ({topic.subscribers?.length ?? 0})
+                </h2>
+              </div>
+              {topic.subscribers?.length ? (
+                <div className="space-y-0.5">
+                  {topic.subscribers.map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => navigate(`/agents/${sub.agent_id}`)}
+                      className="flex items-center gap-2 w-full text-left py-1 rounded hover:bg-surface-hover/50 transition-colors"
+                    >
+                      <Bot className="w-2.5 h-2.5 text-emerald-400 shrink-0" strokeWidth={1.5} />
+                      <span className="text-[11px] text-text-primary hover:text-accent transition-colors truncate">{sub.agent_name}</span>
+                      <span className="text-[9px] font-mono text-text-quaternary ml-auto shrink-0">{sub.reaction_type}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-text-quaternary">No {subscriberLabel} subscribed.</p>
+              )}
+            </div>
+
+            {/* Publish */}
+            <div className="sticky top-16 bg-surface-sunken/40 rounded-md p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Send className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
+                <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Publish</h2>
+              </div>
+              <textarea
+                value={publishPayload || defaultPayload}
+                onChange={(e) => setPublishPayload(e.target.value)}
+                className="input-json w-full text-[11px]"
+                rows={7}
+                spellCheck={false}
+                placeholder='{ "key": "value" }'
+              />
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    try {
+                      const data = JSON.parse(publishPayload || defaultPayload);
+                      publishMutation.mutate({ topic: topic.topic, data }, { onSuccess: () => refetch() });
+                    } catch { /* invalid JSON */ }
+                  }}
+                  disabled={publishMutation.isPending}
+                  className="btn-primary text-xs w-full"
+                >
+                  {publishMutation.isPending ? 'Publishing…' : 'Publish'}
+                </button>
+              </div>
+              {publishMutation.isSuccess && (
+                <p className="text-[10px] text-status-success mt-2 animate-page-enter">Event published</p>
+              )}
+              {publishMutation.isError && (
+                <p className="text-[10px] text-status-error mt-2">{publishMutation.error.message}</p>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Description */}
-      <div className="mb-8">
-        {editing ? (
+      {/* ── Edit mode ────────────────────────────────────────────── */}
+      {editing && (
+        <div className="space-y-6 max-w-3xl">
           <div>
             <label className="section-header">Description</label>
             <textarea
@@ -210,16 +297,6 @@ export function TopicDetailPage() {
               placeholder="What this topic represents"
             />
           </div>
-        ) : (
-          topic.description
-            ? <p className="text-sm text-text-secondary leading-relaxed">{topic.description}</p>
-            : <p className="text-sm text-text-quaternary italic">No description</p>
-        )}
-      </div>
-
-      {/* Tags */}
-      <div className="mb-8">
-        {editing ? (
           <div>
             <label className="section-header">Tags</label>
             <input
@@ -231,21 +308,6 @@ export function TopicDetailPage() {
             />
             <p className="hint">Comma-separated. Used for filtering in the catalog.</p>
           </div>
-        ) : topic.tags?.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <Tag className="w-3 h-3 text-text-quaternary" strokeWidth={1.5} />
-            {topic.tags.map((tag) => (
-              <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono text-text-tertiary bg-surface-sunken">
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Payload Schema */}
-      <div className="mb-8">
-        {editing ? (
           <div>
             <label className="section-header">Payload Schema</label>
             <textarea
@@ -256,62 +318,10 @@ export function TopicDetailPage() {
               placeholder={'{\n  "type": "object",\n  "properties": {\n    "orderId": { "type": "string" }\n  }\n}'}
             />
             {schemaError && <p className="text-[10px] text-red-400 mt-1">{schemaError}</p>}
-            <p className="hint">JSON Schema describing the event.data shape. Shown in subscription editor as field reference.</p>
+            <p className="hint">JSON Schema describing the event.data shape.</p>
           </div>
-        ) : topic.payload_schema ? (
-          <>
-            <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
-            <JsonViewer data={topic.payload_schema} />
-          </>
-        ) : (
-          <>
-            <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
-            <p className="text-[11px] text-text-quaternary">No schema defined. Click Edit to add one.</p>
-          </>
-        )}
-      </div>
-
-      {/* Example Payload */}
-      {topic.example_payload && (
-        <div className="mb-8">
-          <SectionHeader icon={Radio} color="text-cyan-400">Example Payload</SectionHeader>
-          <JsonViewer data={topic.example_payload} />
         </div>
       )}
-
-      {/* Subscribers */}
-      <div className="mb-8">
-        <SectionHeader icon={Bot} color="text-emerald-400">
-          Subscribers ({topic.subscribers?.length ?? 0})
-        </SectionHeader>
-        {topic.subscribers?.length ? (
-          <div className="space-y-1">
-            {topic.subscribers.map((sub) => (
-              <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-surface-hover transition-colors">
-                <button
-                  onClick={() => navigate(`/agents/${sub.agent_id}`)}
-                  className="flex items-center gap-2 text-left min-w-0"
-                >
-                  <Bot className="w-3 h-3 text-emerald-400 shrink-0" strokeWidth={1.5} />
-                  <span className="text-xs text-text-primary hover:text-accent transition-colors">{sub.agent_name}</span>
-                </button>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-text-quaternary">{sub.topic}</span>
-                  <span className="text-[10px] text-text-tertiary">{sub.reaction_type}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[11px] text-text-quaternary py-2">No agents are subscribed to this topic.</p>
-        )}
-      </div>
-
-      {/* Metadata */}
-      <div className="text-[10px] text-text-quaternary space-y-1 pt-4 border-t border-surface-border">
-        <p>Created <DateValue date={topic.created_at} /></p>
-        <p>Updated <DateValue date={topic.updated_at} /></p>
-      </div>
     </div>
   );
 }

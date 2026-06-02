@@ -4,14 +4,14 @@ import { setupRouteTest, authHeaders } from './setup';
 const ctx = setupRouteTest(4613);
 
 describe('MCP Runs routes', () => {
-  describe('GET /api/mcp-runs', () => {
+  describe('GET /api/pipelines', () => {
     it('returns 401 without auth', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs`);
+      const res = await fetch(`${ctx.BASE}/pipelines`);
       expect(res.status).toBe(401);
     });
 
     it('returns 400 without app_id', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs`, {
+      const res = await fetch(`${ctx.BASE}/pipelines`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(400);
@@ -20,7 +20,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('returns jobs list for valid app_id', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=longtail`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=longtail`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -32,7 +32,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('returns empty list for non-existent schema', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=nonexistent_schema_xyz`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=nonexistent_schema_xyz`, {
         headers: authHeaders(ctx.adminToken),
       });
       // May return 200 with empty or 500 depending on schema existence
@@ -44,7 +44,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('supports status filter', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=longtail&status=completed`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=longtail&status=completed`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -55,7 +55,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('supports pagination params', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=longtail&limit=2&offset=0`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=longtail&limit=2&offset=0`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -64,7 +64,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('supports entity filter', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=longtail&entity=nonexistent_entity`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=longtail&entity=nonexistent_entity`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -74,7 +74,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('supports search filter', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=longtail&search=zzz_no_match_zzz`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=longtail&search=zzz_no_match_zzz`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -83,7 +83,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('job records have expected shape', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=longtail&limit=1`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=longtail&limit=1`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -101,7 +101,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('supports sort_by and order params', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=durable&sort_by=created_at&order=asc&limit=2`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=durable&sort_by=created_at&order=asc&limit=2`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -113,7 +113,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('falls back to default sort for invalid sort_by', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs?app_id=durable&sort_by=INVALID_COLUMN&limit=2`, {
+      const res = await fetch(`${ctx.BASE}/pipelines?app_id=durable&sort_by=INVALID_COLUMN&limit=2`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -122,21 +122,21 @@ describe('MCP Runs routes', () => {
     });
   });
 
-  describe('GET /api/mcp-runs/entities', () => {
+  describe('GET /api/pipelines/entities', () => {
     it('returns 401 without auth', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/entities`);
+      const res = await fetch(`${ctx.BASE}/pipelines/entities`);
       expect(res.status).toBe(401);
     });
 
     it('returns 400 without app_id', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/entities`, {
+      const res = await fetch(`${ctx.BASE}/pipelines/entities`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(400);
     });
 
     it('returns entities array for valid app_id', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/entities?app_id=longtail`, {
+      const res = await fetch(`${ctx.BASE}/pipelines/entities?app_id=longtail`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -146,7 +146,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('returns empty array for non-existent schema', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/entities?app_id=nonexistent_schema_xyz`, {
+      const res = await fetch(`${ctx.BASE}/pipelines/entities?app_id=nonexistent_schema_xyz`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -155,7 +155,7 @@ describe('MCP Runs routes', () => {
     });
 
     it('entities are sorted and contain no nulls', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/entities?app_id=longtail`, {
+      const res = await fetch(`${ctx.BASE}/pipelines/entities?app_id=longtail`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(200);
@@ -169,21 +169,21 @@ describe('MCP Runs routes', () => {
     });
   });
 
-  describe('GET /api/mcp-runs/:jobId/execution', () => {
+  describe('GET /api/pipelines/:jobId/execution', () => {
     it('returns 401 without auth', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/some-job/execution`);
+      const res = await fetch(`${ctx.BASE}/pipelines/some-job/execution`);
       expect(res.status).toBe(401);
     });
 
     it('returns 400 without app_id', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/some-job/execution`, {
+      const res = await fetch(`${ctx.BASE}/pipelines/some-job/execution`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(400);
     });
 
     it('returns 404 for non-existent job', async () => {
-      const res = await fetch(`${ctx.BASE}/mcp-runs/nonexistent_job_xyz/execution?app_id=longtail`, {
+      const res = await fetch(`${ctx.BASE}/pipelines/nonexistent_job_xyz/execution?app_id=longtail`, {
         headers: authHeaders(ctx.adminToken),
       });
       expect(res.status).toBe(404);

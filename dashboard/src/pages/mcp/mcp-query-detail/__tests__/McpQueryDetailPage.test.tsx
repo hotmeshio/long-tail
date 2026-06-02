@@ -20,7 +20,7 @@ vi.mock('../../../../api/yaml-workflows', () => ({
   useYamlWorkflows: vi.fn(),
 }));
 
-vi.mock('../../../../api/mcp-runs', () => ({
+vi.mock('../../../../api/pipelines', () => ({
   useMcpRuns: vi.fn(),
 }));
 
@@ -46,7 +46,7 @@ vi.mock('../TestPanel', () => ({
 import { McpQueryDetailPage } from '../McpQueryDetailPage';
 import { useMcpQueryExecution, useMcpQueryResult, useYamlWorkflowForSource, useDescribeMcpQuery } from '../../../../api/mcp-query';
 import { useCreateYamlWorkflow, useDeployYamlWorkflow, useActivateYamlWorkflow, useInvokeYamlWorkflow, useYamlWorkflowAppIds } from '../../../../api/yaml-workflows';
-import { useMcpRuns } from '../../../../api/mcp-runs';
+import { useMcpRuns } from '../../../../api/pipelines';
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

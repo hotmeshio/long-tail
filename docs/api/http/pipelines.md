@@ -1,11 +1,11 @@
-# MCP Runs API (Process Server Runs)
+# Pipelines API
 
-Query execution runs from MCP process servers. Runs are stored in HotMesh's `{namespace}.jobs` table, one schema per namespace. All endpoints require authentication.
+Query and manage pipeline execution runs. Runs are stored in HotMesh's `{namespace}.jobs` table, one schema per namespace. All endpoints require authentication.
 
 ## List runs
 
 ```
-GET /api/mcp-runs
+GET /api/pipelines
 ```
 
 **Query parameters:**
@@ -42,7 +42,7 @@ GET /api/mcp-runs
 ## List entities (tools)
 
 ```
-GET /api/mcp-runs/entities
+GET /api/pipelines/entities
 ```
 
 Returns distinct entity names from job runs, supplemented with `graph_topic` values from active/deployed YAML workflows for the namespace.
@@ -68,7 +68,7 @@ Entities are sorted alphabetically and exclude null/empty values.
 ## Get execution detail
 
 ```
-GET /api/mcp-runs/:jobId/execution
+GET /api/pipelines/:jobId/execution
 ```
 
 Returns full execution detail for a specific run, including inflated activity events, trace IDs, and a summary.
@@ -93,26 +93,7 @@ Returns full execution detail for a specific run, including inflated activity ev
   "duration_ms": 5230,
   "trace_id": "a5fb792464c1d6c7e692824f0ceb011d",
   "result": { "rotated_url": "https://...", "verified": true },
-  "events": [
-    {
-      "event_id": 1,
-      "event_type": "workflow_execution_started",
-      "category": "workflow",
-      "event_time": "2025-01-15T10:00:00.000Z",
-      "duration_ms": null,
-      "is_system": false,
-      "attributes": { "kind": "workflow_execution_started", "workflow_type": "rotate_and_verify" }
-    },
-    {
-      "event_id": 2,
-      "event_type": "activity_task_scheduled",
-      "category": "activity",
-      "event_time": "2025-01-15T10:00:00.100Z",
-      "duration_ms": null,
-      "is_system": false,
-      "attributes": { "kind": "activity_task_scheduled", "activity_type": "rotate_image" }
-    }
-  ],
+  "events": [...],
   "summary": {
     "total_events": 5,
     "activities": { "total": 2, "completed": 2, "failed": 0, "system": 1, "user": 1 },
@@ -126,3 +107,36 @@ Returns full execution detail for a specific run, including inflated activity ev
 **Response 400:** Missing `app_id`.
 
 **Response 404:** Job not found.
+
+## Interrupt a running pipeline
+
+```
+POST /api/pipelines/:jobId/interrupt
+```
+
+Immediately terminates a running pipeline job via `HotMesh.interrupt()`. The job is marked as interrupted and its state is expired.
+
+**Body:**
+
+```json
+{
+  "topic": "rotate_and_verify",
+  "app_id": "longtail"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `topic` | `string` | **Required.** Workflow entity/topic name |
+| `app_id` | `string` | **Required.** HotMesh namespace |
+
+**Response 200:**
+
+```json
+{
+  "interrupted": true,
+  "jobId": "abc123..."
+}
+```
+
+**Response 400:** Missing `topic` or `app_id`.

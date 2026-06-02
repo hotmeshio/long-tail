@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Server, Workflow } from 'lucide-react';
 import { useMcpServers } from '../../api/mcp';
-import { useMcpRuns } from '../../api/mcp-runs';
+import { useMcpRuns } from '../../api/pipelines';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useNamespaces } from '../../api/namespaces';
 import { PageHeader } from '../../components/common/layout/PageHeader';

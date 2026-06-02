@@ -96,7 +96,7 @@ describe('StartWorkflowPage', () => {
 
   it('renders page header', () => {
     renderPage();
-    expect(screen.getByText('Invoke Workflow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Invoke' })).toBeInTheDocument();
   });
 
   it('renders mode toggle with Start Now and Schedule buttons', () => {
@@ -119,7 +119,7 @@ describe('StartWorkflowPage', () => {
 
   it('shows prompt to select a workflow when none is selected', () => {
     renderPage();
-    expect(screen.getByText('Ready when you are')).toBeInTheDocument();
+    expect(screen.getByText('Choose a workflow to get started')).toBeInTheDocument();
   });
 
   it('shows loading skeleton when configs are loading', () => {
@@ -202,7 +202,7 @@ describe('StartWorkflowPage', () => {
     renderPage();
     // With a single invocable workflow, it should auto-select it
     // and show the StartNowPanel instead of "Select a workflow"
-    expect(screen.queryByText('Ready when you are')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose a workflow to get started')).not.toBeInTheDocument();
     expect(screen.getByText('Start Workflow')).toBeInTheDocument();
   });
 });

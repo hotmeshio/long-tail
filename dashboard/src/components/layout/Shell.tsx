@@ -7,6 +7,7 @@ import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
 import { WorkSidebar } from './WorkSidebar';
 import { BuildSidebar } from './BuildSidebar';
+import { DesignSidebar } from './DesignSidebar';
 import { StorageSidebar } from './StorageSidebar';
 import { AdminSidebar } from './AdminSidebar';
 import { EventFeed } from './EventFeed';
@@ -60,7 +61,8 @@ function ShellLayout() {
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
             <WorkSidebar aiEnabled={aiEnabled} />
-            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <BuildSidebar aiEnabled={aiEnabled} />}
+            {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <BuildSidebar />}
+            {aiEnabled && (isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <DesignSidebar />}
             {(isSuperAdmin || hasRoleType('admin') || hasRole('engineer')) && <StorageSidebar />}
             {(isSuperAdmin || hasRoleType('admin')) && <AdminSidebar />}
           </nav>

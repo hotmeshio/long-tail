@@ -70,7 +70,7 @@ The client mirrors the REST route structure:
 | `lt.roles` | `/api/roles` | `list`, `listWithDetails`, `create`, `delete`, `getEscalationChains` |
 | `lt.auth` | `/api/auth` | `login` |
 | `lt.mcp` | `/api/mcp` | `listServers`, `createServer`, `getServer`, `connectServer`, `listTools`, `callTool` |
-| `lt.mcpRuns` | `/api/mcp-runs` | `listEntities`, `listJobs`, `getExecution` |
+| `lt.pipelines` | `/api/pipelines` | `listEntities`, `listJobs`, `getExecution`, `interrupt` |
 | `lt.insight` | `/api/insight` | `mcpQuery`, `buildWorkflow`, `refineWorkflow`, `describeWorkflow` |
 | `lt.exports` | `/api/workflow-states` | `listJobs`, `exportState`, `exportExecution`, `getStatus`, `getState` |
 | `lt.controlplane` | `/api/controlplane` | `listApps`, `rollCall`, `throttle`, `getStreamStats` |
