@@ -63,7 +63,7 @@ The client mirrors the REST route structure:
 | Namespace | REST equivalent | Key operations |
 |-----------|----------------|----------------|
 | `lt.tasks` | `/api/tasks` | `list`, `get`, `listProcesses`, `getProcess`, `getProcessStats` |
-| `lt.escalations` | `/api/escalations` | `list`, `listAvailable`, `get`, `claim`, `release`, `resolve`, `escalate`, `bulkClaim`, `bulkAssign` |
+| `lt.escalations` | `/api/escalations` | `list`, `listAvailable`, `get`, `claim`, `release`, `resolve`, `escalate`, `bulkClaim`, `bulkAssign`, `findByMetadata`, `claimByMetadata`, `resolveByMetadata` |
 | `lt.workflows` | `/api/workflows` | `invoke`, `getStatus`, `getResult`, `terminate`, `listWorkers`, `listDiscovered`, `listConfigs`, `getConfig`, `upsertConfig` |
 | `lt.yamlWorkflows` | `/api/yaml-workflows` | `list`, `get`, `create`, `deploy`, `activate`, `invoke`, `archive` |
 | `lt.users` | `/api/users` | `list`, `get`, `create`, `update`, `delete`, `getRoles`, `addRole`, `removeRole` |

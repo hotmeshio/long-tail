@@ -509,3 +509,87 @@ const result = await lt.escalations.bulkTriage({
 **Returns:** `LTApiResult<{ triaged, workflows }>`
 
 **Auth:** Required
+
+---
+
+## findByMetadata
+
+Find escalations by a metadata key-value pair. Uses JSONB containment backed by a GIN index.
+
+```typescript
+const result = await lt.escalations.findByMetadata({
+  key: 'orderId',
+  value: 'order-123',
+  status: 'pending',
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Metadata field name |
+| `value` | `string` | Yes | Metadata field value |
+| `status` | `string` | No | Filter by status |
+| `limit` | `number` | No | Max results (default: 50) |
+| `offset` | `number` | No | Pagination offset |
+
+**Returns:** `LTApiResult<{ escalations, total }>`
+
+**Auth:** Required (RBAC-scoped to visible roles)
+
+---
+
+## claimByMetadata
+
+Find and claim an escalation by metadata key-value pair in one atomic call.
+
+```typescript
+const result = await lt.escalations.claimByMetadata({
+  key: 'orderId',
+  value: 'order-123',
+  durationMinutes: 30,
+  assignee: 'station-operator-42',  // optional external_id
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Metadata field name |
+| `value` | `string` | Yes | Metadata field value |
+| `durationMinutes` | `number` | No | Claim duration (default: 30) |
+| `assignee` | `string` | No | External user ID to claim as (resolved via `getUserByExternalId`) |
+
+**Returns:** `LTApiResult<{ escalation, isExtension }>` -- 404 if no match, 409 if already claimed.
+
+**Auth:** Required
+
+---
+
+## resolveByMetadata
+
+Find and resolve an escalation by metadata key-value pair. Auto-claims if unclaimed. Supports all resolution paths.
+
+```typescript
+const result = await lt.escalations.resolveByMetadata({
+  key: 'orderId',
+  value: 'order-123',
+  resolverPayload: { approved: true, targetStatus: 'completed' },
+  assignee: 'station-operator-42',
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Metadata field name |
+| `value` | `string` | Yes | Metadata field value |
+| `resolverPayload` | `object` | Yes | Resolution data passed to the workflow |
+| `assignee` | `string` | No | External user ID to resolve as |
+
+**Returns:** Same as `resolve` -- 404 if no match.
+
+**Auth:** Required
