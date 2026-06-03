@@ -161,3 +161,45 @@ RETURNING *`;
 
 export const LIST_DISTINCT_TYPES =
   'SELECT DISTINCT type FROM lt_escalations ORDER BY type';
+
+// --- Metadata candidate key lookups -----------------------------------------
+
+/** Find escalations by a single metadata key-value pair. */
+export const FIND_BY_METADATA = `\
+SELECT * FROM lt_escalations
+WHERE metadata @> $1::jsonb
+  AND ($2::text IS NULL OR status = $2)
+ORDER BY priority ASC, created_at ASC
+LIMIT $3 OFFSET $4`;
+
+export const COUNT_BY_METADATA = `\
+SELECT COUNT(*) FROM lt_escalations
+WHERE metadata @> $1::jsonb
+  AND ($2::text IS NULL OR status = $2)`;
+
+/** Atomic claim by metadata: find one available escalation and claim it. */
+export const CLAIM_BY_METADATA = `\
+WITH target AS (
+  SELECT id, assigned_to
+  FROM lt_escalations
+  WHERE metadata @> $1::jsonb
+    AND status = 'pending'
+    AND (
+      assigned_to IS NULL
+      OR assigned_until <= NOW()
+      OR assigned_to = $2
+    )
+  ORDER BY priority ASC, created_at ASC
+  LIMIT 1
+  FOR UPDATE SKIP LOCKED
+),
+updated AS (
+  UPDATE lt_escalations e
+  SET assigned_to = $2,
+      claimed_at = NOW(),
+      assigned_until = NOW() + INTERVAL '1 minute' * $3
+  FROM target t
+  WHERE e.id = t.id
+  RETURNING e.*, t.assigned_to AS prev_assigned_to
+)
+SELECT * FROM updated`;

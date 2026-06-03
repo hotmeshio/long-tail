@@ -35,7 +35,7 @@ export function AvailableEscalationsPage() {
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { role: '', type: '', priority: '', status: 'available' },
+    filters: { role: '', type: '', priority: '', status: 'available', search: '' },
   });
   const claimDurations = useClaimDurations();
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
@@ -93,10 +93,21 @@ export function AvailableEscalationsPage() {
 
   const now = new Date();
   const rawEscalations = data?.escalations ?? [];
-  const escalations = statusFilter === 'claimed'
+  const statusFiltered = statusFilter === 'claimed'
     ? rawEscalations.filter((e) => e.assigned_to && e.assigned_until && new Date(e.assigned_until) > now)
     : rawEscalations;
-  const total = statusFilter === 'claimed'
+
+  // Client-side search across visible fields + metadata values
+  const searchTerm = (filters.search ?? '').toLowerCase();
+  const escalations = searchTerm
+    ? statusFiltered.filter((e) => {
+        const fields = [e.id, e.type, e.subtype, e.description, e.workflow_id, e.origin_id, e.role];
+        if (e.metadata) fields.push(...Object.values(e.metadata).map(String));
+        return fields.some((f) => f && String(f).toLowerCase().includes(searchTerm));
+      })
+    : statusFiltered;
+
+  const total = (statusFilter === 'claimed' || searchTerm)
     ? escalations.length
     : data?.total ?? 0;
   const canBulkManage = isSuperAdmin || user?.roles.some((r) => r.type === 'admin');

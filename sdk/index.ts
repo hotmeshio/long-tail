@@ -116,6 +116,9 @@ export function createClient(options: LTClientOptions = {}) {
       bulkAssign: bindAuth(escalationsApi.bulkAssign, auth),
       bulkEscalate: bindAuth(escalationsApi.bulkEscalate, auth),
       bulkTriage: bindAuth(escalationsApi.bulkTriage, auth),
+      findByMetadata: bindAuth(escalationsApi.findByMetadata, auth),
+      claimByMetadata: bindAuth(escalationsApi.claimByMetadata, auth),
+      resolveByMetadata: bindAuth(escalationsApi.resolveByMetadata, auth),
     },
 
     // ── Workflows ──────────────────────────────────────────────────────────

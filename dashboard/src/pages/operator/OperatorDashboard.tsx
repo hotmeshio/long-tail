@@ -18,7 +18,7 @@ export function OperatorDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { role: '', type: '', priority: '' },
+    filters: { role: '', type: '', priority: '', search: '' },
   });
   const release = useReleaseEscalation();
   const { data: rolesData } = useRoles();
@@ -37,10 +37,20 @@ export function OperatorDashboard() {
   });
 
   // Exclude expired claims — they're back in the available pool
-  const activeClaims = (data?.escalations ?? []).filter(
+  const activeRaw = (data?.escalations ?? []).filter(
     (e) => e.assigned_until && new Date(e.assigned_until) > new Date(),
   );
-  const total = data?.total ?? 0;
+
+  // Client-side search across visible fields + metadata values
+  const searchTerm = (filters.search ?? '').toLowerCase();
+  const activeClaims = searchTerm
+    ? activeRaw.filter((e) => {
+        const fields = [e.id, e.type, e.subtype, e.description, e.workflow_id, e.origin_id, e.role];
+        if (e.metadata) fields.push(...Object.values(e.metadata).map(String));
+        return fields.some((f) => f && String(f).toLowerCase().includes(searchTerm));
+      })
+    : activeRaw;
+  const total = searchTerm ? activeClaims.length : (data?.total ?? 0);
 
   const releaseColumn: Column<LTEscalationRecord> = {
     key: 'actions',

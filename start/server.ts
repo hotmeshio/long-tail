@@ -30,15 +30,16 @@ export function startServer(): ReturnType<typeof express.application.listen> {
   const dashboardDist = existsSync(devDist) ? devDist : prodDist;
 
   if (existsSync(dashboardDist)) {
-    app.use(express.static(dashboardDist));
+    app.use(express.static(dashboardDist, { index: false }));
 
     // SPA fallback — inject <base href="/"> so relative asset paths
     // resolve from root regardless of route depth (e.g. /admin/users).
-    const rawHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');
-    const indexHtml = rawHtml.replace('<head>', '<head><base href="/">');
+    // Read on each request so dashboard rebuilds take effect without restart.
+    const indexPath = path.join(dashboardDist, 'index.html');
 
     app.get('/{*splat}', (_req, res) => {
-      res.type('html').send(indexHtml);
+      const html = readFileSync(indexPath, 'utf-8').replace('<head>', '<head><base href="/">');
+      res.type('html').send(html);
     });
 
     loggerRegistry.info(`[long-tail] Dashboard: http://localhost:${config.PORT}/`);

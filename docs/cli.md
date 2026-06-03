@@ -68,6 +68,14 @@ ltc esc claim abc123                      # Claim for yourself
 ltc esc claim abc123 --duration 60        # Claim for 60 minutes
 ltc esc release abc123                    # Release back to pool
 ltc esc resolve abc123 --data '{"approved": true}'   # Resolve with payload
+
+# Metadata candidate key operations
+ltc esc find-by-meta orderId order-123              # Find by metadata key
+ltc esc find-by-meta orderId order-123 --status pending
+ltc esc claim-by-meta orderId order-123             # Claim by metadata key
+ltc esc claim-by-meta orderId order-123 --assignee ext-user-42  # On behalf of user
+ltc esc resolve-by-meta orderId order-123 --data '{"approved": true}'
+ltc esc resolve-by-meta orderId order-123 --data '{"approved": true}' --assignee ext-user-42
 ```
 
 ### Workflows

@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { registerListRoutes } from './list';
 import { registerBulkRoutes } from './bulk';
+import { registerMetadataRoutes } from './metadata';
 import { registerSingleRoutes } from './single';
 import { registerResolveRoutes } from './resolve';
 
@@ -15,6 +16,9 @@ registerListRoutes(router);
 // POST /release-expired, PATCH /priority, POST /bulk-claim,
 // POST /bulk-assign, PATCH /bulk-escalate, POST /bulk-triage
 registerBulkRoutes(router);
+
+// GET /by-metadata, POST /claim-by-metadata, POST /resolve-by-metadata
+registerMetadataRoutes(router);
 
 // PATCH /:id/escalate, GET /by-workflow/:workflowId,
 // GET /:id, POST /:id/claim, POST /:id/release

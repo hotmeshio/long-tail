@@ -7,7 +7,7 @@ export function BuildSidebar() {
       kind: 'group',
       label: 'Durable Workflows',
       icon: Cog,
-      matchPaths: ['/workflows'],
+      matchPaths: ['/workflows/registry', '/workflows/start', '/workflows/workers'],
       items: [
         { to: '/workflows/registry', label: 'Configure', icon: SlidersHorizontal },
         { to: '/workflows/start', label: 'Invoke', icon: Play },

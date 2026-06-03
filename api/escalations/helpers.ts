@@ -34,6 +34,22 @@ export async function checkBulkPermission(
   return { allowed: true };
 }
 
+/**
+ * Resolve an optional assignee external_id to an internal userId.
+ * When omitted, returns the caller's userId from auth.
+ */
+export async function resolveAssignee(
+  assignee: string | undefined,
+  auth: { userId: string },
+): Promise<{ userId: string } | { error: { status: number; error: string } }> {
+  if (!assignee) return { userId: auth.userId };
+  const user = await userService.getUserByExternalId(assignee);
+  if (!user) {
+    return { error: { status: 404, error: `User not found for external_id: ${assignee}` } };
+  }
+  return { userId: user.id };
+}
+
 export function publishBulkClaimEvents(ids: string[], assignedTo: string): void {
   for (const id of ids) {
     publishEscalationEvent({

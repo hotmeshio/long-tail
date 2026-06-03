@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink, Circle, Bell, Clock } from 'lucide-react';
 import type { Column } from '../../components/common/data/DataTable';
-import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
+import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
@@ -159,7 +159,7 @@ export function EscalationFilterBar({
   showStatus = false,
   actions,
 }: {
-  filters: { role: string; type: string; priority: string; status?: string };
+  filters: { role: string; type: string; priority: string; status?: string; search?: string };
   setFilter: (key: any, value: string) => void;
   roles: string[];
   types: string[];
@@ -193,6 +193,12 @@ export function EscalationFilterBar({
         value={filters.priority}
         onChange={(v) => setFilter('priority', v)}
         options={PRIORITY_OPTIONS}
+      />
+      <FilterInput
+        label="Search"
+        value={filters.search ?? ''}
+        onChange={(v) => setFilter('search', v)}
+        placeholder="ID, workflow, origin…"
       />
     </FilterBar>
   );
