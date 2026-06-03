@@ -117,6 +117,26 @@ escCmd.command('resolve <id>')
   .requiredOption('--data <json>', 'Resolver payload (JSON string)')
   .action(wrap(esc.resolveEscalation));
 
+escCmd.command('find-by-meta <key> <value>')
+  .description('Find escalations by metadata key-value pair')
+  .option('--status <status>', 'Filter by status')
+  .option('--limit <n>', 'Max results')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'IDs only')
+  .action(wrap(esc.findByMetadata));
+
+escCmd.command('claim-by-meta <key> <value>')
+  .description('Claim an escalation by metadata key-value pair')
+  .option('--duration <minutes>', 'Claim duration in minutes')
+  .option('--assignee <external_id>', 'Claim on behalf of user (external_id)')
+  .action(wrap(esc.claimByMetadata));
+
+escCmd.command('resolve-by-meta <key> <value>')
+  .description('Resolve an escalation by metadata key-value pair')
+  .option('--data <json>', 'Resolver payload (JSON string)')
+  .option('--assignee <external_id>', 'Resolve on behalf of user (external_id)')
+  .action(wrap(esc.resolveByMetadata));
+
 // ── Workflows ────────────────────────────────────────────────────────────
 
 const wfCmd = program.command('workflows').alias('wf').description('Manage durable workflows');

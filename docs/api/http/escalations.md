@@ -672,3 +672,99 @@ Release a claimed escalation back to the available pool. Only the user who holds
 | `resolver_payload` | `string` | JSON decision from the human reviewer |
 
 See [Data Model](../data.md) for the full SQL schema and index strategy.
+
+---
+
+## Metadata Candidate Key Operations
+
+These endpoints find, claim, and resolve escalations using a business-domain key stored in the `metadata` JSONB column (e.g., `orderId`). No raw SQL needed — the GIN index makes lookups fast.
+
+All three endpoints accept an optional `assignee` field — an `external_id` from your auth system. Long Tail resolves it to an internal userId. When omitted, the authenticated caller is used.
+
+### Find by metadata
+
+```
+GET /api/escalations/by-metadata?key=orderId&value=order-123
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | `string` | **Required.** Metadata field name |
+| `value` | `string` | **Required.** Metadata field value |
+| `status` | `string` | Filter by status (`pending`, `resolved`, `cancelled`) |
+| `limit` | `integer` | Max results (default 50) |
+| `offset` | `integer` | Pagination offset (default 0) |
+
+**Response 200:**
+
+```json
+{
+  "escalations": [{ "id": "...", "type": "order", "role": "operator", "metadata": { "orderId": "order-123" }, ... }],
+  "total": 1
+}
+```
+
+### Claim by metadata
+
+```
+POST /api/escalations/claim-by-metadata
+```
+
+Finds one available (pending + unassigned/expired) escalation matching the metadata and claims it atomically.
+
+**Body:**
+
+```json
+{
+  "key": "orderId",
+  "value": "order-123",
+  "durationMinutes": 30,
+  "assignee": "station-operator-42"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | `string` | **Required.** Metadata field name |
+| `value` | `string` | **Required.** Metadata field value |
+| `durationMinutes` | `number` | Claim duration (default 30) |
+| `assignee` | `string` | External user ID to claim as (resolved via `getUserByExternalId`) |
+
+**Response 200:**
+
+```json
+{
+  "escalation": { "id": "...", "assigned_to": "user-uuid", "assigned_until": "2025-01-15T10:30:00Z", ... },
+  "isExtension": false
+}
+```
+
+**Response 404:** No pending escalation found. **Response 409:** Escalation not available (already claimed).
+
+### Resolve by metadata
+
+```
+POST /api/escalations/resolve-by-metadata
+```
+
+Finds the pending escalation, auto-claims if unclaimed, then resolves it. Supports all five resolution paths (signal, re-run, triage, etc.).
+
+**Body:**
+
+```json
+{
+  "key": "orderId",
+  "value": "order-123",
+  "resolverPayload": { "approved": true, "targetStatus": "completed" },
+  "assignee": "station-operator-42"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | `string` | **Required.** Metadata field name |
+| `value` | `string` | **Required.** Metadata field value |
+| `resolverPayload` | `object` | **Required.** Resolution data passed to the workflow |
+| `assignee` | `string` | External user ID to resolve as |
+
+**Response 200:** Same as standard resolve endpoint.

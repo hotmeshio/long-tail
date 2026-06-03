@@ -18,6 +18,9 @@ import {
   GET_ESCALATIONS_BY_TASK_ID,
   GET_ESCALATIONS_BY_WORKFLOW_ID,
   GET_ESCALATIONS_BY_ORIGIN_ID,
+  FIND_BY_METADATA,
+  COUNT_BY_METADATA,
+  CLAIM_BY_METADATA,
 } from './sql';
 
 export async function createEscalation(
@@ -227,4 +230,42 @@ export async function getEscalationsByOriginId(
   const pool = getPool();
   const { rows } = await pool.query(GET_ESCALATIONS_BY_ORIGIN_ID, [originId]);
   return rows;
+}
+
+// --- Metadata candidate key lookups -----------------------------------------
+
+export async function findByMetadata(
+  key: string,
+  value: string,
+  status?: string,
+  limit = 50,
+  offset = 0,
+): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
+  const pool = getPool();
+  const filter = JSON.stringify({ [key]: value });
+  const [countResult, dataResult] = await Promise.all([
+    pool.query(COUNT_BY_METADATA, [filter, status || null]),
+    pool.query(FIND_BY_METADATA, [filter, status || null, limit, offset]),
+  ]);
+  return {
+    escalations: dataResult.rows,
+    total: parseInt(countResult.rows[0].count, 10),
+  };
+}
+
+export async function claimByMetadata(
+  key: string,
+  value: string,
+  userId: string,
+  durationMinutes = 30,
+): Promise<ClaimResult | null> {
+  const pool = getPool();
+  const filter = JSON.stringify({ [key]: value });
+  const { rows } = await pool.query(CLAIM_BY_METADATA, [filter, userId, durationMinutes]);
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    escalation: row,
+    isExtension: row.prev_assigned_to === userId,
+  };
 }

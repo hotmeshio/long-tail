@@ -56,3 +56,35 @@ export async function resolveEscalation(id: string, opts: { data?: string }): Pr
   });
   console.log(`\n  ${pc.green('✓')} Resolved ${pc.dim(id)}\n`);
 }
+
+// --- Metadata candidate key commands ----------------------------------------
+
+export async function findByMetadata(key: string, value: string, opts: ListOptions): Promise<void> {
+  const params = new URLSearchParams({ key, value });
+  if (opts.status) params.set('status', opts.status);
+  if (opts.limit) params.set('limit', opts.limit);
+  const data = await apiFetch<any>(`/escalations/by-metadata?${params}`);
+  output(data, data.escalations || [], COLUMNS, opts);
+}
+
+export async function claimByMetadata(key: string, value: string, opts: { duration?: string; assignee?: string }): Promise<void> {
+  const body: any = { key, value };
+  if (opts.duration) body.durationMinutes = parseInt(opts.duration, 10);
+  if (opts.assignee) body.assignee = opts.assignee;
+  const data = await apiFetch<any>('/escalations/claim-by-metadata', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  console.log(`\n  ${pc.green('✓')} Claimed ${pc.dim(data.escalation?.id || '')} by ${key}=${value}\n`);
+}
+
+export async function resolveByMetadata(key: string, value: string, opts: { data?: string; assignee?: string }): Promise<void> {
+  const resolverPayload = opts.data ? JSON.parse(opts.data) : {};
+  const body: any = { key, value, resolverPayload };
+  if (opts.assignee) body.assignee = opts.assignee;
+  await apiFetch('/escalations/resolve-by-metadata', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  console.log(`\n  ${pc.green('✓')} Resolved by ${key}=${value}\n`);
+}
