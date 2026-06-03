@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bell, User, Info } from 'lucide-react';
 import { StatusBadge } from '../../../components/common/display/StatusBadge';
 import { RolePill } from '../../../components/common/display/RolePill';
@@ -8,6 +9,38 @@ import { CopyableId } from '../../../components/common/display/CopyableId';
 import { UserName } from '../../../components/common/display/UserName';
 import { isAckEscalation } from '../../../lib/escalation';
 import type { LTEscalationRecord } from '../../../api/types';
+
+const VALUE_TRUNCATE = 48;
+
+function MetadataField({ label, value }: { label: string; value: unknown }) {
+  const [expanded, setExpanded] = useState(false);
+  const str = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+  const long = str.length > VALUE_TRUNCATE;
+
+  return (
+    <div className="text-left max-w-xs">
+      <span className="text-[9px] text-text-quaternary">{label}</span>
+      {long && !expanded ? (
+        <button
+          onClick={() => setExpanded(true)}
+          className="block text-[11px] font-mono text-text-secondary hover:text-accent transition-colors text-left"
+          title={str}
+        >
+          {str.slice(0, VALUE_TRUNCATE)}…
+        </button>
+      ) : long && expanded ? (
+        <button
+          onClick={() => setExpanded(false)}
+          className="block text-[11px] font-mono text-text-secondary break-all text-left"
+        >
+          {str}
+        </button>
+      ) : (
+        <p className="text-[11px] font-mono text-text-secondary">{str}</p>
+      )}
+    </div>
+  );
+}
 
 export function EscalationHero({
   esc,
@@ -118,6 +151,19 @@ export function EscalationHero({
               />
             )}
           </div>
+          {/* Metadata key-value pairs */}
+          {esc.metadata && Object.keys(esc.metadata).length > 0 && (
+            <div className="px-5 py-3 border-t border-surface-border/20">
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Metadata</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                {Object.entries(esc.metadata)
+                  .filter(([k]) => !k.startsWith('_'))
+                  .map(([key, value]) => (
+                    <MetadataField key={key} label={key} value={value} />
+                  ))}
+              </div>
+            </div>
+          )}
         </Collapsible>
       </div>
     );
