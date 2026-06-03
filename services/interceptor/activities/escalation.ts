@@ -1,5 +1,6 @@
 import * as escalationService from '../../escalation';
 import { loggerRegistry } from '../../../lib/logger';
+import { publishEscalationEvent } from '../../../lib/events/publish';
 
 /**
  * Resolve an escalation record. Called by the interceptor after
@@ -121,5 +122,17 @@ export async function ltCreateEscalation(input: {
     trace_id: input.traceId,
     span_id: input.spanId,
   });
+
+  publishEscalationEvent({
+    type: 'escalation.created',
+    source: 'interceptor',
+    workflowId: input.workflowId || '',
+    workflowName: input.workflowType || '',
+    taskQueue: input.taskQueue || '',
+    escalationId: escalation.id,
+    status: 'pending',
+    data: { type: input.type, role: input.role },
+  });
+
   return escalation.id;
 }
