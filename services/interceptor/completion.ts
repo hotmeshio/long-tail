@@ -1,7 +1,7 @@
 import type { LTReturn, LTMilestone } from '../../types';
 import type { InterceptorState } from './types';
 import { buildStoredEnvelope } from './state';
-import { publishEscalationEvent, publishMilestoneEvent, publishTaskEvent, publishWorkflowEvent } from '../../lib/events/publish';
+import { publishMilestoneEvent, publishTaskEvent, publishWorkflowEvent } from '../../lib/events/publish';
 
 /**
  * Handle a workflow that returned { type: 'return' }.
@@ -133,18 +133,7 @@ async function createAdvisoryEscalation(
     spanId: state.spanId,
   });
 
-  publishEscalationEvent({
-    type: 'escalation.created',
-    source: 'interceptor',
-    workflowId: state.workflowId,
-    workflowName: state.workflowName,
-    taskQueue: state.taskQueue,
-    taskId: state.taskId,
-    escalationId,
-    originId: state.envelope?.lt?.originId,
-    status: 'pending',
-    data: result.data,
-  });
+  // escalation.created event published by service layer (services/escalation/crud.ts)
 
   publishTaskEvent({
     type: 'task.escalated',

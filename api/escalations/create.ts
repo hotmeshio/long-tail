@@ -1,6 +1,5 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { publishEscalationEvent } from '../../lib/events/publish';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Create ────────────────────────────────────────────────────────────────
@@ -65,16 +64,7 @@ export async function createEscalation(
       escalation_payload: input.escalation_payload,
     });
 
-    publishEscalationEvent({
-      type: 'escalation.created',
-      source: 'api',
-      workflowId: '',
-      workflowName: '',
-      taskQueue: '',
-      escalationId: escalation.id,
-      status: 'pending',
-      data: { type: input.type, role },
-    });
+    // Event published by service layer (services/escalation/crud.ts)
 
     return { status: 201, data: escalation };
   } catch (err: any) {

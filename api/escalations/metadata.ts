@@ -1,6 +1,5 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { publishEscalationEvent } from '../../lib/events/publish';
 import { getVisibleRoles, resolveAssignee } from './helpers';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
@@ -53,7 +52,7 @@ export async function findByMetadata(
  * @returns `{ status: 200, data: { escalation, isExtension } }`
  */
 export async function claimByMetadata(
-  input: { key: string; value: string; durationMinutes?: number; assignee?: string },
+  input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any> },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -81,22 +80,13 @@ export async function claimByMetadata(
     }
 
     const result = await escalationService.claimByMetadata(
-      input.key, input.value, claimUserId, input.durationMinutes,
+      input.key, input.value, claimUserId, input.durationMinutes, input.metadata,
     );
     if (!result) {
       return { status: 409, error: 'Escalation not available for claim' };
     }
 
-    publishEscalationEvent({
-      type: 'escalation.claimed',
-      source: 'api',
-      workflowId: result.escalation.workflow_id || '',
-      workflowName: result.escalation.workflow_type || '',
-      taskQueue: result.escalation.task_queue || '',
-      escalationId: result.escalation.id,
-      status: 'claimed',
-      data: { assigned_to: claimUserId },
-    });
+    // Event published by service layer (services/escalation/crud.ts)
 
     return { status: 200, data: result };
   } catch (err: any) {
@@ -117,7 +107,7 @@ export async function claimByMetadata(
  * @returns result from the standard resolve endpoint
  */
 export async function resolveByMetadata(
-  input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string },
+  input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string; metadata?: Record<string, any> },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -144,6 +134,11 @@ export async function resolveByMetadata(
       if (!userHasRole) {
         return { status: 403, error: `User must have the "${escalation.role}" role` };
       }
+    }
+
+    // Merge additional metadata if provided
+    if (input.metadata && Object.keys(input.metadata).length > 0) {
+      await escalationService.updateEscalationMetadata(escalation.id, input.metadata);
     }
 
     // Auto-claim if unclaimed or expired

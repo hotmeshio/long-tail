@@ -43,16 +43,7 @@ export async function claimEscalation(
       return { status: 409, error: 'Escalation not available for claim' };
     }
 
-    publishEscalationEvent({
-      type: 'escalation.claimed',
-      source: 'api',
-      workflowId: escalation.workflow_id || '',
-      workflowName: escalation.workflow_type || '',
-      taskQueue: escalation.task_queue || '',
-      escalationId: id,
-      status: 'claimed',
-      data: { assigned_to: auth.userId },
-    });
+    // Event published by service layer (services/escalation/crud.ts)
 
     return { status: 200, data: result };
   } catch (err: any) {

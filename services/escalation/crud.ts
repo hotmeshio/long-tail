@@ -1,4 +1,5 @@
 import { getPool } from '../../lib/db';
+import { publishEscalationEvent } from '../../lib/events/publish';
 import type { LTEscalationRecord } from '../../types';
 
 import type { CreateEscalationInput, ClaimResult } from './types';
@@ -50,7 +51,20 @@ export async function createEscalation(
       input.span_id || null,
     ],
   );
-  return rows[0];
+  const escalation = rows[0];
+
+  publishEscalationEvent({
+    type: 'escalation.created',
+    source: 'service',
+    workflowId: escalation.workflow_id || '',
+    workflowName: escalation.workflow_type || '',
+    taskQueue: escalation.task_queue || '',
+    escalationId: escalation.id,
+    status: 'pending',
+    data: { type: input.type, role: input.role },
+  });
+
+  return escalation;
 }
 
 /**
@@ -78,8 +92,21 @@ export async function claimEscalation(
   if (rows.length === 0) return null;
 
   const row = rows[0];
+  const escalation = row as LTEscalationRecord;
+
+  publishEscalationEvent({
+    type: 'escalation.claimed',
+    source: 'service',
+    workflowId: escalation.workflow_id || '',
+    workflowName: escalation.workflow_type || '',
+    taskQueue: escalation.task_queue || '',
+    escalationId: escalation.id,
+    status: 'claimed',
+    data: { assigned_to: userId },
+  });
+
   return {
-    escalation: row as LTEscalationRecord,
+    escalation,
     isExtension: row.prev_assigned_to === userId,
   };
 }
@@ -93,7 +120,22 @@ export async function resolveEscalation(
     RESOLVE_ESCALATION,
     [id, JSON.stringify(resolverPayload)],
   );
-  return rows[0] || null;
+  const escalation = rows[0] || null;
+
+  if (escalation) {
+    publishEscalationEvent({
+      type: 'escalation.resolved',
+      source: 'service',
+      workflowId: escalation.workflow_id || '',
+      workflowName: escalation.workflow_type || '',
+      taskQueue: escalation.task_queue || '',
+      escalationId: escalation.id,
+      status: 'resolved',
+      data: {},
+    });
+  }
+
+  return escalation;
 }
 
 /**
@@ -258,14 +300,29 @@ export async function claimByMetadata(
   value: string,
   userId: string,
   durationMinutes = 30,
+  metadata?: Record<string, any>,
 ): Promise<ClaimResult | null> {
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
-  const { rows } = await pool.query(CLAIM_BY_METADATA, [filter, userId, durationMinutes]);
+  const metaPatch = metadata ? JSON.stringify(metadata) : null;
+  const { rows } = await pool.query(CLAIM_BY_METADATA, [filter, userId, durationMinutes, metaPatch]);
   if (rows.length === 0) return null;
   const row = rows[0];
+  const escalation = row as LTEscalationRecord;
+
+  publishEscalationEvent({
+    type: 'escalation.claimed',
+    source: 'service',
+    workflowId: escalation.workflow_id || '',
+    workflowName: escalation.workflow_type || '',
+    taskQueue: escalation.task_queue || '',
+    escalationId: escalation.id,
+    status: 'claimed',
+    data: { assigned_to: userId },
+  });
+
   return {
-    escalation: row,
+    escalation,
     isExtension: row.prev_assigned_to === userId,
   };
 }

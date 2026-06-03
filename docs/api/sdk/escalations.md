@@ -549,7 +549,7 @@ const result = await lt.escalations.claimByMetadata({
   key: 'orderId',
   value: 'order-123',
   durationMinutes: 30,
-  assignee: 'station-operator-42',  // optional external_id
+  metadata: { claimedBy: 'jimbo', station: 'scanning' },
 });
 ```
 
@@ -560,7 +560,8 @@ const result = await lt.escalations.claimByMetadata({
 | `key` | `string` | Yes | Metadata field name |
 | `value` | `string` | Yes | Metadata field value |
 | `durationMinutes` | `number` | No | Claim duration (default: 30) |
-| `assignee` | `string` | No | External user ID to claim as (resolved via `getUserByExternalId`) |
+| `assignee` | `string` | No | Claim as a Long Tail user (resolved via `getUserByExternalId`) |
+| `metadata` | `object` | No | Merge into escalation metadata (single atomic SQL call with the claim) |
 
 **Returns:** `LTApiResult<{ escalation, isExtension }>` -- 404 if no match, 409 if already claimed.
 
@@ -577,7 +578,7 @@ const result = await lt.escalations.resolveByMetadata({
   key: 'orderId',
   value: 'order-123',
   resolverPayload: { approved: true, targetStatus: 'completed' },
-  assignee: 'station-operator-42',
+  metadata: { completedBy: 'jimbo' },
 });
 ```
 
@@ -588,7 +589,8 @@ const result = await lt.escalations.resolveByMetadata({
 | `key` | `string` | Yes | Metadata field name |
 | `value` | `string` | Yes | Metadata field value |
 | `resolverPayload` | `object` | Yes | Resolution data passed to the workflow |
-| `assignee` | `string` | No | External user ID to resolve as |
+| `assignee` | `string` | No | Resolve as a Long Tail user (resolved via `getUserByExternalId`) |
+| `metadata` | `object` | No | Merge into escalation metadata before resolving |
 
 **Returns:** Same as `resolve` -- 404 if no match.
 

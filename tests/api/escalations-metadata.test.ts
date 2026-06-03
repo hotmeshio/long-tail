@@ -14,6 +14,7 @@ import { findByMetadata, claimByMetadata, resolveByMetadata } from '../../api/es
 const mockFindByMetadata = vi.mocked(escalationService.findByMetadata);
 const mockClaimByMetadata = vi.mocked(escalationService.claimByMetadata);
 const mockClaimEscalation = vi.mocked(escalationService.claimEscalation);
+const mockUpdateMetadata = vi.mocked(escalationService.updateEscalationMetadata);
 const mockIsSuperAdmin = vi.mocked(userService.isSuperAdmin);
 const mockHasRole = vi.mocked(userService.hasRole);
 const mockGetUserByExternalId = vi.mocked(userService.getUserByExternalId);
@@ -110,7 +111,7 @@ describe('claimByMetadata', () => {
     await claimByMetadata({ key: 'orderId', value: 'order-123', assignee: 'ext-42' }, SYSTEM_AUTH);
 
     expect(mockGetUserByExternalId).toHaveBeenCalledWith('ext-42');
-    expect(mockClaimByMetadata).toHaveBeenCalledWith('orderId', 'order-123', 'resolved-uuid', undefined);
+    expect(mockClaimByMetadata).toHaveBeenCalledWith('orderId', 'order-123', 'resolved-uuid', undefined, undefined);
   });
 
   it('returns 404 when assignee external_id not found', async () => {
@@ -154,6 +155,35 @@ describe('claimByMetadata', () => {
   it('returns 400 when key or value missing', async () => {
     const result = await claimByMetadata({ key: 'orderId', value: '' }, SYSTEM_AUTH);
     expect(result.status).toBe(400);
+  });
+
+  it('passes metadata to service claimByMetadata for atomic merge', async () => {
+    const esc = makeEscalation();
+    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false });
+
+    const result = await claimByMetadata({
+      key: 'orderId', value: 'order-123',
+      metadata: { claimedBy: 'jimbo', station: 'scanning' },
+    }, SYSTEM_AUTH);
+
+    expect(result.status).toBe(200);
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined,
+      { claimedBy: 'jimbo', station: 'scanning' },
+    );
+  });
+
+  it('passes undefined metadata when omitted', async () => {
+    const esc = makeEscalation();
+    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false });
+
+    await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
+
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined, undefined,
+    );
   });
 });
 
@@ -223,5 +253,23 @@ describe('resolveByMetadata', () => {
     }, SYSTEM_AUTH);
 
     expect(result.status).toBe(403);
+  });
+
+  it('merges metadata on resolve when provided', async () => {
+    const esc = makeEscalation({ assigned_to: 'system-uuid', assigned_until: new Date(Date.now() + 60000) });
+    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
+    mockUpdateMetadata.mockResolvedValue(esc as any);
+
+    vi.doMock('../../api/escalations/resolve', () => ({
+      resolveEscalation: vi.fn().mockResolvedValue({ status: 200, data: { resolved: true } }),
+    }));
+
+    await resolveByMetadata({
+      key: 'orderId', value: 'order-123',
+      resolverPayload: { approved: true },
+      metadata: { completedBy: 'jimbo' },
+    }, SYSTEM_AUTH);
+
+    expect(mockUpdateMetadata).toHaveBeenCalledWith('esc-uuid', { completedBy: 'jimbo' });
   });
 });

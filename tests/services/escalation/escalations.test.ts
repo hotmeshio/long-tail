@@ -265,4 +265,69 @@ describe('escalation service', () => {
       expect(result.escalations.every(e => e.role === 'engineer')).toBe(true);
     });
   });
+
+  // ── 5. Metadata candidate key operations ─────────────────────────────
+  //
+  // Verify that findByMetadata, claimByMetadata (with metadata merge),
+  // hit real SQL against Postgres.
+
+  describe('metadata candidate key', () => {
+    let metaEscId: string;
+
+    it('should create an escalation with metadata for lookup', async () => {
+      const esc = await escalationService.createEscalation({
+        type: 'order',
+        subtype: 'station',
+        role: 'reviewer',
+        envelope: '{}',
+        metadata: { orderId: 'meta-test-order-1', station: 'scanning' },
+      });
+      metaEscId = esc.id;
+      escalationIds.push(esc.id);
+      expect(esc.metadata).toEqual({ orderId: 'meta-test-order-1', station: 'scanning' });
+    });
+
+    it('should find escalation by metadata key', async () => {
+      const result = await escalationService.findByMetadata('orderId', 'meta-test-order-1');
+      expect(result.total).toBe(1);
+      expect(result.escalations[0].id).toBe(metaEscId);
+    });
+
+    it('should find nothing for non-matching metadata', async () => {
+      const result = await escalationService.findByMetadata('orderId', 'does-not-exist');
+      expect(result.total).toBe(0);
+    });
+
+    it('should claim by metadata and merge additional metadata in one SQL call', async () => {
+      const result = await escalationService.claimByMetadata(
+        'orderId', 'meta-test-order-1', userId, 30,
+        { claimedBy: 'jimbo', workstation: 'ws-7' },
+      );
+      expect(result).not.toBeNull();
+      expect(result!.escalation.assigned_to).toBe(userId);
+      expect(result!.escalation.metadata).toMatchObject({
+        orderId: 'meta-test-order-1',
+        station: 'scanning',
+        claimedBy: 'jimbo',
+        workstation: 'ws-7',
+      });
+      expect(result!.isExtension).toBe(false);
+    });
+
+    it('should preserve original metadata keys after merge', async () => {
+      const esc = await escalationService.getEscalation(metaEscId);
+      expect(esc!.metadata).toMatchObject({
+        orderId: 'meta-test-order-1',
+        station: 'scanning',
+        claimedBy: 'jimbo',
+      });
+    });
+
+    it('should return null when claiming non-matching metadata', async () => {
+      const result = await escalationService.claimByMetadata(
+        'orderId', 'nonexistent', userId, 30,
+      );
+      expect(result).toBeNull();
+    });
+  });
 });
