@@ -1,5 +1,5 @@
 import * as taskService from '../../task';
-import { publishMilestoneEvent, publishTaskEvent } from '../../../lib/events/publish';
+import { publishMilestoneEvent } from '../../../lib/events/publish';
 import { getPool } from '../../../lib/db';
 import { VERIFY_USER_BY_ID, GET_USER_BY_EXTERNAL_ID } from '../../user/sql';
 import type { LTMilestone, LTTaskRecord } from '../../../types';
@@ -60,16 +60,7 @@ export async function ltCreateTask(input: {
     status: input.status,
   });
 
-  publishTaskEvent({
-    type: 'task.created',
-    source: 'interceptor',
-    workflowId: input.workflowId,
-    workflowName: input.workflowType,
-    taskQueue: input.taskQueue || 'unknown',
-    taskId: task.id,
-    originId: input.originId,
-    status: input.status || 'pending',
-  });
+  // Event published by service layer (services/task/crud.ts)
 
   return task.id;
 }
@@ -99,19 +90,7 @@ export async function ltCompleteTask(input: {
     milestones: input.milestones,
   });
 
-  // Publish task.completed event
-  if (input.workflowId) {
-    publishTaskEvent({
-      type: 'task.completed',
-      source: 'orchestrator',
-      workflowId: input.workflowId,
-      workflowName: input.workflowName || 'unknown',
-      taskQueue: input.taskQueue || 'unknown',
-      taskId: input.taskId,
-      status: 'completed',
-      milestones: input.milestones,
-    });
-  }
+  // task.completed event published by service layer (services/task/crud.ts)
 
   // Publish milestone event from orchestrator context
   if (input.milestones?.length && input.workflowId) {

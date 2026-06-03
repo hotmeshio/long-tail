@@ -9,7 +9,7 @@
 import type { LTEnvelope } from '../../types';
 import type { ProxiedActivities } from './state';
 import type { WorkflowIdentity, TaskContext } from './types';
-import { publishWorkflowEvent, publishTaskEvent, publishEscalationEvent } from '../../lib/events/publish';
+import { publishWorkflowEvent } from '../../lib/events/publish';
 
 /** Result of re-run detection and escalation resolution. */
 interface ReRunContext {
@@ -74,17 +74,7 @@ export async function resolveReRun(
       resolverPayload: envelope!.resolver!,
     });
 
-    publishEscalationEvent({
-      type: 'escalation.resolved',
-      source: 'interceptor',
-      workflowId: wf.workflowId,
-      workflowName: wf.workflowName,
-      taskQueue,
-      taskId: task?.id || existingTask?.id,
-      escalationId: escalationId!,
-      originId: envelope?.lt?.originId,
-      status: 'resolved',
-    });
+    // escalation.resolved event published by service layer (services/escalation/crud.ts)
   }
 
   return { isReRun, task, metadata };
@@ -178,16 +168,7 @@ export function publishStartedEvents(
     status: 'running',
   });
 
-  publishTaskEvent({
-    type: 'task.started',
-    source: 'interceptor',
-    workflowId: wf.workflowId,
-    workflowName: wf.workflowName,
-    taskQueue,
-    taskId: taskId!,
-    originId,
-    status: 'in_progress',
-  });
+  // task.started event published by service layer (services/task/crud.ts)
 }
 
 /** Complete a task and signal parent for plain (non-LTReturn) results. */

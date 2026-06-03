@@ -1,4 +1,5 @@
 import { getPool } from '../../lib/db';
+import { publishTaskEvent } from '../../lib/events/publish';
 import type { LTTaskRecord, LTTaskStatus, LTMilestone } from '../../types';
 import type { CreateTaskInput, UpdateTaskInput } from './types';
 import {
@@ -33,7 +34,20 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
       input.status || null,
     ],
   );
-  return rows[0];
+  const task = rows[0];
+
+  publishTaskEvent({
+    type: 'task.created',
+    source: 'service',
+    workflowId: task.workflow_id || '',
+    workflowName: task.workflow_type || '',
+    taskQueue: task.task_queue || '',
+    taskId: task.id,
+    originId: task.origin_id || undefined,
+    status: task.status || 'pending',
+  });
+
+  return task;
 }
 
 export async function updateTask(
@@ -71,7 +85,31 @@ export async function updateTask(
     `UPDATE lt_tasks SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
     values,
   );
-  return rows[0];
+  const task = rows[0];
+
+  // Publish status-driven events from the single write path
+  if (input.status && task) {
+    const STATUS_EVENTS: Record<string, 'task.started' | 'task.completed' | 'task.escalated'> = {
+      in_progress: 'task.started',
+      completed: 'task.completed',
+      needs_intervention: 'task.escalated',
+    };
+    const eventType = STATUS_EVENTS[input.status];
+    if (eventType) {
+      publishTaskEvent({
+        type: eventType,
+        source: 'service',
+        workflowId: task.workflow_id || '',
+        workflowName: task.workflow_type || '',
+        taskQueue: task.task_queue || '',
+        taskId: task.id,
+        originId: task.origin_id || undefined,
+        status: input.status,
+      });
+    }
+  }
+
+  return task;
 }
 
 export async function appendMilestones(
