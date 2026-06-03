@@ -189,12 +189,24 @@ export function SubscriptionsStep({ form, set }: Props) {
               <div>
                 <label className={sectionCls}>But only if</label>
                 <input type="text" value={sub.filter} onChange={(e) => updateSub(selected, 'filter', e.target.value)} placeholder='{"extension": "png"}' className={`${inputCls} font-mono text-xs`} />
-                <p className={hintCls}>
-                  JSON filter against event.data. Operators: equality <code className="text-accent">{`{"key":"val"}`}</code>,
-                  negation <code className="text-accent">{`{"key":{"$ne":"val"}}`}</code>,
-                  in-list <code className="text-accent">{`{"key":{"$in":["a","b"]}}`}</code>,
-                  exists <code className="text-accent">{`{"key":{"$exists":true}}`}</code>
-                </p>
+                <p className={hintCls}>JSON filter against event.data. Click an operator to insert:</p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {[
+                    { label: 'equals', value: '{"key": "val"}' },
+                    { label: 'not equal', value: '{"key": {"$ne": "val"}}' },
+                    { label: 'in list', value: '{"key": {"$in": ["a", "b"]}}' },
+                    { label: 'exists', value: '{"key": {"$exists": true}}' },
+                  ].map((op) => (
+                    <button
+                      key={op.label}
+                      type="button"
+                      onClick={() => updateSub(selected, 'filter', op.value)}
+                      className="px-2 py-0.5 text-[10px] font-mono rounded bg-accent/8 text-accent hover:bg-accent/15 transition-colors"
+                    >
+                      {op.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -274,7 +286,15 @@ function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
   }, [value]);
 
   const updateField = (key: string, fieldValue: any) => {
-    const next = { ...parsed, [key]: fieldValue };
+    // If the value is a JSON array string, parse it so the output is a real array
+    let resolved = fieldValue;
+    if (typeof fieldValue === 'string') {
+      try {
+        const p = JSON.parse(fieldValue);
+        if (Array.isArray(p)) resolved = p;
+      } catch { /* keep as string */ }
+    }
+    const next = { ...parsed, [key]: resolved };
     onChange(JSON.stringify(next, null, 2));
   };
 
@@ -373,6 +393,51 @@ function MappingFieldInput({ value, onChange, suggestions, fieldType, placeholde
         className={`${jsonCls} text-xs`}
         placeholder={`{ "source": "{event.source}" }`}
       />
+    );
+  }
+
+  if (fieldType === 'array') {
+    // Parse existing value: could be a JSON array string or comma-separated
+    const items: string[] = (() => {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch { /* fall through */ }
+      return value ? value.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+    })();
+
+    return (
+      <div>
+        <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+          {items.map((item, i) => (
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono bg-accent/10 text-accent rounded-full">
+              {item}
+              <button
+                type="button"
+                onClick={() => { const next = items.filter((_, j) => j !== i); onChange(JSON.stringify(next)); }}
+                className="text-accent/50 hover:text-accent ml-0.5"
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+        <input
+          type="text"
+          className="input font-mono text-xs w-full"
+          placeholder="Type a value and press Enter"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+              e.preventDefault();
+              const v = (e.target as HTMLInputElement).value.trim();
+              if (v) {
+                onChange(JSON.stringify([...items, v]));
+                (e.target as HTMLInputElement).value = '';
+              }
+            }
+          }}
+        />
+      </div>
     );
   }
 
