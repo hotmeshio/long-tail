@@ -21,8 +21,6 @@ beforeEach(() => {
 afterEach(() => {
   eventRegistry.clear();
   delete process.env.NATS_TOKEN;
-  delete process.env.NATS_WS_URL;
-  delete process.env.VITE_NATS_WS_URL;
   delete process.env.EVENT_TRANSPORT;
 });
 
@@ -95,25 +93,14 @@ describe('getSettings — NATS credentials excluded', () => {
     expect(result.data.events).not.toHaveProperty('natsToken');
   });
 
-  it('includes natsWsUrl from NATS_WS_URL env when NATS is registered', async () => {
-    process.env.NATS_WS_URL = 'ws://nats.example.com:9222';
-    eventRegistry.register(new NatsEventAdapter({ url: 'nats://localhost:4222' }));
+  it('includes natsWsUrl from adapter when NATS is registered', async () => {
+    eventRegistry.register(new NatsEventAdapter({ url: 'nats://localhost:4222', wsUrl: 'ws://nats.example.com:9222' }));
 
     const result = await getSettings();
     expect(result.data.events.natsWsUrl).toBe('ws://nats.example.com:9222');
   });
 
-  it('prefers VITE_NATS_WS_URL over NATS_WS_URL', async () => {
-    process.env.VITE_NATS_WS_URL = 'ws://vite.example.com:9222';
-    process.env.NATS_WS_URL = 'ws://fallback.example.com:9222';
-    eventRegistry.register(new NatsEventAdapter({ url: 'nats://localhost:4222' }));
-
-    const result = await getSettings();
-    expect(result.data.events.natsWsUrl).toBe('ws://vite.example.com:9222');
-  });
-
   it('returns null natsWsUrl when NATS is not registered', async () => {
-    process.env.NATS_WS_URL = 'ws://nats.example.com:9222';
     eventRegistry.register(new SocketIOEventAdapter());
 
     const result = await getSettings();

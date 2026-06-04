@@ -2,6 +2,7 @@ import { telemetryRegistry } from '../lib/telemetry';
 import { eventRegistry } from '../lib/events';
 import { NatsEventAdapter } from '../lib/events/nats';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
+import { config } from '../modules/config';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 import { hasLLMApiKey } from '../services/llm';
 import type { LTApiResult } from '../types/sdk';
@@ -17,14 +18,14 @@ import type { LTApiResult } from '../types/sdk';
 export async function getSettings(): Promise<LTApiResult> {
   try {
     const hasSocketIO = !!eventRegistry.getAdapter(SocketIOEventAdapter);
-    const hasNats = !!eventRegistry.getAdapter(NatsEventAdapter);
+    const natsAdapter = eventRegistry.getAdapter(NatsEventAdapter);
 
     // Dashboard transport: Socket.IO is the default (works in-process, zero config).
     // NATS is only reported when explicitly opted in via EVENT_TRANSPORT=nats,
     // which a multi-container deployment sets when it wants the dashboard to
     // connect via NATS instead of Socket.IO.
-    const forceNats = process.env.EVENT_TRANSPORT === 'nats';
-    const transport = forceNats && hasNats ? 'nats' : hasSocketIO ? 'socketio' : hasNats ? 'nats' : 'none';
+    const forceNats = config.EVENT_TRANSPORT === 'nats';
+    const transport = forceNats && natsAdapter ? 'nats' : hasSocketIO ? 'socketio' : natsAdapter ? 'nats' : 'none';
 
     return {
       status: 200,
@@ -37,9 +38,7 @@ export async function getSettings(): Promise<LTApiResult> {
         },
         events: {
           transport,
-          natsWsUrl: hasNats
-            ? (process.env.VITE_NATS_WS_URL || process.env.NATS_WS_URL || null)
-            : null,
+          natsWsUrl: natsAdapter?.wsUrl ?? null,
         },
         ai: {
           enabled: hasLLMApiKey(),

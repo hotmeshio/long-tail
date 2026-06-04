@@ -26,8 +26,8 @@ services:
   long-tail:
     environment:
       - NATS_URL=nats://nats:4222
-      - NATS_TOKEN=dev_api_secret
       - NATS_WS_URL=ws://localhost:9222
+      - NATS_TOKEN=dev_api_secret
       - EVENT_TRANSPORT=nats
     depends_on:
       nats:

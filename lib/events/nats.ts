@@ -31,15 +31,27 @@ export class NatsEventAdapter implements LTEventAdapter {
   private nc: NatsConnection | null = null;
   private sub: Subscription | null = null;
   private url: string;
+  private _wsUrl: string | null;
   private subjectPrefix: string;
   private token?: string;
   private originId = randomUUID();
   private callbackAdapter: LTEventAdapter | null = null;
 
-  constructor(options?: { url?: string; subjectPrefix?: string; token?: string }) {
+  constructor(options?: { url?: string; wsUrl?: string; subjectPrefix?: string; token?: string }) {
     this.url = options?.url || config.NATS_URL;
+    this._wsUrl = options?.wsUrl || config.NATS_WS_URL || null;
     this.subjectPrefix = options?.subjectPrefix || 'lt.events';
-    this.token = options?.token || process.env.NATS_TOKEN || 'dev_api_secret';
+    this.token = options?.token || config.NATS_TOKEN || undefined;
+  }
+
+  /** Public NATS WebSocket URL for browser connections. */
+  get wsUrl(): string | null {
+    return this._wsUrl;
+  }
+
+  /** NATS auth token for browser connections. */
+  get authToken(): string | null {
+    return this.token || null;
   }
 
   /**

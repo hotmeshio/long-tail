@@ -3,10 +3,10 @@
 /**
  * NATS WebSocket connection configuration.
  *
- * Override via environment variables:
- * - VITE_NATS_WS_URL: WebSocket endpoint (default: ws://localhost:9222)
- * - VITE_NATS_TOKEN: Authentication token (default: dev_api_secret)
+ * The dashboard receives NATS connection details at runtime from the server
+ * via /api/settings and /api/nats-credentials. These build-time constants
+ * are only used as a last resort if the server doesn't provide values.
  */
-export const NATS_WS_URL = import.meta.env.VITE_NATS_WS_URL || 'ws://localhost:9222';
-export const NATS_TOKEN = import.meta.env.VITE_NATS_TOKEN || 'dev_api_secret';
+export const NATS_WS_URL: string | null = null;
+export const NATS_TOKEN: string | null = null;
 export const NATS_SUBJECT_PREFIX = 'lt.events';
