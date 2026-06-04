@@ -88,8 +88,8 @@ async function main() {
       strategy: 'mcp',
     },
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
-    events: process.env.NATS_URL
-      ? { nats: { url: config.NATS_URL, token: process.env.NATS_TOKEN || 'dev_api_secret' } }
+    events: config.EVENT_TRANSPORT === 'nats'
+      ? { nats: { url: config.NATS_URL, wsUrl: config.NATS_WS_URL || undefined, token: config.NATS_TOKEN || undefined } }
       : undefined,
   });
 }

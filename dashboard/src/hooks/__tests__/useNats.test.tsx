@@ -76,7 +76,7 @@ function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <NatsProvider>
+        <NatsProvider url="ws://test-nats:9222">
           {children}
         </NatsProvider>
       </QueryClientProvider>

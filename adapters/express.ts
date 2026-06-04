@@ -6,6 +6,8 @@ import type { Server as HttpServer } from 'http';
 import routes from '../routes';
 import { eventRegistry } from '../lib/events';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
+import { NatsEventAdapter } from '../lib/events/nats';
+import { attachNatsWsProxy } from '../lib/events/nats-ws-proxy';
 
 /**
  * Express adapter for mounting the Long Tail dashboard at an arbitrary subpath
@@ -75,6 +77,19 @@ export class LTExpressAdapter {
       }
       socketAdapter.attachServer(server);
       await socketAdapter.connect();
+    }
+
+    // Attach NATS WebSocket proxy (if configured)
+    const natsAdapter = eventRegistry.getAdapter(NatsEventAdapter);
+    if (natsAdapter?.wsProxyTarget) {
+      attachNatsWsProxy(server, natsAdapter.wsProxyTarget, {
+        basePath: this.basePath,
+        onWsUrlDerived: (url) => {
+          if (!natsAdapter.wsUrl) {
+            natsAdapter.setWsUrl(url);
+          }
+        },
+      });
     }
   }
 

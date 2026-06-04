@@ -11,13 +11,13 @@ const router = Router();
  * Mounted behind requireAuth — only authenticated users receive the token.
  */
 router.get('/', async (_req, res) => {
-  const hasNats = !!eventRegistry.getAdapter(NatsEventAdapter);
-  if (!hasNats) {
+  const natsAdapter = eventRegistry.getAdapter(NatsEventAdapter);
+  if (!natsAdapter) {
     return res.json({ natsWsUrl: null, natsToken: null });
   }
   res.json({
-    natsWsUrl: process.env.VITE_NATS_WS_URL || process.env.NATS_WS_URL || null,
-    natsToken: process.env.NATS_TOKEN || null,
+    natsWsUrl: natsAdapter.wsUrl,
+    natsToken: natsAdapter.authToken,
   });
 });
 

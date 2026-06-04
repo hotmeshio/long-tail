@@ -13,6 +13,8 @@ import { registerAdapters } from './adapters';
 import { buildConnection, collectWorkers, startWorkers } from './workers';
 import { startServer } from './server';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
+import { NatsEventAdapter } from '../lib/events/nats';
+import { attachNatsWsProxy } from '../lib/events/nats-ws-proxy';
 
 import type { LTStartConfig, LTInstance } from '../types/startup';
 
@@ -85,6 +87,19 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     if (socketAdapter && httpServer) {
       socketAdapter.attachServer(httpServer);
       await socketAdapter.connect();
+    }
+
+    // Attach NATS WebSocket proxy (if configured)
+    const natsAdapter = eventRegistry.getAdapter(NatsEventAdapter);
+    if (natsAdapter?.wsProxyTarget && httpServer) {
+      attachNatsWsProxy(httpServer, natsAdapter.wsProxyTarget, {
+        onWsUrlDerived: (url) => {
+          // Auto-set wsUrl if not explicitly configured
+          if (!natsAdapter.wsUrl) {
+            natsAdapter.setWsUrl(url);
+          }
+        },
+      });
     }
   }
 

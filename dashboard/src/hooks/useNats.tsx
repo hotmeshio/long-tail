@@ -139,9 +139,15 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
     try {
       if (ncRef.current) return;
 
+      const resolvedUrl = url || NATS_WS_URL;
+      if (!resolvedUrl) {
+        console.error('[lt-nats] no NATS WebSocket URL configured — set NATS_WS_URL on the server');
+        return;
+      }
+
       const nc = await connect({
-        servers: url || NATS_WS_URL,
-        token: token || NATS_TOKEN,
+        servers: resolvedUrl,
+        token: token || NATS_TOKEN || undefined,
         reconnect: true,
         maxReconnectAttempts: -1,
         reconnectTimeWait: 2000,
