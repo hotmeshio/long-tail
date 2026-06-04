@@ -1,7 +1,7 @@
 import type { LTEscalation } from '../../types';
 import type { InterceptorState } from './types';
 import { buildStoredEnvelope } from './state';
-import { publishEscalationEvent, publishTaskEvent, publishWorkflowEvent } from '../../lib/events/publish';
+import { publishWorkflowEvent } from '../../lib/events/publish';
 import { MissingCredentialError } from '../iam/credentials';
 
 /**
@@ -47,29 +47,9 @@ export async function handleEscalation(
     spanId: state.spanId,
   });
 
-  publishEscalationEvent({
-    type: 'escalation.created',
-    source: 'interceptor',
-    workflowId: state.workflowId,
-    workflowName: state.workflowName,
-    taskQueue: state.taskQueue,
-    taskId: state.taskId,
-    escalationId,
-    originId: state.envelope?.lt?.originId,
-    status: 'pending',
-    data: result.data,
-  });
+  // escalation.created event published by service layer (services/escalation/crud.ts)
 
-  publishTaskEvent({
-    type: 'task.escalated',
-    source: 'interceptor',
-    workflowId: state.workflowId,
-    workflowName: state.workflowName,
-    taskQueue: state.taskQueue,
-    taskId: state.taskId!,
-    originId: state.envelope?.lt?.originId,
-    status: 'needs_intervention',
-  });
+  // task.escalated event published by service layer (services/task/crud.ts)
 
   return result;
 }
@@ -127,30 +107,11 @@ export async function handleErrorEscalation(
     spanId: state.spanId,
   });
 
-  publishEscalationEvent({
-    type: 'escalation.created',
-    source: 'interceptor',
-    workflowId: state.workflowId,
-    workflowName: state.workflowName,
-    taskQueue: state.taskQueue,
-    taskId: state.taskId,
-    escalationId: errorEscalationId,
-    originId: state.envelope?.lt?.originId,
-    status: 'pending',
-    data: { error: err.message },
-  });
+  // escalation.created event published by service layer (services/escalation/crud.ts)
 
-  publishTaskEvent({
-    type: 'task.escalated',
-    source: 'interceptor',
-    workflowId: state.workflowId,
-    workflowName: state.workflowName,
-    taskQueue: state.taskQueue,
-    taskId: state.taskId!,
-    originId: state.envelope?.lt?.originId,
-    status: 'needs_intervention',
-  });
+  // task.escalated event published by service layer (services/task/crud.ts)
 
+  // Publish workflow.failed event (error path only runs once — no replay guard needed)
   publishWorkflowEvent({
     type: 'workflow.failed',
     source: 'interceptor',

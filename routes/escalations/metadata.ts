@@ -26,7 +26,7 @@ export function registerMetadataRoutes(router: Router): void {
   /**
    * POST /api/escalations/claim-by-metadata
    * Find and claim an escalation by metadata key-value pair.
-   * Body: { key, value, durationMinutes?, assignee? }
+   * Body: { key, value, durationMinutes?, assignee?, metadata? }
    */
   router.post('/claim-by-metadata', async (req, res) => {
     const result = await api.claimByMetadata({
@@ -34,6 +34,7 @@ export function registerMetadataRoutes(router: Router): void {
       value: req.body?.value,
       durationMinutes: req.body?.durationMinutes,
       assignee: req.body?.assignee,
+      metadata: req.body?.metadata,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
@@ -41,7 +42,7 @@ export function registerMetadataRoutes(router: Router): void {
   /**
    * POST /api/escalations/resolve-by-metadata
    * Find and resolve an escalation by metadata key-value pair.
-   * Body: { key, value, resolverPayload, assignee? }
+   * Body: { key, value, resolverPayload, assignee?, metadata? }
    */
   router.post('/resolve-by-metadata', async (req, res) => {
     const result = await api.resolveByMetadata({
@@ -49,6 +50,7 @@ export function registerMetadataRoutes(router: Router): void {
       value: req.body?.value,
       resolverPayload: req.body?.resolverPayload,
       assignee: req.body?.assignee,
+      metadata: req.body?.metadata,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });

@@ -1,6 +1,5 @@
 import * as escalationService from '../../services/escalation';
 import * as taskService from '../../services/task';
-import { publishEscalationEvent } from '../../lib/events/publish';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
@@ -88,7 +87,7 @@ async function resolveViaConditionSignal(
   );
   await handle.signal(signalId, { ...resolverPayload, $escalation_id: escalation.id });
 
-  publishResolvedEvent(escalation);
+  // Event published by service layer (services/escalation/crud.ts)
   return signaledResult(escalation, escalation.workflow_id);
 }
 
@@ -120,12 +119,7 @@ async function resolveViaSignalRouting(
     await escalationService.resolveEscalation(escalation.id, resolverPayload);
   }
 
-  publishResolvedEvent(escalation, {
-    workflowId: escalation.workflow_id || signalRouting.workflowId,
-    workflowName: escalation.workflow_type || signalRouting.workflowType,
-    taskQueue: escalation.task_queue || signalRouting.taskQueue || signalRouting.appId,
-    status: signalRouting.engine === 'yaml' ? 'signaled' : 'resolved',
-  });
+  // Event published by service layer (services/escalation/crud.ts)
   return signaledResult(escalation, signalRouting.workflowId || signalRouting.appId);
 }
 
@@ -165,7 +159,7 @@ async function resolveViaTriage(
     _lt: { ...resolverPayload._lt, triaged: true, triageWorkflowId },
   });
 
-  publishResolvedEvent(escalation);
+  // Event published by service layer (services/escalation/crud.ts)
   return {
     status: 200,
     data: { started: true, escalationId: escalation.id, workflowId: triageWorkflowId, triage: true },
@@ -192,7 +186,7 @@ async function resolveViaRerun(
     expire: 180,
   });
 
-  publishResolvedEvent(escalation);
+  // Event published by service layer (services/escalation/crud.ts)
   return {
     status: 200,
     data: { started: true, escalationId: escalation.id, workflowId: newWorkflowId },
@@ -200,23 +194,6 @@ async function resolveViaRerun(
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────
-
-function publishResolvedEvent(
-  escalation: any,
-  overrides?: { workflowId?: string; workflowName?: string; taskQueue?: string; status?: string },
-): void {
-  publishEscalationEvent({
-    type: 'escalation.resolved',
-    source: 'api',
-    workflowId: overrides?.workflowId || escalation.workflow_id || '',
-    workflowName: overrides?.workflowName || escalation.workflow_type || '',
-    taskQueue: overrides?.taskQueue || escalation.task_queue || '',
-    taskId: escalation.task_id!,
-    escalationId: escalation.id,
-    originId: escalation.origin_id ?? undefined,
-    status: overrides?.status || 'resolved',
-  });
-}
 
 function signaledResult(escalation: any, workflowId: string): LTApiResult {
   return {

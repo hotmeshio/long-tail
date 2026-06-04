@@ -6,10 +6,12 @@
  * of the workflow lifecycle.
  */
 
+import { Durable } from '@hotmeshio/hotmesh';
+
 import type { LTEnvelope } from '../../types';
 import type { ProxiedActivities } from './state';
 import type { WorkflowIdentity, TaskContext } from './types';
-import { publishWorkflowEvent, publishTaskEvent, publishEscalationEvent } from '../../lib/events/publish';
+import { publishWorkflowEvent } from '../../lib/events/publish';
 
 /** Result of re-run detection and escalation resolution. */
 interface ReRunContext {
@@ -74,17 +76,7 @@ export async function resolveReRun(
       resolverPayload: envelope!.resolver!,
     });
 
-    publishEscalationEvent({
-      type: 'escalation.resolved',
-      source: 'interceptor',
-      workflowId: wf.workflowId,
-      workflowName: wf.workflowName,
-      taskQueue,
-      taskId: task?.id || existingTask?.id,
-      escalationId: escalationId!,
-      originId: envelope?.lt?.originId,
-      status: 'resolved',
-    });
+    // escalation.resolved event published by service layer (services/escalation/crud.ts)
   }
 
   return { isReRun, task, metadata };
@@ -160,34 +152,30 @@ export async function ensureTaskWithRouting(
   return { taskId, routing, originId };
 }
 
-/** Publish workflow.started + task.started events. */
+/** Publish workflow.started event (guarded against replay). */
 export function publishStartedEvents(
   wf: WorkflowIdentity,
   taskQueue: string,
   taskId: string | undefined,
   originId: string,
 ): void {
-  publishWorkflowEvent({
-    type: 'workflow.started',
-    source: 'interceptor',
-    workflowId: wf.workflowId,
-    workflowName: wf.workflowName,
-    taskQueue,
-    taskId,
-    originId,
-    status: 'running',
-  });
+  const { replay } = Durable.workflow.workflowInfo();
+  const isFirstExecution = Object.keys(replay).length === 0;
 
-  publishTaskEvent({
-    type: 'task.started',
-    source: 'interceptor',
-    workflowId: wf.workflowId,
-    workflowName: wf.workflowName,
-    taskQueue,
-    taskId: taskId!,
-    originId,
-    status: 'in_progress',
-  });
+  if (isFirstExecution) {
+    publishWorkflowEvent({
+      type: 'workflow.started',
+      source: 'interceptor',
+      workflowId: wf.workflowId,
+      workflowName: wf.workflowName,
+      taskQueue,
+      taskId,
+      originId,
+      status: 'running',
+    });
+  }
+
+  // task.started event published by service layer (services/task/crud.ts)
 }
 
 /** Complete a task and signal parent for plain (non-LTReturn) results. */

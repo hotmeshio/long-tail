@@ -719,7 +719,7 @@ Finds one available (pending + unassigned/expired) escalation matching the metad
   "key": "orderId",
   "value": "order-123",
   "durationMinutes": 30,
-  "assignee": "station-operator-42"
+  "metadata": { "claimedBy": "jimbo", "station": "scanning" }
 }
 ```
 
@@ -728,7 +728,8 @@ Finds one available (pending + unassigned/expired) escalation matching the metad
 | `key` | `string` | **Required.** Metadata field name |
 | `value` | `string` | **Required.** Metadata field value |
 | `durationMinutes` | `number` | Claim duration (default 30) |
-| `assignee` | `string` | External user ID to claim as (resolved via `getUserByExternalId`) |
+| `assignee` | `string` | Claim as a Long Tail user (resolved via `getUserByExternalId`) |
+| `metadata` | `object` | Additional metadata to merge (new keys added, existing overwritten) |
 
 **Response 200:**
 
@@ -756,7 +757,7 @@ Finds the pending escalation, auto-claims if unclaimed, then resolves it. Suppor
   "key": "orderId",
   "value": "order-123",
   "resolverPayload": { "approved": true, "targetStatus": "completed" },
-  "assignee": "station-operator-42"
+  "metadata": { "completedBy": "jimbo" }
 }
 ```
 
@@ -765,6 +766,7 @@ Finds the pending escalation, auto-claims if unclaimed, then resolves it. Suppor
 | `key` | `string` | **Required.** Metadata field name |
 | `value` | `string` | **Required.** Metadata field value |
 | `resolverPayload` | `object` | **Required.** Resolution data passed to the workflow |
-| `assignee` | `string` | External user ID to resolve as |
+| `assignee` | `string` | Resolve as a Long Tail user (resolved via `getUserByExternalId`) |
+| `metadata` | `object` | Additional metadata to merge (new keys added, existing overwritten) |
 
 **Response 200:** Same as standard resolve endpoint.

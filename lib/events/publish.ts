@@ -1,11 +1,13 @@
 import type { LTEvent, LTEventType, LTMilestone } from '../../types';
 import { eventRegistry } from './index';
+import { loggerRegistry } from '../logger';
 
 /**
  * Fire-and-forget publish helper. Swallows errors (best-effort).
  */
 function fireAndForget(event: LTEvent): Promise<void> {
   if (!eventRegistry.hasAdapters) return Promise.resolve();
+  loggerRegistry.info(`[lt-pub] ${event.type} ${event.workflowId || ''} ${(event as any).escalationId || (event as any).taskId || ''}`);
   return eventRegistry.publish(event).catch(() => {});
 }
 

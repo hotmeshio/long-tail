@@ -15,6 +15,7 @@ import {
   completePlainResult,
 } from './lifecycle';
 import { runWithToolContext } from '../iam/context';
+import { publishWorkflowEvent } from '../../lib/events/publish';
 import { buildToolContextFromEnvelope } from '../iam/envelope';
 
 import type { LTReturn, LTEscalation } from '../../types';
@@ -110,7 +111,19 @@ export function createLTInterceptor(options: {
         const toolCtx = buildToolContextFromEnvelope(
           envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
         );
-        return toolCtx ? runWithToolContext(toolCtx, next) : next();
+        // Publish workflow events even for uncertified workflows
+        const taskQueue = deriveTaskQueue(wf);
+        publishStartedEvents(wf, taskQueue, undefined, wf.workflowId);
+        const result = toolCtx ? await runWithToolContext(toolCtx, next) : await next();
+        publishWorkflowEvent({
+          type: 'workflow.completed',
+          source: 'interceptor',
+          workflowId: wf.workflowId,
+          workflowName: wf.workflowName,
+          taskQueue,
+          status: 'completed',
+        });
+        return result;
       }
 
       // 3. Load config — unregistered/uncertified workflows get ToolContext only
@@ -119,7 +132,18 @@ export function createLTInterceptor(options: {
         const toolCtx = buildToolContextFromEnvelope(
           envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
         );
-        return toolCtx ? runWithToolContext(toolCtx, next) : next();
+        const taskQueue2 = deriveTaskQueue(wf);
+        publishStartedEvents(wf, taskQueue2, undefined, wf.workflowId);
+        const result2 = toolCtx ? await runWithToolContext(toolCtx, next) : await next();
+        publishWorkflowEvent({
+          type: 'workflow.completed',
+          source: 'interceptor',
+          workflowId: wf.workflowId,
+          workflowName: wf.workflowName,
+          taskQueue: taskQueue2,
+          status: 'completed',
+        });
+        return result2;
       }
 
       const taskQueue = deriveTaskQueue(wf);

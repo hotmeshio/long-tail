@@ -177,7 +177,7 @@ SELECT COUNT(*) FROM lt_escalations
 WHERE metadata @> $1::jsonb
   AND ($2::text IS NULL OR status = $2)`;
 
-/** Atomic claim by metadata: find one available escalation and claim it. */
+/** Atomic claim by metadata: find one available escalation, claim it, and optionally merge metadata. */
 export const CLAIM_BY_METADATA = `\
 WITH target AS (
   SELECT id, assigned_to
@@ -197,7 +197,10 @@ updated AS (
   UPDATE lt_escalations e
   SET assigned_to = $2,
       claimed_at = NOW(),
-      assigned_until = NOW() + INTERVAL '1 minute' * $3
+      assigned_until = NOW() + INTERVAL '1 minute' * $3,
+      metadata = CASE WHEN $4::jsonb IS NOT NULL
+        THEN COALESCE(e.metadata, '{}'::jsonb) || $4::jsonb
+        ELSE e.metadata END
   FROM target t
   WHERE e.id = t.id
   RETURNING e.*, t.assigned_to AS prev_assigned_to

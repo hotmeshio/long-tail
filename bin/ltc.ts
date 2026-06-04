@@ -129,12 +129,14 @@ escCmd.command('claim-by-meta <key> <value>')
   .description('Claim an escalation by metadata key-value pair')
   .option('--duration <minutes>', 'Claim duration in minutes')
   .option('--assignee <external_id>', 'Claim on behalf of user (external_id)')
+  .option('--meta <json>', 'Merge metadata (JSON object, e.g. \'{"claimedBy":"jimbo"}\')')
   .action(wrap(esc.claimByMetadata));
 
 escCmd.command('resolve-by-meta <key> <value>')
   .description('Resolve an escalation by metadata key-value pair')
   .option('--data <json>', 'Resolver payload (JSON string)')
   .option('--assignee <external_id>', 'Resolve on behalf of user (external_id)')
+  .option('--meta <json>', 'Merge metadata (JSON object)')
   .action(wrap(esc.resolveByMetadata));
 
 // ── Workflows ────────────────────────────────────────────────────────────

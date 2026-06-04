@@ -67,10 +67,11 @@ export async function findByMetadata(key: string, value: string, opts: ListOptio
   output(data, data.escalations || [], COLUMNS, opts);
 }
 
-export async function claimByMetadata(key: string, value: string, opts: { duration?: string; assignee?: string }): Promise<void> {
+export async function claimByMetadata(key: string, value: string, opts: { duration?: string; assignee?: string; meta?: string }): Promise<void> {
   const body: any = { key, value };
   if (opts.duration) body.durationMinutes = parseInt(opts.duration, 10);
   if (opts.assignee) body.assignee = opts.assignee;
+  if (opts.meta) body.metadata = JSON.parse(opts.meta);
   const data = await apiFetch<any>('/escalations/claim-by-metadata', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -78,10 +79,11 @@ export async function claimByMetadata(key: string, value: string, opts: { durati
   console.log(`\n  ${pc.green('✓')} Claimed ${pc.dim(data.escalation?.id || '')} by ${key}=${value}\n`);
 }
 
-export async function resolveByMetadata(key: string, value: string, opts: { data?: string; assignee?: string }): Promise<void> {
+export async function resolveByMetadata(key: string, value: string, opts: { data?: string; assignee?: string; meta?: string }): Promise<void> {
   const resolverPayload = opts.data ? JSON.parse(opts.data) : {};
   const body: any = { key, value, resolverPayload };
   if (opts.assignee) body.assignee = opts.assignee;
+  if (opts.meta) body.metadata = JSON.parse(opts.meta);
   await apiFetch('/escalations/resolve-by-metadata', {
     method: 'POST',
     body: JSON.stringify(body),
