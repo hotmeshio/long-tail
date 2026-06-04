@@ -106,6 +106,37 @@ describe('getSettings — NATS credentials excluded', () => {
     const result = await getSettings();
     expect(result.data.events.natsWsUrl).toBeNull();
   });
+
+  it('derives natsWsUrl from request headers when wsProxy is set but wsUrl is null', async () => {
+    eventRegistry.register(new NatsEventAdapter({ url: 'nats://localhost:4222', wsProxy: 'ws://nats:9222' }));
+
+    const mockReq = {
+      headers: {
+        'x-forwarded-proto': 'https',
+        'x-forwarded-host': 'api.example.com',
+        host: 'localhost:3000',
+      },
+    };
+
+    const result = await getSettings(mockReq as any);
+    expect(result.data.events.natsWsUrl).toBe('wss://api.example.com/nats-ws');
+  });
+
+  it('caches derived wsUrl on the adapter for subsequent requests', async () => {
+    const adapter = new NatsEventAdapter({ url: 'nats://localhost:4222', wsProxy: 'ws://nats:9222' });
+    eventRegistry.register(adapter);
+
+    const mockReq = {
+      headers: { host: 'localhost:3000' },
+    };
+
+    await getSettings(mockReq as any);
+    expect(adapter.wsUrl).toBe('ws://localhost:3000/nats-ws');
+
+    // Second call without req still returns the cached value
+    const result = await getSettings();
+    expect(result.data.events.natsWsUrl).toBe('ws://localhost:3000/nats-ws');
+  });
 });
 
 describe('getSettings — AI availability', () => {

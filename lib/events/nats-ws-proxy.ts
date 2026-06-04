@@ -8,6 +8,22 @@ import { loggerRegistry } from '../logger';
 export const NATS_WS_PROXY_PATH = '/nats-ws';
 
 /**
+ * Derive the public NATS WebSocket URL from an HTTP request's headers.
+ *
+ * Respects `X-Forwarded-Proto` and `X-Forwarded-Host` so the correct
+ * `wss://` scheme is used behind TLS-terminating load balancers.
+ */
+export function deriveWsUrlFromRequest(
+  req: { headers: Record<string, string | string[] | undefined> },
+  basePath = '',
+): string {
+  const proto = (req.headers['x-forwarded-proto'] as string) || 'ws';
+  const scheme = proto === 'https' ? 'wss' : 'ws';
+  const host = (req.headers['x-forwarded-host'] as string) || (req.headers.host as string) || 'localhost';
+  return `${scheme}://${host}${basePath}${NATS_WS_PROXY_PATH}`;
+}
+
+/**
  * Attach a WebSocket proxy to an HTTP server that bridges browser
  * connections to an internal NATS WebSocket endpoint.
  *
@@ -37,10 +53,7 @@ export function attachNatsWsProxy(
 
     // Derive the public wsUrl from the first request's headers
     if (!derived && options.onWsUrlDerived) {
-      const proto = (req.headers['x-forwarded-proto'] as string) || 'ws';
-      const scheme = proto === 'https' ? 'wss' : 'ws';
-      const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'localhost';
-      options.onWsUrlDerived(`${scheme}://${host}${proxyPath}`);
+      options.onWsUrlDerived(deriveWsUrlFromRequest(req, basePath));
       derived = true;
     }
 
