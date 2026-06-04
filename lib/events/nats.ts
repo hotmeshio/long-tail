@@ -32,21 +32,37 @@ export class NatsEventAdapter implements LTEventAdapter {
   private sub: Subscription | null = null;
   private url: string;
   private _wsUrl: string | null;
+  private _wsProxyTarget: string | null;
   private subjectPrefix: string;
   private token?: string;
   private originId = randomUUID();
   private callbackAdapter: LTEventAdapter | null = null;
 
-  constructor(options?: { url?: string; wsUrl?: string; subjectPrefix?: string; token?: string }) {
+  constructor(options?: { url?: string; wsUrl?: string; wsProxy?: string; subjectPrefix?: string; token?: string }) {
     this.url = options?.url || config.NATS_URL;
     this._wsUrl = options?.wsUrl || config.NATS_WS_URL || null;
+    this._wsProxyTarget = options?.wsProxy || null;
     this.subjectPrefix = options?.subjectPrefix || 'lt.events';
     this.token = options?.token || config.NATS_TOKEN || undefined;
   }
 
-  /** Public NATS WebSocket URL for browser connections. */
+  /**
+   * Public NATS WebSocket URL for browser connections.
+   * When a wsProxy is configured, this can be set dynamically
+   * via `setWsUrl()` once the server's public address is known.
+   */
   get wsUrl(): string | null {
     return this._wsUrl;
+  }
+
+  /** Set the browser-facing WebSocket URL (called by proxy setup). */
+  setWsUrl(url: string): void {
+    this._wsUrl = url;
+  }
+
+  /** Internal NATS WS target for the proxy to bridge to (e.g. ws://nats:9222). */
+  get wsProxyTarget(): string | null {
+    return this._wsProxyTarget;
   }
 
   /** NATS auth token for browser connections. */

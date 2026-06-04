@@ -204,7 +204,14 @@ export interface LTStartConfig {
 
   /** Milestone event publishing. */
   events?: {
-    nats?: { url?: string; wsUrl?: string; subjectPrefix?: string; token?: string };
+    nats?: {
+      url?: string;
+      wsUrl?: string;
+      /** Internal NATS WebSocket target to proxy through this server (e.g. ws://nats:9222). Enables the /nats-ws proxy route. */
+      wsProxy?: string;
+      subjectPrefix?: string;
+      token?: string;
+    };
     adapters?: LTEventAdapter[];
   };
 
