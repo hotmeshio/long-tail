@@ -1,5 +1,6 @@
 import { getPool } from '../../lib/db';
 import { publishEscalationEvent } from '../../lib/events/publish';
+import { loggerRegistry } from '../../lib/logger';
 import type { LTEscalationRecord } from '../../types';
 
 import type { CreateEscalationInput, ClaimResult } from './types';
@@ -27,6 +28,7 @@ import {
 export async function createEscalation(
   input: CreateEscalationInput,
 ): Promise<LTEscalationRecord> {
+  loggerRegistry.info(`[escalation-crud] createEscalation called for wf=${input.workflow_id} type=${input.type} caller=${new Error().stack?.split('\n')[2]?.trim()}`);
   const pool = getPool();
   // Ensure the role exists in lt_roles (FK constraint)
   await pool.query(ENSURE_ROLE_EXISTS, [input.role]);

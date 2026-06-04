@@ -6,6 +6,8 @@
  * of the workflow lifecycle.
  */
 
+import { Durable } from '@hotmeshio/hotmesh';
+
 import type { LTEnvelope } from '../../types';
 import type { ProxiedActivities } from './state';
 import type { WorkflowIdentity, TaskContext } from './types';
@@ -150,23 +152,28 @@ export async function ensureTaskWithRouting(
   return { taskId, routing, originId };
 }
 
-/** Publish workflow.started + task.started events. */
+/** Publish workflow.started event (guarded against replay). */
 export function publishStartedEvents(
   wf: WorkflowIdentity,
   taskQueue: string,
   taskId: string | undefined,
   originId: string,
 ): void {
-  publishWorkflowEvent({
-    type: 'workflow.started',
-    source: 'interceptor',
-    workflowId: wf.workflowId,
-    workflowName: wf.workflowName,
-    taskQueue,
-    taskId,
-    originId,
-    status: 'running',
-  });
+  const { replay } = Durable.workflow.workflowInfo();
+  const isFirstExecution = Object.keys(replay).length === 0;
+
+  if (isFirstExecution) {
+    publishWorkflowEvent({
+      type: 'workflow.started',
+      source: 'interceptor',
+      workflowId: wf.workflowId,
+      workflowName: wf.workflowName,
+      taskQueue,
+      taskId,
+      originId,
+      status: 'running',
+    });
+  }
 
   // task.started event published by service layer (services/task/crud.ts)
 }

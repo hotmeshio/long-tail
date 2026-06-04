@@ -111,6 +111,7 @@ export async function handleErrorEscalation(
 
   // task.escalated event published by service layer (services/task/crud.ts)
 
+  // Publish workflow.failed event (error path only runs once — no replay guard needed)
   publishWorkflowEvent({
     type: 'workflow.failed',
     source: 'interceptor',
