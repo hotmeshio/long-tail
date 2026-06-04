@@ -56,20 +56,20 @@ export function attachNatsWsProxy(
         });
       });
 
-      const close = (code?: number) => {
-        if (clientWs.readyState === WebSocket.OPEN) clientWs.close(code);
-        if (upstream.readyState === WebSocket.OPEN) upstream.close(code);
+      const close = () => {
+        if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
+        if (upstream.readyState === WebSocket.OPEN) upstream.close();
       };
 
-      clientWs.on('close', () => close());
-      upstream.on('close', (code) => close(code));
+      clientWs.on('close', close);
+      upstream.on('close', close);
       upstream.on('error', (err) => {
         loggerRegistry.error(`[lt-nats-ws-proxy] upstream error: ${err.message}`);
-        close(1011);
+        close();
       });
       clientWs.on('error', (err) => {
         loggerRegistry.error(`[lt-nats-ws-proxy] client error: ${err.message}`);
-        close(1011);
+        close();
       });
     });
   });
