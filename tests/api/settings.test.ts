@@ -137,6 +137,22 @@ describe('getSettings — NATS credentials excluded', () => {
     const result = await getSettings();
     expect(result.data.events.natsWsUrl).toBe('ws://localhost:3000/nats-ws');
   });
+
+  it('includes basePath in derived wsUrl when proxy has a basePath', async () => {
+    const adapter = new NatsEventAdapter({ url: 'nats://localhost:4222', wsProxy: 'ws://nats:9222' });
+    adapter.setWsProxyBasePath('/longtail');
+    eventRegistry.register(adapter);
+
+    const mockReq = {
+      headers: {
+        'x-forwarded-proto': 'https',
+        'x-forwarded-host': 'api.example.com',
+      },
+    };
+
+    const result = await getSettings(mockReq as any);
+    expect(result.data.events.natsWsUrl).toBe('wss://api.example.com/longtail/nats-ws');
+  });
 });
 
 describe('getSettings — AI availability', () => {

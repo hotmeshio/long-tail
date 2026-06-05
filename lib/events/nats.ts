@@ -33,6 +33,7 @@ export class NatsEventAdapter implements LTEventAdapter {
   private url: string;
   private _wsUrl: string | null;
   private _wsProxyTarget: string | null;
+  private _wsProxyBasePath = '';
   private subjectPrefix: string;
   private token?: string;
   private originId = randomUUID();
@@ -63,6 +64,16 @@ export class NatsEventAdapter implements LTEventAdapter {
   /** Internal NATS WS target for the proxy to bridge to (e.g. ws://nats:9222). */
   get wsProxyTarget(): string | null {
     return this._wsProxyTarget;
+  }
+
+  /** BasePath the proxy is mounted at (e.g. /longtail). Set by LTExpressAdapter. */
+  get wsProxyBasePath(): string {
+    return this._wsProxyBasePath;
+  }
+
+  /** Set the proxy basePath (called by LTExpressAdapter.attachServer). */
+  setWsProxyBasePath(basePath: string): void {
+    this._wsProxyBasePath = basePath;
   }
 
   /** NATS auth token for browser connections. */

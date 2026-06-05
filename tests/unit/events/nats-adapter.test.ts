@@ -51,4 +51,12 @@ describe('NatsEventAdapter — config properties', () => {
     const adapter = new NatsEventAdapter({ url: 'nats://localhost:4222', token: '' });
     expect(adapter.authToken).toBeNull();
   });
+
+  it('stores and returns wsProxyBasePath', () => {
+    const adapter = new NatsEventAdapter({ url: 'nats://localhost:4222', wsProxy: 'ws://nats:9222' });
+    expect(adapter.wsProxyBasePath).toBe('');
+
+    adapter.setWsProxyBasePath('/longtail');
+    expect(adapter.wsProxyBasePath).toBe('/longtail');
+  });
 });

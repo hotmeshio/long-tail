@@ -82,6 +82,10 @@ export class LTExpressAdapter {
     // Attach NATS WebSocket proxy (if configured)
     const natsAdapter = eventRegistry.getAdapter(NatsEventAdapter);
     if (natsAdapter?.wsProxyTarget) {
+      // Store basePath so the settings endpoint can derive the correct wsUrl
+      if (this.basePath) {
+        natsAdapter.setWsProxyBasePath(this.basePath);
+      }
       attachNatsWsProxy(server, natsAdapter.wsProxyTarget, {
         basePath: this.basePath,
         onWsUrlDerived: (url) => {
