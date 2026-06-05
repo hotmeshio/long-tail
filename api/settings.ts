@@ -24,7 +24,7 @@ function resolveNatsWsUrl(
 ): string | null {
   if (adapter.wsUrl) return adapter.wsUrl;
   if (adapter.wsProxyTarget && req) {
-    const derived = deriveWsUrlFromRequest(req);
+    const derived = deriveWsUrlFromRequest(req, adapter.wsProxyBasePath);
     // Cache for future requests and for the proxy's onWsUrlDerived
     adapter.setWsUrl(derived);
     return derived;

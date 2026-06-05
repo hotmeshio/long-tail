@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
   // Derive wsUrl from request headers when proxy is active but no URL cached yet
   let wsUrl = natsAdapter.wsUrl;
   if (!wsUrl && natsAdapter.wsProxyTarget) {
-    wsUrl = deriveWsUrlFromRequest(req);
+    wsUrl = deriveWsUrlFromRequest(req, natsAdapter.wsProxyBasePath);
     natsAdapter.setWsUrl(wsUrl);
   }
 
