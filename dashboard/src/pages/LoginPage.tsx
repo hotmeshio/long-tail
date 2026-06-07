@@ -34,6 +34,45 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [launched, setLaunched] = useState(!!oauthToken);
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
+  const [ssoAttempted, setSsoAttempted] = useState(false);
+
+  // SSO auto-exchange: if settings reports sso=true, exchange host auth for LT JWT
+  const ssoHandled = useRef(false);
+  useEffect(() => {
+    if (oauthToken || ssoHandled.current) return;
+    ssoHandled.current = true;
+
+    (async () => {
+      try {
+        const settingsRes = await fetch(`${LT_BASE}/api/settings`);
+        if (!settingsRes.ok) return;
+        const settings = await settingsRes.json();
+        if (!settings.auth?.sso) return;
+
+        // SSO enabled — exchange host cookies for LT JWT
+        const ssoRes = await fetch(`${LT_BASE}/api/auth/sso`, { method: 'POST' });
+        if (!ssoRes.ok) {
+          setSsoAttempted(true);
+          setError('Host authentication required — please log in to your organization first');
+          return;
+        }
+        const data = await ssoRes.json();
+        if (data.token) {
+          // Store SSO logout URL for redirect on sign out
+          if (settings.auth?.ssoLogoutUrl) {
+            sessionStorage.setItem('lt_sso_logout_url', settings.auth.ssoLogoutUrl);
+          }
+          setLaunched(true);
+          login(data.token, undefined, {
+            displayName: data.user?.display_name,
+            username: data.user?.external_id,
+          });
+        }
+      } catch {
+        setSsoAttempted(true);
+      }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch available OAuth providers on mount
   useEffect(() => {

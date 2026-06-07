@@ -1,6 +1,6 @@
 import type { LoggerOptions } from 'pino';
 
-import type { LTAuthAdapter } from './auth';
+import type { LTAuthAdapter, LTSSOConfig } from './auth';
 import type { LTOAuthStartConfig } from './oauth';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
@@ -194,6 +194,9 @@ export interface LTStartConfig {
     adapter?: LTAuthAdapter;
     /** OAuth/OIDC configuration for identity and resource OAuth. */
     oauth?: LTOAuthStartConfig;
+    /** SSO for embedded deployments. Host auth is trusted; users are
+     *  JIT-provisioned in lt_users from the resolved identity. */
+    sso?: LTSSOConfig;
   };
 
   /** OpenTelemetry. Register before workers start. */

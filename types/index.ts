@@ -36,6 +36,8 @@ export type {
 export type {
   AuthPayload,
   LTAuthAdapter,
+  SSOIdentity,
+  LTSSOConfig,
 } from './auth';
 
 export type {

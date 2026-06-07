@@ -207,3 +207,28 @@ describe('getSettings — AI availability', () => {
     expect(hasLLMApiKey()).toBe(false);
   });
 });
+
+describe('getSettings — SSO', () => {
+  afterEach(async () => {
+    const { clearSSOConfig } = await import('../../modules/sso');
+    clearSSOConfig();
+  });
+
+  it('returns auth.sso: false when SSO is not configured', async () => {
+    const result = await getSettings();
+    expect(result.data.auth.sso).toBe(false);
+    expect(result.data.auth.ssoLogoutUrl).toBeNull();
+  });
+
+  it('returns auth.sso: true when SSO is configured', async () => {
+    const { setSSOConfig } = await import('../../modules/sso');
+    setSSOConfig({
+      resolve: () => null,
+      logoutUrl: '/auth/logout',
+    });
+
+    const result = await getSettings();
+    expect(result.data.auth.sso).toBe(true);
+    expect(result.data.auth.ssoLogoutUrl).toBe('/auth/logout');
+  });
+});

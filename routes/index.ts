@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { requireAuth } from '../modules/auth';
 import authRouter from './auth';
+import authSSORouter from './auth-sso';
 import oauthRouter from './oauth';
 import delegationRouter from './delegation';
 import tasksRouter from './tasks';
@@ -34,6 +35,7 @@ const router = Router();
 
 // Public routes (no auth required — they handle their own auth)
 router.use('/auth', authRouter);
+router.use('/auth', authSSORouter);
 router.use('/auth/oauth', oauthRouter);
 router.use('/delegation', delegationRouter);
 router.use('/files', filesRouter);

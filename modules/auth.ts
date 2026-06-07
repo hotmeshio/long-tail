@@ -2,7 +2,9 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 
 import { config } from './config';
+import { getSSOConfig } from './sso';
 import { isSuperAdmin } from '../services/user';
+import { ssoProvision } from '../services/user/sso-provision';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
 import { resolvePrincipal } from '../services/iam/principal';
 import type { AuthPayload, LTAuthAdapter } from '../types';
@@ -124,7 +126,40 @@ export function createAuthMiddleware(adapter: LTAuthAdapter): RequestHandler {
  */
 let _authMiddleware: RequestHandler | null = null;
 
-export const requireAuth: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+export const requireAuth: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+  // Fast path: Bearer token present — use standard JWT/adapter auth
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    const mw = _authMiddleware || createAuthMiddleware(new JwtAuthAdapter());
+    return mw(req, res, next);
+  }
+
+  // SSO fallback: no Bearer, but host may have authenticated via cookies/headers
+  const ssoConfig = getSSOConfig();
+  if (ssoConfig) {
+    try {
+      const identity = await ssoConfig.resolve(req);
+      if (identity) {
+        const provisioned = await ssoProvision(identity, ssoConfig);
+        const highestType = provisioned.roles.some((r) => r.type === 'superadmin')
+          ? 'superadmin'
+          : provisioned.roles.some((r) => r.type === 'admin')
+            ? 'admin'
+            : 'member';
+        req.auth = {
+          userId: provisioned.userId,
+          role: highestType,
+          roles: provisioned.roles,
+          sso: true,
+        };
+        return next();
+      }
+    } catch {
+      // SSO resolve failed — fall through to 401
+    }
+  }
+
+  // No Bearer, no SSO — delegate to standard middleware (returns 401)
   const mw = _authMiddleware || createAuthMiddleware(new JwtAuthAdapter());
   mw(req, res, next);
 };

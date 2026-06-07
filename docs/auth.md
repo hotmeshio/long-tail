@@ -136,6 +136,115 @@ await start({
 
 This adapter grants admin access to every request. Restrict its use to local environments.
 
+## SSO for Embedded Deployments
+
+When Long Tail is mounted inside a host application (NestJS, Express, Rails, etc.) at a subpath, users authenticate with the host — not with Long Tail. The host's middleware validates cookies, headers, or session tokens before requests reach Long Tail's routes. SSO integration tells Long Tail how to extract that identity and transparently provision matching users.
+
+### How It Works
+
+1. User authenticates with the host application (via OIDC, SAML, cookies, etc.)
+2. Host middleware validates identity and attaches user context to the request
+3. Dashboard loads, detects SSO is enabled via `/api/settings`
+4. Dashboard calls `POST /api/auth/sso` — host cookies are sent automatically
+5. Long Tail calls `sso.resolve(req)`, extracts the host identity, and JIT provisions a user in `lt_users`
+6. Long Tail returns its own JWT — the dashboard stores it for subsequent API calls
+7. All downstream RBAC, escalation claims, and audit trails use the provisioned `lt_users.id`
+
+### Configuration
+
+The host provides a single `resolve` function. Long Tail handles provisioning, role mapping, JWT issuance, and dashboard awareness.
+
+```typescript
+import { start } from '@hotmeshio/long-tail';
+
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  server: { enabled: false }, // host owns the HTTP server
+
+  auth: {
+    secret: process.env.JWT_SECRET,
+    sso: {
+      // Extract identity from the host's already-validated request.
+      // req.user is set by the host's auth middleware before Long Tail sees it.
+      resolve: (req) => {
+        const user = (req as any).user;
+        if (!user) return null;
+        return {
+          externalId: user.id,           // stable identifier → lt_users.external_id
+          displayName: user.displayName,
+          email: user.email,
+          roles: ['operator', 'reviewer'],
+        };
+      },
+
+      // Optional: map host role names to LT role names.
+      // Unmapped roles are ignored. Omit to pass roles through as-is.
+      roleMap: {
+        admin: 'superadmin',
+        operator: 'station-operator',
+      },
+
+      // Optional: default role type for provisioned users (default: 'member')
+      defaultRoleType: 'member',
+
+      // Optional: redirect here when user logs out of LT dashboard
+      logoutUrl: '/auth/logout',
+    },
+  },
+});
+```
+
+### SSOIdentity
+
+The `resolve` function returns an `SSOIdentity` or `null`:
+
+```typescript
+interface SSOIdentity {
+  externalId: string;                    // mapped to lt_users.external_id
+  displayName?: string;                  // lt_users.display_name
+  email?: string;                        // lt_users.email
+  roles?: string[];                      // mapped to lt_user_roles via roleMap
+  metadata?: Record<string, any>;        // lt_users.metadata (JSONB)
+}
+```
+
+### JIT Provisioning
+
+On first contact, Long Tail creates a `lt_users` record with the resolved identity. On subsequent contacts, it syncs any new roles. The internal `lt_users.id` (UUID) is used for all RBAC, escalation claims, and audit trails — the host's external ID is stored in `lt_users.external_id` as a stable lookup key.
+
+### Token Exchange
+
+`POST /api/auth/sso` is a public endpoint (no Bearer required). It calls `sso.resolve(req)`, provisions the user, and returns an LT JWT. The dashboard calls this automatically when `auth.sso` is `true` in settings.
+
+```
+POST /api/auth/sso
+
+Response 200:
+{
+  "token": "<jwt>",
+  "user": {
+    "id": "lt-uuid",
+    "external_id": "host-user-id",
+    "display_name": "Jane Doe",
+    "roles": [{ "role": "operator", "type": "member" }]
+  }
+}
+```
+
+### requireAuth Fallback
+
+When SSO is configured and a request arrives without a Bearer token, `requireAuth` calls `sso.resolve(req)` as a fallback. This allows direct API calls from the host backend (which forward cookies but not Bearer tokens) to authenticate without an explicit exchange. The dashboard always uses Bearer after the initial exchange.
+
+### Role Mapping
+
+Roles are resolved once during the token exchange (not per-request) and baked into the JWT — the same pattern as the built-in login. When the host system changes a user's roles, the new roles take effect on the next token refresh.
+
+If `roleMap` is provided, only mapped roles are assigned. If omitted, host role names are passed through directly as LT role names. Roles named `superadmin` or `admin` are assigned the corresponding role type; all others default to `member`.
+
+### Standalone Deployments
+
+When `auth.sso` is not configured, nothing changes. The login page, OAuth providers, service accounts, and JWT auth all work exactly as before. SSO is purely additive.
+
 ## Service Account Authentication
 
 Service accounts are named identities that authenticate with API keys instead of passwords or OAuth. They share the same RBAC system as human users — same roles, same delegation tokens, same credential storage.
