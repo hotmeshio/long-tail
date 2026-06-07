@@ -34,7 +34,6 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [launched, setLaunched] = useState(!!oauthToken);
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
-  const [ssoAttempted, setSsoAttempted] = useState(false);
 
   // SSO auto-exchange: if settings reports sso=true, exchange host auth for LT JWT
   const ssoHandled = useRef(false);
@@ -52,7 +51,7 @@ export function LoginPage() {
         // SSO enabled — exchange host cookies for LT JWT
         const ssoRes = await fetch(`${LT_BASE}/api/auth/sso`, { method: 'POST' });
         if (!ssoRes.ok) {
-          setSsoAttempted(true);
+
           setError('Host authentication required — please log in to your organization first');
           return;
         }
@@ -69,7 +68,7 @@ export function LoginPage() {
           });
         }
       } catch {
-        setSsoAttempted(true);
+        // SSO exchange failed — fall through to login form
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
