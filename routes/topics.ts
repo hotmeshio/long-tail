@@ -67,6 +67,7 @@ router.delete('/by-name/:topic', async (req, res) => {
 router.post('/by-name/:topic/publish', async (req, res) => {
   const result = await api.publishTopic({
     topic: decodeURIComponent(req.params.topic),
+    subject: req.body.subject || undefined,
     data: req.body.data ?? {},
     source: req.body.source ?? 'dashboard',
   });

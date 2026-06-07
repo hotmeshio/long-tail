@@ -1,5 +1,6 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
+import { hasGlobalEscalationAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Create ────────────────────────────────────────────────────────────────
@@ -45,8 +46,8 @@ export async function createEscalation(
     }
 
     // RBAC: caller must hold the target role or be superadmin
-    const isSuperAdminUser = await userService.isSuperAdmin(auth.userId);
-    if (!isSuperAdminUser) {
+    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+    if (!hasGlobal) {
       const userHasRole = await userService.hasRole(auth.userId, role);
       if (!userHasRole) {
         return { status: 403, error: `You must hold the "${role}" role or be a superadmin to create escalations for it` };

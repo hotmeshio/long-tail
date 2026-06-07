@@ -4,11 +4,13 @@ import { publishEscalationEvent } from '../../lib/events/publish';
 
 // ── Private helpers ────────────────────────────────────────────────────────
 
+// Re-export from service layer for use by escalation API modules
+export { hasGlobalEscalationAccess } from '../../services/user';
+
 export async function getVisibleRoles(
   userId: string,
 ): Promise<string[] | undefined> {
-  const isSuperAdminUser = await userService.isSuperAdmin(userId);
-  if (isSuperAdminUser) return undefined;
+  if (await userService.hasGlobalEscalationAccess(userId)) return undefined;
   const userRoles = await userService.getUserRoles(userId);
   return userRoles.map((r) => r.role);
 }
@@ -21,8 +23,7 @@ export async function checkBulkPermission(
   userId: string,
   ids: string[],
 ): Promise<{ allowed: true } | { allowed: false; status: 403; error: string }> {
-  const isSuperAdminUser = await userService.isSuperAdmin(userId);
-  if (isSuperAdminUser) return { allowed: true };
+  if (await userService.hasGlobalEscalationAccess(userId)) return { allowed: true };
 
   const roles = await escalationService.getEscalationRoles(ids);
   for (const role of roles) {

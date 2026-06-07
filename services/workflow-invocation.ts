@@ -182,7 +182,7 @@ export async function checkInvocationRoles(
   // Superadmin from JWT bypasses all invocation role checks
   if (authRole === 'superadmin') return;
 
-  const user = await userService.getUserByExternalId(userId);
+  const user = await userService.getUser(userId);
   if (!user) {
     throw new InvocationError('User not registered', 403);
   }
@@ -192,8 +192,10 @@ export async function checkInvocationRoles(
     userRoles.includes(r),
   );
   if (!hasInvocationRole) {
-    const isSuperAdmin = user.roles.some((r) => r.type === 'superadmin');
-    if (!isSuperAdmin) {
+    // superadmin and admin/admin bypass role checks
+    const hasGlobalAccess = user.roles.some((r) => r.type === 'superadmin')
+      || user.roles.some((r) => r.role === 'admin' && r.type === 'admin');
+    if (!hasGlobalAccess) {
       throw new InvocationError('Insufficient role for invocation', 403);
     }
   }

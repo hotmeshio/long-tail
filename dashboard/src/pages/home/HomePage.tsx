@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertCircle, Inbox, ListChecks, Wand2, Layers, ExternalLink, BookOpen,
+  Inbox, ScrollText, GitBranch, Layers, ExternalLink, BookOpen,
 } from 'lucide-react';
 import { useAvailableEscalations, useEscalations } from '../../api/escalations';
 import { useJobs } from '../../api/workflows';
@@ -9,6 +9,7 @@ import { useMcpRuns } from '../../api/pipelines';
 import { useControlPlaneApps } from '../../api/controlplane';
 import { useProcesses } from '../../api/tasks';
 import { useAuth } from '../../hooks/useAuth';
+import { useAccess } from '../../hooks/useAccess';
 import { useEscalationStatsEvents, useWorkflowListEvents, useProcessListEvents } from '../../hooks/useEventHooks';
 import { DateValue } from '../../components/common/display/DateValue';
 import { RolePill } from '../../components/common/display/RolePill';
@@ -156,6 +157,7 @@ function AppPicker({ appIds, selected, onSelect }: {
 export function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isBuilder } = useAccess();
   const [searchParams, setSearchParams] = useSearchParams();
   const pipelineNs = searchParams.get('pipelinenamespace') || 'hmsh';
   const durableNs = searchParams.get('durablenamespace') || 'durable';
@@ -199,7 +201,7 @@ export function HomePage() {
 
         {/* Col 1: Available Escalations */}
         <div>
-          <SectionHeader icon={AlertCircle} color="text-amber-400" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
+          <SectionHeader icon={Inbox} color="text-blue-400" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
               <NavIcon to="/escalations/available" icon={ExternalLink} title="All available escalations" />
@@ -208,7 +210,7 @@ export function HomePage() {
             Available Escalations
           </SectionHeader>
           {allEscalations.length === 0 ? (
-            <EmptyPanel icon={AlertCircle} text="No pending escalations" />
+            <EmptyPanel icon={Inbox} text="No pending escalations" />
           ) : (
             <div className="space-y-1">
               {allEscalations.map((esc: any) => (
@@ -270,8 +272,8 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* ── Row 2: Processes | Durable Executions | Pipeline Executions ──── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 mt-14">
+      {/* ── Row 2: Processes | Durable Executions | Pipeline Executions (builders only) */}
+      {isBuilder && <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 mt-14">
 
         {/* Col 1: Processes */}
         <div>
@@ -306,7 +308,7 @@ export function HomePage() {
 
         {/* Col 2: Durable Executions */}
         <div>
-          <SectionHeader icon={ListChecks} color="text-blue-400" count={jobsTotal} docsHash="#docs:dashboard.md:durable-executions" actions={
+          <SectionHeader icon={ScrollText} color="text-blue-400" count={jobsTotal} docsHash="#docs:dashboard.md:durable-executions" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
               <NavIcon to="/workflows/executions" icon={ExternalLink} title="All durable executions" />
@@ -316,7 +318,7 @@ export function HomePage() {
           </SectionHeader>
           <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
           {jobs.length === 0 ? (
-            <EmptyPanel icon={ListChecks} text="No recent executions" />
+            <EmptyPanel icon={ScrollText} text="No recent executions" />
           ) : (
             <div className="space-y-1">
               {jobs.map((job: any) => (
@@ -335,7 +337,7 @@ export function HomePage() {
 
         {/* Col 3: Pipeline Executions */}
         <div>
-          <SectionHeader icon={Wand2} color="text-violet-400" count={mcpTotal} docsHash="#docs:dashboard.md:mcp-pipeline-tools" actions={
+          <SectionHeader icon={GitBranch} color="text-violet-400" count={mcpTotal} docsHash="#docs:dashboard.md:mcp-pipeline-tools" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
               <NavIcon to="/mcp/executions" icon={ExternalLink} title="All pipeline executions" />
@@ -345,7 +347,7 @@ export function HomePage() {
           </SectionHeader>
           <AppPicker appIds={pipelineAppIds} selected={pipelineNs} onSelect={(ns) => setNs('pipelinenamespace', ns)} />
           {mcpRuns.length === 0 ? (
-            <EmptyPanel icon={Wand2} text="No recent pipeline runs" />
+            <EmptyPanel icon={GitBranch} text="No recent pipeline runs" />
           ) : (
             <div className="space-y-1">
               {mcpRuns.map((run: any) => (
@@ -361,7 +363,7 @@ export function HomePage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

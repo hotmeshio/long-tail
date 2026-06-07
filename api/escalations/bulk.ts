@@ -3,7 +3,7 @@ import * as userService from '../../services/user';
 import * as taskService from '../../services/task';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { validateIds, checkBulkPermission, publishBulkClaimEvents } from './helpers';
+import { validateIds, checkBulkPermission, publishBulkClaimEvents, hasGlobalEscalationAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Bulk routes ────────────────────────────────────────────────────────────
@@ -120,8 +120,8 @@ export async function bulkAssign(
     if (!perm.allowed) return perm;
 
     // Non-superadmin: target user must hold each escalation's role
-    const isSuperAdminUser = await userService.isSuperAdmin(auth.userId);
-    if (!isSuperAdminUser) {
+    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+    if (!hasGlobal) {
       const roles = await escalationService.getEscalationRoles(ids);
       for (const role of roles) {
         const targetHasRole = await userService.hasRole(targetUserId, role);

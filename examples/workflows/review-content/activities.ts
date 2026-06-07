@@ -41,7 +41,7 @@ export async function analyzeContent(
 
   return {
     approved,
-    confidence: Math.max(0, Math.min(1, confidence)),
+    confidence: Math.round(Math.max(0, Math.min(1, confidence)) * 100) / 100,
     flags,
     summary: flags.length
       ? `Content flagged: ${flags.join(', ')}`

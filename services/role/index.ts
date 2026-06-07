@@ -1,5 +1,5 @@
 import { getPool } from '../../lib/db';
-import { isSuperAdmin, hasRole } from '../user';
+import { hasGlobalEscalationAccess, hasRole } from '../user';
 import {
   GET_ESCALATION_TARGETS,
   GET_ALL_ESCALATION_CHAINS,
@@ -92,7 +92,7 @@ export async function replaceEscalationTargets(
 
 /**
  * Check whether a user can escalate from sourceRole to targetRole.
- * Superadmins can escalate to any role.
+ * Superadmins and admin/admin can escalate to any role.
  * Others must hold the sourceRole AND the chain must exist.
  */
 export async function canEscalateTo(
@@ -100,7 +100,7 @@ export async function canEscalateTo(
   sourceRole: string,
   targetRole: string,
 ): Promise<boolean> {
-  if (await isSuperAdmin(userId)) return true;
+  if (await hasGlobalEscalationAccess(userId)) return true;
   if (!(await hasRole(userId, sourceRole))) return false;
 
   const pool = getPool();

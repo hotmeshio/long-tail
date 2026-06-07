@@ -16,6 +16,6 @@ export {
   hasRole,
   hasRoleType,
 } from './roles';
-export { isSuperAdmin, isGroupAdmin, canManageRole } from './rbac';
+export { isSuperAdmin, isGroupAdmin, canManageRole, hasGlobalEscalationAccess } from './rbac';
 export { verifyPassword } from './auth';
 export { seedAdmin } from './seed-admin';

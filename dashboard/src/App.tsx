@@ -292,7 +292,7 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Admin section (admin or superadmin)
+      // Admin: Identity & Access (admin type or superadmin)
       {
         element: <RequireRole roleTypes={['admin', 'superadmin']} />,
         children: [
@@ -301,6 +301,13 @@ const router = createBrowserRouter([
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
+        ],
+      },
+
+      // Admin: Infrastructure (builders only — superadmin or engineer)
+      {
+        element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
+        children: [
           { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
           { path: 'admin/controlplane', element: <Lazy><ControlPlanePage /></Lazy> },
           { path: 'admin/streams', element: <Lazy><StreamMessagesPage /></Lazy> },

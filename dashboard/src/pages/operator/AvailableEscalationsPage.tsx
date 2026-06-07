@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { useAccess } from '../../hooks/useAccess';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
@@ -33,7 +33,6 @@ import type { LTEscalationRecord } from '../../api/types';
 export function AvailableEscalationsPage() {
   useEscalationListEvents();
   const navigate = useNavigate();
-  const { user, isSuperAdmin } = useAuth();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available', search: '' },
   });
@@ -108,7 +107,7 @@ export function AvailableEscalationsPage() {
   const total = searchTerm
     ? escalations.length
     : data?.total ?? 0;
-  const canBulkManage = isSuperAdmin || user?.roles.some((r) => r.type === 'admin');
+  const { canBulk: canBulkManage } = useAccess();
 
   const selectedRoles = useMemo(() => {
     const roles = new Set<string>();

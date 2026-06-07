@@ -269,7 +269,7 @@ export function EscalationDetailPage() {
         requestTriage={requestTriage}
         triageNotes={triageNotes}
         currentRole={esc.role}
-        escalationTargets={escalationTargets?.targets ?? []}
+        escalationTargets={(escalationTargets?.targets ?? []).filter((r) => r !== esc.role)}
         onEscalate={handleEscalate}
         escalatePending={escalate.isPending}
         escalateError={escalate.error as Error | null}

@@ -1,6 +1,7 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 import { publishEscalationEvent } from '../../lib/events/publish';
+import { hasGlobalEscalationAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 /**
@@ -27,8 +28,8 @@ export async function claimEscalation(
       return { status: 404, error: 'Escalation not found' };
     }
 
-    const isSuperAdminUser = await userService.isSuperAdmin(auth.userId);
-    if (!isSuperAdminUser) {
+    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+    if (!hasGlobal) {
       const userHasRole = await userService.hasRole(auth.userId, escalation.role);
       if (!userHasRole) {
         return {
