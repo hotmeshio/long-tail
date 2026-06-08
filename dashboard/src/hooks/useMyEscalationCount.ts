@@ -6,8 +6,8 @@ import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 
 /**
  * Returns the number of active (non-expired) escalations assigned to the current user.
- * Mirrors the queue page's filtering: excludes claims where assigned_until has passed.
- * Stays live via escalation events that invalidate the query.
+ * The API filters expired claims server-side (assigned_until > NOW()) when
+ * assigned_to is provided, so the total from the query is accurate.
  */
 export function useMyEscalationCount(): number {
   const { user } = useAuth();
@@ -17,19 +17,14 @@ export function useMyEscalationCount(): number {
   const { data } = useEscalations({
     assigned_to: userId,
     status: 'pending',
+    limit: 1,
   });
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
     if (userId) {
       qc.invalidateQueries({ queryKey: ['escalations'] });
     }
   });
 
-  // Exclude expired claims — same filter as the queue page
-  const now = new Date();
-  const active = (data?.escalations ?? []).filter(
-    (e) => e.assigned_until && new Date(e.assigned_until) > now,
-  );
-
-  return active.length;
+  return data?.total ?? 0;
 }

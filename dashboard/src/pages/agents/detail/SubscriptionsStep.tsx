@@ -5,7 +5,7 @@ import { ReactionSelector } from '../../../components/common/form/ReactionSelect
 import { useTopics, type TopicCatalogEntry } from '../../../api/topics';
 import { useCapabilities } from '../../../api/capabilities';
 import type { AgentFormState, SubscriptionFormState } from './agent-form-types';
-import { EMPTY_SUBSCRIPTION, sectionCls, hintCls, inputCls, jsonCls } from './agent-form-types';
+import { EMPTY_SUBSCRIPTION, updateMappingField, sectionCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
 const CATEGORY_COLORS: Record<string, string> = {
   task:       'bg-blue-400/15 text-blue-400',
@@ -286,16 +286,7 @@ function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
   }, [value]);
 
   const updateField = (key: string, fieldValue: any) => {
-    // If the value is a JSON array string, parse it so the output is a real array
-    let resolved = fieldValue;
-    if (typeof fieldValue === 'string') {
-      try {
-        const p = JSON.parse(fieldValue);
-        if (Array.isArray(p)) resolved = p;
-      } catch { /* keep as string */ }
-    }
-    const next = { ...parsed, [key]: resolved };
-    onChange(JSON.stringify(next, null, 2));
+    onChange(updateMappingField(value, key, fieldValue, required));
   };
 
   if (fields.length === 0 || jsonMode) {

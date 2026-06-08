@@ -142,6 +142,21 @@ POST /api/bot-accounts/:id/api-keys
 
 The `rawKey` is shown **once**. It cannot be retrieved again.
 
+### API Key Scopes
+
+Scopes control what an API key can access when used with the `/mcp` endpoint:
+
+| Scope | Description |
+|-------|-------------|
+| `mcp:read` | Read-safe tools only (57 tools) — discovery, monitoring, queries |
+| `mcp:full` | All tools (110 tools) — can modify state, invoke workflows, manage resources |
+
+A key with `mcp:read` only sees tools marked `read_safe: true`. A key with both `mcp:read` and `mcp:full` sees all tools. Keys without MCP scopes have no MCP tool filtering applied.
+
+**Recommended keys per service account:**
+- **Read key**: scopes `["mcp:read"]` — safe to hand to monitoring systems
+- **Full key**: scopes `["mcp:read", "mcp:full"]` — for automation and orchestration
+
 ### List keys
 
 ```

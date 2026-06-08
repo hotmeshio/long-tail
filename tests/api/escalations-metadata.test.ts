@@ -16,6 +16,7 @@ const mockClaimByMetadata = vi.mocked(escalationService.claimByMetadata);
 const mockClaimEscalation = vi.mocked(escalationService.claimEscalation);
 const mockUpdateMetadata = vi.mocked(escalationService.updateEscalationMetadata);
 const mockIsSuperAdmin = vi.mocked(userService.isSuperAdmin);
+const mockHasGlobalAccess = vi.mocked(userService.hasGlobalEscalationAccess);
 const mockHasRole = vi.mocked(userService.hasRole);
 const mockGetUserByExternalId = vi.mocked(userService.getUserByExternalId);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
@@ -44,6 +45,7 @@ function makeEscalation(overrides: Record<string, any> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsSuperAdmin.mockResolvedValue(true);
+  mockHasGlobalAccess.mockResolvedValue(true);
 });
 
 // ── findByMetadata ──────────────────────────────────────────────────────
@@ -76,6 +78,7 @@ describe('findByMetadata', () => {
 
   it('scopes results by visible roles for non-superadmin', async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
+    mockHasGlobalAccess.mockResolvedValue(false);
     mockGetUserRoles.mockResolvedValue([{ role: 'reviewer', type: 'member', created_at: new Date() }]);
     const esc = makeEscalation({ role: 'operator' });
     mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
@@ -133,6 +136,7 @@ describe('claimByMetadata', () => {
 
   it('returns 403 when non-superadmin lacks role', async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
+    mockHasGlobalAccess.mockResolvedValue(false);
     const esc = makeEscalation();
     mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
     mockHasRole.mockResolvedValue(false);
@@ -244,6 +248,7 @@ describe('resolveByMetadata', () => {
 
   it('returns 403 when non-superadmin lacks role', async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
+    mockHasGlobalAccess.mockResolvedValue(false);
     const esc = makeEscalation();
     mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
     mockHasRole.mockResolvedValue(false);

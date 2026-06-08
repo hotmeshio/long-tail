@@ -211,6 +211,47 @@ function tryParseJson(s: string): Record<string, any> | undefined {
   try { return JSON.parse(s); } catch { return undefined; }
 }
 
+/**
+ * Update a single field in a mapping JSON object, applying form-friendly defaults:
+ *
+ * - Optional fields with empty values (empty string, null, undefined, empty array, "[]")
+ *   are **omitted** from the output — not stored as "".
+ * - Required fields always persist (even if empty) so validation catches them.
+ * - JSON array strings (e.g., '["a","b"]') are parsed into real arrays.
+ *
+ * Returns the updated JSON string.
+ */
+export function updateMappingField(
+  currentJson: string,
+  key: string,
+  fieldValue: any,
+  required: string[],
+): string {
+  let parsed: Record<string, any>;
+  try { parsed = JSON.parse(currentJson); } catch { parsed = {}; }
+
+  const isReq = required.includes(key);
+
+  // Optional fields with empty/blank values are omitted (undefined, not "")
+  const isEmpty = fieldValue === '' || fieldValue === undefined || fieldValue === null
+    || (Array.isArray(fieldValue) && fieldValue.length === 0)
+    || fieldValue === '[]';
+  if (!isReq && isEmpty) {
+    const { [key]: _, ...rest } = parsed;
+    return JSON.stringify(rest, null, 2);
+  }
+
+  // If the value is a JSON array string, parse it so the output is a real array
+  let resolved = fieldValue;
+  if (typeof fieldValue === 'string') {
+    try {
+      const p = JSON.parse(fieldValue);
+      if (Array.isArray(p)) resolved = p;
+    } catch { /* keep as string */ }
+  }
+  return JSON.stringify({ ...parsed, [key]: resolved }, null, 2);
+}
+
 export const sectionCls = 'section-header mt-[3em] first:mt-0';
 export const labelCls = 'label';
 export const hintCls = 'hint';

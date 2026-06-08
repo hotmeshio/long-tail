@@ -4,6 +4,7 @@ export const MCP_WORKFLOW_TOOLS = [
   {
     name: 'list_workflows',
     description: 'List available compiled YAML workflows. These are deterministic pipelines converted from successful MCP triage executions. Each workflow represents a proven solution to a specific edge case. Defaults to listing active (invocable) workflows.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -14,6 +15,7 @@ export const MCP_WORKFLOW_TOOLS = [
   {
     name: 'get_workflow',
     description: 'Inspect a compiled workflow by name. Returns the activity manifest, input/output schemas, and provenance.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -25,6 +27,7 @@ export const MCP_WORKFLOW_TOOLS = [
   {
     name: 'invoke_workflow',
     description: 'Run a compiled YAML workflow by name. Deterministic — no LLM reasoning, just direct tool-to-tool data piping. Use list_workflows to discover available workflows and their input schemas. Set async=true for fire-and-forget.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -42,6 +45,7 @@ export const WORKFLOW_COMPILER_TOOLS = [
   {
     name: 'convert_execution_to_yaml',
     description: 'Analyze a completed workflow execution and convert its tool call sequence into a deterministic HotMesh YAML workflow. Extracts tool call pairs and replaces LLM reasoning with direct tool-to-tool data piping. The generated YAML is stored as a draft that can be deployed and activated.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -57,6 +61,7 @@ export const WORKFLOW_COMPILER_TOOLS = [
   {
     name: 'deploy_yaml_workflow',
     description: 'Deploy a stored YAML workflow to HotMesh. Optionally activate it immediately and register workers so it can receive invocations.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -69,6 +74,7 @@ export const WORKFLOW_COMPILER_TOOLS = [
   {
     name: 'list_yaml_workflows',
     description: 'List stored YAML workflows with optional status filter.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -86,6 +92,7 @@ export const CLAUDE_CODE_TOOLS = [
     description:
       'Run a task using Claude Code CLI. Claude Code is an agentic coding assistant with terminal access, ' +
       'file I/O, code search, and editing. Returns structured output with result text, cost, and duration.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -136,6 +143,7 @@ export const CLAUDE_CODE_TOOLS = [
   {
     name: 'check_availability',
     description: 'Check if Claude Code CLI is installed and an API key is available. Returns version and readiness status.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {},

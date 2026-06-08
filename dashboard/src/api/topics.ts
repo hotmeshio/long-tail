@@ -102,11 +102,11 @@ export function useDeleteTopic() {
 }
 
 export function usePublishTopic() {
-  return useMutation<{ published: boolean; topic: string; timestamp: string }, Error, { topic: string; data: Record<string, any> }>({
-    mutationFn: ({ topic, data }) =>
+  return useMutation<{ published: boolean; topic: string; timestamp: string }, Error, { topic: string; subject?: string; eventId?: string; data: Record<string, any> }>({
+    mutationFn: ({ topic, subject, eventId, data }) =>
       apiFetch(`/topics/by-name/${encodeURIComponent(topic)}/publish`, {
         method: 'POST',
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ subject, eventId, data }),
       }),
   });
 }

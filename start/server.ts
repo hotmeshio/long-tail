@@ -5,6 +5,7 @@ import express from 'express';
 import { config } from '../modules/config';
 import { loggerRegistry } from '../lib/logger';
 import routes from '../routes';
+import mcpEndpoint from '../routes/mcp-endpoint';
 
 /**
  * Create and start the embedded Express server with health check,
@@ -22,6 +23,7 @@ export function startServer(): ReturnType<typeof express.application.listen> {
   });
 
   app.use('/api', routes);
+  app.use('/mcp', mcpEndpoint);
 
   // Serve dashboard static assets
   // Resolves correctly in both dev (ts-node from root) and prod (node build/)

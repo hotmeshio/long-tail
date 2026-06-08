@@ -85,7 +85,7 @@ export function ControlPlanePage() {
         params.set('queue', queue);
       }
       const qs = params.toString();
-      window.history.pushState(null, '', qs ? `?${qs}` : window.location.pathname);
+      window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
       return next;
     });
   }, []);

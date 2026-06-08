@@ -32,14 +32,11 @@ export function OperatorDashboard() {
     priority: filters.priority ? parseInt(filters.priority) : undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
-    sort_by: sort.sort_by || undefined,
-    order: sort.sort_by ? sort.order : undefined,
+    sort_by: sort.sort_by || 'created_at',
+    order: sort.order || 'desc',
   });
 
-  // Exclude expired claims — they're back in the available pool
-  const activeRaw = (data?.escalations ?? []).filter(
-    (e) => e.assigned_until && new Date(e.assigned_until) > new Date(),
-  );
+  const activeRaw = data?.escalations ?? [];
 
   // Client-side search across visible fields + metadata values
   const searchTerm = (filters.search ?? '').toLowerCase();

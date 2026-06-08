@@ -8,5 +8,5 @@ const entries: NavEntry[] = [
 ];
 
 export function EngineerSidebar() {
-  return <SidebarNav heading="Durable Workflows" entries={entries} />;
+  return <SidebarNav heading="Workflows" entries={entries} />;
 }

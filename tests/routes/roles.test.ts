@@ -26,7 +26,7 @@ describe('Roles routes', () => {
 
     it('GET /api/roles/escalation-chains returns array', async () => {
       const res = await fetch(`${ctx.BASE}/roles/escalation-chains`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -45,7 +45,7 @@ describe('Roles routes', () => {
     it('POST /api/roles/escalation-chains validates body', async () => {
       const res = await fetch(`${ctx.BASE}/roles/escalation-chains`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -56,7 +56,7 @@ describe('Roles routes', () => {
     it('POST /api/roles/escalation-chains creates a chain', async () => {
       const res = await fetch(`${ctx.BASE}/roles/escalation-chains`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify(chain),
       });
       expect(res.status).toBe(201);
@@ -77,7 +77,7 @@ describe('Roles routes', () => {
     it('DELETE /api/roles/escalation-chains removes the chain', async () => {
       const res = await fetch(`${ctx.BASE}/roles/escalation-chains`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify(chain),
       });
       expect(res.status).toBe(200);
@@ -88,7 +88,7 @@ describe('Roles routes', () => {
     it('DELETE returns 404 for non-existent chain', async () => {
       const res = await fetch(`${ctx.BASE}/roles/escalation-chains`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ source_role: 'nope', target_role: 'nada' }),
       });
       expect(res.status).toBe(404);
@@ -138,7 +138,7 @@ describe('Roles routes', () => {
     it('PUT /api/roles/:role/escalation-targets validates body', async () => {
       const res = await fetch(`${ctx.BASE}/roles/test_src/escalation-targets`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ targets: 'not-an-array' }),
       });
       expect(res.status).toBe(400);
@@ -147,7 +147,7 @@ describe('Roles routes', () => {
     it('PUT replaces targets for a role', async () => {
       const res = await fetch(`${ctx.BASE}/roles/test_src/escalation-targets`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ targets: ['replaced_tgt'] }),
       });
       expect(res.status).toBe(200);

@@ -16,6 +16,13 @@ describe('Bot account routes', () => {
       });
       expect(res.status).toBe(403);
     });
+
+    it('GET /api/bot-accounts returns 403 for admin role (non-builder)', async () => {
+      const res = await fetch(`${ctx.BASE}/bot-accounts`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(403);
+    });
   });
 
   describe('Bot CRUD lifecycle', () => {
@@ -25,7 +32,7 @@ describe('Bot account routes', () => {
     it('POST /api/bot-accounts creates a bot', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           name: botName,
           description: 'Test bot for integration tests',
@@ -44,7 +51,7 @@ describe('Bot account routes', () => {
     it('POST /api/bot-accounts returns 400 without name', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -53,7 +60,7 @@ describe('Bot account routes', () => {
     it('POST /api/bot-accounts returns 409 for duplicate name', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name: botName }),
       });
       expect(res.status).toBe(409);
@@ -61,7 +68,7 @@ describe('Bot account routes', () => {
 
     it('GET /api/bot-accounts lists bots', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -73,7 +80,7 @@ describe('Bot account routes', () => {
 
     it('GET /api/bot-accounts/:id returns single bot', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -83,7 +90,7 @@ describe('Bot account routes', () => {
 
     it('GET /api/bot-accounts/:id returns 404 for non-existent', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/00000000-0000-0000-0000-000000000099`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -91,7 +98,7 @@ describe('Bot account routes', () => {
     it('PUT /api/bot-accounts/:id updates bot', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ display_name: 'Updated Bot', description: 'Updated desc' }),
       });
       expect(res.status).toBe(200);
@@ -105,7 +112,7 @@ describe('Bot account routes', () => {
     it('POST /api/bot-accounts/:id/roles adds role', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/roles`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ role: 'scheduler', type: 'member' }),
       });
       expect(res.status).toBe(201);
@@ -113,7 +120,7 @@ describe('Bot account routes', () => {
 
     it('GET /api/bot-accounts/:id/roles lists roles', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/roles`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -123,7 +130,7 @@ describe('Bot account routes', () => {
     it('DELETE /api/bot-accounts/:id/roles/:role removes role', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/roles/scheduler`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       expect((await res.json() as any).removed).toBe(true);
@@ -137,7 +144,7 @@ describe('Bot account routes', () => {
     it('POST /api/bot-accounts/:id/api-keys generates key', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/api-keys`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name: 'test-key', scopes: ['mcp:tool:call'] }),
       });
       expect(res.status).toBe(201);
@@ -151,7 +158,7 @@ describe('Bot account routes', () => {
 
     it('GET /api/bot-accounts/:id/api-keys lists keys (without secrets)', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/api-keys`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -172,7 +179,7 @@ describe('Bot account routes', () => {
     it('DELETE /api/bot-accounts/:id/api-keys/:keyId revokes key', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/api-keys/${keyId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       expect((await res.json() as any).revoked).toBe(true);
@@ -190,7 +197,7 @@ describe('Bot account routes', () => {
     it('DELETE /api/bot-accounts/:id deletes bot', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       expect((await res.json() as any).deleted).toBe(true);
@@ -198,7 +205,7 @@ describe('Bot account routes', () => {
 
     it('deleted bot returns 404', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });

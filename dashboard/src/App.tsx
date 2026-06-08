@@ -248,9 +248,9 @@ const router = createBrowserRouter([
       { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
       { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
 
-      // Workflows section (engineer, admin, or superadmin)
+      // Workflows section (builder: superadmin or engineer)
       {
-        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
+        element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
           { path: 'workflows/executions', element: <Lazy><CertifiedExecutionsPage /></Lazy> },
@@ -269,9 +269,9 @@ const router = createBrowserRouter([
         ],
       },
 
-      // MCP section (engineer, admin, or superadmin)
+      // MCP section (builder: superadmin or engineer)
       {
-        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
+        element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
           { path: 'mcp/queries', element: <Lazy><McpQueryPage /></Lazy> },
@@ -292,12 +292,19 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Admin section (admin or superadmin)
+      // Admin: Accounts (admin type, superadmin, or engineer — scoped view for non-builders)
       {
-        element: <RequireRole roleTypes={['admin', 'superadmin']} />,
+        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
+        ],
+      },
+
+      // Admin: Builder-only (roles, bots, infrastructure)
+      {
+        element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
+        children: [
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },

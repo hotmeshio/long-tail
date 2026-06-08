@@ -28,23 +28,17 @@ export function useEscalationCounts(): { available: number; mine: number } {
   }, [qc]);
 
   // Listen for escalation lifecycle events
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, invalidate);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, invalidate);
 
   const { data: availableData } = useAvailableEscalations({ limit: 1 });
   const { data: myData } = useEscalations({
     assigned_to: userId,
     status: 'pending',
-    limit: 200,
+    limit: 1,
   });
-
-  // Exclude expired claims
-  const now = new Date();
-  const activeMine = (myData?.escalations ?? []).filter(
-    (e) => e.assigned_until && new Date(e.assigned_until) > now,
-  );
 
   return {
     available: availableData?.total ?? 0,
-    mine: activeMine.length,
+    mine: myData?.total ?? 0,
   };
 }

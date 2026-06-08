@@ -19,7 +19,7 @@ describe('Control plane routes', () => {
 
     it('returns apps array for admin', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/apps`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -43,7 +43,7 @@ describe('Control plane routes', () => {
 
     it('returns profiles for admin', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/rollcall`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -71,7 +71,7 @@ describe('Control plane routes', () => {
     it('returns 400 when throttle field is missing', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/throttle`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -82,7 +82,7 @@ describe('Control plane routes', () => {
     it('returns 400 when throttle is not a number', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/throttle`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ throttle: 'fast' }),
       });
       expect(res.status).toBe(400);
@@ -106,7 +106,7 @@ describe('Control plane routes', () => {
 
     it('returns stats object for admin', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/streams`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -129,7 +129,7 @@ describe('Control plane routes', () => {
 
     it('returns 400 when namespace is missing', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?source=worker`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(400);
       const body = await res.json() as any;
@@ -138,7 +138,7 @@ describe('Control plane routes', () => {
 
     it('returns 400 when source is missing', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(400);
       const body = await res.json() as any;
@@ -147,7 +147,7 @@ describe('Control plane routes', () => {
 
     it('returns 400 when source is invalid', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=both`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(400);
       const body = await res.json() as any;
@@ -156,7 +156,7 @@ describe('Control plane routes', () => {
 
     it('returns messages array and total for admin (worker)', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -170,7 +170,7 @@ describe('Control plane routes', () => {
 
     it('returns messages array and total for admin (engine)', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=engine`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -183,7 +183,7 @@ describe('Control plane routes', () => {
 
     it('respects limit and offset parameters', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker&limit=5&offset=0`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -192,7 +192,7 @@ describe('Control plane routes', () => {
 
     it('filters by status', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker&status=processed`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -203,7 +203,7 @@ describe('Control plane routes', () => {
 
     it('supports sort_by and order parameters', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/stream-messages?namespace=durable&source=worker&sort_by=priority&order=asc`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -231,7 +231,7 @@ describe('Control plane routes', () => {
     it('returns 200 with subscribed true for admin', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/subscribe`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ appId: 'durable' }),
       });
       expect(res.status).toBe(200);

@@ -4,6 +4,7 @@ export const TRANSLATION_TOOLS = [
   {
     name: 'translate_content',
     description: 'Translate content text to the target language. Returns the translated content and detected source language.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -20,6 +21,7 @@ export const VISION_ANALYSIS_TOOLS = [
   {
     name: 'analyze_image',
     description: 'Analyze an image and extract structured data: description, text content, and notable objects. Accepts storage paths directly (e.g., "google_homepage.png" from capture_page) — no need to read_file first.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -32,6 +34,7 @@ export const VISION_ANALYSIS_TOOLS = [
   {
     name: 'describe_image',
     description: 'Generate a detailed description of an image. Accepts storage paths directly (e.g., "screenshot.png" from capture_page) — no need to read_file first.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -44,18 +47,19 @@ export const VISION_ANALYSIS_TOOLS = [
 ];
 
 export const DB_QUERY_TOOLS = [
-  { name: 'find_tasks', description: 'Search tasks with optional filters. Returns task records with workflow_id, status, workflow_type, milestones, created/completed timestamps, and metadata.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'find_escalations', description: 'Search escalations with optional filters. Returns escalation records with type, role, priority, status, description, and assignment info.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'get_process_summary', description: 'List business processes grouped by origin_id. Each process shows task count, completed/escalated counts, workflow types involved, and time range.', inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
-  { name: 'get_escalation_stats', description: 'Real-time escalation statistics: pending/claimed counts, created/resolved in last 1h and 24h, breakdown by role.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_workflow_types', description: 'List all registered workflow configurations with task queue, roles, invocable flag, and description.', inputSchema: { type: 'object', properties: {} } },
-  { name: 'get_system_health', description: 'Full system overview: durable workflow execution counts by type (active/completed), task counts by status, escalation counts by status, recent activity window, MCP servers (with tool counts and tags), compiled workflow totals, and workflow configurations.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'find_tasks', description: 'Search tasks with optional filters. Returns task records with workflow_id, status, workflow_type, milestones, created/completed timestamps, and metadata.', read_safe: true, inputSchema: { type: 'object', properties: { status: { type: 'string' }, workflow_type: { type: 'string' }, workflow_id: { type: 'string' }, origin_id: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'find_escalations', description: 'Search escalations with optional filters. Returns escalation records with type, role, priority, status, description, and assignment info.', read_safe: true, inputSchema: { type: 'object', properties: { status: { type: 'string' }, role: { type: 'string' }, type: { type: 'string' }, priority: { type: 'integer' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_process_summary', description: 'List business processes grouped by origin_id. Each process shows task count, completed/escalated counts, workflow types involved, and time range.', read_safe: true, inputSchema: { type: 'object', properties: { workflow_type: { type: 'string' }, limit: { type: 'integer', default: 25 } } } },
+  { name: 'get_escalation_stats', description: 'Real-time escalation statistics: pending/claimed counts, created/resolved in last 1h and 24h, breakdown by role.', read_safe: true, inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_workflow_types', description: 'List all registered workflow configurations with task queue, roles, invocable flag, and description.', read_safe: true, inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_system_health', description: 'Full system overview: durable workflow execution counts by type (active/completed), task counts by status, escalation counts by status, recent activity window, MCP servers (with tool counts and tags), compiled workflow totals, and workflow configurations.', read_safe: true, inputSchema: { type: 'object', properties: {} } },
 ];
 
 export const FILE_STORAGE_TOOLS = [
   {
     name: 'read_file',
     description: 'Read file content from managed storage. Returns content, size, and detected MIME type. Supports utf8 (text) or base64 encoding.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -68,6 +72,7 @@ export const FILE_STORAGE_TOOLS = [
   {
     name: 'write_file',
     description: 'Write content to a file in managed storage. Creates directories as needed. Returns the storage reference and size.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -81,6 +86,7 @@ export const FILE_STORAGE_TOOLS = [
   {
     name: 'list_files',
     description: 'List files in a storage directory. Returns file paths, sizes, and modification timestamps.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -92,6 +98,7 @@ export const FILE_STORAGE_TOOLS = [
   {
     name: 'delete_file',
     description: 'Remove a file from managed storage.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -106,6 +113,7 @@ export const HTTP_FETCH_TOOLS = [
   {
     name: 'http_request',
     description: 'Make an HTTP request to any URL. Supports all methods, custom headers, and request bodies. Returns status, headers, and body.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -121,6 +129,7 @@ export const HTTP_FETCH_TOOLS = [
   {
     name: 'fetch_json',
     description: 'GET a URL and parse the response as JSON. Convenience wrapper around http_request.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -133,6 +142,7 @@ export const HTTP_FETCH_TOOLS = [
   {
     name: 'fetch_text',
     description: 'GET a URL and return the response as text. Returns content, status, and content type.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -148,6 +158,7 @@ export const SCHEMA_EXCHANGE_TOOLS = [
   {
     name: 'exchange',
     description: 'Exchange data with an external service endpoint under schema enforcement. Validates request body against request_schema before sending and response body against response_schema after receiving. Transport is hidden — the principle is endpoint + schema + validated exchange.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -170,6 +181,7 @@ export const SCHEMA_EXCHANGE_TOOLS = [
   {
     name: 'validate_schema',
     description: 'Validate any value against a JSON Schema without making a network call. Useful for pre-validation, testing, and transform verification.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -185,11 +197,13 @@ export const DOCS_TOOLS = [
   {
     name: 'list_docs',
     description: 'List all available documentation files with their titles.',
+    read_safe: true,
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'search_docs',
     description: 'Search across all documentation for a keyword or phrase. Returns matching files with line context.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -201,6 +215,7 @@ export const DOCS_TOOLS = [
   {
     name: 'read_doc',
     description: 'Read the full content of a documentation file.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -215,6 +230,7 @@ export const OAUTH_TOOLS = [
   {
     name: 'get_access_token',
     description: 'Get a fresh OAuth access token for an external service. Automatically refreshes expired tokens.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -228,6 +244,7 @@ export const OAUTH_TOOLS = [
   {
     name: 'list_connections',
     description: 'List all OAuth providers connected for a user. Returns provider, label, and credential type for each connection.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -239,6 +256,7 @@ export const OAUTH_TOOLS = [
   {
     name: 'revoke_connection',
     description: 'Disconnect an OAuth provider for a user, removing stored tokens. Use label to target a specific credential.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {

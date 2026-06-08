@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Bot, Tag, Pencil, Trash2, Save, X, BookOpen, Send } from 'lucide-react';
+import { Radio, Bot, Tag, Pencil, Trash2, Save, X, BookOpen, Send, FlaskConical, Info, Braces } from 'lucide-react';
 import { useTopic, useUpdateTopic, useDeleteTopic, usePublishTopic } from '../../api/topics';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
 import { DateValue } from '../../components/common/display/DateValue';
@@ -39,6 +39,8 @@ export function TopicDetailPage() {
   const publishMutation = usePublishTopic();
 
   const [editing, setEditing] = useState(false);
+  const [publishSubject, setPublishSubject] = useState('');
+  const [publishEventId, setPublishEventId] = useState(() => `evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`);
   const [publishPayload, setPublishPayload] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState('');
@@ -70,6 +72,9 @@ export function TopicDetailPage() {
       : '{}';
   if (!publishPayload && defaultPayload !== '{}') {
     setPublishPayload(defaultPayload);
+  }
+  if (!publishSubject) {
+    setPublishSubject(topic.topic);
   }
 
   const startEdit = () => {
@@ -203,7 +208,7 @@ export function TopicDetailPage() {
                 )}
                 {topic.example_payload && (
                   <div className="min-w-0">
-                    <SectionHeader icon={Radio} color="text-cyan-400">Example Payload</SectionHeader>
+                    <SectionHeader icon={Braces} color="text-cyan-400">Example Payload</SectionHeader>
                     <JsonViewer data={topic.example_payload} />
                   </div>
                 )}
@@ -216,15 +221,22 @@ export function TopicDetailPage() {
             )}
           </div>
 
-          {/* Right — Activity: Subscribers + Publish */}
-          <div className="w-64 shrink-0 space-y-4 animate-page-enter">
-            {/* Subscribers */}
+          {/* Right — Test */}
+          <div className="w-[295px] shrink-0 space-y-4 animate-page-enter">
+            <SectionHeader icon={FlaskConical} color="text-violet-400">Test</SectionHeader>
+            {/* Target Subscribers */}
             <div className="bg-surface-sunken/30 rounded-md px-4 py-3">
               <div className="flex items-center gap-2 mb-2">
                 <Bot className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.5} />
                 <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-                  Subscribers ({topic.subscribers?.length ?? 0})
+                  Target Subscribers
                 </h2>
+                <span className="relative group ml-auto">
+                  <Info className="w-3 h-3 text-text-quaternary cursor-help" strokeWidth={1.5} />
+                  <span className="absolute right-0 top-full mt-1 w-48 p-2 rounded bg-surface-raised border border-surface-border shadow-lg text-[10px] text-text-secondary leading-relaxed hidden group-hover:block z-10">
+                    Publishing a test event is live — these subscribers will receive and process the payload.
+                  </span>
+                </span>
               </div>
               {topic.subscribers?.length ? (
                 <div className="space-y-0.5">
@@ -251,6 +263,22 @@ export function TopicDetailPage() {
                 <Send className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
                 <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Publish</h2>
               </div>
+              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Event ID</label>
+              <input
+                value={publishEventId}
+                onChange={(e) => setPublishEventId(e.target.value)}
+                className="input w-full text-[11px] font-mono mb-3"
+                spellCheck={false}
+                placeholder="evt-1720368000000-a3f2"
+              />
+              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Subject</label>
+              <input
+                value={publishSubject || topic.topic}
+                onChange={(e) => setPublishSubject(e.target.value)}
+                className="input w-full text-[11px] font-mono mb-3"
+                spellCheck={false}
+              />
+              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Payload</label>
               <textarea
                 value={publishPayload || defaultPayload}
                 onChange={(e) => setPublishPayload(e.target.value)}
@@ -264,7 +292,14 @@ export function TopicDetailPage() {
                   onClick={() => {
                     try {
                       const data = JSON.parse(publishPayload || defaultPayload);
-                      publishMutation.mutate({ topic: topic.topic, data }, { onSuccess: () => refetch() });
+                      const subject = (publishSubject || topic.topic) !== topic.topic
+                        ? (publishSubject || topic.topic)
+                        : undefined;
+                      publishMutation.mutate({ topic: topic.topic, subject, eventId: publishEventId || undefined, data }, { onSuccess: () => {
+                        refetch();
+                        // Generate a fresh event ID for the next publish
+                        setPublishEventId(`evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`);
+                      } });
                     } catch { /* invalid JSON */ }
                   }}
                   disabled={publishMutation.isPending}

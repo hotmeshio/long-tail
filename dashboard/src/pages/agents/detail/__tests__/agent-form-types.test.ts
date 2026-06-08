@@ -4,6 +4,7 @@ import {
   agentToForm,
   formToAgentPayload,
   formToSubscriptionPayloads,
+  updateMappingField,
   EMPTY_FORM,
   EMPTY_SUBSCRIPTION,
   EMPTY_SCHEDULE,
@@ -250,5 +251,76 @@ describe('formToSubscriptionPayloads', () => {
     const payloads = formToSubscriptionPayloads(form);
     expect(payloads[0].filter).toBeUndefined();
     expect(payloads[0].execute_as).toBeUndefined();
+  });
+});
+
+// ── updateMappingField ─────────────────────────────────────────────
+
+describe('updateMappingField', () => {
+  const base = '{"domain": "rotations", "key": "{event.data.path}"}';
+  const req = ['domain', 'key', 'data'];
+
+  it('adds a new field to the mapping', () => {
+    const result = JSON.parse(updateMappingField(base, 'tags', '["angle"]', req));
+    expect(result.tags).toEqual(['angle']);
+    expect(result.domain).toBe('rotations');
+  });
+
+  it('updates an existing field', () => {
+    const result = JSON.parse(updateMappingField(base, 'domain', 'screenshots', req));
+    expect(result.domain).toBe('screenshots');
+  });
+
+  it('omits optional field when value is empty string', () => {
+    const result = JSON.parse(updateMappingField(base, 'field', '', req));
+    expect(result).not.toHaveProperty('field');
+    expect(result.domain).toBe('rotations');
+  });
+
+  it('omits optional field when value is null', () => {
+    const result = JSON.parse(updateMappingField(base, 'field', null, req));
+    expect(result).not.toHaveProperty('field');
+  });
+
+  it('omits optional field when value is undefined', () => {
+    const result = JSON.parse(updateMappingField(base, 'field', undefined, req));
+    expect(result).not.toHaveProperty('field');
+  });
+
+  it('omits optional field when value is empty array', () => {
+    const result = JSON.parse(updateMappingField(base, 'tags', [], req));
+    expect(result).not.toHaveProperty('tags');
+  });
+
+  it('omits optional field when value is "[]" string', () => {
+    const result = JSON.parse(updateMappingField(base, 'tags', '[]', req));
+    expect(result).not.toHaveProperty('tags');
+  });
+
+  it('preserves required field even when empty string', () => {
+    const result = JSON.parse(updateMappingField(base, 'domain', '', req));
+    expect(result).toHaveProperty('domain', '');
+  });
+
+  it('preserves required field even when null', () => {
+    const result = JSON.parse(updateMappingField(base, 'data', null, req));
+    expect(result).toHaveProperty('data', null);
+  });
+
+  it('removes a previously set optional field when cleared', () => {
+    const withField = updateMappingField(base, 'field', 'name', req);
+    expect(JSON.parse(withField)).toHaveProperty('field', 'name');
+    const cleared = JSON.parse(updateMappingField(withField, 'field', '', req));
+    expect(cleared).not.toHaveProperty('field');
+  });
+
+  it('parses JSON array strings into real arrays', () => {
+    const result = JSON.parse(updateMappingField(base, 'tags', '["a", "b"]', req));
+    expect(result.tags).toEqual(['a', 'b']);
+  });
+
+  it('keeps non-array JSON strings as strings', () => {
+    const result = JSON.parse(updateMappingField(base, 'key', '{"nested": true}', req));
+    expect(result.key).toBe('{"nested": true}');
   });
 });

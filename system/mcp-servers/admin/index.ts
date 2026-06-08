@@ -4,14 +4,22 @@
  * Unified system management — every tool maps directly to a REST API
  * route handler. The tools are organized by route file:
  *
- *   tasks.ts           — routes/tasks.ts
- *   escalations.ts     — routes/escalations/
- *   workflow-config.ts  — routes/workflows/config.ts
- *   workflows.ts       — routes/workflows/discovery.ts + invocation.ts
- *   mcp-servers.ts     — routes/mcp.ts
- *   yaml-workflows.ts  — routes/yaml-workflows/
- *   users.ts           — routes/users.ts + routes/roles.ts
- *   maintenance.ts     — routes/dba.ts
+ *   tasks.ts               — routes/tasks.ts
+ *   escalations.ts         — routes/escalations/ (incl. metadata + bulk)
+ *   workflow-config.ts     — routes/workflows/config.ts
+ *   workflows.ts           — routes/workflows/discovery.ts + invocation.ts
+ *   mcp-servers.ts         — routes/mcp.ts
+ *   yaml-workflows.ts      — routes/yaml-workflows/
+ *   users.ts               — routes/users.ts + routes/roles.ts
+ *   maintenance.ts         — routes/dba.ts
+ *   agents.ts              — routes/agents.ts
+ *   agent-subscriptions.ts — routes/agents.ts (subscription sub-routes)
+ *   bot-accounts.ts        — routes/bot-accounts.ts
+ *   controlplane.ts        — routes/controlplane.ts
+ *   pipelines.ts           — routes/pipelines.ts
+ *   topics.ts              — routes/topics.ts
+ *   settings.ts            — routes/settings.ts
+ *   exports.ts             — routes/exports.ts
  *
  * This server replaces three previously separate servers:
  *   - long-tail-db-query (read-only task/escalation/health queries)
@@ -34,8 +42,16 @@ import { registerMcpServerTools } from './mcp-servers';
 import { registerYamlWorkflowTools } from './yaml-workflows';
 import { registerUserTools } from './users';
 import { registerMaintenanceTools } from './maintenance';
+import { registerAgentTools } from './agents';
+import { registerAgentSubscriptionTools } from './agent-subscriptions';
+import { registerBotAccountTools } from './bot-accounts';
+import { registerControlPlaneTools } from './controlplane';
+import { registerPipelineTools } from './pipelines';
+import { registerTopicTools } from './topics';
+import { registerSettingsTools } from './settings';
+import { registerExportTools } from './exports';
 
-const TOOL_COUNT = 30;
+const TOOL_COUNT = 71;
 
 let server: McpServer | null = null;
 
@@ -52,24 +68,23 @@ export async function createAdminServer(options?: {
     server = instance;
   }
 
-  registerTaskTools(instance);          //  2 tools
-  registerEscalationTools(instance);    //  5 tools
-  registerWorkflowConfigTools(instance); // 3 tools
-  registerWorkflowTools(instance);      //  3 tools
-  registerMcpServerTools(instance);     //  4 tools
-  registerYamlWorkflowTools(instance);  //  5 tools
-  registerUserTools(instance);          //  7 tools (users + roles)
-  registerMaintenanceTools(instance);   //  1 tool
-  // Subtotal: 30 — but let me recount...
-  // tasks: find_tasks, get_process_detail = 2
-  // escalations: find_escalations, get_escalation_stats, claim_escalation, release_expired_claims, bulk_triage = 5
-  // workflow-config: list_workflow_configs, upsert_workflow_config, delete_workflow_config = 3
-  // workflows: list_discovered_workflows, invoke_workflow, get_workflow_status = 3
-  // mcp-servers: list_mcp_servers, update_mcp_server, connect_mcp_server, disconnect_mcp_server = 4
-  // yaml-workflows: list_yaml_workflows, get_yaml_workflow, create_yaml_workflow, deploy_yaml_workflow, invoke_yaml_workflow = 5
-  // users: list_users, create_user, add_user_role, remove_user_role, list_roles, create_role, add_escalation_chain = 7
-  // maintenance: prune = 1
-  // Total: 30
+  registerTaskTools(instance);              //  2 tools
+  registerEscalationTools(instance);        // 12 tools (5 base + 7 metadata/bulk)
+  registerWorkflowConfigTools(instance);    //  3 tools
+  registerWorkflowTools(instance);          //  3 tools
+  registerMcpServerTools(instance);         //  4 tools
+  registerYamlWorkflowTools(instance);      //  5 tools
+  registerUserTools(instance);              //  7 tools (users + roles)
+  registerMaintenanceTools(instance);       //  1 tool
+  registerAgentTools(instance);             //  5 tools
+  registerAgentSubscriptionTools(instance); //  3 tools
+  registerBotAccountTools(instance);        //  7 tools
+  registerControlPlaneTools(instance);      //  5 tools
+  registerPipelineTools(instance);          //  4 tools
+  registerTopicTools(instance);             //  5 tools
+  registerSettingsTools(instance);          //  1 tool
+  registerExportTools(instance);            //  4 tools
+  // Total: 71 (actual count may vary slightly)
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
   return instance;

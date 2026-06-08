@@ -36,11 +36,11 @@ function useDebouncedInvalidation(delayMs = 500) {
 export function useWorkflowListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.task.>`, () => {
     invalidate([['jobs']]);
   });
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.workflow.>`, () => {
     invalidate([['jobs']]);
   });
 }
@@ -61,7 +61,8 @@ export function useWorkflowDetailEvents(workflowId: string | undefined): void {
       || event.workflowId?.includes(workflowId);
     if (!isRelated) return;
 
-    const category = event.type.split('.')[0];
+    const parts = event.type.split('.');
+    const category = parts[0] === 'system' ? parts[1] : parts[0];
     const keys = getInvalidationKeys(event);
 
     if (category === 'escalation') {
@@ -88,7 +89,8 @@ export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
       || event.workflowId?.includes(workflowId);
     if (!isRelated) return;
 
-    const category = event.type.split('.')[0];
+    const parts = event.type.split('.');
+    const category = parts[0] === 'system' ? parts[1] : parts[0];
     const keys = getInvalidationKeys(event);
 
     if (category === 'escalation') {
@@ -132,9 +134,9 @@ export function useProcessDetailEvents(originId: string | undefined): void {
     invalidate([['processes', originId]]);
   }, [originId, invalidate]);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, handler);
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, handler);
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, handler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.task.>`, handler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.workflow.>`, handler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, handler);
 }
 
 /**
@@ -143,7 +145,7 @@ export function useProcessDetailEvents(originId: string | undefined): void {
 export function useEscalationStatsEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
     invalidate([['escalationStats']]);
   });
 }
@@ -154,7 +156,7 @@ export function useEscalationStatsEvents(): void {
 export function useEscalationListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
     invalidate([['escalations']]);
   });
 }
@@ -165,7 +167,7 @@ export function useEscalationListEvents(): void {
 export function useEscalationDetailEvents(escalationId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, (event) => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, (event) => {
     if (!escalationId) return;
     if (event.escalationId === escalationId) {
       invalidate([['escalations', escalationId], ['escalations'], ['escalationStats']]);
@@ -179,7 +181,7 @@ export function useEscalationDetailEvents(escalationId: string | undefined): voi
 export function useAgentEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.agent.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.agent.>`, () => {
     invalidate([['agents']]);
   });
 }
@@ -190,7 +192,7 @@ export function useAgentEvents(): void {
 export function useKnowledgeEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.knowledge.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.knowledge.>`, () => {
     invalidate([['knowledge']]);
   });
 }
@@ -201,11 +203,11 @@ export function useKnowledgeEvents(): void {
 export function useProcessListEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.task.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.task.>`, () => {
     invalidate([['processes']]);
   });
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.workflow.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.workflow.>`, () => {
     invalidate([['processes']]);
   });
 }

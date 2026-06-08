@@ -71,4 +71,10 @@ export async function applyServerAuthConfig(startConfig: LTStartConfig): Promise
     });
   }
 
+  // SSO — store config for requireAuth fallback and /api/auth/sso exchange
+  if (startConfig.auth?.sso) {
+    const { setSSOConfig } = await import('../modules/sso');
+    setSSOConfig(startConfig.auth.sso);
+    loggerRegistry.info('[long-tail] SSO enabled — host auth will be trusted');
+  }
 }

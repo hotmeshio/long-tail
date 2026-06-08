@@ -30,6 +30,7 @@ export async function listEscalations(
     type?: string;
     subtype?: string;
     assigned_to?: string;
+    claimed?: boolean;
     priority?: number;
     limit?: number;
     offset?: number;
@@ -50,6 +51,7 @@ export async function listEscalations(
       type: input.type,
       subtype: input.subtype,
       assigned_to: input.assigned_to,
+      claimed: input.claimed,
       priority: input.priority,
       limit: input.limit,
       offset: input.offset,

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { requireAdmin } from '../modules/auth';
+import { requireBuilder } from '../modules/auth';
 import * as api from '../api/controlplane';
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
  * List available HotMesh application IDs.
  * Admin-only.
  */
-router.get('/apps', requireAdmin, async (_req, res) => {
+router.get('/apps', requireBuilder, async (_req, res) => {
   const result = await api.listApps();
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -20,7 +20,7 @@ router.get('/apps', requireAdmin, async (_req, res) => {
  * Execute a roll call — discovers all engines and workers.
  * Admin-only.
  */
-router.get('/rollcall', requireAdmin, async (req, res) => {
+router.get('/rollcall', requireBuilder, async (req, res) => {
   const result = await api.rollCall({
     appId: (req.query.app_id as string) || 'durable',
     delay: req.query.delay ? parseInt(req.query.delay as string, 10) : undefined,
@@ -36,7 +36,7 @@ router.get('/rollcall', requireAdmin, async (req, res) => {
  * Body: { appId: string, throttle: number, topic?: string, guid?: string }
  *   throttle: ms delay (-1 = pause, 0 = resume, >0 = delay per msg)
  */
-router.post('/throttle', requireAdmin, async (req, res) => {
+router.post('/throttle', requireBuilder, async (req, res) => {
   const { appId = 'durable', throttle, topic, guid, scope } = req.body;
   const result = await api.applyThrottle({ appId, throttle, topic, guid, scope });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -50,7 +50,7 @@ router.post('/throttle', requireAdmin, async (req, res) => {
  * duration: 15m | 30m | 1h | 1d | 7d (default: 1h)
  * stream: optional stream_name filter (specific task queue topic)
  */
-router.get('/streams', requireAdmin, async (req, res) => {
+router.get('/streams', requireBuilder, async (req, res) => {
   const result = await api.getStreamStats({
     app_id: (req.query.app_id as string) || 'durable',
     duration: (req.query.duration as string) || '1h',
@@ -69,7 +69,7 @@ router.get('/streams', requireAdmin, async (req, res) => {
  * are separate tables with different schemas.
  * Admin-only.
  */
-router.get('/stream-messages', requireAdmin, async (req, res) => {
+router.get('/stream-messages', requireBuilder, async (req, res) => {
   const result = await api.listStreamMessages({
     namespace: req.query.namespace as string,
     source: req.query.source as string,
@@ -97,7 +97,7 @@ router.get('/stream-messages', requireAdmin, async (req, res) => {
  *
  * Body: { appId: string }
  */
-router.post('/subscribe', requireAdmin, async (req, res) => {
+router.post('/subscribe', requireBuilder, async (req, res) => {
   const { appId = 'durable' } = req.body;
   const result = await api.subscribeMesh({ appId });
   res.status(result.status).json(result.data ?? { error: result.error });

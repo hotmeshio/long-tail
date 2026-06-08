@@ -41,18 +41,20 @@ function EmptyHint({ text }: { text: string }) {
 interface FeedEvent { id: number; type: string; timestamp: string; label: string; }
 let feedCounter = 0;
 
-function useAgentFeed(workflowName?: string) {
+function useAgentFeed(agentName?: string) {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [pulse, setPulse] = useState(false);
   const handler = useCallback((event: any) => {
     if (event.type?.startsWith('mesh.')) return;
-    if (workflowName && event.workflowName !== workflowName) return;
     const label = event.activityName || event.data?.domain || event.workflowId?.slice(0, 16) || '';
     setEvents((prev) => [{ id: ++feedCounter, type: event.type, timestamp: event.timestamp, label }, ...prev].slice(0, 10));
     setPulse(true);
     setTimeout(() => setPulse(false), 2000);
-  }, [workflowName]);
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, handler);
+  }, []);
+  useEventSubscription(
+    agentName ? `${NATS_SUBJECT_PREFIX}.system.agent.${agentName}.>` : '',
+    handler,
+  );
   return { events, pulse };
 }
 
@@ -68,7 +70,7 @@ export function AgentDetailPage() {
   const { data: subsData } = useAgentSubscriptions(id ?? null);
   const updateMutation = useUpdateAgent();
   const deleteMutation = useDeleteAgent();
-  const { events: liveEvents, pulse } = useAgentFeed(agent?.workflow_type ?? undefined);
+  const { events: liveEvents, pulse } = useAgentFeed(id);
   useAgentEvents();
 
   if (isLoading) {

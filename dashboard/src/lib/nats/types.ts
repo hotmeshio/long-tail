@@ -5,6 +5,7 @@
  * Dashboard subscribes to `lt.events.>` to receive all events.
  */
 export interface NatsLTEvent {
+  id?: string;
   type: NatsLTEventType | string;
   source: string;
   workflowId: string;
@@ -24,26 +25,14 @@ export interface NatsLTEvent {
  * Known event types published by the Long Tail server.
  */
 export type NatsLTEventType =
-  | 'task.created'
-  | 'task.started'
-  | 'task.completed'
-  | 'task.escalated'
-  | 'task.failed'
-  | 'escalation.created'
-  | 'escalation.resolved'
-  | 'workflow.started'
-  | 'workflow.completed'
-  | 'workflow.failed'
-  | 'activity.started'
-  | 'activity.completed'
-  | 'activity.failed'
-  | 'knowledge.stored'
-  | 'knowledge.deleted'
-  | 'agent.started'
-  | 'agent.completed'
-  | 'agent.failed'
-  | 'agent.status_changed'
-  | 'milestone';
+  | `system.task.${string}.${string}`
+  | `system.escalation.${string}.${string}`
+  | `system.workflow.${string}.${string}`
+  | `system.activity.${string}.${string}.${string}`
+  | `system.knowledge.${string}.${string}`
+  | `system.file.${string}`
+  | `system.agent.${string}.${string}`
+  | `system.milestone.${string}`;
 
 /**
  * Event type category prefixes for pattern matching.

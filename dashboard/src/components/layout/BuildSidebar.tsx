@@ -5,7 +5,7 @@ export function BuildSidebar() {
   const entries: NavEntry[] = [
     {
       kind: 'group',
-      label: 'Durable Workflows',
+      label: 'Workflows',
       icon: Cog,
       matchPaths: ['/workflows/registry', '/workflows/start', '/workflows/workers'],
       items: [
@@ -19,7 +19,7 @@ export function BuildSidebar() {
       icon: ListChecks,
       matchPaths: ['/workflows/executions', '/mcp/executions'],
       items: [
-        { to: '/workflows/executions', label: 'Workflow', icon: ScrollText },
+        { to: '/workflows/executions', label: 'Workflows', icon: ScrollText },
         { to: '/mcp/executions', label: 'Pipelines', icon: GitBranch },
       ],
     },

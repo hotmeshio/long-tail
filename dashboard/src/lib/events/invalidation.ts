@@ -11,7 +11,8 @@ import type { NatsLTEvent } from '../nats/types';
  */
 export function getInvalidationKeys(event: NatsLTEvent): string[][] {
   const keys: string[][] = [];
-  const category = event.type.split('.')[0];
+  const parts = event.type.split('.');
+  const category = parts[0] === 'system' ? parts[1] : parts[0];
 
   switch (category) {
     case 'task':

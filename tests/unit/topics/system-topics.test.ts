@@ -16,14 +16,14 @@ import { getPool } from '../../../lib/db';
 import { loggerRegistry } from '../../../lib/logger';
 
 const EXPECTED_SYSTEM_TOPICS = [
-  'task.created', 'task.started', 'task.completed', 'task.escalated', 'task.failed',
-  'workflow.started', 'workflow.completed', 'workflow.failed',
-  'escalation.created', 'escalation.resolved', 'escalation.claimed', 'escalation.released',
-  'activity.started', 'activity.completed', 'activity.failed',
-  'knowledge.stored', 'knowledge.deleted',
-  'file.stored', 'file.deleted',
-  'agent.started', 'agent.completed', 'agent.failed', 'agent.status_changed',
-  'milestone',
+  'system.task.*.created', 'system.task.*.started', 'system.task.*.completed', 'system.task.*.escalated', 'system.task.*.failed',
+  'system.workflow.*.started', 'system.workflow.*.completed', 'system.workflow.*.failed',
+  'system.escalation.*.created', 'system.escalation.*.resolved', 'system.escalation.*.claimed', 'system.escalation.*.released',
+  'system.activity.*.*.started', 'system.activity.*.*.completed', 'system.activity.*.*.failed',
+  'system.knowledge.*.stored', 'system.knowledge.*.deleted',
+  'system.file.stored', 'system.file.deleted',
+  'system.agent.*.started', 'system.agent.*.completed', 'system.agent.*.failed', 'system.agent.*.status_changed',
+  'system.milestone.*',
 ];
 
 describe('seedSystemTopics', () => {

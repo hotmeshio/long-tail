@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
+import { useAccess } from '../../../hooks/useAccess';
 import { useViewMode } from '../../../hooks/useViewMode';
 import { useCollapsedSections } from '../../../hooks/useCollapsedSections';
 import {
@@ -47,8 +49,9 @@ function hasTriageData(payload: string | null | undefined): boolean {
 
 export function EscalationDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user, hasRoleType, hasRole } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: esc, isLoading } = useEscalation(id!);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
@@ -58,7 +61,7 @@ export function EscalationDetailPage() {
   const { data: workflowConfigs } = useWorkflowConfigs();
   const { data: settings } = useSettings();
 
-  const isPrivilegedUser = hasRoleType('admin') || hasRoleType('superadmin') || hasRole('engineer');
+  const { isBuilder } = useAccess();
   const { isDevMode, toggleMode } = useViewMode(false);
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
@@ -153,7 +156,11 @@ export function EscalationDetailPage() {
     expand('resolver');
   };
 
-  const goBack = () => navigate(-1);
+  const goBack = () => {
+    queryClient.resetQueries({ queryKey: ['escalations'] });
+    queryClient.resetQueries({ queryKey: ['escalationStats'] });
+    navigate(-1);
+  };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
     await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
@@ -183,7 +190,7 @@ export function EscalationDetailPage() {
     goBack();
   };
 
-  const viewToggle = isPrivilegedUser ? (
+  const viewToggle = isBuilder ? (
     <button
       onClick={toggleMode}
       className="text-text-tertiary hover:text-accent transition-colors"
@@ -269,7 +276,7 @@ export function EscalationDetailPage() {
         requestTriage={requestTriage}
         triageNotes={triageNotes}
         currentRole={esc.role}
-        escalationTargets={escalationTargets?.targets ?? []}
+        escalationTargets={(escalationTargets?.targets ?? []).filter((r) => r !== esc.role)}
         onEscalate={handleEscalate}
         escalatePending={escalate.isPending}
         escalateError={escalate.error as Error | null}

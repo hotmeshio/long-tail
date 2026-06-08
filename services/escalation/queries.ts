@@ -91,6 +91,7 @@ export async function listEscalations(filters: {
   type?: string;
   subtype?: string;
   assigned_to?: string;
+  claimed?: boolean;
   priority?: number;
   limit?: number;
   offset?: number;
@@ -128,6 +129,13 @@ export async function listEscalations(filters: {
   if (filters.assigned_to) {
     conditions.push(`assigned_to = $${idx++}`);
     values.push(filters.assigned_to);
+    // Only return active claims — expired claims are back in the available pool
+    conditions.push('assigned_until > NOW()');
+  }
+  if (filters.claimed) {
+    // All actively claimed escalations (by anyone)
+    conditions.push('assigned_to IS NOT NULL');
+    conditions.push('assigned_until > NOW()');
   }
   if (filters.priority) {
     conditions.push(`priority = $${idx++}`);

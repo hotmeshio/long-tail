@@ -1,6 +1,6 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { getVisibleRoles, resolveAssignee } from './helpers';
+import { getVisibleRoles, resolveAssignee, hasGlobalEscalationAccess } from './helpers';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 /**
@@ -71,8 +71,8 @@ export async function claimByMetadata(
     }
     const candidate = candidates.escalations[0];
 
-    const isSuperAdmin = await userService.isSuperAdmin(auth.userId);
-    if (!isSuperAdmin) {
+    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+    if (!hasGlobal) {
       const userHasRole = await userService.hasRole(claimUserId, candidate.role);
       if (!userHasRole) {
         return { status: 403, error: `User must have the "${candidate.role}" role to claim this escalation` };
@@ -128,8 +128,8 @@ export async function resolveByMetadata(
     if ('error' in resolved) return resolved.error;
     const resolveUserId = resolved.userId;
 
-    const isSuperAdmin = await userService.isSuperAdmin(auth.userId);
-    if (!isSuperAdmin) {
+    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+    if (!hasGlobal) {
       const userHasRole = await userService.hasRole(resolveUserId, escalation.role);
       if (!userHasRole) {
         return { status: 403, error: `User must have the "${escalation.role}" role` };

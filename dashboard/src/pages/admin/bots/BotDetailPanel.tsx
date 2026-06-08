@@ -19,16 +19,22 @@ function ApiKeysSection({ botId }: { botId: string }) {
   const revokeKey = useRevokeBotApiKey();
 
   const [newKeyName, setNewKeyName] = useState('');
+  const [selectedScope, setSelectedScope] = useState<'read' | 'full'>('read');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState<BotApiKeyRecord | null>(null);
 
   const keys = data?.keys ?? [];
 
+  const SCOPE_PRESETS = {
+    read: { label: 'Read only', scopes: ['mcp:read'], hint: 'Discovery and monitoring — read-safe tools only' },
+    full: { label: 'Full access', scopes: ['mcp:read', 'mcp:full'], hint: 'All tools — can modify state' },
+  } as const;
+
   const handleGenerate = () => {
     if (!newKeyName.trim()) return;
     createKey.mutate(
-      { botId, name: newKeyName.trim(), scopes: ['mcp:tool:call'] },
+      { botId, name: newKeyName.trim(), scopes: SCOPE_PRESETS[selectedScope].scopes as unknown as string[] },
       {
         onSuccess: (result: any) => {
           setGeneratedKey(result.rawKey);
@@ -88,9 +94,14 @@ function ApiKeysSection({ botId }: { botId: string }) {
               key={k.id}
               className="group/key flex items-center justify-between px-2.5 py-1.5 bg-surface-sunken rounded text-xs"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Key className="w-3 h-3 text-text-tertiary" />
                 <span className="text-text-primary font-mono">{k.name}</span>
+                {(k.scopes ?? []).map((s: string) => (
+                  <span key={s} className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${s.includes('full') ? 'bg-status-warning/15 text-status-warning' : 'bg-accent/10 text-accent'}`}>
+                    {s}
+                  </span>
+                ))}
                 {k.last_used_at && (
                   <span className="text-[10px] text-text-tertiary">
                     used <TimeAgo date={k.last_used_at} />
@@ -117,6 +128,23 @@ function ApiKeysSection({ botId }: { botId: string }) {
           placeholder="Key name..."
           className="input text-xs flex-1 font-mono"
         />
+        <div className="flex rounded-md border border-surface-border overflow-hidden shrink-0">
+          {(Object.entries(SCOPE_PRESETS) as [keyof typeof SCOPE_PRESETS, typeof SCOPE_PRESETS[keyof typeof SCOPE_PRESETS]][]).map(([key, preset]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSelectedScope(key)}
+              title={preset.hint}
+              className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                selectedScope === key
+                  ? 'bg-accent text-white'
+                  : 'bg-surface text-text-secondary hover:bg-surface-hover'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <button
           onClick={handleGenerate}
           disabled={!newKeyName.trim() || createKey.isPending}
@@ -249,7 +277,7 @@ export function BotDetailPanel({ bot }: { bot: BotRecord | null }) {
     return (
       <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px]">
         <p className="text-xs text-text-tertiary">
-          Select a bot to manage its API keys and roles.
+          Select a service account to manage its API keys and roles.
         </p>
       </div>
     );

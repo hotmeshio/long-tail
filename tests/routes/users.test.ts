@@ -23,7 +23,7 @@ describe('User routes', () => {
     });
   });
 
-  describe('POST /api/users (admin-only)', () => {
+  describe('POST /api/users (builder-only)', () => {
     it('returns 403 for member role', async () => {
       const res = await fetch(`${ctx.BASE}/users`, {
         method: 'POST',
@@ -33,10 +33,19 @@ describe('User routes', () => {
       expect(res.status).toBe(403);
     });
 
-    it('returns 400 when external_id is missing', async () => {
+    it('returns 403 for admin role (non-builder)', async () => {
       const res = await fetch(`${ctx.BASE}/users`, {
         method: 'POST',
         headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ external_id: 'test-user' }),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 400 when external_id is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/users`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -47,7 +56,7 @@ describe('User routes', () => {
     it('returns 400 for invalid role type in roles array', async () => {
       const res = await fetch(`${ctx.BASE}/users`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           external_id: 'bad-role-user',
           roles: [{ role: 'reviewer', type: 'invalid_type' }],
@@ -66,7 +75,7 @@ describe('User routes', () => {
     it('POST creates a user', async () => {
       const res = await fetch(`${ctx.BASE}/users`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           external_id: extId,
           email: 'test@example.com',
@@ -100,7 +109,7 @@ describe('User routes', () => {
 
       const res = await fetch(`${ctx.BASE}/users/${createdUserId}`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ display_name: 'Updated Name' }),
       });
       expect(res.status).toBe(200);
@@ -117,7 +126,7 @@ describe('User routes', () => {
 
       const res = await fetch(`${ctx.BASE}/users/${createdUserId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -139,7 +148,7 @@ describe('User routes', () => {
     beforeAll(async () => {
       const res = await fetch(`${ctx.BASE}/users`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ external_id: extId }),
       });
       const body = await res.json() as any;
@@ -149,7 +158,7 @@ describe('User routes', () => {
     afterAll(async () => {
       await fetch(`${ctx.BASE}/users/${userId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
     });
 
@@ -173,7 +182,7 @@ describe('User routes', () => {
 
       const res = await fetch(`${ctx.BASE}/users/${userId}/roles`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ role: 'reviewer', type: 'member' }),
       });
       expect(res.status).toBe(201);
@@ -182,7 +191,7 @@ describe('User routes', () => {
     it('POST /api/users/:id/roles validates required fields', async () => {
       const res = await fetch(`${ctx.BASE}/users/${userId}/roles`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -193,7 +202,7 @@ describe('User routes', () => {
     it('DELETE /api/users/:id/roles/:role removes the role', async () => {
       const res = await fetch(`${ctx.BASE}/users/${userId}/roles/reviewer`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -203,7 +212,7 @@ describe('User routes', () => {
     it('DELETE returns 404 for non-existent role', async () => {
       const res = await fetch(`${ctx.BASE}/users/${userId}/roles/nonexistent-role`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });

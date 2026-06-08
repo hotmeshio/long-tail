@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { useAccess } from '../../hooks/useAccess';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
@@ -33,7 +33,6 @@ import type { LTEscalationRecord } from '../../api/types';
 export function AvailableEscalationsPage() {
   useEscalationListEvents();
   const navigate = useNavigate();
-  const { user, isSuperAdmin } = useAuth();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available', search: '' },
   });
@@ -62,7 +61,8 @@ export function AvailableEscalationsPage() {
 
   const statusFilter = filters.status || '';
   const isAvailable = statusFilter === 'available';
-  const apiStatus = statusFilter === 'claimed' ? 'pending'
+  const isClaimed = statusFilter === 'claimed';
+  const apiStatus = isClaimed ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
     : isAvailable ? undefined
     : undefined;
@@ -73,8 +73,8 @@ export function AvailableEscalationsPage() {
     priority: filters.priority ? parseInt(filters.priority) : undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
-    sort_by: sort.sort_by || undefined,
-    order: sort.sort_by ? sort.order : undefined,
+    sort_by: sort.sort_by || 'created_at',
+    order: sort.order || 'desc',
   };
 
   const availableQuery = useAvailableEscalations({
@@ -84,6 +84,7 @@ export function AvailableEscalationsPage() {
 
   const escalationsQuery = useEscalations({
     status: apiStatus,
+    claimed: isClaimed || undefined,
     ...sharedFilters,
     enabled: !isAvailable,
   });
@@ -91,26 +92,22 @@ export function AvailableEscalationsPage() {
   const activeQuery = isAvailable ? availableQuery : escalationsQuery;
   const { data, isLoading, error: queryError, refetch, isFetching } = activeQuery;
 
-  const now = new Date();
   const rawEscalations = data?.escalations ?? [];
-  const statusFiltered = statusFilter === 'claimed'
-    ? rawEscalations.filter((e) => e.assigned_to && e.assigned_until && new Date(e.assigned_until) > now)
-    : rawEscalations;
 
   // Client-side search across visible fields + metadata values
   const searchTerm = (filters.search ?? '').toLowerCase();
   const escalations = searchTerm
-    ? statusFiltered.filter((e) => {
+    ? rawEscalations.filter((e) => {
         const fields = [e.id, e.type, e.subtype, e.description, e.workflow_id, e.origin_id, e.role];
         if (e.metadata) fields.push(...Object.values(e.metadata).map(String));
         return fields.some((f) => f && String(f).toLowerCase().includes(searchTerm));
       })
-    : statusFiltered;
+    : rawEscalations;
 
-  const total = (statusFilter === 'claimed' || searchTerm)
+  const total = searchTerm
     ? escalations.length
     : data?.total ?? 0;
-  const canBulkManage = isSuperAdmin || user?.roles.some((r) => r.type === 'admin');
+  const { canBulk: canBulkManage } = useAccess();
 
   const selectedRoles = useMemo(() => {
     const roles = new Set<string>();
@@ -219,7 +216,7 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="All Escalations" docsHash="#docs:dashboard.md:all-escalations" />
+      <PageHeader title="Available Escalations" docsHash="#docs:dashboard.md:all-escalations" />
 
       <EscalationFilterBar
         filters={filters}

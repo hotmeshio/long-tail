@@ -1,4 +1,4 @@
-import type { LTEvent, LTEventType, LTMilestone } from '../../types';
+import type { LTEvent, LTMilestone } from '../../types';
 import { eventRegistry } from './index';
 import { loggerRegistry } from '../logger';
 
@@ -7,7 +7,7 @@ import { loggerRegistry } from '../logger';
  */
 function fireAndForget(event: LTEvent): Promise<void> {
   if (!eventRegistry.hasAdapters) return Promise.resolve();
-  loggerRegistry.info(`[lt-pub] ${event.type} ${event.workflowId || ''} ${(event as any).escalationId || (event as any).taskId || ''}`);
+  loggerRegistry.info(`[lt-pub] ${event.type} ${event.workflowId || ''} ${event.escalationId || event.taskId || ''}`);
   return eventRegistry.publish(event).catch(() => {});
 }
 
@@ -29,7 +29,7 @@ export function publishMilestoneEvent(params: {
   if (!params.milestones?.length) return Promise.resolve();
 
   return fireAndForget({
-    type: 'milestone',
+    type: `system.milestone.${params.workflowId}`,
     source: params.source,
     workflowId: params.workflowId,
     workflowName: params.workflowName,
@@ -43,7 +43,8 @@ export function publishMilestoneEvent(params: {
 }
 
 /**
- * Publish a task lifecycle event (created, started, completed, escalated, failed).
+ * Publish a task lifecycle event.
+ * Subject: system.task.{taskId}.{action}
  */
 export function publishTaskEvent(params: {
   type: 'task.created' | 'task.started' | 'task.completed' | 'task.escalated' | 'task.failed';
@@ -57,8 +58,9 @@ export function publishTaskEvent(params: {
   milestones?: LTMilestone[];
   data?: Record<string, any>;
 }): Promise<void> {
+  const action = params.type.split('.')[1]; // created, started, completed, escalated, failed
   return fireAndForget({
-    type: params.type,
+    type: `system.task.${params.taskId}.${action}`,
     source: params.source,
     workflowId: params.workflowId,
     workflowName: params.workflowName,
@@ -73,7 +75,8 @@ export function publishTaskEvent(params: {
 }
 
 /**
- * Publish an escalation lifecycle event (created, resolved).
+ * Publish an escalation lifecycle event.
+ * Subject: system.escalation.{escalationId}.{action}
  */
 export function publishEscalationEvent(params: {
   type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released';
@@ -87,8 +90,9 @@ export function publishEscalationEvent(params: {
   status: string;
   data?: Record<string, any>;
 }): Promise<void> {
+  const action = params.type.split('.')[1];
   return fireAndForget({
-    type: params.type,
+    type: `system.escalation.${params.escalationId}.${action}`,
     source: params.source,
     workflowId: params.workflowId,
     workflowName: params.workflowName,
@@ -104,7 +108,7 @@ export function publishEscalationEvent(params: {
 
 /**
  * Publish an activity lifecycle event for YAML workflow steps.
- * Lightweight — no payload data, just progress signals.
+ * Subject: system.activity.{workflowId}.{activityName}.{action}
  */
 export function publishActivityEvent(params: {
   type: 'activity.started' | 'activity.completed' | 'activity.failed';
@@ -114,8 +118,9 @@ export function publishActivityEvent(params: {
   activityName: string;
   data?: Record<string, any>;
 }): Promise<void> {
+  const action = params.type.split('.')[1];
   return fireAndForget({
-    type: params.type,
+    type: `system.activity.${params.workflowId}.${params.activityName}.${action}`,
     source: 'yaml-worker',
     workflowId: params.workflowId,
     workflowName: params.workflowName,
@@ -127,17 +132,17 @@ export function publishActivityEvent(params: {
 }
 
 /**
- * Publish a knowledge lifecycle event (stored, deleted).
- * Lightweight — no workflow context required since knowledge writes
- * happen both inside and outside workflows.
+ * Publish a knowledge lifecycle event.
+ * Subject: system.knowledge.{domain}.{action}
  */
 export function publishKnowledgeEvent(params: {
   type: 'knowledge.stored' | 'knowledge.deleted';
   domain: string;
   key: string;
 }): Promise<void> {
+  const action = params.type.split('.')[1];
   return fireAndForget({
-    type: params.type,
+    type: `system.knowledge.${params.domain}.${action}`,
     source: 'knowledge',
     workflowId: '',
     workflowName: '',
@@ -148,8 +153,8 @@ export function publishKnowledgeEvent(params: {
 }
 
 /**
- * Publish a file storage event (stored, deleted).
- * Includes rich metadata: path, name, extension, mime type, size.
+ * Publish a file storage event.
+ * Subject: system.file.{action}
  */
 export function publishFileEvent(params: {
   type: 'file.stored' | 'file.deleted';
@@ -157,6 +162,7 @@ export function publishFileEvent(params: {
   size?: number;
   mime?: string;
 }): Promise<void> {
+  const action = params.type.split('.')[1];
   const parsed = params.path.split('/');
   const filename = parsed[parsed.length - 1] || '';
   const dotIdx = filename.lastIndexOf('.');
@@ -164,7 +170,7 @@ export function publishFileEvent(params: {
   const extension = dotIdx > 0 ? filename.slice(dotIdx + 1) : '';
 
   return fireAndForget({
-    type: params.type,
+    type: `system.file.${action}`,
     source: 'file-storage',
     workflowId: '',
     workflowName: '',
@@ -183,6 +189,7 @@ export function publishFileEvent(params: {
 
 /**
  * Publish an agent lifecycle event.
+ * Subject: system.agent.{agentName}.{action}
  */
 export function publishAgentEvent(params: {
   type: 'agent.started' | 'agent.completed' | 'agent.failed' | 'agent.status_changed';
@@ -191,8 +198,9 @@ export function publishAgentEvent(params: {
   status?: string;
   data?: Record<string, any>;
 }): Promise<void> {
+  const action = params.type.replace('agent.', '');
   return fireAndForget({
-    type: params.type,
+    type: `system.agent.${params.agentName}.${action}`,
     source: 'agent',
     workflowId: params.agentId,
     workflowName: params.agentName,
@@ -204,7 +212,8 @@ export function publishAgentEvent(params: {
 }
 
 /**
- * Publish a workflow lifecycle event (started, completed, failed).
+ * Publish a workflow lifecycle event.
+ * Subject: system.workflow.{workflowId}.{action}
  */
 export function publishWorkflowEvent(params: {
   type: 'workflow.started' | 'workflow.completed' | 'workflow.failed';
@@ -217,8 +226,9 @@ export function publishWorkflowEvent(params: {
   status: string;
   data?: Record<string, any>;
 }): Promise<void> {
+  const action = params.type.split('.')[1];
   return fireAndForget({
-    type: params.type,
+    type: `system.workflow.${params.workflowId}.${action}`,
     source: params.source,
     workflowId: params.workflowId,
     workflowName: params.workflowName,

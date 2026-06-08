@@ -101,6 +101,10 @@ export async function startWorkers(
     });
   }
 
+  // Seed MCP service account (idempotent)
+  const { seedMcpServiceAccount } = await import('../services/mcp/seed-service-account');
+  await seedMcpServiceAccount();
+
   const connection = buildConnection();
 
   // Readonly mode: all user-provided workers are observers — skip crons, triggers, and agent seeding.
@@ -222,6 +226,10 @@ export async function startWorkers(
     }
     loggerRegistry.info(`[long-tail] ${Object.keys(allFactories).length} MCP server factories registered`);
 
+    // Set exposure config for the /mcp endpoint
+    const { setExposureConfig } = await import('../services/mcp/exposure');
+    setExposureConfig(startConfig.mcp?.exposure);
+
     // 2. Seed MCP server configs (insert-if-absent + drift log)
     for (const [name, entry] of Object.entries(allFactories)) {
       if (entry.config) {
@@ -245,6 +253,14 @@ export async function startWorkers(
   const { seedSystemTopics, seedConfigTopics } = await import('../services/topics/system-topics');
   await seedSystemTopics();
   if (startConfig.topics?.length) await seedConfigTopics(startConfig.topics);
+
+  // Seed example topics when examples are enabled
+  if (startConfig.examples) {
+    try {
+      const { EXAMPLE_TOPICS } = await import('../examples');
+      if (EXAMPLE_TOPICS?.length) await seedConfigTopics(EXAMPLE_TOPICS);
+    } catch { /* examples not available */ }
+  }
 
   // Seed agents (from startConfig + example system agents when enabled)
   const systemAgents = startConfig.examples

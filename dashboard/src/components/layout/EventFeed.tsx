@@ -17,9 +17,11 @@ interface FeedEvent {
   data: Record<string, unknown>;
 }
 
+// Color by {category}.{action} — extracted from structured subjects like
+// system.workflow.abc123.completed → workflow.completed
 const TYPE_COLORS: Record<string, string> = {
-  'escalation.created': 'text-status-warning',
-  'escalation.claimed': 'text-blue-400',
+  'escalation.created': 'text-blue-400',
+  'escalation.claimed': 'text-status-warning',
   'escalation.released': 'text-text-tertiary',
   'escalation.resolved': 'text-status-success',
   'task.created': 'text-accent',
@@ -41,9 +43,19 @@ const TYPE_COLORS: Record<string, string> = {
   milestone: 'text-violet-400',
 };
 
+/** Extract {category}.{action} from a structured event type for color lookup. */
+function eventColorKey(type: string): string {
+  // system.workflow.abc123.completed → workflow.completed
+  const parts = type.split('.');
+  if (parts[0] === 'system' && parts.length >= 3) {
+    return `${parts[1]}.${parts[parts.length - 1]}`;
+  }
+  return type;
+}
+
 function EventRow({ event, forceExpanded = false }: { event: FeedEvent; forceExpanded?: boolean }) {
   const [expanded, setExpanded] = useState(forceExpanded);
-  const color = TYPE_COLORS[event.type] || 'text-text-tertiary';
+  const color = TYPE_COLORS[eventColorKey(event.type)] || 'text-text-tertiary';
 
   // Sync with parent-driven expand/collapse
   useEffect(() => { setExpanded(forceExpanded); }, [forceExpanded]);
@@ -158,7 +170,7 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
           </span>
         )}
         {events.length > 0 && !open && (
-          <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${TYPE_COLORS[events[0].type] || 'text-text-tertiary'} bg-surface-sunken`}>
+          <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${TYPE_COLORS[eventColorKey(events[0].type)] || 'text-text-tertiary'} bg-surface-sunken`}>
             {events[0].type}
           </span>
         )}

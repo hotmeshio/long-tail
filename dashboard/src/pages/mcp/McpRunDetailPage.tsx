@@ -85,7 +85,7 @@ export function McpRunDetailPage() {
     if (!jobId || event.workflowId !== jobId) return;
     queryClient.invalidateQueries({ queryKey: ['mcpRunExecution', jobId] });
   }, [jobId, queryClient]);
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.activity.>`, activityHandler);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.activity.>`, activityHandler);
 
   if (isLoading) {
     return (

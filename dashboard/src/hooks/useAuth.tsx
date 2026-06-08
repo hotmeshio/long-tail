@@ -82,9 +82,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const msUntilRefresh = (exp - REFRESH_BUFFER_SECONDS) * 1000 - Date.now();
     if (msUntilRefresh <= 0) return; // Already past buffer — apiFetch handles it
     refreshTimerRef.current = setTimeout(async () => {
-      const creds = sessionStorage.getItem('lt_credentials');
-      if (!creds) return;
       try {
+        // SSO tokens: re-exchange via host cookies (no credentials stored)
+        const payload = decodeJwtPayload(token);
+        if (payload?.sso) {
+          const res = await fetch(`${LT_BASE}/api/auth/sso`, { method: 'POST' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.token) {
+            window.dispatchEvent(
+              new CustomEvent('auth:refreshed', { detail: { token: data.token } }),
+            );
+          }
+          return;
+        }
+
+        // Credential tokens: re-post stored credentials
+        const creds = sessionStorage.getItem('lt_credentials');
+        if (!creds) return;
         const { username, password } = JSON.parse(creds);
         const res = await fetch(`${LT_BASE}/api/auth/login`, {
           method: 'POST',
@@ -126,11 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearTimeout(refreshTimerRef.current);
+    const ssoLogout = sessionStorage.getItem('lt_sso_logout_url');
     setToken(null);
     sessionStorage.removeItem('lt_token');
     sessionStorage.removeItem('lt_credentials');
     sessionStorage.removeItem('lt_user_info');
+    sessionStorage.removeItem('lt_sso_logout_url');
     setUser(null);
+    // Redirect to host logout URL if SSO was active
+    if (ssoLogout) {
+      window.location.href = ssoLogout;
+    }
   }, []);
 
   useEffect(() => {

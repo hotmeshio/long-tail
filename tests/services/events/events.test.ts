@@ -176,7 +176,7 @@ describe('events service', () => {
 
     // The interceptor should have published a milestone event
     const milestoneEvents = eventAdapter.events.filter(
-      (e) => e.type === 'milestone',
+      (e) => e.type.startsWith('system.milestone.'),
     );
     expect(milestoneEvents.length).toBeGreaterThanOrEqual(1);
 
@@ -215,7 +215,7 @@ describe('events service', () => {
     // Poll for interceptor event
     const interceptorEvt = await waitForEvent(
       eventAdapter,
-      (e) => e.type === 'milestone' && e.source === 'interceptor',
+      (e) => e.type.startsWith('system.milestone.') && e.source === 'interceptor',
       10_000,
     );
 
@@ -256,10 +256,11 @@ describe('events service', () => {
     await sleepFor(500);
 
     const evt = eventAdapter.events.find(
-      (e) => e.type === 'milestone' && e.workflowId === workflowId,
+      (e) => e.type.startsWith('system.milestone.') && e.workflowId === workflowId,
     );
     expect(evt).toBeTruthy();
-    expect(evt!.type).toBe('milestone');
+    expect(evt!.type).toMatch(/^system\.milestone\./);
+
     expect(evt!.source).toBe('interceptor');
     expect(evt!.workflowId).toBe(workflowId);
     expect(evt!.workflowName).toBe('reviewContent');
@@ -289,7 +290,7 @@ describe('events service', () => {
     // Poll until the event arrives rather than sleeping a fixed amount.
     const evt = await waitForEvent(
       eventAdapter,
-      (e) => e.type === 'milestone'
+      (e) => e.type.startsWith('system.milestone.')
         && e.source === 'activity'
         && e.activityName === 'processWithMilestones'
         && e.workflowId === workflowId,

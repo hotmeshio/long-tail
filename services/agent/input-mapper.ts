@@ -44,7 +44,21 @@ export function applyInputMapping(
   for (const [key, value] of Object.entries(mapping)) {
     if (typeof value === 'string') {
       result[key] = resolveTemplate(value, event);
-    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+    } else if (Array.isArray(value)) {
+      result[key] = value.map((item) => {
+        if (typeof item === 'string') {
+          const resolved = resolveTemplate(item, event);
+          // Coerce scalars to strings when the template was a string in an array context.
+          // Objects/arrays pass through (e.g., "{event.data}" resolves to the full object).
+          if (resolved !== null && resolved !== undefined && typeof resolved !== 'object') {
+            return String(resolved);
+          }
+          return resolved;
+        }
+        if (item && typeof item === 'object') return applyInputMapping(item, event);
+        return item;
+      });
+    } else if (value && typeof value === 'object') {
       result[key] = applyInputMapping(value, event);
     } else {
       result[key] = value;

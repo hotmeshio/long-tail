@@ -1,6 +1,7 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { publishEscalationEvent } from '../../lib/events/publish';
+
+import { hasGlobalEscalationAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 /**
@@ -27,8 +28,8 @@ export async function claimEscalation(
       return { status: 404, error: 'Escalation not found' };
     }
 
-    const isSuperAdminUser = await userService.isSuperAdmin(auth.userId);
-    if (!isSuperAdminUser) {
+    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+    if (!hasGlobal) {
       const userHasRole = await userService.hasRole(auth.userId, escalation.role);
       if (!userHasRole) {
         return {
@@ -70,17 +71,6 @@ export async function releaseEscalation(
     if (!result) {
       return { status: 409, error: 'Escalation not found or not claimed by you' };
     }
-
-    publishEscalationEvent({
-      type: 'escalation.released',
-      source: 'api',
-      workflowId: result.workflow_id || '',
-      workflowName: result.workflow_type || '',
-      taskQueue: result.task_queue || '',
-      escalationId: input.id,
-      status: 'released',
-      data: { released_by: auth.userId },
-    });
 
     return { status: 200, data: { escalation: result } };
   } catch (err: any) {

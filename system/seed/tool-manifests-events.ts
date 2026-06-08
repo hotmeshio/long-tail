@@ -5,6 +5,7 @@ export const EVENTS_TOOLS = [
   {
     name: 'publish_event',
     description: 'Publish a custom event to the event bus. Other agents and workflows can subscribe to these events and react. Topics follow the convention: app.{namespace}.{entity}.{action} (e.g., app.epic.apis.createorder.error, app.vendor.schema.drift).',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -18,6 +19,7 @@ export const EVENTS_TOOLS = [
   {
     name: 'list_subscriptions',
     description: 'List all active agent event subscriptions, optionally filtered by topic pattern.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -28,6 +30,7 @@ export const EVENTS_TOOLS = [
   {
     name: 'list_topics',
     description: 'Browse the topic catalog to discover available event topics, their descriptions, payload schemas, and subscriber counts. Use this to understand what events are available before subscribing or publishing.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -40,6 +43,7 @@ export const EVENTS_TOOLS = [
   {
     name: 'register_topic',
     description: 'Declare a topic in the catalog with its description and payload schema. Use this to pre-register topics before first publish so other agents can discover them.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {

@@ -6,6 +6,7 @@ import { NatsEventAdapter } from '../lib/events/nats';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { deriveWsUrlFromRequest } from '../lib/events/nats-ws-proxy';
 import { config } from '../modules/config';
+import { isSSOEnabled, getSSOConfig } from '../modules/sso';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 import { hasLLMApiKey } from '../services/llm';
 import type { LTApiResult } from '../types/sdk';
@@ -65,6 +66,10 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
         events: {
           transport,
           natsWsUrl: natsAdapter ? resolveNatsWsUrl(natsAdapter, req) : null,
+        },
+        auth: {
+          sso: isSSOEnabled(),
+          ssoLogoutUrl: getSSOConfig()?.logoutUrl ?? null,
         },
         ai: {
           enabled: hasLLMApiKey(),

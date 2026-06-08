@@ -16,6 +16,52 @@ Every role assignment has a `type` that controls management permissions. All thr
 
 A user can hold multiple roles with different types. For example, a user might be a `member` of `reviewer` and an `admin` of `senior-reviewer`.
 
+## Special Roles
+
+Three role names have fixed types and elevated permissions:
+
+| Role | Fixed Type | Dashboard | Escalation Scope | User Management |
+|------|-----------|-----------|-------------------|-----------------|
+| `superadmin` | `superadmin` | Full (builder + admin) | All roles — role filter ignored | Create other superadmins. Manage any user, any role |
+| `engineer` | `admin` | Full (builder) | Engineer role only | Assign users to `engineer` role |
+| `admin` | `admin` | Escalations + user management | All roles — role filter ignored | Assign users to any non-special role. Bulk actions on all escalations |
+
+All other role names are dynamic. A dynamic role can have type `member` (claim/resolve escalations) or `admin` (plus manage users within that role and bulk actions).
+
+## Dashboard Access
+
+The dashboard adapts to the authenticated user's access tier:
+
+| Tier | Condition | Sees |
+|------|-----------|------|
+| **Builder** | `superadmin` or `engineer` role | Full dashboard: workflows, pipelines, MCP, design, storage, admin, all home page sections |
+| **Operations** | Any role with `admin` type | Home page (escalations only), escalation pages, user/role management (scoped to their roles) |
+| **Operator** | Any role with `member` type | Home page (escalations only), escalation pages |
+
+Bulk escalation actions (bulk claim, assign, triage, escalate) require `admin` or `superadmin` type. Plain `member` users work on escalations one at a time.
+
+## API Access by Tier
+
+Certain API endpoints require builder access (`superadmin` or `engineer` role):
+
+| Endpoint | Access |
+|----------|--------|
+| `POST/PUT/DELETE /api/users` | Builder |
+| `POST /api/users/:id/roles` | Admin (scoped — see below) |
+| All `/api/bot-accounts` | Builder |
+| All `/api/roles` mutations | Builder |
+| All `/api/controlplane` | Builder |
+
+### Scoped Role Assignment
+
+When assigning roles via `POST /api/users/:id/roles`, the caller's own roles determine what they can assign:
+
+| Caller | Can Assign |
+|--------|-----------|
+| `superadmin` | Any role, any type (including `superadmin/superadmin`) |
+| `engineer` | Any role up to `admin` type (never `superadmin` type) |
+| `*/admin` (non-builder) | `member` or `admin` type for roles they themselves hold |
+
 ## List roles for a user
 
 ```

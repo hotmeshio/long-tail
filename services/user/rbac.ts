@@ -1,6 +1,6 @@
 import { getPool } from '../../lib/db';
 
-import { hasRoleType } from './roles';
+import { hasRoleType, getUserRoles } from './roles';
 import { IS_GROUP_ADMIN } from './sql';
 
 // ─── RBAC helpers ─────────────────────────────────────────────────────────────
@@ -29,4 +29,20 @@ export async function isGroupAdmin(userId: string, role: string): Promise<boolea
  */
 export async function canManageRole(actorId: string, role: string): Promise<boolean> {
   return isGroupAdmin(actorId, role);
+}
+
+/**
+ * Can this user act on escalations across all roles?
+ *
+ * True for:
+ * - superadmin (any role with type 'superadmin')
+ * - admin/admin (the named 'admin' role with type 'admin')
+ *
+ * These users see all escalations, can claim/resolve/escalate across
+ * all roles, and can perform bulk actions.
+ */
+export async function hasGlobalEscalationAccess(userId: string): Promise<boolean> {
+  if (await isSuperAdmin(userId)) return true;
+  const roles = await getUserRoles(userId);
+  return roles.some((r) => r.role === 'admin' && r.type === 'admin');
 }

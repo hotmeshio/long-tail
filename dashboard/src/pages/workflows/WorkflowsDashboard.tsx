@@ -172,8 +172,8 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     entity: filters.entity || undefined,
     search: filters.search || undefined,
     status: filters.status || undefined,
-    sort_by: sort.sort_by || undefined,
-    order: sort.sort_by ? sort.order : undefined,
+    sort_by: sort.sort_by || 'created_at',
+    order: sort.order || 'desc',
     registered: registeredFilter,
   });
 

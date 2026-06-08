@@ -211,3 +211,290 @@ export const pruneSchema = z.object({
   entities: z.array(z.string()).optional().describe('Entity allowlist'),
   prune_transient: z.boolean().optional().default(false).describe('Delete transient jobs'),
 });
+
+// ── agents (routes/agents.ts) ───────────────────────────────────────────────
+
+export const listAgentsSchema = z.object({
+  status: z.string().optional().describe('Filter by agent status'),
+  knowledge_domain: z.string().optional().describe('Filter by knowledge domain'),
+  limit: z.number().int().min(1).max(100).optional().default(25),
+  offset: z.number().int().min(0).optional().default(0),
+});
+
+export const getAgentSchema = z.object({
+  id: z.string().describe('Agent ID'),
+});
+
+export const createAgentSchema = z.object({
+  id: z.string().describe('Unique agent identifier'),
+  description: z.string().optional().describe('Agent description'),
+  goals: z.array(z.string()).optional().describe('Agent goals'),
+  rules: z.array(z.string()).optional().describe('Agent behavioral rules'),
+  status: z.string().optional().describe('Initial status'),
+  knowledge_domain: z.string().optional().describe('Knowledge domain'),
+  schedules: z.array(z.any()).optional().describe('Cron schedules for the agent'),
+  subscriptions: z.array(z.any()).optional().describe('Topic subscriptions for the agent'),
+});
+
+export const updateAgentSchema = z.object({
+  id: z.string().describe('Agent ID to update'),
+  description: z.string().optional().describe('Agent description'),
+  goals: z.array(z.string()).optional().describe('Agent goals'),
+  rules: z.array(z.string()).optional().describe('Agent behavioral rules'),
+  status: z.string().optional().describe('Agent status'),
+  knowledge_domain: z.string().optional().describe('Knowledge domain'),
+});
+
+export const deleteAgentSchema = z.object({
+  id: z.string().describe('Agent ID to delete'),
+});
+
+// ── agent subscriptions (routes/agents.ts) ──────────────────────────────────
+
+export const listAgentSubscriptionsSchema = z.object({
+  agent_id: z.string().describe('Agent ID to list subscriptions for'),
+});
+
+export const createAgentSubscriptionSchema = z.object({
+  agent_id: z.string().describe('Agent ID to subscribe'),
+  topic: z.string().describe('Topic to subscribe to'),
+  reaction_type: z.string().describe('Reaction type (e.g. workflow, pipeline, prompt)'),
+  workflow_type: z.string().optional().describe('Workflow type to invoke'),
+  pipeline_id: z.string().optional().describe('Pipeline ID to invoke'),
+  mcp_prompt: z.string().optional().describe('MCP prompt to execute'),
+  input_mapping: z.record(z.any()).optional().describe('Input mapping from event payload'),
+  filter: z.record(z.any()).optional().describe('Event filter criteria'),
+  execute_as: z.string().optional().describe('Bot external_id to execute as'),
+});
+
+export const deleteAgentSubscriptionSchema = z.object({
+  id: z.string().describe('Subscription ID to delete'),
+});
+
+// ── bot accounts (routes/bot-accounts.ts) ───────────────────────────────────
+
+export const listBotsSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional().default(50),
+  offset: z.number().int().min(0).optional().default(0),
+});
+
+export const getBotSchema = z.object({
+  id: z.string().describe('Bot UUID'),
+});
+
+export const createBotSchema = z.object({
+  name: z.string().describe('Unique bot name (slug)'),
+  description: z.string().optional().describe('Bot description'),
+  display_name: z.string().optional().describe('Human-readable display name'),
+  roles: z.array(z.object({
+    role: z.string(),
+    type: z.string(),
+  })).optional().describe('Roles to assign on creation'),
+});
+
+export const updateBotSchema = z.object({
+  id: z.string().describe('Bot UUID'),
+  display_name: z.string().optional().describe('Updated display name'),
+  description: z.string().optional().describe('Updated description'),
+  status: z.string().optional().describe('Bot status'),
+});
+
+export const deleteBotSchema = z.object({
+  id: z.string().describe('Bot UUID to delete'),
+});
+
+export const createBotApiKeySchema = z.object({
+  id: z.string().describe('Bot UUID to create key for'),
+  name: z.string().describe('Key name/label'),
+  scopes: z.array(z.string()).optional().describe('Permission scopes'),
+  expires_at: z.string().optional().describe('Expiration timestamp (ISO 8601)'),
+});
+
+export const revokeBotKeySchema = z.object({
+  key_id: z.string().describe('API key ID to revoke'),
+});
+
+// ── control plane (routes/controlplane.ts) ──────────────────────────────────
+
+export const listAppsSchema = z.object({});
+
+export const rollCallSchema = z.object({
+  app_id: z.string().optional().describe('Namespace to query'),
+  delay: z.number().int().optional().describe('Delay in ms before roll call'),
+});
+
+export const applyThrottleSchema = z.object({
+  appId: z.string().optional().describe('Namespace to throttle'),
+  throttle: z.number().int().describe('Throttle value (messages per second)'),
+  topic: z.string().optional().describe('Topic to throttle'),
+  guid: z.string().optional().describe('Specific GUID to throttle'),
+  scope: z.string().optional().describe('Throttle scope'),
+});
+
+export const getStreamStatsSchema = z.object({
+  app_id: z.string().optional().describe('Namespace to query'),
+  duration: z.string().optional().describe('Stats duration window'),
+  stream: z.string().optional().describe('Specific stream name'),
+});
+
+export const listStreamMessagesSchema = z.object({
+  namespace: z.string().describe('App namespace'),
+  source: z.string().describe('Message source'),
+  limit: z.number().int().min(1).max(100).optional().default(25),
+  offset: z.number().int().min(0).optional().default(0),
+  sort_by: z.string().optional().describe('Sort field'),
+  order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
+  status: z.string().optional().describe('Filter by message status'),
+  stream_name: z.string().optional().describe('Filter by stream name'),
+  msg_type: z.string().optional().describe('Filter by message type'),
+  topic: z.string().optional().describe('Filter by topic'),
+  workflow_name: z.string().optional().describe('Filter by workflow name'),
+  jid: z.string().optional().describe('Filter by job ID'),
+  aid: z.string().optional().describe('Filter by activity ID'),
+});
+
+// ── pipelines (routes/pipelines.ts) ─────────────────────────────────────────
+
+export const listPipelineEntitiesSchema = z.object({
+  app_id: z.string().optional().describe('Namespace to query'),
+});
+
+export const listPipelineJobsSchema = z.object({
+  app_id: z.string().optional().describe('Namespace to query'),
+  limit: z.number().int().min(1).max(100).optional().default(25),
+  offset: z.number().int().min(0).optional().default(0),
+  entity: z.string().optional().describe('Filter by entity type'),
+  search: z.string().optional().describe('Search term'),
+  status: z.string().optional().describe('Filter by job status'),
+  sort_by: z.string().optional().describe('Sort field'),
+  order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
+});
+
+export const getJobExecutionSchema = z.object({
+  job_id: z.string().describe('Job ID to retrieve'),
+  app_id: z.string().optional().describe('Namespace'),
+});
+
+export const interruptJobSchema = z.object({
+  job_id: z.string().describe('Job ID to interrupt'),
+  topic: z.string().describe('Topic of the job'),
+  app_id: z.string().optional().describe('Namespace'),
+});
+
+// ── topics (routes/topics.ts) ───────────────────────────────────────────────
+
+export const listTopicsSchema = z.object({
+  category: z.string().optional().describe('Filter by category'),
+  search: z.string().optional().describe('Search term'),
+  limit: z.number().int().min(1).max(100).optional().default(50),
+  offset: z.number().int().min(0).optional().default(0),
+});
+
+export const getTopicSchema = z.object({
+  topic: z.string().describe('Topic name'),
+});
+
+export const createTopicSchema = z.object({
+  topic: z.string().describe('Unique topic name'),
+  category: z.string().describe('Topic category'),
+  description: z.string().optional().describe('Topic description'),
+  payload_schema: z.record(z.any()).optional().describe('JSON Schema for event payloads'),
+  example_payload: z.record(z.any()).optional().describe('Example payload'),
+  tags: z.array(z.string()).optional().describe('Discovery tags'),
+});
+
+export const updateTopicSchema = z.object({
+  topic: z.string().describe('Topic name to update'),
+  description: z.string().optional().describe('Updated description'),
+  category: z.string().optional().describe('Updated category'),
+  payload_schema: z.record(z.any()).optional().describe('Updated payload schema'),
+  example_payload: z.record(z.any()).optional().describe('Updated example payload'),
+  tags: z.array(z.string()).optional().describe('Updated tags'),
+});
+
+export const deleteTopicSchema = z.object({
+  topic: z.string().describe('Topic name to delete'),
+});
+
+// ── escalation metadata/bulk (routes/escalations/) ──────────────────────────
+
+export const findByMetadataSchema = z.object({
+  key: z.string().describe('Metadata key to search'),
+  value: z.string().describe('Metadata value to match'),
+  status: z.string().optional().describe('Filter by escalation status'),
+  limit: z.number().int().min(1).max(100).optional().default(25),
+  offset: z.number().int().min(0).optional().default(0),
+});
+
+export const claimByMetadataSchema = z.object({
+  key: z.string().describe('Metadata key to match'),
+  value: z.string().describe('Metadata value to match'),
+  durationMinutes: z.number().int().optional().describe('Lock duration in minutes'),
+  assignee: z.string().optional().describe('Assignee user ID'),
+  metadata: z.record(z.any()).optional().describe('Additional metadata to attach'),
+});
+
+export const resolveByMetadataSchema = z.object({
+  key: z.string().describe('Metadata key to match'),
+  value: z.string().describe('Metadata value to match'),
+  resolverPayload: z.record(z.any()).describe('Resolution payload'),
+  assignee: z.string().optional().describe('Assignee user ID'),
+  metadata: z.record(z.any()).optional().describe('Additional metadata to attach'),
+});
+
+export const bulkClaimSchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation UUIDs to claim'),
+  durationMinutes: z.number().int().optional().describe('Lock duration in minutes'),
+});
+
+export const bulkAssignSchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation UUIDs to assign'),
+  targetUserId: z.string().describe('User ID to assign to'),
+  durationMinutes: z.number().int().optional().describe('Lock duration in minutes'),
+});
+
+export const bulkEscalateSchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation UUIDs to escalate'),
+  targetRole: z.string().describe('Role to escalate to'),
+});
+
+export const updatePrioritySchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation UUIDs to update'),
+  priority: z.number().int().min(1).max(4).describe('New priority (1=critical, 4=low)'),
+});
+
+// ── settings (routes/settings.ts) ───────────────────────────────────────────
+
+export const getSettingsSchema = z.object({});
+
+// ── exports (routes/exports.ts) ─────────────────────────────────────────────
+
+export const listExportJobsSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional().default(25),
+  offset: z.number().int().min(0).optional().default(0),
+  entity: z.string().optional().describe('Filter by entity type'),
+  search: z.string().optional().describe('Search term'),
+  status: z.string().optional().describe('Filter by export status'),
+  sort_by: z.string().optional().describe('Sort field'),
+  order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
+  registered: z.string().optional().describe('Filter by registered status'),
+});
+
+export const exportWorkflowStateSchema = z.object({
+  workflow_id: z.string().describe('Workflow ID to export'),
+  allow: z.array(z.string()).optional().describe('Allowlisted field paths'),
+  block: z.array(z.string()).optional().describe('Blocklisted field paths'),
+  values: z.record(z.any()).optional().describe('Override values'),
+});
+
+export const exportWorkflowExecutionSchema = z.object({
+  workflow_id: z.string().describe('Workflow ID to export'),
+  excludeSystem: z.boolean().optional().describe('Exclude system activities'),
+  omitResults: z.boolean().optional().describe('Omit activity results'),
+  mode: z.string().optional().describe('Export mode'),
+  maxDepth: z.number().int().optional().describe('Max traversal depth'),
+});
+
+export const getExportStatusSchema = z.object({
+  workflow_id: z.string().describe('Workflow ID to check export status'),
+});

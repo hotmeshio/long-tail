@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, Inbox, User, BookOpen, Radio } from 'lucide-react';
+import { Inbox, User, BookOpen, Radio } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useAccess } from '../../hooks/useAccess';
 import { useEscalationCounts } from '../../hooks/useEscalationCounts';
 import { useEventStatus } from '../../hooks/useEventContext';
 import { useAIOverride } from '../../api/settings';
@@ -9,6 +10,7 @@ import { AppLogo } from '../common/display/AppLogo';
 
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
+  const { isBuilder } = useAccess();
   const { available, mine } = useEscalationCounts();
   const { connected } = useEventStatus();
   const { toggleAIOverride } = useAIOverride();
@@ -52,8 +54,8 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           }`}
           title="Available escalations"
         >
-          <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-          all{available > 0 && <span className="tabular-nums font-medium">{available}</span>}
+          <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
+          available{available > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{available}</sup>}
         </Link>
 
         {/* Escalations: mine */}
@@ -65,33 +67,43 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           title="My escalation queue"
         >
           <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
-          mine{mine > 0 && <span className="tabular-nums font-medium">{mine}</span>}
+          mine{mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
         </Link>
 
-        <div className="w-px h-4 bg-surface-border" />
+        {isBuilder && (
+          <>
+            <div className="w-px h-4 bg-surface-border" />
 
-        {/* Events */}
-        <button
-          type="button"
-          onClick={onToggleEventFeed}
-          className={`flex items-center gap-1.5 text-[11px] transition-colors ${
-            connected ? 'text-emerald-400 hover:text-emerald-300' : 'text-text-quaternary hover:text-text-secondary'
-          }`}
-          title={connected ? 'Live events — click to toggle feed' : 'Events disconnected'}
-        >
-          <Radio className="w-3.5 h-3.5" strokeWidth={1.5} />
-          events
-        </button>
+            {/* Events */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!connected) {
+                  window.location.reload();
+                } else {
+                  onToggleEventFeed?.();
+                }
+              }}
+              className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+                connected ? 'text-emerald-400 hover:text-emerald-300' : 'text-text-quaternary hover:text-text-secondary'
+              }`}
+              title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
+            >
+              <Radio className="w-3.5 h-3.5" strokeWidth={1.5} />
+              events
+            </button>
 
-        {/* Docs */}
-        <button
-          onClick={onToggleDocs}
-          className="flex items-center gap-1.5 text-[11px] text-text-quaternary hover:text-text-secondary transition-colors"
-          title="Documentation"
-        >
-          <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
-          docs
-        </button>
+            {/* Docs */}
+            <button
+              onClick={onToggleDocs}
+              className="flex items-center gap-1.5 text-[11px] text-text-quaternary hover:text-text-secondary transition-colors"
+              title="Documentation"
+            >
+              <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+              docs
+            </button>
+          </>
+        )}
 
         <div className="w-px h-4 bg-surface-border" />
 

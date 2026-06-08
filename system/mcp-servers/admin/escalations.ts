@@ -5,12 +5,21 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as escalationService from '../../../services/escalation';
+import * as escalationMetaApi from '../../../api/escalations/metadata';
+import * as escalationBulkApi from '../../../api/escalations/bulk';
 import {
   findEscalationsSchema,
   getEscalationStatsSchema,
   claimEscalationSchema,
   releaseExpiredClaimsSchema,
   bulkTriageSchema,
+  findByMetadataSchema,
+  claimByMetadataSchema,
+  resolveByMetadataSchema,
+  bulkClaimSchema,
+  bulkAssignSchema,
+  bulkEscalateSchema,
+  updatePrioritySchema,
 } from './schemas';
 
 export function registerEscalationTools(server: McpServer): void {
@@ -155,6 +164,132 @@ export function registerEscalationTools(server: McpServer): void {
           }),
         }],
       };
+    },
+  );
+
+  // ── Metadata-based operations ───────────────────────────────────────────────
+
+  // mirrors GET /api/escalations/by-metadata
+  (server as any).registerTool(
+    'find_by_metadata',
+    {
+      title: 'Find by Metadata',
+      description:
+        'Find escalations by a metadata key-value pair.',
+      inputSchema: findByMetadataSchema,
+    },
+    async (args: z.infer<typeof findByMetadataSchema>) => {
+      const result = await escalationMetaApi.findByMetadata(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/claim-by-metadata
+  (server as any).registerTool(
+    'claim_by_metadata',
+    {
+      title: 'Claim by Metadata',
+      description:
+        'Find and claim an escalation by metadata key-value pair.',
+      inputSchema: claimByMetadataSchema,
+    },
+    async (args: z.infer<typeof claimByMetadataSchema>) => {
+      const result = await escalationMetaApi.claimByMetadata(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/resolve-by-metadata
+  (server as any).registerTool(
+    'resolve_by_metadata',
+    {
+      title: 'Resolve by Metadata',
+      description:
+        'Find and resolve an escalation by metadata key-value pair.',
+      inputSchema: resolveByMetadataSchema,
+    },
+    async (args: z.infer<typeof resolveByMetadataSchema>) => {
+      const result = await escalationMetaApi.resolveByMetadata(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // ── Bulk operations ─────────────────────────────────────────────────────────
+
+  // mirrors POST /api/escalations/bulk-claim
+  (server as any).registerTool(
+    'bulk_claim',
+    {
+      title: 'Bulk Claim',
+      description: 'Claim multiple escalations in a single operation.',
+      inputSchema: bulkClaimSchema,
+    },
+    async (args: z.infer<typeof bulkClaimSchema>) => {
+      const result = await escalationBulkApi.bulkClaim(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/bulk-assign
+  (server as any).registerTool(
+    'bulk_assign',
+    {
+      title: 'Bulk Assign',
+      description: 'Assign multiple escalations to a specific user.',
+      inputSchema: bulkAssignSchema,
+    },
+    async (args: z.infer<typeof bulkAssignSchema>) => {
+      const result = await escalationBulkApi.bulkAssign(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors PATCH /api/escalations/bulk-escalate
+  (server as any).registerTool(
+    'bulk_escalate',
+    {
+      title: 'Bulk Escalate',
+      description: 'Escalate multiple escalations to a different role.',
+      inputSchema: bulkEscalateSchema,
+    },
+    async (args: z.infer<typeof bulkEscalateSchema>) => {
+      const result = await escalationBulkApi.bulkEscalate(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors PATCH /api/escalations/priority
+  (server as any).registerTool(
+    'update_priority',
+    {
+      title: 'Update Priority',
+      description: 'Update the priority of multiple escalations.',
+      inputSchema: updatePrioritySchema,
+    },
+    async (args: z.infer<typeof updatePrioritySchema>) => {
+      const result = await escalationBulkApi.updatePriority(args, { userId: 'lt-system' });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
     },
   );
 }

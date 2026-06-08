@@ -8,6 +8,7 @@ import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ResolverForm } from '../../../components/escalation/ResolverForm';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { DateValue } from '../../../components/common/display/DateValue';
+import { useAccess } from '../../../hooks/useAccess';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
 import type { LTEscalationRecord } from '../../../api/types';
@@ -23,6 +24,7 @@ function MetaValue({ children }: { children: React.ReactNode }) {
 }
 
 function EscalationRecordSummary({ esc }: { esc: LTEscalationRecord }) {
+  const { isBuilder } = useAccess();
   return (
     <div className="space-y-6">
       {/* Identity + Classification */}
@@ -55,10 +57,10 @@ function EscalationRecordSummary({ esc }: { esc: LTEscalationRecord }) {
         <p className="text-[10px] font-semibold uppercase tracking-wider text-accent/60 mb-3">References</p>
         <div className="flex flex-wrap gap-x-8 gap-y-4">
           <CopyableId label="Escalation ID" value={esc.id} />
-          {esc.task_id && <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />}
-          {esc.workflow_type && <CopyableId label="Workflow Name" value={esc.workflow_type} href={`/workflows/registry/${esc.workflow_type}`} />}
-          {esc.workflow_id && <CopyableId label="Workflow ID" value={esc.workflow_id} href={`/workflows/executions/${esc.workflow_id}`} />}
-          {esc.task_queue && <CopyableId label="Task Queue" value={esc.task_queue} />}
+          {esc.task_id && <CopyableId label="Task ID" value={esc.task_id} href={isBuilder ? `/workflows/tasks/detail/${esc.task_id}` : undefined} />}
+          {esc.workflow_type && <CopyableId label="Workflow Name" value={esc.workflow_type} href={isBuilder ? `/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}` : undefined} />}
+          {esc.workflow_id && <CopyableId label="Workflow ID" value={esc.workflow_id} href={isBuilder ? `/workflows/executions/${esc.workflow_id}` : undefined} />}
+          {esc.task_queue && <CopyableId label="Task Queue" value={esc.task_queue} href={isBuilder ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />}
           {esc.origin_id && esc.origin_id !== esc.workflow_id && <CopyableId label="Origin ID" value={esc.origin_id} />}
           {esc.parent_id && <CopyableId label="Parent ID" value={esc.parent_id} />}
           {esc.trace_id && <CopyableId label="Trace ID" value={esc.trace_id} />}
