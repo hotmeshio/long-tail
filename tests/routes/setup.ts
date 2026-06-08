@@ -17,6 +17,7 @@ const TEST_DB = {
   database: 'longtail_test',
 };
 
+const SUPERADMIN_USER_ID = '00000000-0000-0000-0000-000000000000';
 const ADMIN_USER_ID = '00000000-0000-0000-0000-000000000001';
 const MEMBER_USER_ID = '00000000-0000-0000-0000-000000000002';
 
@@ -37,6 +38,7 @@ export function authHeaders(token: string) {
  */
 export function setupRouteTest(port: number, startOverrides?: Partial<LTStartConfig>) {
   let lt: LTInstance;
+  let builderToken: string;
   let adminToken: string;
   let memberToken: string;
   const BASE = `http://localhost:${port}/api`;
@@ -49,6 +51,7 @@ export function setupRouteTest(port: number, startOverrides?: Partial<LTStartCon
       auth: { secret: 'route-test-secret' },
       ...startOverrides,
     } as LTStartConfig);
+    builderToken = signToken({ userId: SUPERADMIN_USER_ID, role: 'superadmin' });
     adminToken = signToken({ userId: ADMIN_USER_ID, role: 'admin' });
     memberToken = signToken({ userId: MEMBER_USER_ID, role: 'member' });
   }, 30_000);
@@ -60,7 +63,11 @@ export function setupRouteTest(port: number, startOverrides?: Partial<LTStartCon
 
   return {
     get BASE() { return BASE; },
+    /** Superadmin / builder — full access */
+    get builderToken() { return builderToken; },
+    /** Admin type — scoped admin, no builder access */
     get adminToken() { return adminToken; },
+    /** Member type — escalation operator only */
     get memberToken() { return memberToken; },
   };
 }
