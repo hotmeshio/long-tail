@@ -20,7 +20,7 @@ describe('agent and knowledge event publishing', () => {
     await eventRegistry.connect();
     await publishKnowledgeEvent({ type: 'knowledge.stored', domain: 'test', key: 'k1' });
     expect(adapter.events.length).toBe(1);
-    expect(adapter.events[0].type).toBe('knowledge.stored');
+    expect(adapter.events[0].type).toBe('system.knowledge.test.stored');
     expect(adapter.events[0].source).toBe('knowledge');
     expect(adapter.events[0].data).toEqual({ domain: 'test', key: 'k1' });
   });
@@ -28,14 +28,14 @@ describe('agent and knowledge event publishing', () => {
   it('publishKnowledgeEvent emits knowledge.deleted', async () => {
     await eventRegistry.connect();
     await publishKnowledgeEvent({ type: 'knowledge.deleted', domain: 'test', key: 'k1' });
-    expect(adapter.events[0].type).toBe('knowledge.deleted');
+    expect(adapter.events[0].type).toBe('system.knowledge.test.deleted');
   });
 
   it('publishAgentEvent emits agent.started', async () => {
     await eventRegistry.connect();
     await publishAgentEvent({ type: 'agent.started', agentId: 'a1', agentName: 'test-agent' });
     expect(adapter.events.length).toBe(1);
-    expect(adapter.events[0].type).toBe('agent.started');
+    expect(adapter.events[0].type).toBe('system.agent.test-agent.started');
     expect(adapter.events[0].source).toBe('agent');
     expect(adapter.events[0].workflowId).toBe('a1');
     expect(adapter.events[0].workflowName).toBe('test-agent');

@@ -153,8 +153,8 @@ export function McpRunsPage() {
     entity: filters.entity || undefined,
     search: filters.search || undefined,
     status: filters.status || undefined,
-    sort_by: sort.sort_by || undefined,
-    order: sort.order || undefined,
+    sort_by: sort.sort_by || 'created_at',
+    order: sort.order || 'desc',
   });
 
   const total = runsData?.total ?? 0;

@@ -44,7 +44,7 @@ describe('event publish functions', () => {
 
       expect(adapter.events).toHaveLength(1);
       const evt = adapter.events[0];
-      expect(evt.type).toBe('milestone');
+      expect(evt.type).toBe('system.milestone.wf-1');
       expect(evt.source).toBe('interceptor');
       expect(evt.workflowId).toBe('wf-1');
       expect(evt.workflowName).toBe('reviewContent');
@@ -108,7 +108,8 @@ describe('event publish functions', () => {
 
         expect(adapter.events).toHaveLength(1);
         const evt = adapter.events[0];
-        expect(evt.type).toBe(type);
+        const action = type.split('.')[1];
+        expect(evt.type).toBe(`system.task.task-2.${action}`);
         expect(evt.taskId).toBe('task-2');
         expect(evt.originId).toBe('origin-1');
         expect(evt.status).toBe('in_progress');
@@ -156,7 +157,7 @@ describe('event publish functions', () => {
 
       expect(adapter.events).toHaveLength(1);
       const evt = adapter.events[0];
-      expect(evt.type).toBe('escalation.created');
+      expect(evt.type).toBe('system.escalation.esc-1.created');
       expect(evt.escalationId).toBe('esc-1');
       expect(evt.status).toBe('pending');
       expect(evt.data).toEqual({ reason: 'needs human review' });
@@ -174,7 +175,7 @@ describe('event publish functions', () => {
       });
 
       const evt = adapter.events[0];
-      expect(evt.type).toBe('escalation.resolved');
+      expect(evt.type).toBe('system.escalation.esc-2.resolved');
       expect(evt.escalationId).toBe('esc-2');
       expect(evt.status).toBe('resolved');
     });
@@ -204,7 +205,8 @@ describe('event publish functions', () => {
 
         expect(adapter.events).toHaveLength(1);
         const evt = adapter.events[0];
-        expect(evt.type).toBe(type);
+        const action = type.split('.')[1];
+        expect(evt.type).toBe(`system.workflow.wf-6.${action}`);
         expect(evt.workflowId).toBe('wf-6');
         expect(evt.originId).toBe('origin-3');
         expect(evt.status).toBe('running');
@@ -251,7 +253,8 @@ describe('event publish functions', () => {
 
         expect(adapter.events).toHaveLength(1);
         const evt = adapter.events[0];
-        expect(evt.type).toBe(type);
+        const action = type.split('.')[1];
+        expect(evt.type).toBe(`system.activity.job-1.capture_page.${action}`);
         expect(evt.source).toBe('yaml-worker');
         expect(evt.workflowId).toBe('job-1');
         expect(evt.workflowName).toBe('take-screenshots');

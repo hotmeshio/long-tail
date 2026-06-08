@@ -20,6 +20,7 @@ interface EscalationFilters {
   sort_by?: string;
   order?: string;
   enabled?: boolean;
+  staleTime?: number;
 }
 
 export interface EscalationStats {
@@ -47,7 +48,7 @@ export function useEscalationTypes() {
 }
 
 export function useEscalations(filters: EscalationFilters) {
-  const { enabled = true, ...rest } = filters;
+  const { enabled = true, staleTime, ...rest } = filters;
   const params = new URLSearchParams();
   if (rest.status) params.set('status', rest.status);
   if (rest.role) params.set('role', rest.role);
@@ -65,11 +66,12 @@ export function useEscalations(filters: EscalationFilters) {
     queryKey: ['escalations', rest],
     queryFn: () => apiFetch(`/escalations?${params}`),
     enabled,
+    ...(staleTime !== undefined ? { staleTime } : {}),
   });
 }
 
 export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status'>) {
-  const { enabled = true, ...rest } = filters;
+  const { enabled = true, staleTime, ...rest } = filters;
   const params = new URLSearchParams();
   if (rest.role) params.set('role', rest.role);
   if (rest.type) params.set('type', rest.type);
@@ -84,6 +86,7 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
     queryKey: ['escalations', 'available', rest],
     queryFn: () => apiFetch(`/escalations/available?${params}`),
     enabled,
+    ...(staleTime !== undefined ? { staleTime } : {}),
   });
 }
 
@@ -112,8 +115,8 @@ export function useClaimEscalation() {
         body: JSON.stringify({ durationMinutes }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+      queryClient.resetQueries({ queryKey: ['escalations'] });
+      queryClient.resetQueries({ queryKey: ['escalationStats'] });
     },
   });
 }
@@ -124,8 +127,8 @@ export function useReleaseEscalation() {
     mutationFn: (id: string) =>
       apiFetch(`/escalations/${id}/release`, { method: 'POST' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+      queryClient.resetQueries({ queryKey: ['escalations'] });
+      queryClient.resetQueries({ queryKey: ['escalationStats'] });
     },
   });
 }
@@ -145,10 +148,10 @@ export function useResolveEscalation() {
         body: JSON.stringify({ resolverPayload }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['tasks'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'all' });
+      queryClient.resetQueries({ queryKey: ['escalations'] });
+      queryClient.resetQueries({ queryKey: ['escalationStats'] });
+      queryClient.resetQueries({ queryKey: ['tasks'] });
+      queryClient.resetQueries({ queryKey: ['jobs'] });
     },
   });
 }
@@ -162,8 +165,8 @@ export function useEscalateToRole() {
         body: JSON.stringify({ targetRole }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+      queryClient.resetQueries({ queryKey: ['escalations'] });
+      queryClient.resetQueries({ queryKey: ['escalationStats'] });
     },
   });
 }

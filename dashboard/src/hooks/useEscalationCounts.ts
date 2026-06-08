@@ -28,7 +28,7 @@ export function useEscalationCounts(): { available: number; mine: number } {
   }, [qc]);
 
   // Listen for escalation lifecycle events
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, invalidate);
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, invalidate);
 
   const { data: availableData } = useAvailableEscalations({ limit: 1 });
   const { data: myData } = useEscalations({

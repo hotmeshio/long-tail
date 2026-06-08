@@ -181,6 +181,17 @@ export function HomePage() {
   const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' });
   const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc' });
   const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc' });
+
+  // Delayed refetch — allows signal-routed escalation resolutions
+  // (durable activity) time to commit before refreshing the list
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      myEscQ.refetch();
+      allEscQ.refetch();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const processes = procQ.data?.processes ?? [];
   const processTotal = (procQ.data as any)?.total as number | undefined;
   const jobs = jobsQ.data?.jobs ?? [];

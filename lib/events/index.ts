@@ -25,10 +25,14 @@ class LTEventRegistry {
 
   /**
    * Publish an event to all registered adapters.
+   * Auto-assigns an idempotent event ID if not provided.
    * Best-effort: individual adapter failures are logged, not thrown.
    */
   async publish(event: LTEvent): Promise<void> {
     if (!this.adapters.length) return;
+    if (!event.id) {
+      event.id = `evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    }
     await Promise.allSettled(
       this.adapters.map((a) =>
         a.publish(event).catch((err) => {

@@ -22,9 +22,13 @@ interface EventTopicPillProps {
 }
 
 export function EventTopicPill({ topic }: EventTopicPillProps) {
-  const category = topic.split('.')[0];
+  const parts = topic.split('.');
+  const category = parts[0] === 'system' ? parts[1] : parts[0];
   const iconColor = CATEGORY_COLORS[category] ?? 'text-text-quaternary';
-  const shortTopic = topic.split('.').slice(-2).join('.');
+  // Show category.action for system events (e.g., workflow.completed)
+  const shortTopic = parts[0] === 'system'
+    ? `${parts[1]}.${parts[parts.length - 1]}`
+    : parts.slice(-2).join('.');
 
   return (
     <span className="inline-flex items-center gap-1 text-[11px] font-mono text-text-secondary">

@@ -64,7 +64,7 @@ export function useYamlActivityEvents(jobId: string | null): {
   }, [jobId]);
 
   useEventSubscription(
-    jobId ? `${NATS_SUBJECT_PREFIX}.activity.>` : '',
+    jobId ? `${NATS_SUBJECT_PREFIX}.system.activity.>` : '',
     handler,
   );
 

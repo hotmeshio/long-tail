@@ -97,6 +97,7 @@ export function isValidVariant(pattern: string, subject: string): boolean {
 export async function publishTopic(input: {
   topic: string;
   subject?: string;
+  eventId?: string;
   data: Record<string, any>;
   source?: string;
 }): Promise<LTApiResult> {
@@ -109,6 +110,7 @@ export async function publishTopic(input: {
     }
 
     const event: LTEvent = {
+      id: input.eventId,
       type: publishSubject,
       source: input.source || 'dashboard',
       workflowId: '',

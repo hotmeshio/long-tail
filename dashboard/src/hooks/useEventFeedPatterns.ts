@@ -10,20 +10,32 @@ function patternFromRoute(pathname: string): string {
     const topic = decodeURIComponent(pathname.replace('/topics/', ''));
     if (topic && !topic.includes('/')) return `lt.events.${topic}`;
   }
-  // Escalation pages
-  if (pathname.startsWith('/escalations')) return 'lt.events.escalation.>';
-  // Workflow pages
-  if (pathname.startsWith('/workflows')) return 'lt.events.workflow.>';
-  // Agent pages
-  if (pathname.startsWith('/agents')) return 'lt.events.agent.>';
+  // Escalation detail → subscribe to that specific escalation
+  const escDetailMatch = pathname.match(/^\/escalations\/detail\/(.+)/);
+  if (escDetailMatch) return `lt.events.system.escalation.${escDetailMatch[1]}.>`;
+  // Escalation pages (list)
+  if (pathname.startsWith('/escalations')) return 'lt.events.system.escalation.>';
+  // Workflow execution detail → subscribe to that specific workflow
+  const wfDetailMatch = pathname.match(/^\/workflows\/(?:durable\/)?executions\/(.+)/);
+  if (wfDetailMatch) return `lt.events.system.workflow.${wfDetailMatch[1]}.>`;
+  // Workflow pages (list)
+  if (pathname.startsWith('/workflows')) return 'lt.events.system.workflow.>';
+  // Agent detail → subscribe to that specific agent's events
+  const agentDetailMatch = pathname.match(/^\/agents\/([^/]+)$/);
+  if (agentDetailMatch && agentDetailMatch[1] !== 'new') return `lt.events.system.agent.${agentDetailMatch[1]}.>`;
+  // Agent pages (list)
+  if (pathname.startsWith('/agents')) return 'lt.events.system.agent.>';
   // Knowledge
-  if (pathname.startsWith('/knowledge')) return 'lt.events.knowledge.>';
+  if (pathname.startsWith('/knowledge')) return 'lt.events.system.knowledge.>';
   // Files
-  if (pathname.startsWith('/files')) return 'lt.events.file.>';
+  if (pathname.startsWith('/files')) return 'lt.events.system.file.>';
   // Home / recent activity — broader
   if (pathname === '/') return 'lt.events.>';
+  // MCP execution detail → subscribe to that specific job
+  const mcpDetailMatch = pathname.match(/^\/mcp\/executions\/(.+)/);
+  if (mcpDetailMatch) return `lt.events.system.activity.${mcpDetailMatch[1]}.>`;
   // Capabilities, MCP
-  if (pathname.startsWith('/mcp')) return 'lt.events.activity.>';
+  if (pathname.startsWith('/mcp')) return 'lt.events.system.activity.>';
   // Fallback
   return 'lt.events.>';
 }

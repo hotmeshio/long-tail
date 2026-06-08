@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { useViewMode } from '../../../hooks/useViewMode';
 import { useCollapsedSections } from '../../../hooks/useCollapsedSections';
@@ -49,6 +50,7 @@ export function EscalationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, hasRoleType, hasRole } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: esc, isLoading } = useEscalation(id!);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
@@ -153,7 +155,11 @@ export function EscalationDetailPage() {
     expand('resolver');
   };
 
-  const goBack = () => navigate(-1);
+  const goBack = () => {
+    queryClient.resetQueries({ queryKey: ['escalations'] });
+    queryClient.resetQueries({ queryKey: ['escalationStats'] });
+    navigate(-1);
+  };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
     await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });

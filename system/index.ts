@@ -354,8 +354,8 @@ export function getSystemAgents(): LTAgentConfig[] {
         { cron: '0 * * * *', workflow_type: 'basicEcho' },
       ],
       subscriptions: [
-        { topic: 'workflow.failed', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } } },
-        { topic: 'activity.failed', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { activity: '{event.activityName}', workflowId: '{event.workflowId}' } } },
+        { topic: 'system.workflow.*.failed', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } } },
+        { topic: 'system.activity.*.*.failed', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { activity: '{event.activityName}', workflowId: '{event.workflowId}' } } },
         { topic: 'app.*.*.error', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { error: '{event.data}', source: '{event.source}' } } },
       ],
     },
@@ -368,7 +368,7 @@ export function getSystemAgents(): LTAgentConfig[] {
       knowledge_domain: 'event-routing',
       subscriptions: [
         { topic: 'app.>', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { topic: '{event.type}', source: '{event.source}', payload: '{event.data}' } } },
-        { topic: 'knowledge.stored', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { domain: '{event.data.domain}', key: '{event.data.key}' } } },
+        { topic: 'system.knowledge.*.stored', reaction_type: 'durable', workflow_type: 'basicEcho', input_mapping: { data: { domain: '{event.data.domain}', key: '{event.data.key}' } } },
       ],
     },
     {
@@ -382,7 +382,7 @@ export function getSystemAgents(): LTAgentConfig[] {
         { cron: '*/15 * * * *', workflow_type: 'reviewContent' },
       ],
       subscriptions: [
-        { topic: 'escalation.created', reaction_type: 'durable', workflow_type: 'reviewContent', filter: { workflowName: 'reviewContent' }, input_mapping: { data: { escalationId: '{event.escalationId}', workflowId: '{event.workflowId}' } } },
+        { topic: 'system.escalation.*.created', reaction_type: 'durable', workflow_type: 'reviewContent', filter: { workflowName: 'reviewContent' }, input_mapping: { data: { escalationId: '{event.escalationId}', workflowId: '{event.workflowId}' } } },
       ],
     },
   ];

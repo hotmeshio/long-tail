@@ -40,6 +40,7 @@ export function TopicDetailPage() {
 
   const [editing, setEditing] = useState(false);
   const [publishSubject, setPublishSubject] = useState('');
+  const [publishEventId, setPublishEventId] = useState(() => `evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`);
   const [publishPayload, setPublishPayload] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState('');
@@ -262,6 +263,14 @@ export function TopicDetailPage() {
                 <Send className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
                 <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Publish</h2>
               </div>
+              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Event ID</label>
+              <input
+                value={publishEventId}
+                onChange={(e) => setPublishEventId(e.target.value)}
+                className="input w-full text-[11px] font-mono mb-3"
+                spellCheck={false}
+                placeholder="evt-1720368000000-a3f2"
+              />
               <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Subject</label>
               <input
                 value={publishSubject || topic.topic}
@@ -286,7 +295,11 @@ export function TopicDetailPage() {
                       const subject = (publishSubject || topic.topic) !== topic.topic
                         ? (publishSubject || topic.topic)
                         : undefined;
-                      publishMutation.mutate({ topic: topic.topic, subject, data }, { onSuccess: () => refetch() });
+                      publishMutation.mutate({ topic: topic.topic, subject, eventId: publishEventId || undefined, data }, { onSuccess: () => {
+                        refetch();
+                        // Generate a fresh event ID for the next publish
+                        setPublishEventId(`evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`);
+                      } });
                     } catch { /* invalid JSON */ }
                   }}
                   disabled={publishMutation.isPending}

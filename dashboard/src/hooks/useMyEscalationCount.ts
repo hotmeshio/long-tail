@@ -20,7 +20,7 @@ export function useMyEscalationCount(): number {
     limit: 1,
   });
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.escalation.>`, () => {
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
     if (userId) {
       qc.invalidateQueries({ queryKey: ['escalations'] });
     }
