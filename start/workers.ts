@@ -222,6 +222,10 @@ export async function startWorkers(
     }
     loggerRegistry.info(`[long-tail] ${Object.keys(allFactories).length} MCP server factories registered`);
 
+    // Set exposure config for the /mcp endpoint
+    const { setExposureConfig } = await import('../services/mcp/exposure');
+    setExposureConfig(startConfig.mcp?.exposure);
+
     // 2. Seed MCP server configs (insert-if-absent + drift log)
     for (const [name, entry] of Object.entries(allFactories)) {
       if (entry.config) {
