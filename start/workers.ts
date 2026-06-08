@@ -101,6 +101,10 @@ export async function startWorkers(
     });
   }
 
+  // Seed MCP service account (idempotent)
+  const { seedMcpServiceAccount } = await import('../services/mcp/seed-service-account');
+  await seedMcpServiceAccount();
+
   const connection = buildConnection();
 
   // Readonly mode: all user-provided workers are observers — skip crons, triggers, and agent seeding.

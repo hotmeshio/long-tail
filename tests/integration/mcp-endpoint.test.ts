@@ -197,4 +197,67 @@ describe('MCP Endpoint — /mcp', () => {
     log('mcp-test', `service account auth: discovered ${tools.length} tools`);
     await client.close();
   });
+
+  it('read-scoped key sees fewer tools than full key', async () => {
+    // Create a service account with two keys
+    const botName = `mcp-scope-test-${Date.now()}`;
+    const botRes = await fetch(`${BASE_URL}/api/bot-accounts`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: botName }),
+    });
+    const bot = await botRes.json() as any;
+
+    // Read key
+    const readKeyRes = await fetch(`${BASE_URL}/api/bot-accounts/${bot.id}/api-keys`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: 'read', scopes: ['mcp:read'] }),
+    });
+    const readKeyData = await readKeyRes.json() as any;
+
+    // Full key
+    const fullKeyRes = await fetch(`${BASE_URL}/api/bot-accounts/${bot.id}/api-keys`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: 'full', scopes: ['mcp:read', 'mcp:full'] }),
+    });
+    const fullKeyData = await fullKeyRes.json() as any;
+
+    // Discover tools with read key
+    const { client: readClient, transport: readTransport } = createMcpClient(readKeyData.rawKey);
+    await readClient.connect(readTransport);
+    const { tools: readTools } = await readClient.listTools();
+    await readClient.close();
+
+    // Discover tools with full key
+    const { client: fullClient, transport: fullTransport } = createMcpClient(fullKeyData.rawKey);
+    await fullClient.connect(fullTransport);
+    const { tools: fullTools } = await fullClient.listTools();
+    await fullClient.close();
+
+    // Read key should see fewer tools
+    expect(readTools.length).toBeLessThan(fullTools.length);
+    expect(readTools.length).toBeGreaterThan(0);
+
+    // Read key should not see write tools
+    const readNames = readTools.map((t) => t.name);
+    expect(readNames).not.toContain('create_user');
+    expect(readNames).not.toContain('invoke_workflow');
+
+    // Read key should see read_safe tools
+    expect(readNames).toContain('find_tasks');
+    expect(readNames).toContain('get_settings');
+
+    log('mcp-test', `scope test: read=${readTools.length} tools, full=${fullTools.length} tools`);
+  });
 });

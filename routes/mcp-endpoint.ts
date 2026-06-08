@@ -31,7 +31,8 @@ router.use(requireAuth);
 router.post('/', async (req, res) => {
   try {
     const exposure = getExposureConfig();
-    const server = await createUnifiedMcpServer(exposure);
+    const callerScopes = (req.auth as any)?.scopes as string[] | undefined;
+    const server = await createUnifiedMcpServer(exposure, callerScopes);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless

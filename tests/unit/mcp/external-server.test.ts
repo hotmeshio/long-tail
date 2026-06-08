@@ -108,6 +108,37 @@ describe('createUnifiedMcpServer', () => {
     expect(listTopicsCount).toBeGreaterThanOrEqual(1);
   });
 
+  it('filters to read_safe tools for mcp:read scope (no mcp:full)', async () => {
+    const full = await createUnifiedMcpServer(undefined, ['mcp:read', 'mcp:full']);
+    const readOnly = await createUnifiedMcpServer(undefined, ['mcp:read']);
+
+    const fullNames = Object.keys((full as any)._registeredTools);
+    const readNames = Object.keys((readOnly as any)._registeredTools);
+
+    // Read-only should have fewer tools than full
+    expect(readNames.length).toBeLessThan(fullNames.length);
+
+    // Read-only should include read_safe tools
+    expect(readNames).toContain('find_tasks');
+    expect(readNames).toContain('get_settings');
+    expect(readNames).toContain('list_users');
+
+    // Read-only should NOT include write tools
+    expect(readNames).not.toContain('create_user');
+    expect(readNames).not.toContain('invoke_workflow');
+    expect(readNames).not.toContain('prune');
+  });
+
+  it('mcp:full scope sees all tools', async () => {
+    const full = await createUnifiedMcpServer(undefined, ['mcp:read', 'mcp:full']);
+    const unscoped = await createUnifiedMcpServer();
+    const fullNames = Object.keys((full as any)._registeredTools);
+    const unscopedNames = Object.keys((unscoped as any)._registeredTools);
+
+    // Full scoped should match unscoped (no filtering)
+    expect(fullNames.length).toBe(unscopedNames.length);
+  });
+
   it('all registered tools have handlers', async () => {
     const server = await createUnifiedMcpServer();
     const tools = (server as any)._registeredTools as Record<string, any>;

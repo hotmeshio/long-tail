@@ -73,8 +73,13 @@ function isToolAllowed(
   toolName: string,
   serverName: string,
   exposure?: ExposureConfig,
+  callerScopes?: string[],
 ): boolean {
-  if (!exposure?.readOnly) return true;
+  // Per-caller scope filtering: mcp:read callers only see read_safe tools
+  const isReadOnly = exposure?.readOnly
+    || (callerScopes?.length && callerScopes.includes('mcp:read') && !callerScopes.includes('mcp:full'));
+
+  if (!isReadOnly) return true;
 
   // Check read_safe in the tool manifest
   const config = builtinMcpServerFactories[serverName]?.config;
@@ -94,6 +99,7 @@ function isToolAllowed(
  */
 export async function createUnifiedMcpServer(
   exposure?: ExposureConfig,
+  callerScopes?: string[],
 ): Promise<McpServer> {
   const unified = new McpServer({ name: 'long-tail', version: '1.0.0' });
   const registered = new Set<string>();
@@ -109,7 +115,7 @@ export async function createUnifiedMcpServer(
 
     for (const [toolName, tool] of Object.entries(tools)) {
       if (!tool?.handler || !tool.enabled) continue;
-      if (!isToolAllowed(toolName, name, exposure)) continue;
+      if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
 
       // Deduplicate: prefix with server short name on collision
       let finalName = toolName;
