@@ -21,8 +21,8 @@ import {
   GET_ESCALATIONS_BY_WORKFLOW_ID,
   GET_ESCALATIONS_BY_ORIGIN_ID,
   FIND_BY_METADATA,
-  COUNT_BY_METADATA,
-  CLAIM_BY_METADATA,
+  CLAIM_BY_METADATA_GUARDED,
+  RESOLVE_BY_METADATA_ATOMIC,
 } from './sql';
 
 export async function createEscalation(
@@ -300,30 +300,39 @@ export async function findByMetadata(
 ): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
-  const [countResult, dataResult] = await Promise.all([
-    pool.query(COUNT_BY_METADATA, [filter, status || null]),
-    pool.query(FIND_BY_METADATA, [filter, status || null, limit, offset]),
-  ]);
-  return {
-    escalations: dataResult.rows,
-    total: parseInt(countResult.rows[0].count, 10),
-  };
+  const { rows } = await pool.query(FIND_BY_METADATA, [filter, status || null, limit, offset]);
+  const total = rows.length > 0 ? parseInt(rows[0]._total, 10) : 0;
+  // Strip the window function column from results
+  const escalations = rows.map(({ _total, ...rest }) => rest as LTEscalationRecord);
+  return { escalations, total };
 }
 
+/**
+ * Atomic claim by metadata with inline RBAC.
+ * The SQL WHERE clause enforces role membership — if the caller
+ * doesn't have an allowed role, zero rows match and the claim
+ * never happens. No pre-flight find, no TOCTOU.
+ *
+ * @param allowedRoles — roles the caller can claim (null = no filter / global access)
+ * @returns `{ escalation, isExtension, candidatesExist }` or null
+ */
 export async function claimByMetadata(
   key: string,
   value: string,
   userId: string,
   durationMinutes = 30,
   metadata?: Record<string, any>,
-): Promise<ClaimResult | null> {
+  allowedRoles?: string[] | null,
+): Promise<(ClaimResult & { candidatesExist: number }) | null> {
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
   const metaPatch = metadata ? JSON.stringify(metadata) : null;
-  const { rows } = await pool.query(CLAIM_BY_METADATA, [filter, userId, durationMinutes, metaPatch]);
+  const roles = allowedRoles ?? null;
+  const { rows } = await pool.query(CLAIM_BY_METADATA_GUARDED, [filter, userId, durationMinutes, metaPatch, roles]);
   if (rows.length === 0) return null;
   const row = rows[0];
-  const escalation = row as LTEscalationRecord;
+  const { candidates_exist, prev_assigned_to, _total, ...rest } = row;
+  const escalation = rest as LTEscalationRecord;
 
   publishEscalationEvent({
     type: 'escalation.claimed',
@@ -338,6 +347,42 @@ export async function claimByMetadata(
 
   return {
     escalation,
-    isExtension: row.prev_assigned_to === userId,
+    isExtension: prev_assigned_to === userId,
+    candidatesExist: parseInt(candidates_exist, 10),
   };
+}
+
+/**
+ * Atomic resolve by metadata: find + claim + resolve in one CTE.
+ * RBAC is enforced in the SQL WHERE clause via allowedRoles.
+ */
+export async function resolveByMetadataAtomic(
+  key: string,
+  value: string,
+  userId: string,
+  resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
+  allowedRoles?: string[] | null,
+): Promise<LTEscalationRecord | null> {
+  const pool = getPool();
+  const filter = JSON.stringify({ [key]: value });
+  const payloadJson = JSON.stringify(resolverPayload);
+  const metaPatch = metadata ? JSON.stringify(metadata) : null;
+  const roles = allowedRoles ?? null;
+  const { rows } = await pool.query(RESOLVE_BY_METADATA_ATOMIC, [filter, userId, payloadJson, metaPatch, roles]);
+  if (rows.length === 0) return null;
+  const escalation = rows[0] as LTEscalationRecord;
+
+  publishEscalationEvent({
+    type: 'escalation.resolved',
+    source: 'service',
+    workflowId: escalation.workflow_id || '',
+    workflowName: escalation.workflow_type || '',
+    taskQueue: escalation.task_queue || '',
+    escalationId: escalation.id,
+    status: 'resolved',
+    data: { resolved_by: userId },
+  });
+
+  return escalation;
 }

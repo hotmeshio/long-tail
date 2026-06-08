@@ -26,11 +26,12 @@ export async function checkBulkPermission(
   if (await userService.hasGlobalEscalationAccess(userId)) return { allowed: true };
 
   const roles = await escalationService.getEscalationRoles(ids);
-  for (const role of roles) {
-    const canManage = await userService.isGroupAdmin(userId, role);
-    if (!canManage) {
-      return { allowed: false, status: 403, error: `Insufficient permissions for role "${role}"` };
-    }
+  if (!roles.length) return { allowed: true };
+
+  // Single batched query instead of N+1 loop
+  const canManageAll = await userService.hasRolesAsAdmin(userId, roles);
+  if (!canManageAll) {
+    return { allowed: false, status: 403, error: 'Insufficient permissions for one or more escalation roles' };
   }
   return { allowed: true };
 }
