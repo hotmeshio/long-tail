@@ -8,6 +8,7 @@ import { DateValue } from '../../../components/common/display/DateValue';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { UserName } from '../../../components/common/display/UserName';
 import { isAckEscalation } from '../../../lib/escalation';
+import { useAccess } from '../../../hooks/useAccess';
 import type { LTEscalationRecord } from '../../../api/types';
 
 const VALUE_TRUNCATE = 48;
@@ -61,6 +62,7 @@ export function EscalationHero({
   showDetails: boolean;
   onToggleDetails: () => void;
 }) {
+  const { isBuilder } = useAccess();
   const isAck = isAckEscalation(esc);
 
   // ── User mode: clean typography + lines, no cards ──
@@ -116,29 +118,32 @@ export function EscalationHero({
             </div>
           )}
           <div>
-            <button
-              onClick={onToggleDetails}
-              className="text-text-tertiary/50 hover:text-accent transition-colors"
-              title={showDetails ? 'Hide details' : 'Show details'}
-            >
-              <Info className={`w-3.5 h-3.5 transition-opacity duration-200 ${showDetails ? 'opacity-100 text-accent' : 'opacity-60'}`} />
-            </button>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Priority</p>
+            <span className="text-xs text-text-secondary">P{esc.priority}</span>
           </div>
+          {isBuilder && (
+            <div>
+              <button
+                onClick={onToggleDetails}
+                className="text-text-tertiary/50 hover:text-accent transition-colors"
+                title={showDetails ? 'Hide details' : 'Show details'}
+              >
+                <Info className={`w-3.5 h-3.5 transition-opacity duration-200 ${showDetails ? 'opacity-100 text-accent' : 'opacity-60'}`} />
+              </button>
+            </div>
+          )}
         </div>
 
+        {isBuilder && (
         <Collapsible open={showDetails}>
           <div className="mt-px bg-surface-sunken/30 rounded-b-md px-5 py-4 flex flex-wrap gap-x-8 gap-y-4 border-t border-surface-border/30">
-            <div className="text-left">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">Priority</span>
-              <p className="text-[12px] text-text-secondary mt-0.5">P{esc.priority}</p>
-            </div>
             <CopyableId label="Escalation ID" value={esc.id} />
             {esc.task_id && (
-              <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />
+              <CopyableId label="Task ID" value={esc.task_id} href={isBuilder ? `/workflows/tasks/detail/${esc.task_id}` : undefined} />
             )}
-            <CopyableId label="Workflow Name" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}` : undefined} />
-            <CopyableId label="Workflow ID" value={esc.workflow_id} href={esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
-            <CopyableId label="Task Queue" value={esc.task_queue} href={esc.task_queue ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />
+            <CopyableId label="Workflow Name" value={esc.workflow_type} href={isBuilder && esc.workflow_type ? `/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}` : undefined} />
+            <CopyableId label="Workflow ID" value={esc.workflow_id} href={isBuilder && esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
+            <CopyableId label="Task Queue" value={esc.task_queue} href={isBuilder && esc.task_queue ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />
             {esc.origin_id && esc.origin_id !== esc.workflow_id && (
               <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
             )}
@@ -165,6 +170,7 @@ export function EscalationHero({
             </div>
           )}
         </Collapsible>
+        )}
       </div>
     );
   }

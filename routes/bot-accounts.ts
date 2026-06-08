@@ -1,12 +1,12 @@
 import { Router } from 'express';
 
-import { requireAdmin } from '../modules/auth';
+import { requireBuilder } from '../modules/auth';
 import * as api from '../api/bot-accounts';
 
 const router = Router();
 
 // All bot account routes require admin access
-router.use(requireAdmin);
+router.use(requireBuilder);
 
 // ── Bot CRUD ─────────────────────────────────────────────────────────────────
 

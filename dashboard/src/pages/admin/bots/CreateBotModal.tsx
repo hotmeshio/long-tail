@@ -38,7 +38,7 @@ export function CreateBotModal({
     setForm((f) => ({ ...f, [field]: value }));
 
   return (
-    <Modal open={open} onClose={onClose} title="Create Bot">
+    <Modal open={open} onClose={onClose} title="Create Service Account">
       <div className="space-y-4">
         <div>
           <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">

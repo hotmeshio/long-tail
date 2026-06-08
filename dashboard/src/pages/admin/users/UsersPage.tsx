@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Pencil, Trash2 } from 'lucide-react';
+import { useAccess } from '../../../hooks/useAccess';
 import { useUsers, useDeleteUser } from '../../../api/users';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
@@ -31,9 +32,10 @@ const statusDot: Record<string, string> = {
 };
 
 export function UsersPage() {
+  const { isBuilder } = useAccess();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const activeTab: AccountTab = tabParam === 'service-accounts' ? 'service-accounts' : 'users';
+  const activeTab: AccountTab = (isBuilder && tabParam === 'service-accounts') ? 'service-accounts' : 'users';
 
   const handleTabChange = (tab: AccountTab) => {
     if (tab === 'users') {
@@ -48,7 +50,7 @@ export function UsersPage() {
       <PageHeader
         title="Accounts"
         docsHash="#docs:dashboard.md:accounts"
-        actions={<AccountTabToggle active={activeTab} onChange={handleTabChange} />}
+        actions={isBuilder ? <AccountTabToggle active={activeTab} onChange={handleTabChange} /> : undefined}
       />
       {activeTab === 'users' ? <UserAccountsPanel /> : <BotsPage embedded />}
     </div>
@@ -56,6 +58,7 @@ export function UsersPage() {
 }
 
 function UserAccountsPanel() {
+  const { isBuilder } = useAccess();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { status: '' },
   });
@@ -118,10 +121,10 @@ function UserAccountsPanel() {
       render: (row) => <TimestampCell date={row.created_at} />,
       className: 'w-44',
     },
-    {
-      key: 'actions',
+    ...(isBuilder ? [{
+      key: 'actions' as const,
       label: '',
-      render: (row) => (
+      render: (row: LTUserRecord) => (
         <RowActionGroup>
           <RowAction
             icon={Pencil}
@@ -137,7 +140,7 @@ function UserAccountsPanel() {
         </RowActionGroup>
       ),
       className: 'w-16 text-right',
-    },
+    }] : []),
   ];
 
   const handleDelete = () => {
@@ -149,11 +152,13 @@ function UserAccountsPanel() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
-          Add User
-        </button>
-      </div>
+      {isBuilder && (
+        <div className="flex justify-end mb-4">
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
+            Add User
+          </button>
+        </div>
+      )}
 
       <FilterBar>
         <FilterSelect

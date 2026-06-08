@@ -43,6 +43,10 @@ function makeUsersReturn(data: typeof mockUsers | typeof mockEmptyUsers, isLoadi
 
 const mutationStub = () => ({ mutate: vi.fn(), isPending: false, error: null });
 
+vi.mock('../../../../hooks/useAccess', () => ({
+  useAccess: () => ({ isBuilder: true, isOps: true, canBulk: true }),
+}));
+
 vi.mock('../../../../api/users', () => ({
   useUsers: () => usersReturn,
   useDeleteUser: () => mutationStub(),

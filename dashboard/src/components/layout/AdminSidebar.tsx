@@ -10,16 +10,18 @@ import {
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 export function AdminSidebar({ isBuilder = false }: { isBuilder?: boolean }) {
+  const identityItems = [
+    { to: '/admin/users', label: 'Accounts', icon: Users },
+    ...(isBuilder ? [{ to: '/admin/roles', label: 'Roles & Permissions', icon: Tag }] : []),
+  ];
+
   const entries: NavEntry[] = [
     {
       kind: 'group',
       label: 'Identity & Access',
       icon: Shield,
-      matchPaths: ['/admin/users', '/admin/roles'],
-      items: [
-        { to: '/admin/users', label: 'Accounts', icon: Users },
-        { to: '/admin/roles', label: 'Roles & Permissions', icon: Tag },
-      ],
+      matchPaths: identityItems.map((i) => i.to),
+      items: identityItems,
     },
   ];
 

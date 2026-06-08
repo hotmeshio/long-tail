@@ -45,7 +45,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
   const columns: Column<BotRecord>[] = [
     {
       key: 'display_name',
-      label: 'Bot',
+      label: 'Service Account',
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <span
@@ -87,12 +87,12 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
         <RowActionGroup>
           <RowAction
             icon={Pencil}
-            title="Edit bot"
+            title="Edit service account"
             onClick={() => setEditingBot(row)}
           />
           <RowAction
             icon={Trash2}
-            title="Delete bot"
+            title="Delete service account"
             onClick={() => setConfirmDelete(row)}
             colorClass="text-text-tertiary hover:text-status-error"
           />
@@ -117,7 +117,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
       {embedded ? (
         <div className="flex justify-end mb-4">
           <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
-            Add Bot
+            Add Service Account
           </button>
         </div>
       ) : (
@@ -125,7 +125,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
           title="Service Accounts"
           actions={
             <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
-              Add Bot
+              Add Service Account
             </button>
           }
         />
@@ -138,7 +138,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
             data={bots}
             keyFn={(row) => row.id}
             isLoading={isLoading}
-            emptyMessage="No bots yet"
+            emptyMessage="No service accounts yet"
             onRowClick={(row) => setSelectedBot(row)}
             activeRowKey={activeBot?.id ?? null}
           />
@@ -168,7 +168,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
-        title="Delete Bot"
+        title="Delete Service Account"
         description={
           <>
             Delete{' '}

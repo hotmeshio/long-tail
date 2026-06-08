@@ -249,7 +249,7 @@ export function BotDetailPanel({ bot }: { bot: BotRecord | null }) {
     return (
       <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px]">
         <p className="text-xs text-text-tertiary">
-          Select a bot to manage its API keys and roles.
+          Select a service account to manage its API keys and roles.
         </p>
       </div>
     );

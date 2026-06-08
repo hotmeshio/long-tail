@@ -113,14 +113,14 @@ describe('BotsPage', () => {
     expect(screen.getByText('Service Accounts')).toBeInTheDocument();
   });
 
-  it('renders Add Bot button', () => {
+  it('renders Add Service Account button', () => {
     renderPage();
-    expect(screen.getByText('Add Bot')).toBeInTheDocument();
+    expect(screen.getByText('Add Service Account')).toBeInTheDocument();
   });
 
-  it('shows Add Bot button without header when embedded', () => {
+  it('shows Add Service Account button without header when embedded', () => {
     renderPage({ embedded: true });
-    expect(screen.getByText('Add Bot')).toBeInTheDocument();
+    expect(screen.getByText('Add Service Account')).toBeInTheDocument();
     expect(screen.queryByText('Service Accounts')).not.toBeInTheDocument();
   });
 
@@ -153,7 +153,7 @@ describe('BotsPage', () => {
   it('shows empty message when no bots exist', () => {
     mockBotsReturn = makeQueryReturn(emptyBots);
     renderPage();
-    expect(screen.getByText('No bots yet')).toBeInTheDocument();
+    expect(screen.getByText('No service accounts yet')).toBeInTheDocument();
   });
 
   // -- Detail panel --
@@ -161,7 +161,7 @@ describe('BotsPage', () => {
   it('shows placeholder text when no bot is selected', () => {
     renderPage();
     expect(
-      screen.getByText('Select a bot to manage its API keys and roles.'),
+      screen.getByText('Select a service account to manage its API keys and roles.'),
     ).toBeInTheDocument();
   });
 
@@ -198,7 +198,7 @@ describe('BotsPage', () => {
 
   it('renders table column headers', () => {
     renderPage();
-    expect(screen.getByText('Bot')).toBeInTheDocument();
+    expect(screen.getByText('Service Account')).toBeInTheDocument();
     expect(screen.getByText('Roles')).toBeInTheDocument();
     expect(screen.getByText('Created')).toBeInTheDocument();
   });
@@ -209,7 +209,7 @@ describe('BotsPage', () => {
     mockBotsReturn = makeQueryReturn(undefined, { isLoading: true });
     renderPage();
     // Loading state shows skeleton, not column headers or empty message
-    expect(screen.queryByText('No bots yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No service accounts yet')).not.toBeInTheDocument();
     expect(screen.getByText('Service Accounts')).toBeInTheDocument();
   });
 });
