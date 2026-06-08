@@ -62,8 +62,6 @@ Dashboard at [http://localhost:3000](http://localhost:3000). The [boilerplate](h
 
 ## The pattern
 
-Most systems start with a durable workflow and stop there. Long Tail keeps going.
-
 **Step 1 — Author a durable workflow.** Your function checkpoints to Postgres. It can sleep, branch, call child workflows, wait for signals. Standard durable execution.
 
 **Step 2 — Certify it.** Promotion to certified adds interceptor guarantees: failures escalate instead of throwing, escalation chains route through RBAC-scoped roles, and every error is either handled or surfaced. It cannot silently fail.

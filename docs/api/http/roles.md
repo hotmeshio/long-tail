@@ -40,6 +40,28 @@ The dashboard adapts to the authenticated user's access tier:
 
 Bulk escalation actions (bulk claim, assign, triage, escalate) require `admin` or `superadmin` type. Plain `member` users work on escalations one at a time.
 
+## API Access by Tier
+
+Certain API endpoints require builder access (`superadmin` or `engineer` role):
+
+| Endpoint | Access |
+|----------|--------|
+| `POST/PUT/DELETE /api/users` | Builder |
+| `POST /api/users/:id/roles` | Admin (scoped — see below) |
+| All `/api/bot-accounts` | Builder |
+| All `/api/roles` mutations | Builder |
+| All `/api/controlplane` | Builder |
+
+### Scoped Role Assignment
+
+When assigning roles via `POST /api/users/:id/roles`, the caller's own roles determine what they can assign:
+
+| Caller | Can Assign |
+|--------|-----------|
+| `superadmin` | Any role, any type (including `superadmin/superadmin`) |
+| `engineer` | Any role up to `admin` type (never `superadmin` type) |
+| `*/admin` (non-builder) | `member` or `admin` type for roles they themselves hold |
+
 ## List roles for a user
 
 ```

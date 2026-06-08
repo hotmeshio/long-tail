@@ -2,6 +2,8 @@
 
 Long Tail exposes its full API surface as MCP (Model Context Protocol) tools. These tools allow AI agents (or Long Tail itself in reflexive mode) to perform any action a human would via the dashboard or REST APIs.
 
+**Endpoint**: `POST /mcp` — see [MCP Endpoint](../http/mcp-endpoint.md) for connection examples, authentication, and scope filtering.
+
 ## Exposure Control
 
 Configure which tools are exposed when Long Tail acts as an MCP server:

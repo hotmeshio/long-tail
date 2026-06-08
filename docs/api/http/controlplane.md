@@ -2,7 +2,7 @@
 
 Admin-only endpoints for application discovery, worker health, throttling, stream statistics, and stream message browsing.
 
-All endpoints require admin or superadmin role.
+All endpoints require builder access (superadmin role type or engineer role).
 
 ---
 
