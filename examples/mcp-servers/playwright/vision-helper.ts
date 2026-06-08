@@ -22,7 +22,7 @@ const MIME_MAP: Record<string, string> = {
 export async function analyzeScreenshot(storagePath: string): Promise<string> {
   const { callLLM, hasLLMApiKey } = await import('../../../services/llm');
   const { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } = await import('../../../modules/defaults');
-  const { ANALYZE_IMAGE_PROMPT } = await import('../vision-prompts');
+  const { ANALYZE_IMAGE_PROMPT } = await import('../../../system/mcp-servers/vision-prompts');
 
   if (!hasLLMApiKey(LLM_MODEL_SECONDARY)) {
     return 'Vision LLM not configured — set an API key to enable screenshot analysis.';

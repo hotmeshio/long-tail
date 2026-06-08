@@ -11,7 +11,11 @@ import type { LTWorkerConfig, LTMcpServerConfig, LTAgentConfig } from '../types/
 
 import { HUMAN_QUEUE_TOOLS } from './seed/tool-manifests-escalation';
 import { TRANSLATION_TOOLS, VISION_ANALYSIS_TOOLS, FILE_STORAGE_TOOLS, HTTP_FETCH_TOOLS, SCHEMA_EXCHANGE_TOOLS, DOCS_TOOLS, OAUTH_TOOLS } from './seed/tool-manifests-data';
-import { PLAYWRIGHT_TOOLS, PLAYWRIGHT_CLI_TOOLS } from './seed/tool-manifests-browser';
+// Playwright is an example connector — loaded conditionally (not in npm package)
+let PLAYWRIGHT_TOOLS: any[] = [];
+try { PLAYWRIGHT_TOOLS = require('../examples/seed/tool-manifests-browser').PLAYWRIGHT_TOOLS; } catch { /* not available */ }
+let PLAYWRIGHT_CLI_TOOLS: any[] = [];
+try { PLAYWRIGHT_CLI_TOOLS = require('../examples/seed/tool-manifests-browser').PLAYWRIGHT_CLI_TOOLS; } catch { /* not available */ }
 import { CLAUDE_CODE_TOOLS } from './seed/tool-manifests-workflows';
 import { ADMIN_TOOLS } from './seed/tool-manifests-admin';
 import { KNOWLEDGE_TOOLS } from './seed/tool-manifests-knowledge';
@@ -158,6 +162,7 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
       description: 'Text translation using LLM. Translates content between languages with automatic source language detection.',
       tags: ['translation', 'language', 'text-processing'],
       category: 'Analysis',
+      aiRequired: true,
       credentialProviders: ['anthropic'],
       toolManifest: TRANSLATION_TOOLS,
     },
@@ -168,6 +173,7 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
       description: 'Image analysis and description using LLM vision. Analyzes images to extract structured data, text content, and descriptions.',
       tags: ['vision', 'image-analysis', 'multimodal'],
       category: 'Analysis',
+      aiRequired: true,
       compileHints: [
         'Vision tools process one image at a time.',
         'The argument name is `image` (NOT `image_path`). It accepts a storage path, data URI, or https:// URL.',
@@ -176,34 +182,6 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
       ].join(' '),
       credentialProviders: ['anthropic'],
       toolManifest: VISION_ANALYSIS_TOOLS,
-    },
-  },
-  'long-tail-playwright': {
-    factory: () => import('./mcp-servers/playwright').then((m) => m.createPlaywrightServer()),
-    config: {
-      description: 'Low-level browser automation via Playwright. Fine-grained control: navigate, click, fill, wait_for, evaluate, run_script.',
-      tags: ['browser-automation', 'testing', 'screenshots'],
-      category: 'Automation',
-      compileHints: [
-        'Session fields (_handle, page_id) MUST be threaded from the step that created them to EVERY subsequent browser step.',
-        'run_script accepts a `steps` array — fixed implementation detail, never a dynamic input.',
-        'run_script exposes `screenshots` (array) and `last_screenshot_path` (string) as output fields.',
-      ].join(' '),
-      toolManifest: PLAYWRIGHT_TOOLS,
-    },
-  },
-  'long-tail-playwright-cli': {
-    factory: () => import('./mcp-servers/playwright-cli').then((m) => m.createPlaywrightCliServer()),
-    config: {
-      description: 'High-level browser automation. Intent-based tools that handle session management, timing, and error recovery internally.',
-      tags: ['browser-automation', 'screenshots', 'scraping', 'forms'],
-      category: 'Automation',
-      compileHints: [
-        'Session fields (_handle, page_id) MUST be threaded from producing step to ALL subsequent browser steps.',
-        'extract_content returns `links` (structured array) and `script_result` (raw). Use `links` as the source field.',
-        'capture_page screenshot_path MUST include a file extension (.png).',
-      ].join(' '),
-      toolManifest: PLAYWRIGHT_CLI_TOOLS,
     },
   },
   'long-tail-docs': {
@@ -250,6 +228,7 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
       description: 'Agentic coding assistant via Claude Code CLI. Execute development tasks: code generation, refactoring, file analysis, and multi-step workflows.',
       tags: ['development', 'coding', 'ai-agent', 'terminal', 'code-generation'],
       category: 'Development',
+      aiRequired: true,
       compileHints:
         'execute_task runs Claude Code as a subprocess. The `prompt` parameter is ALWAYS a dynamic trigger input. ' +
         'Keep prompts self-contained. For read-only analysis, restrict with allowed_tools: ["Read", "Grep", "Glob"].',
@@ -260,8 +239,8 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
   'long-tail-admin': {
     factory: () => import('./mcp-servers/admin').then((m) => m.createAdminServer()),
     config: {
-      description: 'System administration tools for reflexive self-management. Certify workflows, update server tags, manage roles.',
-      tags: ['admin', 'system', 'configuration'],
+      description: 'Unified system management — tasks, escalations, workflows, agents, bot accounts, control plane, pipelines, topics, users, roles, and settings.',
+      tags: ['admin', 'system', 'configuration', 'agents', 'bot-accounts', 'controlplane', 'pipelines', 'topics'],
       category: 'System',
       compileHints: 'Admin tools modify system configuration. certify_workflow and decertify_workflow change interceptor behavior.',
       toolManifest: ADMIN_TOOLS,
@@ -307,6 +286,41 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
     },
   },
 };
+
+// Playwright is an example connector — only register when available (not in npm package)
+if (PLAYWRIGHT_TOOLS.length > 0) {
+  builtinMcpServerFactories['long-tail-playwright'] = {
+    factory: () => import('../examples/mcp-servers/playwright').then((m) => m.createPlaywrightServer()),
+    config: {
+      description: 'Low-level browser automation via Playwright. Fine-grained control: navigate, click, fill, wait_for, evaluate, run_script.',
+      tags: ['browser-automation', 'testing', 'screenshots'],
+      category: 'Automation',
+      compileHints: [
+        'Session fields (_handle, page_id) MUST be threaded from the step that created them to EVERY subsequent browser step.',
+        'run_script accepts a `steps` array — fixed implementation detail, never a dynamic input.',
+        'run_script exposes `screenshots` (array) and `last_screenshot_path` (string) as output fields.',
+      ].join(' '),
+      toolManifest: PLAYWRIGHT_TOOLS,
+    },
+  };
+}
+
+if (PLAYWRIGHT_CLI_TOOLS.length > 0) {
+  builtinMcpServerFactories['long-tail-playwright-cli'] = {
+    factory: () => import('../examples/mcp-servers/playwright-cli').then((m) => m.createPlaywrightCliServer()),
+    config: {
+      description: 'High-level browser automation. Intent-based tools that handle session management, timing, and error recovery internally.',
+      tags: ['browser-automation', 'screenshots', 'scraping', 'forms'],
+      category: 'Automation',
+      compileHints: [
+        'Session fields (_handle, page_id) MUST be threaded from producing step to ALL subsequent browser steps.',
+        'extract_content returns `links` (structured array) and `script_result` (raw). Use `links` as the source field.',
+        'capture_page screenshot_path MUST include a file extension (.png).',
+      ].join(' '),
+      toolManifest: PLAYWRIGHT_CLI_TOOLS,
+    },
+  };
+}
 
 // Gmail is an example connector — only register when available (not in npm package)
 if (GMAIL_TOOLS.length > 0) {

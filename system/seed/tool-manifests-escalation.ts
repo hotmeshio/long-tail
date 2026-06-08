@@ -4,6 +4,7 @@ export const HUMAN_QUEUE_TOOLS = [
   {
     name: 'escalate_to_human',
     description: 'Create a new escalation for human review. Returns the escalation ID.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -20,6 +21,7 @@ export const HUMAN_QUEUE_TOOLS = [
   {
     name: 'check_resolution',
     description: 'Check the status of an escalation. Returns status and resolver payload if resolved.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -31,6 +33,7 @@ export const HUMAN_QUEUE_TOOLS = [
   {
     name: 'get_available_work',
     description: 'List available escalations for a role. Returns pending, unassigned escalations.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -43,6 +46,7 @@ export const HUMAN_QUEUE_TOOLS = [
   {
     name: 'claim_and_resolve',
     description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -56,6 +60,7 @@ export const HUMAN_QUEUE_TOOLS = [
   {
     name: 'escalate_and_wait',
     description: 'Create an escalation and pause the workflow until a human responds. Returns a signal ID that the workflow uses to wait durably. Preferred over escalate_to_human + check_resolution polling.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {

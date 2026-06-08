@@ -4,6 +4,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'store_knowledge',
     description: 'Store a value in a 3-level additive hierarchy: domain > key > field. Upserts by domain+key — fields accumulate across calls. Same domain+key+field overwrites that field. When field is provided, data can be any type. When omitted, data must be an object.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -19,6 +20,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'get_knowledge',
     description: 'Retrieve a single knowledge entry by domain and key.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -31,6 +33,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'search_knowledge',
     description: 'Search knowledge entries using JSONB containment queries. The query object matches entries whose data contains the specified key-value pairs.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -45,6 +48,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'list_knowledge',
     description: 'List knowledge entries in a domain, optionally filtered by tags. Returns most recently updated first.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -59,6 +63,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'delete_knowledge',
     description: 'Delete a knowledge entry by domain and key.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -71,6 +76,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'list_domains',
     description: 'List all knowledge domains with entry counts and last-updated timestamps.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -79,6 +85,7 @@ export const KNOWLEDGE_TOOLS = [
   {
     name: 'append_knowledge',
     description: 'Append a value to an array field within a knowledge entry. Creates the entry and array if they do not exist.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {

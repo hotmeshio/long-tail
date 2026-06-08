@@ -5,13 +5,36 @@
  * discovered and called by the Pipeline Designer.
  *
  * This is an example of how to build a custom MCP server
- * that wraps your own activities as tools.
+ * that wraps your own activities as tools and publishes
+ * events to the topic bus after each operation.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { registerMcpTool } from '../../services/mcp/register-tool';
+import { eventRegistry } from '../../lib/events';
+import type { LTEvent } from '../../types/events';
 import * as image from '../activities/image';
+
+/**
+ * Publish a fire-and-forget image event to the topic bus.
+ * Agents subscribed to `image.*` will react automatically.
+ */
+function publishImageEvent(
+  topic: string,
+  data: Record<string, any>,
+): void {
+  const event: LTEvent = {
+    type: topic,
+    source: 'image-tools',
+    workflowId: '',
+    workflowName: '',
+    taskQueue: '',
+    data,
+    timestamp: new Date().toISOString(),
+  };
+  eventRegistry.publish(event).catch(() => {});
+}
 
 export function createImageToolsServer(): McpServer {
   const server = new McpServer({ name: 'image-tools', version: '1.0.0' });
@@ -20,9 +43,11 @@ export function createImageToolsServer(): McpServer {
     'get_image_info',
     'Get image metadata: dimensions, format, file size, megapixels.',
     { path: z.string().describe('Path to the image file') },
-    async ({ path }: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.getImageInfo({ path })) }],
-    }),
+    async ({ path }: any) => {
+      const result = await image.getImageInfo({ path });
+      publishImageEvent('image.info', { path, ...result });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -35,9 +60,11 @@ export function createImageToolsServer(): McpServer {
       fit: z.enum(['cover', 'contain', 'fill', 'inside', 'outside']).optional().describe('How to fit the image'),
       output_path: z.string().optional().describe('Output path (defaults to input_resized.ext)'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.resizeImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.resizeImage(args);
+      publishImageEvent('image.resized', { ...result, path: args.path, output_path: args.output_path });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -51,9 +78,11 @@ export function createImageToolsServer(): McpServer {
       height: z.number().describe('Crop height in pixels'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.cropImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.cropImage(args);
+      publishImageEvent('image.cropped', { path: args.path, output_path: args.output_path });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -65,9 +94,11 @@ export function createImageToolsServer(): McpServer {
       background: z.string().optional().describe('Background color for exposed areas (hex, e.g. #ffffff)'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.rotateImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.rotateImage(args);
+      publishImageEvent('image.rotated', { path: args.path, output_path: args.output_path, angle: args.angle });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -78,9 +109,11 @@ export function createImageToolsServer(): McpServer {
       direction: z.enum(['horizontal', 'vertical']).describe('Flip direction'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.flipImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.flipImage(args);
+      publishImageEvent('image.flipped', { path: args.path, output_path: args.output_path, direction: args.direction });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -90,9 +123,11 @@ export function createImageToolsServer(): McpServer {
       path: z.string().describe('Path to the image file'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.grayscaleImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.grayscaleImage(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'grayscale' });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -103,9 +138,11 @@ export function createImageToolsServer(): McpServer {
       sigma: z.number().optional().describe('Blur intensity (default: 3)'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.blurImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.blurImage(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'blur' });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -117,9 +154,11 @@ export function createImageToolsServer(): McpServer {
       saturation: z.number().optional().describe('Saturation multiplier (default: 1.0)'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.adjustImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.adjustImage(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'adjust' });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -131,9 +170,11 @@ export function createImageToolsServer(): McpServer {
       format: z.enum(['jpeg', 'png', 'webp']).optional().describe('Output format (default: jpeg)'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.compressImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.compressImage(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'compress', format: args.format });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -144,9 +185,11 @@ export function createImageToolsServer(): McpServer {
       format: z.enum(['jpeg', 'png', 'webp', 'avif', 'tiff']).describe('Target format'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.convertFormat(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.convertFormat(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'convert', format: args.format });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -158,9 +201,11 @@ export function createImageToolsServer(): McpServer {
       color: z.string().optional().describe('Border color (hex, default: #000000)'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.addBorder(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.addBorder(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'border' });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   registerMcpTool(server,
@@ -171,9 +216,11 @@ export function createImageToolsServer(): McpServer {
       block_size: z.number().optional().describe('Pixel block size (default: 10)'),
       output_path: z.string().optional().describe('Output path'),
     },
-    async (args: any) => ({
-      content: [{ type: 'text', text: JSON.stringify(await image.pixelateImage(args)) }],
-    }),
+    async (args: any) => {
+      const result = await image.pixelateImage(args);
+      publishImageEvent('image.converted', { path: args.path, output_path: args.output_path, operation: 'pixelate' });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 
   return server;

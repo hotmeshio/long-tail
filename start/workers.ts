@@ -246,6 +246,14 @@ export async function startWorkers(
   await seedSystemTopics();
   if (startConfig.topics?.length) await seedConfigTopics(startConfig.topics);
 
+  // Seed example topics when examples are enabled
+  if (startConfig.examples) {
+    try {
+      const { EXAMPLE_TOPICS } = await import('../examples');
+      if (EXAMPLE_TOPICS?.length) await seedConfigTopics(EXAMPLE_TOPICS);
+    } catch { /* examples not available */ }
+  }
+
   // Seed agents (from startConfig + example system agents when enabled)
   const systemAgents = startConfig.examples
     ? (await import('../system')).getSystemAgents()

@@ -214,4 +214,81 @@ describe('Escalation routes', () => {
       expect(body.error).toContain('not found');
     });
   });
+
+  // ── Metadata-based operations ──────────────────────────────────────────
+
+  describe('GET /api/escalations/by-metadata', () => {
+    it('returns 400 when key is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/by-metadata?value=test`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns empty array for non-matching metadata', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/by-metadata?key=nonexistent&value=none`, {
+        headers: authHeaders(ctx.adminToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.escalations).toEqual([]);
+    });
+  });
+
+  describe('POST /api/escalations/claim-by-metadata', () => {
+    it('returns 400 when key/value missing', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/claim-by-metadata`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /api/escalations/resolve-by-metadata', () => {
+    it('returns 400 when key/value missing', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/resolve-by-metadata`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ── Bulk operations ────────────────────────────────────────────────────
+
+  describe('POST /api/escalations/bulk-assign', () => {
+    it('returns 400 with empty ids', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/bulk-assign`, {
+        method: 'POST',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ ids: [], targetUserId: 'someone' }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PATCH /api/escalations/bulk-escalate', () => {
+    it('returns 400 with empty ids', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/bulk-escalate`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ ids: [], targetRole: 'admin' }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PATCH /api/escalations/priority', () => {
+    it('returns 400 with empty ids', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/priority`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ ids: [], priority: 1 }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
 });

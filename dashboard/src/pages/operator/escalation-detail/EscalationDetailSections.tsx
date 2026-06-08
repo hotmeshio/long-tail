@@ -56,9 +56,9 @@ function EscalationRecordSummary({ esc }: { esc: LTEscalationRecord }) {
         <div className="flex flex-wrap gap-x-8 gap-y-4">
           <CopyableId label="Escalation ID" value={esc.id} />
           {esc.task_id && <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />}
-          {esc.workflow_type && <CopyableId label="Workflow Name" value={esc.workflow_type} href={`/workflows/registry/${esc.workflow_type}`} />}
+          {esc.workflow_type && <CopyableId label="Workflow Name" value={esc.workflow_type} href={`/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}`} />}
           {esc.workflow_id && <CopyableId label="Workflow ID" value={esc.workflow_id} href={`/workflows/executions/${esc.workflow_id}`} />}
-          {esc.task_queue && <CopyableId label="Task Queue" value={esc.task_queue} />}
+          {esc.task_queue && <CopyableId label="Task Queue" value={esc.task_queue} href={`/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}`} />}
           {esc.origin_id && esc.origin_id !== esc.workflow_id && <CopyableId label="Origin ID" value={esc.origin_id} />}
           {esc.parent_id && <CopyableId label="Parent ID" value={esc.parent_id} />}
           {esc.trace_id && <CopyableId label="Trace ID" value={esc.trace_id} />}

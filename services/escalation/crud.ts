@@ -184,7 +184,20 @@ export async function releaseEscalation(
     RELEASE_ESCALATION,
     [id, userId],
   );
-  return rows[0] || null;
+  const released = rows[0] as LTEscalationRecord | undefined;
+  if (released) {
+    publishEscalationEvent({
+      type: 'escalation.released',
+      source: 'service',
+      workflowId: released.workflow_id || '',
+      workflowName: released.workflow_type || '',
+      taskQueue: released.task_queue || '',
+      escalationId: released.id,
+      status: 'released',
+      data: { released_by: userId },
+    });
+  }
+  return released || null;
 }
 
 export async function releaseExpiredClaims(): Promise<number> {

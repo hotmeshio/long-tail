@@ -66,4 +66,42 @@ describe('applyInputMapping', () => {
     expect(result.metadata).toEqual({ source: 'agent', certified: true });
     expect(result.data).toEqual({ id: 'wf-123' });
   });
+
+  it('resolves template strings inside arrays', () => {
+    const mapping = {
+      tags: ['{event.data.orderId}', '{event.data.error}'],
+    };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.tags).toEqual(['ORD-001', 'timeout']);
+  });
+
+  it('coerces numeric values to strings in array context', () => {
+    const event = { ...baseEvent, data: { ...baseEvent.data, angle: 180 } };
+    const mapping = { tags: ['{event.data.angle}'] };
+    const result = applyInputMapping(mapping, event);
+    expect(result.tags).toEqual(['180']);
+  });
+
+  it('preserves object values in arrays without coercion', () => {
+    const mapping = { items: ['{event.data}'] };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.items[0]).toEqual(baseEvent.data);
+    expect(typeof result.items[0]).toBe('object');
+  });
+
+  it('passes through non-template values inside arrays', () => {
+    const mapping = {
+      tags: ['static', 42, true, null, '{event.source}'],
+    };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.tags).toEqual(['static', 42, true, null, 'interceptor']);
+  });
+
+  it('resolves nested objects inside arrays', () => {
+    const mapping = {
+      items: [{ id: '{event.workflowId}' }, { id: '{event.data.orderId}' }],
+    };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.items).toEqual([{ id: 'wf-123' }, { id: 'ORD-001' }]);
+  });
 });

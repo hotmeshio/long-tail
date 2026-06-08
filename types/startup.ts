@@ -55,11 +55,15 @@ export interface LTMcpServerConfig {
   compileHints?: string;
   /** OAuth providers required by this server's tools (e.g., ['google']). */
   credentialProviders?: string[];
+  /** When true, all tools on this server require an AI API key. Server is hidden when no key is configured. */
+  aiRequired?: boolean;
   /** Tool manifest — static JSON schema definitions for each tool. */
   toolManifest?: Array<{
     name: string;
     description: string;
     inputSchema: Record<string, any>;
+    /** Tool only reads data — safe to expose to external MCP consumers without write permission. */
+    read_safe?: boolean;
   }>;
 }
 
@@ -313,6 +317,20 @@ export interface LTStartConfig {
     serverFactories?: Record<string, (() => any) | { factory: () => any; config: LTMcpServerConfig }>;
     /** Replace the built-in MCP adapter entirely. */
     adapter?: LTMcpAdapter;
+    /**
+     * Controls which tools are exposed when this instance acts as an MCP server.
+     * All fields are optional — omit the entire object for unrestricted access.
+     */
+    exposure?: {
+      /** Only expose tools marked `read_safe: true`. Default: false. */
+      readOnly?: boolean;
+      /** Hide servers with `aiRequired: true` when no AI API key is configured. Default: true. */
+      hideAiWhenUnavailable?: boolean;
+      /** When set, only these server IDs are exposed. */
+      allowServers?: string[];
+      /** Server IDs to exclude from exposure. */
+      denyServers?: string[];
+    };
   };
 }
 

@@ -6,7 +6,7 @@ The Long Tail dashboard is a React single-page application for managing durable 
 
 The sidebar organizes pages into five groups.
 
-### Durable Workflows
+### Workflows
 
 | Page | Route | Purpose |
 |------|-------|---------|

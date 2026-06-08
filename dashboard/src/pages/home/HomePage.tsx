@@ -283,7 +283,7 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* ── Row 2: Processes | Durable Executions | Pipeline Executions (builders only) */}
+      {/* ── Row 2: Processes | Workflow Executions | Pipeline Executions (builders only) */}
       {isBuilder && <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 mt-14">
 
         {/* Col 1: Processes */}
@@ -317,7 +317,7 @@ export function HomePage() {
           )}
         </div>
 
-        {/* Col 2: Durable Executions */}
+        {/* Col 2: Workflow Executions */}
         <div>
           <SectionHeader icon={ScrollText} color="text-blue-400" count={jobsTotal} docsHash="#docs:dashboard.md:durable-executions" actions={
             <div className="flex items-center gap-2">
@@ -325,7 +325,7 @@ export function HomePage() {
               <NavIcon to="/workflows/executions" icon={ExternalLink} title="All durable executions" />
             </div>
           }>
-            Durable Executions
+            Workflow Executions
           </SectionHeader>
           <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
           {jobs.length === 0 ? (

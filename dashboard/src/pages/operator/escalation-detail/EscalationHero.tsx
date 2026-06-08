@@ -136,9 +136,9 @@ export function EscalationHero({
             {esc.task_id && (
               <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />
             )}
-            <CopyableId label="Workflow Name" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/registry/${esc.workflow_type}` : undefined} />
+            <CopyableId label="Workflow Name" value={esc.workflow_type} href={esc.workflow_type ? `/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}` : undefined} />
             <CopyableId label="Workflow ID" value={esc.workflow_id} href={esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
-            <CopyableId label="Task Queue" value={esc.task_queue} />
+            <CopyableId label="Task Queue" value={esc.task_queue} href={esc.task_queue ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />
             {esc.origin_id && esc.origin_id !== esc.workflow_id && (
               <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
             )}
