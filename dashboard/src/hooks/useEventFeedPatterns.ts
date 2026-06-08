@@ -29,15 +29,15 @@ function patternFromRoute(pathname: string): string {
   if (pathname.startsWith('/knowledge')) return 'lt.events.system.knowledge.>';
   // Files
   if (pathname.startsWith('/files')) return 'lt.events.system.file.>';
-  // Home / recent activity — broader
-  if (pathname === '/') return 'lt.events.>';
+  // Home / recent activity — all system events
+  if (pathname === '/') return 'lt.events.system.>';
   // MCP execution detail → subscribe to that specific job
   const mcpDetailMatch = pathname.match(/^\/mcp\/executions\/(.+)/);
   if (mcpDetailMatch) return `lt.events.system.activity.${mcpDetailMatch[1]}.>`;
   // Capabilities, MCP
   if (pathname.startsWith('/mcp')) return 'lt.events.system.activity.>';
-  // Fallback
-  return 'lt.events.>';
+  // Fallback — all system events
+  return 'lt.events.system.>';
 }
 
 function loadUserPatterns(): string[] {

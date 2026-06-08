@@ -20,8 +20,8 @@ interface FeedEvent {
 // Color by {category}.{action} — extracted from structured subjects like
 // system.workflow.abc123.completed → workflow.completed
 const TYPE_COLORS: Record<string, string> = {
-  'escalation.created': 'text-status-warning',
-  'escalation.claimed': 'text-blue-400',
+  'escalation.created': 'text-blue-400',
+  'escalation.claimed': 'text-status-warning',
   'escalation.released': 'text-text-tertiary',
   'escalation.resolved': 'text-status-success',
   'task.created': 'text-accent',
