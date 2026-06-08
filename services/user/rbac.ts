@@ -46,3 +46,19 @@ export async function hasGlobalEscalationAccess(userId: string): Promise<boolean
   const roles = await getUserRoles(userId);
   return roles.some((r) => r.role === 'admin' && r.type === 'admin');
 }
+
+/**
+ * Batch check: does the user have admin type for ALL specified roles?
+ * Single query — replaces the N+1 loop in checkBulkPermission.
+ */
+export async function hasRolesAsAdmin(userId: string, roles: string[]): Promise<boolean> {
+  if (!roles.length) return true;
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT COUNT(DISTINCT role)::int AS cnt
+     FROM lt_user_roles
+     WHERE user_id = $1 AND role = ANY($2::text[]) AND type IN ('admin', 'superadmin')`,
+    [userId, roles],
+  );
+  return (rows[0]?.cnt ?? 0) >= roles.length;
+}

@@ -244,6 +244,65 @@ describe('Escalation routes', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('returns 404 when no escalation matches', async () => {
+      const res = await fetch(`${ctx.BASE}/escalations/claim-by-metadata`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ key: 'orderId', value: 'nonexistent-order' }),
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it('builder (superadmin) can claim by metadata', async () => {
+      // Create escalation with metadata
+      const createRes = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          type: 'meta-claim-test',
+          role: 'reviewer',
+          description: 'Metadata claim test',
+          metadata: { orderId: `claim-test-${Date.now()}` },
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const { metadata } = await createRes.json() as any;
+
+      const res = await fetch(`${ctx.BASE}/escalations/claim-by-metadata`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ key: 'orderId', value: metadata.orderId }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.escalation).toBeDefined();
+      expect(body.escalation.status).toBe('pending');
+    });
+
+    it('member token gets 404 for role-scoped metadata claim', async () => {
+      // Create escalation on a role the member doesn't have
+      const createRes = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          type: 'meta-rbac-test',
+          role: 'engineer',
+          description: 'RBAC test',
+          metadata: { orderId: `rbac-test-${Date.now()}` },
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const { metadata } = await createRes.json() as any;
+
+      // Member has no roles → SQL WHERE filters out, returns 404
+      const res = await fetch(`${ctx.BASE}/escalations/claim-by-metadata`, {
+        method: 'POST',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify({ key: 'orderId', value: metadata.orderId }),
+      });
+      expect(res.status).toBe(404);
+    });
   });
 
   describe('POST /api/escalations/resolve-by-metadata', () => {
@@ -254,6 +313,35 @@ describe('Escalation routes', () => {
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
+    });
+
+    it('builder can atomically resolve by metadata', async () => {
+      const orderId = `resolve-test-${Date.now()}`;
+      const createRes = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          type: 'meta-resolve-test',
+          role: 'reviewer',
+          description: 'Metadata resolve test',
+          metadata: { orderId },
+        }),
+      });
+      expect(createRes.status).toBe(201);
+
+      const res = await fetch(`${ctx.BASE}/escalations/resolve-by-metadata`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          key: 'orderId',
+          value: orderId,
+          resolverPayload: { answer: 'approved' },
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.escalation).toBeDefined();
+      expect(body.escalation.status).toBe('resolved');
     });
   });
 

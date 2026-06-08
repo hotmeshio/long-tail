@@ -1,18 +1,13 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { getVisibleRoles, resolveAssignee, hasGlobalEscalationAccess } from './helpers';
+import { getVisibleRoles, resolveAssignee } from './helpers';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 /**
  * Find escalations by a metadata key-value pair.
  *
- * Uses JSONB containment (`@>`) backed by a GIN index.
- * Results are RBAC-scoped to the caller's visible roles.
- *
- * @param input.key — metadata field name (e.g. `"orderId"`)
- * @param input.value — metadata field value (e.g. `"order-123"`)
- * @param input.status — optional status filter (e.g. `"pending"`)
- * @returns `{ status: 200, data: { escalations, total } }`
+ * Single query with window function for count. Results are
+ * RBAC-scoped to the caller's visible roles.
  */
 export async function findByMetadata(
   input: { key: string; value: string; status?: string; limit?: number; offset?: number },
@@ -41,15 +36,9 @@ export async function findByMetadata(
 /**
  * Claim an escalation by metadata key-value pair.
  *
- * Finds one available (pending + unassigned/expired) escalation matching
- * the metadata and claims it atomically. Optionally resolves an assignee
- * from an external_id.
- *
- * @param input.key — metadata field name
- * @param input.value — metadata field value
- * @param input.durationMinutes — claim duration (default 30)
- * @param input.assignee — optional external_id of the user to claim as
- * @returns `{ status: 200, data: { escalation, isExtension } }`
+ * Single atomic query. RBAC is enforced in the SQL WHERE clause —
+ * if the caller doesn't have an allowed role, zero rows match and
+ * the claim never happens. No pre-flight find, no TOCTOU.
  */
 export async function claimByMetadata(
   input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any> },
@@ -64,31 +53,24 @@ export async function claimByMetadata(
     if ('error' in resolved) return resolved.error;
     const claimUserId = resolved.userId;
 
-    // RBAC: find the candidate to check role membership before atomic claim
-    const candidates = await escalationService.findByMetadata(input.key, input.value, 'pending', 1, 0);
-    if (candidates.escalations.length === 0) {
-      return { status: 404, error: 'No pending escalation found for this metadata' };
-    }
-    const candidate = candidates.escalations[0];
-
-    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
-    if (!hasGlobal) {
-      const userHasRole = await userService.hasRole(claimUserId, candidate.role);
-      if (!userHasRole) {
-        return { status: 403, error: `User must have the "${candidate.role}" role to claim this escalation` };
-      }
-    }
+    // Resolve allowed roles: null = global access (no filter), string[] = scoped
+    const allowedRoles = await resolveAllowedRoles(auth.userId);
 
     const result = await escalationService.claimByMetadata(
-      input.key, input.value, claimUserId, input.durationMinutes, input.metadata,
+      input.key, input.value, claimUserId, input.durationMinutes,
+      input.metadata, allowedRoles,
     );
+
     if (!result) {
-      return { status: 409, error: 'Escalation not available for claim' };
+      // No rows matched. Check if candidates existed (role mismatch vs no match).
+      return { status: 404, error: 'No pending escalation found for this metadata' };
     }
 
-    // Event published by service layer (services/escalation/crud.ts)
+    if (result.candidatesExist > 0 && !result.escalation) {
+      return { status: 403, error: 'Escalation exists but your roles do not permit claiming it' };
+    }
 
-    return { status: 200, data: result };
+    return { status: 200, data: { escalation: result.escalation, isExtension: result.isExtension } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -97,14 +79,8 @@ export async function claimByMetadata(
 /**
  * Resolve an escalation by metadata key-value pair.
  *
- * Finds the pending escalation, auto-claims if unclaimed, then delegates
- * to the standard resolve logic (supports all 5 resolution paths).
- *
- * @param input.key — metadata field name
- * @param input.value — metadata field value
- * @param input.resolverPayload — resolution data for the workflow
- * @param input.assignee — optional external_id of the resolving user
- * @returns result from the standard resolve endpoint
+ * Single atomic CTE: find + claim + resolve in one query.
+ * RBAC is enforced in the SQL WHERE clause.
  */
 export async function resolveByMetadata(
   input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string; metadata?: Record<string, any> },
@@ -118,41 +94,35 @@ export async function resolveByMetadata(
       return { status: 400, error: 'resolverPayload is required' };
     }
 
-    const candidates = await escalationService.findByMetadata(input.key, input.value, 'pending', 1, 0);
-    if (candidates.escalations.length === 0) {
-      return { status: 404, error: 'No pending escalation found for this metadata' };
-    }
-    const escalation = candidates.escalations[0];
-
     const resolved = await resolveAssignee(input.assignee, auth);
     if ('error' in resolved) return resolved.error;
     const resolveUserId = resolved.userId;
 
-    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
-    if (!hasGlobal) {
-      const userHasRole = await userService.hasRole(resolveUserId, escalation.role);
-      if (!userHasRole) {
-        return { status: 403, error: `User must have the "${escalation.role}" role` };
-      }
+    const allowedRoles = await resolveAllowedRoles(auth.userId);
+
+    const escalation = await escalationService.resolveByMetadataAtomic(
+      input.key, input.value, resolveUserId,
+      input.resolverPayload, input.metadata, allowedRoles,
+    );
+
+    if (!escalation) {
+      return { status: 404, error: 'No pending escalation found for this metadata, or insufficient role permissions' };
     }
 
-    // Merge additional metadata if provided
-    if (input.metadata && Object.keys(input.metadata).length > 0) {
-      await escalationService.updateEscalationMetadata(escalation.id, input.metadata);
-    }
-
-    // Auto-claim if unclaimed or expired
-    const isClaimed = escalation.assigned_to &&
-      escalation.assigned_until &&
-      new Date(escalation.assigned_until) > new Date();
-    if (!isClaimed) {
-      await escalationService.claimEscalation(escalation.id, resolveUserId, 5);
-    }
-
-    // Delegate to the full resolve logic (handles all 5 resolution paths)
-    const { resolveEscalation } = await import('./resolve');
-    return resolveEscalation({ id: escalation.id, resolverPayload: input.resolverPayload }, auth);
+    return { status: 200, data: { escalation } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the set of roles the caller is allowed to act on.
+ * Returns null for global access (superadmin/admin), or string[] for scoped users.
+ */
+async function resolveAllowedRoles(userId: string): Promise<string[] | null> {
+  if (await userService.hasGlobalEscalationAccess(userId)) return null;
+  const userRoles = await userService.getUserRoles(userId);
+  return userRoles.map(r => r.role);
 }

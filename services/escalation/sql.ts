@@ -164,31 +164,28 @@ export const LIST_DISTINCT_TYPES =
 
 // --- Metadata candidate key lookups -----------------------------------------
 
-/** Find escalations by a single metadata key-value pair. */
+/** Find escalations by a single metadata key-value pair. Window function for total count. */
 export const FIND_BY_METADATA = `\
-SELECT * FROM lt_escalations
+SELECT *, COUNT(*) OVER() AS _total
+FROM lt_escalations
 WHERE metadata @> $1::jsonb
   AND ($2::text IS NULL OR status = $2)
 ORDER BY priority ASC, created_at ASC
 LIMIT $3 OFFSET $4`;
 
-export const COUNT_BY_METADATA = `\
-SELECT COUNT(*) FROM lt_escalations
-WHERE metadata @> $1::jsonb
-  AND ($2::text IS NULL OR status = $2)`;
-
-/** Atomic claim by metadata: find one available escalation, claim it, and optionally merge metadata. */
-export const CLAIM_BY_METADATA = `\
+/**
+ * Atomic claim by metadata with inline RBAC.
+ * $1 = metadata filter (jsonb), $2 = userId, $3 = durationMinutes,
+ * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
+ */
+export const CLAIM_BY_METADATA_GUARDED = `\
 WITH target AS (
   SELECT id, assigned_to
   FROM lt_escalations
   WHERE metadata @> $1::jsonb
     AND status = 'pending'
-    AND (
-      assigned_to IS NULL
-      OR assigned_until <= NOW()
-      OR assigned_to = $2
-    )
+    AND (assigned_to IS NULL OR assigned_until <= NOW() OR assigned_to = $2)
+    AND ($5::text[] IS NULL OR role = ANY($5))
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE SKIP LOCKED
@@ -200,9 +197,49 @@ updated AS (
       assigned_until = NOW() + INTERVAL '1 minute' * $3,
       metadata = CASE WHEN $4::jsonb IS NOT NULL
         THEN COALESCE(e.metadata, '{}'::jsonb) || $4::jsonb
-        ELSE e.metadata END
+        ELSE e.metadata END,
+      updated_at = NOW()
   FROM target t
   WHERE e.id = t.id
   RETURNING e.*, t.assigned_to AS prev_assigned_to
 )
-SELECT * FROM updated`;
+SELECT *,
+  (SELECT COUNT(*) FROM lt_escalations WHERE metadata @> $1::jsonb AND status = 'pending') AS candidates_exist
+FROM updated`;
+
+/**
+ * Atomic resolve by metadata: find + claim + resolve in one CTE.
+ * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
+ * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
+ */
+export const RESOLVE_BY_METADATA_ATOMIC = `\
+WITH target AS (
+  SELECT id
+  FROM lt_escalations
+  WHERE metadata @> $1::jsonb
+    AND status = 'pending'
+    AND ($5::text[] IS NULL OR role = ANY($5))
+  ORDER BY priority ASC, created_at ASC
+  LIMIT 1
+  FOR UPDATE SKIP LOCKED
+),
+claimed AS (
+  UPDATE lt_escalations e
+  SET assigned_to = $2,
+      claimed_at = NOW(),
+      assigned_until = NOW() + INTERVAL '5 minutes',
+      metadata = CASE WHEN $4::jsonb IS NOT NULL
+        THEN COALESCE(e.metadata, '{}'::jsonb) || $4::jsonb
+        ELSE e.metadata END
+  FROM target
+  WHERE e.id = target.id
+  RETURNING e.*
+)
+UPDATE lt_escalations e
+SET status = 'resolved',
+    resolved_at = NOW(),
+    resolver_payload = $3,
+    updated_at = NOW()
+FROM claimed
+WHERE e.id = claimed.id
+RETURNING e.*`;
