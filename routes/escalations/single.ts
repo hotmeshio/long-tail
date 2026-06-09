@@ -49,7 +49,7 @@ export function registerSingleRoutes(router: Router): void {
    */
   router.post('/:id/claim', async (req, res) => {
     const result = await api.claimEscalation(
-      { id: req.params.id, durationMinutes: req.body?.durationMinutes },
+      { id: req.params.id, durationMinutes: req.body?.durationMinutes, provisionIfAbsent: req.body?.provisionIfAbsent },
       req.auth!,
     );
     res.status(result.status).json(result.data ?? { error: result.error });

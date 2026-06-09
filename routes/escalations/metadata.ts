@@ -26,7 +26,7 @@ export function registerMetadataRoutes(router: Router): void {
   /**
    * POST /api/escalations/claim-by-metadata
    * Find and claim an escalation by metadata key-value pair.
-   * Body: { key, value, durationMinutes?, assignee?, metadata? }
+   * Body: { key, value, durationMinutes?, assignee?, metadata?, provisionIfAbsent? }
    */
   router.post('/claim-by-metadata', async (req, res) => {
     const result = await api.claimByMetadata({
@@ -35,6 +35,7 @@ export function registerMetadataRoutes(router: Router): void {
       durationMinutes: req.body?.durationMinutes,
       assignee: req.body?.assignee,
       metadata: req.body?.metadata,
+      provisionIfAbsent: req.body?.provisionIfAbsent,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
