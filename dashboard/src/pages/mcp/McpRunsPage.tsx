@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Filter } from 'lucide-react';
 import { useMcpRuns, useMcpEntities } from '../../api/pipelines';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
-import { useNamespaces } from '../../api/namespaces';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { useNamespace } from '../../hooks/useNamespace';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
@@ -116,6 +116,7 @@ function buildColumns(
 
 export function McpRunsPage() {
   const navigate = useNavigate();
+  const { namespace: hookNamespace, available } = useNamespace('namespace');
   const { filters, setFilter, setFilters, pagination, sort, setSort } = useFilterParams({
     filters: { search: '', entity: '', status: '', namespace: '' },
   });
@@ -129,21 +130,17 @@ export function McpRunsPage() {
   }, [searchInput, setFilter, filters.search]);
 
   const { data: appIdData } = useYamlWorkflowAppIds();
-  const { data: nsData } = useNamespaces();
 
+  // Merge real HotMesh namespaces (from controlplane/apps) with YAML workflow app_ids
   const allNamespaceNames = useMemo(() => {
-    const set = new Set(appIdData?.app_ids ?? []);
-    for (const ns of nsData?.namespaces ?? []) {
-      set.add(ns.name);
+    const set = new Set(available);
+    for (const id of appIdData?.app_ids ?? []) {
+      set.add(id);
     }
     return [...set].sort();
-  }, [appIdData?.app_ids, nsData?.namespaces]);
+  }, [available, appIdData?.app_ids]);
 
-  // Default: URL param > 'hmsh' (if exists) > first in list
-  const defaultNamespace = allNamespaceNames.includes('hmsh')
-    ? 'hmsh'
-    : allNamespaceNames[0] ?? '';
-  const activeNamespace = filters.namespace || defaultNamespace;
+  const activeNamespace = filters.namespace || hookNamespace;
   const { data: entitiesData } = useMcpEntities(activeNamespace);
 
   const { data: runsData, isLoading, refetch, isFetching } = useMcpRuns({
@@ -185,7 +182,7 @@ export function McpRunsPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/pipelines?app_id=${activeNamespace || 'longtail'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+          apiPath={`/pipelines?app_id=${activeNamespace}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
         />
       }>
         <FilterSelect

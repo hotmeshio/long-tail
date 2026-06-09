@@ -44,7 +44,7 @@ export function registerControlPlaneTools(server: McpServer): void {
     },
     async (args: z.infer<typeof rollCallSchema>) => {
       const result = await api.rollCall({
-        appId: args.app_id || 'durable',
+        appId: args.app_id,
         delay: args.delay,
       });
       if (result.error) {

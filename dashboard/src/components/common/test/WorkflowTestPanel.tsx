@@ -151,7 +151,7 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
   };
 
   const isRunning = !!activeJobId;
-  const ns = workflow.app_id || 'longtail';
+  const ns = workflow.app_id || '';
 
   return (
     <div className="border-l border-surface-border bg-surface-raised flex flex-col h-full">

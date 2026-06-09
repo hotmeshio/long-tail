@@ -112,7 +112,7 @@ export function PlanWizard() {
 
   // ── Namespace lock (first saved non-default app_id wins) ────────────────
   const lockedAppId = useMemo(() => {
-    const saved = yamlWorkflows.find(w => w.app_id && w.app_id !== 'longtail');
+    const saved = yamlWorkflows.find(w => w.app_id);
     return saved?.app_id || null;
   }, [yamlWorkflows]);
 

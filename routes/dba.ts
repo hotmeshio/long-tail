@@ -21,7 +21,13 @@ const router = Router();
  * Returns: { jobs, streams, attributes, transient, marked }
  */
 router.post('/prune', requireAdmin, async (req, res) => {
+  const appId = req.body.app_id;
+  if (!appId) {
+    res.status(400).json({ error: 'app_id is required' });
+    return;
+  }
   const result = await api.prune({
+    appId,
     expire: req.body.expire,
     jobs: req.body.jobs,
     streams: req.body.streams,
@@ -42,8 +48,13 @@ router.post('/prune', requireAdmin, async (req, res) => {
  * Deploy the server-side prune function and run migrations.
  * Idempotent — safe to call on startup or from CI/CD.
  */
-router.post('/deploy', requireAdmin, async (_req, res) => {
-  const result = await api.deploy();
+router.post('/deploy', requireAdmin, async (req, res) => {
+  const appId = req.body.app_id;
+  if (!appId) {
+    res.status(400).json({ error: 'app_id is required' });
+    return;
+  }
+  const result = await api.deploy(appId);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

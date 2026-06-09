@@ -41,8 +41,15 @@ describe('Control plane routes', () => {
       expect(res.status).toBe(403);
     });
 
-    it('returns profiles for admin', async () => {
+    it('returns 400 when app_id is missing', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/rollcall`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns profiles for builder with app_id', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/rollcall?app_id=durable`, {
         headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
@@ -68,11 +75,22 @@ describe('Control plane routes', () => {
       expect(res.status).toBe(403);
     });
 
+    it('returns 400 when appId is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/throttle`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ throttle: 0 }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('appId');
+    });
+
     it('returns 400 when throttle field is missing', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/throttle`, {
         method: 'POST',
         headers: authHeaders(ctx.builderToken),
-        body: JSON.stringify({}),
+        body: JSON.stringify({ appId: 'durable' }),
       });
       expect(res.status).toBe(400);
       const body = await res.json() as any;
@@ -83,7 +101,7 @@ describe('Control plane routes', () => {
       const res = await fetch(`${ctx.BASE}/controlplane/throttle`, {
         method: 'POST',
         headers: authHeaders(ctx.builderToken),
-        body: JSON.stringify({ throttle: 'fast' }),
+        body: JSON.stringify({ appId: 'durable', throttle: 'fast' }),
       });
       expect(res.status).toBe(400);
       const body = await res.json() as any;
@@ -104,8 +122,15 @@ describe('Control plane routes', () => {
       expect(res.status).toBe(403);
     });
 
-    it('returns stats object for admin', async () => {
+    it('returns 400 when app_id is missing', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/streams`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns stats object for builder with app_id', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/streams?app_id=durable`, {
         headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
@@ -228,7 +253,16 @@ describe('Control plane routes', () => {
       expect(res.status).toBe(403);
     });
 
-    it('returns 200 with subscribed true for admin', async () => {
+    it('returns 400 when appId is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/controlplane/subscribe`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 200 with subscribed true for builder', async () => {
       const res = await fetch(`${ctx.BASE}/controlplane/subscribe`, {
         method: 'POST',
         headers: authHeaders(ctx.builderToken),

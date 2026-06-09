@@ -1,7 +1,6 @@
-import { Trash2 } from 'lucide-react';
+import { Users, Trash2 } from 'lucide-react';
 import { type RoleDetail } from '../../../api/roles';
 import { type Column } from '../../../components/common/data/DataTable';
-import { RolePill } from '../../../components/common/display/RolePill';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 
 export function getRoleColumns(
@@ -11,7 +10,12 @@ export function getRoleColumns(
     {
       key: 'role',
       label: 'Role',
-      render: (row) => <RolePill role={row.role} />,
+      render: (row) => (
+        <div className="flex items-center gap-2.5">
+          <Users className="w-4 h-4 text-accent/60 shrink-0" />
+          <span className="text-sm text-text-primary">{row.role}</span>
+        </div>
+      ),
     },
     {
       key: 'user_count',

@@ -10,12 +10,18 @@ describe('Exports routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 200 or 500 (durable schema may not exist without workers)', async () => {
-      const res = await fetch(`${ctx.BASE}/workflow-states/jobs?limit=5&offset=0`, {
+    it('returns 400 when app_id is missing', async () => {
+      const res = await fetch(`${ctx.BASE}/workflow-states/jobs?limit=5`, {
         headers: authHeaders(ctx.memberToken),
       });
-      // The durable.jobs table only exists when HotMesh workers have registered.
-      // Without workers, the endpoint returns 500. Both are valid.
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 200 with app_id (schema may not exist without workers)', async () => {
+      const res = await fetch(`${ctx.BASE}/workflow-states/jobs?app_id=durable&limit=5`, {
+        headers: authHeaders(ctx.memberToken),
+      });
+      // Schema may not exist in test env — both are valid
       if (res.status === 200) {
         const body = await res.json() as any;
         expect(Array.isArray(body.jobs)).toBe(true);

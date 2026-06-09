@@ -43,6 +43,7 @@ Replaces the maintenance configuration and restarts the cron. The endpoint disco
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `appId` | `string` | no | Target a specific application namespace |
 | `schedule` | `string` | yes | Cron expression (`0 3 * * *`) or interval (`1 day`) |
 | `rules` | `array` | yes | Ordered list of maintenance rules |
 

@@ -11,6 +11,7 @@ import type {
   LTTransitionEntry,
 } from '../../types';
 import { getPool } from '../../lib/db';
+import { sanitizeAppId, quoteSchema } from '../hotmesh-utils';
 
 import { getHandle } from './client';
 import { postProcessExecution } from './post-process';
@@ -164,10 +165,14 @@ function buildJobOrderBy(sortBy?: string, order?: string): string {
 }
 
 /**
- * List workflow jobs from durable.jobs where entity IS NOT NULL.
+ * List workflow jobs from {schema}.jobs where entity IS NOT NULL.
  * Returns paginated results sorted by active first, then created_at DESC.
  */
-export async function listJobs(params: JobListParams): Promise<JobListResult> {
+export async function listJobs(app_id: string, params: JobListParams): Promise<JobListResult> {
+  const appId = sanitizeAppId(app_id);
+  const schema = quoteSchema(appId);
+  const keyPrefix = `hmsh:${appId}:j:`;
+
   const limit = Math.min(params.limit ?? 20, 100);
   const offset = params.offset ?? 0;
 
@@ -212,15 +217,17 @@ export async function listJobs(params: JobListParams): Promise<JobListResult> {
 
   const where = conditions.join(' AND ');
 
+  // Graceful degradation: schema may not exist if no engine has started.
+  const emptyCount = { rows: [{ count: '0' }] };
   const [countResult, dataResult] = await Promise.all([
     pool.query(
-      `SELECT COUNT(*) FROM durable.jobs j WHERE ${where}`,
+      `SELECT COUNT(*) FROM ${schema}.jobs j WHERE ${where}`,
       values,
-    ),
+    ).catch(() => emptyCount),
     pool.query(
       `WITH ju_symbols AS (
-         SELECT value FROM durable.symbols
-         WHERE key LIKE 'hmsh:durable:sym:keys:%' AND field = 'metadata/ju'
+         SELECT value FROM ${schema}.symbols
+         WHERE key LIKE 'hmsh:${appId}:sym:keys:%' AND field = 'metadata/ju'
        )
        SELECT j.key, j.entity, j.status, j.is_live, j.created_at,
          CASE WHEN j.updated_at != j.created_at THEN j.updated_at
@@ -228,23 +235,23 @@ export async function listJobs(params: JobListParams): Promise<JobListResult> {
               ELSE j.updated_at
          END as updated_at,
          ws.id as set_id
-       FROM durable.jobs j
-       LEFT JOIN durable.jobs_attributes ju
+       FROM ${schema}.jobs j
+       LEFT JOIN ${schema}.jobs_attributes ju
          ON ju.job_id = j.id
          AND ju.symbol IN (SELECT value FROM ju_symbols)
          AND (ju.dimension IS NULL OR ju.dimension = '')
        LEFT JOIN lt_workflow_sets ws
-         ON ws.source_workflow_id = REPLACE(j.key, 'hmsh:durable:j:', '')
+         ON ws.source_workflow_id = REPLACE(j.key, '${keyPrefix}', '')
          AND j.entity = 'mcpWorkflowPlanner'
        WHERE ${where}
        ORDER BY ${buildJobOrderBy(params.sort_by, params.order)}
        LIMIT $${idx++} OFFSET $${idx++}`,
       [...values, limit, offset],
-    ),
+    ).catch(() => ({ rows: [] })),
   ]);
 
   const jobs = dataResult.rows.map((row: any) => ({
-    workflow_id: row.key.replace('hmsh:durable:j:', ''),
+    workflow_id: row.key.replace(keyPrefix, ''),
     entity: row.entity,
     status: (row.status > 0 ? 'running' : row.status === 0 ? 'completed' : 'failed') as JobRow['status'],
     is_live: row.is_live,

@@ -86,7 +86,7 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
             {(() => {
               const res = (callTool.data as any)?.result;
               const jobId = res?.job_id;
-              const ns = res?.namespace || 'longtail';
+              const ns = res?.namespace || '';
               return jobId ? (
                 <Link
                   to={`/mcp/executions/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(ns)}`}

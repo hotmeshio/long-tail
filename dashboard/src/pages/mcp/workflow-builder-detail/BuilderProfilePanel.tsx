@@ -20,7 +20,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(sanitizeToolName(builderData?.name || ''));
   const [description, setDescription] = useState(builderData?.description || '');
-  const [appId, setAppId] = useState('longtail');
+  const [appId, setAppId] = useState('');
   const [tags, setTags] = useState<string[]>(builderData?.tags || []);
 
   const createYaml = useCreateDirectYamlWorkflow();

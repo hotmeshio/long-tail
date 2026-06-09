@@ -4,8 +4,8 @@ import { RefreshCw } from 'lucide-react';
 import { PageHeaderWithStats, type InlineStat } from '../../../components/common/layout/PageHeaderWithStats';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
 import { useFilterParams } from '../../../hooks/useFilterParams';
+import { useNamespace } from '../../../hooks/useNamespace';
 import {
-  useControlPlaneApps,
   useRollCall,
   useStreamStats,
   useSubscribeMesh,
@@ -23,15 +23,13 @@ import { EmergencyControls } from './EmergencyControls';
 import { ControlPlaneContent } from './ControlPlaneContent';
 
 export function ControlPlanePage() {
-  const { data: appsData } = useControlPlaneApps();
-  const apps = appsData?.apps ?? [];
+  const { namespace, available } = useNamespace();
 
   const { filters, setFilter } = useFilterParams({
     filters: { app_id: '', duration: '1h' },
   });
 
-  const firstAppId = apps[0]?.appId ?? 'durable';
-  const activeAppId = filters.app_id || firstAppId;
+  const activeAppId = filters.app_id || namespace;
   const activeDuration = (filters.duration || '1h') as Duration;
 
   const subscribeMesh = useSubscribeMesh();
@@ -60,10 +58,10 @@ export function ControlPlanePage() {
   const throttledCount = allProfiles.filter(isThrottled).length;
 
   const appOptions = useMemo(() => {
-    const ids = new Set(apps.map((a) => a.appId));
+    const ids = new Set(available);
     if (activeAppId) ids.add(activeAppId);
     return [...ids].sort().map((id) => ({ value: id, label: id }));
-  }, [apps, activeAppId]);
+  }, [available, activeAppId]);
 
   // ── Deep-link: auto-expand a queue from ?queue= param ──────────
   const [searchParams] = useSearchParams();

@@ -22,7 +22,7 @@ export function useMcpRuns(filters: McpRunFilters = {}) {
   if (filters.status) params.set('status', filters.status);
   if (filters.sort_by) params.set('sort_by', filters.sort_by);
   if (filters.order) params.set('order', filters.order);
-  params.set('app_id', filters.app_id || 'longtail');
+  params.set('app_id', filters.app_id || '');
 
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['mcpRuns', filters],
@@ -30,14 +30,14 @@ export function useMcpRuns(filters: McpRunFilters = {}) {
   });
 }
 
-export function useMcpEntities(appId = 'longtail') {
+export function useMcpEntities(appId = '') {
   return useQuery<{ entities: string[] }>({
     queryKey: ['mcpEntities', appId],
     queryFn: () => apiFetch(`/pipelines/entities?app_id=${appId}`),
   });
 }
 
-export function useMcpRunExecution(jobId: string, appId = 'longtail') {
+export function useMcpRunExecution(jobId: string, appId = '') {
   return useQuery<WorkflowExecution>({
     queryKey: ['mcpRunExecution', jobId, appId],
     queryFn: () => apiFetch(`/pipelines/${jobId}/execution?app_id=${appId}`),

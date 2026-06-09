@@ -70,7 +70,7 @@ export function sanitizeToolName(value: string): string {
  * Output: lowercase letters and digits only, guaranteed to start with a letter.
  *         All non-alphanumeric chars are stripped (not replaced).
  *         Leading digits are stripped so the result starts with a letter.
- *         Default: 'longtail' if the result is empty after sanitization.
+ *         Returns empty string if the result is empty after sanitization.
  *
  * This is the ONE canonical frontend implementation. The backend has an
  * identical copy at `modules/utils.ts`. No other file in the platform

@@ -205,7 +205,7 @@ export function HelpAssistantProvider({ children }: { children: ReactNode }) {
               name: described.tool_name,
               description: described.description,
               tags: described.tags,
-              app_id: 'longtail',
+              app_id: '',
             }),
           },
         );

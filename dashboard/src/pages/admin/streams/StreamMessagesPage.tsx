@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useStreamMessages, type StreamMessage } from '../../../api/stream-messages';
-import { useControlPlaneApps } from '../../../api/controlplane';
 import { useFilterParams } from '../../../hooks/useFilterParams';
+import { useNamespace } from '../../../hooks/useNamespace';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
@@ -20,20 +20,21 @@ function truncateMiddle(str: string, max: number): string {
 }
 
 export function StreamMessagesPage() {
+  const { namespace, available } = useNamespace('namespace');
+
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
-    filters: { namespace: 'durable', source: 'worker', status: '', stream_name: '', msg_type: '', topic: '', workflow_name: '', jid: '', aid: '' },
+    filters: { namespace: '', source: 'worker', status: '', stream_name: '', msg_type: '', topic: '', workflow_name: '', jid: '', aid: '' },
   });
 
   const [selected, setSelected] = useState<StreamMessage | null>(null);
 
-  const { data: appsData } = useControlPlaneApps();
   const namespaceOptions = useMemo(
-    () => (appsData?.apps ?? []).map((a) => ({ value: a.appId, label: a.appId })),
-    [appsData],
+    () => available.map((id) => ({ value: id, label: id })),
+    [available],
   );
 
   const { data, isLoading, refetch, isFetching } = useStreamMessages({
-    namespace: filters.namespace || 'durable',
+    namespace: filters.namespace || namespace,
     source: (filters.source as 'engine' | 'worker') || 'worker',
     limit: pagination.pageSize,
     offset: pagination.offset,
@@ -140,7 +141,7 @@ export function StreamMessagesPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/controlplane/stream-messages?namespace=${filters.namespace || 'durable'}&source=${filters.source || 'worker'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.status ? `&status=${filters.status}` : ''}${filters.stream_name ? `&stream_name=${filters.stream_name}` : ''}`}
+          apiPath={`/controlplane/stream-messages?namespace=${filters.namespace || namespace}&source=${filters.source || 'worker'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.status ? `&status=${filters.status}` : ''}${filters.stream_name ? `&stream_name=${filters.stream_name}` : ''}`}
         />
       }>
         <FilterSelect

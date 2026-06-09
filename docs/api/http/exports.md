@@ -4,6 +4,32 @@ Export endpoints expose workflow state and execution history. The execution hist
 
 Every endpoint resolves the workflow automatically from the `workflowId` — no additional parameters needed.
 
+## List workflow jobs
+
+```
+GET /api/workflow-states/jobs
+```
+
+List workflow jobs with optional filtering and pagination. Requires a namespace.
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `app_id` | `string` | **Yes** | Application namespace (alias: `namespace`) |
+| `entity` | `string` | No | Filter by entity name |
+| `search` | `string` | No | Search by workflow ID substring |
+| `status` | `string` | No | Filter by status: `running`, `completed`, `failed` |
+| `sort_by` | `string` | No | Sort field |
+| `order` | `string` | No | Sort direction: `asc` or `desc` |
+| `registered` | `string` | No | Filter by registration status |
+| `limit` | `integer` | No | Max results |
+| `offset` | `integer` | No | Pagination offset |
+
+**Response 400:** Missing `app_id`.
+
+---
+
 ## Raw workflow state
 
 ```

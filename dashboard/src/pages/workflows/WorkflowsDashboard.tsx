@@ -5,6 +5,7 @@ import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { useJobs, useWorkflowConfigs, useDiscoveredWorkflows } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
+import { useNamespace } from '../../hooks/useNamespace';
 import { useWorkflowListEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -128,6 +129,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
   useWorkflowListEvents();
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
+  const { namespace } = useNamespace();
 
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { search: '', entity: '', status: '', tier: initialTier },
@@ -175,6 +177,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     sort_by: sort.sort_by || 'created_at',
     order: sort.order || 'desc',
     registered: registeredFilter,
+    namespace: namespace || undefined,
   });
 
   const total = jobsData?.total ?? 0;

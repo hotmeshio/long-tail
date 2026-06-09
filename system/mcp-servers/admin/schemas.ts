@@ -205,6 +205,7 @@ export const addEscalationChainSchema = z.object({
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────
 
 export const pruneSchema = z.object({
+  app_id: z.string().describe('HotMesh application namespace (required)'),
   expire: z.string().optional().default('7 days').describe('Retention period (PostgreSQL interval)'),
   jobs: z.boolean().optional().default(true).describe('Hard-delete expired jobs'),
   streams: z.boolean().optional().default(true).describe('Hard-delete expired streams'),
@@ -319,12 +320,12 @@ export const revokeBotKeySchema = z.object({
 export const listAppsSchema = z.object({});
 
 export const rollCallSchema = z.object({
-  app_id: z.string().optional().describe('Namespace to query'),
+  app_id: z.string().describe('HotMesh application namespace (required)'),
   delay: z.number().int().optional().describe('Delay in ms before roll call'),
 });
 
 export const applyThrottleSchema = z.object({
-  appId: z.string().optional().describe('Namespace to throttle'),
+  appId: z.string().describe('HotMesh application namespace (required)'),
   throttle: z.number().int().describe('Throttle value (messages per second)'),
   topic: z.string().optional().describe('Topic to throttle'),
   guid: z.string().optional().describe('Specific GUID to throttle'),
@@ -332,7 +333,7 @@ export const applyThrottleSchema = z.object({
 });
 
 export const getStreamStatsSchema = z.object({
-  app_id: z.string().optional().describe('Namespace to query'),
+  app_id: z.string().describe('HotMesh application namespace (required)'),
   duration: z.string().optional().describe('Stats duration window'),
   stream: z.string().optional().describe('Specific stream name'),
 });
@@ -356,11 +357,11 @@ export const listStreamMessagesSchema = z.object({
 // ── pipelines (routes/pipelines.ts) ─────────────────────────────────────────
 
 export const listPipelineEntitiesSchema = z.object({
-  app_id: z.string().optional().describe('Namespace to query'),
+  app_id: z.string().describe('HotMesh application namespace (required)'),
 });
 
 export const listPipelineJobsSchema = z.object({
-  app_id: z.string().optional().describe('Namespace to query'),
+  app_id: z.string().describe('HotMesh application namespace (required)'),
   limit: z.number().int().min(1).max(100).optional().default(25),
   offset: z.number().int().min(0).optional().default(0),
   entity: z.string().optional().describe('Filter by entity type'),
@@ -372,13 +373,13 @@ export const listPipelineJobsSchema = z.object({
 
 export const getJobExecutionSchema = z.object({
   job_id: z.string().describe('Job ID to retrieve'),
-  app_id: z.string().optional().describe('Namespace'),
+  app_id: z.string().describe('HotMesh application namespace (required)'),
 });
 
 export const interruptJobSchema = z.object({
   job_id: z.string().describe('Job ID to interrupt'),
   topic: z.string().describe('Topic of the job'),
-  app_id: z.string().optional().describe('Namespace'),
+  app_id: z.string().describe('HotMesh application namespace (required)'),
 });
 
 // ── topics (routes/topics.ts) ───────────────────────────────────────────────
@@ -470,6 +471,7 @@ export const getSettingsSchema = z.object({});
 // ── exports (routes/exports.ts) ─────────────────────────────────────────────
 
 export const listExportJobsSchema = z.object({
+  app_id: z.string().describe('HotMesh application namespace (required)'),
   limit: z.number().int().min(1).max(100).optional().default(25),
   offset: z.number().int().min(0).optional().default(0),
   entity: z.string().optional().describe('Filter by entity type'),

@@ -4,7 +4,7 @@ import { Server, Workflow } from 'lucide-react';
 import { useMcpServers } from '../../api/mcp';
 import { useMcpRuns } from '../../api/pipelines';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
-import { useNamespaces } from '../../api/namespaces';
+import { useControlPlaneApps } from '../../api/controlplane';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StatCard } from '../../components/common/data/StatCard';
 import type { McpToolManifest } from '../../api/types';
@@ -67,17 +67,19 @@ function StatCell({
 export function McpOverview() {
   const navigate = useNavigate();
   const [duration, setDuration] = useState<DurationLabel>('24h');
-  const [namespace, setNamespace] = useState('longtail');
+  const [namespace, setNamespace] = useState('');
 
-  const { data: nsData } = useNamespaces();
-  const { data: allRuns } = useMcpRuns({ limit: 500, app_id: namespace });
+  const { data: appsData } = useControlPlaneApps();
+
+  // Auto-select the first namespace when available
+  const nsNames = useMemo(() => (appsData?.apps ?? []).map((a: any) => a.appId).sort(), [appsData?.apps]);
+  const effectiveNamespace = namespace || nsNames[0] || '';
+
+  const { data: allRuns } = useMcpRuns({ limit: 500, app_id: effectiveNamespace });
   const { data: serverData, isLoading: serversLoading } = useMcpServers();
   const { data: yamlData, isLoading: yamlLoading } = useYamlWorkflows({ limit: 200 });
 
-  const namespaces = useMemo(
-    () => (nsData?.namespaces ?? []).map((ns) => ns.name),
-    [nsData?.namespaces],
-  );
+  const namespaces = nsNames;
 
   // ── Server counts ────────────────────────────────────────────
   const servers = serverData?.servers ?? [];
@@ -141,7 +143,7 @@ export function McpOverview() {
 
   const goToRuns = (entity?: string, status?: string) => {
     const params = new URLSearchParams();
-    if (namespace !== 'longtail') params.set('namespace', namespace);
+    if (effectiveNamespace) params.set('namespace', effectiveNamespace);
     if (entity) params.set('entity', entity);
     if (status) params.set('status', status);
     const qs = params.toString();
@@ -173,7 +175,7 @@ export function McpOverview() {
         </div>
         {namespaces.length > 1 && (
           <select
-            value={namespace}
+            value={effectiveNamespace}
             onChange={(e) => setNamespace(e.target.value)}
             className="select text-xs py-1 px-2"
           >

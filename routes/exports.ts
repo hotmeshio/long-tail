@@ -11,7 +11,13 @@ const router = Router();
  * List workflow jobs with optional filtering and pagination.
  */
 router.get('/jobs', async (req, res) => {
+  const app_id = (req.query.app_id || req.query.namespace) as string | undefined;
+  if (!app_id) {
+    res.status(400).json({ error: 'app_id (or namespace) query parameter is required' });
+    return;
+  }
   const result = await api.listJobs({
+    app_id,
     limit: parseInt(req.query.limit as string) || undefined,
     offset: parseInt(req.query.offset as string) || undefined,
     entity: (req.query.entity as string) || undefined,

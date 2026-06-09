@@ -2,9 +2,6 @@
 // Schema placeholders (${schema}) are interpolated at call time
 // because Postgres does not support parameterized schema names.
 
-export const DISTINCT_ENTITIES_DURABLE = `
-  SELECT DISTINCT entity FROM durable.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`;
-
 export const DISTINCT_ENTITIES = (schema: string) =>
   `SELECT DISTINCT entity FROM ${schema}.jobs WHERE entity IS NOT NULL AND entity != '' ORDER BY entity`;
 

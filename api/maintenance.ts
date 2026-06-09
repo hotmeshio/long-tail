@@ -25,14 +25,14 @@ export function getMaintenanceConfig(): LTApiResult {
  * @returns `{ status: 200, data: { config, restarted: true } }`
  */
 export async function updateMaintenanceConfig(
-  input: { schedule: string; rules: LTMaintenanceConfig['rules'] },
+  input: { appId: string; schedule: string; rules: LTMaintenanceConfig['rules'] },
 ): Promise<LTApiResult> {
   try {
-    if (!input.schedule || !Array.isArray(input.rules)) {
-      return { status: 400, error: 'schedule (string) and rules (array) are required' };
+    if (!input.appId || !input.schedule || !Array.isArray(input.rules)) {
+      return { status: 400, error: 'appId (string), schedule (string), and rules (array) are required' };
     }
     await maintenanceRegistry.disconnect();
-    maintenanceRegistry.register({ schedule: input.schedule, rules: input.rules });
+    maintenanceRegistry.register({ appId: input.appId, schedule: input.schedule, rules: input.rules });
     await maintenanceRegistry.connect();
     return {
       status: 200,

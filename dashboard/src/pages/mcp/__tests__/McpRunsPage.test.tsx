@@ -12,6 +12,10 @@ vi.mock('../../../api/yaml-workflows', () => ({
   useYamlWorkflowAppIds: vi.fn(),
 }));
 
+vi.mock('../../../hooks/useNamespace', () => ({
+  useNamespace: () => ({ namespace: 'longtail', available: ['longtail', 'lt-yaml'], isLoading: false, setNamespace: vi.fn() }),
+}));
+
 import { McpRunsPage } from '../McpRunsPage';
 import { useMcpRuns, useMcpEntities } from '../../../api/pipelines';
 import { useYamlWorkflowAppIds } from '../../../api/yaml-workflows';
