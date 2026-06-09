@@ -185,7 +185,7 @@ WITH target AS (
   WHERE metadata @> $1::jsonb
     AND status = 'pending'
     AND (assigned_to IS NULL OR assigned_until <= NOW() OR assigned_to = $2)
-    AND ($5::text[] IS NULL OR array_length($5, 1) IS NULL OR role = ANY($5))
+    AND ($5::text[] IS NULL OR role = ANY($5))
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE SKIP LOCKED
@@ -208,38 +208,60 @@ SELECT *,
 FROM updated`;
 
 /**
- * Atomic resolve by metadata: find + claim + resolve in one CTE.
+ * Atomic resolve by metadata with signal guard.
+ *
+ * Single query, two outcomes:
+ * 1. No signal_id → claim + resolve atomically. `resolved` is populated.
+ * 2. signal_id present → resolve CTE skips (guard in WHERE). `resolved` is null,
+ *    but `target_id`, `signal_id`, `workflow_id`, `task_queue`, `workflow_type`
+ *    are returned so the caller can signal the workflow directly.
+ *
  * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
  * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
  */
 export const RESOLVE_BY_METADATA_ATOMIC = `\
 WITH target AS (
-  SELECT id
+  SELECT *
   FROM lt_escalations
   WHERE metadata @> $1::jsonb
     AND status = 'pending'
-    AND ($5::text[] IS NULL OR array_length($5, 1) IS NULL OR role = ANY($5))
+    AND ($5::text[] IS NULL OR role = ANY($5))
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE
 ),
 claimed AS (
   UPDATE lt_escalations e
-  SET assigned_to = $2,
-      claimed_at = NOW(),
-      assigned_until = NOW() + INTERVAL '5 minutes',
+  SET assigned_to = COALESCE(e.assigned_to, $2),
+      claimed_at = COALESCE(e.claimed_at, NOW()),
+      assigned_until = CASE
+        WHEN e.assigned_to IS NOT NULL AND e.assigned_until > NOW() THEN e.assigned_until
+        ELSE NOW() + INTERVAL '5 minutes' END,
       metadata = CASE WHEN $4::jsonb IS NOT NULL
         THEN COALESCE(e.metadata, '{}'::jsonb) || $4::jsonb
         ELSE e.metadata END
   FROM target
   WHERE e.id = target.id
+    AND (target.metadata->>'signal_id') IS NULL
+  RETURNING e.*
+),
+resolved AS (
+  UPDATE lt_escalations e
+  SET status = 'resolved',
+      resolved_at = NOW(),
+      resolver_payload = $3,
+      updated_at = NOW()
+  FROM claimed
+  WHERE e.id = claimed.id
   RETURNING e.*
 )
-UPDATE lt_escalations e
-SET status = 'resolved',
-    resolved_at = NOW(),
-    resolver_payload = $3,
-    updated_at = NOW()
-FROM claimed
-WHERE e.id = claimed.id
-RETURNING e.*`;
+SELECT
+  resolved.*,
+  target.id AS target_id,
+  target.metadata->>'signal_id' AS signal_id,
+  target.workflow_id AS target_workflow_id,
+  target.workflow_type AS target_workflow_type,
+  target.task_queue AS target_task_queue,
+  CASE WHEN resolved.id IS NOT NULL THEN 'resolved' ELSE 'signal_required' END AS outcome
+FROM target
+LEFT JOIN resolved ON resolved.id = target.id`;

@@ -17,7 +17,6 @@ const TEST_DB = {
   database: 'longtail_test',
 };
 
-const SUPERADMIN_USER_ID = '00000000-0000-0000-0000-000000000000';
 const ADMIN_USER_ID = '00000000-0000-0000-0000-000000000001';
 const MEMBER_USER_ID = '00000000-0000-0000-0000-000000000002';
 
@@ -35,6 +34,10 @@ export function authHeaders(token: string) {
 /**
  * Boot a test server on the given port and return helpers.
  * Each test file gets its own port to avoid conflicts.
+ *
+ * The builder token is backed by a real superadmin user seeded in the DB
+ * via start({ seed: { admin } }). This ensures DB-level RBAC checks
+ * (hasGlobalEscalationAccess, hasRole, isSuperAdmin) all pass.
  */
 export function setupRouteTest(port: number, startOverrides?: Partial<LTStartConfig>) {
   let lt: LTInstance;
@@ -49,9 +52,18 @@ export function setupRouteTest(port: number, startOverrides?: Partial<LTStartCon
       database: TEST_DB,
       server: { port },
       auth: { secret: 'route-test-secret' },
+      seed: {
+        admin: {
+          externalId: 'test-superadmin',
+          displayName: 'Test Superadmin',
+        },
+      },
       ...startOverrides,
     } as LTStartConfig);
-    builderToken = signToken({ userId: SUPERADMIN_USER_ID, role: 'superadmin' });
+
+    // Builder token uses the real seeded superadmin user ID
+    const superadminUserId = lt.adminUserId!;
+    builderToken = signToken({ userId: superadminUserId, role: 'superadmin' });
     adminToken = signToken({ userId: ADMIN_USER_ID, role: 'admin' });
     memberToken = signToken({ userId: MEMBER_USER_ID, role: 'member' });
   }, 30_000);
@@ -63,7 +75,7 @@ export function setupRouteTest(port: number, startOverrides?: Partial<LTStartCon
 
   return {
     get BASE() { return BASE; },
-    /** Superadmin / builder — full access */
+    /** Superadmin / builder — real DB-backed user with superadmin role */
     get builderToken() { return builderToken; },
     /** Admin type — scoped admin, no builder access */
     get adminToken() { return adminToken; },

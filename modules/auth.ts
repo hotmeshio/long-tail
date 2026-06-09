@@ -207,7 +207,7 @@ export const requireAdmin: RequestHandler = async (
 /**
  * Middleware that requires builder access. Must be placed AFTER requireAuth.
  *
- * Builders are superadmin, admin, or users with the 'engineer' role.
+ * Builders are superadmin or users with the 'engineer' role.
  * This is the backend equivalent of the dashboard's `isBuilder` check.
  */
 export const requireBuilder: RequestHandler = async (
@@ -220,8 +220,8 @@ export const requireBuilder: RequestHandler = async (
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    // Fast path: trust the JWT role claim for admin/superadmin
-    if (req.auth.role === 'admin' || req.auth.role === 'superadmin') {
+    // Fast path: trust the JWT role claim for superadmin
+    if (req.auth.role === 'superadmin') {
       next();
       return;
     }

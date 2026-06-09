@@ -542,14 +542,20 @@ const result = await lt.escalations.findByMetadata({
 
 ## claimByMetadata
 
-Find and claim an escalation by metadata key-value pair in one atomic call.
+Find and claim an escalation by metadata key-value pair in one atomic call. RBAC is enforced in the SQL WHERE clause.
 
 ```typescript
 const result = await lt.escalations.claimByMetadata({
   key: 'orderId',
   value: 'order-123',
   durationMinutes: 30,
+  assignee: 'jane.doe',
   metadata: { claimedBy: 'jimbo', station: 'scanning' },
+  provisionIfAbsent: {
+    displayName: 'Jane Doe',
+    email: 'jane@example.com',
+    roles: [{ role: 'station-operator', type: 'member' }],
+  },
 });
 ```
 
@@ -562,6 +568,9 @@ const result = await lt.escalations.claimByMetadata({
 | `durationMinutes` | `number` | No | Claim duration (default: 30) |
 | `assignee` | `string` | No | Claim as a Long Tail user (resolved via `getUserByExternalId`) |
 | `metadata` | `object` | No | Merge into escalation metadata (single atomic SQL call with the claim) |
+| `provisionIfAbsent` | `object` | No | JIT-provision the assignee if they don't exist or lack the required role (superadmin only) |
+
+`provisionIfAbsent` accepts `{ displayName?, email?, roles?: [{ role, type? }] }`. Only callers with global escalation access can use this flag. The happy path (user exists, has role) adds zero extra queries.
 
 **Returns:** `LTApiResult<{ escalation, isExtension }>` -- 404 if no match, 409 if already claimed.
 
@@ -571,15 +580,26 @@ const result = await lt.escalations.claimByMetadata({
 
 ## resolveByMetadata
 
-Find and resolve an escalation by metadata key-value pair. Auto-claims if unclaimed. Supports all resolution paths.
+Find and resolve an escalation by metadata key-value pair. Single atomic query with signal guard.
+
+If the escalation has `metadata.signal_id` (created by `conditionLT`), the endpoint signals the running workflow instead of resolving directly in the DB. `conditionLT` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
 
 ```typescript
+// Non-signal escalation → resolved atomically
 const result = await lt.escalations.resolveByMetadata({
   key: 'orderId',
   value: 'order-123',
-  resolverPayload: { approved: true, targetStatus: 'completed' },
-  metadata: { completedBy: 'jimbo' },
+  resolverPayload: { approved: true },
 });
+// result.data.escalation.status === 'resolved'
+
+// Signal-backed escalation → workflow signaled
+const result = await lt.escalations.resolveByMetadata({
+  key: 'orderId',
+  value: 'order-123',
+  resolverPayload: { approved: true },
+});
+// result.data.signaled === true, result.data.workflowId === '...'
 ```
 
 **Parameters:**
@@ -592,6 +612,6 @@ const result = await lt.escalations.resolveByMetadata({
 | `assignee` | `string` | No | Resolve as a Long Tail user (resolved via `getUserByExternalId`) |
 | `metadata` | `object` | No | Merge into escalation metadata before resolving |
 
-**Returns:** Same as `resolve` -- 404 if no match.
+**Returns:** `LTApiResult<{ escalation }>` for non-signal, `LTApiResult<{ signaled, escalationId, workflowId }>` for signal-backed. 404 if no match.
 
 **Auth:** Required

@@ -151,8 +151,7 @@ describe('claimByMetadata', () => {
     );
   });
 
-  it('passes null roles for system account with no roles (global)', async () => {
-    // System account: hasGlobalAccess false, but no roles → treated as global
+  it('passes empty roles for user with no role assignments', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
     mockGetUserRoles.mockResolvedValue([]);
     const esc = makeEscalation();
@@ -160,9 +159,9 @@ describe('claimByMetadata', () => {
 
     await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
-    // Empty roles → null (unrestricted)
+    // Empty roles → empty array (SQL WHERE filters out all rows)
     expect(mockClaimByMetadata).toHaveBeenCalledWith(
-      'orderId', 'order-123', 'system-uuid', undefined, undefined, null,
+      'orderId', 'order-123', 'system-uuid', undefined, undefined, [],
     );
   });
 
@@ -185,9 +184,12 @@ describe('claimByMetadata', () => {
 // ── resolveByMetadata ───────────────────────────────────────────────────
 
 describe('resolveByMetadata', () => {
-  it('atomically resolves by metadata', async () => {
+  it('atomically resolves non-signal escalation', async () => {
     const esc = makeEscalation({ status: 'resolved' });
-    mockResolveByMetadataAtomic.mockResolvedValue(esc as any);
+    mockResolveByMetadataAtomic.mockResolvedValue({
+      outcome: 'resolved',
+      escalation: esc as any,
+    });
 
     const result = await resolveByMetadata({
       key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
@@ -197,8 +199,37 @@ describe('resolveByMetadata', () => {
     expect(result.data.escalation.id).toBe('esc-uuid');
   });
 
+  it('returns signal info for signal-backed escalation', async () => {
+    mockResolveByMetadataAtomic.mockResolvedValue({
+      outcome: 'signal_required',
+      signalId: 'sig-123',
+      escalationId: 'esc-uuid',
+      workflowId: 'wf-123',
+      workflowType: 'orderPipeline',
+      taskQueue: 'order-pipeline',
+    });
+
+    // Mock the workflow client
+    const mockSignal = vi.fn();
+    vi.doMock('../../workers', () => ({
+      createClient: () => ({
+        workflow: {
+          getHandle: vi.fn().mockResolvedValue({ signal: mockSignal }),
+        },
+      }),
+    }));
+
+    const result = await resolveByMetadata({
+      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
+    }, SYSTEM_AUTH);
+
+    expect(result.status).toBe(200);
+    expect(result.data.signaled).toBe(true);
+    expect(result.data.escalationId).toBe('esc-uuid');
+  });
+
   it('returns 404 when no pending escalation found', async () => {
-    mockResolveByMetadataAtomic.mockResolvedValue(null);
+    mockResolveByMetadataAtomic.mockResolvedValue({ outcome: 'not_found' });
 
     const result = await resolveByMetadata({
       key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
@@ -217,7 +248,10 @@ describe('resolveByMetadata', () => {
 
   it('passes metadata for atomic merge in CTE', async () => {
     const esc = makeEscalation({ status: 'resolved' });
-    mockResolveByMetadataAtomic.mockResolvedValue(esc as any);
+    mockResolveByMetadataAtomic.mockResolvedValue({
+      outcome: 'resolved',
+      escalation: esc as any,
+    });
 
     await resolveByMetadata({
       key: 'orderId', value: 'order-123',

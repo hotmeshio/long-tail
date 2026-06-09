@@ -730,6 +730,24 @@ Finds one available (pending + unassigned/expired) escalation matching the metad
 | `durationMinutes` | `number` | Claim duration (default 30) |
 | `assignee` | `string` | Claim as a Long Tail user (resolved via `getUserByExternalId`) |
 | `metadata` | `object` | Additional metadata to merge (new keys added, existing overwritten) |
+| `provisionIfAbsent` | `object` | JIT-provision the assignee if they don't exist (superadmin only) |
+
+**`provisionIfAbsent`** — when the `assignee` doesn't exist in `lt_users` or lacks the escalation's role, provision them inline:
+
+```json
+{
+  "key": "orderId",
+  "value": "order-123",
+  "assignee": "jane.doe",
+  "provisionIfAbsent": {
+    "displayName": "Jane Doe",
+    "email": "jane@example.com",
+    "roles": [{ "role": "station-operator", "type": "member" }]
+  }
+}
+```
+
+Only callers with global escalation access (superadmin, admin/admin) can use this flag. The user is created with the declared roles if absent. If the user exists but lacks a required role, the role is added. The happy path (user exists, has role) adds zero extra queries.
 
 **Response 200:**
 
@@ -748,7 +766,9 @@ Finds one available (pending + unassigned/expired) escalation matching the metad
 POST /api/escalations/resolve-by-metadata
 ```
 
-Finds the pending escalation, auto-claims if unclaimed, then resolves it. Supports all five resolution paths (signal, re-run, triage, etc.).
+Single atomic query finds the pending escalation by metadata, auto-claims if unclaimed, and resolves it. RBAC is enforced in the SQL WHERE clause.
+
+**Signal guard:** If the escalation has `metadata.signal_id` (created by `conditionLT`), the SQL does NOT resolve it directly. Instead, the endpoint signals the running workflow — `conditionLT` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
 
 **Body:**
 
@@ -769,4 +789,20 @@ Finds the pending escalation, auto-claims if unclaimed, then resolves it. Suppor
 | `assignee` | `string` | Resolve as a Long Tail user (resolved via `getUserByExternalId`) |
 | `metadata` | `object` | Additional metadata to merge (new keys added, existing overwritten) |
 
-**Response 200:** Same as standard resolve endpoint.
+**Response 200 (non-signal):** Escalation resolved atomically.
+
+```json
+{
+  "escalation": { "id": "...", "status": "resolved", ... }
+}
+```
+
+**Response 200 (signal-backed):** Workflow signaled; `conditionLT` resolves the escalation durably.
+
+```json
+{
+  "signaled": true,
+  "escalationId": "...",
+  "workflowId": "..."
+}
+```
