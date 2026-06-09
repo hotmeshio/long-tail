@@ -115,10 +115,12 @@ export async function getStreamStats(
   const pool = getPool();
   const stream = streamName || null;
 
+  // Graceful degradation: HotMesh schema may not exist if no engine has started.
+  const emptyCount = { rows: [{ count: 0 }] };
   const [pendingRes, processedRes, byStreamRes] = await Promise.all([
-    pool.query<{ count: number }>(COUNT_PENDING(schema), [stream]),
-    pool.query<{ count: number }>(COUNT_PROCESSED_SINCE(schema), [interval, stream]),
-    pool.query<{ stream_type: 'engine' | 'worker'; stream_name: string; count: number }>(VOLUME_BY_STREAM(schema), [interval, stream]),
+    pool.query<{ count: number }>(COUNT_PENDING(schema), [stream]).catch(() => emptyCount),
+    pool.query<{ count: number }>(COUNT_PROCESSED_SINCE(schema), [interval, stream]).catch(() => emptyCount),
+    pool.query<{ stream_type: 'engine' | 'worker'; stream_name: string; count: number }>(VOLUME_BY_STREAM(schema), [interval, stream]).catch(() => ({ rows: [] as any[] })),
   ]);
 
   return {
@@ -167,11 +169,11 @@ export async function getStreamMessages(
     pool.query<StreamMessage>(
       LIST_STREAM_MESSAGES(schema, sortColumn, sortOrder, source),
       queryParams,
-    ),
+    ).catch(() => ({ rows: [] as StreamMessage[] })),
     pool.query<{ count: number }>(
       COUNT_STREAM_MESSAGES(schema, source),
       countParams,
-    ),
+    ).catch(() => ({ rows: [{ count: 0 }] })),
   ]);
 
   return {

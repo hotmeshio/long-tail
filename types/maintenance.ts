@@ -18,6 +18,8 @@ export interface LTMaintenanceRule {
  * Full maintenance configuration: schedule + ordered rules.
  */
 export interface LTMaintenanceConfig {
+  /** HotMesh application namespace to prune */
+  appId: string;
   /** Cron expression or ms-compatible interval, e.g. '0 2 * * *' or '1 day' */
   schedule: string;
   /** Rules executed sequentially each cycle */

@@ -90,9 +90,12 @@ export async function listJobs(params: ListJobsParams): Promise<{ jobs: JobRow[]
 
   const orderBy = buildOrderBy(params.sort_by, params.order);
 
+  // Graceful degradation: HotMesh schema may not exist yet if no
+  // engine/worker has initialized. Return empty results, not 500.
+  const empty = { rows: [{ count: '0' }] };
   const [countResult, dataResult] = await Promise.all([
-    pool.query(COUNT_JOBS(schema, where), values),
-    pool.query(LIST_JOBS(schema, appId, where, idx++, idx++, orderBy), [...values, limit, offset]),
+    pool.query(COUNT_JOBS(schema, where), values).catch(() => empty),
+    pool.query(LIST_JOBS(schema, appId, where, idx++, idx++, orderBy), [...values, limit, offset]).catch(() => ({ rows: [] })),
   ]);
 
   const jobs = dataResult.rows.map((row: any) => ({

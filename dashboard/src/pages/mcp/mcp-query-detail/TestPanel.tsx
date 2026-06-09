@@ -31,7 +31,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
   const { data: wf } = useYamlWorkflow(yamlId);
 
   const { data: runs } = useMcpRuns({
-    entity: wf?.graph_topic, app_id: wf?.app_id || 'longtail', limit: 10,
+    entity: wf?.graph_topic, app_id: wf?.app_id || '', limit: 10,
   });
 
   // Deep-linked run selection via ?run= param
@@ -51,7 +51,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
   };
 
   const { data: selectedRunExecution, isLoading: runLoading } = useMcpRunExecution(
-    selectedRunId ?? '', wf?.app_id || 'longtail',
+    selectedRunId ?? '', wf?.app_id || '',
   );
 
   // Sidebar state: input form or live execution

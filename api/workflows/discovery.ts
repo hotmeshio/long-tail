@@ -2,7 +2,8 @@ import * as configService from '../../services/config';
 import { cronRegistry } from '../../services/cron';
 import { getPool } from '../../lib/db';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../services/workers/registry';
-import { DISTINCT_ENTITIES_DURABLE } from '../../services/pipelines/sql';
+import { DISTINCT_ENTITIES } from '../../services/pipelines/sql';
+import { sanitizeAppId, quoteSchema } from '../../services/hotmesh-utils';
 import type { LTApiResult } from '../../types/sdk';
 
 /**
@@ -52,9 +53,11 @@ export async function listDiscoveredWorkflows(input: {
     // 1. Active workers from in-memory registry
     const activeWorkers = getRegisteredWorkers();
 
-    // 2. Historical entities from durable.jobs
+    // 2. Historical entities from jobs table
     const pool = getPool();
-    const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES_DURABLE);
+    // TODO: accept app_id parameter to avoid hardcoded schema
+    const schema = quoteSchema(sanitizeAppId('durable'));
+    const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES(schema));
     const historicalEntities = new Set(entityRows.map((r) => r.entity));
 
     // 3. Registered configs

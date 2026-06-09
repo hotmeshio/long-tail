@@ -11,11 +11,12 @@ const CRON_ID = 'lt-maintenance-nightly';
 /**
  * Translate a single maintenance rule into the appropriate dbaService.prune() call.
  */
-async function executeRule(rule: LTMaintenanceRule): Promise<void> {
+async function executeRule(appId: string, rule: LTMaintenanceRule): Promise<void> {
   switch (true) {
     // Delete stream messages
     case rule.target === 'streams' && rule.action === 'delete':
       await dbaService.prune({
+        appId,
         expire: rule.olderThan,
         streams: true,
         jobs: false,
@@ -25,6 +26,7 @@ async function executeRule(rule: LTMaintenanceRule): Promise<void> {
     // Delete transient jobs (entity IS NULL)
     case rule.target === 'jobs' && rule.action === 'delete' && rule.hasEntity === false:
       await dbaService.prune({
+        appId,
         expire: rule.olderThan,
         jobs: false,
         streams: false,
@@ -35,6 +37,7 @@ async function executeRule(rule: LTMaintenanceRule): Promise<void> {
     // Strip execution artifacts from entity jobs (keep jdata/udata/jmark/hmark)
     case rule.target === 'jobs' && rule.action === 'prune' && rule.hasEntity === true:
       await dbaService.prune({
+        appId,
         expire: rule.olderThan,
         jobs: false,
         streams: false,
@@ -46,6 +49,7 @@ async function executeRule(rule: LTMaintenanceRule): Promise<void> {
     // Hard-delete old pruned jobs
     case rule.target === 'jobs' && rule.action === 'delete' && rule.pruned === true:
       await dbaService.prune({
+        appId,
         expire: rule.olderThan,
         jobs: true,
         streams: false,
@@ -85,8 +89,7 @@ class LTMaintenanceRegistry {
   async connect(): Promise<void> {
     if (this.connected || !this._config) return;
 
-    const rules = this._config.rules;
-    const schedule = this._config.schedule;
+    const { appId, rules, schedule } = this._config;
     const connection = getConnection();
 
     await Virtual.cron({
@@ -96,7 +99,7 @@ class LTMaintenanceRegistry {
         loggerRegistry.info('[lt-maintenance] starting maintenance cycle...');
         for (const rule of rules) {
           try {
-            await executeRule(rule);
+            await executeRule(appId, rule);
           } catch (err: any) {
             loggerRegistry.error(`[lt-maintenance] rule failed: ${JSON.stringify(rule)} ${err?.message}`);
           }

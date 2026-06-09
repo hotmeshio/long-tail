@@ -70,7 +70,7 @@ function ActionsDropdown({ isRunning, onTerminate }: {
 export function McpRunDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
-  const namespace = searchParams.get('namespace') || 'longtail';
+  const namespace = searchParams.get('namespace') || '';
   const queryClient = useQueryClient();
   const { data: execution, isLoading, error, refetch, isFetching } = useMcpRunExecution(jobId!, namespace);
   const interruptMutation = useInterruptJob();

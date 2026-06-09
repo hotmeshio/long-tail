@@ -21,6 +21,7 @@ import type { LTApiResult } from '../types/sdk';
  * @returns `{ status: 200, data: <prune result summary> }`
  */
 export async function prune(input: {
+  appId: string;
   expire?: string;
   jobs?: boolean;
   streams?: boolean;
@@ -35,6 +36,7 @@ export async function prune(input: {
 }): Promise<LTApiResult> {
   try {
     const result = await dbaService.prune({
+      appId: input.appId,
       expire: input.expire,
       jobs: input.jobs,
       streams: input.streams,
@@ -61,9 +63,9 @@ export async function prune(input: {
  *
  * @returns `{ status: 200, data: { ok: true } }`
  */
-export async function deploy(): Promise<LTApiResult> {
+export async function deploy(appId: string): Promise<LTApiResult> {
   try {
-    await dbaService.deploy();
+    await dbaService.deploy(appId);
     return { status: 200, data: { ok: true } };
   } catch (err: any) {
     return { status: 500, error: err.message };

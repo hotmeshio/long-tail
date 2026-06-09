@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Inbox, ScrollText, GitBranch, Layers, ExternalLink, BookOpen,
@@ -159,8 +159,11 @@ export function HomePage() {
   const { user } = useAuth();
   const { isBuilder } = useAccess();
   const [searchParams, setSearchParams] = useSearchParams();
-  const pipelineNs = searchParams.get('pipelinenamespace') || 'hmsh';
-  const durableNs = searchParams.get('durablenamespace') || 'durable';
+  const { data: cpData } = useControlPlaneApps();
+  const allAppIds = useMemo(() => (cpData?.apps ?? []).map((a: any) => a.appId).sort(), [cpData]);
+  const firstAppId = allAppIds[0] ?? '';
+  const pipelineNs = searchParams.get('pipelinenamespace') || firstAppId;
+  const durableNs = searchParams.get('durablenamespace') || firstAppId;
   const setNs = useCallback((key: string, ns: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -174,8 +177,6 @@ export function HomePage() {
 
   const procQ = useProcesses({ limit: 5 });
   const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs });
-  const { data: cpData } = useControlPlaneApps();
-  const allAppIds = (cpData?.apps ?? []).map((a: any) => a.appId);
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
   const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' });

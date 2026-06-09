@@ -30,7 +30,7 @@ const result = await lt.controlplane.rollCall({ appId: 'durable', delay: 2000 })
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `appId` | `string` | No | Application namespace to query (defaults to `'durable'`) |
+| `appId` | `string` | **Yes** | Application namespace to query |
 | `delay` | `number` | No | Milliseconds to wait for worker responses before returning |
 
 **Returns:** `LTApiResult<{ profiles: object[] }>`
@@ -52,7 +52,7 @@ const result = await lt.controlplane.throttle({ throttle: 50, topic: 'my-topic' 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `throttle` | `number` | Yes | Throttle value to apply |
-| `appId` | `string` | No | Application namespace (defaults to `'durable'`) |
+| `appId` | `string` | **Yes** | Application namespace |
 | `topic` | `string` | No | Topic to scope the throttle to |
 | `guid` | `string` | No | Workflow GUID to scope the throttle to |
 
@@ -74,7 +74,7 @@ const result = await lt.controlplane.getStreamStats({ app_id: 'durable', duratio
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `app_id` | `string` | No | Application namespace (defaults to `'durable'`) |
+| `app_id` | `string` | **Yes** | Application namespace |
 | `duration` | `string` | No | Time window for stats aggregation, e.g. `'1h'`, `'30m'` (defaults to `'1h'`) |
 | `stream` | `string` | No | Specific stream name to filter results |
 
@@ -132,7 +132,7 @@ const result = await lt.controlplane.subscribe({ appId: 'durable' });
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `appId` | `string` | No | Application namespace to subscribe to (defaults to `'durable'`) |
+| `appId` | `string` | **Yes** | Application namespace to subscribe to |
 
 **Returns:** `LTApiResult<{ subscribed: true, appId: string }>`
 

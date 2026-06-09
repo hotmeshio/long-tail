@@ -35,7 +35,7 @@ function ToolErrorDisplay({ error }: { error: Error | null }) {
 function ExecutionLink({ data }: { data: unknown }) {
   const res = (data as any)?.result;
   const jobId = res?.job_id;
-  const ns = res?.namespace || 'longtail';
+  const ns = res?.namespace || '';
   if (!jobId) return null;
   return (
     <Link

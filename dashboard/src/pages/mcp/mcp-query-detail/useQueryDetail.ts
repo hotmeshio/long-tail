@@ -31,7 +31,7 @@ export function useQueryDetail() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [compileAppId, setCompileAppId] = useState('longtail');
+  const [compileAppId, setCompileAppId] = useState('');
   const [compileName, setCompileName] = useState('');
   const [compileDescription, setCompileDescription] = useState('');
   const [compileTags, setCompileTags] = useState<string[]>([]);

@@ -51,6 +51,7 @@ describe('Maintenance routes', () => {
     it('updates maintenance config', async () => {
       const newConfig = {
         schedule: '30 2 * * *',
+        appId: 'durable',
         rules: [{ target: 'streams', olderThan: '3 days', action: 'delete' }],
       };
       const res = await fetch(`${ctx.BASE}/config/maintenance`, {

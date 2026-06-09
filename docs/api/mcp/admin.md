@@ -887,7 +887,7 @@ Execute a roll call — discovers all engines and workers in the mesh.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| app_id | string | No | App namespace |
+| app_id | string | **Yes** | App namespace |
 | delay | integer | No | Delay in ms |
 
 ### apply_throttle
@@ -903,7 +903,7 @@ Apply a throttle to the mesh (-1=pause, 0=resume, >0=delay ms per message).
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | throttle | integer | Yes | Throttle value (-1=pause, 0=resume, >0=delay ms) |
-| appId | string | No | App namespace |
+| appId | string | **Yes** | App namespace |
 | topic | string | No | Topic to throttle |
 | guid | string | No | Specific GUID |
 | scope | string | No | Throttle scope |
@@ -920,7 +920,7 @@ Stream processing statistics — pending count and processed volume by time rang
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| app_id | string | No | App namespace |
+| app_id | string | **Yes** | App namespace |
 | duration | string | No | Time range |
 | stream | string | No | Specific stream |
 
@@ -964,7 +964,7 @@ List distinct entity (tool) names from pipeline jobs.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| app_id | string | No | App namespace |
+| app_id | string | **Yes** | App namespace |
 
 ### list_pipeline_jobs
 
@@ -978,7 +978,7 @@ List pipeline jobs with optional entity, search, and status filters.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| app_id | string | No | App namespace |
+| app_id | string | **Yes** | App namespace |
 | limit | integer | No | Max results |
 | offset | integer | No | Pagination offset |
 | entity | string | No | Filter by entity |
@@ -1000,7 +1000,7 @@ Export execution details for a specific pipeline job.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | job_id | string | Yes | Pipeline job ID |
-| app_id | string | No | App namespace |
+| app_id | string | **Yes** | App namespace |
 
 ### interrupt_pipeline_job
 
@@ -1016,7 +1016,7 @@ Interrupt a running pipeline job.
 |-------|------|----------|-------------|
 | job_id | string | Yes | Pipeline job ID |
 | topic | string | Yes | Pipeline topic |
-| app_id | string | No | App namespace |
+| app_id | string | **Yes** | App namespace |
 
 ## Topics
 

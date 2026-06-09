@@ -14,6 +14,7 @@ Runs HotMesh's built-in prune operations against the workflow database. All para
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `app_id` | `string` | — | **Required.** Application namespace to prune |
 | `expire` | `string` | `"7 days"` | Retention period — only affect records older than this |
 | `jobs` | `boolean` | `true` | Hard-delete expired jobs |
 | `streams` | `boolean` | `true` | Hard-delete expired streams |

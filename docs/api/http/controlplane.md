@@ -4,6 +4,8 @@ Admin-only endpoints for application discovery, worker health, throttling, strea
 
 All endpoints require builder access (superadmin role type or engineer role).
 
+> All endpoints except `GET /apps` require a namespace (`app_id`) parameter. Use `GET /api/controlplane/apps` to discover available namespaces.
+
 ---
 
 ## List applications
@@ -34,7 +36,7 @@ Discover all running engines and workers for an application by broadcasting a pi
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `app_id` | `string` | No | Application namespace (default: `durable`) |
+| `app_id` | `string` | **Yes** | Application namespace |
 | `delay` | `number` | No | Milliseconds to wait for responses |
 
 **Response 200:**
@@ -57,7 +59,7 @@ Apply a throttle rate to workflow execution across the mesh.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `appId` | `string` | No | Application namespace (default: `durable`) |
+| `appId` | `string` | **Yes** | Application namespace |
 | `throttle` | `number` | Yes | Delay in ms per message (`-1` = pause, `0` = resume) |
 | `topic` | `string` | No | Scope throttle to a specific worker topic |
 | `guid` | `string` | No | Scope throttle to a specific engine/worker GUID |
@@ -82,7 +84,7 @@ Throughput and backlog metrics for engine and worker streams.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `app_id` | `string` | No | Application namespace (default: `durable`) |
+| `app_id` | `string` | **Yes** | Application namespace |
 | `duration` | `string` | No | Time window: `15m`, `30m`, `1h`, `1d`, `7d` (default: `1h`) |
 | `stream` | `string` | No | Filter to a specific stream name |
 
@@ -184,7 +186,7 @@ Start the quorum-to-NATS bridge for an application so mesh events are forwarded 
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `appId` | `string` | No | Application namespace (default: `durable`) |
+| `appId` | `string` | **Yes** | Application namespace |
 
 **Response 200:**
 

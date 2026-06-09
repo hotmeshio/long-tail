@@ -3,20 +3,19 @@ import type { PruneOptions, PruneResult } from '@hotmeshio/hotmesh/build/types/d
 
 import { getConnection } from '../lib/db';
 
-const APP_ID = 'durable';
-
 /**
  * Deploy the server-side prune() Postgres function and run
  * any schema migrations (e.g. adding the `pruned_at` column).
  * Idempotent — safe to call on every startup.
  */
-export async function deploy(): Promise<void> {
-  await DBA.deploy(getConnection(), APP_ID);
+export async function deploy(appId: string): Promise<void> {
+  await DBA.deploy(getConnection(), appId);
 }
 
 /**
  * Prune expired jobs, streams, and/or execution artifacts.
  *
+ * - `appId` — HotMesh application namespace (required)
  * - `jobs` — hard-delete expired job rows older than `expire`
  * - `streams` — hard-delete expired stream messages (engine + worker) older than `expire`
  * - `attributes` — strip execution artifacts from completed jobs
@@ -26,6 +25,7 @@ export async function deploy(): Promise<void> {
  * - `keepHmark` — preserve hmark rows during stripping
  */
 export async function prune(options: {
+  appId: string;
   expire?: string;
   jobs?: boolean;
   streams?: boolean;
@@ -38,7 +38,8 @@ export async function prune(options: {
   pruneTransient?: boolean;
   keepHmark?: boolean;
 }): Promise<PruneResult> {
-  return DBA.prune({ appId: APP_ID, connection: getConnection(), ...options });
+  const { appId, ...rest } = options;
+  return DBA.prune({ appId, connection: getConnection(), ...rest });
 }
 
 export type { PruneOptions, PruneResult };

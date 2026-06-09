@@ -18,6 +18,7 @@ import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
  * @returns `{ status: 200, data: { jobs, total, ... } }` on success
  */
 export async function listJobs(input: {
+  app_id: string;
   limit?: number;
   offset?: number;
   entity?: string;
@@ -28,7 +29,7 @@ export async function listJobs(input: {
   registered?: string;
 }): Promise<LTApiResult> {
   try {
-    const result = await exportService.listJobs(input);
+    const result = await exportService.listJobs(input.app_id, input);
     return { status: 200, data: result };
   } catch (err: any) {
     return { status: 500, error: err.message };

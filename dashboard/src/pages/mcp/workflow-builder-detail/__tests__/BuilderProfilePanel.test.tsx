@@ -81,7 +81,7 @@ describe('BuilderProfilePanel', () => {
 
   it('renders editable form fields when not created', () => {
     setup();
-    expect(screen.getByDisplayValue('longtail')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('')).toBeInTheDocument();
     expect(screen.getByDisplayValue('analyze_page')).toBeInTheDocument();
     expect(screen.getByText('MCP Server Name')).toBeInTheDocument();
     expect(screen.getByText('MCP Tool Name')).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('BuilderProfilePanel', () => {
     expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
       name: 'analyze_page',
       yaml_content: builderData.yaml,
-      app_id: 'longtail',
+      app_id: '',
       tags: ['web', 'analysis'],
     }));
     expect(props.onCreate).toHaveBeenCalledWith('yaml-123');
@@ -123,7 +123,7 @@ describe('BuilderProfilePanel', () => {
 
   it('shows read-only view when created', () => {
     vi.mocked(useYamlWorkflow).mockReturnValue({
-      data: { app_id: 'longtail', name: 'analyze_page', description: 'Test desc', tags: ['web'] },
+      data: { app_id: '', name: 'analyze_page', description: 'Test desc', tags: ['web'] },
     } as any);
     setup({ resolvedYamlId: 'yaml-123' });
     // Should not have input fields

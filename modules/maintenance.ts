@@ -17,6 +17,7 @@ import type { LTMaintenanceConfig } from '../types/maintenance';
  * inputs from the execution timeline.
  */
 export const defaultMaintenanceConfig: LTMaintenanceConfig = {
+  appId: 'durable',
   schedule: '0 2 * * 0',
   rules: [
     {

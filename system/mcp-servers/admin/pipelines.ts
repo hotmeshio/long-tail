@@ -25,7 +25,7 @@ export function registerPipelineTools(server: McpServer): void {
       inputSchema: listPipelineEntitiesSchema,
     },
     async (args: z.infer<typeof listPipelineEntitiesSchema>) => {
-      const result = await api.listEntities({ app_id: args.app_id || 'durable' });
+      const result = await api.listEntities({ app_id: args.app_id });
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -43,7 +43,7 @@ export function registerPipelineTools(server: McpServer): void {
       inputSchema: listPipelineJobsSchema,
     },
     async (args: z.infer<typeof listPipelineJobsSchema>) => {
-      const result = await api.listJobs({ ...args, app_id: args.app_id || 'durable' });
+      const result = await api.listJobs({ ...args, app_id: args.app_id });
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -62,7 +62,7 @@ export function registerPipelineTools(server: McpServer): void {
     async (args: z.infer<typeof getJobExecutionSchema>) => {
       const result = await api.getJobExecution({
         jobId: args.job_id,
-        app_id: args.app_id || 'durable',
+        app_id: args.app_id,
       });
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -83,7 +83,7 @@ export function registerPipelineTools(server: McpServer): void {
       const result = await api.interruptJob({
         jobId: args.job_id,
         topic: args.topic,
-        app_id: args.app_id || 'durable',
+        app_id: args.app_id,
       });
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };

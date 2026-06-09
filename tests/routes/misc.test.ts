@@ -96,7 +96,7 @@ describe('DBA routes', () => {
       const res = await fetch(`${ctx.BASE}/dba/prune`, {
         method: 'POST',
         headers: authHeaders(ctx.adminToken),
-        body: JSON.stringify({ expire: '7 days' }),
+        body: JSON.stringify({ app_id: 'durable', expire: '7 days' }),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;

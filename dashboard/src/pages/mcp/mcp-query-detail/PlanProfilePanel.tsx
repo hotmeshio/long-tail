@@ -19,7 +19,7 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
   const { data: wf } = useYamlWorkflow(yamlId);
   const updateYaml = useUpdateYamlWorkflow();
 
-  const [appId, setAppId] = useState(lockedAppId || 'longtail');
+  const [appId, setAppId] = useState(lockedAppId || '');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -29,7 +29,7 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
   // Re-initialize when switching workflows (yamlId changes) or data arrives
   useEffect(() => {
     if (wf && wf.id !== loadedId) {
-      setAppId(lockedAppId || wf.app_id || 'longtail');
+      setAppId(lockedAppId || wf.app_id || '');
       const defaultName = sanitizeToolName(planItem.name);
       setName((wf.name !== defaultName && wf.name) ? sanitizeToolName(wf.name) : defaultName);
       setDescription(wf.description || planItem.description || '');

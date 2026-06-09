@@ -23,6 +23,7 @@ router.get('/', (_req, res) => {
  */
 router.put('/', requireAdmin, async (req, res) => {
   const result = await api.updateMaintenanceConfig({
+    appId: req.body?.appId ?? req.body?.app_id,
     schedule: req.body?.schedule,
     rules: req.body?.rules,
   });

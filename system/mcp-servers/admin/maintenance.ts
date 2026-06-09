@@ -21,6 +21,7 @@ export function registerMaintenanceTools(server: McpServer): void {
     },
     async (args: z.infer<typeof pruneSchema>) => {
       const result = await dbaService.prune({
+        appId: args.app_id,
         expire: args.expire,
         jobs: args.jobs,
         streams: args.streams,
