@@ -3,26 +3,15 @@ import bcrypt from 'bcryptjs';
 
 import { getPool } from '../../lib/db';
 import type { ServiceTokenRecord } from '../../types/delegation';
+import {
+  INSERT_SERVICE_TOKEN,
+  GET_ALL_ACTIVE_SERVICE_TOKENS,
+  UPDATE_SERVICE_TOKEN_LAST_USED,
+  DELETE_SERVICE_TOKEN,
+  LIST_SERVICE_TOKENS_BY_SERVER,
+} from './sql';
 
 const TOKEN_PREFIX = 'lt_svc_';
-
-const INSERT_TOKEN = `
-  INSERT INTO lt_service_tokens (name, token_hash, server_id, scopes, expires_at)
-  VALUES ($1, $2, $3, $4, $5) RETURNING id`;
-
-const GET_ALL_TOKENS = `
-  SELECT id, name, token_hash FROM lt_service_tokens
-  WHERE (expires_at IS NULL OR expires_at > NOW())`;
-
-const UPDATE_LAST_USED = `
-  UPDATE lt_service_tokens SET last_used_at = NOW() WHERE id = $1`;
-
-const DELETE_TOKEN = `
-  DELETE FROM lt_service_tokens WHERE id = $1`;
-
-const LIST_BY_SERVER = `
-  SELECT id, name, server_id, scopes, expires_at, last_used_at, created_at, updated_at
-  FROM lt_service_tokens WHERE server_id = $1 ORDER BY created_at`;
 
 /**
  * Generate a new service token for an external MCP server.
@@ -37,7 +26,7 @@ export async function generateServiceToken(
   const rawToken = `${TOKEN_PREFIX}${crypto.randomBytes(32).toString('hex')}`;
   const tokenHash = await bcrypt.hash(rawToken, 10);
   const pool = await getPool();
-  const { rows } = await pool.query(INSERT_TOKEN, [
+  const { rows } = await pool.query(INSERT_SERVICE_TOKEN, [
     name, tokenHash, serverId, scopes, expiresAt || null,
   ]);
   return { id: rows[0].id, rawToken };
@@ -51,10 +40,10 @@ export async function validateServiceToken(
 ): Promise<(ServiceTokenRecord & { token_hash?: undefined }) | null> {
   if (!rawToken.startsWith(TOKEN_PREFIX)) return null;
   const pool = await getPool();
-  const { rows } = await pool.query(GET_ALL_TOKENS);
+  const { rows } = await pool.query(GET_ALL_ACTIVE_SERVICE_TOKENS);
   for (const row of rows) {
     if (await bcrypt.compare(rawToken, row.token_hash)) {
-      await pool.query(UPDATE_LAST_USED, [row.id]);
+      await pool.query(UPDATE_SERVICE_TOKEN_LAST_USED, [row.id]);
       const { token_hash, ...record } = row;
       return record;
     }
@@ -67,7 +56,7 @@ export async function validateServiceToken(
  */
 export async function revokeServiceToken(id: string): Promise<boolean> {
   const pool = await getPool();
-  const result = await pool.query(DELETE_TOKEN, [id]);
+  const result = await pool.query(DELETE_SERVICE_TOKEN, [id]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -76,6 +65,6 @@ export async function revokeServiceToken(id: string): Promise<boolean> {
  */
 export async function listServiceTokens(serverId: string): Promise<ServiceTokenRecord[]> {
   const pool = await getPool();
-  const { rows } = await pool.query(LIST_BY_SERVER, [serverId]);
+  const { rows } = await pool.query(LIST_SERVICE_TOKENS_BY_SERVER, [serverId]);
   return rows;
 }

@@ -124,5 +124,7 @@ export async function resolveByMetadata(
 async function resolveAllowedRoles(userId: string): Promise<string[] | null> {
   if (await userService.hasGlobalEscalationAccess(userId)) return null;
   const userRoles = await userService.getUserRoles(userId);
+  // Empty roles = system account with no explicit role assignments → unrestricted
+  if (userRoles.length === 0) return null;
   return userRoles.map(r => r.role);
 }
