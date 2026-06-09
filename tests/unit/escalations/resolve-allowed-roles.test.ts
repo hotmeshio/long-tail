@@ -32,7 +32,6 @@ describe('resolveAllowedRoles logic', () => {
   async function resolveAllowedRoles(userId: string): Promise<string[] | null> {
     if (await mockHasGlobalEscalationAccess(userId)) return null;
     const userRoles = await mockGetUserRoles(userId);
-    if (userRoles.length === 0) return null;
     return userRoles.map((r: any) => r.role);
   }
 
@@ -49,12 +48,13 @@ describe('resolveAllowedRoles logic', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null for system account with no roles (empty array → global)', async () => {
-    // THIS IS THE BUG FIX: empty roles = system account = unrestricted
+  it('returns empty array for user with no roles (SQL filters out all rows)', async () => {
+    // No roles = no access. System accounts that need unrestricted access
+    // should be seeded with superadmin role (hasGlobalEscalationAccess → null).
     mockHasGlobalEscalationAccess.mockResolvedValue(false);
     mockGetUserRoles.mockResolvedValue([]);
-    const result = await resolveAllowedRoles('system-service-account');
-    expect(result).toBeNull(); // NOT [] — null means no filter in SQL
+    const result = await resolveAllowedRoles('no-role-user');
+    expect(result).toEqual([]); // empty = no matching roles in SQL WHERE
   });
 
   it('returns role names for scoped user with assigned roles', async () => {

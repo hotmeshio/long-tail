@@ -79,8 +79,14 @@ export async function claimByMetadata(
 /**
  * Resolve an escalation by metadata key-value pair.
  *
- * Single atomic CTE: find + claim + resolve in one query.
- * RBAC is enforced in the SQL WHERE clause.
+ * Single atomic query with signal guard:
+ * - No signal_id → claim + resolve atomically in SQL. One query. Done.
+ * - signal_id present → SQL returns the signal info without resolving.
+ *   Caller signals the workflow; conditionLT resolves durably inside
+ *   the workflow via ltResolveEscalation.
+ *
+ * Never does SELECT-then-UPDATE. The SQL CTE handles find + RBAC +
+ * claim + resolve (or signal detection) in one round-trip.
  */
 export async function resolveByMetadata(
   input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string; metadata?: Record<string, any> },
@@ -100,16 +106,36 @@ export async function resolveByMetadata(
 
     const allowedRoles = await resolveAllowedRoles(auth.userId);
 
-    const escalation = await escalationService.resolveByMetadataAtomic(
+    const result = await escalationService.resolveByMetadataAtomic(
       input.key, input.value, resolveUserId,
       input.resolverPayload, input.metadata, allowedRoles,
     );
 
-    if (!escalation) {
+    if (result.outcome === 'not_found') {
       return { status: 404, error: 'No pending escalation found for this metadata, or insufficient role permissions' };
     }
 
-    return { status: 200, data: { escalation } };
+    if (result.outcome === 'resolved') {
+      return { status: 200, data: { escalation: result.escalation } };
+    }
+
+    // Signal-backed escalation — signal the workflow, conditionLT resolves durably
+    const { createClient } = await import('../../workers');
+    const client = createClient();
+    const handle = await client.workflow.getHandle(
+      result.taskQueue!,
+      result.workflowType!,
+      result.workflowId!,
+    );
+    await handle.signal(result.signalId!, {
+      ...input.resolverPayload,
+      $escalation_id: result.escalationId,
+    });
+
+    return {
+      status: 200,
+      data: { signaled: true, escalationId: result.escalationId, workflowId: result.workflowId },
+    };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -124,7 +150,8 @@ export async function resolveByMetadata(
 async function resolveAllowedRoles(userId: string): Promise<string[] | null> {
   if (await userService.hasGlobalEscalationAccess(userId)) return null;
   const userRoles = await userService.getUserRoles(userId);
-  // Empty roles = system account with no explicit role assignments → unrestricted
-  if (userRoles.length === 0) return null;
+  // Return the user's roles (may be empty → SQL filters out all rows).
+  // System/service accounts that need unrestricted access should be
+  // seeded with the superadmin role via start({ seed: { admin } }).
   return userRoles.map(r => r.role);
 }

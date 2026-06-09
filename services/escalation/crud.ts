@@ -352,9 +352,26 @@ export async function claimByMetadata(
   };
 }
 
+export interface ResolveByMetadataResult {
+  /** 'resolved' = done atomically. 'signal_required' = signal_id present, caller must signal. */
+  outcome: 'resolved' | 'signal_required' | 'not_found';
+  /** The resolved escalation (when outcome = 'resolved') */
+  escalation?: LTEscalationRecord;
+  /** Signal info (when outcome = 'signal_required') */
+  signalId?: string;
+  escalationId?: string;
+  workflowId?: string;
+  workflowType?: string;
+  taskQueue?: string;
+}
+
 /**
- * Atomic resolve by metadata: find + claim + resolve in one CTE.
- * RBAC is enforced in the SQL WHERE clause via allowedRoles.
+ * Atomic resolve by metadata with signal guard.
+ *
+ * Single query, two outcomes:
+ * 1. No signal_id → claim + resolve atomically. Returns { outcome: 'resolved', escalation }.
+ * 2. signal_id present → resolve skipped. Returns { outcome: 'signal_required', signalId, escalationId, ... }
+ *    so the caller can signal the workflow. conditionLT handles the rest.
  */
 export async function resolveByMetadataAtomic(
   key: string,
@@ -363,26 +380,43 @@ export async function resolveByMetadataAtomic(
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
   allowedRoles?: string[] | null,
-): Promise<LTEscalationRecord | null> {
+): Promise<ResolveByMetadataResult> {
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
   const payloadJson = JSON.stringify(resolverPayload);
   const metaPatch = metadata ? JSON.stringify(metadata) : null;
   const roles = allowedRoles ?? null;
   const { rows } = await pool.query(RESOLVE_BY_METADATA_ATOMIC, [filter, userId, payloadJson, metaPatch, roles]);
-  if (rows.length === 0) return null;
-  const escalation = rows[0] as LTEscalationRecord;
 
-  publishEscalationEvent({
-    type: 'escalation.resolved',
-    source: 'service',
-    workflowId: escalation.workflow_id || '',
-    workflowName: escalation.workflow_type || '',
-    taskQueue: escalation.task_queue || '',
-    escalationId: escalation.id,
-    status: 'resolved',
-    data: { resolved_by: userId },
-  });
+  if (rows.length === 0) return { outcome: 'not_found' };
 
-  return escalation;
+  const row = rows[0];
+
+  if (row.outcome === 'resolved') {
+    const { target_id, signal_id, target_workflow_id, target_workflow_type, target_task_queue, outcome, ...rest } = row;
+    const escalation = rest as LTEscalationRecord;
+
+    publishEscalationEvent({
+      type: 'escalation.resolved',
+      source: 'service',
+      workflowId: escalation.workflow_id || '',
+      workflowName: escalation.workflow_type || '',
+      taskQueue: escalation.task_queue || '',
+      escalationId: escalation.id,
+      status: 'resolved',
+      data: { resolved_by: userId },
+    });
+
+    return { outcome: 'resolved', escalation };
+  }
+
+  // Signal-backed escalation — return the signal info for the caller
+  return {
+    outcome: 'signal_required',
+    signalId: row.signal_id,
+    escalationId: row.target_id,
+    workflowId: row.target_workflow_id,
+    workflowType: row.target_workflow_type,
+    taskQueue: row.target_task_queue,
+  };
 }
