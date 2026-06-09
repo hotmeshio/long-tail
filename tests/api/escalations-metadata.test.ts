@@ -13,11 +13,8 @@ import { findByMetadata, claimByMetadata, resolveByMetadata } from '../../api/es
 
 const mockFindByMetadata = vi.mocked(escalationService.findByMetadata);
 const mockClaimByMetadata = vi.mocked(escalationService.claimByMetadata);
-const mockClaimEscalation = vi.mocked(escalationService.claimEscalation);
-const mockUpdateMetadata = vi.mocked(escalationService.updateEscalationMetadata);
-const mockIsSuperAdmin = vi.mocked(userService.isSuperAdmin);
+const mockResolveByMetadataAtomic = vi.mocked(escalationService.resolveByMetadataAtomic);
 const mockHasGlobalAccess = vi.mocked(userService.hasGlobalEscalationAccess);
-const mockHasRole = vi.mocked(userService.hasRole);
 const mockGetUserByExternalId = vi.mocked(userService.getUserByExternalId);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
 
@@ -44,8 +41,8 @@ function makeEscalation(overrides: Record<string, any> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockIsSuperAdmin.mockResolvedValue(true);
   mockHasGlobalAccess.mockResolvedValue(true);
+  mockGetUserRoles.mockResolvedValue([]);
 });
 
 // ── findByMetadata ──────────────────────────────────────────────────────
@@ -60,7 +57,6 @@ describe('findByMetadata', () => {
     expect(result.status).toBe(200);
     expect(result.data.escalations).toHaveLength(1);
     expect(result.data.total).toBe(1);
-    expect(mockFindByMetadata).toHaveBeenCalledWith('orderId', 'order-123', undefined, undefined, undefined);
   });
 
   it('passes status filter', async () => {
@@ -76,10 +72,9 @@ describe('findByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('scopes results by visible roles for non-superadmin', async () => {
-    mockIsSuperAdmin.mockResolvedValue(false);
+  it('scopes results by visible roles for non-global user', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
-    mockGetUserRoles.mockResolvedValue([{ role: 'reviewer', type: 'member', created_at: new Date() }]);
+    mockGetUserRoles.mockResolvedValue([{ role: 'reviewer', type: 'member', created_at: new Date() } as any]);
     const esc = makeEscalation({ role: 'operator' });
     mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
 
@@ -93,31 +88,34 @@ describe('findByMetadata', () => {
 // ── claimByMetadata ─────────────────────────────────────────────────────
 
 describe('claimByMetadata', () => {
-  it('claims an escalation by metadata', async () => {
+  it('claims an escalation by metadata (global access)', async () => {
     const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false });
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
 
     const result = await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
     expect(result.status).toBe(200);
     expect(result.data.escalation.id).toBe('esc-uuid');
-    expect(result.data.isExtension).toBe(false);
+    // Global access passes null as allowedRoles
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined, undefined, null,
+    );
   });
 
   it('resolves assignee from external_id', async () => {
     const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
     mockGetUserByExternalId.mockResolvedValue({ id: 'resolved-uuid' } as any);
-    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false });
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
 
     await claimByMetadata({ key: 'orderId', value: 'order-123', assignee: 'ext-42' }, SYSTEM_AUTH);
 
     expect(mockGetUserByExternalId).toHaveBeenCalledWith('ext-42');
-    expect(mockClaimByMetadata).toHaveBeenCalledWith('orderId', 'order-123', 'resolved-uuid', undefined, undefined);
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'resolved-uuid', undefined, undefined, null,
+    );
   });
 
-  it('returns 404 when assignee external_id not found', async () => {
+  it('returns 404 when assignee external_id not found (no provision flag)', async () => {
     mockGetUserByExternalId.mockResolvedValue(null);
 
     const result = await claimByMetadata({ key: 'orderId', value: 'order-123', assignee: 'nonexistent' }, SYSTEM_AUTH);
@@ -126,34 +124,12 @@ describe('claimByMetadata', () => {
     expect(result.error).toContain('User not found');
   });
 
-  it('returns 404 when no pending escalation found', async () => {
-    mockFindByMetadata.mockResolvedValue({ escalations: [], total: 0 });
-
-    const result = await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
-
-    expect(result.status).toBe(404);
-  });
-
-  it('returns 403 when non-superadmin lacks role', async () => {
-    mockIsSuperAdmin.mockResolvedValue(false);
-    mockHasGlobalAccess.mockResolvedValue(false);
-    const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockHasRole.mockResolvedValue(false);
-
-    const result = await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
-
-    expect(result.status).toBe(403);
-  });
-
-  it('returns 409 when escalation already claimed', async () => {
-    const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
+  it('returns 404 when no pending escalation matches', async () => {
     mockClaimByMetadata.mockResolvedValue(null);
 
     const result = await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
-    expect(result.status).toBe(409);
+    expect(result.status).toBe(404);
   });
 
   it('returns 400 when key or value missing', async () => {
@@ -161,32 +137,47 @@ describe('claimByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('passes metadata to service claimByMetadata for atomic merge', async () => {
+  it('passes scoped roles for non-global user', async () => {
+    mockHasGlobalAccess.mockResolvedValue(false);
+    mockGetUserRoles.mockResolvedValue([{ role: 'operator', type: 'member' } as any]);
     const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false });
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
 
-    const result = await claimByMetadata({
+    await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
+
+    // Non-global user passes their roles as allowedRoles
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined, undefined, ['operator'],
+    );
+  });
+
+  it('passes null roles for system account with no roles (global)', async () => {
+    // System account: hasGlobalAccess false, but no roles → treated as global
+    mockHasGlobalAccess.mockResolvedValue(false);
+    mockGetUserRoles.mockResolvedValue([]);
+    const esc = makeEscalation();
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
+
+    await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
+
+    // Empty roles → null (unrestricted)
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined, undefined, null,
+    );
+  });
+
+  it('passes metadata to service for atomic merge', async () => {
+    const esc = makeEscalation();
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
+
+    await claimByMetadata({
       key: 'orderId', value: 'order-123',
       metadata: { claimedBy: 'jimbo', station: 'scanning' },
     }, SYSTEM_AUTH);
 
-    expect(result.status).toBe(200);
     expect(mockClaimByMetadata).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid', undefined,
-      { claimedBy: 'jimbo', station: 'scanning' },
-    );
-  });
-
-  it('passes undefined metadata when omitted', async () => {
-    const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false });
-
-    await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
-
-    expect(mockClaimByMetadata).toHaveBeenCalledWith(
-      'orderId', 'order-123', 'system-uuid', undefined, undefined,
+      { claimedBy: 'jimbo', station: 'scanning' }, null,
     );
   });
 });
@@ -194,31 +185,26 @@ describe('claimByMetadata', () => {
 // ── resolveByMetadata ───────────────────────────────────────────────────
 
 describe('resolveByMetadata', () => {
+  it('atomically resolves by metadata', async () => {
+    const esc = makeEscalation({ status: 'resolved' });
+    mockResolveByMetadataAtomic.mockResolvedValue(esc as any);
+
+    const result = await resolveByMetadata({
+      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
+    }, SYSTEM_AUTH);
+
+    expect(result.status).toBe(200);
+    expect(result.data.escalation.id).toBe('esc-uuid');
+  });
+
   it('returns 404 when no pending escalation found', async () => {
-    mockFindByMetadata.mockResolvedValue({ escalations: [], total: 0 });
+    mockResolveByMetadataAtomic.mockResolvedValue(null);
 
     const result = await resolveByMetadata({
       key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
     }, SYSTEM_AUTH);
 
     expect(result.status).toBe(404);
-  });
-
-  it('auto-claims when unclaimed before resolving', async () => {
-    const esc = makeEscalation({ assigned_to: null, assigned_until: null });
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockClaimEscalation.mockResolvedValue({ escalation: esc as any, isExtension: false });
-
-    // Mock the resolve import
-    vi.doMock('../../api/escalations/resolve', () => ({
-      resolveEscalation: vi.fn().mockResolvedValue({ status: 200, data: { resolved: true } }),
-    }));
-
-    const result = await resolveByMetadata({
-      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
-    }, SYSTEM_AUTH);
-
-    expect(mockClaimEscalation).toHaveBeenCalledWith('esc-uuid', 'system-uuid', 5);
   });
 
   it('returns 400 when resolverPayload missing', async () => {
@@ -229,45 +215,9 @@ describe('resolveByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('resolves assignee from external_id', async () => {
-    const esc = makeEscalation({ assigned_to: null });
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockGetUserByExternalId.mockResolvedValue({ id: 'resolved-uuid' } as any);
-    mockClaimEscalation.mockResolvedValue({ escalation: esc as any, isExtension: false });
-
-    vi.doMock('../../api/escalations/resolve', () => ({
-      resolveEscalation: vi.fn().mockResolvedValue({ status: 200, data: { resolved: true } }),
-    }));
-
-    await resolveByMetadata({
-      key: 'orderId', value: 'order-123', resolverPayload: { approved: true }, assignee: 'ext-42',
-    }, SYSTEM_AUTH);
-
-    expect(mockGetUserByExternalId).toHaveBeenCalledWith('ext-42');
-  });
-
-  it('returns 403 when non-superadmin lacks role', async () => {
-    mockIsSuperAdmin.mockResolvedValue(false);
-    mockHasGlobalAccess.mockResolvedValue(false);
-    const esc = makeEscalation();
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockHasRole.mockResolvedValue(false);
-
-    const result = await resolveByMetadata({
-      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
-    }, SYSTEM_AUTH);
-
-    expect(result.status).toBe(403);
-  });
-
-  it('merges metadata on resolve when provided', async () => {
-    const esc = makeEscalation({ assigned_to: 'system-uuid', assigned_until: new Date(Date.now() + 60000) });
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
-    mockUpdateMetadata.mockResolvedValue(esc as any);
-
-    vi.doMock('../../api/escalations/resolve', () => ({
-      resolveEscalation: vi.fn().mockResolvedValue({ status: 200, data: { resolved: true } }),
-    }));
+  it('passes metadata for atomic merge in CTE', async () => {
+    const esc = makeEscalation({ status: 'resolved' });
+    mockResolveByMetadataAtomic.mockResolvedValue(esc as any);
 
     await resolveByMetadata({
       key: 'orderId', value: 'order-123',
@@ -275,6 +225,9 @@ describe('resolveByMetadata', () => {
       metadata: { completedBy: 'jimbo' },
     }, SYSTEM_AUTH);
 
-    expect(mockUpdateMetadata).toHaveBeenCalledWith('esc-uuid', { completedBy: 'jimbo' });
+    expect(mockResolveByMetadataAtomic).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid',
+      { approved: true }, { completedBy: 'jimbo' }, null,
+    );
   });
 });

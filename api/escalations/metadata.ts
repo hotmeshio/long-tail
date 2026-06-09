@@ -1,6 +1,6 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { getVisibleRoles, resolveAssignee } from './helpers';
+import { getVisibleRoles, resolveAssignee, type ProvisionIfAbsent } from './helpers';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 /**
@@ -41,7 +41,7 @@ export async function findByMetadata(
  * the claim never happens. No pre-flight find, no TOCTOU.
  */
 export async function claimByMetadata(
-  input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any> },
+  input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>; provisionIfAbsent?: ProvisionIfAbsent },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -49,7 +49,7 @@ export async function claimByMetadata(
       return { status: 400, error: 'key and value are required' };
     }
 
-    const resolved = await resolveAssignee(input.assignee, auth);
+    const resolved = await resolveAssignee(input.assignee, auth, input.provisionIfAbsent);
     if ('error' in resolved) return resolved.error;
     const claimUserId = resolved.userId;
 
@@ -124,5 +124,7 @@ export async function resolveByMetadata(
 async function resolveAllowedRoles(userId: string): Promise<string[] | null> {
   if (await userService.hasGlobalEscalationAccess(userId)) return null;
   const userRoles = await userService.getUserRoles(userId);
+  // Empty roles = system account with no explicit role assignments → unrestricted
+  if (userRoles.length === 0) return null;
   return userRoles.map(r => r.role);
 }

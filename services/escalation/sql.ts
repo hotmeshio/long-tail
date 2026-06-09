@@ -185,7 +185,7 @@ WITH target AS (
   WHERE metadata @> $1::jsonb
     AND status = 'pending'
     AND (assigned_to IS NULL OR assigned_until <= NOW() OR assigned_to = $2)
-    AND ($5::text[] IS NULL OR role = ANY($5))
+    AND ($5::text[] IS NULL OR array_length($5, 1) IS NULL OR role = ANY($5))
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE SKIP LOCKED
@@ -218,10 +218,10 @@ WITH target AS (
   FROM lt_escalations
   WHERE metadata @> $1::jsonb
     AND status = 'pending'
-    AND ($5::text[] IS NULL OR role = ANY($5))
+    AND ($5::text[] IS NULL OR array_length($5, 1) IS NULL OR role = ANY($5))
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
-  FOR UPDATE SKIP LOCKED
+  FOR UPDATE
 ),
 claimed AS (
   UPDATE lt_escalations e

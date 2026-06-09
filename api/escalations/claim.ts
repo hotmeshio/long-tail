@@ -1,7 +1,7 @@
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 
-import { hasGlobalEscalationAccess } from './helpers';
+import { hasGlobalEscalationAccess, ensureRoleMembership, type ProvisionIfAbsent } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 /**
@@ -17,25 +17,32 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
  * @returns `{ status: 200, data: { escalation, isExtension } }` or 403/404/409
  */
 export async function claimEscalation(
-  input: { id: string; durationMinutes?: number },
+  input: { id: string; durationMinutes?: number; provisionIfAbsent?: ProvisionIfAbsent },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { id, durationMinutes } = input;
+    const { id, durationMinutes, provisionIfAbsent } = input;
 
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) {
       return { status: 404, error: 'Escalation not found' };
     }
 
+    // Happy path: try claim assuming user has the role
     const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
     if (!hasGlobal) {
       const userHasRole = await userService.hasRole(auth.userId, escalation.role);
       if (!userHasRole) {
-        return {
-          status: 403,
-          error: `You must have the "${escalation.role}" role to claim this escalation`,
-        };
+        // Unhappy path: provision role if flag present, then retry
+        const provisioned = await ensureRoleMembership(
+          auth.userId, escalation.role, auth.userId, provisionIfAbsent,
+        );
+        if (!provisioned) {
+          return {
+            status: 403,
+            error: `You must have the "${escalation.role}" role to claim this escalation`,
+          };
+        }
       }
     }
 
@@ -43,8 +50,6 @@ export async function claimEscalation(
     if (!result) {
       return { status: 409, error: 'Escalation not available for claim' };
     }
-
-    // Event published by service layer (services/escalation/crud.ts)
 
     return { status: 200, data: result };
   } catch (err: any) {
