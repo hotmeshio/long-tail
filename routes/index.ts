@@ -69,4 +69,7 @@ router.use('/agents', agentsRouter);
 router.use('/capabilities', capabilitiesRouter);
 router.use('/topics', topicsRouter);
 
+import overviewRouter from './overview';
+router.use('/overview', overviewRouter);
+
 export default router;

@@ -104,4 +104,7 @@ export const ADMIN_TOOLS = [
   { name: 'export_workflow_state', description: 'Export the full workflow state using HotMesh durable export.', read_safe: true, inputSchema: { type: 'object', properties: { workflow_id: { type: 'string' }, allow: { type: 'array', items: { type: 'string' } }, block: { type: 'array', items: { type: 'string' } }, values: { type: 'object' } }, required: ['workflow_id'] } },
   { name: 'export_workflow_execution', description: 'Export workflow state as a structured execution event history.', read_safe: true, inputSchema: { type: 'object', properties: { workflow_id: { type: 'string' }, excludeSystem: { type: 'boolean' }, omitResults: { type: 'boolean' }, mode: { type: 'string' }, maxDepth: { type: 'integer' } }, required: ['workflow_id'] } },
   { name: 'get_export_status', description: 'Return the numeric status semaphore for a workflow.', read_safe: true, inputSchema: { type: 'object', properties: { workflow_id: { type: 'string' } }, required: ['workflow_id'] } },
+
+  // ── overview.ts ─────────────────────────────────────────────────────────
+  { name: 'get_system_overview', description: 'Triage-ready system dashboard: escalation queue pressure, task throughput, hourly trends, infrastructure status, and process summary. One call for complete system state.', read_safe: true, inputSchema: { type: 'object', properties: { period: { type: 'string', enum: ['1h', '24h', '7d'], description: 'Time window (default: 24h)' } } } },
 ];
