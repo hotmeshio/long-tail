@@ -158,3 +158,6 @@ test-results/
 tests/functional/screenshots/
 
 CLAUDE.md
+
+# MCP server config (contains API keys)
+.mcp.json

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "long-tail": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-api-key>"
+      }
+    }
+  }
+}

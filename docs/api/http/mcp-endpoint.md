@@ -69,6 +69,74 @@ curl -X POST http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_settings","arguments":{}},"id":3}'
 ```
 
+## Claude Code Integration
+
+Connect Claude Code to your Long Tail instance as an MCP server. Once connected, Claude Code can discover and invoke all 110 tools — query escalations, manage workflows, store knowledge, and more.
+
+### Step 1: Get an API key
+
+Start Long Tail (`docker compose up -d --build`). The startup log shows two seeded API keys:
+
+```
+[seed-mcp] read key: lt_bot_<read-key>
+[seed-mcp] full key: lt_bot_<full-key>
+```
+
+The **read key** exposes 57 read-safe tools (queries, listings). The **full key** exposes all 110 tools.
+
+### Step 2: Configure Claude Code
+
+Copy the example config and add your API key:
+
+```bash
+cp .mcp.example.json .mcp.json
+```
+
+Edit `.mcp.json` and replace `<your-api-key>` with the key from step 1:
+
+```json
+{
+  "mcpServers": {
+    "long-tail": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer lt_bot_<your-api-key>"
+      }
+    }
+  }
+}
+```
+
+`.mcp.json` is gitignored (it contains secrets). `.mcp.example.json` is committed as a template — same pattern as `.env` and `.env.example`.
+
+Or use the CLI:
+
+```bash
+claude mcp add --transport http long-tail http://localhost:3000/mcp \
+  --header "Authorization: Bearer lt_bot_<your-key>"
+```
+
+### Step 3: Verify
+
+Restart Claude Code, then try:
+
+> "How's the system doing?"
+
+Claude Code calls `get_system_overview` — one call returns triage, throughput, trends, infrastructure, and process status. Try more:
+
+> "What roles exist in the system?"
+
+> "Show me the most recent worker stream message"
+
+> "List all pending escalations"
+
+> "Store a knowledge entry: domain=notes, key=today, data={message: 'shipped MCP'}"
+
+> "What MCP servers are registered?"
+
+---
+
 ## Authentication
 
 Two token types are supported:
