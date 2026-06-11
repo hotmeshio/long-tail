@@ -149,7 +149,7 @@ The source is the spec. The compiled YAML is the optimized execution. Both live 
 
 ## Register a graph flow by hand
 
-You don't need the compiler or an API key to author a graph flow — `graphWorkflows` is the graph-form peer of `workers`. Hand-author the HotMesh YAML and it's created, deployed, and activated at startup. This hello-world greets a name with no worker, no MCP, no LLM — just mapping:
+`graphWorkflows` is the graph-form peer of `workers`: hand-author the HotMesh YAML and it's created, deployed, and activated at startup. This hello-world assembles a greeting from the input with a single trigger mapping:
 
 ```typescript
 const lt = await start({

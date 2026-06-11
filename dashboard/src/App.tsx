@@ -74,6 +74,12 @@ const CertifiedExecutionsPage = lazy(() =>
 const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
 );
+const GraphInvokePage = lazy(() =>
+  import('./pages/workflows/GraphInvokePage').then((m) => ({ default: m.GraphInvokePage })),
+);
+const YamlWorkflowDetailPage = lazy(() =>
+  import('./pages/workflows/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
+);
 const TasksListPage = lazy(() =>
   import('./pages/workflows/TasksListPage').then((m) => ({ default: m.TasksListPage })),
 );
@@ -274,8 +280,10 @@ const router = createBrowserRouter([
       {
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
-          // Graph flows + executions — durable orchestration, no AI key required
+          // Graph flows + executions — durable orchestration, available without an AI key
           { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+          { path: 'mcp/workflows/invoke', element: <Lazy><GraphInvokePage /></Lazy> },
+          { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
           { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
           { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
 

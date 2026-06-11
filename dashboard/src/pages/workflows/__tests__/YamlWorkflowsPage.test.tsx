@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
@@ -16,45 +16,34 @@ const mockWorkflows = {
       id: 'wf-1',
       name: 'rotate-and-verify',
       description: 'Rotate document and verify',
-      app_id: 'lt-yaml',
+      app_id: 'graph',
       app_version: '3',
+      content_version: 3,
       graph_topic: 'rotate_and_verify',
-      source_workflow_type: 'mcpTriage',
       status: 'active',
-      activity_manifest: [
-        { activity_id: 'a0', type: 'worker', tool_source: 'mcp' },
-        { activity_id: 'a1', type: 'worker', tool_source: 'mcp' },
-      ],
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-02T00:00:00Z',
+      activity_manifest: [],
     },
     {
       id: 'wf-2',
       name: 'extract-info',
       description: 'Extract and validate info',
-      app_id: 'lt-yaml',
+      app_id: 'graph',
       app_version: '3',
+      content_version: 2,
       graph_topic: 'extract_info',
-      source_workflow_type: 'mcpTriage',
       status: 'deployed',
-      activity_manifest: [
-        { activity_id: 'a0', type: 'worker', tool_source: 'mcp' },
-      ],
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-03T00:00:00Z',
+      activity_manifest: [],
     },
     {
       id: 'wf-3',
       name: 'claim-review',
       description: null,
-      app_id: 'claims-app',
+      app_id: 'claims',
       app_version: '1',
+      content_version: 1,
       graph_topic: 'claim_review',
-      source_workflow_type: null,
       status: 'draft',
       activity_manifest: [],
-      created_at: '2025-01-05T00:00:00Z',
-      updated_at: '2025-01-05T00:00:00Z',
     },
   ],
   total: 3,
@@ -73,10 +62,10 @@ beforeEach(() => {
   vi.mocked(useYamlWorkflows).mockReturnValue({ data: mockWorkflows, isLoading: false } as any);
 });
 
-describe('YamlWorkflowsPage', () => {
-  it('renders page header', () => {
+describe('YamlWorkflowsPage (Configure)', () => {
+  it('renders the Configure header', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByRole('heading', { name: 'Graph Flows' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Configure' })).toBeInTheDocument();
   });
 
   it('renders description text', () => {
@@ -84,32 +73,26 @@ describe('YamlWorkflowsPage', () => {
     expect(screen.getByText(/The compiled form of a durable workflow/)).toBeInTheDocument();
   });
 
-  it('groups workflows by app_id as server rows', () => {
+  it('renders a flat row per flow (no app_id grouping)', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    // Multiple matches expected: table row + server filter dropdown option
-    expect(screen.getAllByText('lt-yaml').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('claims-app').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows tool count badge per server', () => {
-    render(<YamlWorkflowsPage />, { wrapper });
-    // Count is shown as a number in a badge circle — may appear multiple times
-    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('expands server to show tool rows on click', () => {
-    render(<YamlWorkflowsPage />, { wrapper });
-    // Find the server row in the table (not the dropdown option)
-    const matches = screen.getAllByText('lt-yaml');
-    const serverRow = matches.map((el) => el.closest('tr')).find((tr) => tr !== null)!;
-    fireEvent.click(serverRow);
-    // After expand, tool topics should be visible
     expect(screen.getByText('rotate_and_verify')).toBeInTheDocument();
     expect(screen.getByText('extract_info')).toBeInTheDocument();
+    expect(screen.getByText('claim_review')).toBeInTheDocument();
   });
 
-  it('shows empty state when no workflows', () => {
+  it('shows a namespace pill per flow', () => {
+    render(<YamlWorkflowsPage />, { wrapper });
+    expect(screen.getAllByText('graph').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('claims')).toBeInTheDocument();
+  });
+
+  it('shows status badges', () => {
+    render(<YamlWorkflowsPage />, { wrapper });
+    expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Draft').length).toBeGreaterThanOrEqual(2); // badge + filter option
+  });
+
+  it('shows empty state when no flows', () => {
     vi.mocked(useYamlWorkflows).mockReturnValue({
       data: { workflows: [], total: 0 },
       isLoading: false,
@@ -124,37 +107,12 @@ describe('YamlWorkflowsPage', () => {
     expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
-  it('shows best status per server (active over deployed)', () => {
-    render(<YamlWorkflowsPage />, { wrapper });
-    // lt-yaml has active + deployed; best status is "active"
-    // claims-app has draft; status is "draft"
-    const badges = screen.getAllByText('Active');
-    expect(badges.length).toBeGreaterThanOrEqual(1);
-    const drafts = screen.getAllByText('Draft');
-    // At least 2: one in the filter dropdown + one in the status badge
-    expect(drafts.length).toBeGreaterThanOrEqual(2);
-  });
-
   it('renders search input', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByPlaceholderText('Server or tool name…')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Flow or namespace…')).toBeInTheDocument();
   });
 
-  it('renders status filter', () => {
-    render(<YamlWorkflowsPage />, { wrapper });
-    // Status filter has known options
-    const selects = screen.getAllByRole('combobox');
-    expect(selects.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('renders server filter when multiple servers exist', () => {
-    render(<YamlWorkflowsPage />, { wrapper });
-    // Should have Server dropdown since there are two distinct app_ids
-    const labels = screen.getAllByText('Server');
-    expect(labels.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('passes filters to API hook', () => {
+  it('passes filters to the API hook', () => {
     render(<YamlWorkflowsPage />, { wrapper });
     expect(useYamlWorkflows).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 200, offset: 0 }),

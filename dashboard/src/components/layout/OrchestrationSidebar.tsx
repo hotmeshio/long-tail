@@ -1,12 +1,12 @@
-import { SlidersHorizontal, Play, ListChecks, GitBranch, Code2, Workflow } from 'lucide-react';
+import { SlidersHorizontal, Play, ListChecks, Code2, Workflow } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 /**
  * "Do This Do That" — top-down durable orchestration, authorable two ways.
- * Both flavors are fully durable and transactional; they differ only in form:
+ * Both flavors are durable and transactional; they differ in form:
  *   Procedural — temporal-like TypeScript, readable, emulated atop the graph.
- *   Graph      — the compiled DAG, ~3x faster, less to read.
- * Each flavor owns its configure/invoke surface and its own execution history.
+ *   Graph      — the compiled DAG, roughly 3x the speed.
+ * Each flavor exposes the same shape: Configure, Invoke, Executions.
  */
 export function OrchestrationSidebar() {
   const entries: NavEntry[] = [
@@ -17,6 +17,7 @@ export function OrchestrationSidebar() {
       matchPaths: [
         '/workflows/registry',
         '/workflows/durable/invoke',
+        '/workflows/executions',
         '/workflows/durable/executions',
         '/workflows/start',
         '/workflows/workers',
@@ -25,7 +26,7 @@ export function OrchestrationSidebar() {
       items: [
         { to: '/workflows/registry', label: 'Configure', icon: SlidersHorizontal },
         { to: '/workflows/durable/invoke', label: 'Invoke', icon: Play },
-        { to: '/workflows/durable/executions', label: 'Executions', icon: ListChecks },
+        { to: '/workflows/executions', label: 'Executions', icon: ListChecks },
       ],
     },
     {
@@ -34,7 +35,9 @@ export function OrchestrationSidebar() {
       icon: Workflow,
       matchPaths: ['/mcp/workflows', '/mcp/executions'],
       items: [
-        { to: '/mcp/workflows', label: 'Flows', icon: GitBranch },
+        // `end` so Configure isn't flagged active on /mcp/workflows/invoke.
+        { to: '/mcp/workflows', label: 'Configure', icon: SlidersHorizontal, end: true },
+        { to: '/mcp/workflows/invoke', label: 'Invoke', icon: Play },
         { to: '/mcp/executions', label: 'Executions', icon: ListChecks },
       ],
     },

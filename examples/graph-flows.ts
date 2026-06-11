@@ -3,10 +3,9 @@ import type { LTGraphWorkflowConfig } from '../types/startup';
 /**
  * A hello-world graph flow — the graph-form peer of an example durable workflow.
  *
- * Pure HotMesh mapping: the trigger concatenates a greeting from the input and
- * returns it as the job output. No worker activity, no MCP server, no LLM — it
- * just runs. This is the "you can author a graph flow without the Designer"
- * proof point, registered the same way durable `workers` are.
+ * Pure HotMesh mapping: the trigger assembles a greeting from the input and
+ * returns it as the job output. Authored as YAML and registered at startup the
+ * same way durable `workers` are.
  */
 const HELLO_WORLD_YAML = `
 app:
@@ -45,7 +44,7 @@ app:
 export const EXAMPLE_GRAPH_WORKFLOWS: LTGraphWorkflowConfig[] = [
   {
     name: 'hello_world',
-    description: 'Greets the name you pass in. A graph flow authored by hand — no MCP, no LLM.',
+    description: 'Greets a name with a message the graph assembles as it runs.',
     namespace: 'graph',
     yaml: HELLO_WORLD_YAML,
     inputSchema: {

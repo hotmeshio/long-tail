@@ -2,10 +2,8 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useSettings } from '../../api/settings';
 
 /**
- * Gates routes behind the AI add-on. When no Anthropic key is configured
- * (ai.enabled === false), the Designer and other LLM-authoring surfaces are
- * neither shown in the nav nor reachable by URL. Choreography and orchestration
- * stand on their own without it.
+ * Gates LLM-authoring routes (the Designer) so they're reachable only when an
+ * Anthropic key is configured (ai.enabled === true), matching the nav gating.
  */
 export function RequireAI({ redirectTo = '/' }: { redirectTo?: string }) {
   const { data, isLoading } = useSettings();
