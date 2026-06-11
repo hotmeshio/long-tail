@@ -125,7 +125,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Activity lifecycle
   {
     topic: 'system.activity.*.*.started',
-    description: 'A graph flow step has started.',
+    description: 'A workflow activity has started.',
     category: 'activity',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, activityName: { type: 'string', description: 'Activity step name' } }),
     example_payload: { workflowId: 'wf-abc', activityName: 'fetchOrder', workflowName: 'processOrder' },
@@ -133,7 +133,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.activity.*.*.completed',
-    description: 'A graph flow step has completed.',
+    description: 'A workflow activity has completed.',
     category: 'activity',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, activityName: { type: 'string' }, data: { type: 'object' } }),
     example_payload: { workflowId: 'wf-abc', activityName: 'fetchOrder', workflowName: 'processOrder' },
@@ -141,7 +141,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.activity.*.*.failed',
-    description: 'A graph flow step has failed.',
+    description: 'A workflow activity has failed.',
     category: 'activity',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, activityName: { type: 'string' }, data: { type: 'object', description: 'Error details' } }),
     example_payload: { workflowId: 'wf-abc', activityName: 'fetchOrder', workflowName: 'processOrder' },
@@ -199,7 +199,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Agent lifecycle
   {
     topic: 'system.agent.*.started',
-    description: 'An agent has started in response to an event.',
+    description: 'An agent automation has started in response to an event.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string', description: 'Agent ID' }, agentName: { type: 'string', description: 'Agent name' }, status: STATUS_FIELD, data: { type: 'object', description: 'Trigger context' } }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'running' },
@@ -207,7 +207,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.agent.*.completed',
-    description: 'An agent has completed its reaction.',
+    description: 'An agent automation has completed.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string' }, agentName: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'completed' },
@@ -215,7 +215,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.agent.*.failed',
-    description: 'An agent reaction has failed.',
+    description: 'An agent automation has failed.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string' }, agentName: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object', description: 'Error details' } }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'failed' },
@@ -223,7 +223,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.agent.*.status_changed',
-    description: 'An agent\'s status has changed.',
+    description: 'An agent automation\'s status has changed.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string' }, agentName: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'active' },
@@ -233,7 +233,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Milestone
   {
     topic: 'system.milestone.*',
-    description: 'A workflow has reported progress.',
+    description: 'A workflow or workflow activity has reported progress.',
     category: 'milestone',
     payload_schema: objectSchema({
       ...WORKFLOW_CONTEXT_PROPS,
