@@ -30,12 +30,14 @@ export function useYamlActivityEvents(jobId: string | null): {
 
   const activityHandler = useCallback((event: any) => {
     if (!jobId || event.workflowId !== jobId) return;
-    const category = event.type?.split('.')[0];
-    if (category !== 'activity') return;
+    // event.type is the full topic: 'system.activity.{wfId}.{name}.{action}'
+    const parts = (event.type as string | undefined)?.split('.') ?? [];
+    if (parts[1] !== 'activity') return;
 
     const activityId = event.activityName as string;
     const data = event.data as Record<string, any> | undefined;
-    const eventType = event.type as string;
+    // Normalise to short form for comparisons below (e.g. 'activity.started')
+    const eventType = `activity.${parts[parts.length - 1]}`;
 
     setSteps((prev) => {
       const existing = prev.find((s) => s.activityId === activityId);
@@ -69,9 +71,10 @@ export function useYamlActivityEvents(jobId: string | null): {
 
   const workflowHandler = useCallback((event: any) => {
     if (!jobId || event.workflowId !== jobId) return;
-    const eventType = event.type as string | undefined;
-    if (eventType === 'workflow.completed') setWorkflowStatus('completed');
-    if (eventType === 'workflow.failed') setWorkflowStatus('failed');
+    // event.type is the full topic: 'system.workflow.{wfId}.{action}'
+    const action = (event.type as string | undefined)?.split('.').pop();
+    if (action === 'completed') setWorkflowStatus('completed');
+    if (action === 'failed') setWorkflowStatus('failed');
   }, [jobId]);
 
   useEventSubscription(
