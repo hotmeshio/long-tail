@@ -47,7 +47,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.task.*.escalated',
-    description: 'A task is waiting for human review.',
+    description: 'A task has been escalated.',
     category: 'task',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { taskId: 'tsk-001', status: 'escalated', workflowName: 'processOrder' },
@@ -91,7 +91,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Escalation lifecycle
   {
     topic: 'system.escalation.*.created',
-    description: 'A step is waiting for human review.',
+    description: 'An escalation has been created.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { escalationId: 'esc-001', status: 'pending', workflowName: 'processOrder' },
@@ -99,7 +99,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.escalation.*.resolved',
-    description: 'A human review has been resolved.',
+    description: 'An escalation has been resolved.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { escalationId: 'esc-001', status: 'resolved', workflowName: 'processOrder' },
@@ -107,7 +107,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.escalation.*.claimed',
-    description: 'A human review has been claimed.',
+    description: 'An escalation has been claimed.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { escalationId: 'esc-001', status: 'claimed' },
@@ -115,7 +115,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.escalation.*.released',
-    description: 'A claimed review has been returned to the queue.',
+    description: 'An escalation has been returned to the queue.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { escalationId: 'esc-001', status: 'pending' },
