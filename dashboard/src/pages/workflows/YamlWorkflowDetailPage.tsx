@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Workflow, Braces, Info, FileCode2, History, Play, BookOpen,
 } from 'lucide-react';
+import yaml from 'js-yaml';
 import { useYamlWorkflow, useYamlWorkflowVersions } from '../../api/yaml-workflows';
 import { StatusBadge } from '../../components/common/display/StatusBadge';
 import { NamespacePill } from '../../components/common/display/NamespacePill';
@@ -83,6 +84,19 @@ export function YamlWorkflowDetailPage() {
 
   const manifest = flow.activity_manifest ?? [];
 
+  // output_schema may be {} for flows created before the output_schema column was populated.
+  // Fall back to parsing it from the stored YAML content.
+  const outputSchema: Record<string, unknown> | undefined = (() => {
+    const stored = flow.output_schema as any;
+    if (stored && Object.keys(stored).length > 0) return stored;
+    try {
+      const parsed = yaml.load(flow.yaml_content) as any;
+      return parsed?.app?.graphs?.[0]?.output?.schema ?? undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+
   return (
     <div>
       {/* Hero */}
@@ -148,7 +162,7 @@ export function YamlWorkflowDetailPage() {
           </div>
           <div>
             <SectionHeader icon={Braces} color="text-amber-400">Output</SectionHeader>
-            <FieldList schema={flow.output_schema} empty="No declared output fields" />
+            <FieldList schema={outputSchema} empty="No declared output fields" />
           </div>
         </div>
 

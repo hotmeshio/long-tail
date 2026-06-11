@@ -54,6 +54,12 @@ export const EXAMPLE_GRAPH_WORKFLOWS: LTGraphWorkflowConfig[] = [
       },
       required: ['name'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        greeting: { type: 'string', description: 'The assembled greeting' },
+      },
+    },
     tags: ['example', 'hello-world'],
   },
 ];

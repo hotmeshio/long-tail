@@ -204,13 +204,14 @@ export async function createYamlWorkflowDirect(input: {
   description?: string;
   yaml_content: string;
   input_schema?: any;
+  output_schema?: any;
   activity_manifest?: any[];
   tags?: string[];
   app_id?: string;
   graph_topic?: string;
 }): Promise<LTApiResult> {
   try {
-    const { name, description, yaml_content, input_schema, activity_manifest, tags, app_id, graph_topic } = input;
+    const { name, description, yaml_content, input_schema, output_schema, activity_manifest, tags, app_id, graph_topic } = input;
 
     if (!name || !yaml_content) {
       return { status: 400, error: 'name and yaml_content are required' };
@@ -261,7 +262,7 @@ export async function createYamlWorkflowDirect(input: {
       yaml_content: finalYaml,
       graph_topic: graphTopic,
       input_schema: input_schema || {},
-      output_schema: {},
+      output_schema: output_schema || {},
       activity_manifest: normalizeManifestToolNames(activity_manifest) || [],
       tags: tags || [],
       original_prompt: description,

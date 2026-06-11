@@ -1,4 +1,5 @@
 import { loggerRegistry } from '../lib/logger';
+import { sanitizeToolName, sanitizeServerName } from '../modules/utils';
 import type { LTGraphWorkflowConfig } from '../types/startup';
 
 /**
@@ -6,31 +7,50 @@ import type { LTGraphWorkflowConfig } from '../types/startup';
  * peer of durable `workers`. Each flow is created insert-if-absent, then
  * deployed + activated through the same path the dashboard uses.
  *
+ * On a re-boot where the flow already exists, description and output_schema are
+ * synced if they've changed (e.g. after updating the example config).
+ *
  * Per-flow failures are logged and skipped so a single malformed flow can never
- * block boot. Re-registration on a later boot is a no-op (topic already exists).
+ * block boot.
  */
 export async function seedGraphWorkflows(configs: LTGraphWorkflowConfig[]): Promise<void> {
-  const { createYamlWorkflowDirect } = await import('../api/yaml-workflows/crud');
+  const { createYamlWorkflowDirect, listYamlWorkflows, updateYamlWorkflow } = await import('../api/yaml-workflows/crud');
   const { deployYamlWorkflow } = await import('../api/yaml-workflows/deploy');
 
   for (const gf of configs) {
-    const namespace = gf.namespace ?? 'graph';
+    const namespace = sanitizeServerName(gf.namespace ?? 'graph');
+    const graphTopic = sanitizeToolName(gf.name);
     try {
       const created = await createYamlWorkflowDirect({
         name: gf.name,
         description: gf.description,
         yaml_content: gf.yaml,
         input_schema: gf.inputSchema,
-        app_id: namespace,
+        output_schema: gf.outputSchema,
+        app_id: gf.namespace,
         tags: gf.tags,
       });
 
-      // 409 = a flow with this topic already exists in the namespace (prior boot).
-      // Leave the already-deployed version in place — registration is insert-if-absent.
       if (created.status === 409) {
-        loggerRegistry.info(`[long-tail] graph flow already registered: ${gf.name}`);
+        // Flow already exists — sync description and output_schema if stale.
+        const listing = await listYamlWorkflows({ app_id: namespace, graph_topic: graphTopic, limit: 1 });
+        const match = listing.data?.workflows?.[0];
+        if (match) {
+          const updates: Record<string, any> = {};
+          if (gf.description && match.description !== gf.description) updates.description = gf.description;
+          if (gf.outputSchema && JSON.stringify(match.output_schema ?? {}) === '{}') updates.output_schema = gf.outputSchema;
+          if (Object.keys(updates).length > 0) {
+            await updateYamlWorkflow({ id: match.id, ...updates });
+            loggerRegistry.info(`[long-tail] graph flow updated: ${gf.name}`);
+          } else {
+            loggerRegistry.info(`[long-tail] graph flow already registered: ${gf.name}`);
+          }
+        } else {
+          loggerRegistry.info(`[long-tail] graph flow already registered: ${gf.name}`);
+        }
         continue;
       }
+
       if (created.status !== 200 || !created.data?.id) {
         loggerRegistry.warn(
           `[long-tail] graph flow create failed for ${gf.name}: ${created.error ?? 'unknown error'}`,

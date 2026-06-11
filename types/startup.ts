@@ -146,6 +146,8 @@ export interface LTGraphWorkflowConfig {
   namespace?: string;
   /** JSON Schema for the graph's input — pre-fills the dashboard run form. */
   inputSchema?: Record<string, any>;
+  /** JSON Schema for the graph's output — shown on the detail page. */
+  outputSchema?: Record<string, any>;
   /** Classification tags for discovery. */
   tags?: string[];
 }
