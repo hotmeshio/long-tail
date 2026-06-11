@@ -2,7 +2,7 @@ import { Zap, Bot, Radio, Inbox, ListChecks } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 /**
- * "If This Then That" — the reactive, event-driven surface (choreography).
+ * "React" — the reactive, event-driven surface (choreography).
  * Builders configure automations, topics, and capabilities here. Operators,
  * who don't build, get their escalation queue (home is also one logo click away).
  */
@@ -21,5 +21,5 @@ export function ChoreographySidebar({ aiEnabled = false, isBuilder = false }: { 
     { to: '/capabilities', label: 'Capabilities', icon: Zap },
   ];
 
-  return <SidebarNav heading="If This Then That" entries={entries} />;
+  return <SidebarNav heading="React" entries={entries} />;
 }

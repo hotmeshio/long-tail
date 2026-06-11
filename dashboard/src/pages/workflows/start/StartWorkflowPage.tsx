@@ -96,7 +96,7 @@ export function StartWorkflowPage() {
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         Start a Procedural flow — a durable workflow that checkpoints every step and resumes where it
-        left off. The same work runs in compiled form under Do This Do That › Graph.
+        left off. The same work runs in compiled form under Orchestrate › Graph.
       </p>
 
       {invocableConfigs.length === 0 ? (

@@ -2,7 +2,7 @@ import { SlidersHorizontal, Play, ListChecks, Code2, Workflow } from 'lucide-rea
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 /**
- * "Do This Do That" — top-down durable orchestration, authorable two ways.
+ * "Orchestrate" — top-down durable orchestration, authorable two ways.
  * Both flavors are durable and transactional; they differ in form:
  *   Procedural — temporal-like TypeScript, readable, emulated atop the graph.
  *   Graph      — the compiled DAG, roughly 3x the speed.
@@ -43,5 +43,5 @@ export function OrchestrationSidebar() {
     },
   ];
 
-  return <SidebarNav heading="Do This Do That" entries={entries} />;
+  return <SidebarNav heading="Orchestrate" entries={entries} />;
 }

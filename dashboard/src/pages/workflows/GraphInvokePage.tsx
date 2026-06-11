@@ -36,7 +36,7 @@ export function GraphInvokePage() {
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         Run a Graph flow — the compiled form of a durable workflow that the router discovers and
-        executes on demand. The procedural form runs under Do This Do That › Procedural.
+        executes on demand. The procedural form runs under Orchestrate › Procedural.
       </p>
 
       {flows.length === 0 ? (
