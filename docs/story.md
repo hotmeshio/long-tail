@@ -116,7 +116,7 @@ Automation
 
 Each capability shows who uses it: which agents, which pipelines, which workflows. Click one and see its schema, its compile hints, its execution history. This is the **institutional memory map** — it tells you what your organization has taught this system to do.
 
-### Do This Do That: How It Works
+### Orchestrate: How It Works
 
 The orchestration backstage — the same durable workflow, offered two ways:
 

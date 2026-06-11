@@ -54,7 +54,7 @@ describe('YamlWorkflowDetailPage', () => {
     expect(screen.getAllByText('hello_world').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Overview')).toBeInTheDocument();
     expect(screen.getByText('Input')).toBeInTheDocument();
-    expect(screen.getByText('YAML')).toBeInTheDocument();
+    expect(screen.getByText('Definition')).toBeInTheDocument();
     // input schema field surfaces
     expect(screen.getByText('name')).toBeInTheDocument();
   });

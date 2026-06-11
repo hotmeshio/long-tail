@@ -23,7 +23,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Task lifecycle
   {
     topic: 'system.task.*.created',
-    description: 'A new task has been created and queued for execution.',
+    description: 'A new task has been queued.',
     category: 'task',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string', description: 'Task ID' }, status: STATUS_FIELD, data: { type: 'object', description: 'Task input data' } }),
     example_payload: { taskId: 'tsk-001', status: 'pending', workflowName: 'processOrder' },
@@ -31,7 +31,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.task.*.started',
-    description: 'A task has begun execution.',
+    description: 'A task has started.',
     category: 'task',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { taskId: 'tsk-001', status: 'running', workflowName: 'processOrder' },
@@ -39,7 +39,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.task.*.completed',
-    description: 'A task has finished successfully.',
+    description: 'A task has finished.',
     category: 'task',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD, milestones: { type: 'array', items: { type: 'object' }, description: 'Milestones reported' }, data: { type: 'object', description: 'Task result data' } }),
     example_payload: { taskId: 'tsk-001', status: 'completed', workflowName: 'processOrder' },
@@ -47,7 +47,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.task.*.escalated',
-    description: 'A task has been escalated for human review.',
+    description: 'A task is waiting for human review.',
     category: 'task',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { taskId: 'tsk-001', status: 'escalated', workflowName: 'processOrder' },
@@ -55,7 +55,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.task.*.failed',
-    description: 'A task has failed execution.',
+    description: 'A task has failed.',
     category: 'task',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object', description: 'Error details' } }),
     example_payload: { taskId: 'tsk-001', status: 'failed', workflowName: 'processOrder' },
@@ -65,7 +65,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Workflow lifecycle
   {
     topic: 'system.workflow.*.started',
-    description: 'A workflow execution has started.',
+    description: 'A workflow has started.',
     category: 'workflow',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { workflowId: 'wf-abc', workflowName: 'processOrder', status: 'running' },
@@ -73,7 +73,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.workflow.*.completed',
-    description: 'A workflow execution has completed successfully.',
+    description: 'A workflow has completed.',
     category: 'workflow',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { workflowId: 'wf-abc', workflowName: 'processOrder', status: 'completed' },
@@ -81,7 +81,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.workflow.*.failed',
-    description: 'A workflow execution has failed.',
+    description: 'A workflow has failed.',
     category: 'workflow',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, taskId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object', description: 'Error details' } }),
     example_payload: { workflowId: 'wf-abc', workflowName: 'processOrder', status: 'failed' },
@@ -91,7 +91,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Escalation lifecycle
   {
     topic: 'system.escalation.*.created',
-    description: 'A new escalation has been created for human review.',
+    description: 'A step is waiting for human review.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { escalationId: 'esc-001', status: 'pending', workflowName: 'processOrder' },
@@ -99,7 +99,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.escalation.*.resolved',
-    description: 'An escalation has been resolved by a human operator.',
+    description: 'A human review has been resolved.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { escalationId: 'esc-001', status: 'resolved', workflowName: 'processOrder' },
@@ -107,7 +107,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.escalation.*.claimed',
-    description: 'An escalation has been claimed by an operator.',
+    description: 'A human review has been claimed.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { escalationId: 'esc-001', status: 'claimed' },
@@ -115,7 +115,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.escalation.*.released',
-    description: 'An escalation has been released back to the queue.',
+    description: 'A claimed review has been returned to the queue.',
     category: 'escalation',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { escalationId: 'esc-001', status: 'pending' },
@@ -125,33 +125,33 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Activity lifecycle
   {
     topic: 'system.activity.*.*.started',
-    description: 'A YAML workflow activity step has started.',
+    description: 'A graph flow step has started.',
     category: 'activity',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, activityName: { type: 'string', description: 'Activity step name' } }),
     example_payload: { workflowId: 'wf-abc', activityName: 'fetchOrder', workflowName: 'processOrder' },
-    tags: ['lifecycle', 'yaml'],
+    tags: ['lifecycle', 'graph'],
   },
   {
     topic: 'system.activity.*.*.completed',
-    description: 'A YAML workflow activity step has completed.',
+    description: 'A graph flow step has completed.',
     category: 'activity',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, activityName: { type: 'string' }, data: { type: 'object' } }),
     example_payload: { workflowId: 'wf-abc', activityName: 'fetchOrder', workflowName: 'processOrder' },
-    tags: ['lifecycle', 'yaml'],
+    tags: ['lifecycle', 'graph'],
   },
   {
     topic: 'system.activity.*.*.failed',
-    description: 'A YAML workflow activity step has failed.',
+    description: 'A graph flow step has failed.',
     category: 'activity',
     payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, activityName: { type: 'string' }, data: { type: 'object', description: 'Error details' } }),
     example_payload: { workflowId: 'wf-abc', activityName: 'fetchOrder', workflowName: 'processOrder' },
-    tags: ['lifecycle', 'yaml', 'error'],
+    tags: ['lifecycle', 'graph', 'error'],
   },
 
   // Knowledge lifecycle
   {
     topic: 'system.knowledge.*.stored',
-    description: 'A knowledge entry has been written to the knowledge store.',
+    description: 'A knowledge entry has been saved.',
     category: 'knowledge',
     payload_schema: objectSchema({ domain: { type: 'string', description: 'Knowledge domain' }, key: { type: 'string', description: 'Knowledge entry key' } }),
     example_payload: { domain: 'orders', key: 'order-12345' },
@@ -159,7 +159,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.knowledge.*.deleted',
-    description: 'A knowledge entry has been removed from the knowledge store.',
+    description: 'A knowledge entry has been deleted.',
     category: 'knowledge',
     payload_schema: objectSchema({ domain: { type: 'string', description: 'Knowledge domain' }, key: { type: 'string', description: 'Knowledge entry key' } }),
     example_payload: { domain: 'orders', key: 'order-12345' },
@@ -169,7 +169,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // File storage
   {
     topic: 'system.file.stored',
-    description: 'A file has been written to storage.',
+    description: 'A file has been saved to storage.',
     category: 'file',
     payload_schema: objectSchema({
       path: { type: 'string', description: 'File path in storage' },
@@ -184,7 +184,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.file.deleted',
-    description: 'A file has been removed from storage.',
+    description: 'A file has been deleted from storage.',
     category: 'file',
     payload_schema: objectSchema({
       path: { type: 'string', description: 'File path in storage' },
@@ -199,7 +199,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Agent lifecycle
   {
     topic: 'system.agent.*.started',
-    description: 'An agent reaction workflow has started in response to an event.',
+    description: 'An agent has started in response to an event.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string', description: 'Agent ID' }, agentName: { type: 'string', description: 'Agent name' }, status: STATUS_FIELD, data: { type: 'object', description: 'Trigger context' } }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'running' },
@@ -207,7 +207,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.agent.*.completed',
-    description: 'An agent reaction workflow has completed successfully.',
+    description: 'An agent has completed its reaction.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string' }, agentName: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'completed' },
@@ -215,7 +215,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.agent.*.failed',
-    description: 'An agent reaction workflow has failed.',
+    description: 'An agent reaction has failed.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string' }, agentName: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object', description: 'Error details' } }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'failed' },
@@ -223,7 +223,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   },
   {
     topic: 'system.agent.*.status_changed',
-    description: 'An agent\'s status has changed (activated, paused, errored).',
+    description: 'An agent\'s status has changed.',
     category: 'agent',
     payload_schema: objectSchema({ agentId: { type: 'string' }, agentName: { type: 'string' }, status: STATUS_FIELD }),
     example_payload: { agentId: 'agt-001', agentName: 'error-handler', status: 'active' },
@@ -233,7 +233,7 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
   // Milestone
   {
     topic: 'system.milestone.*',
-    description: 'A workflow or activity has reported progress milestones.',
+    description: 'A workflow has reported progress.',
     category: 'milestone',
     payload_schema: objectSchema({
       ...WORKFLOW_CONTEXT_PROPS,

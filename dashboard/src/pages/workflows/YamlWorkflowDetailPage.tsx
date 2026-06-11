@@ -170,7 +170,7 @@ export function YamlWorkflowDetailPage() {
         <div>
           <SectionHeader icon={Workflow} color="text-violet-400">Graph</SectionHeader>
           {manifest.length === 0 ? (
-            <EmptyHint text="A single trigger maps the input straight to the output — see the YAML below." />
+            <EmptyHint text="A single trigger maps the input straight to the output — see the graph definition below." />
           ) : (
             <div className="divide-y divide-surface-border/30">
               {manifest.map((a) => (
@@ -187,9 +187,9 @@ export function YamlWorkflowDetailPage() {
         </div>
       </div>
 
-      {/* YAML */}
+      {/* Graph definition source */}
       <div className="mb-12">
-        <SectionHeader icon={FileCode2} color="text-cyan-400">YAML</SectionHeader>
+        <SectionHeader icon={FileCode2} color="text-cyan-400">Definition</SectionHeader>
         <pre className="text-[11px] font-mono text-text-secondary bg-surface-sunken/50 rounded-md p-4 overflow-x-auto leading-relaxed">
           {flow.yaml_content}
         </pre>

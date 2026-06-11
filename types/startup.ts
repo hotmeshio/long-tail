@@ -134,7 +134,7 @@ export interface LTTopicConfig {
  * peer of a `workers` entry (which registers a procedural workflow). Hand-author
  * the HotMesh YAML; no MCP server or LLM Designer is required. Each flow is
  * created insert-if-absent, then deployed and activated, and appears under
- * Do This Do That › Graph in the dashboard.
+ * Orchestrate › Graph in the dashboard.
  */
 export interface LTGraphWorkflowConfig {
   /** Tool name (snake_case). Unique within the namespace. */

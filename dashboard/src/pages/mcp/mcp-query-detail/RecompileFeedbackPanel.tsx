@@ -39,7 +39,7 @@ export function RecompileFeedbackPanel({
         placeholder="E.g.: 'Only url, username, password, and screenshot_dir should be dynamic inputs. The steps array and script are implementation details.'"
         className="w-full min-h-[80px] px-3 py-2 bg-surface border border-surface-border rounded-md text-xs text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
       <div className="flex items-center justify-between mt-2">
-        <p className="text-[10px] text-text-tertiary">This feedback guides the compiler. The current YAML will be replaced.</p>
+        <p className="text-[10px] text-text-tertiary">This feedback guides the compiler. The current graph definition will be replaced.</p>
         <button onClick={onRegenerate} disabled={!feedbackText.trim() || isPending} className="btn-primary text-xs shrink-0 ml-4">
           {isPending ? 'Recompiling...' : 'Recompile Pipeline'}
         </button>

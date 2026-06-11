@@ -34,7 +34,7 @@ export function YamlDefinitionSection({
 
   return (
     <div>
-      <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">YAML Definition</h4>
+      <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Graph Definition</h4>
       <div ref={yamlSectionRef} className="relative">
         {/* Toolbar — inside the widget, upper right */}
         <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 bg-surface-sunken/90 rounded backdrop-blur-sm">
@@ -43,7 +43,7 @@ export function YamlDefinitionSection({
             target="_blank"
             rel="noopener noreferrer"
             className={BTN}
-            title="YAML Guide"
+            title="Graph Guide"
           >
             <BookOpen className={ICON} />
           </a>
@@ -81,7 +81,7 @@ export function YamlDefinitionSection({
               target="_blank"
               rel="noopener noreferrer"
               className={BTN_LG}
-              title="YAML Guide"
+              title="Graph Guide"
             >
               <BookOpen className="w-5 h-5" />
             </a>

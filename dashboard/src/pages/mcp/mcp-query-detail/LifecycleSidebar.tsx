@@ -57,7 +57,7 @@ export function LifecycleSidebar({
       {/* Out-of-sync warning */}
       {needsRedeploy && effectiveStatus !== 'draft' && effectiveStatus !== 'archived' && (
         <div className="mb-4 px-3 py-2 rounded-md bg-status-pending/10 border border-status-pending/30">
-          <p className="text-[10px] font-semibold text-status-pending mb-1">YAML modified</p>
+          <p className="text-[10px] font-semibold text-status-pending mb-1">Graph modified</p>
           <p className="text-[10px] text-text-secondary leading-relaxed">
             v{contentVersion} edited since deploy (v{deployedContentVersion}). Redeploy to apply changes.
           </p>

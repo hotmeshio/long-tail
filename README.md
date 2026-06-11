@@ -78,7 +78,7 @@ curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
 
 Over time, the system accumulates compiled tools. Problems that once required a human, then required AI reasoning, eventually require neither.
 
-These four steps map to how the dashboard is organized. **If This Then That** is the reactive side (Step 3) — topics, subscriptions, automations. **Do This Do That** is the orchestrated side (Steps 1 and 4) — procedural and graph flows side by side, both durable and pull-based under the hood. **Design** is the optional bridge: with an `ANTHROPIC_API_KEY` it turns a description or a tool run into a graph flow; without one, choreography and orchestration stand on their own, no tradeoff.
+These four steps map to how the dashboard is organized. **React** is the reactive side (Step 3) — topics, subscriptions, automations. **Orchestrate** is the orchestrated side (Steps 1 and 4) — procedural and graph flows side by side, both durable and pull-based under the hood. **Design** is the optional bridge: with an `ANTHROPIC_API_KEY` it turns a description or a tool run into a graph flow; without one, choreography and orchestration stand on their own, no tradeoff.
 
 ## Register MCP tools
 
@@ -182,7 +182,7 @@ app:
 });
 ```
 
-It appears under **Do This Do That › Graph** and runs the same way a procedural workflow does — durable, transactional, invocable from the dashboard or API.
+It appears under **Orchestrate › Graph** and runs the same way a procedural workflow does — durable, transactional, invocable from the dashboard or API.
 
 ## Full configuration
 

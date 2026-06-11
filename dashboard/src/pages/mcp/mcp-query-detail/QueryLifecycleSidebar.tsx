@@ -11,7 +11,7 @@ interface Props {
 const STEPS: Array<{ key: LifecycleStep; label: string; description: string }> = [
   { key: 'query', label: 'Query', description: 'Dynamic MCP execution' },
   { key: 'review', label: 'Review', description: 'Verify results' },
-  { key: 'compile', label: 'Compile', description: 'Generate YAML workflow' },
+  { key: 'compile', label: 'Compile', description: 'Generate graph flow' },
   { key: 'deploy', label: 'Deploy', description: 'Activate deterministic flow' },
   { key: 'test', label: 'Test', description: 'Verify deterministic execution' },
 ];
