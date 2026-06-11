@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
 import { useWorkflowSets } from '../../api/workflow-sets';
+import { useSettings } from '../../api/settings';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useExpandedRows } from '../../hooks/useExpandedRows';
 
-import { Wand2 } from 'lucide-react';
+import { Wand2, Workflow } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
@@ -19,6 +20,8 @@ import type { LTYamlWorkflowRecord } from '../../api/types';
 
 export function YamlWorkflowsPage() {
   const navigate = useNavigate();
+  const { data: settings } = useSettings();
+  const aiEnabled = !!settings?.ai?.enabled;
   const { filters, setFilter } = useFilterParams({
     filters: { status: '', server: '', search: '' },
   });
@@ -86,16 +89,20 @@ export function YamlWorkflowsPage() {
         title="Graph Flows"
         docsHash="#docs:dashboard.md:mcp-pipeline-tools"
         actions={
-          <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
-            Design Flow
-          </button>
+          aiEnabled ? (
+            <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
+              Design Flow
+            </button>
+          ) : undefined
         }
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
         The compiled form of a durable workflow — same guarantees, ~3x faster, less to read.
-        Each flow is a graph the router discovers and runs on demand. Run or schedule one below,
-        or design a new one from a description.
+        Each flow is a graph the router discovers and runs on demand. Run or schedule one below
+        {aiEnabled
+          ? ', or design a new one from a description.'
+          : ', or register one at startup with the graphWorkflows config.'}
       </p>
 
       <FilterBar>
@@ -129,9 +136,21 @@ export function YamlWorkflowsPage() {
       <div className="flex gap-0">
         <div className={`${sidebarWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
           {filteredServers.length === 0 ? (
-            <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
-              <EmptyState icon={Wand2} title="No pipelines yet" description="Click to open the MCP Tool Designer and create your first deterministic tool." />
-            </div>
+            aiEnabled ? (
+              <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
+                <EmptyState
+                  icon={Wand2}
+                  title="No graph flows yet"
+                  description="Click to open the Designer and compile your first flow from a description — or register flows at startup with the graphWorkflows config."
+                />
+              </div>
+            ) : (
+              <EmptyState
+                icon={Workflow}
+                title="No graph flows yet"
+                description="Register graph flows at startup with the graphWorkflows config — no API key required. See the docs for a hello-world example."
+              />
+            )
           ) : (
             <table className="w-full">
               <thead>

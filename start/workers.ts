@@ -245,6 +245,21 @@ export async function startWorkers(
     // 3. Clean stale builtin servers no longer in factory list
     await cleanStaleBuiltinServers(Object.keys(allFactories));
 
+    // Seed static graph (YAML/DAG) workflows — the graph-form peer of `workers`.
+    // Hand-authored flows from config, plus the hello-world example when enabled.
+    // Runs before worker registration so newly-deployed flows are picked up.
+    if (!isReadonly) {
+      const graphFlows = [...(startConfig.graphWorkflows ?? [])];
+      if (startConfig.examples) {
+        const { EXAMPLE_GRAPH_WORKFLOWS } = await import('../examples');
+        graphFlows.push(...EXAMPLE_GRAPH_WORKFLOWS);
+      }
+      if (graphFlows.length) {
+        const { seedGraphWorkflows } = await import('./graph-workflows');
+        await seedGraphWorkflows(graphFlows);
+      }
+    }
+
     // Register workers for active YAML (deterministic) workflows
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }

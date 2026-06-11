@@ -147,6 +147,43 @@ npx ltc compile workflows/
 
 The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
 
+## Register a graph flow by hand
+
+You don't need the compiler or an API key to author a graph flow — `graphWorkflows` is the graph-form peer of `workers`. Hand-author the HotMesh YAML and it's created, deployed, and activated at startup. This hello-world greets a name with no worker, no MCP, no LLM — just mapping:
+
+```typescript
+const lt = await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  graphWorkflows: [{
+    name: 'hello_world',
+    namespace: 'graph',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+    yaml: `
+app:
+  id: graph
+  version: '1'
+  graphs:
+    - subscribes: hello_world
+      publishes: hello_world.done
+      input:  { schema: { type: object, properties: { name: { type: string } } } }
+      output: { schema: { type: object, properties: { greeting: { type: string } } } }
+      activities:
+        trigger:
+          type: trigger
+          job:
+            maps:
+              greeting:
+                '@pipe':
+                  - ['Hello, ', '{$self.input.data.name}', '!']
+                  - ['{@string.concat}']
+      transitions: {}
+`,
+  }],
+});
+```
+
+It appears under **Do This Do That › Graph** and runs the same way a procedural workflow does — durable, transactional, invocable from the dashboard or API.
+
 ## Full configuration
 
 ```typescript
@@ -155,6 +192,7 @@ const lt = await start({
   workers: [{ taskQueue: 'default', workflow: reviewContent }],
 
   // Everything below is optional
+  graphWorkflows: [{ name: 'hello_world', namespace: 'graph', yaml: helloWorldYaml }],
   seed: { admin: { externalId: 'admin', password: process.env.ADMIN_PASSWORD } },
   mcp: { server: { enabled: true }, serverFactories: { 'my-tools': createMyToolsServer } },
   escalation: { strategy: 'mcp' },
