@@ -68,7 +68,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Pipeline Tools" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
+        <PageHeader title="Graph Flows" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -83,17 +83,19 @@ export function YamlWorkflowsPage() {
   return (
     <div>
       <PageHeader
-        title="Pipeline Tools"
+        title="Graph Flows"
         docsHash="#docs:dashboard.md:mcp-pipeline-tools"
         actions={
           <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
-            Design Pipeline
+            Design Flow
           </button>
         }
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DAG that the router discovers and invokes automatically.
+        The compiled form of a durable workflow — same guarantees, ~3x faster, less to read.
+        Each flow is a graph the router discovers and runs on demand. Run or schedule one below,
+        or design a new one from a description.
       </p>
 
       <FilterBar>

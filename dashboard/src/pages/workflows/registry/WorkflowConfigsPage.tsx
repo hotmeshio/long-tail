@@ -197,6 +197,11 @@ export function WorkflowConfigsPage() {
         }
       />
 
+      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
+        Procedural flows — durable workflows written as readable TypeScript. Register one here to
+        make it invocable and to route its escalations through RBAC roles.
+      </p>
+
       <FilterBar>
         <input
           type="text"

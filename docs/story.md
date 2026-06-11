@@ -116,16 +116,16 @@ Automation
 
 Each capability shows who uses it: which agents, which pipelines, which workflows. Click one and see its schema, its compile hints, its execution history. This is the **institutional memory map** — it tells you what your organization has taught this system to do.
 
-### Build: How It Works
+### Do This Do That: How It Works
 
-The engineering backstage. Everything that exists today, reorganized:
+The orchestration backstage — the same durable workflow, offered two ways:
 
-- **Workflows** — durable TypeScript workflows, config, invocation, executions
-- **Pipelines** — compiled YAML DAGs, plan/build/compose, pipeline executions
-- **Servers & Tools** — MCP server registry, tool manifests, try-tool panel
-- **Designer** — the six-step compilation wizard
+- **Procedural** — readable, Temporal-like TypeScript. Configure it, invoke it, watch its executions. Emulated atop the graph: cheap to maintain, heavier to run.
+- **Graph** — that same workflow as a compiled, deterministic DAG. Same guarantees, roughly 3x faster, less to read. Run or schedule it; the router discovers it and pulls the work when it's healthy to.
 
-Engineers move freely between these. They see execution traces, YAML DAGs, durable cycle replay, swimlane timelines. Nothing is hidden. The technical depth is the product.
+Every procedural pattern has a graph equivalent and the reverse, so the choice is readability or speed — never durability, escalation, or transactional safety. Engineers move freely between them: execution traces, durable cycle replay, swimlane timelines. Nothing is hidden. The technical depth is the product.
+
+**Design** sits alongside as an optional add-on. With an Anthropic key, the Designer turns a description — or a recorded run of MCP tools — into a graph flow. Without a key, procedural and graph orchestration stand on their own, no tradeoff.
 
 ### Storage: What's Remembered
 
@@ -151,6 +151,8 @@ The event spine is NATS. Clean pub/sub. Topic-based routing. No polling. The das
 
 This is what makes the system feel alive. It's not cron-only (check every hour). It's reactive (respond when something happens). Agents that react are faster, cheaper, and more natural than agents that poll.
 
+And though orchestration *feels* top-down — you invoke a flow, it drives the steps — execution is pull-based underneath. A flexible fleet of routers consumes work as a quorum, adapting their draw to find the healthiest throughput the database can sustain. That's how back-pressure is solved without anyone configuring it. NATS is the in-memory adjunct: it filters millions of events down to the ones that matter, and idempotent request handling guarantees exactly one workflow runs in response to each. Choreography this rich starts to look like orchestration — and orchestration, underneath, is just disciplined choreography.
+
 ---
 
 ## The Transition
@@ -159,7 +161,7 @@ The beautiful thing about this system is that it doesn't require a "big bang." I
 
 **Week 1:** An engineer adds activities and a workflow. Old school. Works great.
 
-**Week 2:** Someone discovers the pipeline designer. Compiles a dynamic workflow into a tool. Faster, no tokens.
+**Week 2:** Someone discovers the Designer. Compiles a working run into a graph flow. Faster, no tokens.
 
 **Week 3:** A product manager creates their first agent from a conversation. It runs on a schedule.
 
@@ -167,7 +169,9 @@ The beautiful thing about this system is that it doesn't require a "big bang." I
 
 **Month 3:** The system has 40 compiled tools, 8 agents, and 3 active knowledge domains. 94% of executions are deterministic. Cost has dropped. Reliability has increased. The team has institutional memory encoded in executable tools that survive personnel changes.
 
-**Month 6:** A new team member asks: "How do we handle the Aetna prior-auth process?" The answer isn't a wiki page. It's a compiled pipeline they can run, inspect, and modify. The knowledge is alive.
+**Month 6:** A new team member asks: "How do we handle the Aetna prior-auth process?" The answer isn't a wiki page. It's a compiled flow they can run, inspect, and modify. The knowledge is alive.
+
+**The turn:** none of this was built for AI — it was built for a human-only team. But every activity was authored as an MCP tool: schema-backed with Zod, discoverable, composable. Every compiled flow is itself an MCP server. So the same reflexive API the dashboard calls is open to an LLM under the same RBAC — a service account with exactly the access a person has. Claiming and resolving an escalation is just another tool call. The human-only core becomes the seed: humans first, then humans and AI sharing one set of tools, and eventually work that resolves itself. Nothing about the plumbing changes — only who pulls the next task.
 
 ---
 

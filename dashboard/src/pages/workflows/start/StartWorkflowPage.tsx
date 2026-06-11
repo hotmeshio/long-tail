@@ -109,6 +109,11 @@ export function StartWorkflowPage() {
         actions={<ModeToggle mode={mode} onChange={setMode} />}
       />
 
+      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
+        Start or schedule a Procedural flow — a durable workflow that checkpoints every step and
+        resumes where it left off. The Graph form of the same work runs under Do This Do That › Graph.
+      </p>
+
       {invocableConfigs.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-sm text-text-primary mb-1">No invocable workflows</p>

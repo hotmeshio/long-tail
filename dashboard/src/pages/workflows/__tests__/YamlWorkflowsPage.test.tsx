@@ -76,12 +76,12 @@ beforeEach(() => {
 describe('YamlWorkflowsPage', () => {
   it('renders page header', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByRole('heading', { name: 'Pipeline Tools' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Graph Flows' })).toBeInTheDocument();
   });
 
   it('renders description text', () => {
     render(<YamlWorkflowsPage />, { wrapper });
-    expect(screen.getByText(/Deterministic tools compiled from dynamic MCP executions/)).toBeInTheDocument();
+    expect(screen.getByText(/The compiled form of a durable workflow/)).toBeInTheDocument();
   });
 
   it('groups workflows by app_id as server rows', () => {
