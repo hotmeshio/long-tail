@@ -24,11 +24,8 @@ import { getExposureConfig } from '../services/mcp/exposure';
 
 const router = Router();
 
-// All MCP endpoint requests require authentication
-router.use(requireAuth);
-
 // POST /mcp — JSON-RPC messages
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const exposure = getExposureConfig();
     const callerScopes = (req.auth as any)?.scopes as string[] | undefined;
@@ -58,7 +55,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /mcp — SSE stream (not supported in stateless mode)
-router.get('/', (_req, res) => {
+router.get('/', requireAuth, (_req, res) => {
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Method not allowed. Use POST for stateless requests.' },
@@ -67,7 +64,7 @@ router.get('/', (_req, res) => {
 });
 
 // DELETE /mcp — session close (not supported in stateless mode)
-router.delete('/', (_req, res) => {
+router.delete('/', requireAuth, (_req, res) => {
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Method not allowed. Stateless mode has no sessions.' },

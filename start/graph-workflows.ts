@@ -33,7 +33,7 @@ export async function seedGraphWorkflows(configs: LTGraphWorkflowConfig[]): Prom
         yaml_content: gf.yaml,
         input_schema: gf.inputSchema,
         output_schema: gf.outputSchema,
-        app_id: gf.namespace,
+        app_id: namespace,
         tags: gf.tags,
       });
 
