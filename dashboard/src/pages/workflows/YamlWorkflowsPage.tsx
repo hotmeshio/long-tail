@@ -1,74 +1,39 @@
-import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Wand2, Workflow } from 'lucide-react';
 import { useYamlWorkflows } from '../../api/yaml-workflows';
-import { useWorkflowSets } from '../../api/workflow-sets';
+import { useSettings } from '../../api/settings';
 import { useFilterParams } from '../../hooks/useFilterParams';
-import { useExpandedRows } from '../../hooks/useExpandedRows';
 
-import { Wand2 } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { EmptyState } from '../../components/common/display/EmptyState';
-import { WorkflowTestPanel } from '../../components/common/test/WorkflowTestPanel';
-import { CronPanel } from '../../components/common/test/CronPanel';
-import { groupByAppId, matchesSearch, filterTools } from './yaml-helpers';
-import { ServerRow } from './yaml-workflow-rows';
-import type { LTYamlWorkflowRecord } from '../../api/types';
+import { ToolPill } from '../../components/common/display/ToolPill';
+import { NamespacePill } from '../../components/common/display/NamespacePill';
+import { StatusBadge } from '../../components/common/display/StatusBadge';
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Page: Graph › Configure ─────────────────────────────────────────────────
 
 export function YamlWorkflowsPage() {
   const navigate = useNavigate();
+  const { data: settings } = useSettings();
+  const aiEnabled = !!settings?.ai?.enabled;
   const { filters, setFilter } = useFilterParams({
-    filters: { status: '', server: '', search: '' },
+    filters: { status: '', search: '' },
   });
 
-  // Fetch a larger page to get all workflows for grouping
   const { data, isLoading } = useYamlWorkflows({
     status: (filters.status || undefined) as any,
-    app_id: filters.server || undefined,
     search: filters.search || undefined,
     limit: 200,
     offset: 0,
   });
 
-  const workflows = data?.workflows ?? [];
-
-  // Fetch workflow sets to resolve workbench links (set_id → planner workflow ID)
-  const { data: setsData } = useWorkflowSets({ limit: 100 });
-  const setSourceMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of setsData?.sets ?? []) {
-      if (s.source_workflow_id) map.set(s.id, s.source_workflow_id);
-    }
-    return map;
-  }, [setsData?.sets]);
-
-  const servers = useMemo(() => groupByAppId(workflows), [workflows]);
-
-  // Build server options from unfiltered results; re-derive when status/search change
-  const serverOptions = useMemo(() => {
-    const ids = [...new Set(workflows.map((wf) => wf.app_id))].sort();
-    return ids.map((id) => ({ value: id, label: id }));
-  }, [workflows]);
-
-  // Client-side search filtering for tool-level matches within expanded rows
-  const filteredServers = useMemo(() => {
-    if (!filters.search) return servers;
-    return servers.filter((s) => matchesSearch(s, filters.search));
-  }, [servers, filters.search]);
-
-  const { expandedIds, toggle: toggleExpand } = useExpandedRows('lt:expanded:yaml-workflows');
-  const [tryWorkflow, setTryWorkflow] = useState<LTYamlWorkflowRecord | null>(null);
-  const [cronWorkflow, setCronWorkflow] = useState<LTYamlWorkflowRecord | null>(null);
-
-  // Active sidebar: test panel or cron panel (mutually exclusive)
-  const sidebarWorkflow = tryWorkflow || cronWorkflow;
+  const flows = data?.workflows ?? [];
 
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Pipeline Tools" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
+        <PageHeader title="Configure" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -83,17 +48,21 @@ export function YamlWorkflowsPage() {
   return (
     <div>
       <PageHeader
-        title="Pipeline Tools"
+        title="Configure"
         docsHash="#docs:dashboard.md:mcp-pipeline-tools"
         actions={
-          <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
-            Design Pipeline
-          </button>
+          aiEnabled ? (
+            <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">
+              Design Flow
+            </button>
+          ) : undefined
         }
       />
 
       <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DAG that the router discovers and invokes automatically.
+        The compiled form of a durable workflow — the same guarantees at roughly 3× the speed. Each
+        flow is a graph the router discovers and runs on demand. Open one to inspect or run it
+        {aiEnabled ? ', or design a new one from a description.' : '.'}
       </p>
 
       <FilterBar>
@@ -101,16 +70,8 @@ export function YamlWorkflowsPage() {
           label="Search"
           value={filters.search}
           onChange={(v) => setFilter('search', v)}
-          placeholder="Server or tool name…"
+          placeholder="Flow or namespace…"
         />
-        {serverOptions.length > 1 && (
-          <FilterSelect
-            label="Server"
-            value={filters.server}
-            onChange={(v) => setFilter('server', v)}
-            options={serverOptions}
-          />
-        )}
         <FilterSelect
           label="Status"
           value={filters.status}
@@ -124,71 +85,67 @@ export function YamlWorkflowsPage() {
         />
       </FilterBar>
 
-      <div className="flex gap-0">
-        <div className={`${sidebarWorkflow ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
-          {filteredServers.length === 0 ? (
-            <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
-              <EmptyState icon={Wand2} title="No pipelines yet" description="Click to open the MCP Tool Designer and create your first deterministic tool." />
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
-                    Server / Tool
-                  </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-20">
-                    Version
-                  </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
-                    Status
-                  </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface w-16" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredServers.map((server) => (
-                  <ServerRow
-                    key={server.appId}
-                    server={server}
-                    expanded={expandedIds.has(server.appId)}
-                    onToggle={() => toggleExpand(server.appId)}
-                    onTryTool={(wf) => { setCronWorkflow(null); setTryWorkflow(wf); }}
-                    onWorkbench={() => {
-                      if (server.setId) {
-                        const plannerWfId = setSourceMap.get(server.setId);
-                        if (plannerWfId) {
-                          navigate(`/mcp/queries/${plannerWfId}?mode=plan&set_id=${server.setId}&step=2`);
-                        }
-                      }
-                    }}
-                    onCron={(wf) => { setTryWorkflow(null); setCronWorkflow(wf); }}
-                    visibleTools={filterTools(server.workflows, filters.search)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {tryWorkflow && (
-          <div className="w-[380px] shrink-0 sticky top-0 max-h-screen overflow-y-auto">
-            <WorkflowTestPanel
-              workflow={tryWorkflow}
-              onClose={() => setTryWorkflow(null)}
+      {flows.length === 0 ? (
+        aiEnabled ? (
+          <div className="cursor-pointer" onClick={() => navigate('/mcp/queries/new')}>
+            <EmptyState
+              icon={Wand2}
+              title="No graph flows yet"
+              description="Open the Designer to compile your first flow from a description, or register flows at startup with the graphWorkflows config."
             />
           </div>
-        )}
-
-        {cronWorkflow && (
-          <div className="w-[380px] shrink-0 sticky top-0 max-h-screen overflow-y-auto">
-            <CronPanel
-              workflow={cronWorkflow}
-              onClose={() => setCronWorkflow(null)}
-            />
-          </div>
-        )}
-      </div>
+        ) : (
+          <EmptyState
+            icon={Workflow}
+            title="No graph flows yet"
+            description="Register graph flows at startup with the graphWorkflows config — see the docs for an example."
+          />
+        )
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b">
+              <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                Flow
+              </th>
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-40">
+                Namespace
+              </th>
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-20">
+                Version
+              </th>
+              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {flows.map((flow) => (
+              <tr
+                key={flow.id}
+                onClick={() => navigate(`/mcp/workflows/${flow.id}`)}
+                className="border-b border-surface-border/50 hover:bg-surface-hover/40 transition-colors duration-100 cursor-pointer"
+              >
+                <td className="px-6 py-2.5">
+                  <ToolPill name={flow.graph_topic} size="md" />
+                  {flow.description && (
+                    <p className="text-[11px] leading-snug text-text-quaternary mt-0.5">{flow.description}</p>
+                  )}
+                </td>
+                <td className="px-4 py-2.5">
+                  <NamespacePill namespace={flow.app_id} />
+                </td>
+                <td className="px-4 py-2.5 text-[10px] text-text-quaternary font-mono whitespace-nowrap">
+                  v{flow.content_version}
+                </td>
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  <StatusBadge status={flow.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

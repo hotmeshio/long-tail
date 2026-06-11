@@ -146,7 +146,7 @@ export default function WorkflowBuilderPage() {
       {showComposer && (
         <div className="mb-6 rounded-lg border border-surface-border bg-surface-raised p-4">
           <p className="text-sm text-text-secondary mb-3">
-            Describe the workflow you want to build. The LLM will discover available tools and construct a HotMesh YAML DAG directly.
+            Describe the workflow you want to build. The AI will discover available tools and construct a graph flow.
           </p>
           <textarea
             value={promptText}

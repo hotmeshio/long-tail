@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Play, Clock } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useWorkflowConfigs, useDiscoveredWorkflows, useCronStatus } from '../../../api/workflows';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
-import { ModeToggle } from './ModeToggle';
-import type { Mode } from './ModeToggle';
 import { WorkflowSelector } from './WorkflowSelector';
 import { StartNowPanel } from './StartNowPanel';
-import { SchedulePanel } from './SchedulePanel';
 
 export function StartWorkflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,7 +13,6 @@ export function StartWorkflowPage() {
   const { data: discoveredData, isLoading: discoveredLoading } = useDiscoveredWorkflows();
   const { data: cronEntries } = useCronStatus();
 
-  const mode = (searchParams.get('mode') as Mode) || 'now';
   const selectedType = searchParams.get('type') ?? '';
 
   const configs: LTWorkflowConfig[] = configsData ?? [];
@@ -60,36 +56,29 @@ export function StartWorkflowPage() {
 
   const executionsPath = '/workflows/executions';
 
-  // Fade transition when selection or mode changes
+  // Fade transition when selection changes
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelVisible, setPanelVisible] = useState(true);
-  const panelKey = `${selectedType}:${mode}`;
-  const prevKeyRef = useRef(panelKey);
+  const prevKeyRef = useRef(selectedType);
   useEffect(() => {
-    if (prevKeyRef.current !== panelKey) {
+    if (prevKeyRef.current !== selectedType) {
       setPanelVisible(false);
       const timer = setTimeout(() => {
-        prevKeyRef.current = panelKey;
+        prevKeyRef.current = selectedType;
         setPanelVisible(true);
       }, 120);
       return () => clearTimeout(timer);
     }
-  }, [panelKey]);
+  }, [selectedType]);
 
   useEffect(() => {
     if (invocableConfigs.length === 1 && !searchParams.get('type')) {
-      setSearchParams({ type: invocableConfigs[0].workflow_type, mode }, { replace: true });
+      setSearchParams({ type: invocableConfigs[0].workflow_type }, { replace: true });
     }
   }, [invocableConfigs.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setMode = (m: Mode) => {
-    const params: Record<string, string> = { mode: m };
-    if (selectedType) params.type = selectedType;
-    setSearchParams(params, { replace: true });
-  };
-
   const handleSelect = (config: LTWorkflowConfig) => {
-    setSearchParams({ type: config.workflow_type, mode }, { replace: true });
+    setSearchParams({ type: config.workflow_type }, { replace: true });
   };
 
   if (isLoading || discoveredLoading) {
@@ -103,11 +92,12 @@ export function StartWorkflowPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Invoke"
-        docsHash="#docs:dashboard.md:invoke-workflow"
-        actions={<ModeToggle mode={mode} onChange={setMode} />}
-      />
+      <PageHeader title="Invoke" docsHash="#docs:dashboard.md:invoke-workflow" />
+
+      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
+        Start a Procedural flow — a durable workflow that checkpoints every step and resumes where it
+        left off. The same work runs in compiled form under Orchestrate › Graph.
+      </p>
 
       {invocableConfigs.length === 0 ? (
         <div className="py-16 text-center">
@@ -131,26 +121,14 @@ export function StartWorkflowPage() {
             }`}
           >
             {selectedType && selectedConfig ? (
-              mode === 'now' ? (
-                <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
-              ) : (
-                <SchedulePanel selected={selectedConfig} activeTypes={activeTypes} />
-              )
+              <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
             ) : (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-12 h-12 rounded-full bg-accent/[0.06] flex items-center justify-center mb-4">
-                  {mode === 'schedule'
-                    ? <Clock className="w-5 h-5 text-accent/50" />
-                    : <Play className="w-5 h-5 text-accent/50" />}
+                  <Play className="w-5 h-5 text-accent/50" />
                 </div>
-                <p className="text-sm text-text-secondary mb-1">
-                  {mode === 'schedule' ? 'Schedule' : 'Invoke'}
-                </p>
-                <p className="text-xs text-text-quaternary">
-                  {mode === 'schedule'
-                    ? 'Choose a workflow to configure its schedule'
-                    : 'Choose a workflow to get started'}
-                </p>
+                <p className="text-sm text-text-secondary mb-1">Invoke</p>
+                <p className="text-xs text-text-quaternary">Choose a workflow to get started</p>
               </div>
             )}
           </div>

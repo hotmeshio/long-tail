@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   Search, Play,
   MessageSquare, Eye, Database, Cog, Code2, Shield, BookOpen,
-  LayoutGrid, Image,
+  LayoutGrid, Image, Zap,
 } from 'lucide-react';
 import { useCapabilities, type CapabilityTool } from '../../api/capabilities';
 import { ToolTestPanel } from '../../components/common/test/ToolTestPanel';
@@ -11,18 +11,18 @@ import { ServerName } from '../../components/common/display/ServerName';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import type { LucideIcon } from 'lucide-react';
 
-// ── Category icons + colors ─────────────────────────────────────────────────
+// ── Category meta ─────────────────────────────────────────────────────────────
 
 const CATEGORY_META: Record<string, { icon: LucideIcon; color: string }> = {
   Communication: { icon: MessageSquare, color: 'text-blue-400' },
-  Analysis:      { icon: Eye,            color: 'text-violet-400' },
-  Media:         { icon: Image,          color: 'text-pink-400' },
-  Data:          { icon: Database,       color: 'text-emerald-400' },
-  Automation:    { icon: Cog,            color: 'text-amber-400' },
-  Development:   { icon: Code2,          color: 'text-cyan-400' },
-  System:        { icon: Shield,         color: 'text-red-400' },
-  Reference:     { icon: BookOpen,       color: 'text-text-tertiary' },
-  Other:         { icon: LayoutGrid,     color: 'text-text-tertiary' },
+  Analysis:      { icon: Eye,           color: 'text-violet-400' },
+  Media:         { icon: Image,         color: 'text-pink-400' },
+  Data:          { icon: Database,      color: 'text-emerald-400' },
+  Automation:    { icon: Cog,           color: 'text-amber-400' },
+  Development:   { icon: Code2,         color: 'text-cyan-400' },
+  System:        { icon: Shield,        color: 'text-red-400' },
+  Reference:     { icon: BookOpen,      color: 'text-text-tertiary' },
+  Other:         { icon: LayoutGrid,    color: 'text-text-tertiary' },
 };
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export function CapabilitiesPage() {
   const { data, isLoading } = useCapabilities();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [tryTool, setTryTool] = useState<{
+  const [selected, setSelected] = useState<{
     serverId: string;
     serverName: string;
     tool: { name: string; description: string; inputSchema: Record<string, any> };
@@ -40,12 +40,9 @@ export function CapabilitiesPage() {
   const categories = data?.categories ?? [];
   const totalTools = data?.totalTools ?? 0;
 
-  // Filter by active category + search term
   const filtered = useMemo(() => {
     let cats = categories;
-    if (activeCategory) {
-      cats = cats.filter((c) => c.name === activeCategory);
-    }
+    if (activeCategory) cats = cats.filter((c) => c.name === activeCategory);
     if (!search.trim()) return cats;
     const q = search.toLowerCase();
     return cats
@@ -65,7 +62,7 @@ export function CapabilitiesPage() {
     <div>
       <PageHeader title="Capabilities" />
 
-      {/* Filter row: category icons + search */}
+      {/* Category tabs + search */}
       {!isLoading && categories.length > 0 && (
         <div className="flex items-center gap-5 mb-10">
           <button
@@ -101,24 +98,30 @@ export function CapabilitiesPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${totalTools} capabilities...`}
+              placeholder={`Search ${totalTools} capabilities…`}
               className="pl-9 pr-3 py-1.5 text-sm bg-surface-sunken border border-surface-border rounded-md text-text-primary placeholder:text-text-quaternary focus:outline-none focus:ring-1 focus:ring-accent/50 w-56"
             />
           </div>
         </div>
       )}
 
-      <div className="flex gap-0">
-        {/* Main content */}
-        <div className={`${tryTool ? 'flex-1 min-w-0' : 'w-full'} transition-all`}>
+      {/* Two-panel grid — list always shares space with the run panel */}
+      <div className="grid grid-cols-3 gap-8 items-start">
+
+        {/* ── Left: capability list (2 cols) ── */}
+        <div className="col-span-2">
           {isLoading ? (
-            <div className="animate-pulse space-y-6">
+            <div className="animate-pulse space-y-8">
               {[1, 2, 3].map((i) => (
                 <div key={i}>
-                  <div className="h-5 bg-surface-sunken rounded w-32 mb-4" />
-                  <div className="space-y-2">
-                    <div className="h-4 bg-surface-sunken rounded w-full" />
-                    <div className="h-4 bg-surface-sunken rounded w-3/4" />
+                  <div className="h-4 bg-surface-sunken rounded w-28 mb-4" />
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((j) => (
+                      <div key={j} className="space-y-1.5">
+                        <div className="h-4 bg-surface-sunken rounded w-36" />
+                        <div className="h-3 bg-surface-sunken rounded w-full" />
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -134,19 +137,19 @@ export function CapabilitiesPage() {
                 const Icon = meta.icon;
                 return (
                   <div key={category.name}>
-                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-surface-border">
-                      <Icon className={`w-4.5 h-4.5 ${meta.color}`} strokeWidth={1.5} />
-                      <h2 className="text-sm font-semibold uppercase tracking-widest text-accent/80">{category.name}</h2>
+                    <div className="flex items-center gap-2 mb-1 pb-2 border-b border-surface-border">
+                      <Icon className={`w-4 h-4 ${meta.color}`} strokeWidth={1.5} />
+                      <h2 className="text-xs font-semibold uppercase tracking-widest text-accent/80">{category.name}</h2>
                       <span className="text-xs text-text-quaternary">{category.tools.length}</span>
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="divide-y divide-surface-border/30">
                       {category.tools.map((tool) => (
                         <ToolRow
                           key={`${tool.serverId}-${tool.name}`}
                           tool={tool}
-
-                          onTry={() =>
-                            setTryTool({
+                          isSelected={selected?.tool.name === tool.name && selected?.serverId === tool.serverId}
+                          onSelect={() =>
+                            setSelected({
                               serverId: tool.serverId,
                               serverName: tool.serverName,
                               tool: { name: tool.name, description: tool.description, inputSchema: tool.inputSchema },
@@ -162,63 +165,73 @@ export function CapabilitiesPage() {
           )}
         </div>
 
-        {/* Try tool panel — sticky right sidebar */}
-        {tryTool && (
-          <div className="w-[380px] shrink-0 sticky top-0 max-h-screen overflow-y-auto">
+        {/* ── Right: run panel (1 col, sticky) ── */}
+        <div className="sticky top-4">
+          {selected ? (
             <ToolTestPanel
-              serverId={tryTool.serverId}
-              serverName={tryTool.serverName}
-              tool={tryTool.tool}
-              onClose={() => setTryTool(null)}
+              serverId={selected.serverId}
+              serverName={selected.serverName}
+              tool={selected.tool}
+              onClose={() => setSelected(null)}
             />
-          </div>
-        )}
+          ) : (
+            <EmptyRunPanel />
+          )}
+        </div>
+
       </div>
     </div>
   );
 }
 
-// ── Tool Row ────────────────────────────────────────────────────────────────
+// ── Empty run panel ──────────────────────────────────────────────────────────
+
+function EmptyRunPanel() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+      <Zap className="w-7 h-7 text-text-quaternary" strokeWidth={1} />
+      <p className="text-sm text-text-tertiary">Select a capability</p>
+      <p className="text-xs text-text-quaternary leading-relaxed max-w-[200px]">
+        Explore its inputs, run it live, and inspect the response.
+      </p>
+    </div>
+  );
+}
+
+// ── Tool row ─────────────────────────────────────────────────────────────────
 
 function ToolRow({
   tool,
-  onTry,
+  isSelected,
+  onSelect,
 }: {
   tool: CapabilityTool;
-  onTry: () => void;
+  isSelected: boolean;
+  onSelect: () => void;
 }) {
-  const params = Object.keys(tool.inputSchema?.properties ?? {});
-
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onTry}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTry(); }}
-      className="group w-full py-2 px-2 rounded-md hover:bg-surface-hover transition-colors text-left flex gap-4 items-start cursor-pointer"
+      onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}
+      className={`group py-3 px-3 -mx-3 rounded-md cursor-pointer transition-colors text-left ${
+        isSelected ? 'bg-accent/[0.06]' : 'hover:bg-surface-hover/60'
+      }`}
     >
-      {/* Col 1: tool name — wider */}
-      <div className="w-56 shrink-0">
+      <div className="flex items-center justify-between gap-3 mb-1">
         <ToolPill name={tool.name} size="md" />
+        <div className="flex items-center gap-2 shrink-0">
+          <ServerName name={tool.serverName} serverId={tool.serverId} />
+          <Play
+            className={`w-3 h-3 transition-opacity ${isSelected ? 'text-accent opacity-100' : 'text-accent opacity-0 group-hover:opacity-100'}`}
+            strokeWidth={1.5}
+          />
+        </div>
       </div>
-      {/* Col 2: params — inline with middot delimiter */}
-      <div className="w-44 shrink-0 pt-0.5">
-        {params.length > 0 && (
-          <p className="text-[9px] font-mono text-text-quaternary/70 leading-relaxed">
-            {params.map((p, i) => i < params.length - 1
-              ? <span key={p}><span className="whitespace-nowrap">{p} ·</span> </span>
-              : <span key={p}>{p}</span>
-            )}
-          </p>
-        )}
-      </div>
-      {/* Col 3: description — takes remaining */}
-      <p className="text-[11px] text-text-tertiary leading-relaxed flex-1 pt-0.5">{tool.description}</p>
-      {/* Col 4: server */}
-      <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
-        <ServerName name={tool.serverName} serverId={tool.serverId} />
-        <Play className="w-2.5 h-2.5 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
+      <p className="text-[11px] text-text-tertiary leading-relaxed line-clamp-2 pl-0.5">
+        {tool.description}
+      </p>
     </div>
   );
 }

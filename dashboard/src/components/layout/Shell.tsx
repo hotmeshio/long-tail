@@ -6,8 +6,8 @@ import { useAccess } from '../../hooks/useAccess';
 import { useSettings } from '../../api/settings';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
-import { WorkSidebar } from './WorkSidebar';
-import { BuildSidebar } from './BuildSidebar';
+import { ChoreographySidebar } from './ChoreographySidebar';
+import { OrchestrationSidebar } from './OrchestrationSidebar';
 import { DesignSidebar } from './DesignSidebar';
 import { StorageSidebar } from './StorageSidebar';
 import { AdminSidebar } from './AdminSidebar';
@@ -61,8 +61,8 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <WorkSidebar aiEnabled={aiEnabled} isBuilder={isBuilder} />
-            {isBuilder && <BuildSidebar />}
+            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} />
+            {isBuilder && <OrchestrationSidebar />}
             {isBuilder && aiEnabled && <DesignSidebar />}
             {isBuilder && <StorageSidebar />}
             {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} />}

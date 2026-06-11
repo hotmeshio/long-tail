@@ -1,6 +1,7 @@
 import { Bot, Clock } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
+import { NamespacePill } from '../../../components/common/display/NamespacePill';
 import type { LTWorkflowConfig } from '../../../api/types';
 import type { WorkflowTier } from '../../../api/types';
 
@@ -37,6 +38,7 @@ export function WorkflowSelector({
             >
               <div className="flex items-center gap-2">
                 <WorkflowPill type={config.workflow_type} size="md" variant={variant} />
+                <NamespacePill namespace="durable" />
                 {activeTypes?.has(config.workflow_type) && (
                   <span title="Cron schedule active"><Clock className="w-3 h-3 text-status-success/70 shrink-0" /></span>
                 )}

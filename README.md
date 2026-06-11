@@ -74,9 +74,11 @@ curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
 
 **Step 3 — React to events.** Workflows publish topics. Agents subscribe. When `activity.failed` fires, an automation can re-run the step, notify a team, or trigger a different workflow. The choreography is dynamic — add subscribers through the dashboard without changing code.
 
-**Step 4 — Compile what repeats.** The Pipeline Designer takes a working execution and compiles it into a deterministic YAML DAG. No LLM at runtime, no replay overhead, typed inputs and outputs. It deploys as a reusable tool that any workflow or API call can invoke.
+**Step 4 — Compile what repeats.** The same workflow has two forms. What you wrote in Step 1 is the *procedural* form — readable, Temporal-like, emulated atop the graph: cheap to maintain, heavier to run. The Designer compiles a working execution into the *graph* form — the same durable workflow as a deterministic DAG: no LLM at runtime, no replay overhead, typed in and out, roughly 3x faster. Every procedural pattern has a graph equivalent and the reverse; you pick readability or speed without giving up durability, escalation, or transactional guarantees. It deploys as a reusable tool that any workflow or API call can invoke.
 
 Over time, the system accumulates compiled tools. Problems that once required a human, then required AI reasoning, eventually require neither.
+
+These four steps map to how the dashboard is organized. **React** is the reactive side (Step 3) — topics, subscriptions, automations. **Orchestrate** is the orchestrated side (Steps 1 and 4) — procedural and graph flows side by side, both durable and pull-based under the hood. **Design** is the optional bridge: with an `ANTHROPIC_API_KEY` it turns a description or a tool run into a graph flow; without one, choreography and orchestration stand on their own, no tradeoff.
 
 ## Register MCP tools
 
@@ -145,6 +147,43 @@ npx ltc compile workflows/
 
 The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
 
+## Register a graph flow by hand
+
+`graphWorkflows` is the graph-form peer of `workers`: hand-author the HotMesh YAML and it's created, deployed, and activated at startup. This hello-world assembles a greeting from the input with a single trigger mapping:
+
+```typescript
+const lt = await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  graphWorkflows: [{
+    name: 'hello_world',
+    namespace: 'graph',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+    yaml: `
+app:
+  id: graph
+  version: '1'
+  graphs:
+    - subscribes: hello_world
+      publishes: hello_world.done
+      input:  { schema: { type: object, properties: { name: { type: string } } } }
+      output: { schema: { type: object, properties: { greeting: { type: string } } } }
+      activities:
+        trigger:
+          type: trigger
+          job:
+            maps:
+              greeting:
+                '@pipe':
+                  - ['Hello, ', '{$self.input.data.name}', '!']
+                  - ['{@string.concat}']
+      transitions: {}
+`,
+  }],
+});
+```
+
+It appears under **Orchestrate › Graph** and runs the same way a procedural workflow does — durable, transactional, invocable from the dashboard or API.
+
 ## Full configuration
 
 ```typescript
@@ -153,6 +192,7 @@ const lt = await start({
   workers: [{ taskQueue: 'default', workflow: reviewContent }],
 
   // Everything below is optional
+  graphWorkflows: [{ name: 'hello_world', namespace: 'graph', yaml: helloWorldYaml }],
   seed: { admin: { externalId: 'admin', password: process.env.ADMIN_PASSWORD } },
   mcp: { server: { enabled: true }, serverFactories: { 'my-tools': createMyToolsServer } },
   escalation: { strategy: 'mcp' },

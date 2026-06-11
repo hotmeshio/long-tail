@@ -129,6 +129,29 @@ export interface LTTopicConfig {
   reset?: boolean;
 }
 
+/**
+ * Declarative graph (YAML/DAG) workflow registered at startup — the graph-form
+ * peer of a `workers` entry (which registers a procedural workflow). Hand-author
+ * the HotMesh YAML; no MCP server or LLM Designer is required. Each flow is
+ * created insert-if-absent, then deployed and activated, and appears under
+ * Orchestrate › Graph in the dashboard.
+ */
+export interface LTGraphWorkflowConfig {
+  /** Tool name (snake_case). Unique within the namespace. */
+  name: string;
+  description?: string;
+  /** Raw HotMesh YAML — an `app:` block with one or more `graphs:`. */
+  yaml: string;
+  /** Namespace / app_id (lowercase alphanumeric). Default: 'graph'. */
+  namespace?: string;
+  /** JSON Schema for the graph's input — pre-fills the dashboard run form. */
+  inputSchema?: Record<string, any>;
+  /** JSON Schema for the graph's output — shown on the detail page. */
+  outputSchema?: Record<string, any>;
+  /** Classification tags for discovery. */
+  tags?: string[];
+}
+
 export interface LTStartConfig {
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
@@ -296,6 +319,13 @@ export interface LTStartConfig {
 
   /** Declarative agent configurations. Seeded on first boot (insert-if-absent). */
   agents?: LTAgentConfig[];
+
+  /**
+   * Declarative graph (YAML/DAG) workflows — the graph-form peer of `workers`.
+   * Each is created (insert-if-absent), deployed, and activated at startup with
+   * no MCP/LLM Designer involved. Hand-author the HotMesh YAML and it runs.
+   */
+  graphWorkflows?: LTGraphWorkflowConfig[];
 
   /** MCP (Model Context Protocol) integration. */
   mcp?: {

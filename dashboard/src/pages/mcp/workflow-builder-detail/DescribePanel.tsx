@@ -15,7 +15,7 @@ interface DescribePanelProps {
 
 const BUILD_PHASES = [
   { icon: Server, label: 'Discovering MCP servers and tools', key: 'discover' },
-  { icon: Cpu, label: 'LLM constructing YAML pipeline', key: 'build' },
+  { icon: Cpu, label: 'Building graph flow', key: 'build' },
   { icon: FileCode, label: 'Validating workflow structure', key: 'validate' },
 ];
 
@@ -73,7 +73,7 @@ export function DescribePanel({ workflowId, status, builderData, onBuilt, onNext
           : isBuilding
           ? 'Building your workflow — this typically takes 20-40 seconds.'
           : isComplete
-          ? 'Pipeline constructed — YAML definition, input schema, and activity manifest generated.'
+          ? 'Graph flow ready — input schema and activity manifest generated.'
           : isFailed
           ? 'Build failed. Try a more specific prompt or use Discover & Compile mode.'
           : 'Workflow build submitted.'}

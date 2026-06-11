@@ -14,8 +14,11 @@ export interface ActivityStep {
 }
 
 /**
- * Subscribe to activity events for a specific YAML workflow job.
- * Returns live step progress as events arrive.
+ * Subscribe to activity and workflow lifecycle events for a specific graph job.
+ * Returns live step progress and overall workflow status.
+ *
+ * Hook-only flows (no worker activities) produce no activity events, so
+ * isComplete/isFailed is derived from workflow.completed/failed events instead.
  */
 export function useYamlActivityEvents(jobId: string | null): {
   steps: ActivityStep[];
@@ -23,15 +26,18 @@ export function useYamlActivityEvents(jobId: string | null): {
   isFailed: boolean;
 } {
   const [steps, setSteps] = useState<ActivityStep[]>([]);
+  const [workflowStatus, setWorkflowStatus] = useState<'idle' | 'completed' | 'failed'>('idle');
 
-  const handler = useCallback((event: any) => {
+  const activityHandler = useCallback((event: any) => {
     if (!jobId || event.workflowId !== jobId) return;
-    const category = event.type?.split('.')[0];
-    if (category !== 'activity') return;
+    // event.type is the full topic: 'system.activity.{wfId}.{name}.{action}'
+    const parts = (event.type as string | undefined)?.split('.') ?? [];
+    if (parts[1] !== 'activity') return;
 
     const activityId = event.activityName as string;
     const data = event.data as Record<string, any> | undefined;
-    const eventType = event.type as string;
+    // Normalise to short form for comparisons below (e.g. 'activity.started')
+    const eventType = `activity.${parts[parts.length - 1]}`;
 
     setSteps((prev) => {
       const existing = prev.find((s) => s.activityId === activityId);
@@ -63,13 +69,28 @@ export function useYamlActivityEvents(jobId: string | null): {
     });
   }, [jobId]);
 
+  const workflowHandler = useCallback((event: any) => {
+    if (!jobId || event.workflowId !== jobId) return;
+    // event.type is the full topic: 'system.workflow.{wfId}.{action}'
+    const action = (event.type as string | undefined)?.split('.').pop();
+    if (action === 'completed') setWorkflowStatus('completed');
+    if (action === 'failed') setWorkflowStatus('failed');
+  }, [jobId]);
+
   useEventSubscription(
     jobId ? `${NATS_SUBJECT_PREFIX}.system.activity.>` : '',
-    handler,
+    activityHandler,
+  );
+  useEventSubscription(
+    jobId ? `${NATS_SUBJECT_PREFIX}.system.workflow.>` : '',
+    workflowHandler,
   );
 
-  const isComplete = steps.length > 0 && steps.every((s) => s.status === 'completed' || s.status === 'failed');
-  const isFailed = steps.some((s) => s.status === 'failed');
+  const stepsComplete = steps.length > 0 && steps.every((s) => s.status === 'completed' || s.status === 'failed');
+  const stepsFailed = steps.some((s) => s.status === 'failed');
+
+  const isComplete = stepsComplete || workflowStatus === 'completed';
+  const isFailed = stepsFailed || workflowStatus === 'failed';
 
   return { steps, isComplete, isFailed };
 }

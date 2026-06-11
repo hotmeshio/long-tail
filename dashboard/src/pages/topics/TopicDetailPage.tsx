@@ -193,36 +193,31 @@ export function TopicDetailPage() {
         </div>
       </div>
 
-      {/* ── Three-column layout: Payloads | Activity (pub/sub) ─── */}
+      {/* ── Three-column layout: Schema | Example | Test ─── */}
       {!editing && (
-        <div className="flex gap-5">
-          {/* Left — Payloads */}
-          <div className="flex-1 min-w-0">
-            {(topic.payload_schema || topic.example_payload) ? (
-              <div className={`grid gap-5 ${topic.payload_schema && topic.example_payload ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                {topic.payload_schema && (
-                  <div className="min-w-0">
-                    <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
-                    <JsonViewer data={topic.payload_schema} />
-                  </div>
-                )}
-                {topic.example_payload && (
-                  <div className="min-w-0">
-                    <SectionHeader icon={Braces} color="text-cyan-400">Example Payload</SectionHeader>
-                    <JsonViewer data={topic.example_payload} />
-                  </div>
-                )}
-              </div>
+        <div className="grid grid-cols-3 gap-5">
+          {/* Col 1 — Payload Schema */}
+          <div className="min-w-0">
+            <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
+            {topic.payload_schema ? (
+              <JsonViewer data={topic.payload_schema} />
             ) : (
-              <div>
-                <SectionHeader icon={Radio} color="text-accent">Payload Schema</SectionHeader>
-                <p className="text-[11px] text-text-quaternary">No schema defined. Click Edit to add one.</p>
-              </div>
+              <p className="text-[11px] text-text-quaternary">No schema defined. Click Edit to add one.</p>
             )}
           </div>
 
-          {/* Right — Test */}
-          <div className="w-[295px] shrink-0 space-y-4 animate-page-enter">
+          {/* Col 2 — Example Payload */}
+          <div className="min-w-0">
+            <SectionHeader icon={Braces} color="text-cyan-400">Example Payload</SectionHeader>
+            {topic.example_payload ? (
+              <JsonViewer data={topic.example_payload} />
+            ) : (
+              <p className="text-[11px] text-text-quaternary">No example defined. Click Edit to add one.</p>
+            )}
+          </div>
+
+          {/* Col 3 — Test */}
+          <div className="min-w-0 space-y-4 animate-page-enter">
             <SectionHeader icon={FlaskConical} color="text-violet-400">Test</SectionHeader>
             {/* Target Subscribers */}
             <div className="bg-surface-sunken/30 rounded-md px-4 py-3">

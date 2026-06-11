@@ -7,6 +7,7 @@ import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
 import { RequireRole } from './components/layout/RequireRole';
+import { RequireAI } from './components/layout/RequireAI';
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded route sections
@@ -72,6 +73,12 @@ const CertifiedExecutionsPage = lazy(() =>
 );
 const YamlWorkflowsPage = lazy(() =>
   import('./pages/workflows/YamlWorkflowsPage').then((m) => ({ default: m.YamlWorkflowsPage })),
+);
+const GraphInvokePage = lazy(() =>
+  import('./pages/workflows/GraphInvokePage').then((m) => ({ default: m.GraphInvokePage })),
+);
+const YamlWorkflowDetailPage = lazy(() =>
+  import('./pages/workflows/YamlWorkflowDetailPage').then((m) => ({ default: m.YamlWorkflowDetailPage })),
 );
 const TasksListPage = lazy(() =>
   import('./pages/workflows/TasksListPage').then((m) => ({ default: m.TasksListPage })),
@@ -273,14 +280,10 @@ const router = createBrowserRouter([
       {
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
-          { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
-          { path: 'mcp/queries', element: <Lazy><McpQueryPage /></Lazy> },
-          { path: 'mcp/queries/:workflowId', element: <Lazy><McpQueryDetailPage /></Lazy> },
-          { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
-          { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
-          { path: 'mcp/servers/new', element: <Lazy><McpServerDetailPage /></Lazy> },
-          { path: 'mcp/servers/:serverId', element: <Lazy><McpServerDetailPage /></Lazy> },
+          // Graph flows + executions — durable orchestration, available without an AI key
           { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+          { path: 'mcp/workflows/invoke', element: <Lazy><GraphInvokePage /></Lazy> },
+          { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
           { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
           { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
 
@@ -289,6 +292,21 @@ const router = createBrowserRouter([
 
           // Knowledge section
           { path: 'knowledge', element: <Lazy><KnowledgePage /></Lazy> },
+
+          // Design — the LLM authoring add-on. Hidden from nav and unreachable
+          // by URL unless an Anthropic key is configured.
+          {
+            element: <RequireAI />,
+            children: [
+              { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
+              { path: 'mcp/queries', element: <Lazy><McpQueryPage /></Lazy> },
+              { path: 'mcp/queries/:workflowId', element: <Lazy><McpQueryDetailPage /></Lazy> },
+              { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
+              { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
+              { path: 'mcp/servers/new', element: <Lazy><McpServerDetailPage /></Lazy> },
+              { path: 'mcp/servers/:serverId', element: <Lazy><McpServerDetailPage /></Lazy> },
+            ],
+          },
         ],
       },
 

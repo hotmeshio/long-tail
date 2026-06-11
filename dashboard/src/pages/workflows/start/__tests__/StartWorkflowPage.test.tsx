@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -99,10 +99,10 @@ describe('StartWorkflowPage', () => {
     expect(screen.getByRole('heading', { name: 'Invoke' })).toBeInTheDocument();
   });
 
-  it('renders mode toggle with Start Now and Schedule buttons', () => {
+  it('has no schedule toggle (cron is owned by agents/automations)', () => {
     renderPage();
-    expect(screen.getByText('Start Now')).toBeInTheDocument();
-    expect(screen.getByText('Schedule')).toBeInTheDocument();
+    expect(screen.queryByText('Start Now')).not.toBeInTheDocument();
+    expect(screen.queryByText('Schedule')).not.toBeInTheDocument();
   });
 
   it('renders workflow selector with all invocable workflows', () => {
@@ -110,6 +110,8 @@ describe('StartWorkflowPage', () => {
     expect(screen.getByText('Select Workflow')).toBeInTheDocument();
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
     expect(screen.getByText('processClaim')).toBeInTheDocument();
+    // every procedural workflow carries the 'durable' namespace pill
+    expect(screen.getAllByText('durable').length).toBeGreaterThanOrEqual(1);
   });
 
   it('includes discovered durable workflows in the selector', () => {
@@ -145,26 +147,6 @@ describe('StartWorkflowPage', () => {
   it('shows the StartNowPanel when a workflow is selected with mode=now', () => {
     renderPage(['/workflows/start?type=reviewContent&mode=now']);
     // StartNowPanel renders the workflow_type as a SectionLabel and the Start Workflow button
-    expect(screen.getByText('Start Workflow')).toBeInTheDocument();
-  });
-
-  it('shows the SchedulePanel when a workflow is selected with mode=schedule', () => {
-    renderPage(['/workflows/start?type=reviewContent&mode=schedule']);
-    // SchedulePanel renders "Schedule" section label and "Save" button
-    expect(screen.getByText('Save')).toBeInTheDocument();
-    expect(screen.getByText('Common Patterns')).toBeInTheDocument();
-  });
-
-  it('switches between Start Now and Schedule modes', () => {
-    renderPage(['/workflows/start?type=reviewContent&mode=now']);
-    expect(screen.getByText('Start Workflow')).toBeInTheDocument();
-
-    // Click Schedule
-    fireEvent.click(screen.getByText('Schedule'));
-    expect(screen.getByText('Save')).toBeInTheDocument();
-
-    // Click Start Now
-    fireEvent.click(screen.getByText('Start Now'));
     expect(screen.getByText('Start Workflow')).toBeInTheDocument();
   });
 
