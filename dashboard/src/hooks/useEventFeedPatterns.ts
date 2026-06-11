@@ -33,7 +33,7 @@ function patternFromRoute(pathname: string): string {
   if (pathname === '/') return 'lt.events.system.>';
   // MCP execution detail → subscribe to that specific job
   const mcpDetailMatch = pathname.match(/^\/mcp\/executions\/(.+)/);
-  if (mcpDetailMatch) return `lt.events.system.activity.${mcpDetailMatch[1]}.>`;
+  if (mcpDetailMatch) return `lt.events.system.*.${mcpDetailMatch[1]}.>`;
   // Capabilities, MCP
   if (pathname.startsWith('/mcp')) return 'lt.events.system.activity.>';
   // Fallback — all system events

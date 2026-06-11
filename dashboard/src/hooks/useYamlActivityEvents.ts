@@ -14,8 +14,11 @@ export interface ActivityStep {
 }
 
 /**
- * Subscribe to activity events for a specific YAML workflow job.
- * Returns live step progress as events arrive.
+ * Subscribe to activity and workflow lifecycle events for a specific graph job.
+ * Returns live step progress and overall workflow status.
+ *
+ * Hook-only flows (no worker activities) produce no activity events, so
+ * isComplete/isFailed is derived from workflow.completed/failed events instead.
  */
 export function useYamlActivityEvents(jobId: string | null): {
   steps: ActivityStep[];
@@ -23,8 +26,9 @@ export function useYamlActivityEvents(jobId: string | null): {
   isFailed: boolean;
 } {
   const [steps, setSteps] = useState<ActivityStep[]>([]);
+  const [workflowStatus, setWorkflowStatus] = useState<'idle' | 'completed' | 'failed'>('idle');
 
-  const handler = useCallback((event: any) => {
+  const activityHandler = useCallback((event: any) => {
     if (!jobId || event.workflowId !== jobId) return;
     const category = event.type?.split('.')[0];
     if (category !== 'activity') return;
@@ -63,13 +67,27 @@ export function useYamlActivityEvents(jobId: string | null): {
     });
   }, [jobId]);
 
+  const workflowHandler = useCallback((event: any) => {
+    if (!jobId || event.workflowId !== jobId) return;
+    const eventType = event.type as string | undefined;
+    if (eventType === 'workflow.completed') setWorkflowStatus('completed');
+    if (eventType === 'workflow.failed') setWorkflowStatus('failed');
+  }, [jobId]);
+
   useEventSubscription(
     jobId ? `${NATS_SUBJECT_PREFIX}.system.activity.>` : '',
-    handler,
+    activityHandler,
+  );
+  useEventSubscription(
+    jobId ? `${NATS_SUBJECT_PREFIX}.system.workflow.>` : '',
+    workflowHandler,
   );
 
-  const isComplete = steps.length > 0 && steps.every((s) => s.status === 'completed' || s.status === 'failed');
-  const isFailed = steps.some((s) => s.status === 'failed');
+  const stepsComplete = steps.length > 0 && steps.every((s) => s.status === 'completed' || s.status === 'failed');
+  const stepsFailed = steps.some((s) => s.status === 'failed');
+
+  const isComplete = stepsComplete || workflowStatus === 'completed';
+  const isFailed = stepsFailed || workflowStatus === 'failed';
 
   return { steps, isComplete, isFailed };
 }
