@@ -179,7 +179,7 @@ LIMIT $3 OFFSET $4`;
  * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
  */
 export const CLAIM_BY_METADATA_GUARDED = `\
-WITH target AS (
+WITH target AS MATERIALIZED (
   SELECT id, assigned_to
   FROM lt_escalations
   WHERE metadata @> $1::jsonb
@@ -220,7 +220,7 @@ FROM updated`;
  * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
  */
 export const RESOLVE_BY_METADATA_ATOMIC = `\
-WITH target AS (
+WITH target AS MATERIALIZED (
   SELECT *
   FROM lt_escalations
   WHERE metadata @> $1::jsonb
