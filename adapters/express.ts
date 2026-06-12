@@ -4,6 +4,7 @@ import express, { Router } from 'express';
 import type { Server as HttpServer } from 'http';
 
 import routes from '../routes';
+import mcpEndpoint from '../routes/mcp-endpoint';
 import { eventRegistry } from '../lib/events';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { NatsEventAdapter } from '../lib/events/nats';
@@ -100,6 +101,7 @@ export class LTExpressAdapter {
   /**
    * Return a self-contained Express Router that serves:
    * - `/api/*` — Long Tail API routes (auth, tasks, escalations, etc.)
+   * - `/mcp` — MCP streamable-HTTP transport (Claude Desktop, Cursor, agents)
    * - `/health` — health check
    * - Static dashboard assets
    * - SPA fallback with injected `<base href>` and `window.__LT_BASE__`
@@ -116,6 +118,9 @@ export class LTExpressAdapter {
 
     // API routes — internal routes handle their own JWT auth
     router.use('/api', routes);
+
+    // MCP streamable-HTTP transport — same endpoint as standalone server
+    router.use('/mcp', mcpEndpoint);
 
     // Dashboard static assets
     const dashboardDist = this.resolveDashboardDist();
