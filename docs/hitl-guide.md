@@ -78,9 +78,9 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-### Pattern 2: Signal Queue (Recommended for High-Throughput)
+### Pattern 2: Signal Queue (Recommended)
 
-Identical in surface to Pattern 1, but uses the HotMesh native signal queue for atomic suspend + signal routing. Eliminates the `enrichEscalationRouting` round-trip. Preferred for new code.
+The workflow creates an `lt_escalations` record with `metadata.signal_queue: true`, then calls `conditionLT(signalId, queueConfig)`. The engine suspends the workflow and inserts a `hotmesh_signals` row in a single atomic transaction. When the escalation is resolved, `lt.escalations.resolve()` detects `signal_queue: true` and calls `client.signalQueue.resolve()` — which marks the signal entry resolved and delivers the payload to the paused workflow atomically.
 
 ```typescript
 import { conditionLT } from '@hotmeshio/long-tail';
@@ -90,7 +90,6 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
   const ctx = Durable.workflow.workflowInfo();
   const signalId = `approval-${ctx.workflowId}`;
 
-  // Create the lt_escalations record — no enrichEscalationRouting needed
   await activities.createApprovalEscalation({
     workflowId: ctx.workflowId,
     taskQueue: ctx.taskQueue,
@@ -98,7 +97,7 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
     signalId,
     metadata: {
       signal_id: signalId,
-      signal_queue: true,          // marks this escalation as signal-queue-backed
+      signal_queue: true,
       form_schema: {
         title: 'Budget Approval',
         required: ['approved'],
@@ -110,7 +109,6 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
     },
   });
 
-  // Atomic: suspend workflow + create hotmesh_signals row in one transaction
   const decision = await conditionLT<{ approved: boolean; notes?: string }>(signalId, {
     role: 'finance-reviewer',
     type: 'approval',
@@ -128,9 +126,7 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-**Key difference from Pattern 1:** The `metadata.signal_queue: true` flag tells the resolve endpoint to use Path F — `client.signalQueue.resolve()` — which delivers the signal and marks it resolved atomically. There is no race window. `enrichEscalationRouting` is not called.
-
-See the [Signal Queue guide](../signal-queue.md) for architecture details and migration from Pattern 1.
+See the [Signal Queue guide](../signal-queue.md) for architecture details, `lt.signalQueue.*` operations, and `tryResolveByMetadata` for defensive programmatic resolution.
 
 ### Pattern 3: Interceptor Return
 

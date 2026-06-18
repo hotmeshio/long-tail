@@ -1,60 +1,25 @@
 # Signal Queue
 
-HotMesh 0.21.0 adds a native `hotmesh_signals` table and `client.signalQueue.*` API. Long Tail wraps these as `lt.signalQueue.*` and extends `conditionLT` to use them. The result is a single atomic operation that suspends a workflow and creates a signal queue row — removing a two-round-trip overhead from every human-in-the-loop escalation that uses the `conditionLT` pattern.
+The signal queue is a native HotMesh execution primitive (`hotmesh_signals` table) that suspends a workflow and registers a signal route in one atomic database operation. Long Tail exposes it as `lt.signalQueue.*` and integrates it into `conditionLT` via an optional second argument.
 
 ---
 
-## What Changed
+## Architecture
 
-### Before: Two round-trips
-
-```
-1. createEscalation()         → INSERT lt_escalations row
-2. enrichEscalationRouting()  → UPDATE lt_escalations SET metadata.signal_routing = { ... }
-3. conditionLT(signalId)      → suspend workflow (no-op on the table)
-```
-
-Resolution:
-```
-4. resolveByMetadata()        → reads signal_routing from lt_escalations
-5. handle.signal(signalId)    → delivers signal to workflow
-6. ltResolveEscalation()      → UPDATE lt_escalations SET status = 'resolved'
-```
-
-### After: One atomic operation
-
-```
-1. createEscalation()         → INSERT lt_escalations (metadata.signal_id + signal_queue: true)
-2. conditionLT(signalId, queueConfig)
-                              → atomic: suspend workflow + INSERT hotmesh_signals row
-```
-
-Resolution:
-```
-3. resolveEscalation(id)      → client.signalQueue.resolve() marks resolved + signals workflow
-                              → UPDATE lt_escalations SET status = 'resolved'
-```
-
-The `enrichEscalationRouting` call is eliminated. The suspension and the signal queue row are created atomically inside the HotMesh engine, so there is no race window between "workflow paused" and "signal route registered."
-
----
-
-## Two-Table Architecture
+Two tables underlie every signal-backed HITL escalation:
 
 | Table | Role | Owned by |
 |-------|------|----------|
 | `lt_escalations` | Business-layer record: display, audit, RBAC, forms | Long Tail |
 | `hotmesh_signals` | Execution-layer record: signal routing, claim lifecycle | HotMesh engine |
 
-The two tables are linked by `signal_id`. `lt_escalations.metadata.signal_id` holds the key; `hotmesh_signals.signalKey` holds the same value. Resolution updates both.
-
-`lt_escalations` is always the source of truth for the dashboard, API queries, and RBAC checks. `hotmesh_signals` is always the source of truth for signal routing and the claim lifecycle. Do not bypass either.
+The tables are linked by `signal_id`. `lt_escalations.metadata.signal_id` holds the key; `hotmesh_signals.signalKey` holds the same value. `lt_escalations` is the source of truth for the dashboard, API queries, and RBAC checks. `hotmesh_signals` is the source of truth for signal routing and the claim lifecycle. Resolution updates both.
 
 ---
 
 ## conditionLT with queueConfig
 
-The existing `conditionLT(signalId)` call is unchanged. Pass an optional second argument to use the signal queue path:
+`conditionLT(signalId, queueConfig)` suspends the workflow and creates a `hotmesh_signals` row in a single atomic transaction. The paused workflow is immediately discoverable via `lt.signalQueue.*` using any of the metadata fields from `queueConfig`.
 
 ```typescript
 import { conditionLT } from '@hotmeshio/long-tail';
@@ -73,60 +38,61 @@ const resolution = await conditionLT<{ approved: boolean; notes: string }>(signa
 });
 ```
 
-**How it works internally:**
+When `lt.escalations.resolve()` or `lt.signalQueue.resolve()` is called, it marks the `hotmesh_signals` row as resolved AND delivers the signal to the paused workflow in a single transaction. No separate signal delivery step needed.
 
-1. `conditionLT(signalId, queueConfig)` calls `Durable.workflow.condition(signalId, queueConfig)`.
-2. The HotMesh engine atomically suspends the workflow and inserts a row into `hotmesh_signals` with the provided queue config.
-3. The `hotmesh_signals` row is queryable via `lt.signalQueue.*` — it holds role, type, priority, metadata, and the signal key.
-4. When `lt.escalations.resolve()` (or `lt.signalQueue.resolve()`) is called, it marks the `hotmesh_signals` row as resolved AND delivers the signal to the paused workflow in a single transaction.
+The `queueConfig` fields (role, type, subtype, priority, description, metadata, envelope) mirror `lt_escalations` fields. This is intentional: the signal queue entry holds the execution-layer routing info; the escalation record holds the business-layer audit trail, RBAC scope, and dashboard display.
 
-**The `queueConfig` fields mirror `lt_escalations` fields** — role, type, subtype, priority, description, metadata, envelope. This redundancy is intentional: the signal queue is an execution-layer record; `lt_escalations` is the business-layer record with RBAC, audit trail, and dashboard visibility.
+Calling `conditionLT(signalId)` without the second argument continues to work — the behavior is unchanged.
 
 ---
 
-## Migration Pattern
+## Writing a Signal-Queue Station Workflow
 
-### Before (boilerplate ortho:pipeline pattern)
+The activity creates the `lt_escalations` record with `signal_id` and `signal_queue: true`. The workflow suspends atomically via `conditionLT`.
 
 ```typescript
 // activities.ts
 export async function createStationEscalation(input: StepInput): Promise<string> {
-  const esc = await EscalationService.createEscalation({ ... });
-  await EscalationService.enrichEscalationRouting(esc.id, {
-    signal_routing: { engine: 'durable', taskQueue, workflowType, workflowId, signalId },
-  }, { workflowType, workflowId, taskQueue });
-  return esc.id;
-}
-
-// station.ts
-export async function myStation(envelope: LTEnvelope) {
-  const signalId = `station-${ctx.workflowId}`;
-  await createStationEscalation({ ..., signalId });
-  const resolution = await conditionLT<StepResult>(signalId);   // Path B
-  return { type: 'return' as const, data: resolution };
-}
-```
-
-### After (signal queue pattern)
-
-```typescript
-// activities.ts — no enrichEscalationRouting
-export async function createStationEscalation(input: StepInput): Promise<string> {
   const esc = await EscalationService.createEscalation({
-    ...
+    type: 'station',
+    subtype: input.stationName,
+    description: input.instructions,
+    role: input.role,
+    priority: 2,
+    workflow_id: input.workflowId,
+    task_queue: input.taskQueue,
+    workflow_type: input.workflowType,
     metadata: {
-      signal_id: input.signalId,
-      signal_queue: true,
+      signal_id: input.signalId,   // links lt_escalations to hotmesh_signals
+      signal_queue: true,          // tells resolve to use Path F
       form_schema: { ... },
     },
+    envelope: JSON.stringify(input.envelope),
   });
   return esc.id;
 }
 
 // station.ts
 export async function myStation(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
   const signalId = `station-${ctx.workflowId}`;
-  await createStationEscalation({ ..., signalId });
+
+  const activities = Durable.workflow.proxyActivities<ActivitiesType>({
+    activities: stationActivities,
+    taskQueue: ctx.taskQueue,
+    retry: { maximumAttempts: 3 },
+  });
+
+  await activities.createStationEscalation({
+    role: envelope.data.role,
+    stationName: envelope.data.stationName,
+    instructions: envelope.data.instructions,
+    workflowId: ctx.workflowId,
+    taskQueue: ctx.taskQueue,
+    workflowType: ctx.workflowName,
+    signalId,
+    envelope,
+  });
 
   const resolution = await conditionLT<StepResult>(signalId, {
     role: envelope.data.role,
@@ -138,55 +104,48 @@ export async function myStation(envelope: LTEnvelope) {
     workflowType: ctx.workflowName,
     metadata: { stationName: envelope.data.stationName, workflowId: ctx.workflowId },
     envelope: { station: envelope.data.stationName },
-  });   // Path F
+  });
 
   return { type: 'return' as const, data: resolution };
 }
 ```
 
-The migration is additive — the `conditionLT` signature is backward-compatible. Existing workflows using `conditionLT(signalId)` without the second argument continue to work unchanged.
-
 ---
 
 ## Resolution Paths
 
-| Path | When | How |
-|------|------|-----|
+`lt.escalations.resolve()` inspects `metadata.signal_queue` to choose the resolution path automatically:
+
+| Path | Condition | Behavior |
+|------|-----------|----------|
 | **B** — signal routing | `metadata.signal_id` set, no `signal_queue: true` | Reads `signal_routing` from `lt_escalations.metadata`, calls `handle.signal()` |
 | **F** — signal queue | `metadata.signal_queue === true` | Calls `client.signalQueue.resolve()` — atomic mark-resolved + signal delivery |
 
-Path F is preferred for new code. Path B remains for backward compatibility.
+No caller changes required. Pass the escalation ID to `lt.escalations.resolve()` and the correct path is selected.
 
 ---
 
 ## Signal Queue Operations
 
-The `lt.signalQueue` namespace exposes the full `hotmesh_signals` lifecycle.
+`lt.signalQueue` exposes the full `hotmesh_signals` lifecycle — useful for agents, automation workflows, and queue management tasks.
 
-### Claim and Resolve (Automation / Agent Pattern)
-
-The typical agent pattern: find work by metadata, claim it, do the work, resolve.
+### Claim and Resolve (Agent Pattern)
 
 ```typescript
-// 1. Claim an entry atomically by metadata
+// Find and claim an entry by metadata
 const claimed = await lt.signalQueue.claimByMetadata({
   key: 'stationName',
   value: 'scan',
   durationMinutes: 15,
 });
 
-if (!claimed.data?.ok) {
-  // Nothing available
-  return;
-}
+if (!claimed.ok) return;  // Nothing available
 
-const { id, signalKey } = claimed.data;
+// ... do the work ...
 
-// 2. Do the work ...
-
-// 3. Resolve — marks hotmesh_signals resolved AND delivers signal to paused workflow
+// Deliver signal atomically — marks hotmesh_signals resolved + unblocks workflow
 await lt.signalQueue.resolve({
-  id,
+  id: claimed.id,
   resolverPayload: { approved: true, scannedAt: new Date().toISOString() },
 });
 ```
@@ -194,14 +153,10 @@ await lt.signalQueue.resolve({
 ### List and Monitor
 
 ```typescript
-const entries = await lt.signalQueue.list({
-  role: 'reviewer',
-  status: 'pending',
-  limit: 25,
-});
+const entries = await lt.signalQueue.list({ role: 'reviewer', status: 'pending', limit: 25 });
 ```
 
-### Release an Expired Claim
+### Release Expired Claims
 
 ```typescript
 await lt.signalQueue.releaseExpired();
@@ -213,7 +168,7 @@ See [`lt.signalQueue` SDK reference](api/sdk/signal-queue.md) for the full metho
 
 ## Defensive Resolution with tryResolveByMetadata
 
-For downstream services that call `resolveByMetadata` programmatically (not via the dashboard), use `tryResolveByMetadata` instead. It returns a discriminated union rather than throwing or returning an HTTP-like error body, making it safe to use in conditional branches:
+For services that resolve escalations programmatically, use `tryResolveByMetadata` instead of `resolveByMetadata`. It returns a discriminated union that distinguishes "no pending escalation found" (safe to skip) from "resolution failed" (should not be skipped silently):
 
 ```typescript
 const result = await lt.escalations.tryResolveByMetadata({
@@ -223,39 +178,37 @@ const result = await lt.escalations.tryResolveByMetadata({
 });
 
 if (result.matched) {
-  // Escalation found and resolved (or signaled). Continue.
+  // Resolved. Continue.
 } else if (result.reason === 'not-found') {
-  // No pending escalation with this key — safe to fall through.
+  // No pending escalation — safe to fall through.
 } else {
   // result.reason === 'resolve-failed'
-  // Something exists but resolution failed (DB error or signal delivery failure).
-  // Do NOT silently continue — the workflow may be suspended waiting for a signal
-  // that will never arrive.
+  // Resolution or signal delivery failed. Do NOT silently continue —
+  // a workflow may be suspended waiting on a signal that will never arrive.
   throw new Error(`Resolution failed for order ${orderId}`);
 }
 ```
 
-The critical distinction: `not-found` is safe to ignore; `resolve-failed` is not. A standard `resolveByMetadata` call collapses both into an error response, forcing callers to guess which case they're in.
+See [lt.escalations SDK reference](api/sdk/escalations.md#tryresolvebymetadata) for full parameter and type docs.
 
 ---
 
 ## Working Example
 
-See [`examples/workflows/signal-queue-station/`](../examples/workflows/signal-queue-station/) for a side-by-side comparison:
+[`examples/workflows/signal-queue-station/`](../examples/workflows/signal-queue-station/) ships two station implementations side by side:
 
-- `old-station.ts` — `enrichEscalationRouting` + `conditionLT(signalId)` (Path B)
-- `new-station.ts` — `conditionLT(signalId, queueConfig)` (Path F), no `enrichEscalationRouting`
-- `tests/workflows/signal-queue.test.ts` — integration test proving both paths produce the same resolved escalation
+- `old-station.ts` — uses `enrichEscalationRouting` + `conditionLT(signalId)` (Path B)
+- `new-station.ts` — uses `conditionLT(signalId, queueConfig)`, no `enrichEscalationRouting` (Path F)
+- `tests/workflows/signal-queue.test.ts` — integration test verifying both paths resolve to the same escalation status
 
 ---
 
-## Checklist
+## Updating Existing Workflows
 
-When migrating a station workflow to the signal queue pattern:
+If you have an existing station workflow that calls `enrichEscalationRouting`:
 
 - [ ] Remove `enrichEscalationRouting` from the activity
-- [ ] Add `signal_id: signalId` and `signal_queue: true` to `metadata` in `createEscalation`
+- [ ] Add `signal_id: signalId` and `signal_queue: true` to `metadata` when calling `createEscalation`
 - [ ] Change `conditionLT(signalId)` to `conditionLT(signalId, queueConfig)` in the workflow
 - [ ] Populate `queueConfig` with role, type, subtype, priority, description, taskQueue, workflowType, metadata, envelope
-- [ ] Verify resolution via `lt.escalations.resolve()` or `lt.signalQueue.resolve()` — both update both tables
-- [ ] Do NOT remove `lt_escalations.status` from the escalation record — it is still the source of truth for the dashboard and RBAC
+- [ ] `lt.escalations.resolve()` and `lt.signalQueue.resolve()` both update both tables — use either for resolution
