@@ -215,6 +215,46 @@ The workflow is responsible for resolving the escalation. The `conditionLT()` he
 
 If you use raw `Durable.workflow.condition()` instead, you must resolve the escalation yourself using the `$escalation_id` from the signal data.
 
+**Response 200 (signal path):**
+
+```json
+{
+  "signaled": true,
+  "escalationId": "esc-a1b2c3d4-...",
+  "workflowId": "my-workflow-123"
+}
+```
+
+### Signal queue resolution (metadata.signal_queue: true)
+
+When an escalation has `metadata.signal_queue === true`, it was created alongside a native `hotmesh_signals` row via `conditionLT(signalId, queueConfig)`. Resolution uses an atomic path: the `hotmesh_signals` entry is marked resolved and the signal is delivered to the workflow in a single transaction. No race window between DB update and signal delivery.
+
+The resolve endpoint detects `signal_queue: true` and automatically routes to this path. No caller changes required.
+
+**Response 200 (signal queue path):**
+
+```json
+{
+  "signaled": true,
+  "escalationId": "esc-a1b2c3d4-...",
+  "workflowId": "my-workflow-123"
+}
+```
+
+**Response 207 (partial — signal delivery failed):**
+
+Returned when the `hotmesh_signals` row was found but signal delivery failed (e.g., the workflow already completed or timed out). The `lt_escalations` record was not updated. The caller should investigate or retry.
+
+```json
+{
+  "partial": true,
+  "reason": "signal-failed",
+  "signalKey": "station-my-workflow-123"
+}
+```
+
+See the [Signal Queue guide](../../signal-queue.md) for the migration pattern and architecture details.
+
 ### What happens during resolution
 
 1. The route reads the escalation record and verifies it is still `pending`.

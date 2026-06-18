@@ -78,7 +78,61 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-### Pattern 2: Interceptor Return
+### Pattern 2: Signal Queue (Recommended for High-Throughput)
+
+Identical in surface to Pattern 1, but uses the HotMesh native signal queue for atomic suspend + signal routing. Eliminates the `enrichEscalationRouting` round-trip. Preferred for new code.
+
+```typescript
+import { conditionLT } from '@hotmeshio/long-tail';
+import type { ConditionQueueConfig } from '@hotmeshio/long-tail';
+
+export async function approvalWorkflow(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+  const signalId = `approval-${ctx.workflowId}`;
+
+  // Create the lt_escalations record — no enrichEscalationRouting needed
+  await activities.createApprovalEscalation({
+    workflowId: ctx.workflowId,
+    taskQueue: ctx.taskQueue,
+    workflowType: 'approvalWorkflow',
+    signalId,
+    metadata: {
+      signal_id: signalId,
+      signal_queue: true,          // marks this escalation as signal-queue-backed
+      form_schema: {
+        title: 'Budget Approval',
+        required: ['approved'],
+        properties: {
+          approved: { type: 'boolean', description: 'Approve this request?' },
+          notes: { type: 'string', format: 'textarea' },
+        },
+      },
+    },
+  });
+
+  // Atomic: suspend workflow + create hotmesh_signals row in one transaction
+  const decision = await conditionLT<{ approved: boolean; notes?: string }>(signalId, {
+    role: 'finance-reviewer',
+    type: 'approval',
+    subtype: 'budget-request',
+    priority: 2,
+    description: `Budget approval: $${envelope.data.amount}`,
+    taskQueue: ctx.taskQueue,
+    workflowType: 'approvalWorkflow',
+    metadata: { requestId: envelope.data.requestId },
+  });
+
+  if (decision.approved) {
+    // proceed
+  }
+}
+```
+
+**Key difference from Pattern 1:** The `metadata.signal_queue: true` flag tells the resolve endpoint to use Path F — `client.signalQueue.resolve()` — which delivers the signal and marks it resolved atomically. There is no race window. `enrichEscalationRouting` is not called.
+
+See the [Signal Queue guide](../signal-queue.md) for architecture details and migration from Pattern 1.
+
+### Pattern 3: Interceptor Return
 
 The workflow returns an escalation result. The interceptor handles creation. On resolution, the workflow is re-run with the resolver payload injected into the envelope.
 

@@ -615,3 +615,59 @@ const result = await lt.escalations.resolveByMetadata({
 **Returns:** `LTApiResult<{ escalation }>` for non-signal, `LTApiResult<{ signaled, escalationId, workflowId }>` for signal-backed. 404 if no match.
 
 **Auth:** Required
+
+---
+
+## tryResolveByMetadata
+
+Defensive variant of `resolveByMetadata`. Returns a discriminated result object instead of throwing — safe to use in conditional branches where the distinction between "no escalation found" and "resolution failed" matters.
+
+```typescript
+import type { EscalationSignalResult } from '@hotmeshio/long-tail';
+
+const result = await lt.escalations.tryResolveByMetadata({
+  key: 'orderId',
+  value: 'order-123',
+  resolverPayload: { approved: true, notes: 'Looks good' },
+});
+
+if (result.matched) {
+  // Escalation found and resolved (or signal delivered). Continue.
+} else if (result.reason === 'not-found') {
+  // No pending escalation with this key/value. Safe to fall through.
+} else {
+  // result.reason === 'resolve-failed'
+  // An escalation may exist but resolution or signal delivery failed.
+  // Do NOT silently continue — the workflow may be stuck waiting on a signal
+  // that will never arrive.
+  logger.error('escalation resolution failed', { orderId });
+}
+```
+
+**Why use this instead of `resolveByMetadata`:**
+
+`resolveByMetadata` returns an `LTApiResult` where both "not found" (404) and "internal error" (5xx) are errors. Callers typically collapse both to `false`, destroying the difference between a safe no-op and a critical failure. `tryResolveByMetadata` makes the distinction explicit at the type level.
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Metadata field name |
+| `value` | `string` | Yes | Metadata field value |
+| `resolverPayload` | `object` | Yes | Resolution data passed to the workflow |
+| `assignee` | `string` | No | Resolve as a Long Tail user (resolved via `getUserByExternalId`) |
+| `metadata` | `object` | No | Merge into escalation metadata before resolving |
+
+**Returns:** `EscalationSignalResult`
+
+```typescript
+type EscalationSignalResult =
+  | { matched: true }
+  | { matched: false; reason: 'not-found' | 'resolve-failed' };
+```
+
+- `matched: true` — escalation found and resolved (or signal delivered successfully)
+- `matched: false, reason: 'not-found'` — no pending escalation matched the key/value; safe to skip
+- `matched: false, reason: 'resolve-failed'` — an escalation exists or resolution failed; do not silently continue
+
+**Auth:** Required

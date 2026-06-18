@@ -134,7 +134,7 @@ const lt = await start({
 });
 ```
 
-All three paths produce the same outcome: tools callable as durable activities. See the [MCP guide](docs/mcp.md).
+All three paths produce the same outcome: tools callable as durable activities. See the [MCP guide](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md).
 
 ## Compile workflows
 
@@ -145,7 +145,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 npx ltc compile workflows/
 ```
 
-The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
+The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md).
 
 ## Register a graph flow by hand
 
@@ -221,6 +221,20 @@ const client = createClient({ auth: { userId: lt.adminUserId } });
 
 const tasks = await client.tasks.list({ status: 'completed', limit: 10 });
 const result = await client.escalations.claim({ id: 'esc_123', durationMinutes: 30 });
+
+// Defensive resolution — discriminated result, never throws
+const resolved = await client.escalations.tryResolveByMetadata({
+  key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
+});
+if (!resolved.matched && resolved.reason === 'resolve-failed') {
+  // Signal delivery failed — do not silently continue
+}
+
+// Signal queue — atomic claim + resolve for agents and automation
+const entry = await client.signalQueue.claimByMetadata({ key: 'stationName', value: 'scan', durationMinutes: 15 });
+if (entry.ok) {
+  await client.signalQueue.resolve({ id: entry.id, resolverPayload: { scanned: true } });
+}
 ```
 
 Mount the dashboard at a subpath:
@@ -240,7 +254,7 @@ client.events.on('task.completed', (event) => console.log('done:', event.workflo
 client.events.on('escalation.*', (event) => notifyTeam(event));
 ```
 
-Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. See the [SDK guide](docs/sdk.md).
+Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. See the [SDK guide](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md).
 
 ## Deployment
 
@@ -258,31 +272,33 @@ await start({ database: { connectionString: process.env.DATABASE_URL }, server: 
 const lt = createClient({ auth: { userId: 'service' } });
 ```
 
-All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud.md).
+All modes share PostgreSQL and scale independently. See [Cloud Deployment](https://github.com/hotmeshio/long-tail/blob/main/docs/cloud.md).
 
 ## Docs
 
 | Guide | What it covers |
 |-------|---------------|
-| [The Long Tail Story](docs/story.md) | Why this exists, what accumulates over time |
-| [Workflows](docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
-| [IAM](docs/iam.md) | Identity propagation, service accounts, credential exchange |
-| [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
-| [MCP](docs/mcp.md) | Server registration, tool calls, human queue |
-| [Compilation](docs/compilation.md) | Dynamic to deterministic pipeline wizard |
-| [Compiler](docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
-| [CLI](docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
-| [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
-| [SDK](docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
-| [Architecture](docs/architecture.md) | Project structure, conventions, discovery |
-| [Cloud](docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |
-| [Data Model](docs/data.md) | Database schema |
+| [The Long Tail Story](https://github.com/hotmeshio/long-tail/blob/main/docs/story.md) | Why this exists, what accumulates over time |
+| [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
+| [HITL Guide](https://github.com/hotmeshio/long-tail/blob/main/docs/hitl-guide.md) | Human-in-the-loop: patterns, forms, iframe viewport, dev/user mode |
+| [Signal Queue](https://github.com/hotmeshio/long-tail/blob/main/docs/signal-queue.md) | Atomic suspend + signal routing, migration from enrichEscalationRouting |
+| [IAM](https://github.com/hotmeshio/long-tail/blob/main/docs/iam.md) | Identity propagation, service accounts, credential exchange |
+| [Dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md) | Navigation, key pages, event feed |
+| [MCP](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md) | Server registration, tool calls, human queue |
+| [Compilation](https://github.com/hotmeshio/long-tail/blob/main/docs/compilation.md) | Dynamic to deterministic pipeline wizard |
+| [Compiler](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
+| [CLI](https://github.com/hotmeshio/long-tail/blob/main/docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
+| [Escalation Strategies](https://github.com/hotmeshio/long-tail/blob/main/docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
+| [SDK](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
+| [Architecture](https://github.com/hotmeshio/long-tail/blob/main/docs/architecture.md) | Project structure, conventions, discovery |
+| [Cloud](https://github.com/hotmeshio/long-tail/blob/main/docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |
+| [Data Model](https://github.com/hotmeshio/long-tail/blob/main/docs/data.md) | Database schema |
 
-**Adapters:** [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [Maintenance](docs/maintenance.md) · [OAuth](docs/oauth-and-delegation.md)
+**Adapters:** [Auth](https://github.com/hotmeshio/long-tail/blob/main/docs/auth.md) · [Events](https://github.com/hotmeshio/long-tail/blob/main/docs/events.md) · [Telemetry](https://github.com/hotmeshio/long-tail/blob/main/docs/telemetry.md) · [Logging](https://github.com/hotmeshio/long-tail/blob/main/docs/logging.md) · [Maintenance](https://github.com/hotmeshio/long-tail/blob/main/docs/maintenance.md) · [OAuth](https://github.com/hotmeshio/long-tail/blob/main/docs/oauth-and-delegation.md)
 
-**HTTP API:** [Workflows](docs/api/http/workflows.md) · [Tasks](docs/api/http/tasks.md) · [Escalations](docs/api/http/escalations.md) · [YAML Workflows](docs/api/http/yaml-workflows.md) · [Users](docs/api/http/users.md) · [Roles](docs/api/http/roles.md) · [Service Accounts](docs/api/http/service-accounts.md) · [MCP Servers](docs/api/http/mcp-servers.md) · [Pipelines](docs/api/http/pipelines.md) · [Exports](docs/api/http/exports.md)
+**HTTP API:** [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/workflows.md) · [Tasks](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/tasks.md) · [Escalations](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/escalations.md) · [YAML Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/yaml-workflows.md) · [Users](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/users.md) · [Roles](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/roles.md) · [Service Accounts](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/service-accounts.md) · [MCP Servers](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/mcp-servers.md) · [Pipelines](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/pipelines.md) · [Exports](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/exports.md)
 
-**SDK:** [Overview](docs/sdk.md) · [Workflows](docs/api/sdk/workflows.md) · [Tasks](docs/api/sdk/tasks.md) · [Escalations](docs/api/sdk/escalations.md) · [YAML Workflows](docs/api/sdk/yaml-workflows.md) · [MCP](docs/api/sdk/mcp.md) · [Events](docs/api/sdk/events.md)
+**SDK:** [Overview](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) · [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/workflows.md) · [Tasks](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/tasks.md) · [Escalations](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/escalations.md) · [Signal Queue](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/signal-queue.md) · [YAML Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/yaml-workflows.md) · [MCP](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/mcp.md) · [Events](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/events.md)
 
 ## Contributing
 
@@ -301,8 +317,8 @@ Open [http://localhost:3000](http://localhost:3000). Example workflows seed the 
 | `engineer` | `l0ngt@1l` | engineer |
 | `reviewer` | `l0ngt@1l` | reviewer |
 
-See [Contributing](docs/contributing.md).
+See [Contributing](https://github.com/hotmeshio/long-tail/blob/main/docs/contributing.md).
 
 ## License
 
-See [LICENSE](LICENSE).
+See [LICENSE](https://github.com/hotmeshio/long-tail/blob/main/LICENSE).
