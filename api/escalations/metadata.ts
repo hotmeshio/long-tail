@@ -2,6 +2,8 @@ import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 import { getVisibleRoles, resolveAssignee, type ProvisionIfAbsent } from './helpers';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
+import type { EscalationSignalResult } from '../../types/escalation';
+import type { ResolveByMetadataResult } from '../../services/escalation/crud';
 
 /**
  * Find escalations by a metadata key-value pair.
@@ -138,6 +140,67 @@ export async function resolveByMetadata(
     };
   } catch (err: any) {
     return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Find-by-metadata and signal — returns a discriminated result instead of LTApiResult.
+ *
+ * Unlike resolveByMetadata (which collapses signal delivery failure into a generic 500),
+ * this function keeps the two failure modes distinct so callers can branch correctly:
+ *
+ *   { matched: false, reason: 'not-found' }      → no pending escalation; safe to fall through
+ *   { matched: false, reason: 'resolve-failed' }  → escalation exists but signal not delivered;
+ *                                                    caller must NOT fall through silently
+ *   { matched: true }                             → signal delivered (or resolved atomically)
+ */
+export async function tryResolveByMetadata(
+  input: {
+    key: string;
+    value: string;
+    resolverPayload: Record<string, any>;
+    assignee?: string;
+    metadata?: Record<string, any>;
+  },
+  auth: LTApiAuth,
+): Promise<EscalationSignalResult> {
+  if (!input.key || !input.value || !input.resolverPayload) {
+    return { matched: false, reason: 'resolve-failed' };
+  }
+
+  const resolved = await resolveAssignee(input.assignee, auth);
+  if ('error' in resolved) return { matched: false, reason: 'resolve-failed' };
+
+  const allowedRoles = await resolveAllowedRoles(auth.userId);
+
+  let serviceResult: ResolveByMetadataResult;
+  try {
+    serviceResult = await escalationService.resolveByMetadataAtomic(
+      input.key, input.value, resolved.userId, input.resolverPayload, input.metadata, allowedRoles,
+    );
+  } catch {
+    return { matched: false, reason: 'resolve-failed' };
+  }
+
+  if (serviceResult.outcome === 'not_found') return { matched: false, reason: 'not-found' };
+  if (serviceResult.outcome === 'resolved') return { matched: true };
+
+  // signal_required — escalation exists and has a signal_id; deliver and isolate failure
+  try {
+    const { createClient } = await import('../../workers');
+    const client = createClient();
+    const handle = await client.workflow.getHandle(
+      serviceResult.taskQueue!,
+      serviceResult.workflowType!,
+      serviceResult.workflowId!,
+    );
+    await handle.signal(serviceResult.signalId!, {
+      ...input.resolverPayload,
+      $escalation_id: serviceResult.escalationId,
+    });
+    return { matched: true };
+  } catch {
+    return { matched: false, reason: 'resolve-failed' };
   }
 }
 

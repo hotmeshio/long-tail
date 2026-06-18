@@ -4,4 +4,4 @@ export { getEscalation, getEscalationsByWorkflowId, escalateToRole } from './sin
 export { claimEscalation, releaseEscalation } from './claim';
 export { releaseExpiredClaims, updatePriority, bulkClaim, bulkAssign, bulkEscalate, bulkTriage } from './bulk';
 export { resolveEscalation } from './resolve';
-export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
+export { findByMetadata, claimByMetadata, resolveByMetadata, tryResolveByMetadata } from './metadata';

@@ -1,4 +1,5 @@
 import * as escalationService from '../../services/escalation';
+import { sqGetBySignalKey } from '../../services/escalation/signal-queue';
 import * as taskService from '../../services/task';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
@@ -13,6 +14,7 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
  * Resolve a pending escalation with a human-provided payload.
  *
  * Handles multiple resolution paths:
+ * F. **Signal queue** — hotmesh_signals-backed (metadata.signal_queue === true); resolves atomically via client.signalQueue
  * 1. **Condition signal** — lightweight `conditionLT` signal via metadata.signal_id
  * 2. **Signal-routed** — full signal_routing via YAML engine or Durable handle
  * 3. **Strategy triage** — escalation strategy redirects to a triage workflow
@@ -35,6 +37,11 @@ export async function resolveEscalation(
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
+
+    // Path F: hotmesh_signals-backed escalation (conditionLT with queueConfig)
+    if ((escalation.metadata as any)?.signal_queue === true) {
+      return resolveViaSignalQueue(escalation, resolverPayload);
+    }
 
     // Path A: conditionLT signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
@@ -72,6 +79,45 @@ export async function resolveEscalation(
 }
 
 // ── Resolution paths ─────────────────────────────────────────────────────
+
+/**
+ * Path F: hotmesh_signals-backed escalation.
+ *
+ * Finds the signal queue entry by signal_key (stored in metadata.signal_id),
+ * then delegates to client.signalQueue.resolve() which atomically marks the
+ * row resolved and delivers the low-level signal to the suspended workflow.
+ *
+ * Returns 207 (partial) if the DB row was updated but signal delivery failed,
+ * so callers can retry delivery using the signalKey.
+ */
+async function resolveViaSignalQueue(
+  escalation: any,
+  resolverPayload: Record<string, any>,
+): Promise<LTApiResult> {
+  const signalKey = (escalation.metadata as any)?.signal_id;
+  if (!signalKey) {
+    return { status: 422, error: 'No signal_id found for signal-queue-backed escalation' };
+  }
+
+  const entry = await sqGetBySignalKey(signalKey);
+  if (!entry) {
+    return { status: 404, error: 'Signal queue entry not found for this escalation' };
+  }
+
+  const client = createClient();
+  const result = await client.signalQueue.resolve({ id: entry.id, resolverPayload });
+
+  if (!result.ok) {
+    if (result.reason === 'signal-failed') {
+      return { status: 207, data: { partial: true, reason: 'signal-failed', signalKey: result.signalKey } };
+    }
+    return { status: 404, error: `Signal queue resolve failed: ${result.reason}` };
+  }
+
+  await escalationService.resolveEscalation(escalation.id, resolverPayload);
+
+  return signaledResult(escalation, escalation.workflow_id);
+}
 
 /** Path A: lightweight conditionLT signal — inject $escalation_id and signal the running workflow. */
 async function resolveViaConditionSignal(

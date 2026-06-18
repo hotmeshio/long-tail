@@ -51,6 +51,17 @@ export interface LTEscalationRecord {
 }
 
 /**
+ * Result of a try-resolve-by-metadata call.
+ *
+ * - matched: true  → escalation found and signal delivered (or atomically resolved)
+ * - matched: false, reason: 'not-found'      → no pending escalation for this metadata; safe to fall through
+ * - matched: false, reason: 'resolve-failed' → escalation exists but signal was not delivered; do NOT fall through
+ */
+export type EscalationSignalResult =
+  | { matched: true }
+  | { matched: false; reason: 'not-found' | 'resolve-failed' };
+
+/**
  * An escalation is "effectively claimed" when assigned_to is set
  * and assigned_until is in the future. Status remains 'pending'.
  */

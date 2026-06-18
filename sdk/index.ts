@@ -20,6 +20,7 @@ import * as filesApi from '../api/files';
 import * as knowledgeApi from '../api/knowledge';
 import * as agentsApi from '../api/agents';
 import * as agentSubsApi from '../api/agent-subscriptions';
+import * as signalQueueService from '../services/escalation/signal-queue';
 import { eventRegistry } from '../lib/events';
 import { CallbackEventAdapter } from '../lib/events/callback';
 import type { LTApiAuth, LTApiResult } from '../types/sdk';
@@ -42,6 +43,20 @@ function bindAuth<TInput, TResult>(
     const resolvedAuth = auth ?? defaultAuth;
     if (!resolvedAuth) {
       return Promise.resolve({ status: 401, error: 'Auth context required' } as LTApiResult<TResult>);
+    }
+    return fn(input, resolvedAuth);
+  };
+}
+
+/** Bind auth for functions whose return type is not LTApiResult (e.g. discriminated unions). */
+function bindAuthDirect<TInput, TReturn>(
+  fn: (input: TInput, auth: LTApiAuth) => Promise<TReturn>,
+  defaultAuth: LTApiAuth | undefined,
+): (input: TInput, auth?: LTApiAuth) => Promise<TReturn | { matched: false; reason: 'resolve-failed' }> {
+  return (input: TInput, auth?: LTApiAuth) => {
+    const resolvedAuth = auth ?? defaultAuth;
+    if (!resolvedAuth) {
+      return Promise.resolve({ matched: false as const, reason: 'resolve-failed' as const });
     }
     return fn(input, resolvedAuth);
   };
@@ -119,6 +134,20 @@ export function createClient(options: LTClientOptions = {}) {
       findByMetadata: bindAuth(escalationsApi.findByMetadata, auth),
       claimByMetadata: bindAuth(escalationsApi.claimByMetadata, auth),
       resolveByMetadata: bindAuth(escalationsApi.resolveByMetadata, auth),
+      tryResolveByMetadata: bindAuthDirect(escalationsApi.tryResolveByMetadata, auth),
+    },
+
+    // ── Signal Queue ───────────────────────────────────────────────────────
+    signalQueue: {
+      list:              signalQueueService.sqList,
+      get:               signalQueueService.sqGet,
+      getBySignalKey:    signalQueueService.sqGetBySignalKey,
+      claim:             signalQueueService.sqClaim,
+      claimByMetadata:   signalQueueService.sqClaimByMetadata,
+      release:           signalQueueService.sqRelease,
+      resolve:           signalQueueService.sqResolve,
+      resolveByMetadata: signalQueueService.sqResolveByMetadata,
+      releaseExpired:    signalQueueService.sqReleaseExpired,
     },
 
     // ── Workflows ──────────────────────────────────────────────────────────

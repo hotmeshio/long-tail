@@ -13,12 +13,21 @@ export type {
   LTEscalationStatus,
   LTEscalationPriority,
   LTEscalationRecord,
+  EscalationSignalResult,
 } from './escalation';
 
 export {
   isEffectivelyClaimed,
   isAvailable,
 } from './escalation';
+
+export type {
+  SignalQueueEntry,
+  ConditionQueueConfig,
+  ClaimSignalResult,
+  ReleaseSignalResult,
+  ResolveSignalResult,
+} from '@hotmeshio/hotmesh/build/types/signal';
 
 export type {
   LTReturn,

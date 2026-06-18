@@ -1,4 +1,5 @@
 import { Durable } from '@hotmeshio/hotmesh';
+import type { ConditionQueueConfig } from '@hotmeshio/hotmesh/build/types/signal';
 
 import * as interceptorActivities from '../interceptor/activities';
 
@@ -9,39 +10,46 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 /**
  * Wait for a signal and resolve the associated escalation automatically.
  *
- * Wraps `Durable.workflow.condition()` with escalation lifecycle:
- * when the signal arrives (from the dashboard resolve endpoint),
- * the payload includes an injected `$escalation_id` field. This
- * helper strips it, calls `ltResolveEscalation` as a durable
- * activity, and returns the clean resolver payload.
+ * **Legacy path** (no queueConfig): wraps `Durable.workflow.condition()` with
+ * escalation lifecycle. When the signal arrives the payload includes an injected
+ * `$escalation_id` field. This helper strips it, calls `ltResolveEscalation`
+ * as a durable activity, and returns the clean resolver payload.
  *
- * Usage (from within a workflow):
+ * **Signal-queue path** (with queueConfig): delegates directly to
+ * `Durable.workflow.condition(signalId, queueConfig)`, which atomically
+ * suspends the workflow AND inserts a `hotmesh_signals` row in one
+ * transaction. No `$escalation_id` injection — signal resolution is
+ * handled by Path F in the resolve endpoint via `client.signalQueue.resolve()`.
+ *
+ * Usage (legacy path, from within a workflow):
  * ```typescript
- * import { conditionLT } from '@hotmeshio/long-tail';
- *
- * export async function myWorkflow(envelope: LTEnvelope) {
- *   // Create an escalation with signal_id in metadata
- *   const signalId = `approval-${Durable.workflow.workflowId}`;
- *   await activities.ltCreateEscalation({
- *     type: 'approval',
- *     role: 'reviewer',
- *     metadata: { signal_id: signalId },
- *     // ...
- *   });
- *
- *   // Wait — the dashboard signals on resolve
- *   const decision = await conditionLT<{ approved: boolean }>(signalId);
- *   // decision.approved is clean — no $escalation_id
- * }
+ * const signalId = `approval-${Durable.workflow.workflowId}`;
+ * await activities.ltCreateEscalation({ ..., metadata: { signal_id: signalId } });
+ * const decision = await conditionLT<{ approved: boolean }>(signalId);
  * ```
  *
- * If the signal payload does not contain `$escalation_id` (e.g., signaled
- * manually), the function returns the payload as-is without calling
- * the resolve activity.
+ * Usage (signal-queue path, from within a workflow):
+ * ```typescript
+ * const signalId = `approval-${Durable.workflow.workflowId}`;
+ * await activities.createEscalation({ ..., metadata: { signal_id: signalId, signal_queue: true } });
+ * const decision = await conditionLT<{ approved: boolean }>(signalId, {
+ *   role: 'reviewer', type: 'approval', metadata: { orderId },
+ * });
+ * ```
  */
 export async function conditionLT<T = Record<string, any>>(
   signalId: string,
+  queueConfig?: ConditionQueueConfig,
 ): Promise<T> {
+  if (queueConfig) {
+    // Signal-queue path: atomic suspension + hotmesh_signals row.
+    // No $escalation_id — resolution flows through client.signalQueue.resolve().
+    // condition() returns T | false; false only occurs with a timeout, which
+    // this overload does not use, so the cast is safe.
+    return Durable.workflow.condition<T>(signalId, queueConfig) as Promise<T>;
+  }
+
+  // Legacy path: unchanged behavior.
   const raw = await Durable.workflow.condition<T & { $escalation_id?: string }>(signalId) as T & { $escalation_id?: string };
 
   const escalationId = raw.$escalation_id;
