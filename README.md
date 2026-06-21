@@ -1,8 +1,6 @@
 # Long Tail
 
-Every operation runs on a short list of expected steps and a long tail of everything else — the part that fails inspection, the order that changes after it ships, etc. Long Tail is a framework for workflows that treat that tail as ordinary: each case is just another path the work can take. It makes the exceptional ordinary.
-
-Durability is the foundation. Workflows run in seconds or weeks then resume exactly where they left off when a signal returns. What it enables is adaptation: when a machine reports a fault or a reviewer rejects a result, the workflow takes in what happened and rewrites the path ahead, inserting a step, rerouting, sending the part back.
+The world is not passive. Machines fail, humans intervene, and conditions change. Long Tail gives TypeScript workflows a durable way to adapt on the fly: call machines, wait on people, resume from Postgres.
 
 ```bash
 npm install @hotmeshio/long-tail
@@ -10,7 +8,7 @@ npm install @hotmeshio/long-tail
 
 ## How it works
 
-Everything checkpoints to Postgres.
+Author in TypeScript. Checkpoint to Postgres. Route work to machines or people with the same workflow model.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
