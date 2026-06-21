@@ -3,6 +3,7 @@ import type { StreamData, StreamDataResponse } from '@hotmeshio/hotmesh/build/ty
 
 import { getConnection } from '../../../lib/db';
 import { loggerRegistry } from '../../../lib/logger';
+import { systemEventsConfig } from '../../../lib/events/system-events';
 import { exchangeTokensInArgs } from '../../iam/ephemeral';
 import * as mcpClient from '../../mcp/client';
 import { dispatchBuiltinTool } from '../../mcp/client/connection';
@@ -248,6 +249,8 @@ export async function registerWorkersForWorkflow(
       },
     },
     workers: workerConfigs,
+    // Emit escalation/lifecycle events (incl. YAML hook `escalation:` Leg1 writes).
+    events: systemEventsConfig,
   });
 
   loggerRegistry.info(

@@ -4,6 +4,7 @@ import type { HotMeshManifest } from '@hotmeshio/hotmesh/build/types/hotmesh';
 import { getConnection } from '../../lib/db';
 import { WORKFLOW_SYNC_TIMEOUT_MS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
+import { systemEventsConfig } from '../../lib/events/system-events';
 import * as namespaceService from '../namespace';
 import { buildMergedYaml, recompileWithContext } from './deployer-helpers';
 
@@ -27,6 +28,9 @@ export async function getEngine(appId: string): Promise<HotMesh> {
     engine: {
       connection: getConnection(),
     },
+    // YAML hook `escalation:` blocks write their row in this engine's Leg1 —
+    // wire the sink so those escalation events flow through the eventManager.
+    events: systemEventsConfig,
   });
   engines.set(appId, engine);
   return engine;

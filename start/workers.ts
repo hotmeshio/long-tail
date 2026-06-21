@@ -2,6 +2,8 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { getConnection } from '../lib/db';
 import { registerLT } from '../services/interceptor';
+import { ensureEscalationCompatView } from '../services/escalation';
+import { systemEventsConfig } from '../lib/events/system-events';
 import { registerWorker } from '../services/workers/registry';
 import { loggerRegistry } from '../lib/logger';
 import { telemetryRegistry } from '../lib/telemetry';
@@ -121,7 +123,13 @@ export async function startWorkers(
     // Register LT interceptors
     await registerLT(connection, {
       defaultRole: startConfig.interceptor?.defaultRole ?? 'reviewer',
+      events: systemEventsConfig,
     });
+
+    // Replace the legacy lt_escalations table with a view over the SDK's
+    // hmsh_escalations (migrating any rows). Read-path consumers (overview,
+    // mcp health, role/agent) and test cleanup depend on the view. Idempotent.
+    await ensureEscalationCompatView();
 
     // Start each worker
     for (const w of workers) {
@@ -140,6 +148,11 @@ export async function startWorkers(
         taskQueue: w.taskQueue,
         workflow: w.workflow,
         guid: `${label}-${Durable.guid()}`,
+        // Efficient path: a workflow that suspends via condition(signalId, config)
+        // writes its escalation row in this worker engine's Leg1 — this hook
+        // emits the lifecycle event, mapped into the eventManager. (Disjoint from
+        // the service-mediated path, so no duplicate events.)
+        events: systemEventsConfig,
       });
       await worker.run();
       registerWorker(w.workflow.name, w.taskQueue);

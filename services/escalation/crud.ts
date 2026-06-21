@@ -1,59 +1,49 @@
 import { getPool } from '../../lib/db';
 import { publishEscalationEvent } from '../../lib/events/publish';
-import { loggerRegistry } from '../../lib/logger';
 import type { LTEscalationRecord } from '../../types';
 
-import type { CreateEscalationInput, ClaimResult } from './types';
+import { escalations, ensureEscalationCompatView } from './client';
 import {
-  ENSURE_ROLE_EXISTS,
-  CREATE_ESCALATION,
-  CLAIM_ESCALATION,
-  RESOLVE_ESCALATION,
-  UPDATE_ESCALATION_METADATA,
-  ENRICH_ESCALATION_ROUTING,
-  UPDATE_ESCALATIONS_PRIORITY,
-  GET_ESCALATION_ROLES,
-  RELEASE_ESCALATION,
-  RELEASE_EXPIRED_CLAIMS,
-  ESCALATE_TO_ROLE,
-  GET_ESCALATION,
-  GET_ESCALATIONS_BY_TASK_ID,
-  GET_ESCALATIONS_BY_WORKFLOW_ID,
-  GET_ESCALATIONS_BY_ORIGIN_ID,
-  FIND_BY_METADATA,
-  CLAIM_BY_METADATA_GUARDED,
-  RESOLVE_BY_METADATA_ATOMIC,
-} from './sql';
+  toEscalationRecord,
+  toEscalationRecords,
+  toJsonObject,
+  toEnvelopeObject,
+} from './map';
+import type { CreateEscalationInput, ClaimResult } from './types';
+import { RESOLVE_BY_METADATA_ATOMIC, RELEASE_EXPIRED_CLAIMS } from './sql';
+
+// All escalation state lives in `public.hmsh_escalations` (HotMesh 0.22.3),
+// reached through `client.escalations.*`. The function signatures and return
+// shapes below are the frozen public surface — only the storage path changed.
+
+// Generous upper bound for the "all escalations for X" lookups, which the
+// legacy SQL returned without a LIMIT. Escalations per workflow/origin/task are
+// few; this avoids a silent page cap without an unbounded scan.
+const LOOKUP_LIMIT = 1000;
 
 export async function createEscalation(
   input: CreateEscalationInput,
 ): Promise<LTEscalationRecord> {
-  loggerRegistry.info(`[escalation-crud] createEscalation called for wf=${input.workflow_id} type=${input.type} caller=${new Error().stack?.split('\n')[2]?.trim()}`);
-  const pool = getPool();
-  // Ensure the role exists in lt_roles (FK constraint)
-  await pool.query(ENSURE_ROLE_EXISTS, [input.role]);
-  const { rows } = await pool.query(
-    CREATE_ESCALATION,
-    [
-      input.type,
-      input.subtype,
-      input.description || null,
-      input.priority || 2,
-      input.task_id || null,
-      input.origin_id || null,
-      input.parent_id || null,
-      input.role,
-      input.envelope,
-      input.metadata ? JSON.stringify(input.metadata) : null,
-      input.escalation_payload || null,
-      input.workflow_id || null,
-      input.task_queue || null,
-      input.workflow_type || null,
-      input.trace_id || null,
-      input.span_id || null,
-    ],
-  );
-  const escalation = rows[0];
+  const client = await escalations();
+  const entry = await client.create({
+    type: input.type,
+    subtype: input.subtype,
+    description: input.description,
+    priority: input.priority ?? 2,
+    role: input.role,
+    taskId: input.task_id,
+    originId: input.origin_id,
+    parentId: input.parent_id,
+    workflowId: input.workflow_id,
+    taskQueue: input.task_queue,
+    workflowType: input.workflow_type,
+    traceId: input.trace_id,
+    spanId: input.span_id,
+    envelope: toEnvelopeObject(input.envelope),
+    metadata: input.metadata,
+    escalationPayload: toJsonObject(input.escalation_payload),
+  });
+  const escalation = toEscalationRecord(entry);
 
   publishEscalationEvent({
     type: 'escalation.created',
@@ -70,32 +60,20 @@ export async function createEscalation(
 }
 
 /**
- * Atomic claim operation. Does NOT change status — "claimed" is implicit
- * via assigned_to + assigned_until > NOW().
- *
- * Conditions:
- * - status = 'pending' (not resolved/cancelled)
- * - Either: unassigned, expired claim, or same user (extension)
- *
- * Uses a CTE to capture the previous state so callers can detect extensions.
+ * Atomic claim. Implicit model — status stays 'pending'; "claimed" is
+ * assigned_to + assigned_until > NOW(). `isExtension` is true when the same
+ * user re-claims (extends expiry). Returns null when the row is not claimable.
  */
 export async function claimEscalation(
   id: string,
   userId: string,
   durationMinutes: number = 30,
 ): Promise<ClaimResult | null> {
-  const pool = getPool();
+  const client = await escalations();
+  const result = await client.claim({ id, assignee: userId, durationMinutes });
+  if (!result.ok) return null;
 
-  const { rows } = await pool.query(
-    CLAIM_ESCALATION,
-    [id, userId, durationMinutes],
-  );
-
-  if (rows.length === 0) return null;
-
-  const row = rows[0];
-  const escalation = row as LTEscalationRecord;
-
+  const escalation = toEscalationRecord(result.entry);
   publishEscalationEvent({
     type: 'escalation.claimed',
     source: 'service',
@@ -107,54 +85,49 @@ export async function claimEscalation(
     data: { assigned_to: userId },
   });
 
-  return {
-    escalation,
-    isExtension: row.prev_assigned_to === userId,
-  };
+  return { escalation, isExtension: result.isExtension };
 }
 
+/**
+ * Mark an escalation resolved. Signal delivery is owned by the resolution
+ * orchestrator (api/escalations/resolve.ts); service-created rows have no
+ * signal_key, so this never delivers a signal itself. Returns null when the
+ * row is missing or already terminal.
+ */
 export async function resolveEscalation(
   id: string,
   resolverPayload: Record<string, any>,
 ): Promise<LTEscalationRecord | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(
-    RESOLVE_ESCALATION,
-    [id, JSON.stringify(resolverPayload)],
-  );
-  const escalation = rows[0] || null;
+  const client = await escalations();
+  const result = await client.resolve({ id, resolverPayload });
+  if (!result.ok) return null;
 
-  if (escalation) {
-    publishEscalationEvent({
-      type: 'escalation.resolved',
-      source: 'service',
-      workflowId: escalation.workflow_id || '',
-      workflowName: escalation.workflow_type || '',
-      taskQueue: escalation.task_queue || '',
-      escalationId: escalation.id,
-      status: 'resolved',
-      data: {},
-    });
-  }
+  const escalation = toEscalationRecord(result.entry);
+  publishEscalationEvent({
+    type: 'escalation.resolved',
+    source: 'service',
+    workflowId: escalation.workflow_id || '',
+    workflowName: escalation.workflow_type || '',
+    taskQueue: escalation.task_queue || '',
+    escalationId: escalation.id,
+    status: 'resolved',
+    data: {},
+  });
 
   return escalation;
 }
 
 /**
- * Bulk update priority for a set of escalations.
- * Only updates pending escalations.
+ * Bulk update priority for a set of escalations. Only pending escalations are
+ * updated.
  */
 export async function updateEscalationsPriority(
   ids: string[],
   priority: 1 | 2 | 3 | 4,
 ): Promise<number> {
   if (ids.length === 0) return 0;
-  const pool = getPool();
-  const { rowCount } = await pool.query(
-    UPDATE_ESCALATIONS_PRIORITY,
-    [priority, ids],
-  );
-  return rowCount ?? 0;
+  const client = await escalations();
+  return client.updateManyPriority({ ids, priority });
 }
 
 /**
@@ -163,12 +136,9 @@ export async function updateEscalationsPriority(
  */
 export async function getEscalationRoles(ids: string[]): Promise<string[]> {
   if (ids.length === 0) return [];
-  const pool = getPool();
-  const { rows } = await pool.query(
-    GET_ESCALATION_ROLES,
-    [ids],
-  );
-  return rows.map((r: any) => r.role);
+  const client = await escalations();
+  const rows = await client.list({ ids, limit: LOOKUP_LIMIT });
+  return [...new Set(rows.map(r => r.role).filter((r): r is string => !!r))];
 }
 
 /**
@@ -179,31 +149,35 @@ export async function releaseEscalation(
   id: string,
   userId: string,
 ): Promise<LTEscalationRecord | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(
-    RELEASE_ESCALATION,
-    [id, userId],
-  );
-  const released = rows[0] as LTEscalationRecord | undefined;
-  if (released) {
-    publishEscalationEvent({
-      type: 'escalation.released',
-      source: 'service',
-      workflowId: released.workflow_id || '',
-      workflowName: released.workflow_type || '',
-      taskQueue: released.task_queue || '',
-      escalationId: released.id,
-      status: 'released',
-      data: { released_by: userId },
-    });
-  }
-  return released || null;
+  const client = await escalations();
+  const result = await client.release({ id, assignee: userId });
+  if (!result.ok) return null;
+
+  const released = toEscalationRecord(result.entry);
+  publishEscalationEvent({
+    type: 'escalation.released',
+    source: 'service',
+    workflowId: released.workflow_id || '',
+    workflowName: released.workflow_type || '',
+    taskQueue: released.task_queue || '',
+    escalationId: released.id,
+    status: 'released',
+    data: { released_by: userId },
+  });
+  return released;
 }
 
+/**
+ * Sweep expired claims back to the available pool, returning the count cleared.
+ * Availability is already query-time in the implicit model, but long-tail's
+ * public contract clears `assigned_to` and returns a count, so this runs as a
+ * single direct UPDATE on the shared table (the SDK's releaseExpired is a no-op).
+ */
 export async function releaseExpiredClaims(): Promise<number> {
+  await ensureEscalationCompatView();
   const pool = getPool();
   const { rowCount } = await pool.query(RELEASE_EXPIRED_CLAIMS);
-  return rowCount || 0;
+  return rowCount ?? 0;
 }
 
 /**
@@ -214,46 +188,50 @@ export async function escalateToRole(
   id: string,
   targetRole: string,
 ): Promise<LTEscalationRecord | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(
-    ESCALATE_TO_ROLE,
-    [id, targetRole],
-  );
-  return rows[0] || null;
+  const client = await escalations();
+  const entry = await client.escalateToRole({ id, targetRole });
+  return entry ? toEscalationRecord(entry) : null;
 }
 
 export async function getEscalation(id: string): Promise<LTEscalationRecord | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(GET_ESCALATION, [id]);
-  return rows[0] || null;
+  const client = await escalations();
+  const entry = await client.get(id);
+  return entry ? toEscalationRecord(entry) : null;
 }
 
 export async function getEscalationsByTaskId(
   taskId: string,
 ): Promise<LTEscalationRecord[]> {
-  const pool = getPool();
-  const { rows } = await pool.query(GET_ESCALATIONS_BY_TASK_ID, [taskId]);
-  return rows;
+  const client = await escalations();
+  const rows = await client.list({
+    taskId,
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+    limit: LOOKUP_LIMIT,
+  });
+  return toEscalationRecords(rows);
 }
 
 export async function getEscalationsByWorkflowId(
   workflowId: string,
 ): Promise<LTEscalationRecord[]> {
-  const pool = getPool();
-  const { rows } = await pool.query(GET_ESCALATIONS_BY_WORKFLOW_ID, [workflowId]);
-  return rows;
+  const client = await escalations();
+  const rows = await client.list({
+    workflowId,
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+    limit: LOOKUP_LIMIT,
+  });
+  return toEscalationRecords(rows);
 }
 
 export async function updateEscalationMetadata(
   id: string,
   patch: Record<string, any>,
 ): Promise<LTEscalationRecord | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(
-    UPDATE_ESCALATION_METADATA,
-    [id, JSON.stringify(patch)],
-  );
-  return rows[0] || null;
+  const client = await escalations();
+  const entry = await client.update({ id, metadata: patch });
+  return entry ? toEscalationRecord(entry) : null;
 }
 
 export async function enrichEscalationRouting(
@@ -266,27 +244,29 @@ export async function enrichEscalationRouting(
     taskId?: string;
   },
 ): Promise<LTEscalationRecord | null> {
-  const pool = getPool();
-  const { rows } = await pool.query(
-    ENRICH_ESCALATION_ROUTING,
-    [
-      id,
-      JSON.stringify(metadataPatch),
-      workflowFields.workflowType || null,
-      workflowFields.workflowId || null,
-      workflowFields.taskQueue || null,
-      workflowFields.taskId || null,
-    ],
-  );
-  return rows[0] || null;
+  const client = await escalations();
+  const entry = await client.update({
+    id,
+    metadata: metadataPatch,
+    workflowType: workflowFields.workflowType,
+    workflowId: workflowFields.workflowId,
+    taskQueue: workflowFields.taskQueue,
+    taskId: workflowFields.taskId,
+  });
+  return entry ? toEscalationRecord(entry) : null;
 }
 
 export async function getEscalationsByOriginId(
   originId: string,
 ): Promise<LTEscalationRecord[]> {
-  const pool = getPool();
-  const { rows } = await pool.query(GET_ESCALATIONS_BY_ORIGIN_ID, [originId]);
-  return rows;
+  const client = await escalations();
+  const rows = await client.list({
+    originId,
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+    limit: LOOKUP_LIMIT,
+  });
+  return toEscalationRecords(rows);
 }
 
 // --- Metadata candidate key lookups -----------------------------------------
@@ -298,23 +278,31 @@ export async function findByMetadata(
   limit = 50,
   offset = 0,
 ): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
-  const pool = getPool();
-  const filter = JSON.stringify({ [key]: value });
-  const { rows } = await pool.query(FIND_BY_METADATA, [filter, status || null, limit, offset]);
-  const total = rows.length > 0 ? parseInt(rows[0]._total, 10) : 0;
-  // Strip the window function column from results
-  const escalations = rows.map(({ _total, ...rest }) => rest as LTEscalationRecord);
-  return { escalations, total };
+  const client = await escalations();
+  const metadata = { [key]: value };
+  const [rows, total] = await Promise.all([
+    client.list({
+      metadata,
+      status,
+      orderBy: [
+        { column: 'priority', direction: 'asc' },
+        { column: 'created_at', direction: 'asc' },
+      ],
+      limit,
+      offset,
+    }),
+    client.count({ metadata, status }),
+  ]);
+  return { escalations: toEscalationRecords(rows), total };
 }
 
 /**
- * Atomic claim by metadata with inline RBAC.
- * The SQL WHERE clause enforces role membership — if the caller
- * doesn't have an allowed role, zero rows match and the claim
- * never happens. No pre-flight find, no TOCTOU.
+ * Atomic claim by metadata with inline RBAC and optional metadata merge.
+ * The SDK enforces the role filter in SQL — callers without an allowed role
+ * match zero rows. Returns `{ escalation, isExtension, candidatesExist }` or
+ * null when nothing was claimed.
  *
- * @param allowedRoles — roles the caller can claim (null = no filter / global access)
- * @returns `{ escalation, isExtension, candidatesExist }` or null
+ * @param allowedRoles — roles the caller can claim (null = no filter / global)
  */
 export async function claimByMetadata(
   key: string,
@@ -324,16 +312,18 @@ export async function claimByMetadata(
   metadata?: Record<string, any>,
   allowedRoles?: string[] | null,
 ): Promise<(ClaimResult & { candidatesExist: number }) | null> {
-  const pool = getPool();
-  const filter = JSON.stringify({ [key]: value });
-  const metaPatch = metadata ? JSON.stringify(metadata) : null;
-  const roles = allowedRoles ?? null;
-  const { rows } = await pool.query(CLAIM_BY_METADATA_GUARDED, [filter, userId, durationMinutes, metaPatch, roles]);
-  if (rows.length === 0) return null;
-  const row = rows[0];
-  const { candidates_exist, prev_assigned_to, _total, ...rest } = row;
-  const escalation = rest as LTEscalationRecord;
+  const client = await escalations();
+  const result = await client.claimByMetadata({
+    key,
+    value,
+    assignee: userId,
+    durationMinutes,
+    roles: allowedRoles === null ? undefined : allowedRoles,
+    metadata,
+  });
+  if (!result.ok) return null;
 
+  const escalation = toEscalationRecord(result.entry);
   publishEscalationEvent({
     type: 'escalation.claimed',
     source: 'service',
@@ -347,8 +337,8 @@ export async function claimByMetadata(
 
   return {
     escalation,
-    isExtension: prev_assigned_to === userId,
-    candidatesExist: parseInt(candidates_exist, 10),
+    isExtension: result.isExtension,
+    candidatesExist: result.candidatesExist,
   };
 }
 
@@ -366,12 +356,14 @@ export interface ResolveByMetadataResult {
 }
 
 /**
- * Atomic resolve by metadata with signal guard.
+ * Atomic resolve by metadata with signal guard, in a single CTE.
  *
- * Single query, two outcomes:
- * 1. No signal_id → claim + resolve atomically. Returns { outcome: 'resolved', escalation }.
- * 2. signal_id present → resolve skipped. Returns { outcome: 'signal_required', signalId, escalationId, ... }
- *    so the caller can signal the workflow. conditionLT handles the rest.
+ * Signal-backed rows (those carrying `metadata.signal_id`) are NOT resolved
+ * here — long-tail signals the paused workflow and the workflow interceptor
+ * resolves durably. If the workflow is gone the signal fails and the row stays
+ * pending, which is the contract the route suite pins. This guard is long-tail
+ * business logic over the shared table, so it runs as one atomic statement on
+ * `hmsh_escalations` rather than through the generic SDK resolve.
  */
 export async function resolveByMetadataAtomic(
   key: string,
@@ -381,6 +373,7 @@ export async function resolveByMetadataAtomic(
   metadata?: Record<string, any>,
   allowedRoles?: string[] | null,
 ): Promise<ResolveByMetadataResult> {
+  await ensureEscalationCompatView();
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
   const payloadJson = JSON.stringify(resolverPayload);
@@ -393,8 +386,7 @@ export async function resolveByMetadataAtomic(
   const row = rows[0];
 
   if (row.outcome === 'resolved') {
-    const { target_id, signal_id, target_workflow_id, target_workflow_type, target_task_queue, outcome, ...rest } = row;
-    const escalation = rest as LTEscalationRecord;
+    const escalation = toEscalationRecord(row);
 
     publishEscalationEvent({
       type: 'escalation.resolved',
@@ -410,7 +402,7 @@ export async function resolveByMetadataAtomic(
     return { outcome: 'resolved', escalation };
   }
 
-  // Signal-backed escalation — return the signal info for the caller
+  // Signal-backed escalation — return the signal info for the caller to deliver.
   return {
     outcome: 'signal_required',
     signalId: row.signal_id,

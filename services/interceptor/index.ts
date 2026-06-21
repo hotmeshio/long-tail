@@ -1,4 +1,5 @@
 import { Durable } from '@hotmeshio/hotmesh';
+import type { Types } from '@hotmeshio/hotmesh';
 
 import * as interceptorActivities from './activities';
 import { createLTActivityInterceptor } from './activity-interceptor';
@@ -38,12 +39,14 @@ export async function registerLT(
   options?: {
     taskQueue?: string;
     defaultRole?: string;
+    /** SDK system-event sink — wired so the activity worker emits lifecycle events. */
+    events?: Types.EventsConfig;
   },
 ): Promise<void> {
   const taskQueue = options?.taskQueue ?? DEFAULT_ACTIVITY_QUEUE;
 
   await Durable.registerActivityWorker(
-    { connection, taskQueue, guid: `interceptor::${taskQueue}-${Durable.guid()}` as any },
+    { connection, taskQueue, guid: `interceptor::${taskQueue}-${Durable.guid()}` as any, events: options?.events },
     interceptorActivities,
     taskQueue,
   );
@@ -104,29 +107,12 @@ export function createLTInterceptor(options: {
 
       const envelope = extractEnvelope(ctx);
 
-      // 2. Fast path: certification is opt-in. Only workflows with
-      //    metadata.certified === true pay for the config lookup,
-      //    task creation, and escalation wiring.
-      if (envelope?.metadata?.certified !== true) {
-        const toolCtx = buildToolContextFromEnvelope(
-          envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
-        );
-        // Publish workflow events even for uncertified workflows
-        const taskQueue = deriveTaskQueue(wf);
-        publishStartedEvents(wf, taskQueue, undefined, wf.workflowId);
-        const result = toolCtx ? await runWithToolContext(toolCtx, next) : await next();
-        publishWorkflowEvent({
-          type: 'workflow.completed',
-          source: 'interceptor',
-          workflowId: wf.workflowId,
-          workflowName: wf.workflowName,
-          taskQueue,
-          status: 'completed',
-        });
-        return result;
-      }
-
-      // 3. Load config — unregistered/uncertified workflows get ToolContext only
+      // 2. The gate is REGISTRATION in lt_config_workflows, not the runtime
+      //    `certified` flag. Every registered workflow gets task tracking and
+      //    escalation wiring; unregistered ad-hoc durable workflows get
+      //    ToolContext + lifecycle events only. The `certified` flag is
+      //    propagated by executeLT and gates parent/child signal composition
+      //    (services/orchestrator), not task-record creation.
       const wfConfig = await activities.ltGetWorkflowConfig(wf.workflowName);
       if (!wfConfig) {
         const toolCtx = buildToolContextFromEnvelope(

@@ -13,6 +13,7 @@ import { registerAdapters } from './adapters';
 import { buildConnection, collectWorkers, startWorkers } from './workers';
 import { startServer } from './server';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
+import { systemEventsConfig } from '../lib/events/system-events';
 import { NatsEventAdapter } from '../lib/events/nats';
 import { attachNatsWsProxy } from '../lib/events/nats-ws-proxy';
 
@@ -105,7 +106,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
 
   // 7. Return instance
   const connection = buildConnection();
-  const client = new Durable.Client({ connection });
+  const client = new Durable.Client({ connection, events: systemEventsConfig });
 
   const shutdown = async () => {
     loggerRegistry.info('[long-tail] shutting down...');
