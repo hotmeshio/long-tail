@@ -42,6 +42,15 @@ export function TopicDetailPage() {
   const [publishSubject, setPublishSubject] = useState('');
   const [publishEventId, setPublishEventId] = useState(() => `evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`);
   const [publishPayload, setPublishPayload] = useState('');
+  // Opt-in envelope extension fields. Which ones are shown depends on the topic
+  // family (system.workflow.* shows workflow fields; a custom/file topic shows
+  // none). Prefilled like Event ID; sent as top-level event fields.
+  const [publishWorkflowName, setPublishWorkflowName] = useState('myWorkflow');
+  const [publishWorkflowId, setPublishWorkflowId] = useState('wf-001');
+  const [publishTaskQueue, setPublishTaskQueue] = useState('default');
+  const [publishStatus, setPublishStatus] = useState('');
+  const [publishEscalationId, setPublishEscalationId] = useState('esc-001');
+  const [publishActivityName, setPublishActivityName] = useState('myActivity');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState('');
   const [editSchema, setEditSchema] = useState('');
@@ -70,6 +79,42 @@ export function TopicDetailPage() {
     : topic.payload_schema?.properties
       ? JSON.stringify(Object.fromEntries(Object.keys(topic.payload_schema.properties).map(k => [k, ''])), null, 2)
       : '{}';
+
+  // Which envelope extensions belong to this topic's family ("the system injects
+  // fields by type"). Custom / file / knowledge topics carry none — just data.
+  const fam =
+    topic.topic.startsWith('system.workflow.') || topic.topic.startsWith('system.task.') ? 'workflow'
+      : topic.topic.startsWith('system.escalation.') ? 'escalation'
+        : topic.topic.startsWith('system.activity.') ? 'activity'
+          : 'none';
+  const showWorkflowFields = fam === 'workflow' || fam === 'escalation' || fam === 'activity';
+  const showStatus = fam === 'workflow' || fam === 'escalation';
+  // Status default mirrors the subject's terminal verb (failed / completed / resolved …).
+  const statusDefault = (publishSubject || topic.topic).split('.').pop() ?? '';
+
+  // The literal event the publish will send — built from the universal envelope
+  // (id, subject, source) + only the family's extension fields + the payload.
+  const buildPublishEvent = (): Record<string, any> => {
+    let data: Record<string, any> = {};
+    try { data = JSON.parse(publishPayload || defaultPayload); } catch { /* invalid JSON */ }
+    const subject = (publishSubject || topic.topic) !== topic.topic ? (publishSubject || topic.topic) : undefined;
+    const event: Record<string, any> = { id: publishEventId || undefined, source: 'dashboard', data };
+    if (subject) event.subject = subject;
+    if (showWorkflowFields) {
+      event.workflowName = publishWorkflowName;
+      event.workflowId = publishWorkflowId;
+      event.taskQueue = publishTaskQueue;
+    }
+    if (showStatus) event.status = publishStatus || statusDefault;
+    if (fam === 'escalation') event.escalationId = publishEscalationId;
+    if (fam === 'activity') event.activityName = publishActivityName;
+    return event;
+  };
+  // A literal preview of the published envelope (type derived from subject).
+  const eventPreview = (() => {
+    const { subject, ...rest } = buildPublishEvent();
+    return JSON.stringify({ type: subject || topic.topic, timestamp: '<minted>', ...rest }, null, 2);
+  })();
   if (!publishPayload && defaultPayload !== '{}') {
     setPublishPayload(defaultPayload);
   }
@@ -273,29 +318,98 @@ export function TopicDetailPage() {
                 className="input w-full text-[11px] font-mono mb-3"
                 spellCheck={false}
               />
+              {showWorkflowFields && (
+                <div className="grid grid-cols-2 gap-x-3">
+                  <div>
+                    <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Workflow Name</label>
+                    <input
+                      value={publishWorkflowName}
+                      onChange={(e) => setPublishWorkflowName(e.target.value)}
+                      className="input w-full text-[11px] font-mono mb-3"
+                      spellCheck={false}
+                      placeholder="myWorkflow"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Workflow ID</label>
+                    <input
+                      value={publishWorkflowId}
+                      onChange={(e) => setPublishWorkflowId(e.target.value)}
+                      className="input w-full text-[11px] font-mono mb-3"
+                      spellCheck={false}
+                      placeholder="wf-001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Task Queue</label>
+                    <input
+                      value={publishTaskQueue}
+                      onChange={(e) => setPublishTaskQueue(e.target.value)}
+                      className="input w-full text-[11px] font-mono mb-3"
+                      spellCheck={false}
+                      placeholder="default"
+                    />
+                  </div>
+                  {showStatus && (
+                    <div>
+                      <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Status</label>
+                      <input
+                        value={publishStatus || statusDefault}
+                        onChange={(e) => setPublishStatus(e.target.value)}
+                        className="input w-full text-[11px] font-mono mb-3"
+                        spellCheck={false}
+                        placeholder={statusDefault}
+                      />
+                    </div>
+                  )}
+                  {fam === 'escalation' && (
+                    <div>
+                      <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Escalation ID</label>
+                      <input
+                        value={publishEscalationId}
+                        onChange={(e) => setPublishEscalationId(e.target.value)}
+                        className="input w-full text-[11px] font-mono mb-3"
+                        spellCheck={false}
+                        placeholder="esc-001"
+                      />
+                    </div>
+                  )}
+                  {fam === 'activity' && (
+                    <div>
+                      <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Activity Name</label>
+                      <input
+                        value={publishActivityName}
+                        onChange={(e) => setPublishActivityName(e.target.value)}
+                        className="input w-full text-[11px] font-mono mb-3"
+                        spellCheck={false}
+                        placeholder="myActivity"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Payload</label>
               <textarea
                 value={publishPayload || defaultPayload}
                 onChange={(e) => setPublishPayload(e.target.value)}
                 className="input-json w-full text-[11px]"
-                rows={7}
+                rows={6}
                 spellCheck={false}
                 placeholder='{ "key": "value" }'
               />
+              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1 mt-3">Event Preview</label>
+              <pre className="bg-surface-sunken/60 rounded px-2 py-2 text-[10px] font-mono text-text-tertiary overflow-auto max-h-44 whitespace-pre">{eventPreview}</pre>
               <div className="mt-3">
                 <button
                   onClick={() => {
-                    try {
-                      const data = JSON.parse(publishPayload || defaultPayload);
-                      const subject = (publishSubject || topic.topic) !== topic.topic
-                        ? (publishSubject || topic.topic)
-                        : undefined;
-                      publishMutation.mutate({ topic: topic.topic, subject, eventId: publishEventId || undefined, data }, { onSuccess: () => {
+                    publishMutation.mutate(
+                      { topic: topic.topic, event: buildPublishEvent() },
+                      { onSuccess: () => {
                         refetch();
                         // Generate a fresh event ID for the next publish
                         setPublishEventId(`evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`);
-                      } });
-                    } catch { /* invalid JSON */ }
+                      } },
+                    );
                   }}
                   disabled={publishMutation.isPending}
                   className="btn-primary text-xs w-full"

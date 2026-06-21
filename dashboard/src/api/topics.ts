@@ -102,11 +102,13 @@ export function useDeleteTopic() {
 }
 
 export function usePublishTopic() {
-  return useMutation<{ published: boolean; topic: string; timestamp: string }, Error, { topic: string; subject?: string; eventId?: string; data: Record<string, any> }>({
-    mutationFn: ({ topic, subject, eventId, data }) =>
+  // The request body IS the event envelope (Partial<LTEvent> + optional subject).
+  // The server derives `type` from the subject/topic and mints id/timestamp.
+  return useMutation<{ published: boolean; topic: string; timestamp: string }, Error, { topic: string; event: Record<string, any> }>({
+    mutationFn: ({ topic, event }) =>
       apiFetch(`/topics/by-name/${encodeURIComponent(topic)}/publish`, {
         method: 'POST',
-        body: JSON.stringify({ subject, eventId, data }),
+        body: JSON.stringify(event),
       }),
   });
 }

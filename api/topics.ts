@@ -94,29 +94,39 @@ export function isValidVariant(pattern: string, subject: string): boolean {
   return pi === patternParts.length && si === subjectParts.length;
 }
 
+/**
+ * A publishable event envelope. The request body IS the event: any `LTEvent`
+ * field the caller wants to set (`id`, `source`, `data`, and — for system
+ * families — `workflowId` / `workflowName` / `taskQueue` / `status` / etc.),
+ * minus the server-managed ones (`type` is derived from the subject, `timestamp`
+ * is stamped). `subject` is an optional concrete variant of a wildcard topic.
+ *
+ * One typed object, infinitely extensible — no per-field API parameters.
+ */
+export type PublishEventInput = Partial<Omit<LTEvent, 'type' | 'timestamp'>> & {
+  subject?: string;
+};
+
 export async function publishTopic(input: {
   topic: string;
-  subject?: string;
-  eventId?: string;
-  data: Record<string, any>;
-  source?: string;
+  event?: PublishEventInput;
 }): Promise<LTApiResult> {
   try {
-    const publishSubject = input.subject || input.topic;
+    const { subject, ...fields } = input.event ?? {};
+    const publishSubject = subject || input.topic;
 
     // Validate subject is a valid variant of the topic pattern
-    if (input.subject && !isValidVariant(input.topic, input.subject)) {
-      return { status: 400, error: `Subject "${input.subject}" does not match topic pattern "${input.topic}"` };
+    if (subject && !isValidVariant(input.topic, subject)) {
+      return { status: 400, error: `Subject "${subject}" does not match topic pattern "${input.topic}"` };
     }
 
+    // The envelope is the caller's; the server owns type/timestamp (and mints id
+    // downstream in eventRegistry.publish if the caller didn't supply one).
     const event: LTEvent = {
-      id: input.eventId,
+      ...fields,
       type: publishSubject,
-      source: input.source || 'dashboard',
-      workflowId: '',
-      workflowName: '',
-      taskQueue: '',
-      data: input.data,
+      source: fields.source || 'dashboard',
+      data: fields.data ?? {},
       timestamp: new Date().toISOString(),
     };
     await eventRegistry.publish(event);

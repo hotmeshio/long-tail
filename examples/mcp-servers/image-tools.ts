@@ -24,12 +24,12 @@ function publishImageEvent(
   topic: string,
   data: Record<string, any>,
 ): void {
+  // A custom (non-system) event: just the minimal envelope + data. No workflow
+  // fields — those belong only to system.workflow.* families. eventRegistry
+  // mints the id.
   const event: LTEvent = {
     type: topic,
     source: 'image-tools',
-    workflowId: '',
-    workflowName: '',
-    taskQueue: '',
     data,
     timestamp: new Date().toISOString(),
   };

@@ -30,8 +30,14 @@ class LTEventRegistry {
    */
   async publish(event: LTEvent): Promise<void> {
     if (!this.adapters.length) return;
+    // The manager guarantees the universal envelope fields: mint an idempotent
+    // id and stamp a timestamp when the publisher (e.g. a custom app event) did
+    // not supply them. `type` is the publisher's responsibility.
     if (!event.id) {
       event.id = `evt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    }
+    if (!event.timestamp) {
+      event.timestamp = new Date().toISOString();
     }
     await Promise.allSettled(
       this.adapters.map((a) =>

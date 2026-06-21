@@ -141,12 +141,10 @@ export function publishKnowledgeEvent(params: {
   key: string;
 }): Promise<void> {
   const action = params.type.split('.')[1];
+  // No workflow context — knowledge events carry only the minimal envelope + data.
   return fireAndForget({
     type: `system.knowledge.${params.domain}.${action}`,
     source: 'knowledge',
-    workflowId: '',
-    workflowName: '',
-    taskQueue: '',
     data: { domain: params.domain, key: params.key },
     timestamp: new Date().toISOString(),
   });
@@ -169,12 +167,10 @@ export function publishFileEvent(params: {
   const name = dotIdx > 0 ? filename.slice(0, dotIdx) : filename;
   const extension = dotIdx > 0 ? filename.slice(dotIdx + 1) : '';
 
+  // No workflow context — file events carry only the minimal envelope + data.
   return fireAndForget({
     type: `system.file.${action}`,
     source: 'file-storage',
-    workflowId: '',
-    workflowName: '',
-    taskQueue: '',
     data: {
       path: params.path,
       name,
@@ -199,12 +195,12 @@ export function publishAgentEvent(params: {
   data?: Record<string, any>;
 }): Promise<void> {
   const action = params.type.replace('agent.', '');
+  // Agents have no task queue; agentId/agentName ride workflowId/workflowName for routing parity.
   return fireAndForget({
     type: `system.agent.${params.agentName}.${action}`,
     source: 'agent',
     workflowId: params.agentId,
     workflowName: params.agentName,
-    taskQueue: '',
     status: params.status,
     data: params.data,
     timestamp: new Date().toISOString(),

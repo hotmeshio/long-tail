@@ -49,9 +49,9 @@ export function mapSystemEvent(event: SystemEvent): LTEvent {
     return {
       type: event.type,
       source: 'sdk',
-      workflowId: (row.workflow_id as string) || event.workflow_id || '',
-      workflowName: (row.workflow_type as string) || '',
-      taskQueue: (row.task_queue as string) || '',
+      workflowId: (row.workflow_id as string) || event.workflow_id || undefined,
+      workflowName: (row.workflow_type as string) || undefined,
+      taskQueue: (row.task_queue as string) || undefined,
       escalationId: (row.id as string) || segments[2],
       originId: (row.origin_id as string) || event.origin_id || undefined,
       status: ESCALATION_STATUS_BY_VERB[verb] ?? verb,
@@ -65,9 +65,8 @@ export function mapSystemEvent(event: SystemEvent): LTEvent {
   return {
     type: event.type,
     source: 'sdk',
-    workflowId: event.workflow_id || '',
-    workflowName: '',
-    taskQueue: (event.data as Record<string, any>)?.taskQueue || '',
+    workflowId: event.workflow_id || undefined,
+    taskQueue: (event.data as Record<string, any>)?.taskQueue || undefined,
     data: event.data,
     timestamp: event.ts,
   };

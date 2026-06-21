@@ -32,12 +32,44 @@ describe('applyInputMapping', () => {
     expect(result).toEqual({ deep: 'deep' });
   });
 
-  it('passes through non-template strings', () => {
-    const mapping = { static: 'hello', mixed: 'prefix-{event.source}' };
+  it('passes through static strings with no tokens', () => {
+    const mapping = { static: 'hello' };
     const result = applyInputMapping(mapping, baseEvent);
-    // Only exact {path} templates resolve; partial templates stay as-is
     expect(result.static).toBe('hello');
-    expect(result.mixed).toBe('prefix-{event.source}');
+  });
+
+  it('interpolates a token embedded in surrounding text', () => {
+    const mapping = { mixed: 'prefix-{event.source}' };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.mixed).toBe('prefix-interceptor');
+  });
+
+  it('interpolates multiple tokens in a composite string (dynamic URL)', () => {
+    const mapping = {
+      text: 'https://host/longtail?entity={event.workflowName}&search={event.workflowId}',
+    };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.text).toBe('https://host/longtail?entity=myWorkflow&search=wf-123');
+  });
+
+  it('leaves an unresolved token verbatim while resolving the others', () => {
+    const mapping = { text: 'a={event.source}&b={event.data.missing}' };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.text).toBe('a=interceptor&b={event.data.missing}');
+  });
+
+  it('stringifies a scalar token inside a composite string', () => {
+    const event = { ...baseEvent, data: { ...baseEvent.data, angle: 180 } };
+    const mapping = { text: 'angle={event.data.angle}deg' };
+    const result = applyInputMapping(mapping, event);
+    expect(result.text).toBe('angle=180deg');
+  });
+
+  it('preserves a whole-string token that resolves to an object', () => {
+    const mapping = { payload: '{event.data}' };
+    const result = applyInputMapping(mapping, baseEvent);
+    expect(result.payload).toEqual(baseEvent.data);
+    expect(typeof result.payload).toBe('object');
   });
 
   it('passes through non-string values (numbers, booleans, null)', () => {

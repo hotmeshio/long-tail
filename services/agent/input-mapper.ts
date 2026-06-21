@@ -1,22 +1,47 @@
 import type { LTEvent } from '../../types';
 
 /**
- * Resolve a template string like "{event.data.orderId}" against an event object.
- * Returns the resolved value, or the raw template if the path doesn't exist.
+ * Resolve a dotted path like "event.data.orderId" against `{ event }`.
+ * Returns the resolved value, or `undefined` if any segment is missing.
  */
-function resolveTemplate(template: string, event: LTEvent): any {
-  const match = template.match(/^\{(.+)\}$/);
-  if (!match) return template;
-
-  const path = match[1].split('.');
+function resolvePath(path: string, event: LTEvent): any {
+  const segments = path.trim().split('.');
   let current: any = { event };
 
-  for (const segment of path) {
-    if (current == null || typeof current !== 'object') return template;
+  for (const segment of segments) {
+    if (current == null || typeof current !== 'object') return undefined;
     current = current[segment];
   }
 
-  return current ?? template;
+  return current;
+}
+
+/**
+ * Resolve a template string against an event.
+ *
+ * - A string that is exactly one token resolving to a **non-scalar**
+ *   (object/array) returns that value unchanged — full-object resolution,
+ *   e.g. `"{event.data}"` → the whole data object.
+ * - Every other string is interpolated **inline**: each `{path}` is replaced by
+ *   `String(resolved)`. This covers tokens embedded in surrounding text, multiple
+ *   tokens in one string, and single tokens that resolve to a scalar — e.g.
+ *   `"https://host/lt?entity={event.workflowName}&q={event.workflowId}"`.
+ *   A token whose path does not exist is left verbatim, so an unresolved
+ *   `{event.data.missing}` passes through unchanged (other tokens still resolve).
+ */
+function resolveTemplate(template: string, event: LTEvent): any {
+  const exact = template.match(/^\{([^}]+)\}$/);
+  if (exact) {
+    const resolved = resolvePath(exact[1], event);
+    if (resolved !== null && resolved !== undefined && typeof resolved === 'object') {
+      return resolved;
+    }
+  }
+
+  return template.replace(/\{([^}]+)\}/g, (original, path) => {
+    const resolved = resolvePath(path, event);
+    return resolved !== null && resolved !== undefined ? String(resolved) : original;
+  });
 }
 
 /**
