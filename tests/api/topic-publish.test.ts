@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { isValidVariant, publishTopic } from '../../api/topics';
+import { eventRegistry } from '../../lib/events';
 
 // Mock the event registry so publishTopic doesn't need a real event bus
 vi.mock('../../lib/events', () => ({
@@ -8,6 +9,9 @@ vi.mock('../../lib/events', () => ({
     publish: vi.fn().mockResolvedValue(undefined),
   },
 }));
+
+const lastPublishedEvent = () =>
+  vi.mocked(eventRegistry.publish).mock.calls.at(-1)?.[0] as any;
 
 describe('isValidVariant', () => {
   it('exact match — no wildcards', () => {
@@ -65,7 +69,7 @@ describe('publishTopic — subject validation', () => {
   });
 
   it('publishes with topic as subject when no subject provided', async () => {
-    const result = await publishTopic({ topic: 'knowledge.stored', data: { key: '1' } });
+    const result = await publishTopic({ topic: 'knowledge.stored', event: { data: { key: '1' } } });
     expect(result.status).toBe(200);
     expect(result.data.topic).toBe('knowledge.stored');
   });
@@ -73,8 +77,7 @@ describe('publishTopic — subject validation', () => {
   it('publishes with valid subject variant', async () => {
     const result = await publishTopic({
       topic: 'order.*.completed',
-      subject: 'order.123.completed',
-      data: {},
+      event: { subject: 'order.123.completed', data: {} },
     });
     expect(result.status).toBe(200);
     expect(result.data.topic).toBe('order.123.completed');
@@ -83,8 +86,7 @@ describe('publishTopic — subject validation', () => {
   it('rejects invalid subject variant with 400', async () => {
     const result = await publishTopic({
       topic: 'order.*.completed',
-      subject: 'order.123.456.completed',
-      data: {},
+      event: { subject: 'order.123.456.completed', data: {} },
     });
     expect(result.status).toBe(400);
     expect(result.error).toContain('does not match topic pattern');
@@ -93,9 +95,57 @@ describe('publishTopic — subject validation', () => {
   it('rejects completely unrelated subject', async () => {
     const result = await publishTopic({
       topic: 'knowledge.stored',
-      subject: 'workflow.completed',
-      data: {},
+      event: { subject: 'workflow.completed', data: {} },
     });
     expect(result.status).toBe(400);
+  });
+});
+
+describe('publishTopic — minimal envelope + opt-in extensions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('publishes a MINIMAL envelope (no empty workflow fields injected) when none are given', async () => {
+    await publishTopic({ topic: 'system.workflow.*.failed', event: { data: { reason: 'boom' } } });
+    const event = lastPublishedEvent();
+    expect('workflowId' in event).toBe(false);
+    expect('workflowName' in event).toBe(false);
+    expect('taskQueue' in event).toBe(false);
+    // the universal fields are present
+    expect(event.type).toBe('system.workflow.*.failed');
+    expect(event.timestamp).toBeTruthy();
+  });
+
+  it('passes through the envelope fields the caller set (so input_mapping tokens resolve)', async () => {
+    await publishTopic({
+      topic: 'system.workflow.*.failed',
+      event: {
+        subject: 'system.workflow.myWorkflow.failed',
+        workflowId: 'wf-001',
+        workflowName: 'myWorkflow',
+        taskQueue: 'my-queue',
+        status: 'failed',
+        originId: 'origin-1',
+        data: { reason: 'boom' },
+      },
+    });
+    const event = lastPublishedEvent();
+    expect(event.type).toBe('system.workflow.myWorkflow.failed');
+    expect(event.workflowName).toBe('myWorkflow');
+    expect(event.workflowId).toBe('wf-001');
+    expect(event.taskQueue).toBe('my-queue');
+    expect(event.status).toBe('failed');
+    expect(event.originId).toBe('origin-1');
+    expect(event.data).toEqual({ reason: 'boom' });
+  });
+
+  it('honours a caller-supplied id and omits fields not provided', async () => {
+    await publishTopic({ topic: 'app.image.resized', event: { id: 'custom-1', data: { w: 100 } } });
+    const event = lastPublishedEvent();
+    expect(event.id).toBe('custom-1');
+    expect('workflowName' in event).toBe(false);
+    expect('status' in event).toBe(false);
+    expect('taskId' in event).toBe(false);
   });
 });

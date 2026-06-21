@@ -107,12 +107,34 @@ export function createLTInterceptor(options: {
 
       const envelope = extractEnvelope(ctx);
 
-      // 2. The gate is REGISTRATION in lt_config_workflows, not the runtime
-      //    `certified` flag. Every registered workflow gets task tracking and
-      //    escalation wiring; unregistered ad-hoc durable workflows get
-      //    ToolContext + lifecycle events only. The `certified` flag is
-      //    propagated by executeLT and gates parent/child signal composition
-      //    (services/orchestrator), not task-record creation.
+      // 2. Opt-in gate — the envelope drives behavior. Certification is opt-in:
+      //    only workflows explicitly marked `metadata.certified === true` pay for
+      //    the config lookup, task tracking, and escalation wiring. Every other
+      //    durable workflow is a pure pass-through (ToolContext for identity +
+      //    fire-and-forget lifecycle events) — NO proxyActivity, NO DB lookup, NO
+      //    extra durable leg. The invoke layer (services/workflow-invocation)
+      //    stamps certified:true for certified workflows; executeLT propagates it
+      //    to children. This keeps plain durable workflows free of interceptor cost.
+      if (envelope?.metadata?.certified !== true) {
+        const toolCtx = buildToolContextFromEnvelope(
+          envelope, wf.workflowId, wf.workflowTrace, wf.workflowSpan,
+        );
+        const taskQueue0 = deriveTaskQueue(wf);
+        publishStartedEvents(wf, taskQueue0, undefined, wf.workflowId);
+        const result0 = toolCtx ? await runWithToolContext(toolCtx, next) : await next();
+        publishWorkflowEvent({
+          type: 'workflow.completed',
+          source: 'interceptor',
+          workflowId: wf.workflowId,
+          workflowName: wf.workflowName,
+          taskQueue: taskQueue0,
+          status: 'completed',
+        });
+        return result0;
+      }
+
+      // 3. Opted in (certified === true): load config. A certified workflow with
+      //    no registered config still falls back to ToolContext + events only.
       const wfConfig = await activities.ltGetWorkflowConfig(wf.workflowName);
       if (!wfConfig) {
         const toolCtx = buildToolContextFromEnvelope(

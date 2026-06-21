@@ -45,24 +45,45 @@ services:
 
 Both adapters still publish events regardless of `EVENT_TRANSPORT` — the setting only controls what the dashboard listens on. This means server-side event consumers (callbacks, NATS subscribers) work independently of the dashboard transport.
 
-## LTEvent
+## The event envelope
 
-Every published event conforms to the `LTEvent` interface:
+An event is a tiny **universal envelope** plus a topic-specific **payload** (`data`). Only three fields are universal; everything else is a per-family extension, added by the family that needs it.
+
+### Universal envelope
 
 ```typescript
-interface LTEvent {
-  type: string;              // 'milestone', 'escalation', 'task.completed', etc.
-  source: string;            // 'interceptor' | 'orchestrator' | 'activity'
-  workflowId: string;        // workflow instance ID
-  workflowName: string;      // workflow function name
-  taskQueue: string;         // task queue the workflow ran on
-  taskId?: string;           // present when orchestrated
-  activityName?: string;     // present when source is 'activity'
-  milestones: LTMilestone[]; // milestones reported by the workflow
-  data?: Record<string, any>;
-  timestamp: string;         // ISO 8601
+interface LTEventBase {
+  id?: string;        // idempotency key — minted by eventRegistry.publish() if omitted
+  type: string;       // the subject (system: `system.workflow.{id}.failed`; custom: `app.*`)
+  timestamp: string;  // ISO 8601 — stamped by the publisher; ensured by eventRegistry
+  source?: string;    // producer tag (optional)
+  data?: Record<string, any>; // the payload — topic-specific shape
 }
 ```
+
+`type` and `timestamp` are the only required fields; `id` is minted if the publisher doesn't supply one. A **custom** event (e.g. `app.image.resized` from an MCP tool) is just this base plus `data` — **no workflow fields are injected.**
+
+### Per-family extensions ("the system injects fields by type")
+
+System families declare the fields they populate. Which fields exist is a function of the subject family, not a universal requirement:
+
+| Family | Subject | Adds |
+|---|---|---|
+| workflow | `system.workflow.{id}.{started\|completed\|failed}` | `workflowId`, `workflowName`, `taskQueue`, `status` |
+| task | `system.task.{taskId}.{created\|started\|completed\|escalated\|failed}` | + `taskId` |
+| escalation | `system.escalation.{id}.{created\|resolved\|claimed\|released}` | `escalationId` (+ workflow context), `status` |
+| activity | `system.activity.{wfId}.{activity}.{started\|completed\|failed}` | `activityName` (+ workflow context) |
+| milestone | `system.milestone.{wfId}` | `milestones` (+ workflow context) |
+| agent | `system.agent.{name}.{started\|completed\|failed\|…}` | `workflowId`=agentId, `workflowName`=agentName |
+| knowledge / file | `system.knowledge.{domain}.*` / `system.file.*` | none — payload only |
+
+`status` is a **per-family vocabulary**, not one global enum: workflow `started|in_progress|running|completed|failed`; task `created|in_progress|completed|needs_intervention|failed`; escalation `pending|claimed|released|resolved|cancelled`.
+
+Consumers (adapters, the agent trigger registry, input_mapping) type against the broad **`LTEvent`** — the base plus every extension as **optional** — since they can't assume any extension is present. Producers (`lib/events/publish.ts`) construct the precise `LT*Event` family types, all assignable to `LTEvent`.
+
+### Who mints it
+
+`lib/events/publish.ts` holds one typed constructor per family (the central, principled mint). `eventRegistry.publish()` is the dispatch: it guarantees the universals (mints `id`, stamps `timestamp` if absent) and fans out to every adapter. For custom events it leaves the envelope minimal.
 
 A milestone is a name/value pair:
 

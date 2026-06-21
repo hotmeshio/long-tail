@@ -65,12 +65,10 @@ router.delete('/by-name/:topic', async (req, res) => {
  * Publish a test event to the event bus with the given topic and payload.
  */
 router.post('/by-name/:topic/publish', async (req, res) => {
+  // The request body IS the event envelope (Partial<LTEvent> + optional subject).
   const result = await api.publishTopic({
     topic: decodeURIComponent(req.params.topic),
-    subject: req.body.subject || undefined,
-    eventId: req.body.eventId || undefined,
-    data: req.body.data ?? {},
-    source: req.body.source ?? 'dashboard',
+    event: (req.body ?? {}) as api.PublishEventInput,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

@@ -61,38 +61,68 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 | `idx_lt_tasks_origin_id` | `(origin_id)` | Look up tasks by origin ID |
 | `idx_lt_tasks_trace` | `(trace_id)` | Look up tasks by trace ID |
 
-### lt_escalations
+### lt_escalations (view) → hmsh_escalations
 
-Records human intervention requests. Created when a workflow returns `type: 'escalation'`. Updated when claimed or resolved.
+Records human intervention requests. Created when a workflow returns
+`type: 'escalation'`, when `ltCreateEscalation` runs, or atomically when a
+workflow calls `condition(signalId, config)` / `conditionLT(signalId, config)`.
+Updated when claimed or resolved.
+
+Since v0.5.3 the storage is the **shared HotMesh table `public.hmsh_escalations`**
+(written by both long-tail and the HotMesh SDK). `lt_escalations` remains as a
+backward-compatible **view** over it — `SELECT *` plus a computed `available`
+column — so existing read queries and the public API are unchanged. Indexes are
+managed by the SDK on `hmsh_escalations` (see below).
+
+The columns below are the `hmsh_escalations` table. The public API record
+(`LTEscalationRecord`) is mapped from these: the JSONB `envelope` /
+`escalation_payload` / `resolver_payload` are serialized to JSON **strings**, and
+`type` / `subtype` / `role` are coerced to non-null (`''` when absent) so the API
+contract is stable.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
 | `id` | `UUID` | `gen_random_uuid()` | Primary key |
-| `type` | `TEXT NOT NULL` | — | Escalation category (e.g., `review`, `verification`) |
-| `subtype` | `TEXT NOT NULL` | — | Subcategory for finer routing |
-| `modality` | `TEXT NOT NULL` | — | Modality from workflow config |
-| `description` | `TEXT` | — | Human-readable reason for the escalation |
-| `status` | `TEXT NOT NULL` | `'pending'` | `pending` or `resolved` |
-| `priority` | `INTEGER NOT NULL` | `2` | Numeric priority |
-| `task_id` | `UUID` | — | FK to `lt_tasks(id)` — the task that triggered this escalation |
-| `origin_id` | `TEXT` | — | Correlation ID from the parent orchestrator |
-| `parent_id` | `TEXT` | — | Direct parent workflow ID |
+| `namespace` | `TEXT NOT NULL` | — | HotMesh namespace scope |
+| `app_id` | `TEXT NOT NULL` | — | HotMesh app scope |
+| `signal_key` | `TEXT` | — | Atomic resume key set by `condition(signalId, config)` — resuming this row signals the waiting workflow in place. `NULL` for service-created rows. Unique per `(namespace, app_id, signal_key)`. |
+| `topic` | `TEXT` | — | Hook topic used to deliver the resume signal |
 | `workflow_id` | `TEXT` | — | HotMesh workflow ID of the escalated workflow |
-| `task_queue` | `TEXT` | — | Task queue the workflow runs on (needed for resolution re-run) |
-| `workflow_type` | `TEXT` | — | Workflow name (needed for resolution re-run) |
-| `role` | `TEXT NOT NULL` | — | Target role — users with this role see the escalation |
+| `task_queue` | `TEXT` | — | Task queue the workflow runs on (needed for resolution) |
+| `workflow_type` | `TEXT` | — | Workflow name (needed for resolution) |
+| `type` | `TEXT` | — | Escalation category (e.g., `review`, `orderPipeline`). Non-null in the API record. |
+| `subtype` | `TEXT` | — | Subcategory for finer routing. Non-null in the API record. |
+| `entity` | `TEXT` | — | Entity/workflow tag (replaces the former `modality`) |
+| `description` | `TEXT` | — | Human-readable reason for the escalation |
+| `role` | `TEXT` | — | Target role name — users with this role see the escalation. Matched by name (logical pointer to `lt_roles.role`, one role → many escalations); not an FK. Non-null in the API record. |
+| `status` | `TEXT NOT NULL` | `'pending'` | `pending`, `resolved`, or `cancelled` |
+| `priority` | `INTEGER NOT NULL` | `5` | Numeric priority (long-tail's `createEscalation` defaults rows to `2`) |
 | `assigned_to` | `TEXT` | — | User ID of the claimer |
 | `assigned_until` | `TIMESTAMPTZ` | — | Claim expiry — after this time the escalation returns to the queue |
-| `resolved_at` | `TIMESTAMPTZ` | — | When the escalation was resolved |
 | `claimed_at` | `TIMESTAMPTZ` | — | When the escalation was claimed |
-| `envelope` | `TEXT NOT NULL` | — | JSON-serialized original workflow envelope |
-| `metadata` | `JSONB` | — | Arbitrary metadata |
-| `escalation_payload` | `TEXT` | — | JSON-serialized data the workflow attached to the escalation |
-| `resolver_payload` | `TEXT` | — | JSON-serialized decision from the human reviewer |
+| `claim_expires_at` | `TIMESTAMPTZ` | — | SDK claim-expiry timestamp |
+| `resolved_at` | `TIMESTAMPTZ` | — | When the escalation was resolved |
+| `task_id` | `TEXT` | — | ID of the `lt_tasks` row that triggered this escalation |
+| `origin_id` | `TEXT` | — | Correlation ID from the parent orchestrator |
+| `parent_id` | `TEXT` | — | Direct parent workflow ID |
+| `initiated_by` | `TEXT` | — | Identity that initiated the escalation |
+| `created_by` | `TEXT` | — | Identity that created the row |
+| `envelope` | `JSONB` | — | Original workflow envelope (serialized to a JSON string in the API record) |
+| `metadata` | `JSONB` | — | Arbitrary metadata (GIN-indexed; holds claim/filter keys) |
+| `escalation_payload` | `JSONB` | — | Data the workflow attached (JSON string in the API record) |
+| `resolver_payload` | `JSONB` | — | Human reviewer's decision (JSON string in the API record) |
+| `milestones` | `JSONB NOT NULL` | `'[]'` | Audit trail of lifecycle milestones |
 | `trace_id` | `TEXT` | — | Distributed tracing trace ID |
 | `span_id` | `TEXT` | — | Distributed tracing span ID |
+| `expires_at` | `TIMESTAMPTZ` | — | Optional deadline for the escalation |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
+
+The `lt_escalations` view adds one computed column on top of the above:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `available` | `BOOLEAN` | `true` when claimable — `assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()` |
 
 **Claiming is implicit.** There is no separate status for "claimed". An escalation is considered claimed when `assigned_to IS NOT NULL` and `assigned_until > NOW()`. When the claim expires, the escalation is available again without any status change. The `/available` endpoint uses this logic:
 
@@ -101,27 +131,20 @@ WHERE status = 'pending'
   AND (assigned_to IS NULL OR assigned_until <= NOW())
 ```
 
-**Indexes:**
+**Indexes** (SDK-managed, on `hmsh_escalations`):
 
 | Index | Columns | Purpose |
 |-------|---------|---------|
-| `idx_lt_escalations_available` | `(status, role, assigned_until, created_at DESC)` | Available escalation query |
-| `idx_lt_escalations_available_v2` | `(role, priority, created_at DESC) WHERE status = 'pending'` | Partial index for priority-ordered available queries |
-| `idx_lt_escalations_assigned` | `(assigned_to, assigned_until, created_at DESC)` | Find escalations claimed by a specific user |
-| `idx_lt_escalations_expiry` | `(assigned_until, assigned_to)` | Expire stale claims |
-| `idx_lt_escalations_role_type` | `(role, status, type, created_at DESC)` | Filter by role + type |
-| `idx_lt_escalations_role_subtype` | `(role, status, type, subtype, created_at DESC)` | Filter by role + type + subtype |
-| `idx_lt_escalations_status` | `(status, created_at DESC)` | General status queries |
-| `idx_lt_escalations_task` | `(task_id)` | Join escalations to their parent task |
-| `idx_lt_escalations_origin` | `(origin_id, created_at DESC)` | Find escalations sharing an origin |
-| `idx_lt_escalations_workflow` | `(workflow_id)` | Look up escalation by workflow ID |
-| `idx_lt_escalations_type` | `(type)` | Filter by escalation type |
-| `idx_lt_escalations_pending_sort` | `(status, priority, created_at DESC)` | Sort pending escalations by priority |
-| `idx_lt_escalations_origin_id` | `(origin_id)` | Look up escalations by origin ID |
-| `idx_lt_escalations_trace` | `(trace_id)` | Look up escalations by trace ID |
-| `idx_lt_escalations_created_desc` | `(created_at DESC)` | Sort by creation time descending |
-| `idx_lt_escalations_updated_desc` | `(updated_at DESC)` | Sort by update time descending |
-| `idx_lt_escalations_priority_desc` | `(priority DESC)` | Sort by priority descending |
+| `hmsh_escalations_pkey` | `(id)` | Primary key |
+| `idx_hmsh_esc_available` | `(namespace, app_id, role, priority, created_at) WHERE status = 'pending'` | Priority-ordered available-by-role query |
+| `idx_hmsh_esc_available_expiry` | `(namespace, app_id, role, assigned_until, created_at DESC)` | Available-by-role with claim expiry |
+| `idx_hmsh_esc_assigned` | `(assigned_to, assigned_until, created_at DESC) WHERE status = 'pending' AND assigned_to IS NOT NULL` | Escalations claimed by a specific user |
+| `idx_hmsh_esc_signal_key` | `UNIQUE (namespace, app_id, signal_key) WHERE signal_key IS NOT NULL` | Resolve/look up an atomic escalation by its resume key |
+| `idx_hmsh_esc_metadata` | `GIN (metadata jsonb_path_ops)` | Metadata key/value filters (claim-by-metadata) |
+| `idx_hmsh_esc_entity` | `(namespace, app_id, entity, created_at DESC) WHERE entity IS NOT NULL` | Filter by entity |
+| `idx_hmsh_esc_origin` | `(origin_id) WHERE origin_id IS NOT NULL` | Find escalations sharing an origin |
+| `idx_hmsh_esc_task` | `(task_id) WHERE task_id IS NOT NULL` | Join escalations to their parent task |
+| `idx_hmsh_esc_workflow` | `(workflow_id) WHERE workflow_id IS NOT NULL` | Look up escalation by workflow ID |
 
 ### lt_users
 
@@ -461,7 +484,7 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-This fires `BEFORE UPDATE` on `lt_tasks`, `lt_escalations`, `lt_users`, `lt_config_workflows`, `lt_mcp_servers`, `lt_yaml_workflows`, and `lt_namespaces`.
+This fires `BEFORE UPDATE` on `lt_tasks`, `lt_users`, `lt_config_workflows`, `lt_mcp_servers`, `lt_yaml_workflows`, and `lt_namespaces`. Escalations are not in this list: `lt_escalations` is a view, and `updated_at` on the underlying `hmsh_escalations` table is maintained by the HotMesh SDK.
 
 ## Migrations
 

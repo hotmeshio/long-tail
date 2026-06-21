@@ -19,12 +19,10 @@ function registerTools(srv: McpServer): void {
     async (args: { topic: string; data?: Record<string, any>; source?: string }) => {
       const topic = args.topic.startsWith('app.') ? args.topic : `app.${args.topic}`;
 
+      // Custom `app.*` event: minimal envelope + data, no workflow fields.
       const event: LTEvent = {
         type: topic,
         source: args.source || 'mcp-tool',
-        workflowId: '',
-        workflowName: '',
-        taskQueue: '',
         data: args.data,
         timestamp: new Date().toISOString(),
       };

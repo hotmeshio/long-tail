@@ -1,6 +1,6 @@
 # Long Tail
 
-Write durable workflows in TypeScript. When they need a human, they escalate. When they need AI, they orchestrate. When a pattern repeats, they compile it away. Postgres is the engine.
+The world is not passive. Machines fail, humans intervene, and conditions change. Long Tail gives TypeScript workflows a durable way to adapt on the fly: call machines, wait on people, resume from Postgres.
 
 ```bash
 npm install @hotmeshio/long-tail
@@ -8,7 +8,7 @@ npm install @hotmeshio/long-tail
 
 ## How it works
 
-You write a workflow function. Each activity call checkpoints to Postgres — if the process crashes, it resumes from the last completed step.
+Author in TypeScript. Checkpoint to Postgres. Route work to machines or people with the same workflow model.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -18,23 +18,33 @@ import * as activities from './activities';
 const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export async function reviewContent(envelope: LTEnvelope) {
+  // A machine does the work — your code, an API, a model.
   const analysis = await analyzeContent(envelope.data.content);
 
   if (analysis.confidence >= 0.85) {
     return { type: 'return' as const, data: { approved: true, analysis } };
   }
 
-  // Low confidence — escalate to a human reviewer
-  return {
-    type: 'escalation' as const,
-    role: 'reviewer',
-    message: `Review needed (confidence: ${analysis.confidence})`,
-    data: { content: envelope.data.content, analysis },
-  };
+  // The work goes to a person: the workflow suspends and writes one escalation
+  // row — assigned to a role, claimable and resolvable from the dashboard, API, or MCP.
+  const { workflowId } = Durable.workflow.workflowInfo();
+  const decision = await Durable.workflow.condition<{ approved: boolean; notes?: string }>(
+    `review-${workflowId}`,
+    {
+      role: 'reviewer',
+      type: 'content-review',
+      priority: 2,
+      description: `Confidence ${analysis.confidence} — needs a human`,
+      metadata: { contentId: envelope.data.contentId },
+      envelope: { data: envelope.data, analysis },
+    },
+  );
+
+  return { type: 'return' as const, data: { approved: decision.approved, analysis } };
 }
 ```
 
-That's a complete workflow. It runs, checkpoints, and when confidence is low, it hands off to a human. The human resolves it through the dashboard or API, and the workflow completes. No separate queue system, no webhook callbacks — the escalation is part of the execution.
+Two surfaces, one model. A `proxyActivity` targets a machine: call it, get a result. `condition()` targets the external world — a reviewer, an operator, a factory cell. It suspends the workflow and writes a single escalation row carrying everything needed to route the work: the `role` that should act, its `type` and `priority`, and any `metadata` to display or filter on. People work that row through an RBAC-scoped surface — find it, claim it, resolve it — from the dashboard, the API, or MCP, and resolving it resumes the workflow exactly where it paused.
 
 Activities are plain functions:
 
@@ -62,6 +72,8 @@ Dashboard at [http://localhost:3000](http://localhost:3000). The [boilerplate](h
 
 ## The pattern
 
+Four moves, from a plan you write to a plan that keeps up with reality.
+
 **Step 1 — Author a durable workflow.** Your function checkpoints to Postgres. It can sleep, branch, call child workflows, wait for signals. Standard durable execution.
 
 **Step 2 — Certify it.** Promotion to certified adds interceptor guarantees: failures escalate instead of throwing, escalation chains route through RBAC-scoped roles, and every error is either handled or surfaced. It cannot silently fail.
@@ -72,7 +84,7 @@ curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
   -d '{ "invocable": true, "task_queue": "default", "default_role": "reviewer" }'
 ```
 
-**Step 3 — React to events.** Workflows publish topics. Agents subscribe. When `activity.failed` fires, an automation can re-run the step, notify a team, or trigger a different workflow. The choreography is dynamic — add subscribers through the dashboard without changing code.
+**Step 3 — React to events.** Signals are reality reporting back. Workflows publish topics; agents subscribe. When `activity.failed` fires, an automation can re-run the step, notify a team, or trigger a different workflow. The choreography is dynamic — add subscribers through the dashboard without changing code.
 
 **Step 4 — Compile what repeats.** The same workflow has two forms. What you wrote in Step 1 is the *procedural* form — readable, Temporal-like, emulated atop the graph: cheap to maintain, heavier to run. The Designer compiles a working execution into the *graph* form — the same durable workflow as a deterministic DAG: no LLM at runtime, no replay overhead, typed in and out, roughly 3x faster. Every procedural pattern has a graph equivalent and the reverse; you pick readability or speed without giving up durability, escalation, or transactional guarantees. It deploys as a reusable tool that any workflow or API call can invoke.
 
@@ -134,7 +146,7 @@ const lt = await start({
 });
 ```
 
-All three paths produce the same outcome: tools callable as durable activities. See the [MCP guide](docs/mcp.md).
+All three paths produce the same outcome: tools callable as durable activities. See the [MCP guide](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md).
 
 ## Compile workflows
 
@@ -145,44 +157,62 @@ export ANTHROPIC_API_KEY=sk-ant-...
 npx ltc compile workflows/
 ```
 
-The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](docs/compiler.md).
+The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md).
 
 ## Register a graph flow by hand
 
-`graphWorkflows` is the graph-form peer of `workers`: hand-author the HotMesh YAML and it's created, deployed, and activated at startup. This hello-world assembles a greeting from the input with a single trigger mapping:
+`graphWorkflows` is the graph-form peer of `workers`: hand-author the HotMesh YAML and it's created, deployed, and activated at startup. The same human surface is declarative here — a `hook` with an `escalation:` block. When the flow reaches it, the workflow suspends and writes the escalation row; a person resolves it and the flow continues:
 
 ```typescript
 const lt = await start({
   database: { connectionString: process.env.DATABASE_URL },
   graphWorkflows: [{
-    name: 'hello_world',
+    name: 'order_approval',
     namespace: 'graph',
-    inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+    inputSchema: { type: 'object', properties: { orderId: { type: 'string' }, region: { type: 'string' } }, required: ['orderId'] },
     yaml: `
 app:
   id: graph
   version: '1'
   graphs:
-    - subscribes: hello_world
-      publishes: hello_world.done
-      input:  { schema: { type: object, properties: { name: { type: string } } } }
-      output: { schema: { type: object, properties: { greeting: { type: string } } } }
+    - subscribes: order_approval
+      publishes: order_approval.done
+      input:  { schema: { type: object, properties: { orderId: { type: string }, region: { type: string } } } }
+      output: { schema: { type: object, properties: { approved: { type: boolean } } } }
       activities:
         trigger:
           type: trigger
+        review:
+          type: hook
+          escalation:
+            role: approver
+            type: order-approval
+            priority: 2
+            description: Approve order for dispatch
+            metadata:
+              orderId: '{trigger.output.data.orderId}'
+              region: '{trigger.output.data.region}'
+            envelope:
+              instructions: Review and approve or reject
           job:
             maps:
-              greeting:
-                '@pipe':
-                  - ['Hello, ', '{$self.input.data.name}', '!']
-                  - ['{@string.concat}']
-      transitions: {}
+              approved: '{review.hook.data.approved}'
+      transitions:
+        trigger:
+          - to: review
+      hooks:
+        order_approval.approve:
+          - to: review
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.id}'
 `,
   }],
 });
 ```
 
-It appears under **Orchestrate › Graph** and runs the same way a procedural workflow does — durable, transactional, invocable from the dashboard or API.
+It appears under **Orchestrate › Graph** and routes to a person exactly like the procedural `condition()` above — the same claim-and-resolve surface, declared in YAML. The `metadata` expressions resolve against the live job at suspension time, so the row carries the real order values.
 
 ## Full configuration
 
@@ -240,7 +270,7 @@ client.events.on('task.completed', (event) => console.log('done:', event.workflo
 client.events.on('escalation.*', (event) => notifyTeam(event));
 ```
 
-Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. See the [SDK guide](docs/sdk.md).
+Every SDK call returns an `LTApiResult` — same status codes, same validation, same RBAC. See the [SDK guide](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md).
 
 ## Deployment
 
@@ -258,31 +288,31 @@ await start({ database: { connectionString: process.env.DATABASE_URL }, server: 
 const lt = createClient({ auth: { userId: 'service' } });
 ```
 
-All modes share PostgreSQL and scale independently. See [Cloud Deployment](docs/cloud.md).
+All modes share PostgreSQL and scale independently. See [Cloud Deployment](https://github.com/hotmeshio/long-tail/blob/main/docs/cloud.md).
 
 ## Docs
 
 | Guide | What it covers |
 |-------|---------------|
-| [The Long Tail Story](docs/story.md) | Why this exists, what accumulates over time |
-| [Workflows](docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
-| [IAM](docs/iam.md) | Identity propagation, service accounts, credential exchange |
-| [Dashboard](docs/dashboard.md) | Navigation, key pages, event feed |
-| [MCP](docs/mcp.md) | Server registration, tool calls, human queue |
-| [Compilation](docs/compilation.md) | Dynamic to deterministic pipeline wizard |
-| [Compiler](docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
-| [CLI](docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
-| [Escalation Strategies](docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
-| [SDK](docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
-| [Architecture](docs/architecture.md) | Project structure, conventions, discovery |
-| [Cloud](docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |
-| [Data Model](docs/data.md) | Database schema |
+| [The Long Tail Story](https://github.com/hotmeshio/long-tail/blob/main/docs/story.md) | Why this exists, what accumulates over time |
+| [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
+| [IAM](https://github.com/hotmeshio/long-tail/blob/main/docs/iam.md) | Identity propagation, service accounts, credential exchange |
+| [Dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md) | Navigation, key pages, event feed |
+| [MCP](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md) | Server registration, tool calls, human queue |
+| [Compilation](https://github.com/hotmeshio/long-tail/blob/main/docs/compilation.md) | Dynamic to deterministic pipeline wizard |
+| [Compiler](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
+| [CLI](https://github.com/hotmeshio/long-tail/blob/main/docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
+| [Escalation Strategies](https://github.com/hotmeshio/long-tail/blob/main/docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
+| [SDK](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
+| [Architecture](https://github.com/hotmeshio/long-tail/blob/main/docs/architecture.md) | Project structure, conventions, discovery |
+| [Cloud](https://github.com/hotmeshio/long-tail/blob/main/docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |
+| [Data Model](https://github.com/hotmeshio/long-tail/blob/main/docs/data.md) | Database schema |
 
-**Adapters:** [Auth](docs/auth.md) · [Events](docs/events.md) · [Telemetry](docs/telemetry.md) · [Logging](docs/logging.md) · [Maintenance](docs/maintenance.md) · [OAuth](docs/oauth-and-delegation.md)
+**Adapters:** [Auth](https://github.com/hotmeshio/long-tail/blob/main/docs/auth.md) · [Events](https://github.com/hotmeshio/long-tail/blob/main/docs/events.md) · [Telemetry](https://github.com/hotmeshio/long-tail/blob/main/docs/telemetry.md) · [Logging](https://github.com/hotmeshio/long-tail/blob/main/docs/logging.md) · [Maintenance](https://github.com/hotmeshio/long-tail/blob/main/docs/maintenance.md) · [OAuth](https://github.com/hotmeshio/long-tail/blob/main/docs/oauth-and-delegation.md)
 
-**HTTP API:** [Workflows](docs/api/http/workflows.md) · [Tasks](docs/api/http/tasks.md) · [Escalations](docs/api/http/escalations.md) · [YAML Workflows](docs/api/http/yaml-workflows.md) · [Users](docs/api/http/users.md) · [Roles](docs/api/http/roles.md) · [Service Accounts](docs/api/http/service-accounts.md) · [MCP Servers](docs/api/http/mcp-servers.md) · [Pipelines](docs/api/http/pipelines.md) · [Exports](docs/api/http/exports.md)
+**HTTP API:** [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/workflows.md) · [Tasks](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/tasks.md) · [Escalations](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/escalations.md) · [YAML Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/yaml-workflows.md) · [Users](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/users.md) · [Roles](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/roles.md) · [Service Accounts](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/service-accounts.md) · [MCP Servers](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/mcp-servers.md) · [Pipelines](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/pipelines.md) · [Exports](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/exports.md)
 
-**SDK:** [Overview](docs/sdk.md) · [Workflows](docs/api/sdk/workflows.md) · [Tasks](docs/api/sdk/tasks.md) · [Escalations](docs/api/sdk/escalations.md) · [YAML Workflows](docs/api/sdk/yaml-workflows.md) · [MCP](docs/api/sdk/mcp.md) · [Events](docs/api/sdk/events.md)
+**SDK:** [Overview](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) · [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/workflows.md) · [Tasks](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/tasks.md) · [Escalations](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/escalations.md) · [YAML Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/yaml-workflows.md) · [MCP](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/mcp.md) · [Events](https://github.com/hotmeshio/long-tail/blob/main/docs/api/sdk/events.md)
 
 ## Contributing
 
@@ -301,8 +331,8 @@ Open [http://localhost:3000](http://localhost:3000). Example workflows seed the 
 | `engineer` | `l0ngt@1l` | engineer |
 | `reviewer` | `l0ngt@1l` | reviewer |
 
-See [Contributing](docs/contributing.md).
+See [Contributing](https://github.com/hotmeshio/long-tail/blob/main/docs/contributing.md).
 
 ## License
 
-See [LICENSE](LICENSE).
+See [LICENSE](https://github.com/hotmeshio/long-tail/blob/main/LICENSE).

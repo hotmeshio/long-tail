@@ -81,7 +81,7 @@ describe('kitchenSink workflow', () => {
     const handle = await client.workflow.start({
       args: [{
         data: { name: 'Test', mode: 'quick' },
-        metadata: {},
+        metadata: { certified: true },
       }],
       taskQueue: TASK_QUEUE,
       workflowName: 'kitchenSink',
@@ -106,7 +106,7 @@ describe('kitchenSink workflow', () => {
     await client.workflow.start({
       args: [{
         data: { name: 'Reviewer', mode: 'full' },
-        metadata: {},
+        metadata: { certified: true },
       }],
       taskQueue: TASK_QUEUE,
       workflowName: 'kitchenSink',

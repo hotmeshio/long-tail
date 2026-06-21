@@ -47,7 +47,7 @@ describe('workflow export', () => {
           contentId: contentId || suffix,
           content: `Good content for ${suffix} test.`,
         },
-        metadata: {},
+        metadata: { certified: true },
       }],
       taskQueue: TASK_QUEUE,
       workflowName: 'reviewContent',
@@ -286,7 +286,7 @@ describe('workflow export', () => {
             contentId: 'export-esc-1',
             content: 'REVIEW_ME content that triggers escalation for export test',
           },
-          metadata: {},
+          metadata: { certified: true },
         }],
         taskQueue: TASK_QUEUE,
         workflowName: 'reviewContent',
@@ -536,7 +536,7 @@ describe('workflow export', () => {
       const opts: Record<string, unknown> = {
         args: [{
           data: { contentId: suffix, content: 'Good content for prune test.' },
-          metadata: {},
+          metadata: { certified: true },
         }],
         taskQueue: TASK_QUEUE,
         workflowName: 'reviewContent',

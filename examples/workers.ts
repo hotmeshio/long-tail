@@ -8,6 +8,7 @@ import * as workstationWorkflow from './workflows/assembly-line/worker';
 import * as stepIteratorWorkflow from './workflows/assembly-line/iterator';
 import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
+import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
 
 // ── Role constants ──────────────────────────────────────────────────────────
@@ -70,6 +71,23 @@ const basicSignalConfig: LTWorkerConfig = {
   defaultRole: REVIEWER,
   envelopeSchema: {
     data: { message: 'Deployment approval needed for v2.1.0', role: REVIEWER },
+    metadata: { source: 'dashboard' },
+  },
+  resolverSchema: {
+    properties: {
+      approved: { type: 'boolean', default: false, description: 'Approve this deployment?' },
+      notes: { type: 'string', default: '', description: 'Reviewer notes — visible to the workflow author' },
+    },
+  },
+};
+
+const efficientSignalConfig: LTWorkerConfig = {
+  description: 'Signal-based escalation (efficient) — same human-in-the-loop as basicSignal, but the escalation row is written atomically in the workflow\'s Leg1 via condition(config): no separate create activity, no enrich. Invoke both and compare.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  envelopeSchema: {
+    data: { message: 'Deployment approval needed for v2.1.0 (efficient path)', role: REVIEWER },
     metadata: { source: 'dashboard' },
   },
   resolverSchema: {
@@ -176,5 +194,6 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: stepIteratorWorkflow.stepIterator, config: stepIteratorConfig },
   { taskQueue: 'long-tail-examples', workflow: reverterWorkflow.reverter, config: reverterConfig },
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
+  { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
 ];
