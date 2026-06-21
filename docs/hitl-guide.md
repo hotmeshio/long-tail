@@ -31,7 +31,50 @@ Durable Workflow                  Long-tail Platform              Dashboard
 
 ### Pattern 1: `conditionLT` Signal (Recommended)
 
-The workflow stays running and waits for a signal. Lightweight, no re-run needed.
+The workflow stays running and waits for a signal. Lightweight, no re-run needed. Two forms — prefer the atomic one.
+
+#### Atomic form (recommended)
+
+Pass an escalation config to `conditionLT`. The escalation row is written inside the workflow's Leg1 checkpoint — one commit, crash-safe: no separate create activity, no enrich step. `signal_key` is the resume key, so the dashboard resolve endpoint and `POST /escalations/resolve-by-signal-key` both resume *this* job in place, and `system.escalation.{id}.created` fires automatically.
+
+```typescript
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function approvalWorkflow(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+  const signalId = `approval-${ctx.workflowId}`;
+
+  // One atomic expression: write the escalation in Leg1, then pause.
+  const decision = await conditionLT<{ approved: boolean; notes?: string }>(signalId, {
+    role: 'finance-reviewer',
+    type: 'approval',
+    subtype: 'budget-request',
+    priority: 2,
+    description: `Budget approval needed: $${envelope.data.amount}`,
+    metadata: {
+      form_schema: {
+        title: 'Budget Approval',
+        properties: {
+          approved: { type: 'boolean', description: 'Approve this request?' },
+          notes: { type: 'string', format: 'textarea' },
+        },
+        required: ['approved'],
+      },
+    },
+    envelope: { data: envelope.data },
+  });
+
+  if (decision.approved) {
+    // ... proceed with approved flow ...
+  } else {
+    // ... handle rejection ...
+  }
+}
+```
+
+#### Two-step form
+
+When you need to create the escalation separately — for example to enrich routing metadata before pausing — create it first, then wait:
 
 ```typescript
 import { conditionLT } from 'long-tail/orchestrator';

@@ -35,6 +35,7 @@ export function toEscalationRecord(entry: EscalationEntry): LTEscalationRecord {
     workflow_id: entry.workflow_id,
     task_queue: entry.task_queue,
     workflow_type: entry.workflow_type,
+    signal_key: entry.signal_key,
     role: entry.role ?? '',
     assigned_to: entry.assigned_to,
     assigned_until: entry.assigned_until,

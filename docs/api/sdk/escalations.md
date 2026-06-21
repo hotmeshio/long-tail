@@ -280,6 +280,39 @@ const result = await lt.escalations.resolve({
 Wait for a signal and automatically resolve the associated escalation. This is the counterpart to `executeLT` — where `executeLT` wraps `startChild` + `condition`, `conditionLT` wraps `condition` + escalation resolution.
 
 ```typescript
+conditionLT<T>(signalId: string, escalation?: ConditionQueueConfig): Promise<T>
+```
+
+### Atomic form (recommended)
+
+Pass an escalation config as the second argument. The escalation row is written inside the workflow's Leg1 checkpoint — one commit, crash-safe: no separate `ltCreateEscalation` activity, no enrich step. `signal_key` is set to `signalId`, so the dashboard resolve endpoint (resolve-by-id → Path 0) and `POST /escalations/resolve-by-signal-key` resume *this* job in place, and `system.escalation.{id}.created` fires automatically.
+
+```typescript
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function stationWorker(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+  const signalId = `station-done-${ctx.workflowId}`;
+
+  const decision = await conditionLT<{ approved: boolean }>(signalId, {
+    role: 'qc-inspector',
+    type: 'orderPipeline',
+    subtype: 'qc',
+    priority: 2,
+    description: 'Inspect the order and approve',
+    workflowType: 'stationWorker',
+    metadata: { orderId: envelope.data.orderId, station: 'qc' },
+    envelope: { instructions: 'Review and approve or reject' },
+  });
+  // decision is clean — the escalation was resolved by the resolve endpoint
+}
+```
+
+### Two-step form
+
+Create the escalation first (e.g. to enrich routing metadata), then wait:
+
+```typescript
 import { conditionLT } from '@hotmeshio/long-tail';
 
 export async function myWorkflow(envelope: LTEnvelope) {

@@ -33,6 +33,13 @@ vi.mock('../../services/interceptor', () => ({
   registerLT: vi.fn(),
 }));
 
+// startWorkers eagerly installs the lt_escalations compat view (real DB work).
+// This suite verifies worker collection/readonly/event-adapter wiring, not the
+// view migration — which has its own coverage — so stub it to a no-op.
+vi.mock('../../services/escalation', () => ({
+  ensureEscalationCompatView: vi.fn(),
+}));
+
 vi.mock('../../services/workers/registry', async () => {
   const workers = new Map<string, { taskQueue: string }>();
   return {
