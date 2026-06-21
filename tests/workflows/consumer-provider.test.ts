@@ -199,7 +199,7 @@ describe('consumer/provider data injection', () => {
     const handle = await client.workflow.start({
       args: [{
         data: { orderId, itemCount: 3 },
-        metadata: {},
+        metadata: { certified: true },
       }],
       taskQueue: ORCH_QUEUE,
       workflowName: 'orderPipeline',
@@ -224,7 +224,7 @@ describe('consumer/provider data injection', () => {
     const handle = await client.workflow.start({
       args: [{
         data: { orderId, itemCount: 5 },
-        metadata: {},
+        metadata: { certified: true },
       }],
       taskQueue: ORCH_QUEUE,
       workflowName: 'orderPipeline',
@@ -268,7 +268,7 @@ describe('consumer/provider data injection', () => {
     const handle = await client.workflow.start({
       args: [{
         data: { orderId, itemCount: 1 },
-        metadata: {},
+        metadata: { certified: true },
       }],
       taskQueue: LEAF_QUEUE,
       workflowName: 'processOrder',

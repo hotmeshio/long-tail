@@ -261,7 +261,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
       topOrchWorkflowId = `test-hier-happy-${Durable.guid()}`;
 
       const handle = await client.workflow.start({
-        args: [{ data: { testId: 'hierarchy-happy' }, metadata: {} }],
+        args: [{ data: { testId: 'hierarchy-happy' }, metadata: { certified: true } }],
         taskQueue: TOP_ORCH_QUEUE,
         workflowName: 'topLevelOrch',
         workflowId: topOrchWorkflowId,
@@ -429,7 +429,7 @@ describe('workflow hierarchy (nested containers + lineage)', () => {
       const handle = await client.workflow.start({
         args: [{
           data: { testId: 'hierarchy-escalation', escalateB3: true },
-          metadata: {},
+          metadata: { certified: true },
         }],
         taskQueue: TOP_ORCH_QUEUE,
         workflowName: 'topLevelOrch',
