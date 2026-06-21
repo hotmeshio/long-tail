@@ -5,6 +5,7 @@ import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemer
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
+import { getVisibleRoles } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Orchestrator ─────────────────────────────────────────────────────────
@@ -48,6 +49,14 @@ export async function resolveEscalation(
       return resolveViaSignalRouting(escalation, resolverPayload);
     }
 
+    // Path 0: efficient (atomic) escalation — signal_key resumes in place.
+    // The row was written inside the workflow's Leg1 checkpoint via
+    // `condition(signalId, config)`. The SDK's resolve marks it resolved AND
+    // delivers the signal to `signal_key`, resuming THIS job — no re-run.
+    if (escalation.signal_key) {
+      return resolveViaSignalKey(escalation, resolverPayload);
+    }
+
     // Path C: escalation strategy may redirect to triage
     const envelope = await reconstructEnvelope(escalation);
     const strategy = escalationStrategyRegistry.current;
@@ -71,6 +80,36 @@ export async function resolveEscalation(
   }
 }
 
+/**
+ * Resolve an efficient (atomic) escalation directly by its `signal_key` and
+ * resume the waiting workflow in place. For webhook callers that know the
+ * deterministic signal id (e.g. `signal-scan-ar-${orderId}`) and want to skip
+ * the id lookup. RBAC-scoped to the caller's visible roles.
+ */
+export async function resolveBySignalKey(
+  input: { signalKey: string; resolverPayload: Record<string, any> },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    const { signalKey, resolverPayload } = input;
+    if (!signalKey) return { status: 400, error: 'signalKey is required' };
+    if (!resolverPayload) return { status: 400, error: 'resolverPayload is required' };
+
+    const escalation = await escalationService.getEscalationBySignalKey(signalKey);
+    if (!escalation) return { status: 404, error: 'Escalation not found' };
+    if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
+
+    const visibleRoles = await getVisibleRoles(auth.userId);
+    if (visibleRoles && !visibleRoles.includes(escalation.role)) {
+      return { status: 404, error: 'Escalation not found' };
+    }
+
+    return resolveViaSignalKey(escalation, resolverPayload);
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
 // ── Resolution paths ─────────────────────────────────────────────────────
 
 /** Path A: lightweight conditionLT signal — inject $escalation_id and signal the running workflow. */
@@ -89,6 +128,25 @@ async function resolveViaConditionSignal(
 
   // Event published by service layer (services/escalation/crud.ts)
   return signaledResult(escalation, escalation.workflow_id);
+}
+
+/**
+ * Path 0: efficient escalation — resolve by `signal_key`. The SDK delivers the
+ * signal to the waiting `condition()` AND marks the row resolved in one
+ * transaction, so the original job resumes in place (no re-run, no separate
+ * resolve activity). Password fields are redacted before they enter the signal.
+ */
+async function resolveViaSignalKey(
+  escalation: any,
+  resolverPayload: Record<string, any>,
+): Promise<LTApiResult> {
+  const signalPayload = await redactPasswords(resolverPayload, (escalation.metadata as any)?.form_schema);
+  const resolved = await escalationService.resolveEscalation(escalation.id, signalPayload);
+  if (!resolved) {
+    return { status: 409, error: 'Escalation not available for resolution' };
+  }
+  // Event published by service layer (services/escalation/crud.ts)
+  return signaledResult(escalation, escalation.workflow_id || '');
 }
 
 /** Path B: waitFor signal escalation — signal via YAML engine or Durable handle. */

@@ -215,7 +215,26 @@ The workflow is responsible for resolving the escalation. The `conditionLT()` he
 
 If you use raw `Durable.workflow.condition()` instead, you must resolve the escalation yourself using the `$escalation_id` from the signal data.
 
+### Signal-key resolution (efficient/atomic — `signal_key`)
+
+When an escalation was written atomically by `conditionLT(signalId, config)` (or `Durable.workflow.condition(signalId, config)`), the row carries a `signal_key` and no `signal_id`/`signal_routing` metadata. The resolve endpoint detects `signal_key` and resolves it through the SDK: the resolve marks the row resolved **and** delivers the signal to the waiting `condition()` in one transaction, so the original job resumes in place — no re-run, no separate resolve activity. `system.escalation.{id}.resolved` fires.
+
+```
+POST /api/escalations/resolve-by-signal-key
+```
+
+For callers that know the deterministic signal id (webhooks — e.g. `signal-scan-ar-${orderId}`) and want to skip the id lookup.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `signalKey` | `string` | yes | The signal id passed to `conditionLT(signalId, config)` |
+| `resolverPayload` | `object` | yes | The decision payload delivered to the waiting workflow |
+
+Returns `404` when the key is unknown, `409` when the escalation is already terminal, and `200 { signaled: true }` on success. RBAC-scoped to the caller's visible roles.
+
 ### What happens during resolution
+
+> Applies to the **re-run** path (an escalation with no `signal_id`, `signal_routing`, or `signal_key`). Signal-based and signal-key escalations resume the live workflow in place, as described above.
 
 1. The route reads the escalation record and verifies it is still `pending`.
 2. It reconstructs the original workflow envelope from the escalation's `envelope` field (or from the parent task if the escalation envelope is missing).

@@ -27,6 +27,12 @@ export interface LTEscalationRecord {
   task_queue: string | null;
   workflow_type: string | null;
 
+  // efficient (atomic) escalation resume key — set when the row was written
+  // inside a workflow's Leg1 checkpoint via `condition(signalId, config)` /
+  // `conditionLT(signalId, config)`. The value is the signal id used to resume
+  // the waiting workflow in place. Null for service-created rows.
+  signal_key: string | null;
+
   // routing / ownership
   role: string;
   assigned_to: string | null;

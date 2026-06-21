@@ -118,6 +118,39 @@ export async function resolveEscalation(
 }
 
 /**
+ * Look up an efficient (atomic) escalation by its `signal_key` — the signal id
+ * passed to `conditionLT(signalId, config)` / `condition(signalId, config)`.
+ * Returns null when no row carries that key.
+ */
+export async function getEscalationBySignalKey(
+  signalKey: string,
+): Promise<LTEscalationRecord | null> {
+  const client = await escalations();
+  const entry = await client.getBySignalKey(signalKey);
+  return entry ? toEscalationRecord(entry) : null;
+}
+
+/**
+ * Resolve an efficient (atomic) escalation by its `signal_key` and resume the
+ * waiting workflow in place. Convenience for webhook callers that know the
+ * deterministic signal id (e.g. `signal-scan-ar-${orderId}`) and want to skip
+ * the id lookup. Returns null when the key is unknown or already terminal.
+ *
+ * Race-free: `signal_key → id` is an immutable mapping, and the state mutation
+ * is delegated to `resolveEscalation`, whose `client.resolve` uses FOR UPDATE +
+ * `WHERE status = 'pending'` so exactly one concurrent caller commits. No status
+ * pre-check (that would be a TOCTOU window) — the atomic resolve is the arbiter.
+ */
+export async function resolveEscalationBySignalKey(
+  signalKey: string,
+  resolverPayload: Record<string, any>,
+): Promise<LTEscalationRecord | null> {
+  const escalation = await getEscalationBySignalKey(signalKey);
+  if (!escalation) return null;
+  return resolveEscalation(escalation.id, resolverPayload);
+}
+
+/**
  * Bulk update priority for a set of escalations. Only pending escalations are
  * updated.
  */
