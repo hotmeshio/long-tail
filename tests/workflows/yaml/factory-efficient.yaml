@@ -1,0 +1,80 @@
+# Efficient factory station — the 0.22.x atomic-escalation variant of a
+# 04-factory station. NEVER replaces 04-factory; it sits beside it to compare.
+#
+# Legacy 04-factory station = THREE activities:
+#   esc_*  (worker: escalate_and_wait — creates the escalation)
+#   wait_* (hook: pauses for the signal)
+#   resolve_* (worker: resolve_escalation — closes it)
+#
+# Efficient station = ONE hook with an `escalation:` block:
+#   the hook's Leg1 transaction writes the escalation row atomically with the
+#   job checkpoint (crash-safe, no escalate worker, no resolve worker). A
+#   resolver delivers the signal to the hook topic to resume the workflow, and
+#   system.escalation.{id}.created fires from the engine through the eventManager.
+
+app:
+  id: longtail-eff-factory
+  version: '1'
+  graphs:
+    - subscribes: eff_factory
+      publishes: eff_factory.done
+      expire: 300
+
+      input:
+        schema:
+          type: object
+          properties:
+            orderId: { type: string }
+
+      output:
+        schema:
+          type: object
+          properties:
+            approved: { type: boolean }
+
+      activities:
+        trigger_ef:
+          type: trigger
+          output:
+            schema:
+              type: object
+
+        # ── Station: QC — one hook, escalation written atomically in Leg1 ──
+        qc_ef:
+          type: hook
+          hook:
+            type: object
+            properties:
+              id: { type: string }
+              approved: { type: boolean }
+          escalation:
+            role: qc_inspector
+            type: factory-station
+            subtype: qc
+            priority: 2
+            description: Inspect the order and approve
+            metadata:
+              orderId: '{trigger_ef.output.data.orderId}'
+              station: qc
+            envelope:
+              instructions: Review the order and approve or reject
+          job:
+            maps:
+              approved: '{qc_ef.hook.data.approved}'
+
+        done_ef:
+          type: hook
+
+      transitions:
+        trigger_ef:
+          - to: qc_ef
+        qc_ef:
+          - to: done_ef
+
+      hooks:
+        eff_factory.qc.resolved:
+          - to: qc_ef
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.id}'

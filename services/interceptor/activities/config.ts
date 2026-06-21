@@ -12,7 +12,11 @@ import type { LTResolvedConfig, LTProviderData } from '../../../types';
 export async function ltGetWorkflowConfig(
   workflowName: string,
 ): Promise<LTResolvedConfig | null> {
-  return ltConfig.getResolvedConfig(workflowName);
+  // Gate on REGISTRATION (a row in lt_config_workflows), not certification:
+  // every registered workflow gets interceptor task/escalation/orchestrator
+  // treatment. Certification (roles/consumes) governs RBAC and provider
+  // injection, not whether the workflow is tracked.
+  return ltConfig.getRegisteredConfig(workflowName);
 }
 
 /**

@@ -161,3 +161,6 @@ CLAUDE.md
 
 # MCP server config (contains API keys)
 .mcp.json
+
+# HotMesh compiled deploy artifacts (regenerated on deploy)
+.hotmesh.*.json

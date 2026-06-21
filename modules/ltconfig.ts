@@ -96,6 +96,17 @@ class LTConfigCache {
     const isCertified = (config.roles?.length ?? 0) > 0 || (config.consumes?.length ?? 0) > 0;
     return isCertified ? config : null;
   }
+
+  /**
+   * Get the config for any workflow REGISTERED in lt_config_workflows (a row
+   * exists), regardless of certification (roles/consumes). The interceptor
+   * uses this to decide whether to apply task tracking, escalation handling,
+   * and orchestrator context — every registered workflow gets the full
+   * treatment; only unregistered ad-hoc durable workflows are skipped.
+   */
+  async getRegisteredConfig(name: string): Promise<LTResolvedConfig | null> {
+    return (await this.get(name)) ?? null;
+  }
 }
 
 export const ltConfig = new LTConfigCache();

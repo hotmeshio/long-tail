@@ -137,14 +137,32 @@ export function postProcessExecution(execution: WorkflowExecution): WorkflowExec
     events.push(...toAdd);
   }
 
-  // Sort by execution_index first — it reflects the true workflow sequence.
-  // Timestamps are unreliable for ordering (e.g. signal_wait_started gets
-  // the workflow start time). Fall back to timestamp only when index is absent.
+  // Order the stream in three bands: the workflow_execution_started bookend
+  // first, the workflow_execution_completed/failed bookend last, and the
+  // activity/signal events in between. Within the middle band, execution_index
+  // reflects the true workflow sequence (timestamps are unreliable — e.g.
+  // signal_wait_started gets the workflow start time), so sort by it and fall
+  // back to timestamp only when index is absent or tied.
+  //
+  // The bookends carry no execution_index; without explicit banding the
+  // completed event would sort to the front alongside started. (HotMesh's
+  // exporter does not index the terminal event.)
+  const band = (e: WorkflowExecution['events'][number]): number => {
+    if (e.event_type === 'workflow_execution_started') return 0;
+    if (
+      e.event_type === 'workflow_execution_completed' ||
+      e.event_type === 'workflow_execution_failed'
+    ) return 2;
+    return 1;
+  };
   events.sort((a, b) => {
+    const bandA = band(a);
+    const bandB = band(b);
+    if (bandA !== bandB) return bandA - bandB;
     const idxA = (a.attributes as any).execution_index ?? -1;
     const idxB = (b.attributes as any).execution_index ?? -1;
     if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
-    if (idxA !== -1 && idxB === -1) return 1;  // indexed after non-indexed (workflow_started)
+    if (idxA !== -1 && idxB === -1) return 1;
     if (idxA === -1 && idxB !== -1) return -1;
     // Same index (scheduled/completed pairs) — sort by timestamp
     const cmp = a.event_time.localeCompare(b.event_time);
