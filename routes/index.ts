@@ -72,4 +72,7 @@ router.use('/topics', topicsRouter);
 import overviewRouter from './overview';
 router.use('/overview', overviewRouter);
 
+import diagnosticsRouter from './diagnostics';
+router.use('/diagnostics', diagnosticsRouter);
+
 export default router;
