@@ -1,6 +1,6 @@
 # Long Tail
 
-The world is not passive. Machines fail, humans intervene, and conditions change. Long Tail gives TypeScript workflows a durable way to adapt on the fly: call machines, wait on people, resume from Postgres.
+Durable workflow for humans in the loop.
 
 ```bash
 npm install @hotmeshio/long-tail
@@ -8,7 +8,7 @@ npm install @hotmeshio/long-tail
 
 ## How it works
 
-Author in TypeScript. Checkpoint to Postgres. Route work to machines or people with the same workflow model.
+Route work to machines or people interchangeably with ease.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -18,15 +18,14 @@ import * as activities from './activities';
 const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export async function reviewContent(envelope: LTEnvelope) {
-  // A machine does the work — your code, an API, a model.
+  // method calls are checkpointed and crash safe
   const analysis = await analyzeContent(envelope.data.content);
 
   if (analysis.confidence >= 0.85) {
-    return { type: 'return' as const, data: { approved: true, analysis } };
+    return { data: { approved: true, analysis } };
   }
 
-  // The work goes to a person: the workflow suspends and writes one escalation
-  // row — assigned to a role, claimable and resolvable from the dashboard, API, or MCP.
+  //role-based escalations are baked-in. create HITL escalations with one call
   const { workflowId } = Durable.workflow.workflowInfo();
   const decision = await Durable.workflow.condition<{ approved: boolean; notes?: string }>(
     `review-${workflowId}`,
@@ -40,7 +39,7 @@ export async function reviewContent(envelope: LTEnvelope) {
     },
   );
 
-  return { type: 'return' as const, data: { approved: decision.approved, analysis } };
+  return { data: { approved: decision.approved, analysis } };
 }
 ```
 
