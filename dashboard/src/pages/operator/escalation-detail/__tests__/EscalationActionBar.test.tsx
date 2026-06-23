@@ -28,6 +28,7 @@ function renderBar(overrides: Partial<EscalationActionBarProps> = {}) {
     escalateError: null,
     onRelease: vi.fn(),
     releasePending: false,
+    onCancel: vi.fn(),
     assignedTo: null,
     assignedUntil: null,
     ...overrides,

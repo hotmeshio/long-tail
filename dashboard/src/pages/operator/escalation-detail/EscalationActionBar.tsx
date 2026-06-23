@@ -42,6 +42,8 @@ export interface EscalationActionBarProps {
   // Release
   onRelease: () => void;
   releasePending: boolean;
+  // Cancel (opens confirm modal in parent)
+  onCancel: () => void;
   // Other user
   assignedTo?: string | null;
   assignedUntil?: string | null;
@@ -61,6 +63,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     requestTriage, triageNotes,
     currentRole, escalationTargets, onEscalate, escalatePending, escalateError,
     onRelease, releasePending,
+    onCancel,
     assignedTo, assignedUntil,
     onSubmitAttempt,
   } = props;
@@ -159,6 +162,12 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
             </div>
             {/* Action row — right-aligned */}
             <div className="flex items-center gap-3">
+              <button
+                onClick={onCancel}
+                className="text-xs text-text-tertiary hover:text-status-error transition-colors"
+              >
+                Cancel escalation
+              </button>
               <div className="flex-1" />
               {isCustom && (
                 <CustomDurationPicker onChange={onCustomChange} compact autoFocus />
@@ -208,6 +217,12 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 className={`text-xs transition-colors ${activeView === 'release' ? 'text-status-error font-medium' : 'text-text-tertiary hover:text-status-error'}`}
               >
                 Release
+              </button>
+              <button
+                onClick={onCancel}
+                className="text-xs transition-colors text-text-tertiary hover:text-status-error"
+              >
+                Cancel
               </button>
             </div>
 
@@ -279,7 +294,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 <span className="text-xs text-text-secondary">Release back to pool?</span>
                 <div className="flex-1" />
                 <button onClick={() => onActiveViewChange('resolve')} className="btn-secondary text-xs">
-                  Cancel
+                  Back
                 </button>
                 <button
                   onClick={onRelease}
@@ -290,6 +305,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 </button>
               </div>
             )}
+
           </div>
         )}
     </div>

@@ -47,11 +47,14 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 export async function conditionLT<T = Record<string, any>>(
   signalId: string,
   escalation?: Types.ConditionQueueConfig,
-): Promise<T> {
+): Promise<T | false | null> {
   const raw = await Durable.workflow.condition<T & { $escalation_id?: string }>(
     signalId,
     escalation,
-  ) as T & { $escalation_id?: string };
+  ) as (T & { $escalation_id?: string }) | false | null;
+
+  // false = timeout, null = escalation was cancelled — propagate both as-is
+  if (raw === null || raw === false) return raw;
 
   const escalationId = raw.$escalation_id;
   if (escalationId) {

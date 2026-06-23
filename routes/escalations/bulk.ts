@@ -51,4 +51,12 @@ export function registerBulkRoutes(router: Router): void {
     );
     res.status(result.status).json(result.data ?? { error: result.error });
   });
+
+  router.post('/bulk-cancel', async (req, res) => {
+    const result = await api.bulkCancel(
+      { ids: req.body?.ids },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
 }

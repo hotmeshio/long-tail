@@ -9,7 +9,7 @@ const statusStyles: Record<string, string> = {
   resolved: 'bg-status-success',
   needs_intervention: 'bg-status-error',
   failed: 'bg-status-error',
-  cancelled: 'bg-accent-muted',
+  cancelled: 'bg-status-error',
   draft: 'bg-status-draft',
   deployed: 'bg-status-active',
   active: 'bg-status-success',

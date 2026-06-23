@@ -20,6 +20,8 @@ function defaultProps(): React.ComponentProps<typeof BulkActionBar> {
     isAssignPending: false,
     isEscalatePending: false,
     isTriagePending: false,
+    onCancel: vi.fn(),
+    isCancelPending: false,
     availableRoles: ['reviewer', 'engineer'],
   };
 }

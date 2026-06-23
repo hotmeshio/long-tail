@@ -1,12 +1,17 @@
 #!/bin/sh
 set -e
 
-# Build dashboard on first run if dist/ is missing (the host volume
-# mount overwrites the image's pre-built copy, so a fresh clone
-# won't have it).
+# Install dashboard deps when node_modules is missing (anonymous volume was
+# cleared by `docker compose down -v`, or first run on a fresh clone).
+if [ ! -d dashboard/node_modules/.bin ]; then
+  echo "[long-tail] Dashboard node_modules missing — running npm install..."
+  cd dashboard && npm install && cd ..
+fi
+
+# Build dashboard if dist/ is missing.
 if [ ! -f dashboard/dist/index.html ]; then
-  echo "[long-tail] Dashboard not built — running npm install + build..."
-  cd dashboard && npm install && npm run build && cd ..
+  echo "[long-tail] Dashboard not built — running build..."
+  cd dashboard && npm run build && cd ..
 fi
 
 exec "$@"

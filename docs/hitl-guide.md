@@ -64,6 +64,12 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
     envelope: { data: envelope.data },
   });
 
+  if (!decision) {
+    // null = escalation was cancelled (workflow terminated or explicit cancel)
+    // false = escalation timed out
+    return { type: 'return' as const, data: { cancelled: true } };
+  }
+
   if (decision.approved) {
     // ... proceed with approved flow ...
   } else {
@@ -112,6 +118,11 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 
   // Workflow pauses here until the human responds
   const decision = await conditionLT<{ approved: boolean; notes?: string }>(signalId);
+
+  if (!decision) {
+    // null = cancelled, false = timeout
+    return { type: 'return' as const, data: { cancelled: true } };
+  }
 
   if (decision.approved) {
     // ... proceed with approved flow ...
@@ -583,6 +594,58 @@ metadata: {
 
 ---
 
+## Cancelling Escalations
+
+Escalations can be cancelled at any point before they are resolved. Cancellation is terminal — a cancelled escalation cannot be re-opened.
+
+### When cancellation happens
+
+- **Workflow termination** — when you terminate a workflow (`POST /api/workflows/:workflowId/terminate`), HotMesh automatically cancels any pending escalations tied to it. The waiting `conditionLT` call returns `null`.
+- **Explicit cancel** — cancel a single escalation via the API or from the dashboard. Any workflow waiting on that escalation via `conditionLT` receives `null`.
+
+### API
+
+```
+POST /api/escalations/:id/cancel        # single escalation
+POST /api/escalations/bulk-cancel       # { "ids": [...] }
+```
+
+Returns 409 if the escalation is already resolved or cancelled.
+
+### Dashboard
+
+- **Available escalations list** — select one or more rows and click **Cancel** in the bulk action bar. A confirmation modal appears before any action is taken.
+- **Escalation detail page** — a Cancel link appears in the action bar when the escalation is in `available` or `claimed_by_me` state. Terminal escalations (resolved or cancelled) show no cancel affordance.
+
+### Handling cancellation in workflows
+
+`conditionLT` returns `T | false | null`. Always guard before accessing the payload:
+
+```typescript
+const decision = await conditionLT<{ approved: boolean }>(signalId, escalationConfig);
+
+if (decision === null) {
+  // Escalation was cancelled (workflow terminated or explicit cancel)
+  return { type: 'return' as const, data: { cancelled: true } };
+}
+if (decision === false) {
+  // Escalation timed out
+  return { type: 'return' as const, data: { timedOut: true } };
+}
+
+// Normal path — decision is the resolver's payload
+```
+
+The `!decision` shorthand handles both cases when you don't need to distinguish between them:
+
+```typescript
+if (!decision) {
+  return { type: 'return' as const, data: { cancelled: true } };
+}
+```
+
+---
+
 ## What Long-tail Provides (For Free)
 
 When you author a HITL-backed workflow, the platform handles:
@@ -598,6 +661,7 @@ When you author a HITL-backed workflow, the platform handles:
 - **Signal routing** — 5 resolution paths (conditionLT, waitFor, triage, re-run, notification-only)
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces
-- **Bulk operations** — bulk claim, assign, escalate, triage for queue management
+- **Bulk operations** — bulk claim, assign, escalate, triage, and cancel for queue management
+- **Cancellation** — cancel pending escalations from the API or dashboard; `conditionLT` returns `null` so workflows handle it cleanly
 
 You write the workflow and the schema. Everything else is provided.

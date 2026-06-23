@@ -35,6 +35,7 @@ export async function resolveEscalation(
 
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
+    if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
 
     // Path A: conditionLT signal
@@ -259,6 +260,7 @@ function signaledResult(escalation: any, workflowId: string): LTApiResult {
     data: { signaled: true, escalationId: escalation.id, workflowId },
   };
 }
+
 
 /** Replace password fields with ephemeral tokens so plaintext never enters the signal store. */
 async function redactPasswords(

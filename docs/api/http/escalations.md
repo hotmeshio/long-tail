@@ -6,11 +6,15 @@ Escalations represent human intervention requests. When a workflow returns `type
 
 ```
 pending ──► claimed ──► resolved
-              │
-              └──► (claim expires) ──► pending (available again)
+   │           │
+   │           └──► (claim expires) ──► pending (available again)
+   │
+   └──► cancelled  (workflow terminated or explicit cancel)
 ```
 
 Claiming is implicit: `assigned_to` is set and `assigned_until` is set to a future timestamp. When the claim expires, the escalation becomes available again without any status change — it remains `pending`.
+
+`cancelled` is a terminal state. A cancelled escalation cannot be claimed, resolved, or re-cancelled. When a workflow is terminated (`POST /api/workflows/:workflowId/terminate`), HotMesh automatically cancels any pending escalations tied to that workflow. Escalations can also be cancelled directly via `POST /api/escalations/:id/cancel`.
 
 ## List escalations
 
@@ -22,7 +26,7 @@ GET /api/escalations
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `status` | `string` | `pending` or `resolved` |
+| `status` | `string` | `pending`, `resolved`, or `cancelled` |
 | `role` | `string` | Filter by target role |
 | `type` | `string` | Filter by escalation type |
 | `subtype` | `string` | Filter by subtype |
@@ -196,10 +200,16 @@ The new workflow ID follows the pattern `rerun-{escalationId}-{timestamp}`.
 **Response 409:**
 
 ```json
+{ "error": "Escalation is cancelled" }
+```
+
+Returned when the escalation was cancelled (workflow terminated or explicit cancel). Cannot be resolved.
+
+```json
 { "error": "Escalation not available for resolution" }
 ```
 
-Returned when the escalation has already been resolved.
+Returned when the escalation has already been resolved or is otherwise not pending.
 
 ### Signal-based resolution (metadata.signal_id)
 
@@ -633,6 +643,80 @@ Returns all escalations linked to a specific workflow ID.
 }
 ```
 
+## Cancel an escalation
+
+```
+POST /api/escalations/:id/cancel
+```
+
+Permanently cancels a pending or claimed escalation. The workflow waiting on this escalation (via `conditionLT`) receives `null` as the condition result, allowing it to handle the cancellation gracefully.
+
+Terminal escalations (`resolved` or already `cancelled`) return 409.
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `id` | Escalation UUID |
+
+**Request body:** None.
+
+**Response 200:** The cancelled escalation object.
+
+**Response 404:**
+
+```json
+{ "error": "Escalation not found" }
+```
+
+**Response 409:**
+
+```json
+{ "error": "Escalation already resolved or cancelled" }
+```
+
+**Auth:** Requires admin or superadmin for the escalation's role.
+
+---
+
+## Bulk cancel escalations
+
+```
+POST /api/escalations/bulk-cancel
+```
+
+Cancel multiple escalations at once. Skips any that are already terminal.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | yes | Escalation UUIDs to cancel |
+
+**Example request:**
+
+```json
+{ "ids": ["esc-a1b2c3d4-...", "esc-e5f6a7b8-..."] }
+```
+
+**Response 200:**
+
+```json
+{ "cancelled": 2, "skipped": 0 }
+```
+
+`skipped` counts escalations that were already terminal (resolved or cancelled) at call time.
+
+**Response 400:**
+
+```json
+{ "error": "ids must be a non-empty array" }
+```
+
+**Auth:** Requires admin or superadmin for the escalation roles.
+
+---
+
 ## Release a claim
 
 ```
@@ -672,7 +756,7 @@ Release a claimed escalation back to the available pool. Only the user who holds
 | `subtype` | `string` | Subcategory for finer routing |
 | `modality` | `string` | Modality from workflow config |
 | `description` | `string` | Human-readable reason |
-| `status` | `string` | `pending` or `resolved` |
+| `status` | `string` | `pending`, `resolved`, or `cancelled` |
 | `priority` | `integer` | Numeric priority |
 | `task_id` | `UUID` | FK to the task that triggered this escalation |
 | `origin_id` | `string` | Correlation ID from the parent orchestrator |

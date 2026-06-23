@@ -79,7 +79,7 @@ export function publishTaskEvent(params: {
  * Subject: system.escalation.{escalationId}.{action}
  */
 export function publishEscalationEvent(params: {
-  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released';
+  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released' | 'escalation.cancelled';
   source: string;
   workflowId: string;
   workflowName: string;

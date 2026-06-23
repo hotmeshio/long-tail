@@ -253,3 +253,32 @@ export function useBulkTriageEscalations() {
     },
   });
 }
+
+export function useCancelEscalation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ cancelled: boolean; escalationId: string }>(`/escalations/${id}/cancel`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.resetQueries({ queryKey: ['escalations'] });
+      queryClient.resetQueries({ queryKey: ['escalationStats'] });
+    },
+  });
+}
+
+export function useBulkCancelEscalations() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids }: { ids: string[] }) =>
+      apiFetch<{ cancelled: number; skipped: number }>('/escalations/bulk-cancel', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+    },
+  });
+}

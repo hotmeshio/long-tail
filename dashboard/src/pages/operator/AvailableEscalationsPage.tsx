@@ -12,7 +12,9 @@ import {
   useBulkAssignEscalations,
   useBulkEscalateToRole,
   useBulkTriageEscalations,
+  useBulkCancelEscalations,
 } from '../../api/escalations';
+import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -44,6 +46,7 @@ export function AvailableEscalationsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [triageModalOpen, setTriageModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   const claim = useClaimEscalation();
   const setPriority = useSetEscalationPriority();
@@ -51,6 +54,7 @@ export function AvailableEscalationsPage() {
   const bulkAssign = useBulkAssignEscalations();
   const bulkEscalate = useBulkEscalateToRole();
   const bulkTriage = useBulkTriageEscalations();
+  const bulkCancel = useBulkCancelEscalations();
   const { data: rolesData } = useRoles();
   const { data: typesData } = useEscalationTypes();
 
@@ -64,6 +68,7 @@ export function AvailableEscalationsPage() {
   const isClaimed = statusFilter === 'claimed';
   const apiStatus = isClaimed ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
+    : statusFilter === 'cancelled' ? 'cancelled'
     : isAvailable ? undefined
     : undefined;
 
@@ -140,6 +145,7 @@ export function AvailableEscalationsPage() {
     handleBulkEscalate,
     handleBulkTriage,
     handleBulkAssign,
+    handleBulkCancel,
   } = createBulkHandlers({
     selectedIds,
     clearSelection,
@@ -148,8 +154,10 @@ export function AvailableEscalationsPage() {
     bulkEscalate,
     bulkTriage,
     bulkAssign,
+    bulkCancel,
     closeTriageModal: () => setTriageModalOpen(false),
     closeAssignModal: () => setAssignModalOpen(false),
+    closeCancelModal: () => setCancelModalOpen(false),
   });
 
   const toggleSelect = (id: string) => {
@@ -242,11 +250,13 @@ export function AvailableEscalationsPage() {
           onAssign={() => setAssignModalOpen(true)}
           onEscalate={handleBulkEscalate}
           onTriage={() => setTriageModalOpen(true)}
+          onCancel={() => setCancelModalOpen(true)}
           isPriorityPending={setPriority.isPending}
           isClaimPending={bulkClaim.isPending}
           isAssignPending={bulkAssign.isPending}
           isEscalatePending={bulkEscalate.isPending}
           isTriagePending={bulkTriage.isPending}
+          isCancelPending={bulkCancel.isPending}
           availableRoles={rolesData?.roles ?? []}
         />
       )}
@@ -306,6 +316,15 @@ export function AvailableEscalationsPage() {
         selectedRoles={selectedRoles}
         onSubmit={handleBulkAssign}
         isPending={bulkAssign.isPending}
+      />
+
+      <ConfirmCancelModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        onConfirm={handleBulkCancel}
+        selectedCount={selectedIds.size}
+        isPending={bulkCancel.isPending}
+        error={bulkCancel.error as Error | null}
       />
     </div>
   );

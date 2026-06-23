@@ -117,6 +117,9 @@ export async function richForm(envelope: LTEnvelope): Promise<any> {
   });
 
   const response = await conditionLT<Record<string, unknown>>(signalId);
+  if (!response) {
+    return { type: 'return' as const, data: { cancelled: true } };
+  }
   const result = await processIntake(response);
 
   return {
