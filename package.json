@@ -98,6 +98,7 @@
     "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.19.33",
     "@types/pg": "^8.10.0",
