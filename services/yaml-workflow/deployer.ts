@@ -7,6 +7,7 @@ import { loggerRegistry } from '../../lib/logger';
 import { systemEventsConfig } from '../../lib/events/system-events';
 import * as namespaceService from '../namespace';
 import { buildMergedYaml, recompileWithContext } from './deployer-helpers';
+import { validatePipeStructure } from './pipe-validator';
 
 // Re-export helpers so existing `import * from './deployer'` consumers keep working
 export { buildMergedYaml } from './deployer-helpers';
@@ -55,6 +56,11 @@ export async function deployAppId(
 
   const mergedYaml = await buildMergedYaml(appId, version);
   loggerRegistry.debug(`[yaml-workflow] merged YAML for ${appId} v${version}:\n${mergedYaml}`);
+
+  // Structural guard: reject YAML with malformed @pipe rows before they reach
+  // the HotMesh engine. A bad pipe passes deploy() silently but causes
+  // collation errors on every execution, poisoning the stream.
+  validatePipeStructure(mergedYaml);
 
   const engine = await getEngine(appId);
   try {

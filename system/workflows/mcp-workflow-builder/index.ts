@@ -1,6 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope, LTReturn } from '../../../types';
+import { repairPipeStructure } from '../../../services/yaml-workflow/pipe-validator';
 import * as activities from './activities';
 import { BUILDER_SYSTEM_PROMPT, REFINE_PROMPT } from './prompts';
 
@@ -212,8 +213,19 @@ export async function mcpWorkflowBuilder(
         continue;
       }
 
-      // Fix known @pipe anti-patterns before returning
-      const fixedYaml = fixPipePatterns(result.yaml);
+      // Fix known @pipe anti-patterns, then structurally validate —
+      // throws if unfixable violations remain, blocking deployment of poison YAML.
+      let fixedYaml = fixPipePatterns(result.yaml);
+      try {
+        fixedYaml = repairPipeStructure(fixedYaml);
+      } catch (pipeErr: any) {
+        messages.push({ role: 'assistant', content });
+        messages.push({
+          role: 'user',
+          content: `The generated YAML has structural @pipe errors that would cause runtime collation failures:\n${pipeErr.message}\n\nFix all @pipe rows: every row must be an array like ['{@fn}'] or [value1, value2]. Never use a bare string as a pipe row.`,
+        });
+        continue;
+      }
 
       return {
         type: 'return',
