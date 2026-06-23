@@ -67,4 +67,17 @@ export function registerSingleRoutes(router: Router): void {
     );
     res.status(result.status).json(result.data ?? { error: result.error });
   });
+
+  /**
+   * POST /api/escalations/:id/cancel
+   * Permanently cancel an escalation. Caller must hold the escalation's role
+   * or have global escalation access. Terminal escalations return 409.
+   */
+  router.post('/:id/cancel', async (req, res) => {
+    const result = await api.cancelSingleEscalation(
+      { id: req.params.id },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
 }

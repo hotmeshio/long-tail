@@ -151,6 +151,33 @@ export async function resolveEscalationBySignalKey(
 }
 
 /**
+ * Mark an escalation cancelled — used when the tied workflow has terminated and
+ * can never receive the resolution signal. The escalation is removed from the
+ * active queue but preserved for audit. Returns null when the row is missing or
+ * already terminal.
+ */
+export async function cancelEscalation(
+  id: string,
+): Promise<LTEscalationRecord | null> {
+  const client = await escalations();
+  const result = await client.cancel(id);
+  if (!result.ok) return null;
+
+  const cancelled = toEscalationRecord(result.entry);
+  publishEscalationEvent({
+    type: 'escalation.cancelled',
+    source: 'service',
+    workflowId: cancelled.workflow_id || '',
+    workflowName: cancelled.workflow_type || '',
+    taskQueue: cancelled.task_queue || '',
+    escalationId: cancelled.id,
+    status: 'cancelled',
+    data: { reason: 'workflow_terminated' },
+  });
+  return cancelled;
+}
+
+/**
  * Bulk update priority for a set of escalations. Only pending escalations are
  * updated.
  */
@@ -256,6 +283,47 @@ export async function getEscalationsByWorkflowId(
     limit: LOOKUP_LIMIT,
   });
   return toEscalationRecords(rows);
+}
+
+/**
+ * Cancel all pending escalations tied to a workflow in one atomic UPDATE.
+ * Called after workflow termination so escalations don't remain in the queue.
+ *
+ * HotMesh's interrupt() is supposed to do this atomically, but it filters by
+ * `app_id = <engine-appId>`. Long-tail's Durable client uses app_id='durable'
+ * while escalations are stored with app_id='hmsh' — the WHERE never matches.
+ * This single UPDATE bypasses the SDK entirely and closes that gap.
+ */
+export async function cancelEscalationsByWorkflowId(
+  workflowId: string,
+): Promise<number> {
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  const { rows } = await pool.query<{
+    id: string; workflow_id: string | null; workflow_type: string | null;
+    task_queue: string | null;
+  }>(
+    `UPDATE public.hmsh_escalations
+        SET status = 'cancelled', updated_at = NOW()
+      WHERE workflow_id = $1
+        AND status = 'pending'
+      RETURNING id, workflow_id, workflow_type, task_queue`,
+    [workflowId],
+  );
+
+  for (const row of rows) {
+    publishEscalationEvent({
+      type: 'escalation.cancelled',
+      source: 'service',
+      workflowId: row.workflow_id || '',
+      workflowName: row.workflow_type || '',
+      taskQueue: row.task_queue || '',
+      escalationId: row.id,
+      status: 'cancelled',
+      data: { reason: 'workflow_terminated' },
+    });
+  }
+  return rows.length;
 }
 
 export async function updateEscalationMetadata(

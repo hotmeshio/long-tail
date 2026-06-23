@@ -82,6 +82,11 @@ export async function basicSignal(envelope: LTEnvelope): Promise<any> {
   // Pause — conditionLT handles $escalation_id stripping and resolution
   const decision = await conditionLT<{ approved: boolean; notes: string }>(signalId);
 
+  // null = escalation cancelled (workflow terminated); false = timeout
+  if (!decision) {
+    return { type: 'return' as const, data: { cancelled: true } };
+  }
+
   // Continue with the clean resolver payload
   const result = await processApproval({
     approved: decision.approved,

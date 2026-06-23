@@ -280,12 +280,19 @@ const result = await lt.escalations.resolve({
 Wait for a signal and automatically resolve the associated escalation. This is the counterpart to `executeLT` — where `executeLT` wraps `startChild` + `condition`, `conditionLT` wraps `condition` + escalation resolution.
 
 ```typescript
-conditionLT<T>(signalId: string, escalation?: ConditionQueueConfig): Promise<T>
+conditionLT<T>(signalId: string, escalation?: ConditionQueueConfig): Promise<T | false | null>
 ```
 
 ### Atomic form (recommended)
 
 Pass an escalation config as the second argument. The escalation row is written inside the workflow's Leg1 checkpoint — one commit, crash-safe: no separate `ltCreateEscalation` activity, no enrich step. `signal_key` is set to `signalId`, so the dashboard resolve endpoint (resolve-by-id → Path 0) and `POST /escalations/resolve-by-signal-key` resume *this* job in place, and `system.escalation.{id}.created` fires automatically.
+
+`conditionLT` returns `T | false | null`:
+- `T` — the resolver's payload (normal resolution)
+- `false` — the escalation timed out (if a timeout was configured)
+- `null` — the escalation was cancelled (workflow terminated or explicit `POST /api/escalations/:id/cancel`)
+
+Always guard for `null` and `false` before accessing the payload:
 
 ```typescript
 import { conditionLT } from '@hotmeshio/long-tail';
@@ -304,6 +311,11 @@ export async function stationWorker(envelope: LTEnvelope) {
     metadata: { orderId: envelope.data.orderId, station: 'qc' },
     envelope: { instructions: 'Review and approve or reject' },
   });
+
+  if (!decision) {
+    // null = cancelled, false = timeout
+    return { type: 'return' as const, data: { cancelled: true } };
+  }
   // decision is clean — the escalation was resolved by the resolve endpoint
 }
 ```
@@ -339,6 +351,11 @@ export async function myWorkflow(envelope: LTEnvelope) {
 
   // Pause — dashboard signals on resolve
   const decision = await conditionLT<{ approved: boolean; notes: string }>(signalId);
+
+  if (!decision) {
+    // null = cancelled, false = timeout
+    return { type: 'return' as const, data: { cancelled: true } };
+  }
   // decision is clean: { approved: true, notes: "..." }
   // $escalation_id was stripped and the escalation was resolved via durable activity
 }
@@ -542,6 +559,48 @@ const result = await lt.escalations.bulkTriage({
 **Returns:** `LTApiResult<{ triaged, workflows }>`
 
 **Auth:** Required
+
+---
+
+## cancel
+
+Permanently cancel a pending or claimed escalation. The workflow waiting on `conditionLT` receives `null`.
+
+```typescript
+const result = await lt.escalations.cancel({ id: 'esc_123' });
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Escalation UUID |
+
+**Returns:** `LTApiResult<{ escalation }>` — 404 if not found, 409 if already terminal.
+
+**Auth:** Required (admin or superadmin for the escalation's role)
+
+---
+
+## bulkCancel
+
+Cancel multiple escalations at once. Skips any already in a terminal state.
+
+```typescript
+const result = await lt.escalations.bulkCancel({
+  ids: ['esc_1', 'esc_2'],
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | Yes | Array of escalation UUIDs |
+
+**Returns:** `LTApiResult<{ cancelled: number; skipped: number }>`
+
+**Auth:** Required (admin or superadmin for the escalation roles)
 
 ---
 

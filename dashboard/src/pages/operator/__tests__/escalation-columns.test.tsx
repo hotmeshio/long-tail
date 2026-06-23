@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
-import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar } from '../escalation-columns';
+import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar, STATUS_OPTIONS } from '../escalation-columns';
 import type { LTEscalationRecord } from '../../../api/types';
 
 function makeEscalation(overrides: Partial<LTEscalationRecord> = {}): LTEscalationRecord {
@@ -95,6 +95,31 @@ describe('TIME_LEFT_COLUMN', () => {
     render(<MemoryRouter>{TIME_LEFT_COLUMN.render(makeEscalation({ assigned_until: future }), 0)}</MemoryRouter>);
     // CountdownTimer renders e.g. "4m 59s" or "5m"
     expect(screen.getByText(/\d+m(\s+\d+s)?/)).toBeInTheDocument();
+  });
+});
+
+describe('STATUS_OPTIONS', () => {
+  it('includes cancelled option', () => {
+    const values = STATUS_OPTIONS.map((o) => o.value);
+    expect(values).toContain('cancelled');
+  });
+
+  it('includes all four status values', () => {
+    const values = STATUS_OPTIONS.map((o) => o.value);
+    expect(values).toEqual(expect.arrayContaining(['available', 'claimed', 'resolved', 'cancelled']));
+  });
+
+  it('renders cancelled status option in filter bar when showStatus is true', () => {
+    render(
+      <EscalationFilterBar
+        filters={{ role: '', type: '', priority: '', status: '' }}
+        setFilter={vi.fn()}
+        roles={[]}
+        types={[]}
+        showStatus
+      />,
+    );
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
   });
 });
 

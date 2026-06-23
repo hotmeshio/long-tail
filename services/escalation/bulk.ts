@@ -50,6 +50,28 @@ export async function bulkEscalateToRole(
 }
 
 /**
+ * Bulk cancel escalations. Each row is cancelled individually; rows already in
+ * a terminal state are silently skipped by the SDK. Returns the count
+ * successfully cancelled.
+ */
+export async function bulkCancelEscalations(
+  ids: string[],
+): Promise<{ cancelled: number; skipped: number }> {
+  if (ids.length === 0) return { cancelled: 0, skipped: 0 };
+  const client = await escalations();
+  let cancelled = 0;
+  let skipped = 0;
+  await Promise.all(
+    ids.map(async (id) => {
+      const result = await client.cancel(id);
+      if (result.ok) cancelled++;
+      else skipped++;
+    }),
+  );
+  return { cancelled, skipped };
+}
+
+/**
  * Bulk resolve escalations for AI triage.
  * Returns full records so the caller can start triage workflows. No signal is
  * delivered — the triage workflow takes over handling.

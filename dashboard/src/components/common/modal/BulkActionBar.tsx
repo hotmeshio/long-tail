@@ -9,16 +9,18 @@ interface BulkActionBarProps {
   onAssign: () => void;
   onEscalate: (targetRole: string) => void;
   onTriage: () => void;
+  onCancel: () => void;
   isPriorityPending: boolean;
   isClaimPending: boolean;
   isAssignPending: boolean;
   isEscalatePending: boolean;
   isTriagePending: boolean;
+  isCancelPending: boolean;
   availableRoles: string[];
 }
 
 const anyPending = (props: BulkActionBarProps) =>
-  props.isPriorityPending || props.isClaimPending || props.isAssignPending || props.isEscalatePending || props.isTriagePending;
+  props.isPriorityPending || props.isClaimPending || props.isAssignPending || props.isEscalatePending || props.isTriagePending || props.isCancelPending;
 
 export function BulkActionBar(props: BulkActionBarProps) {
   const disabled = anyPending(props);
@@ -101,6 +103,15 @@ export function BulkActionBar(props: BulkActionBarProps) {
         className="btn-secondary text-xs py-1.5"
       >
         {props.isTriagePending ? 'Triaging...' : 'Triage'}
+      </button>
+
+      {/* Cancel */}
+      <button
+        onClick={props.onCancel}
+        disabled={disabled}
+        className="text-xs py-1.5 px-3 rounded-md border border-status-error/40 text-status-error hover:bg-status-error/10 transition-colors disabled:opacity-50"
+      >
+        {props.isCancelPending ? 'Cancelling...' : 'Cancel'}
       </button>
 
       <div className="flex-1" />

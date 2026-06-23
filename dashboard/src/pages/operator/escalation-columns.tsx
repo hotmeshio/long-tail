@@ -148,6 +148,7 @@ export const STATUS_OPTIONS = [
   { value: 'available', label: 'Available' },
   { value: 'claimed', label: 'Claimed' },
   { value: 'resolved', label: 'Resolved' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 /** Shared filter bar for escalation list pages. */

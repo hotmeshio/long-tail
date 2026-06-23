@@ -43,7 +43,7 @@ export async function efficientSignal(envelope: LTEnvelope): Promise<any> {
 
   // `false` only if a timeout string had been supplied (it wasn't) — here the
   // signal always carries the resolver payload.
-  if (decision === false) {
+  if (decision === false || decision === null) {
     return { type: 'return' as const, data: { approved: false, notes: 'no decision' } };
   }
 

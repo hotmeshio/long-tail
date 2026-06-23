@@ -6,6 +6,7 @@ import {
   checkInvocationRoles,
   InvocationError,
 } from '../../services/workflow-invocation';
+import { cancelEscalationsByWorkflowId } from '../../services/escalation/crud';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 function isResolveError(err: any): boolean {
@@ -156,6 +157,12 @@ export async function terminateWorkflow(input: {
     );
 
     await handle.terminate();
+
+    // HotMesh's interrupt() cancels escalations in the same Postgres transaction,
+    // but only when the engine app_id matches the escalation row's app_id. The
+    // Durable client uses app_id='durable' while escalations are stored with
+    // app_id='hmsh', so the automatic cancel is a no-op. Cancel explicitly here.
+    await cancelEscalationsByWorkflowId(input.workflowId);
 
     return {
       status: 200,

@@ -500,3 +500,22 @@ export const exportWorkflowExecutionSchema = z.object({
 export const getExportStatusSchema = z.object({
   workflow_id: z.string().describe('Workflow ID to check export status'),
 });
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
+
+export const diagnoseJobSchema = z.object({
+  workflow_id: z.string().describe('Workflow ID to diagnose'),
+  app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
+});
+
+export const findStalledJobsSchema = z.object({
+  app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
+  stalled_minutes: z.number().int().min(1).optional().default(5).describe('Minimum minutes since last progress (default: 5)'),
+  workflow_type: z.string().optional().describe('Filter by workflow function name'),
+  limit: z.number().int().min(1).max(200).optional().default(50).describe('Max results (default: 50)'),
+});
+
+export const findOrphanedSignalsSchema = z.object({
+  app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
+  limit: z.number().int().min(1).max(500).optional().default(100).describe('Max results (default: 100)'),
+});

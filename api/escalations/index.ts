@@ -5,3 +5,4 @@ export { claimEscalation, releaseEscalation } from './claim';
 export { releaseExpiredClaims, updatePriority, bulkClaim, bulkAssign, bulkEscalate, bulkTriage } from './bulk';
 export { resolveEscalation, resolveBySignalKey } from './resolve';
 export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
+export { cancelSingleEscalation, bulkCancel } from './cancel';

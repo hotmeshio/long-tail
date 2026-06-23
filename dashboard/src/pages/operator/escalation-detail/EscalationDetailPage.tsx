@@ -10,7 +10,9 @@ import {
   useClaimEscalation,
   useResolveEscalation,
   useEscalateToRole,
+  useCancelEscalation,
 } from '../../../api/escalations';
+import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
 import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
@@ -57,6 +59,8 @@ export function EscalationDetailPage() {
   const claim = useClaimEscalation();
   const resolve = useResolveEscalation();
   const escalate = useEscalateToRole();
+  const cancel = useCancelEscalation();
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const { data: escalationTargets } = useEscalationTargets(esc?.role ?? '');
   const { data: workflowConfigs } = useWorkflowConfigs();
   const { data: settings } = useSettings();
@@ -190,6 +194,12 @@ export function EscalationDetailPage() {
     goBack();
   };
 
+  const handleConfirmCancel = async () => {
+    await cancel.mutateAsync(esc.id);
+    setCancelModalOpen(false);
+    goBack();
+  };
+
   const viewToggle = isBuilder ? (
     <button
       onClick={toggleMode}
@@ -282,9 +292,18 @@ export function EscalationDetailPage() {
         escalateError={escalate.error as Error | null}
         onRelease={handleRelease}
         releasePending={claim.isPending}
+        onCancel={() => setCancelModalOpen(true)}
         assignedTo={esc.assigned_to}
         assignedUntil={esc.assigned_until}
         onSubmitAttempt={() => setSubmitAttempted(true)}
+      />
+
+      <ConfirmCancelModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        onConfirm={handleConfirmCancel}
+        isPending={cancel.isPending}
+        error={cancel.error as Error | null}
       />
     </div>
   );

@@ -53,6 +53,10 @@ export async function efficientStation(envelope: LTEnvelope): Promise<unknown> {
     envelope: { instructions, station: stationName },
   });
 
+  if (!resolution) {
+    return { type: 'return' as const, data: { stationName, cancelled: true } };
+  }
+
   return {
     type: 'return' as const,
     data: {
