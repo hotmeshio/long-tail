@@ -444,12 +444,19 @@ export async function claimByMetadata(
 }
 
 export interface ResolveByMetadataResult {
-  /** 'resolved' = done atomically. 'signal_required' = signal_id present, caller must signal. */
-  outcome: 'resolved' | 'signal_required' | 'not_found';
+  /**
+   * 'resolved'        = done atomically in SQL (no signal backing).
+   * 'signal_required' = signal backing present, caller must deliver the signal.
+   * 'conflict'        = signal_id row already claimed by a concurrent caller; skip re-signal.
+   * 'not_found'       = no pending escalation matched the metadata filter.
+   */
+  outcome: 'resolved' | 'signal_required' | 'conflict' | 'not_found';
   /** The resolved escalation (when outcome = 'resolved') */
   escalation?: LTEscalationRecord;
-  /** Signal info (when outcome = 'signal_required') */
+  /** Legacy conditionLT signal info (when signalId is set, caller uses handle.signal) */
   signalId?: string;
+  /** Atomic conditionLT signal key (when signalKey is set, caller uses SDK resolve to atomically mark+signal) */
+  signalKey?: string;
   escalationId?: string;
   workflowId?: string;
   workflowType?: string;
@@ -503,10 +510,16 @@ export async function resolveByMetadataAtomic(
     return { outcome: 'resolved', escalation };
   }
 
+  // Signal_id row already claimed by a concurrent caller — skip re-signal to prevent duplicate delivery.
+  if (row.signal_id && row.signal_already_claimed) {
+    return { outcome: 'conflict', escalationId: row.target_id };
+  }
+
   // Signal-backed escalation — return the signal info for the caller to deliver.
   return {
     outcome: 'signal_required',
-    signalId: row.signal_id,
+    signalId: row.signal_id ?? undefined,
+    signalKey: row.signal_key ?? undefined,
     escalationId: row.target_id,
     workflowId: row.target_workflow_id,
     workflowType: row.target_workflow_type,

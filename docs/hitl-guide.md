@@ -594,6 +594,54 @@ metadata: {
 
 ---
 
+## Resolving from System Code
+
+When a backend service (not the dashboard UI) needs to resolve an escalation — for example, an ingress handler that receives a webhook or processes a domain event — use the escalation SDK methods directly.
+
+### By escalation ID
+
+Use when you already have the escalation UUID (e.g. stored in your own DB alongside the order):
+
+```typescript
+const result = await lt.escalations.resolve({
+  id: escalationId,
+  resolverPayload: { approved: true, targetStatus: 'ready' },
+});
+```
+
+This routes through the full resolution path and works for all escalation types — atomic `conditionLT` (signal_key), legacy `conditionLT` (signal_id), and re-run-style escalations.
+
+### By metadata key-value pair
+
+Use when you know a domain identifier (e.g. `orderId`) but not the escalation UUID. `resolveByMetadata` finds the highest-priority pending escalation matching the key-value pair and resolves it atomically — no pre-flight lookup, no TOCTOU:
+
+```typescript
+const result = await lt.escalations.resolveByMetadata({
+  key: 'orderId',
+  value: orderId,
+  resolverPayload: { approved: true, targetStatus: 'ready' },
+});
+
+if (result.status === 404) {
+  // No pending escalation for this orderId
+}
+```
+
+This works for all escalation types including atomic `conditionLT` rows (those with `signal_key` set). The routing is transparent — the caller does not need to know which pattern the workflow used.
+
+### By signal key
+
+When the signal key is deterministic and known to the caller (e.g. `station-done-${workflowId}`), use the direct signal-key path to skip the metadata lookup:
+
+```typescript
+await lt.escalations.resolveBySignalKey({
+  signalKey: `station-done-${workflowId}`,
+  resolverPayload: { approved: true },
+});
+```
+
+---
+
 ## Cancelling Escalations
 
 Escalations can be cancelled at any point before they are resolved. Cancellation is terminal — a cancelled escalation cannot be re-opened.

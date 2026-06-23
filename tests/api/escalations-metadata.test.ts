@@ -14,6 +14,7 @@ import { findByMetadata, claimByMetadata, resolveByMetadata } from '../../api/es
 const mockFindByMetadata = vi.mocked(escalationService.findByMetadata);
 const mockClaimByMetadata = vi.mocked(escalationService.claimByMetadata);
 const mockResolveByMetadataAtomic = vi.mocked(escalationService.resolveByMetadataAtomic);
+const mockResolveEscalation = vi.mocked(escalationService.resolveEscalation);
 const mockHasGlobalAccess = vi.mocked(userService.hasGlobalEscalationAccess);
 const mockGetUserByExternalId = vi.mocked(userService.getUserByExternalId);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
@@ -244,6 +245,61 @@ describe('resolveByMetadata', () => {
     }, SYSTEM_AUTH);
 
     expect(result.status).toBe(400);
+  });
+
+  it('calls SDK resolve for atomic conditionLT escalation (signal_key set)', async () => {
+    const esc = makeEscalation({ status: 'resolved' });
+    mockResolveByMetadataAtomic.mockResolvedValue({
+      outcome: 'signal_required',
+      signalKey: 'station-done-wf-123',
+      escalationId: 'esc-uuid',
+      workflowId: 'wf-123',
+      workflowType: 'stationWorker',
+      taskQueue: 'order-pipeline',
+    });
+    mockResolveEscalation.mockResolvedValue(esc as any);
+
+    const result = await resolveByMetadata({
+      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
+    }, SYSTEM_AUTH);
+
+    expect(result.status).toBe(200);
+    expect(result.data.signaled).toBe(true);
+    expect(result.data.escalationId).toBe('esc-uuid');
+    // SDK resolve is called — not handle.signal
+    expect(mockResolveEscalation).toHaveBeenCalledWith('esc-uuid', { approved: true });
+  });
+
+  it('returns 409 when concurrent caller already claimed a signal_id escalation', async () => {
+    mockResolveByMetadataAtomic.mockResolvedValue({
+      outcome: 'conflict',
+      escalationId: 'esc-uuid',
+    });
+
+    const result = await resolveByMetadata({
+      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
+    }, SYSTEM_AUTH);
+
+    expect(result.status).toBe(409);
+    expect(mockResolveEscalation).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when SDK resolve returns null for signal_key escalation', async () => {
+    mockResolveByMetadataAtomic.mockResolvedValue({
+      outcome: 'signal_required',
+      signalKey: 'station-done-wf-123',
+      escalationId: 'esc-uuid',
+      workflowId: 'wf-123',
+      workflowType: 'stationWorker',
+      taskQueue: 'order-pipeline',
+    });
+    mockResolveEscalation.mockResolvedValue(null);
+
+    const result = await resolveByMetadata({
+      key: 'orderId', value: 'order-123', resolverPayload: { approved: true },
+    }, SYSTEM_AUTH);
+
+    expect(result.status).toBe(409);
   });
 
   it('passes metadata for atomic merge in CTE', async () => {

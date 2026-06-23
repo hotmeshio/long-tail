@@ -115,11 +115,29 @@ export async function resolveByMetadata(
       return { status: 404, error: 'No pending escalation found for this metadata, or insufficient role permissions' };
     }
 
+    if (result.outcome === 'conflict') {
+      return { status: 409, error: 'A concurrent resolution is already in progress for this escalation' };
+    }
+
     if (result.outcome === 'resolved') {
       return { status: 200, data: { escalation: result.escalation } };
     }
 
-    // Signal-backed escalation — signal the workflow, conditionLT resolves durably
+    // Atomic conditionLT escalation (signal_key set) — SDK resolve atomically marks
+    // resolved AND delivers the signal to the waiting condition(), resuming the workflow.
+    if (result.signalKey) {
+      const resolved = await escalationService.resolveEscalation(result.escalationId!, input.resolverPayload);
+      if (!resolved) {
+        return { status: 409, error: 'Escalation not available for resolution' };
+      }
+      return {
+        status: 200,
+        data: { signaled: true, escalationId: result.escalationId, workflowId: result.workflowId },
+      };
+    }
+
+    // Legacy conditionLT escalation (metadata.signal_id set) — signal the workflow,
+    // conditionLT interceptor resolves durably via ltResolveEscalation.
     const { createClient } = await import('../../workers');
     const client = createClient();
     const handle = await client.workflow.getHandle(
