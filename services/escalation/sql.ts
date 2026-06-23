@@ -33,11 +33,21 @@ WHERE status = 'pending'
 /**
  * Atomic resolve by metadata with signal guard.
  *
- * Single query, two outcomes:
- * 1. No `metadata.signal_id` → claim + resolve atomically. `resolved` is populated.
- * 2. `metadata.signal_id` present → resolve CTE skips (guard in WHERE). `resolved`
- *    is null, but `target_id`, `signal_id`, and workflow routing are returned so
- *    the caller can signal the workflow directly.
+ * Single query, four outcomes:
+ * 1. No signal backing → claim + resolve atomically. `resolved` is populated.
+ * 2. `metadata.signal_id` present, row unclaimed → claim the row (preventing concurrent
+ *    duplicate signals via FOR UPDATE serialization), then return signal info so the
+ *    caller can signal the workflow. `signal_already_claimed = false`.
+ * 3. `metadata.signal_id` present, row already claimed and claim not expired →
+ *    a concurrent caller is handling the signal. `signal_already_claimed = true`;
+ *    caller returns 409 without re-signaling.
+ * 4. `signal_key` present (atomic conditionLT) → `claimed` and `resolved` both skip.
+ *    Caller invokes SDK resolve to atomically mark resolved + deliver the signal.
+ *
+ * Signal_id hardening: the `claimed` CTE runs for signal_id rows (previously excluded).
+ * This stamps `assigned_to` on the row inside the FOR UPDATE transaction, so a
+ * concurrent second caller sees `signal_already_claimed = true` and aborts.
+ * The `resolved` CTE still skips signal_id rows — the workflow resolves durably.
  *
  * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
  * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
@@ -69,7 +79,7 @@ claimed AS (
       updated_at = NOW()
   FROM target
   WHERE e.id = target.id
-    AND (target.metadata->>'signal_id') IS NULL
+    AND target.signal_key IS NULL
   RETURNING e.*
 ),
 resolved AS (
@@ -80,15 +90,20 @@ resolved AS (
       updated_at = NOW()
   FROM claimed
   WHERE e.id = claimed.id
+    AND (claimed.metadata->>'signal_id') IS NULL
   RETURNING e.*
 )
 SELECT
   resolved.*,
   target.id AS target_id,
   target.metadata->>'signal_id' AS signal_id,
+  target.signal_key AS signal_key,
   target.workflow_id AS target_workflow_id,
   target.workflow_type AS target_workflow_type,
   target.task_queue AS target_task_queue,
+  (target.assigned_to IS NOT NULL
+    AND target.assigned_until IS NOT NULL
+    AND target.assigned_until > NOW()) AS signal_already_claimed,
   CASE WHEN resolved.id IS NOT NULL THEN 'resolved' ELSE 'signal_required' END AS outcome
 FROM target
 LEFT JOIN resolved ON resolved.id = target.id`;
