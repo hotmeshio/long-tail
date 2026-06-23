@@ -8,6 +8,10 @@ import { formatDuration } from './utils';
 interface EventTableProps {
   events: WorkflowExecutionEvent[];
   childTasks?: LTTaskRecord[];
+  /** Job id (workflowId) — enables the per-activity raw-stream drill-down. */
+  jid?: string;
+  /** HotMesh namespace / DB schema for the raw-stream lookup (default: durable). */
+  appId?: string;
 }
 
 /** Event types that represent the "start" phase of a paired operation */
@@ -42,7 +46,7 @@ function buildCompletedKeys(events: WorkflowExecutionEvent[]): Set<string> {
   return keys;
 }
 
-export function EventTable({ events, childTasks }: EventTableProps) {
+export function EventTable({ events, childTasks, jid, appId }: EventTableProps) {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -223,6 +227,8 @@ export function EventTable({ events, childTasks }: EventTableProps) {
                       event={evt}
                       childTask={findChildTask(evt)}
                       pending={pending}
+                      jid={jid}
+                      appId={appId}
                       onClose={() => toggleEvent(evt.event_id)}
                     />
                   </div>

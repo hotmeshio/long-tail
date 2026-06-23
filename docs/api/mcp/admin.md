@@ -1,6 +1,6 @@
 # Admin
 
-Unified system management — tasks, escalations, workflows, agents, bot accounts, control plane, pipelines, topics, users, roles, and settings.
+Unified system management — tasks, escalations, workflows, diagnostics, agents, bot accounts, control plane, pipelines, topics, users, roles, and settings.
 
 | Property | Value |
 |----------|-------|
@@ -8,6 +8,10 @@ Unified system management — tasks, escalations, workflows, agents, bot account
 | Category | System |
 | AI required | No |
 | Credential providers | — |
+
+## Access
+
+Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read` can call the Read-safe tools; the rest (Read-safe: No) change state and require an `mcp:full` key, and the account's role must permit the action on the target. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section for the full model.
 
 ## Compile Hints
 
@@ -949,6 +953,95 @@ Browse stream messages with pagination, filtering, and sorting.
 | workflow_name | string | No | Filter by workflow name |
 | jid | string | No | Filter by job ID |
 | aid | string | No | Filter by activity ID |
+| dad | string | No | Filter by dimension/ancestor path (worker-only) — pins one execution among siblings sharing an aid |
+
+## Diagnostics
+
+Read-only inspection of workflow execution. These tools never mutate state —
+HotMesh execution only moves forward and cannot be unwound, so they describe what
+happened and where to look, not how to "fix" a job.
+
+**Read this first — what is and isn't a problem.** A workflow suspended at a
+`condition()` / `waitFor()` / `sleepFor()` can sit idle for days legitimately,
+and HotMesh only bumps `updated_at` when a job's status changes. A frozen
+`updated_at` is therefore the *normal* signature of a wait, **not** a fault. The
+genuinely broken signals are: a dead-lettered message (retries exhausted), a
+reservation leak (claimed but never ACK'd past the reclaim window), and a
+suspended waiter with **no** escalation row.
+
+**Recommended flow:** start fleet-wide with `find_orphaned_signals` (the
+genuinely-broken case) or `find_stalled_jobs` (candidates worth a look), then run
+`diagnose_job` on a specific id for root cause. For the full raw JSONB of a
+specific message, use `list_stream_messages` (Control Plane) filtered by `jid`
+(and `aid`/`dad`) — `diagnose_job` returns a capped summary, not a dump.
+
+### diagnose_job
+
+Complete read-only diagnosis of one workflow: status, idle time, suspension and
+escalation state, stream health (pending / dead-lettered / reservation leaks),
+and structured `findings[]` with confidence, evidence, and read-only guidance.
+Classifies a healthy long-wait as such rather than flagging it as stalled.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workflow_id | string | Yes | Workflow (job) ID to diagnose |
+| app_id | string | No | HotMesh namespace / DB schema (default: durable) |
+| max_events | integer | No | Cap on execution events returned, most recent kept (default: 500). Use `list_stream_messages` for full payloads. |
+
+### find_stalled_jobs
+
+Find running jobs with no status change in N minutes (bounded, indexed). Each
+result is classified `likely`: `waiting` (has a pending escalation — healthy) or
+`no_recent_progress` (worth a closer look). Triage the `no_recent_progress` rows
+with `diagnose_job`.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| app_id | string | No | HotMesh namespace / DB schema (default: durable) |
+| idle_minutes | integer | No | Minimum minutes since last status change (default: 5) |
+| workflow_type | string | No | Filter by workflow function name |
+| limit | integer | No | Max results (default: 50, max: 200) |
+
+### find_orphaned_signals
+
+Find running workflows suspended at a `condition()` (waiter committed, signal
+registered) that have **no** escalation row — the genuinely broken case: the
+workflow waits for a signal nothing will send. Scans a recent time window only,
+so it never degenerates into a full-history scan of the partitioned
+`worker_streams` table.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| app_id | string | No | HotMesh namespace / DB schema (default: durable) |
+| within_hours | integer | No | Recent window to scan, in hours (default: 24, max: 720). Widen to reach older orphans; narrow to go faster. |
+| limit | integer | No | Max results (default: 100, max: 500) |
+
+### Example prompts
+
+- "Diagnose workflow `ortho-eff-1782084825-b9-3-2-printer-0` and tell me whether it's a healthy wait or genuinely stuck."
+- "Find any orphaned signals in the last 48 hours and summarize the common cause."
+- "List stalled jobs of type `printerEfficient` idle more than 30 minutes, then diagnose the ones classified `no_recent_progress`."
+- "Are there dead-lettered messages or reservation leaks behind job `<id>`? Show the evidence."
+- "Diagnose `<id>`, then pull the raw worker stream message for its failing activity so I can see the full input payload."
+- "Scan the fleet for genuinely broken workflows (not normal waits) and give me the job IDs to investigate."
 
 ## Pipelines
 

@@ -7,18 +7,28 @@ export interface Finding {
   confidence: number;
   severity: 'critical' | 'warning' | 'info';
   evidence: string[];
-  treatment: RecoveryOption[];
+  /**
+   * Read-only diagnostic guidance: what the condition means and where a human
+   * should look next. This is NOT recovery — HotMesh state only moves forward
+   * and cannot be unwound, so guidance never prescribes mutating job state.
+   */
+  guidance: Guidance[];
 }
 
-export interface RecoveryOption {
+export interface Guidance {
   action: string;
   note: string;
   [key: string]: unknown;
 }
 
 /**
- * Match event stream + stream messages against known failure patterns.
+ * Match event stream + stream messages against known workflow conditions.
  * Returns findings ordered by severity (critical first).
+ *
+ * Healthy long-waits are a first-class outcome here, not an omission: a
+ * workflow suspended at `condition()`/`waitFor()`/`sleepFor()` can sit for days
+ * legitimately, so we classify those explicitly rather than treating a frozen
+ * job as broken.
  */
 export function matchPatterns(
   execution: WorkflowExecution,
@@ -67,13 +77,18 @@ export function matchPatterns(
         `${openSignals.length} open signal(s) with no matching resolution`,
         `No escalation row in hmsh_escalations for this workflow`,
         queueConfig == null
-          ? `Worker result missing queueConfig — escalation INSERT was skipped (pre-0.22 SDK)`
-          : `Worker result has queueConfig but escalation INSERT did not complete`,
-        ...(signalId ? [`Signal key: ${signalId}`] : []),
+          ? `Worker result missing queueConfig — no escalation row was written (pre-0.22 SDK)`
+          : `Worker result has queueConfig but no escalation row was written`,
+        ...(signalId ? [`Awaited signal key: ${signalId}`] : []),
       ],
-      treatment: [
-        { action: 'create_escalation_row', note: 'INSERT missing row into public.hmsh_escalations' },
-        ...(signalId ? [{ action: 'resolve_by_signal_key', signal_key: signalId, note: 'POST /api/escalations/resolve-by-signal-key after inserting escalation row' }] : []),
+      guidance: [
+        {
+          action: 'inspect_worker_result',
+          note: signalId
+            ? `Workflow is parked on signal "${signalId}" with no escalation backing it, so the normal escalation lifecycle will not resume it. Inspect the worker result payload via the stream browser (list_stream_messages filtered by jid) to confirm the missing queueConfig.`
+            : 'Workflow is parked on a signal with no escalation backing it. Inspect the worker result payload via the stream browser (list_stream_messages filtered by jid).',
+        },
+        { action: 'escalate_to_engineering', note: 'Resolving an orphaned wait requires engineering review of the deploy/SDK version. Do not hand-edit escalation or job state — HotMesh state cannot be unwound.' },
       ],
     });
   }
@@ -95,11 +110,12 @@ export function matchPatterns(
       confidence: 0.99,
       severity: 'info',
       evidence: [
-        `Workflow suspended — escalation exists (status: pending)`,
+        `Healthy wait — workflow suspended at a condition with a pending escalation`,
+        `This is NOT stalled: a workflow can wait here for days legitimately. A frozen updated_at is the normal signature of a wait, not a fault.`,
         ...(escalationRow!.role ? [`Role: ${escalationRow!.role}, Type: ${escalationRow!.type}`] : []),
         ...(escalationRow!.id ? [`Escalation id: ${escalationRow!.id}`] : []),
       ],
-      treatment: [{ action: 'none', note: 'Waiting for human to claim and resolve escalation' }],
+      guidance: [{ action: 'none', note: 'No action required — waiting for a human to claim and resolve the escalation through the normal lifecycle.' }],
     });
   }
 
@@ -116,7 +132,7 @@ export function matchPatterns(
           `aid: ${m.aid ?? 'engine'}, retries: ${m.retry_attempt}/${m.max_retry_attempts}, stream: ${m.stream_name}`,
         ),
       ],
-      treatment: [{
+      guidance: [{
         action: 'investigate_dead_letter',
         count: deadWorker.length + deadEngine.length,
         note: 'Message exhausted retries — check worker health and DB connectivity',
@@ -133,7 +149,7 @@ export function matchPatterns(
       evidence: leaks.map(m =>
         `aid: ${m.aid}, claimed by: ${m.reserved_by ?? 'unknown'}, open for ${Math.round((now - new Date(m.reserved_at!).getTime()) / 1000)}s`,
       ),
-      treatment: [{ action: 'check_worker_health', note: 'Worker claimed message but never ACKd — check for crashed workers' }],
+      guidance: [{ action: 'check_worker_health', note: 'Worker claimed message but never ACKd — check for crashed workers' }],
     });
   }
 
@@ -149,7 +165,7 @@ export function matchPatterns(
         `Workflow terminated with failure`,
         ...(attrs?.error ? [`Error: ${attrs.error}`] : []),
       ],
-      treatment: [{ action: 'none', note: 'Workflow terminated — review error and restart if needed' }],
+      guidance: [{ action: 'none', note: 'Workflow terminated — review error and restart if needed' }],
     });
   }
 
@@ -161,7 +177,7 @@ export function matchPatterns(
       confidence: 0.90,
       severity: 'critical',
       evidence: [`Workflow created but no activities have run — engine may not be consuming this stream`],
-      treatment: [{ action: 'check_engine_health', note: 'Check engine health and stream backlog for this workflow type' }],
+      guidance: [{ action: 'check_engine_health', note: 'Check engine health and stream backlog for this workflow type' }],
     });
   }
 
@@ -175,7 +191,7 @@ export function matchPatterns(
       confidence: 0.95,
       severity: 'info',
       evidence: [isCompleted ? 'Workflow completed normally' : 'Workflow is running — no anomalies detected'],
-      treatment: [{ action: 'none', note: 'No intervention required' }],
+      guidance: [{ action: 'none', note: 'No intervention required' }],
     });
   }
 

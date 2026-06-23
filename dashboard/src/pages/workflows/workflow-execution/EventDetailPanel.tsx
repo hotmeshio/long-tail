@@ -1,12 +1,17 @@
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import type { WorkflowExecutionEvent, LTTaskRecord } from '../../../api/types';
 import { EventMetadataGrid, ChildWorkflowSection, EventPayloadSection } from './EventMetadataGrid';
+import { RawStreamSection } from './RawStreamSection';
 
 interface EventDetailPanelProps {
   event: WorkflowExecutionEvent;
   childTask?: LTTaskRecord;
   /** When true, show a "Pending" badge. Caller determines this from the full event list. */
   pending?: boolean;
+  /** Job id (workflowId) — when present, enables the raw-stream drill-down. */
+  jid?: string;
+  /** HotMesh namespace / DB schema for the raw-stream lookup (default: durable). */
+  appId?: string;
   onClose?: () => void;
 }
 
@@ -21,7 +26,7 @@ interface EventDetailPanelProps {
  * - Timers: duration
  * - Child workflows: child_workflow_id link, awaited badge, result
  */
-export function EventDetailPanel({ event, childTask, pending = false, onClose }: EventDetailPanelProps) {
+export function EventDetailPanel({ event, childTask, pending = false, jid, appId, onClose }: EventDetailPanelProps) {
   return (
     <div className="p-4 bg-surface-sunken rounded-md space-y-4">
       {/* Header */}
@@ -55,6 +60,11 @@ export function EventDetailPanel({ event, childTask, pending = false, onClose }:
 
       {/* Child workflow sections */}
       <ChildWorkflowSection event={event} childTask={childTask} />
+
+      {/* Raw stream message drill-down — the real audit behind the export.
+          Placed above INPUT/RESULT so the underlying record is the first thing
+          available when auditing. */}
+      {jid && <RawStreamSection jid={jid} appId={appId ?? 'durable'} event={event} />}
 
       {/* Input / Result payload */}
       <EventPayloadSection event={event} childTask={childTask} />

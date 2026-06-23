@@ -6,6 +6,7 @@ import { NatsEventAdapter } from '../lib/events/nats';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { deriveWsUrlFromRequest } from '../lib/events/nats-ws-proxy';
 import { config } from '../modules/config';
+import { LONG_TAIL_VERSION, HOTMESH_VERSION } from '../modules/version';
 import { isSSOEnabled, getSSOConfig } from '../modules/sso';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 import { hasLLMApiKey } from '../services/llm';
@@ -37,10 +38,11 @@ function resolveNatsWsUrl(
  * Return platform settings for the current deployment.
  *
  * Includes telemetry configuration (trace URL), escalation claim duration
- * options, and event transport details (socket.io, NATS, or none).
+ * options, event transport details (socket.io, NATS, or none), and an
+ * environment block (long-tail + HotMesh versions, Node env/version).
  *
  * @param req — the incoming HTTP request, used to derive NATS WS URL from headers when proxying
- * @returns `{ status: 200, data: { telemetry, escalation, events } }`
+ * @returns `{ status: 200, data: { telemetry, escalation, events, auth, ai, environment } }`
  */
 export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
   try {
@@ -73,6 +75,13 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
         },
         ai: {
           enabled: hasLLMApiKey(),
+        },
+        environment: {
+          longTailVersion: LONG_TAIL_VERSION,
+          hotmeshVersion: HOTMESH_VERSION,
+          nodeEnv: config.NODE_ENV,
+          nodeVersion: process.version,
+          eventTransport: transport,
         },
       },
     };

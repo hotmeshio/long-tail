@@ -234,12 +234,22 @@ describe('EscalationActionBar', () => {
     expect(onRelease).toHaveBeenCalled();
   });
 
-  it('cancel release calls onActiveViewChange with resolve', () => {
+  it('Back from release returns to the resolve view', () => {
     const onActiveViewChange = vi.fn();
     renderBar({ mode: 'claimed_by_me', activeView: 'release', onActiveViewChange });
 
-    fireEvent.click(screen.getByText('Cancel'));
+    fireEvent.click(screen.getByText('Back'));
     expect(onActiveViewChange).toHaveBeenCalledWith('resolve');
+  });
+
+  it('Cancel tab triggers onCancel (cancel the escalation)', () => {
+    const onCancel = vi.fn();
+    const onActiveViewChange = vi.fn();
+    renderBar({ mode: 'claimed_by_me', activeView: 'release', onCancel, onActiveViewChange });
+
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(onCancel).toHaveBeenCalled();
+    expect(onActiveViewChange).not.toHaveBeenCalled();
   });
 
   // ── Error display ──

@@ -8,6 +8,7 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
     - [Humans as Tools](#humans-as-tools)
     - [Compiled Workflows as Tools](#compiled-workflows-as-tools)
     - [The Cycle](#the-cycle)
+- [Connecting an Agent to Long Tail](#connecting-an-agent-to-long-tail) — the `/mcp` endpoint, service accounts, multi-environment `.mcp.json`, example prompts
 - [Human Queue Server](#human-queue-server) — escalation as MCP tools
 - [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
 - [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
@@ -141,6 +142,107 @@ This is how the system evolves:
 Over time, the YAML replaces the procedural. The MCP triage workflow stops entropy by repairing and replacing the flows that eventually all become obsolete. Dynamic processes author themselves. The long tail gets shorter every time.
 
 The sections above describe the concept. The rest of this guide covers the concrete servers, tools, and APIs that implement it.
+
+## Connecting an Agent to Long Tail
+
+Long Tail is itself an MCP server. Any MCP-aware client — Claude Code, Claude Desktop, Cursor, a custom agent — connects to its full tool surface and operates the system in conversation: read its state, work its queues, run its workflows, inspect its plumbing. Diagnostics are one part of that surface, not the whole of it.
+
+### The endpoint
+
+| | |
+|---|---|
+| URL | `POST https://<host>/mcp` |
+| Transport | Streamable HTTP, stateless — one request and one response per call |
+| Auth | `Authorization: Bearer <token>` — a signed user token (JWT) or a service-account key |
+
+### Access: which tools, and which records
+
+Two things decide what a connected agent can do, and both must pass.
+
+**Scope decides which tools appear.** Every service-account key carries one of two scopes:
+
+- `mcp:read` — the read-only tools: listing, searching, diagnosing, stream and escalation stats, exports. Anything that only reports.
+- `mcp:full` — those, plus the tools that change state: create an escalation, claim and resolve one, invoke a workflow, update a configuration, prune the database.
+
+A deployment can also be set read-only as a whole, which holds every key to read access whatever its scope, and can hide entire groups of tools. Production is the place to do this by default.
+
+**Role decides which records.** Scope opens a tool; the account's role decides whether the action is allowed on a given target. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations — it cannot route work to finance or manage users. Administrative tools (users, roles, configuration, pruning) require an admin or superadmin role.
+
+Put plainly: **scope is which tools, role is which records.** A read key answers questions; a full key with the right role also acts.
+
+Creating an escalation shows both at work. `escalate_to_human` changes state, so the key needs `mcp:full`, and the account needs a role allowed to route to that queue. Reading the same queue back — `get_available_work`, `check_resolution` — needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
+
+### 1. Create a service account
+
+In the dashboard: **Admin → Bot Accounts → Create**, assign the role(s) the account should act under, then generate an API key and choose its scope — `mcp:read` for an investigator, `mcp:full` for an operator that also makes changes. The raw key is shown once. The same is available as admin tools: `create_bot_account`, then `create_bot_api_key`.
+
+Give each environment its own account and key, scoped to the least it needs.
+
+### 2. Point a client at it — `.mcp.json`
+
+Long Tail speaks the standard transport, so a single HTTP server entry connects an MCP client:
+
+```jsonc
+{
+  "mcpServers": {
+    "hikemono-prod": {
+      "type": "http",
+      "url": "https://hike-mono.prod.example.com/mcp",
+      "headers": { "Authorization": "Bearer ${HIKEMONO_PROD_KEY}" }
+    }
+  }
+}
+```
+
+Use `${VAR}` for the key so the file holds no secrets — keep the key itself in your shell environment or a secret manager, and never commit it.
+
+### 3. Local, staging, and production in one conversation
+
+Add one server entry per environment:
+
+```jsonc
+{
+  "mcpServers": {
+    "hikemono-local":   { "type": "http", "url": "http://localhost:3000/mcp",                 "headers": { "Authorization": "Bearer ${HIKEMONO_LOCAL_KEY}" } },
+    "hikemono-staging": { "type": "http", "url": "https://hike-mono.staging.example.com/mcp", "headers": { "Authorization": "Bearer ${HIKEMONO_STAGING_KEY}" } },
+    "hikemono-prod":    { "type": "http", "url": "https://hike-mono.prod.example.com/mcp",     "headers": { "Authorization": "Bearer ${HIKEMONO_PROD_KEY}" } }
+  }
+}
+```
+
+Each server keeps its tools under its own name, so the three copies of every tool never collide — you choose one by naming the environment: *"on production, find orphaned signals,"* *"reproduce it locally and diagnose."*
+
+Two things stay separate:
+
+- The server names the deployment; a tool's `app_id` argument names the workspace inside it. Together they say where to look.
+- Every server you list is live at once. Give production a read key by default, and reach for a full key only when you mean to change something there.
+
+### Usage — example prompts
+
+The full tool reference is in [the admin server doc](api/mcp/admin.md). A read key covers everything marked *read*; a *write* action needs a full key and a role that fits.
+
+**Find and diagnose** — *read*
+- "Diagnose workflow `<id>` — is it waiting normally or genuinely stuck?"
+- "Find orphaned signals from the last 48 hours and group them by cause."
+
+**Escalations and human work** — *read* to view, *write* to act
+- "How many escalations are pending, by role?"
+- "Find the escalation where `orderId` is `<id>` and show its status."
+- "Create an escalation to the `reviewer` role for order `<id>` with this context."
+- "Claim escalation `<id>` and resolve it as approved."
+
+**Workflows and pipelines** — *read* for status, *write* to run
+- "List the workflows this deployment knows about."
+- "Invoke `reviewContent` with this input and return the job id."
+- "What is the status and result of workflow `<id>`?"
+
+**Operations and stats** — *read*, a few actions *write*
+- "Roll call app `durable` — which engines and workers are live?"
+- "Show stream stats for the last hour; is the backlog growing?"
+- "Pause the mesh for app `durable`."
+
+**Settings** — *read*
+- "What versions and features is this deployment running?"
 
 ## Human Queue Server
 

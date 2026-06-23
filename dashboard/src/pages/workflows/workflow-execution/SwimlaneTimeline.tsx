@@ -17,11 +17,15 @@ interface SwimlaneTimelineProps {
   childTasks?: LTTaskRecord[];
   /** Use outline-style bars (border + transparent fill) instead of solid fills */
   outline?: boolean;
+  /** Job id (workflowId) — enables the per-activity raw-stream drill-down. */
+  jid?: string;
+  /** HotMesh namespace / DB schema for the raw-stream lookup (default: durable). */
+  appId?: string;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimelineProps) {
+export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: SwimlaneTimelineProps) {
   const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set());
   const [hoveredEvent, setHoveredEvent] = useState<number | null>(null);
 
@@ -259,6 +263,8 @@ export function SwimlaneTimeline({ events, childTasks, outline }: SwimlaneTimeli
                         event={evt}
                         childTask={findChildTask(evt)}
                         pending={seg.pending}
+                        jid={jid}
+                        appId={appId}
                         onClose={() => toggleEvent(evt.event_id)}
                       />
                     </div>

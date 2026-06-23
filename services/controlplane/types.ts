@@ -54,6 +54,8 @@ export interface StreamMessagesParams {
   workflow_name?: string | null;
   jid?: string | null;
   aid?: string | null;
+  /** Dimension/ancestor path (worker-only) — pins one execution among siblings sharing an aid. */
+  dad?: string | null;
 }
 
 export interface StreamMessagesResult {

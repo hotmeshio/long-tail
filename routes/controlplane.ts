@@ -95,6 +95,7 @@ router.get('/stream-messages', requireBuilder, async (req, res) => {
     workflow_name: (req.query.workflow_name as string) || undefined,
     jid: (req.query.jid as string) || undefined,
     aid: (req.query.aid as string) || undefined,
+    dad: (req.query.dad as string) || undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
