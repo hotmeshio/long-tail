@@ -3,7 +3,7 @@
  * workflow, expressed through long-tail's `conditionLT`.
  *
  * This is the migration target for two-step station workers like
- * hike-mono's `stationWorker` / `printJobWorker` / `signalAwaiter` and the
+ * the reference app's `stationWorker` / `printJobWorker` / `signalAwaiter` and the
  * boilerplate's ortho `station`. Today those run:
  *
  *   await createStationEscalation({...});   // proxyActivity: create + enrich (2 writes)

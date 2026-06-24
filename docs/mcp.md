@@ -185,10 +185,10 @@ Long Tail speaks the standard transport, so a single HTTP server entry connects 
 ```jsonc
 {
   "mcpServers": {
-    "hikemono-prod": {
+    "longtail-prod": {
       "type": "http",
-      "url": "https://hike-mono.prod.example.com/mcp",
-      "headers": { "Authorization": "Bearer ${HIKEMONO_PROD_KEY}" }
+      "url": "https://your-host.example.com/mcp",
+      "headers": { "Authorization": "Bearer ${LONGTAIL_PROD_KEY}" }
     }
   }
 }
@@ -203,9 +203,9 @@ Add one server entry per environment:
 ```jsonc
 {
   "mcpServers": {
-    "hikemono-local":   { "type": "http", "url": "http://localhost:3000/mcp",                 "headers": { "Authorization": "Bearer ${HIKEMONO_LOCAL_KEY}" } },
-    "hikemono-staging": { "type": "http", "url": "https://hike-mono.staging.example.com/mcp", "headers": { "Authorization": "Bearer ${HIKEMONO_STAGING_KEY}" } },
-    "hikemono-prod":    { "type": "http", "url": "https://hike-mono.prod.example.com/mcp",     "headers": { "Authorization": "Bearer ${HIKEMONO_PROD_KEY}" } }
+    "longtail-local":   { "type": "http", "url": "http://localhost:3000/mcp",       "headers": { "Authorization": "Bearer ${LONGTAIL_LOCAL_KEY}" } },
+    "longtail-staging": { "type": "http", "url": "https://staging.example.com/mcp", "headers": { "Authorization": "Bearer ${LONGTAIL_STAGING_KEY}" } },
+    "longtail-prod":    { "type": "http", "url": "https://prod.example.com/mcp",    "headers": { "Authorization": "Bearer ${LONGTAIL_PROD_KEY}" } }
   }
 }
 ```

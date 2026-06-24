@@ -19,7 +19,7 @@ const TASK_QUEUE = 'test-efficient-station';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Efficient station (conditionLT atomic path) — the migration target for the
-// two-step station workers in hike-mono and the boilerplate ortho pipeline.
+// two-step station workers in the reference app and the boilerplate ortho pipeline.
 //
 // Proves the long-tail surface that makes the one-line opt-in work end-to-end:
 //   • conditionLT(signalId, config) writes the escalation in Leg1 (signal_key set);
