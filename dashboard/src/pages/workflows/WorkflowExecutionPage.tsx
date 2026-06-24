@@ -214,6 +214,8 @@ export function WorkflowExecutionPage() {
           <SwimlaneTimeline
             events={execution.events}
             childTasks={childTasksData?.tasks}
+            jid={workflowId}
+            appId="durable"
           />
         </CollapsibleSection>
 
@@ -221,6 +223,8 @@ export function WorkflowExecutionPage() {
           <EventTable
             events={execution.events}
             childTasks={childTasksData?.tasks}
+            jid={workflowId}
+            appId="durable"
           />
         </CollapsibleSection>
       </div>

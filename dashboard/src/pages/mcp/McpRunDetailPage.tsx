@@ -230,12 +230,12 @@ export function McpRunDetailPage() {
 
         {/* Execution Timeline (swimlane) */}
         <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle}>
-          <SwimlaneTimeline events={events} outline />
+          <SwimlaneTimeline events={events} outline jid={jobId} appId={namespace || 'durable'} />
         </CollapsibleSection>
 
         {/* Events (table) */}
         <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle}>
-          <EventTable events={events} />
+          <EventTable events={events} jid={jobId} appId={namespace || 'durable'} />
         </CollapsibleSection>
       </div>
     </div>

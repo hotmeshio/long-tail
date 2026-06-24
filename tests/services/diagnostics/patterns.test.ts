@@ -93,16 +93,21 @@ describe('matchPatterns', () => {
       expect(f.evidence.some(e => e.includes('missing queueConfig'))).toBe(true);
     });
 
-    it('includes signal_key in treatment when signalId is present', () => {
+    it('gives read-only guidance (inspect + escalate, no mutation) referencing the signal', () => {
       const execution = { ...BASE_EXECUTION, events: [makeSignalWaitStarted()] };
       const workerMsg = makeWorkerMsg({
         message: JSON.stringify({ data: { signalId: 'sig-xyz', queueConfig: null } }),
       });
       const findings = matchPatterns(execution as any, [workerMsg], [], null);
       const f = findings.find(f => f.condition === 'orphaned_signal')!;
-      const resolveAction = f.treatment.find(t => t.action === 'resolve_by_signal_key');
-      expect(resolveAction).toBeDefined();
-      expect(resolveAction!.signal_key).toBe('sig-xyz');
+
+      const inspect = f.guidance.find(g => g.action === 'inspect_worker_result');
+      expect(inspect).toBeDefined();
+      expect(inspect!.note).toContain('sig-xyz');
+
+      expect(f.guidance.some(g => g.action === 'escalate_to_engineering')).toBe(true);
+      // No recovery/mutation actions are ever prescribed.
+      expect(f.guidance.some(g => g.action === 'create_escalation_row' || g.action === 'resolve_by_signal_key')).toBe(false);
     });
   });
 

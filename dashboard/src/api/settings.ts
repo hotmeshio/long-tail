@@ -12,6 +12,13 @@ export interface AppSettings {
   ai?: {
     enabled: boolean;
   };
+  environment?: {
+    longTailVersion: string;
+    hotmeshVersion: string;
+    nodeEnv: string;
+    nodeVersion: string;
+    eventTransport: string;
+  };
 }
 
 const AI_OVERRIDE_KEY = 'lt_ai_override';

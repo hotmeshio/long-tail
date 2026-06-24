@@ -41,8 +41,10 @@ const STATUS_CASE = `
  *   $5 = workflow_name filter (NULL = all, worker-only)
  *   $6 = jid filter (NULL = all, worker-only)
  *   $7 = aid filter (NULL = all, worker-only)
+ *   $8 = dad filter (NULL = all, worker-only — pins one execution dimension)
  */
-/** Engine WHERE: supports stream_name, status, and jid (v0.18.0). */
+/** Engine WHERE: supports stream_name, status, and jid (v0.18.0). engine_streams
+ * has no aid/dad columns, so $7/$8 are accepted but inert here. */
 const ENGINE_WHERE_CLAUSE = `
   WHERE ($1::text IS NULL OR stream_name ILIKE $1)
     AND ($2::text IS NULL OR ${STATUS_CASE} = $2)
@@ -50,7 +52,8 @@ const ENGINE_WHERE_CLAUSE = `
     AND ($4::text IS NULL)
     AND ($5::text IS NULL)
     AND ($6::text IS NULL OR jid = $6)
-    AND ($7::text IS NULL)`;
+    AND ($7::text IS NULL)
+    AND ($8::text IS NULL)`;
 
 const WORKER_WHERE_CLAUSE = `
   WHERE ($1::text IS NULL OR stream_name ILIKE $1)
@@ -59,7 +62,8 @@ const WORKER_WHERE_CLAUSE = `
     AND ($4::text IS NULL OR topic = $4)
     AND ($5::text IS NULL OR workflow_name = $5)
     AND ($6::text IS NULL OR jid = $6)
-    AND ($7::text IS NULL OR aid = $7)`;
+    AND ($7::text IS NULL OR aid = $7)
+    AND ($8::text IS NULL OR dad = $8)`;
 
 /**
  * List stream messages with pagination, filtering, and sorting.
@@ -68,8 +72,8 @@ const WORKER_WHERE_CLAUSE = `
  * with different schemas and must never be commingled in a single query.
  *
  * Parameters: $1 = stream_name, $2 = status, $3 = msg_type,
- *             $4 = topic, $5 = workflow_name, $6 = jid, $7 = aid,
- *             $8 = limit, $9 = offset
+ *             $4 = topic, $5 = workflow_name, $6 = jid, $7 = aid, $8 = dad,
+ *             $9 = limit, $10 = offset
  */
 export function LIST_STREAM_MESSAGES(
   schema: string,
@@ -101,13 +105,14 @@ export function LIST_STREAM_MESSAGES(
   return `
     SELECT * FROM (${select}) AS q
     ORDER BY ${sortColumn} ${sortOrder}, id DESC
-    LIMIT $8::int OFFSET $9::int`;
+    LIMIT $9::int OFFSET $10::int`;
 }
 
 /**
  * Count stream messages matching the filter criteria.
  *
- * Parameters: $1 = stream_name, $2 = status, $3 = msg_type
+ * Parameters: $1 = stream_name, $2 = status, $3 = msg_type,
+ *             $4 = topic, $5 = workflow_name, $6 = jid, $7 = aid, $8 = dad
  */
 export function COUNT_STREAM_MESSAGES(
   schema: string,

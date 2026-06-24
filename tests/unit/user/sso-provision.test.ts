@@ -22,9 +22,9 @@ const baseSSOConfig: LTSSOConfig = {
 };
 
 const identity: SSOIdentity = {
-  externalId: 'hike-user-uuid-123',
+  externalId: 'sso-user-uuid-123',
   displayName: 'Jane Doe',
-  email: 'jane@hike.com',
+  email: 'jane@example.com',
   roles: ['grinder', 'quality-inspector'],
 };
 
@@ -37,9 +37,9 @@ describe('ssoProvision', () => {
     mockGetUserByExternalId.mockResolvedValue(null);
     mockCreateUser.mockResolvedValue({
       id: 'lt-uuid-1',
-      external_id: 'hike-user-uuid-123',
+      external_id: 'sso-user-uuid-123',
       display_name: 'Jane Doe',
-      email: 'jane@hike.com',
+      email: 'jane@example.com',
       status: 'active',
       account_type: 'user',
       created_at: new Date().toISOString(),
@@ -57,9 +57,9 @@ describe('ssoProvision', () => {
     expect(result.roles).toHaveLength(2);
     expect(mockCreateUser).toHaveBeenCalledWith(
       expect.objectContaining({
-        external_id: 'hike-user-uuid-123',
+        external_id: 'sso-user-uuid-123',
         display_name: 'Jane Doe',
-        email: 'jane@hike.com',
+        email: 'jane@example.com',
       }),
     );
   });
@@ -67,9 +67,9 @@ describe('ssoProvision', () => {
   it('returns existing user when external_id already exists', async () => {
     mockGetUserByExternalId.mockResolvedValue({
       id: 'lt-uuid-1',
-      external_id: 'hike-user-uuid-123',
+      external_id: 'sso-user-uuid-123',
       display_name: 'Jane Doe',
-      email: 'jane@hike.com',
+      email: 'jane@example.com',
       status: 'active',
       account_type: 'user',
       created_at: '',
@@ -90,9 +90,9 @@ describe('ssoProvision', () => {
   it('syncs new roles on existing user', async () => {
     mockGetUserByExternalId.mockResolvedValue({
       id: 'lt-uuid-1',
-      external_id: 'hike-user-uuid-123',
+      external_id: 'sso-user-uuid-123',
       display_name: 'Jane Doe',
-      email: 'jane@hike.com',
+      email: 'jane@example.com',
       status: 'active',
       account_type: 'user',
       created_at: '',
@@ -121,9 +121,9 @@ describe('ssoProvision', () => {
     mockGetUserByExternalId.mockResolvedValue(null);
     mockCreateUser.mockResolvedValue({
       id: 'lt-uuid-1',
-      external_id: 'hike-user-uuid-123',
+      external_id: 'sso-user-uuid-123',
       display_name: 'Jane Doe',
-      email: 'jane@hike.com',
+      email: 'jane@example.com',
       status: 'active',
       account_type: 'user',
       created_at: '',
@@ -136,7 +136,7 @@ describe('ssoProvision', () => {
       roleMap: { admin: 'superadmin', 'quality-inspector': 'qc-reviewer' },
     };
     const adminIdentity: SSOIdentity = {
-      externalId: 'hike-admin-uuid',
+      externalId: 'sso-admin-uuid',
       roles: ['admin', 'quality-inspector', 'unknown-role'],
     };
 

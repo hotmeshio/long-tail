@@ -506,16 +506,18 @@ export const getExportStatusSchema = z.object({
 export const diagnoseJobSchema = z.object({
   workflow_id: z.string().describe('Workflow ID to diagnose'),
   app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
+  max_events: z.number().int().min(1).optional().default(500).describe('Cap on execution events returned; most recent are kept (default: 500). For full per-message payloads use the stream browser (list_stream_messages filtered by jid) instead.'),
 });
 
 export const findStalledJobsSchema = z.object({
   app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
-  stalled_minutes: z.number().int().min(1).optional().default(5).describe('Minimum minutes since last progress (default: 5)'),
+  idle_minutes: z.number().int().min(1).optional().default(5).describe('Minimum minutes since last status change (default: 5). NOTE: a frozen updated_at is NORMAL for a workflow waiting at a condition — see each row\'s `likely` classification.'),
   workflow_type: z.string().optional().describe('Filter by workflow function name'),
-  limit: z.number().int().min(1).max(200).optional().default(50).describe('Max results (default: 50)'),
+  limit: z.number().int().min(1).max(200).optional().default(50).describe('Max results (default: 50, max: 200)'),
 });
 
 export const findOrphanedSignalsSchema = z.object({
   app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
-  limit: z.number().int().min(1).max(500).optional().default(100).describe('Max results (default: 100)'),
+  within_hours: z.number().int().min(1).max(720).optional().default(24).describe('Recent time window to scan, in hours (default: 24, max: 720). Bounds the scan of the partitioned worker_streams table — widen deliberately to reach older orphans.'),
+  limit: z.number().int().min(1).max(500).optional().default(100).describe('Max results (default: 100, max: 500)'),
 });

@@ -48,6 +48,7 @@ export interface StreamMessagesParams {
   workflow_name?: string;
   jid?: string;
   aid?: string;
+  dad?: string;
 }
 
 // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -67,16 +68,17 @@ function fetchStreamMessages(params: StreamMessagesParams) {
   if (params.workflow_name) qs.set('workflow_name', params.workflow_name);
   if (params.jid) qs.set('jid', params.jid);
   if (params.aid) qs.set('aid', params.aid);
+  if (params.dad) qs.set('dad', params.dad);
   return apiFetch<StreamMessagesResponse>(`/controlplane/stream-messages?${qs}`);
 }
 
 // ── Hook ────────────────────────────────────────────────────────────────────
 
-export function useStreamMessages(params: StreamMessagesParams) {
+export function useStreamMessages(params: StreamMessagesParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['controlplane', 'stream-messages', params],
     queryFn: () => fetchStreamMessages(params),
-    enabled: !!params.namespace,
+    enabled: !!params.namespace && (options?.enabled ?? true),
     staleTime: 15_000,
   });
 }

@@ -171,6 +171,7 @@ export async function listStreamMessages(input: {
   workflow_name?: string | null;
   jid?: string | null;
   aid?: string | null;
+  dad?: string | null;
 }): Promise<LTApiResult> {
   try {
     if (!input.namespace) {
@@ -192,6 +193,7 @@ export async function listStreamMessages(input: {
       workflow_name: input.workflow_name,
       jid: input.jid,
       aid: input.aid,
+      dad: input.dad,
     });
     return { status: 200, data: result };
   } catch (err: any) {

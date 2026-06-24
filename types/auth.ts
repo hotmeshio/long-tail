@@ -68,7 +68,7 @@ export interface SSOIdentity {
  * The host provides ONE function (`resolve`). Long Tail handles JIT provisioning,
  * role sync, JWT issuance, and dashboard awareness.
  *
- * @example NestJS (Hike Medical)
+ * @example NestJS (Acme Corp)
  * ```typescript
  * await start({
  *   auth: {

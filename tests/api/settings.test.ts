@@ -208,6 +208,28 @@ describe('getSettings — AI availability', () => {
   });
 });
 
+describe('getSettings — environment', () => {
+  it('includes long-tail and HotMesh versions plus node env/version', async () => {
+    const result = await getSettings();
+    expect(result.status).toBe(200);
+    const env = result.data.environment;
+    expect(env).toBeDefined();
+    // Versions are non-empty strings (semver-ish or the 'unknown' fallback)
+    expect(typeof env.longTailVersion).toBe('string');
+    expect(env.longTailVersion.length).toBeGreaterThan(0);
+    expect(typeof env.hotmeshVersion).toBe('string');
+    expect(env.hotmeshVersion.length).toBeGreaterThan(0);
+    expect(env.nodeEnv).toBe(config.NODE_ENV);
+    expect(env.nodeVersion).toBe(process.version);
+  });
+
+  it('reports the resolved event transport in the environment block', async () => {
+    eventRegistry.register(new SocketIOEventAdapter());
+    const result = await getSettings();
+    expect(result.data.environment.eventTransport).toBe('socketio');
+  });
+});
+
 describe('getSettings — SSO', () => {
   afterEach(async () => {
     const { clearSSOConfig } = await import('../../modules/sso');

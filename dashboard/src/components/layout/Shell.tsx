@@ -82,6 +82,18 @@ function ShellLayout() {
               <PanelLeftClose className="w-4 h-4 text-accent-muted" strokeWidth={1.5} />
             )}
           </button>
+
+          {/* Version line — long-tail + HotMesh SDK, shown when expanded */}
+          {!collapsed && settings?.environment && (
+            <div
+              className="shrink-0 px-7 pb-3 text-[11px] leading-tight text-text-tertiary"
+              title={`Node ${settings.environment.nodeVersion} · ${settings.environment.nodeEnv}`}
+            >
+              long-tail v{settings.environment.longTailVersion}
+              <span className="mx-1 text-surface-border">·</span>
+              HotMesh v{settings.environment.hotmeshVersion}
+            </div>
+          )}
         </aside>
 
         {/* Main content */}
