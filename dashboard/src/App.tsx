@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
 import { RequireRole } from './components/layout/RequireRole';
 import { RequireAI } from './components/layout/RequireAI';
+import { RequireFeature } from './components/layout/RequireFeature';
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded route sections
@@ -326,7 +327,12 @@ const router = createBrowserRouter([
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
-          { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
+          {
+            element: <RequireFeature flag="dbMaintenance" />,
+            children: [
+              { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
+            ],
+          },
           { path: 'admin/controlplane', element: <Lazy><ControlPlanePage /></Lazy> },
           { path: 'admin/streams', element: <Lazy><StreamMessagesPage /></Lazy> },
         ],

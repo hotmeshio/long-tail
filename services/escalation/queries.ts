@@ -1,11 +1,13 @@
 import type { Types } from '@hotmeshio/hotmesh';
 
+import { getPool } from '../../lib/db';
 import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 
-import { escalations } from './client';
+import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
 import type { EscalationStats } from './types';
 import { SORTABLE_COLUMNS } from './types';
+import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS } from './sql';
 
 type SdkListParams = Types.ListEscalationsParams;
 type OrderBy = NonNullable<SdkListParams['orderBy']>;
@@ -22,6 +24,66 @@ function buildOrderBy(sortBy?: string, order?: string): OrderBy {
     { column: 'priority', direction: 'asc' },
     { column: 'created_at', direction: 'asc' },
   ];
+}
+
+/**
+ * ORDER BY clause for the raw search query. `sortBy` is checked against the
+ * SORTABLE_COLUMNS whitelist before interpolation, so it is injection-safe.
+ */
+function buildSearchOrderBy(sortBy?: string, order?: string): string {
+  const dir = order === 'asc' ? 'ASC' : 'DESC';
+  if (sortBy && SORTABLE_COLUMNS.has(sortBy)) {
+    return `${sortBy} ${dir}`;
+  }
+  return 'priority ASC, created_at ASC';
+}
+
+/**
+ * Server-side free-text search over the `lt_escalations` view. Runs when a
+ * caller supplies a non-empty `search` term — the SDK `client.list()` cannot do
+ * free-text, so this is raw SQL on the shared table (see ./sql.ts). All other
+ * filters combine with the term (AND).
+ */
+async function searchEscalations(params: {
+  status?: LTEscalationStatus;
+  role?: string;
+  roles?: string[];
+  type?: string;
+  subtype?: string;
+  priority?: number;
+  assigned_to?: string;
+  available?: boolean;
+  search: string;
+  limit: number;
+  offset: number;
+  sort_by?: string;
+  order?: string;
+}): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  // Coerce empty strings to NULL so an absent filter (e.g. assigned_to='') does
+  // not become `column = ''` and match zero rows. Mirrors the SDK path's
+  // `if (filters.x)` truthiness guards.
+  const filterArgs = [
+    params.status || null,
+    params.role || null,
+    params.roles && params.roles.length ? params.roles : null,
+    params.type || null,
+    params.subtype || null,
+    params.priority ?? null,
+    params.assigned_to || null,
+    params.available ?? null,
+    params.search,
+  ];
+  const orderBy = buildSearchOrderBy(params.sort_by, params.order);
+  const [rows, countRows] = await Promise.all([
+    pool.query(searchEscalationsQuery(orderBy), [...filterArgs, params.limit, params.offset]),
+    pool.query(COUNT_SEARCH_ESCALATIONS, filterArgs),
+  ]);
+  return {
+    escalations: toEscalationRecords(rows.rows as any),
+    total: countRows.rows[0]?.total ?? 0,
+  };
 }
 
 export async function getEscalationStats(
@@ -53,7 +115,30 @@ export async function listEscalations(filters: {
   visibleRoles?: string[];
   sort_by?: string;
   order?: string;
+  search?: string;
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
+  // Active claim semantics: assigned_to-active and `claimed` both mean "held now".
+  const heldNow = !!(filters.assigned_to || filters.claimed);
+
+  // Free-text search → server-side SQL path (the SDK list() has no free-text).
+  if (filters.search) {
+    return searchEscalations({
+      status: filters.status,
+      role: filters.role,
+      roles: filters.visibleRoles,
+      type: filters.type,
+      subtype: filters.subtype,
+      priority: filters.priority,
+      assigned_to: filters.assigned_to,
+      available: heldNow ? false : undefined,
+      search: filters.search,
+      limit: filters.limit ?? 50,
+      offset: filters.offset ?? 0,
+      sort_by: filters.sort_by,
+      order: filters.order,
+    });
+  }
+
   const client = await escalations();
 
   // Shared filter — passed to both list() and count() so totals stay in sync.
@@ -66,8 +151,7 @@ export async function listEscalations(filters: {
     roles: filters.visibleRoles,
   };
   if (filters.assigned_to) where.assignedTo = filters.assigned_to;
-  // Active claim semantics: assigned_to-active and `claimed` both mean "held now".
-  if (filters.assigned_to || filters.claimed) where.available = false;
+  if (heldNow) where.available = false;
 
   const [rows, total] = await Promise.all([
     client.list({
@@ -95,7 +179,26 @@ export async function listAvailableEscalations(filters: {
   visibleRoles?: string[];
   sort_by?: string;
   order?: string;
+  search?: string;
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
+  // Free-text search → server-side SQL path (available = pending + no active claim).
+  if (filters.search) {
+    return searchEscalations({
+      status: 'pending',
+      role: filters.role,
+      roles: filters.visibleRoles,
+      type: filters.type,
+      subtype: filters.subtype,
+      priority: filters.priority,
+      available: true,
+      search: filters.search,
+      limit: filters.limit ?? 50,
+      offset: filters.offset ?? 0,
+      sort_by: filters.sort_by,
+      order: filters.order,
+    });
+  }
+
   const client = await escalations();
 
   const where: SdkListParams = {

@@ -30,7 +30,13 @@ export const RESOLVE_TASK_BY_WORKFLOW_ID = `SELECT workflow_type, task_queue FRO
 
 export const RESOLVE_CONFIG_TASK_QUEUE = `SELECT task_queue FROM lt_config_workflows WHERE workflow_type = $1`;
 
-export const RESOLVE_JOB_ENTITY = `SELECT entity FROM durable.jobs WHERE key = $1 LIMIT 1`;
+/**
+ * Look up a job's entity tag in a specific HotMesh namespace. The namespace is a
+ * Postgres schema name, so it is interpolated (not a bind param) — same pattern
+ * as the diagnostics queries. Callers pass the trusted app_id from config.
+ */
+export const RESOLVE_JOB_ENTITY = (appId: string): string =>
+  `SELECT entity FROM "${appId}".jobs WHERE key = $1 LIMIT 1`;
 
 // ---- process.ts queries ---------------------------------------------------
 

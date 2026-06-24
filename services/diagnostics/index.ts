@@ -110,6 +110,24 @@ export interface StreamSummary {
   in_flight: number;
 }
 
+/** A large string field replaced with a bounded summary instead of the full payload. */
+export interface TruncatedString {
+  bytes: number;
+  preview: string;
+  truncated: true;
+}
+
+/** Pointer to the stream browser for the raw, untruncated message payloads. */
+export interface RawMessagesHint {
+  hint: string;
+  jid: string;
+}
+
+/** A stream message whose large `message` payload may have been summarized. */
+export type SummarizedStreamMessage = Omit<StreamMessage, 'message'> & {
+  message: string | TruncatedString;
+};
+
 export interface JobDiagnosis {
   workflow_id: string;
   app_id: string;
@@ -125,25 +143,78 @@ export interface JobDiagnosis {
   stream_summary: StreamSummary;
   escalation: EscalationSummary;
   findings: Finding[];
-  execution_events: unknown[];
   /** Total events before any cap was applied (execution_events may be truncated to the most recent `maxEvents`). */
   total_events: number;
   events_truncated: boolean;
-  stream_messages: { worker: StreamMessage[]; engine: StreamMessage[] };
+  /**
+   * Full event timeline — present only when `include` contains `'events'` (or
+   * `verbosity: 'full'`). Large string attributes are summarized to
+   * `{ bytes, preview, truncated }`. Omitted by default to keep the verdict compact.
+   */
+  execution_events?: unknown[];
+  /**
+   * Raw engine + worker stream messages — present only when `include` contains
+   * `'streams'` (or `verbosity: 'full'`). Large `message` payloads are summarized.
+   * Omitted by default; see `raw_messages` for where to fetch the full payloads.
+   */
+  stream_messages?: { worker: SummarizedStreamMessage[]; engine: SummarizedStreamMessage[] };
+  /** Pointer to `list_stream_messages` for the raw payloads (present when streams are omitted). */
+  raw_messages?: RawMessagesHint;
 }
 
 /** Default cap on events returned in the payload — keeps a high-activity workflow from returning a huge response. */
 const DEFAULT_MAX_EVENTS = 500;
+
+/** Strings larger than this (UTF-8 bytes) are summarized rather than returned in full. */
+const LARGE_STRING_BYTES = 1024;
+
+/** How many leading characters of a summarized string to keep as a preview. */
+const PREVIEW_CHARS = 200;
+
+/** Recursion depth cap for summarizing nested event attributes. */
+const SUMMARIZE_MAX_DEPTH = 6;
+
+export type DiagnoseVerbosity = 'summary' | 'full';
+export type DiagnoseSection = 'events' | 'streams';
+
+export interface DiagnoseOptions {
+  maxEvents?: number;
+  /** Heavy sections to include in the response. Default: none (verdict only). */
+  include?: DiagnoseSection[];
+  /** Shorthand: `'full'` includes both events and streams; `'summary'` (default) includes neither. */
+  verbosity?: DiagnoseVerbosity;
+}
+
+/** Replace an over-threshold string with a bounded summary; pass small strings through unchanged. */
+function summarizeString(value: string): string | TruncatedString {
+  const bytes = Buffer.byteLength(value, 'utf8');
+  if (bytes <= LARGE_STRING_BYTES) return value;
+  return { bytes, preview: value.slice(0, PREVIEW_CHARS), truncated: true };
+}
+
+/** Recursively summarize large string leaves in an event attribute tree (result/output/input/error payloads). */
+function summarizeDeep(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return summarizeString(value);
+  if (value === null || typeof value !== 'object' || depth >= SUMMARIZE_MAX_DEPTH) return value;
+  if (Array.isArray(value)) return value.map((v) => summarizeDeep(v, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = summarizeDeep(v, depth + 1);
+  }
+  return out;
+}
 
 // ── diagnoseJob ──────────────────────────────────────────────────────────────
 
 export async function diagnoseJob(
   workflowId: string,
   appId = 'durable',
-  options: { maxEvents?: number } = {},
+  options: DiagnoseOptions = {},
 ): Promise<JobDiagnosis> {
   const pool = getPool();
   const maxEvents = Math.max(options.maxEvents ?? DEFAULT_MAX_EVENTS, 1);
+  const includeEvents = options.verbosity === 'full' || !!options.include?.includes('events');
+  const includeStreams = options.verbosity === 'full' || !!options.include?.includes('streams');
 
   let resolved: { taskQueue: string; workflowName: string };
   try {
@@ -195,7 +266,7 @@ export async function diagnoseJob(
     ? matchPatterns(execution, workerMessages, engineMessages, escalationRow)
     : [{ condition: 'export_unavailable', confidence: 0.9, severity: 'warning' as const, evidence: ['Execution export unavailable — job may have expired or HotMesh engine is not running'], guidance: [] }];
 
-  return {
+  const diagnosis: JobDiagnosis = {
     workflow_id: workflowId,
     app_id: appId,
     status,
@@ -213,11 +284,37 @@ export async function diagnoseJob(
       created_at: escalationRow?.created_at ?? null,
     },
     findings,
-    execution_events: cappedEvents,
     total_events: events.length,
     events_truncated: eventsTruncated,
-    stream_messages: { worker: workerMessages, engine: engineMessages },
   };
+
+  // Heavy sections are opt-in. Large string payloads are summarized either way
+  // so an included section can't reintroduce the 100–200KB blow-up.
+  if (includeEvents) {
+    diagnosis.execution_events = cappedEvents.map((e) =>
+      e && typeof e === 'object'
+        ? { ...e, attributes: summarizeDeep((e as { attributes?: unknown }).attributes) }
+        : e,
+    );
+  }
+  if (includeStreams) {
+    diagnosis.stream_messages = {
+      worker: summarizeMessages(workerMessages),
+      engine: summarizeMessages(engineMessages),
+    };
+  } else {
+    diagnosis.raw_messages = {
+      hint: 'Use list_stream_messages (Control Plane) filtered by jid (and aid/dad) for the full raw message payloads.',
+      jid: workflowId,
+    };
+  }
+
+  return diagnosis;
+}
+
+/** Summarize the large `message` payload of each stream message; everything else passes through. */
+function summarizeMessages(messages: StreamMessage[]): SummarizedStreamMessage[] {
+  return messages.map((m) => ({ ...m, message: summarizeString(m.message) }));
 }
 
 // ── findStalledJobs ──────────────────────────────────────────────────────────
@@ -279,9 +376,7 @@ function notFound(workflowId: string, appId: string): JobDiagnosis {
     stream_summary: { worker_total: 0, engine_total: 0, dead_lettered: 0, pending: 0, in_flight: 0 },
     escalation: { exists: false, id: null, status: null, signal_key: null, role: null, type: null, created_at: null },
     findings: [{ condition: 'not_found', confidence: 1, severity: 'critical', evidence: ['Workflow ID not found — no task record or job entity'], guidance: [] }],
-    execution_events: [],
     total_events: 0,
     events_truncated: false,
-    stream_messages: { worker: [], engine: [] },
   };
 }

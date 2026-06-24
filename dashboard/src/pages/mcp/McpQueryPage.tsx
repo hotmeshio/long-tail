@@ -6,6 +6,7 @@ import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { buildApiPath } from '../../lib/api-path';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
@@ -211,7 +212,15 @@ export function McpQueryPage() {
       <FilterBar actions={
         <ListToolbar
           onRefresh={() => refetch()}
-          apiPath={`/workflow-states/jobs?entity=${filters.type || 'mcpQuery,mcpTriage,mcpWorkflowPlanner'}&limit=${pagination.pageSize}&offset=${pagination.offset}&sort_by=created_at&order=desc${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+          apiPath={buildApiPath('/workflow-states/jobs', {
+            entity: filters.type || 'mcpQuery,mcpTriage,mcpWorkflowPlanner',
+            limit: pagination.pageSize,
+            offset: pagination.offset,
+            sort_by: 'created_at',
+            order: 'desc',
+            status: filters.status || undefined,
+            search: filters.search || undefined,
+          })}
         />
       }>
           <FilterSelect

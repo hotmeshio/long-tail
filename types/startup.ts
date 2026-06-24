@@ -213,6 +213,16 @@ export interface LTStartConfig {
     defaultRole?: string;
   };
 
+  /**
+   * Dashboard feature flags. Defaults are permissive (everything shown); set a
+   * flag to `false` to hide that affordance. Surfaced to the dashboard via
+   * `/api/settings` as `features`.
+   */
+  features?: {
+    /** Show the DB Maintenance admin page (nav + route). Default: true. */
+    dbMaintenance?: boolean;
+  };
+
   /** Authentication. Defaults to the built-in JWT adapter using JWT_SECRET. */
   auth?: {
     /** JWT secret for the built-in adapter. */

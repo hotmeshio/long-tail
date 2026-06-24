@@ -53,7 +53,7 @@ import { registerExportTools } from './exports';
 import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
 
-const TOOL_COUNT = 75;
+const TOOL_COUNT = 83;
 
 let server: McpServer | null = null;
 
@@ -71,7 +71,7 @@ export async function createAdminServer(options?: {
   }
 
   registerTaskTools(instance);              //  2 tools
-  registerEscalationTools(instance);        // 12 tools (5 base + 7 metadata/bulk)
+  registerEscalationTools(instance);        // 20 tools (RO + RW single + metadata + bulk)
   registerWorkflowConfigTools(instance);    //  3 tools
   registerWorkflowTools(instance);          //  3 tools
   registerMcpServerTools(instance);         //  4 tools
@@ -88,7 +88,7 @@ export async function createAdminServer(options?: {
   registerExportTools(instance);            //  4 tools
   registerOverviewTools(instance);          //  1 tool
   registerDiagnosticsTools(instance);       //  3 tools
-  // Total: 75
+  // Total: 83
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
   return instance;

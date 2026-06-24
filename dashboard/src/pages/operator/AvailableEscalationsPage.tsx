@@ -17,6 +17,8 @@ import {
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { PageHeader } from '../../components/common/layout/PageHeader';
@@ -38,6 +40,8 @@ export function AvailableEscalationsPage() {
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available', search: '' },
   });
+  // Debounce so server-side search fires once the user pauses, not per keystroke.
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
   const claimDurations = useClaimDurations();
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
   const [claimDuration, setClaimDuration] = useState('30');
@@ -61,7 +65,7 @@ export function AvailableEscalationsPage() {
   // Clear selections on filter/page changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filters.role, filters.type, filters.priority, filters.status, pagination.page, pagination.pageSize]);
+  }, [filters.role, filters.type, filters.priority, filters.status, debouncedSearch, pagination.page, pagination.pageSize]);
 
   const statusFilter = filters.status || '';
   const isAvailable = statusFilter === 'available';
@@ -80,6 +84,7 @@ export function AvailableEscalationsPage() {
     offset: pagination.offset,
     sort_by: sort.sort_by || 'created_at',
     order: sort.order || 'desc',
+    search: debouncedSearch || undefined,
   };
 
   const availableQuery = useAvailableEscalations({
@@ -97,21 +102,25 @@ export function AvailableEscalationsPage() {
   const activeQuery = isAvailable ? availableQuery : escalationsQuery;
   const { data, isLoading, error: queryError, refetch, isFetching } = activeQuery;
 
-  const rawEscalations = data?.escalations ?? [];
+  // Copy-URL/curl path built from the SAME params the active query sends, so the
+  // generated command always reproduces the real request (filters + search + sort).
+  const apiPath = buildApiPath(`/escalations${isAvailable ? '/available' : ''}`, {
+    status: apiStatus,
+    claimed: isClaimed || undefined,
+    role: filters.role || undefined,
+    type: filters.type || undefined,
+    priority: filters.priority || undefined,
+    search: debouncedSearch || undefined,
+    sort_by: sort.sort_by || 'created_at',
+    order: sort.order || 'desc',
+    limit: pagination.pageSize,
+    offset: pagination.offset,
+  });
 
-  // Client-side search across visible fields + metadata values
-  const searchTerm = (filters.search ?? '').toLowerCase();
-  const escalations = searchTerm
-    ? rawEscalations.filter((e) => {
-        const fields = [e.id, e.type, e.subtype, e.description, e.workflow_id, e.origin_id, e.role];
-        if (e.metadata) fields.push(...Object.values(e.metadata).map(String));
-        return fields.some((f) => f && String(f).toLowerCase().includes(searchTerm));
-      })
-    : rawEscalations;
-
-  const total = searchTerm
-    ? escalations.length
-    : data?.total ?? 0;
+  // Search is server-side (full result set), so results and total come straight
+  // from the query — no client-side filtering of the current page.
+  const escalations = data?.escalations ?? [];
+  const total = data?.total ?? 0;
   const { canBulk: canBulkManage } = useAccess();
 
   const selectedRoles = useMemo(() => {
@@ -236,7 +245,7 @@ export function AvailableEscalationsPage() {
           <ListToolbar
             onRefresh={() => refetch()}
             isFetching={isFetching}
-            apiPath={`/escalations${isAvailable ? '/available' : ''}?limit=${pagination.pageSize}&offset=${pagination.offset}${apiStatus ? `&status=${apiStatus}` : ''}${filters.role ? `&role=${filters.role}` : ''}${filters.type ? `&type=${filters.type}` : ''}${filters.priority ? `&priority=${filters.priority}` : ''}`}
+            apiPath={apiPath}
           />
         }
       />

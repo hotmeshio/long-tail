@@ -40,20 +40,28 @@ router.post('/:type/invoke', async (req, res) => {
 
 /**
  * GET /api/workflows/:workflowId/status
- * Get the status of a workflow. Only the workflowId is needed.
+ * Get the status of a workflow. Optional `app_id` query param selects the
+ * HotMesh namespace for resolution (default: durable).
  */
 router.get('/:workflowId/status', async (req, res) => {
-  const result = await api.getWorkflowStatus({ workflowId: req.params.workflowId });
+  const result = await api.getWorkflowStatus({
+    workflowId: req.params.workflowId,
+    appId: typeof req.query.app_id === 'string' ? req.query.app_id : undefined,
+  });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
 /**
  * GET /api/workflows/:workflowId/result
  * Return the workflow result if complete, or 202 if still running.
- * Never blocks — always returns immediately.
+ * Never blocks — always returns immediately. Optional `app_id` query param
+ * selects the HotMesh namespace for resolution (default: durable).
  */
 router.get('/:workflowId/result', async (req, res) => {
-  const result = await api.getWorkflowResult({ workflowId: req.params.workflowId });
+  const result = await api.getWorkflowResult({
+    workflowId: req.params.workflowId,
+    appId: typeof req.query.app_id === 'string' ? req.query.app_id : undefined,
+  });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

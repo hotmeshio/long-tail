@@ -5,6 +5,7 @@ import { useMcpRuns, useMcpEntities } from '../../api/pipelines';
 import { useYamlWorkflowAppIds } from '../../api/yaml-workflows';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useNamespace } from '../../hooks/useNamespace';
+import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
@@ -182,7 +183,16 @@ export function McpRunsPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/pipelines?app_id=${activeNamespace}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.status ? `&status=${filters.status}` : ''}${filters.search ? `&search=${filters.search}` : ''}`}
+          apiPath={buildApiPath('/pipelines', {
+            app_id: activeNamespace,
+            limit: pagination.pageSize,
+            offset: pagination.offset,
+            entity: filters.entity || undefined,
+            status: filters.status || undefined,
+            search: filters.search || undefined,
+            sort_by: sort.sort_by || 'created_at',
+            order: sort.order || 'desc',
+          })}
         />
       }>
         <FilterSelect

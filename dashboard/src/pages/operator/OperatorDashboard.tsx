@@ -5,6 +5,8 @@ import { useEscalations, useEscalationTypes, useReleaseEscalation } from '../../
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
@@ -20,34 +22,40 @@ export function OperatorDashboard() {
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', search: '' },
   });
+  // Debounce so server-side search fires once the user pauses, not per keystroke.
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
   const release = useReleaseEscalation();
   const { data: rolesData } = useRoles();
   const { data: typesData } = useEscalationTypes();
 
-  const { data, isLoading, error: queryError, refetch, isFetching } = useEscalations({
+  const escalationQuery = {
     assigned_to: user?.userId,
     status: 'pending',
     role: filters.role || undefined,
     type: filters.type || undefined,
     priority: filters.priority ? parseInt(filters.priority) : undefined,
-    limit: pagination.pageSize,
-    offset: pagination.offset,
+    search: debouncedSearch || undefined,
     sort_by: sort.sort_by || 'created_at',
     order: sort.order || 'desc',
+  };
+
+  const { data, isLoading, error: queryError, refetch, isFetching } = useEscalations({
+    ...escalationQuery,
+    limit: pagination.pageSize,
+    offset: pagination.offset,
   });
 
-  const activeRaw = data?.escalations ?? [];
+  // Search is server-side (full result set) — results and total come straight
+  // from the query, no client-side filtering of the current page.
+  const activeClaims = data?.escalations ?? [];
+  const total = data?.total ?? 0;
 
-  // Client-side search across visible fields + metadata values
-  const searchTerm = (filters.search ?? '').toLowerCase();
-  const activeClaims = searchTerm
-    ? activeRaw.filter((e) => {
-        const fields = [e.id, e.type, e.subtype, e.description, e.workflow_id, e.origin_id, e.role];
-        if (e.metadata) fields.push(...Object.values(e.metadata).map(String));
-        return fields.some((f) => f && String(f).toLowerCase().includes(searchTerm));
-      })
-    : activeRaw;
-  const total = searchTerm ? activeClaims.length : (data?.total ?? 0);
+  // Copy-URL/curl path built from the SAME params the query sends.
+  const apiPath = buildApiPath('/escalations', {
+    ...escalationQuery,
+    limit: pagination.pageSize,
+    offset: pagination.offset,
+  });
 
   const releaseColumn: Column<LTEscalationRecord> = {
     key: 'actions',
@@ -85,7 +93,7 @@ export function OperatorDashboard() {
           <ListToolbar
             onRefresh={() => refetch()}
             isFetching={isFetching}
-            apiPath={`/escalations?status=claimed&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.role ? `&role=${filters.role}` : ''}${filters.type ? `&type=${filters.type}` : ''}${filters.priority ? `&priority=${filters.priority}` : ''}`}
+            apiPath={apiPath}
           />
         }
       />

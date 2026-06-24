@@ -12,6 +12,10 @@ export interface AppSettings {
   ai?: {
     enabled: boolean;
   };
+  features?: {
+    /** DB Maintenance admin page is shown. Default: true (omitted treated as true). */
+    dbMaintenance?: boolean;
+  };
   environment?: {
     longTailVersion: string;
     hotmeshVersion: string;

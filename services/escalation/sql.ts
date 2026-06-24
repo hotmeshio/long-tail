@@ -31,6 +31,57 @@ WHERE status = 'pending'
   AND assigned_until <= NOW()`;
 
 /**
+ * Free-text escalation search.
+ *
+ * The SDK's `client.list()` filters by structured columns only — it has no
+ * free-text predicate. Long-tail's contract needs a search box that matches a
+ * correlation key (order id, ticket id) or any visible field across the WHOLE
+ * result set, not just the current page. That is server-side SQL here (over the
+ * `lt_escalations` view, which adds the computed `available` flag), following the
+ * same raw-SQL-on-the-shared-table pattern as the atomic resolve below — so the
+ * filter flows SQL→service→API→route→dashboard rather than being faked client-side.
+ *
+ * All structured filters are optional and combine with the search term (AND).
+ * `metadata::text ILIKE` scans the JSONB as text (the GIN index is containment-only
+ * and cannot serve ILIKE) — bounded in practice by the other filters and the page.
+ *
+ * $1 status, $2 role, $3 roles (text[] visibleRoles), $4 type, $5 subtype,
+ * $6 priority, $7 assigned_to, $8 available (bool), $9 search.
+ * The list query adds $10 limit, $11 offset.
+ */
+const SEARCH_ESCALATIONS_WHERE = `\
+  FROM public.lt_escalations
+  WHERE ($1::text IS NULL OR status = $1)
+    AND ($2::text IS NULL OR role = $2)
+    AND ($3::text[] IS NULL OR role = ANY($3))
+    AND ($4::text IS NULL OR type = $4)
+    AND ($5::text IS NULL OR subtype = $5)
+    AND ($6::int IS NULL OR priority = $6)
+    AND ($7::text IS NULL OR assigned_to = $7)
+    AND ($8::boolean IS NULL OR available = $8)
+    AND ($9::text IS NULL OR (
+          description ILIKE '%' || $9 || '%'
+       OR type ILIKE '%' || $9 || '%'
+       OR subtype ILIKE '%' || $9 || '%'
+       OR role ILIKE '%' || $9 || '%'
+       OR workflow_id ILIKE '%' || $9 || '%'
+       OR origin_id ILIKE '%' || $9 || '%'
+       OR id::text ILIKE '%' || $9 || '%'
+       OR metadata::text ILIKE '%' || $9 || '%'
+    ))`;
+
+/** Count matching the search WHERE (params $1–$9). */
+export const COUNT_SEARCH_ESCALATIONS = `SELECT COUNT(*)::int AS total\n${SEARCH_ESCALATIONS_WHERE}`;
+
+/**
+ * Build the search SELECT. `orderBy` is composed from a whitelist by the caller
+ * (never raw user input), so it is safe to interpolate; everything else is bound.
+ */
+export function searchEscalationsQuery(orderBy: string): string {
+  return `SELECT *\n${SEARCH_ESCALATIONS_WHERE}\n  ORDER BY ${orderBy}\n  LIMIT $10 OFFSET $11`;
+}
+
+/**
  * Atomic resolve by metadata with signal guard.
  *
  * Single query, four outcomes:

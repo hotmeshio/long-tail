@@ -66,15 +66,19 @@ export async function invokeWorkflow(
  *
  * Returns the HotMesh status code (0 = completed, 1 = running).
  * Resolves the workflow handle via task record or worker registry.
+ * `appId` selects the namespace for the job-entity fallback so a child
+ * running in another app resolves instead of 404ing against `durable`.
  *
  * @param input.workflowId — HotMesh workflow ID
+ * @param input.appId — HotMesh namespace for resolution (default: durable)
  * @returns `{ status: 200, data: { workflowId, status } }` or 404
  */
 export async function getWorkflowStatus(input: {
   workflowId: string;
+  appId?: string;
 }): Promise<LTApiResult> {
   try {
-    const resolved = await resolveWorkflowHandle(input.workflowId);
+    const resolved = await resolveWorkflowHandle(input.workflowId, input.appId);
 
     const client = createClient();
     const handle = await client.workflow.getHandle(
@@ -101,13 +105,15 @@ export async function getWorkflowStatus(input: {
  * payload when complete. Never blocks — always returns immediately.
  *
  * @param input.workflowId — HotMesh workflow ID
+ * @param input.appId — HotMesh namespace for resolution (default: durable)
  * @returns `{ status: 200, data: { workflowId, result } }` or 202 if running
  */
 export async function getWorkflowResult(input: {
   workflowId: string;
+  appId?: string;
 }): Promise<LTApiResult> {
   try {
-    const resolved = await resolveWorkflowHandle(input.workflowId);
+    const resolved = await resolveWorkflowHandle(input.workflowId, input.appId);
 
     const client = createClient();
     const handle = await client.workflow.getHandle(

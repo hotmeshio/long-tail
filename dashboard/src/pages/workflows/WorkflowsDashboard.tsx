@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNamespace } from '../../hooks/useNamespace';
 import { useWorkflowListEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { PageHeader } from '../../components/common/layout/PageHeader';
@@ -203,7 +204,17 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/workflow-states/jobs?limit=${pagination.pageSize}&offset=${pagination.offset}${filters.entity ? `&entity=${filters.entity}` : ''}${filters.search ? `&search=${filters.search}` : ''}${filters.status ? `&status=${filters.status}` : ''}${sort.sort_by ? `&sort_by=${sort.sort_by}&order=${sort.order}` : ''}`}
+          apiPath={buildApiPath('/workflow-states/jobs', {
+            limit: pagination.pageSize,
+            offset: pagination.offset,
+            entity: filters.entity || undefined,
+            search: filters.search || undefined,
+            status: filters.status || undefined,
+            sort_by: sort.sort_by || 'created_at',
+            order: sort.order || 'desc',
+            registered: registeredFilter,
+            namespace: namespace || undefined,
+          })}
         />
       }>
         <input

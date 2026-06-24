@@ -95,10 +95,10 @@ describe('diagnoseJob — event volume guard', () => {
     mockQuery.mockResolvedValue({ rows: [] }); // no escalation row
   });
 
-  it('caps execution_events to the most recent maxEvents and flags truncation', async () => {
+  it('caps execution_events to the most recent maxEvents and flags truncation (when events included)', async () => {
     mockExport.mockResolvedValue({ events: makeEvents(600) });
 
-    const d = await diagnoseJob('wf-1', 'durable', { maxEvents: 500 });
+    const d = await diagnoseJob('wf-1', 'durable', { maxEvents: 500, include: ['events'] });
     expect(d.total_events).toBe(600);
     expect(d.events_truncated).toBe(true);
     expect(d.execution_events).toHaveLength(500);
@@ -107,9 +107,82 @@ describe('diagnoseJob — event volume guard', () => {
   it('does not truncate when events fit under the cap', async () => {
     mockExport.mockResolvedValue({ events: makeEvents(10) });
 
-    const d = await diagnoseJob('wf-1', 'durable', { maxEvents: 500 });
+    const d = await diagnoseJob('wf-1', 'durable', { maxEvents: 500, include: ['events'] });
     expect(d.total_events).toBe(10);
     expect(d.events_truncated).toBe(false);
     expect(d.execution_events).toHaveLength(10);
+  });
+});
+
+// ── diagnoseJob — compact by default (token economy) ─────────────────────────
+
+describe('diagnoseJob — compact verdict by default', () => {
+  beforeEach(() => {
+    mockResolve.mockResolvedValue({ taskQueue: 'tq', workflowName: 'reviewContent' });
+    mockStream.mockResolvedValue({ messages: [] });
+    mockQuery.mockResolvedValue({ rows: [] });
+  });
+
+  it('omits execution_events and stream_messages, keeps counts, and points to list_stream_messages', async () => {
+    mockExport.mockResolvedValue({ events: makeEvents(50) });
+
+    const d = await diagnoseJob('wf-1', 'durable');
+    // Verdict fields present
+    expect(d.status).toBeDefined();
+    expect(d.stream_summary).toBeDefined();
+    expect(d.findings).toBeDefined();
+    expect(d.total_events).toBe(50);
+    // Heavy arrays omitted by default
+    expect(d.execution_events).toBeUndefined();
+    expect(d.stream_messages).toBeUndefined();
+    // Pointer to the raw payload browser
+    expect(d.raw_messages?.jid).toBe('wf-1');
+    expect(d.raw_messages?.hint).toContain('list_stream_messages');
+  });
+
+  it("verbosity:'full' includes both events and streams", async () => {
+    mockExport.mockResolvedValue({ events: makeEvents(5) });
+    mockStream.mockResolvedValue({ messages: [] });
+
+    const d = await diagnoseJob('wf-1', 'durable', { verbosity: 'full' });
+    expect(d.execution_events).toHaveLength(5);
+    expect(d.stream_messages).toEqual({ worker: [], engine: [] });
+    expect(d.raw_messages).toBeUndefined();
+  });
+});
+
+// ── diagnoseJob — large-payload truncation ───────────────────────────────────
+
+describe('diagnoseJob — large string summarization', () => {
+  beforeEach(() => {
+    mockResolve.mockResolvedValue({ taskQueue: 'tq', workflowName: 'reviewContent' });
+    mockQuery.mockResolvedValue({ rows: [] });
+  });
+
+  it('summarizes oversized stream message payloads to {bytes,preview,truncated}', async () => {
+    mockExport.mockResolvedValue({ events: [] });
+    const big = 'x'.repeat(5000);
+    mockStream.mockResolvedValue({
+      messages: [{ id: 'm1', source: 'worker', message: big, dead_lettered_at: null, reserved_at: null, expired_at: null }],
+    });
+
+    const d = await diagnoseJob('wf-1', 'durable', { include: ['streams'] });
+    const summarized = d.stream_messages!.worker[0].message as { bytes: number; preview: string; truncated: true };
+    expect(summarized.truncated).toBe(true);
+    expect(summarized.bytes).toBe(5000);
+    expect(summarized.preview.length).toBe(200);
+  });
+
+  it('summarizes oversized result strings inside event attributes', async () => {
+    const big = 'y'.repeat(5000);
+    mockStream.mockResolvedValue({ messages: [] });
+    mockExport.mockResolvedValue({
+      events: [{ event_id: 1, event_type: 'activity_task_completed', event_time: new Date().toISOString(), attributes: { result: big } }],
+    });
+
+    const d = await diagnoseJob('wf-1', 'durable', { include: ['events'] });
+    const attrs = (d.execution_events![0] as { attributes: { result: { truncated: boolean; bytes: number } } }).attributes;
+    expect(attrs.result.truncated).toBe(true);
+    expect(attrs.result.bytes).toBe(5000);
   });
 });

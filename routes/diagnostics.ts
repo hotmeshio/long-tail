@@ -1,23 +1,38 @@
 import { Router } from 'express';
 
 import * as api from '../api/diagnostics';
+import type { DiagnoseSection, DiagnoseVerbosity } from '../services/diagnostics';
 import { requireAdmin } from '../modules/auth';
 
 const router = Router();
 
+const VALID_SECTIONS = new Set<DiagnoseSection>(['events', 'streams']);
+
+/** Parse a comma-separated `include` query param into the recognized heavy sections. */
+function parseInclude(raw: unknown): DiagnoseSection[] | undefined {
+  if (typeof raw !== 'string' || raw.trim() === '') return undefined;
+  const sections = raw.split(',').map((s) => s.trim()).filter((s): s is DiagnoseSection => VALID_SECTIONS.has(s as DiagnoseSection));
+  return sections.length > 0 ? sections : undefined;
+}
+
 /**
  * GET /api/diagnostics/jobs/:workflowId
- * Full diagnosis for a single workflow job.
+ * Compact diagnosis for a single workflow job — the verdict only by default
+ * (status, idle time, stream counts, escalation, findings).
  *
  * Query params:
  *   app_id     — HotMesh namespace (default: durable)
- *   max_events — cap on events returned (most recent kept; default: 500)
+ *   max_events — cap on events returned when included (most recent kept; default: 500)
+ *   include    — comma-separated heavy sections to add: events, streams
+ *   verbosity  — 'summary' (default, verdict only) or 'full' (events + streams)
  */
 router.get('/jobs/:workflowId', requireAdmin, async (req, res) => {
   const result = await api.diagnose({
     workflowId: req.params.workflowId as string,
     appId: typeof req.query.app_id === 'string' ? req.query.app_id : undefined,
     maxEvents: req.query.max_events ? Number(req.query.max_events) : undefined,
+    include: parseInclude(req.query.include),
+    verbosity: req.query.verbosity === 'full' ? 'full' : undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

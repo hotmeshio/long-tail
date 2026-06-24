@@ -4,6 +4,7 @@ import { useWorkflowConfigs } from '../../api/workflows';
 import { useProcessListEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
@@ -107,7 +108,13 @@ export function ProcessesListPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/tasks/processes?limit=${pagination.pageSize}&offset=${pagination.offset}${filters.workflow_type ? `&workflow_type=${filters.workflow_type}` : ''}${filters.status ? `&status=${filters.status}` : ''}${debouncedSearch ? `&search=${debouncedSearch}` : ''}`}
+          apiPath={buildApiPath('/tasks/processes', {
+            limit: pagination.pageSize,
+            offset: pagination.offset,
+            workflow_type: filters.workflow_type || undefined,
+            status: filters.status || undefined,
+            search: debouncedSearch || undefined,
+          })}
         />
       }>
         <FilterInput

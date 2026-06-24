@@ -15,6 +15,7 @@ import {
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
 import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
@@ -54,7 +55,7 @@ export function EscalationDetailPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: esc, isLoading } = useEscalation(id!);
+  const { data: esc, isLoading, refetch, isFetching } = useEscalation(id!);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
   const resolve = useResolveEscalation();
@@ -220,9 +221,20 @@ export function EscalationDetailPage() {
     </button>
   ) : undefined;
 
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {viewToggle}
+      <ListToolbar
+        onRefresh={() => refetch()}
+        isFetching={isFetching}
+        apiPath={`/escalations/${esc.id}`}
+      />
+    </div>
+  );
+
   return (
     <div className="min-h-[calc(100vh-9rem)] flex flex-col">
-      <PageHeader title="Escalation" actions={viewToggle} />
+      <PageHeader title="Escalation" actions={headerActions} />
 
       <EscalationHero
         esc={esc}

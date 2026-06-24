@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { useStreamMessages, type StreamMessage } from '../../../api/stream-messages';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { useNamespace } from '../../../hooks/useNamespace';
+import { buildApiPath } from '../../../lib/api-path';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
@@ -141,7 +142,21 @@ export function StreamMessagesPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/controlplane/stream-messages?namespace=${filters.namespace || namespace}&source=${filters.source || 'worker'}&limit=${pagination.pageSize}&offset=${pagination.offset}${filters.status ? `&status=${filters.status}` : ''}${filters.stream_name ? `&stream_name=${filters.stream_name}` : ''}`}
+          apiPath={buildApiPath('/controlplane/stream-messages', {
+            namespace: filters.namespace || namespace,
+            source: filters.source || 'worker',
+            limit: pagination.pageSize,
+            offset: pagination.offset,
+            sort_by: sort.sort_by || 'created_at',
+            order: sort.order || 'desc',
+            status: filters.status || undefined,
+            stream_name: filters.stream_name || undefined,
+            msg_type: filters.msg_type || undefined,
+            topic: filters.topic || undefined,
+            workflow_name: filters.workflow_name || undefined,
+            jid: filters.jid || undefined,
+            aid: filters.aid || undefined,
+          })}
         />
       }>
         <FilterSelect

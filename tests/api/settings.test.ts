@@ -230,6 +230,35 @@ describe('getSettings — environment', () => {
   });
 });
 
+describe('getSettings — feature flags', () => {
+  afterEach(async () => {
+    // Reset to defaults so flag state never leaks between tests.
+    const { configureFeatureFlags } = await import('../../modules/features');
+    configureFeatureFlags();
+  });
+
+  it('defaults dbMaintenance to true (shown)', async () => {
+    const { configureFeatureFlags } = await import('../../modules/features');
+    configureFeatureFlags();
+    const result = await getSettings();
+    expect(result.data.features.dbMaintenance).toBe(true);
+  });
+
+  it('reports dbMaintenance: false when the start config suppresses it', async () => {
+    const { configureFeatureFlags } = await import('../../modules/features');
+    configureFeatureFlags({ dbMaintenance: false });
+    const result = await getSettings();
+    expect(result.data.features.dbMaintenance).toBe(false);
+  });
+
+  it('an unspecified flag keeps its permissive default', async () => {
+    const { configureFeatureFlags } = await import('../../modules/features');
+    configureFeatureFlags({});
+    const result = await getSettings();
+    expect(result.data.features.dbMaintenance).toBe(true);
+  });
+});
+
 describe('getSettings — SSO', () => {
   afterEach(async () => {
     const { clearSSOConfig } = await import('../../modules/sso');

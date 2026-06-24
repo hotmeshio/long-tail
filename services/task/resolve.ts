@@ -12,13 +12,16 @@ import {
  * HotMesh needs to get a workflow handle.
  *
  * 1. Look up lt_tasks by workflow_id — returns workflow_type and task_queue.
- * 2. If no task record (e.g., orchestrators/containers), fall back to
- *    durable.jobs (entity) + lt_config_workflows (task_queue).
+ * 2. If no task record (e.g., orchestrators/containers, or a child running in
+ *    another app), fall back to `<appId>.jobs` (entity) + lt_config_workflows
+ *    (task_queue). `appId` selects the HotMesh namespace to scan — children of
+ *    a workflow live under their own app's schema, not always `durable`.
  * 3. If task_queue is null (pre-migration record), fall back to lt_config_workflows.
  * 4. Throws if the workflow cannot be resolved.
  */
 export async function resolveWorkflowHandle(
   workflowId: string,
+  appId = 'durable',
 ): Promise<ResolvedHandle> {
   const pool = getPool();
 
@@ -43,11 +46,12 @@ export async function resolveWorkflowHandle(
     }
   }
 
-  // 2. Fall back to durable.jobs — handles orchestrators/containers that
-  //    have no lt_tasks record but do have a job with an entity tag.
+  // 2. Fall back to <appId>.jobs — handles orchestrators/containers that
+  //    have no lt_tasks record but do have a job with an entity tag, and
+  //    children running in a non-default namespace.
   const { rows: jobRows } = await pool.query(
-    RESOLVE_JOB_ENTITY,
-    [`hmsh:durable:j:${workflowId}`],
+    RESOLVE_JOB_ENTITY(appId),
+    [`hmsh:${appId}:j:${workflowId}`],
   );
 
   if (jobRows.length > 0 && jobRows[0].entity) {

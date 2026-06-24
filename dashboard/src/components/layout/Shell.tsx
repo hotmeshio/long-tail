@@ -83,11 +83,11 @@ function ShellLayout() {
             )}
           </button>
 
-          {/* Version line — long-tail + HotMesh SDK, shown when expanded */}
+          {/* Version line — long-tail + HotMesh SDK, shown when expanded. Single line. */}
           {!collapsed && settings?.environment && (
             <div
-              className="shrink-0 px-7 pb-3 text-[11px] leading-tight text-text-tertiary"
-              title={`Node ${settings.environment.nodeVersion} · ${settings.environment.nodeEnv}`}
+              className="shrink-0 px-5 pb-3 text-[10px] leading-tight text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis"
+              title={`long-tail v${settings.environment.longTailVersion} · HotMesh v${settings.environment.hotmeshVersion} · Node ${settings.environment.nodeVersion} · ${settings.environment.nodeEnv}`}
             >
               long-tail v{settings.environment.longTailVersion}
               <span className="mx-1 text-surface-border">·</span>
