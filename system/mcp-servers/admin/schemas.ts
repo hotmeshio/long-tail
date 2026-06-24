@@ -29,12 +29,25 @@ export const getProcessDetailSchema = z.object({
 // ── escalations (routes/escalations/) ───────────────────────────────────────
 
 export const findEscalationsSchema = z.object({
-  status: z.enum(['pending', 'resolved']).optional().describe('Filter by status'),
+  status: z.enum(['pending', 'resolved', 'cancelled']).optional().describe('Filter by status'),
   role: z.string().optional().describe('Filter by target role'),
   type: z.string().optional().describe('Filter by escalation type'),
+  subtype: z.string().optional().describe('Filter by escalation subtype'),
+  assigned_to: z.string().optional().describe('Filter by assigned user UUID (active claim holder)'),
+  search: z.string().optional().describe('Free-text search across description, type/subtype, role, workflow/origin id, and metadata values (e.g. a correlation key like an order id). Server-side over the full result set.'),
   priority: z.number().int().min(1).max(4).optional().describe('Filter by priority (1=critical, 4=low)'),
+  sort_by: z.enum(['created_at', 'priority', 'updated_at']).optional().describe('Sort column (default: priority asc, then created_at asc)'),
+  order: z.enum(['asc', 'desc']).optional().describe('Sort direction for sort_by'),
   limit: z.number().int().min(1).max(100).optional().default(5),
   offset: z.number().int().min(0).optional().default(0),
+});
+
+export const getEscalationSchema = z.object({
+  id: z.string().describe('Escalation UUID'),
+});
+
+export const getEscalationsByWorkflowSchema = z.object({
+  workflow_id: z.string().describe('HotMesh workflow ID to list escalations for'),
 });
 
 export const getEscalationStatsSchema = z.object({
@@ -45,6 +58,33 @@ export const claimEscalationSchema = z.object({
   id: z.string().describe('Escalation UUID'),
   duration_minutes: z.number().int().optional().default(30)
     .describe('Lock duration in minutes'),
+});
+
+export const releaseEscalationSchema = z.object({
+  id: z.string().describe('Escalation UUID to release back to the pool'),
+});
+
+export const resolveEscalationSchema = z.object({
+  id: z.string().describe('Escalation UUID to resolve'),
+  resolverPayload: z.record(z.any()).describe('Resolution payload (matches the escalation form/resolver schema)'),
+});
+
+export const resolveBySignalKeySchema = z.object({
+  signalKey: z.string().describe('Deterministic signal_key of an efficient escalation'),
+  resolverPayload: z.record(z.any()).describe('Resolution payload'),
+});
+
+export const escalateEscalationSchema = z.object({
+  id: z.string().describe('Escalation UUID'),
+  targetRole: z.string().describe('Role to route the escalation to'),
+});
+
+export const cancelEscalationSchema = z.object({
+  id: z.string().describe('Escalation UUID to cancel'),
+});
+
+export const bulkCancelSchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation UUIDs to cancel'),
 });
 
 export const releaseExpiredClaimsSchema = z.object({});
@@ -94,6 +134,7 @@ export const invokeWorkflowSchema = z.object({
 
 export const getWorkflowStatusSchema = z.object({
   workflow_id: z.string().describe('HotMesh workflow ID'),
+  app_id: z.string().optional().describe('HotMesh namespace for resolution (default: durable). Set this to read a child/workflow running in another app.'),
 });
 
 // ── mcp servers (routes/mcp.ts) ─────────────────────────────────────────────
@@ -506,7 +547,9 @@ export const getExportStatusSchema = z.object({
 export const diagnoseJobSchema = z.object({
   workflow_id: z.string().describe('Workflow ID to diagnose'),
   app_id: z.string().optional().default('durable').describe('HotMesh namespace / DB schema (default: durable)'),
-  max_events: z.number().int().min(1).optional().default(500).describe('Cap on execution events returned; most recent are kept (default: 500). For full per-message payloads use the stream browser (list_stream_messages filtered by jid) instead.'),
+  max_events: z.number().int().min(1).optional().default(500).describe('Cap on execution events returned when events are included; most recent are kept (default: 500).'),
+  include: z.array(z.enum(['events', 'streams'])).optional().describe('Heavy sections to add to the verdict. "events" adds the execution timeline; "streams" adds raw engine+worker messages. Omit for the compact verdict (status, idle, stream counts, escalation, findings). For full raw message payloads prefer list_stream_messages filtered by jid.'),
+  verbosity: z.enum(['summary', 'full']).optional().describe('Shorthand: "summary" (default) = verdict only; "full" = events + streams. Overridden by an explicit include[].'),
 });
 
 export const findStalledJobsSchema = z.object({

@@ -19,6 +19,7 @@ interface EscalationFilters {
   offset?: number;
   sort_by?: string;
   order?: string;
+  search?: string;
   enabled?: boolean;
   staleTime?: number;
 }
@@ -61,6 +62,7 @@ export function useEscalations(filters: EscalationFilters) {
   if (rest.offset !== undefined) params.set('offset', String(rest.offset));
   if (rest.sort_by) params.set('sort_by', rest.sort_by);
   if (rest.order) params.set('order', rest.order);
+  if (rest.search) params.set('search', rest.search);
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', rest],
@@ -81,6 +83,7 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
   if (rest.offset !== undefined) params.set('offset', String(rest.offset));
   if (rest.sort_by) params.set('sort_by', rest.sort_by);
   if (rest.order) params.set('order', rest.order);
+  if (rest.search) params.set('search', rest.search);
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', 'available', rest],

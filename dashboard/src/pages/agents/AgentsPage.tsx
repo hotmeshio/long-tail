@@ -4,6 +4,7 @@ import { useAgents, type Agent } from '../../api/agents';
 import { useSettings } from '../../api/settings';
 import { useAgentEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
@@ -112,7 +113,11 @@ export function AgentsPage() {
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
-          apiPath={`/agents?limit=${pagination.pageSize}&offset=${pagination.offset}${filters.status ? `&status=${filters.status}` : ''}`}
+          apiPath={buildApiPath('/agents', {
+            limit: pagination.pageSize,
+            offset: pagination.offset,
+            status: filters.status || undefined,
+          })}
         />
       }>
         <FilterSelect

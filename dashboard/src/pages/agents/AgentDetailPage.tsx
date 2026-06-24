@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Bot, Play, Pause, Trash2, ArrowRight, Pencil, BookOpen,
+  Bot, Play, Pause, Trash2, ArrowRight, ArrowUpRight, Pencil, BookOpen,
   Radio, Clock, Brain, Compass,
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useDeleteAgent } from '../../api/agents';
@@ -34,6 +34,21 @@ function SectionHeader({ icon: Icon, color, children, actions }: { icon: React.E
 
 function EmptyHint({ text }: { text: string }) {
   return <p className="text-[11px] text-text-quaternary py-2">{text}</p>;
+}
+
+/** Per-section deeplink — jumps straight to that section instead of Edit → navigate. */
+function SectionViewLink({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(to)}
+      className="text-text-quaternary hover:text-accent transition-colors"
+      title={`View ${label}`}
+      aria-label={`View ${label}`}
+    >
+      <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+    </button>
+  );
 }
 
 // ── Live feed ───────────────────────────────────────────────────────────────
@@ -165,7 +180,11 @@ export function AgentDetailPage() {
       {/* Motivation */}
       {(agent.goals || agent.rules) && (
         <div className="mb-10">
-          <SectionHeader icon={Compass} color="text-rose-400">Motivation</SectionHeader>
+          <SectionHeader
+            icon={Compass}
+            color="text-rose-400"
+            actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=2`} label="Motivation" />}
+          >Motivation</SectionHeader>
           <div className="grid grid-cols-2 gap-x-14 bg-surface-sunken/20 rounded-lg px-5 py-4">
             {agent.goals && (
               <div>
@@ -188,7 +207,11 @@ export function AgentDetailPage() {
 
         {/* Col 1: Subscriptions */}
         <div>
-          <SectionHeader icon={Radio} color="text-cyan-400">
+          <SectionHeader
+            icon={Radio}
+            color="text-cyan-400"
+            actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=4`} label="Subscriptions" />}
+          >
             Subscriptions ({subs.length})
           </SectionHeader>
           {subs.length === 0 ? (
@@ -213,7 +236,11 @@ export function AgentDetailPage() {
 
         {/* Col 2: Schedules */}
         <div>
-          <SectionHeader icon={Clock} color="text-amber-400">Schedules ({schedCount})</SectionHeader>
+          <SectionHeader
+            icon={Clock}
+            color="text-amber-400"
+            actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=5`} label="Schedules" />}
+          >Schedules ({schedCount})</SectionHeader>
           {schedules?.length ? (
             <div className="divide-y divide-surface-border/30">
               {schedules.map((s: any, i: number) => (
@@ -236,7 +263,16 @@ export function AgentDetailPage() {
         {/* Col 3: Knowledge + Activity */}
         <div className="space-y-10">
           <div>
-            <SectionHeader icon={Brain} color="text-emerald-400">Knowledge</SectionHeader>
+            <SectionHeader
+              icon={Brain}
+              color="text-emerald-400"
+              actions={
+                <SectionViewLink
+                  to={agent.knowledge_domain ? `/knowledge?domain=${agent.knowledge_domain}` : `/agents/${agent.id}/edit?step=3`}
+                  label="Knowledge"
+                />
+              }
+            >Knowledge</SectionHeader>
             {agent.knowledge_domain ? (
               <button onClick={() => navigate(`/knowledge?domain=${agent.knowledge_domain}`)} className="group text-left flex items-center gap-3">
                 <span className="text-sm font-mono text-text-primary group-hover:text-accent transition-colors">{agent.knowledge_domain}</span>

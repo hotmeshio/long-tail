@@ -1,16 +1,33 @@
 /**
  * Escalation tools — mirrors routes/escalations/
+ *
+ * Every tool runs as the `lt-system` bot. The escalation RBAC helpers
+ * (getVisibleRoles / getUserRoles / hasGlobalEscalationAccess) query a uuid
+ * column, so the bot's external_id string ('lt-system') would blow up with
+ * `invalid input syntax for type uuid`. `systemAuth()` resolves the bot's real
+ * UUID once and caches it; that UUID (a superadmin) is passed as the principal.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as escalationService from '../../../services/escalation';
+import * as escalationApi from '../../../api/escalations';
 import * as escalationMetaApi from '../../../api/escalations/metadata';
 import * as escalationBulkApi from '../../../api/escalations/bulk';
+import { ensureSystemBot } from '../../../services/iam';
+import type { LTApiAuth } from '../../../types/sdk';
 import {
   findEscalationsSchema,
+  getEscalationSchema,
+  getEscalationsByWorkflowSchema,
   getEscalationStatsSchema,
   claimEscalationSchema,
+  releaseEscalationSchema,
+  resolveEscalationSchema,
+  cancelEscalationSchema,
+  bulkCancelSchema,
+  escalateEscalationSchema,
+  resolveBySignalKeySchema,
   releaseExpiredClaimsSchema,
   bulkTriageSchema,
   findByMetadataSchema,
@@ -22,7 +39,43 @@ import {
   updatePrioritySchema,
 } from './schemas';
 
+let systemPrincipalId: string | null = null;
+
+/**
+ * Resolve (and cache) the lt-system bot's real UUID. The escalation RBAC helpers
+ * query the uuid `user_id` column, so the external_id string 'lt-system' would
+ * raise `invalid input syntax for type uuid`. The bot is a superadmin, so it has
+ * global escalation access.
+ */
+async function systemAuth(): Promise<LTApiAuth> {
+  if (!systemPrincipalId) systemPrincipalId = await ensureSystemBot();
+  return { userId: systemPrincipalId, role: 'superadmin' };
+}
+
+/** Project the full escalation record to the MCP-facing shape, including metadata. */
+function projectEscalation(e: any) {
+  return {
+    id: e.id,
+    type: e.type,
+    subtype: e.subtype,
+    role: e.role,
+    priority: e.priority,
+    status: e.status,
+    description: e.description,
+    workflow_id: e.workflow_id,
+    workflow_type: e.workflow_type,
+    assigned_to: e.assigned_to,
+    assigned_until: e.assigned_until,
+    signal_key: e.signal_key,
+    metadata: e.metadata,
+    created_at: e.created_at,
+    updated_at: e.updated_at,
+  };
+}
+
 export function registerEscalationTools(server: McpServer): void {
+
+  // ── Read-only ───────────────────────────────────────────────────────────────
 
   // mirrors GET /api/escalations
   (server as any).registerTool(
@@ -30,40 +83,82 @@ export function registerEscalationTools(server: McpServer): void {
     {
       title: 'Find Escalations',
       description:
-        'Search escalations with optional filters. Returns records with ' +
-        'type, role, priority, status, description, and assignment info.',
+        'Search escalations with optional filters (status, role, type, subtype, ' +
+        'assigned_to, priority), free-text `search`, and sorting. `search` matches ' +
+        'across description, type/subtype, role, workflow/origin id, and metadata values ' +
+        '(e.g. a correlation key like an order id) server-side over the full result set. ' +
+        'Returns full records including metadata, workflow linkage, assignment, and signal_key.',
       inputSchema: findEscalationsSchema,
     },
     async (args: z.infer<typeof findEscalationsSchema>) => {
-      const { escalations, total } = await escalationService.listEscalations({
-        status: args.status as any,
-        role: args.role,
-        type: args.type,
-        priority: args.priority,
-        limit: args.limit,
-        offset: args.offset,
-      });
+      const result = await escalationApi.listEscalations(
+        {
+          status: args.status,
+          role: args.role,
+          type: args.type,
+          subtype: args.subtype,
+          assigned_to: args.assigned_to,
+          search: args.search,
+          priority: args.priority,
+          limit: args.limit,
+          offset: args.offset,
+          sort_by: args.sort_by,
+          order: args.order,
+        },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      const { escalations, total } = result.data as { escalations: any[]; total: number };
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
             total,
             count: escalations.length,
-            escalations: escalations.map((e) => ({
-              id: e.id,
-              type: e.type,
-              subtype: e.subtype,
-              role: e.role,
-              priority: e.priority,
-              status: e.status,
-              description: e.description,
-              workflow_type: e.workflow_type,
-              assigned_to: e.assigned_to,
-              created_at: e.created_at,
-            })),
+            escalations: escalations.map(projectEscalation),
           }),
         }],
       };
+    },
+  );
+
+  // mirrors GET /api/escalations/:id
+  (server as any).registerTool(
+    'get_escalation',
+    {
+      title: 'Get Escalation',
+      description:
+        'Get a single escalation by ID — the full record including metadata, envelope ' +
+        'linkage, resolver/escalation payloads, signal_key, and assignment state.',
+      inputSchema: getEscalationSchema,
+    },
+    async (args: z.infer<typeof getEscalationSchema>) => {
+      const result = await escalationApi.getEscalation({ id: args.id }, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors GET /api/escalations/by-workflow/:workflowId
+  (server as any).registerTool(
+    'get_escalations_by_workflow',
+    {
+      title: 'Get Escalations by Workflow',
+      description:
+        'List all escalations linked to a specific workflow ID, newest first. Returns ' +
+        'full records including metadata.',
+      inputSchema: getEscalationsByWorkflowSchema,
+    },
+    async (args: z.infer<typeof getEscalationsByWorkflowSchema>) => {
+      const result = await escalationApi.getEscalationsByWorkflowId({ workflowId: args.workflow_id });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
     },
   );
 
@@ -80,13 +175,31 @@ export function registerEscalationTools(server: McpServer): void {
     async (args: z.infer<typeof getEscalationStatsSchema>) => {
       const stats = await escalationService.getEscalationStats(undefined, args.period);
       return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify(stats),
-        }],
+        content: [{ type: 'text' as const, text: JSON.stringify(stats) }],
       };
     },
   );
+
+  // mirrors GET /api/escalations/by-metadata
+  (server as any).registerTool(
+    'find_by_metadata',
+    {
+      title: 'Find by Metadata',
+      description:
+        'Find escalations by a metadata key-value pair (e.g. a correlation key written ' +
+        'into metadata when the escalation was raised).',
+      inputSchema: findByMetadataSchema,
+    },
+    async (args: z.infer<typeof findByMetadataSchema>) => {
+      const result = await escalationMetaApi.findByMetadata(args, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // ── Read-write ────────────────────────────────────────────────────────────────
 
   // mirrors POST /api/escalations/:id/claim
   (server as any).registerTool(
@@ -100,27 +213,121 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: claimEscalationSchema,
     },
     async (args: z.infer<typeof claimEscalationSchema>) => {
-      const escalation = await escalationService.getEscalation(args.id);
-      if (!escalation) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Escalation not found' }) }],
-          isError: true,
-        };
-      }
-      const result = await escalationService.claimEscalation(
-        args.id,
-        'lt-system',
-        args.duration_minutes,
+      const result = await escalationApi.claimEscalation(
+        { id: args.id, durationMinutes: args.duration_minutes },
+        await systemAuth(),
       );
-      if (!result) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Escalation not available for claim' }) }],
-          isError: true,
-        };
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(result) }],
-      };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/:id/release
+  (server as any).registerTool(
+    'release_escalation',
+    {
+      title: 'Release Escalation',
+      description:
+        'Release a claimed escalation back to the available pool. Reverses a ' +
+        'claim_escalation so another holder can pick it up.',
+      inputSchema: releaseEscalationSchema,
+    },
+    async (args: z.infer<typeof releaseEscalationSchema>) => {
+      const result = await escalationApi.releaseEscalation({ id: args.id }, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/:id/resolve
+  (server as any).registerTool(
+    'resolve_escalation',
+    {
+      title: 'Resolve Escalation',
+      description:
+        'Resolve a pending escalation with a human-provided payload. Routes by escalation ' +
+        'shape: efficient (signal_key) escalations resume the waiting workflow in place; ' +
+        'legacy paths signal via routing metadata or re-run the original workflow. ' +
+        'Password fields in the payload are replaced with ephemeral tokens.',
+      inputSchema: resolveEscalationSchema,
+    },
+    async (args: z.infer<typeof resolveEscalationSchema>) => {
+      const result = await escalationApi.resolveEscalation(
+        { id: args.id, resolverPayload: args.resolverPayload },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/resolve-by-signal-key
+  (server as any).registerTool(
+    'resolve_by_signal_key',
+    {
+      title: 'Resolve by Signal Key',
+      description:
+        'Resolve an efficient (atomic) escalation directly by its signal_key and resume the ' +
+        'waiting workflow in place. For callers that know the deterministic signal id and want ' +
+        'to skip the id lookup.',
+      inputSchema: resolveBySignalKeySchema,
+    },
+    async (args: z.infer<typeof resolveBySignalKeySchema>) => {
+      const result = await escalationApi.resolveBySignalKey(
+        { signalKey: args.signalKey, resolverPayload: args.resolverPayload },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors PATCH /api/escalations/:id/escalate
+  (server as any).registerTool(
+    'escalate_escalation',
+    {
+      title: 'Escalate Escalation',
+      description:
+        'Route a pending escalation to a different role (per the escalation chain). The new ' +
+        'role becomes responsible for resolving it.',
+      inputSchema: escalateEscalationSchema,
+    },
+    async (args: z.infer<typeof escalateEscalationSchema>) => {
+      const result = await escalationApi.escalateToRole(
+        { id: args.id, targetRole: args.targetRole },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/:id/cancel
+  (server as any).registerTool(
+    'cancel_escalation',
+    {
+      title: 'Cancel Escalation',
+      description:
+        'Permanently cancel a pending escalation — used when the tied workflow has ' +
+        'terminated and can never receive the resolution signal. Preserved for audit.',
+      inputSchema: cancelEscalationSchema,
+    },
+    async (args: z.infer<typeof cancelEscalationSchema>) => {
+      const result = await escalationApi.cancelSingleEscalation({ id: args.id }, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
     },
   );
 
@@ -167,26 +374,6 @@ export function registerEscalationTools(server: McpServer): void {
     },
   );
 
-  // ── Metadata-based operations ───────────────────────────────────────────────
-
-  // mirrors GET /api/escalations/by-metadata
-  (server as any).registerTool(
-    'find_by_metadata',
-    {
-      title: 'Find by Metadata',
-      description:
-        'Find escalations by a metadata key-value pair.',
-      inputSchema: findByMetadataSchema,
-    },
-    async (args: z.infer<typeof findByMetadataSchema>) => {
-      const result = await escalationMetaApi.findByMetadata(args, { userId: 'lt-system' });
-      if (result.error) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
-      }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
-    },
-  );
-
   // mirrors POST /api/escalations/claim-by-metadata
   (server as any).registerTool(
     'claim_by_metadata',
@@ -197,7 +384,7 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: claimByMetadataSchema,
     },
     async (args: z.infer<typeof claimByMetadataSchema>) => {
-      const result = await escalationMetaApi.claimByMetadata(args, { userId: 'lt-system' });
+      const result = await escalationMetaApi.claimByMetadata(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -215,7 +402,7 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: resolveByMetadataSchema,
     },
     async (args: z.infer<typeof resolveByMetadataSchema>) => {
-      const result = await escalationMetaApi.resolveByMetadata(args, { userId: 'lt-system' });
+      const result = await escalationMetaApi.resolveByMetadata(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -234,7 +421,7 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: bulkClaimSchema,
     },
     async (args: z.infer<typeof bulkClaimSchema>) => {
-      const result = await escalationBulkApi.bulkClaim(args, { userId: 'lt-system' });
+      const result = await escalationBulkApi.bulkClaim(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -251,7 +438,7 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: bulkAssignSchema,
     },
     async (args: z.infer<typeof bulkAssignSchema>) => {
-      const result = await escalationBulkApi.bulkAssign(args, { userId: 'lt-system' });
+      const result = await escalationBulkApi.bulkAssign(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -268,7 +455,24 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: bulkEscalateSchema,
     },
     async (args: z.infer<typeof bulkEscalateSchema>) => {
-      const result = await escalationBulkApi.bulkEscalate(args, { userId: 'lt-system' });
+      const result = await escalationBulkApi.bulkEscalate(args, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/bulk-cancel
+  (server as any).registerTool(
+    'bulk_cancel',
+    {
+      title: 'Bulk Cancel',
+      description: 'Cancel multiple pending escalations in a single operation.',
+      inputSchema: bulkCancelSchema,
+    },
+    async (args: z.infer<typeof bulkCancelSchema>) => {
+      const result = await escalationApi.bulkCancel(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -285,7 +489,7 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: updatePrioritySchema,
     },
     async (args: z.infer<typeof updatePrioritySchema>) => {
-      const result = await escalationBulkApi.updatePriority(args, { userId: 'lt-system' });
+      const result = await escalationBulkApi.updatePriority(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }

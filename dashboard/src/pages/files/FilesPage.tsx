@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterInput } from '../../components/common/data/FilterBar';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { buildApiPath } from '../../lib/api-path';
 import { EmptyState } from '../../components/common/display/EmptyState';
 import { DropZone } from '../../components/common/DropZone';
 import { useFileBrowse, useUploadFile } from '../../api/files';
@@ -122,7 +123,11 @@ export function FilesPage() {
   const hasNextPage = !!nextToken;
   const hasPrevPage = tokenStack.length > 0;
 
-  const apiPath = `/file-browser/browse?prefix=${encodeURIComponent(effectivePrefix)}&pageSize=${pageSize}${currentToken ? `&continuationToken=${encodeURIComponent(currentToken)}` : ''}`;
+  const apiPath = buildApiPath('/file-browser/browse', {
+    prefix: effectivePrefix,
+    pageSize,
+    continuationToken: currentToken || undefined,
+  });
 
   return (
     <DropZone onDrop={handleUploadFiles} label="Drop files to upload">

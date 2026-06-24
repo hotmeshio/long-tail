@@ -11,7 +11,7 @@ import {
   invokeWorkflow,
   checkInvocationRoles,
 } from '../../../services/workflow-invocation';
-import { createClient } from '../../../workers';
+import * as workflowApi from '../../../api/workflows';
 import {
   listDiscoveredWorkflowsSchema,
   invokeWorkflowSchema,
@@ -108,26 +108,24 @@ export function registerWorkflowTools(server: McpServer): void {
       title: 'Get Workflow Status',
       description:
         'Check the status and result of a workflow execution. Returns ' +
-        'status (0=complete, positive=running) and the result if complete.',
+        'status (running | complete) and the result if complete. ' +
+        'Resolution is namespace-aware: pass app_id to read a workflow (e.g. a ' +
+        'child) running in a non-default HotMesh namespace.',
       inputSchema: getWorkflowStatusSchema,
     },
     async (args: z.infer<typeof getWorkflowStatusSchema>) => {
-      const { getTaskByWorkflowId } = await import('../../../services/task');
-      const task = await getTaskByWorkflowId(args.workflow_id);
-      if (!task) {
+      const statusResult = await workflowApi.getWorkflowStatus({
+        workflowId: args.workflow_id,
+        appId: args.app_id,
+      });
+      if (statusResult.error) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Workflow not found' }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: statusResult.error }) }],
           isError: true,
         };
       }
-      const client = createClient();
-      const handle = await client.workflow.getHandle(
-        task.task_queue || 'long-tail-system',
-        task.workflow_type,
-        args.workflow_id,
-      );
-      const status = await handle.status();
-      if (status !== 0) {
+      // HotMesh status: 0 = complete, positive = running.
+      if (statusResult.data?.status !== 0) {
         return {
           content: [{
             type: 'text' as const,
@@ -135,11 +133,20 @@ export function registerWorkflowTools(server: McpServer): void {
           }],
         };
       }
-      const result = await handle.result();
+      const resultResult = await workflowApi.getWorkflowResult({
+        workflowId: args.workflow_id,
+        appId: args.app_id,
+      });
+      if (resultResult.error) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: resultResult.error }) }],
+          isError: true,
+        };
+      }
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({ workflow_id: args.workflow_id, status: 'complete', result }),
+          text: JSON.stringify({ workflow_id: args.workflow_id, status: 'complete', result: resultResult.data?.result }),
         }],
       };
     },

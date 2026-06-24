@@ -56,7 +56,8 @@ Get all tasks and escalations for a process (origin_id).
 
 ### find_escalations
 
-Search escalations with optional filters by status, role, type, priority.
+Search escalations with optional filters and sorting. Returns full records
+including `metadata`, workflow linkage, assignment, and `signal_key`.
 
 | | |
 |---|---|
@@ -66,12 +67,47 @@ Search escalations with optional filters by status, role, type, priority.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| status | string | No | pending or resolved |
+| status | string | No | pending, resolved, or cancelled |
 | role | string | No | Filter by role |
 | type | string | No | Filter by type |
+| subtype | string | No | Filter by subtype |
+| assigned_to | string | No | Filter by assigned user UUID (active claim holder) |
+| search | string | No | Free-text search across description, type/subtype, role, workflow/origin id, and metadata values (e.g. a correlation key like an order id). Server-side over the full result set. |
 | priority | integer | No | Filter by priority |
+| sort_by | string | No | Sort column: created_at, priority, updated_at |
+| order | string | No | Sort direction (asc, desc) for sort_by |
 | limit | integer | No | Max results |
 | offset | integer | No | Pagination offset |
+
+### get_escalation
+
+Get a single escalation by ID — the full record including metadata, payloads,
+`signal_key`, and assignment state.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Escalation ID |
+
+### get_escalations_by_workflow
+
+List all escalations linked to a workflow ID, newest first. Returns full records
+including metadata.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workflow_id | string | Yes | Workflow ID to list escalations for |
 
 ### get_escalation_stats
 
@@ -102,6 +138,85 @@ Claim an escalation for a time-boxed lock.
 | id | string | Yes | Escalation ID |
 | duration_minutes | integer | No | Lock duration |
 
+### release_escalation
+
+Release a claimed escalation back to the available pool (reverses `claim_escalation`).
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Escalation ID to release |
+
+### resolve_escalation
+
+Resolve a pending escalation with a human-provided payload. Routes by escalation
+shape: efficient (`signal_key`) escalations resume the waiting workflow in place;
+legacy paths signal via routing metadata or re-run the original workflow. Password
+fields in the payload are replaced with ephemeral tokens.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Escalation ID to resolve |
+| resolverPayload | object | Yes | Resolution payload |
+
+### resolve_by_signal_key
+
+Resolve an efficient (atomic) escalation directly by its `signal_key` and resume
+the waiting workflow in place. For callers that know the deterministic signal id
+and want to skip the id lookup.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| signalKey | string | Yes | Deterministic signal key of the escalation |
+| resolverPayload | object | Yes | Resolution payload |
+
+### escalate_escalation
+
+Route a pending escalation to a different role per the escalation chain.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Escalation ID |
+| targetRole | string | Yes | Role to route the escalation to |
+
+### cancel_escalation
+
+Permanently cancel a pending escalation (e.g. its workflow has terminated and can
+never receive the resolution signal). Preserved for audit.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Escalation ID to cancel |
+
 ### release_expired_claims
 
 Release all escalation claims that exceeded their lock duration.
@@ -129,7 +244,8 @@ Resolve escalations for triage and start mcpTriage workflows.
 
 ### find_by_metadata
 
-Find escalations by a metadata key-value pair.
+Find escalations by a metadata key-value pair — e.g. a correlation key (order id,
+ticket id, request id) written into metadata when the escalation was raised.
 
 | | |
 |---|---|
@@ -226,6 +342,20 @@ Escalate multiple escalations to a different role.
 |-------|------|----------|-------------|
 | ids | string[] | Yes | Escalation IDs |
 | targetRole | string | Yes | Target role |
+
+### bulk_cancel
+
+Cancel multiple pending escalations in a single operation.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| ids | string[] | Yes | Escalation IDs to cancel |
 
 ### update_priority
 
@@ -327,7 +457,9 @@ Start a certified workflow by type. Returns workflow ID immediately.
 
 ### get_workflow_status
 
-Check workflow status and result. Returns status (0=complete, positive=running) and result if complete.
+Check workflow status and result. Returns status (`running` | `complete`) and the
+result when complete. Resolution is namespace-aware — pass `app_id` to read a
+workflow (e.g. a child) running in a non-default HotMesh namespace.
 
 | | |
 |---|---|
@@ -338,6 +470,7 @@ Check workflow status and result. Returns status (0=complete, positive=running) 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | workflow_id | string | Yes | Workflow ID to check |
+| app_id | string | No | HotMesh namespace for resolution (default: durable) |
 
 ## MCP Servers
 
@@ -971,16 +1104,25 @@ suspended waiter with **no** escalation row.
 
 **Recommended flow:** start fleet-wide with `find_orphaned_signals` (the
 genuinely-broken case) or `find_stalled_jobs` (candidates worth a look), then run
-`diagnose_job` on a specific id for root cause. For the full raw JSONB of a
-specific message, use `list_stream_messages` (Control Plane) filtered by `jid`
-(and `aid`/`dad`) — `diagnose_job` returns a capped summary, not a dump.
+`diagnose_job` on a specific id for root cause. `diagnose_job` is compact by
+default — the verdict only. Opt into the heavy arrays with `include`, and for the
+full raw JSONB of a specific message use `list_stream_messages` (Control Plane)
+filtered by `jid` (and `aid`/`dad`).
 
 ### diagnose_job
 
-Complete read-only diagnosis of one workflow: status, idle time, suspension and
-escalation state, stream health (pending / dead-lettered / reservation leaks),
-and structured `findings[]` with confidence, evidence, and read-only guidance.
-Classifies a healthy long-wait as such rather than flagging it as stalled.
+Read-only diagnosis of one workflow. **Compact by default** — returns the verdict
+only: `status`, `idle_for_ms`, `workflow_type`, `stream_summary` (counts), the
+`escalation` summary, and structured `findings[]` with confidence, evidence, and
+read-only guidance. Classifies a healthy long-wait as such rather than flagging it
+as stalled.
+
+To opt into the heavy arrays pass `include: ["events"]` for the execution timeline
+and/or `include: ["streams"]` for raw engine+worker messages (`verbosity: "full"`
+adds both). Large `result`/`message` payloads are summarized to
+`{ bytes, preview, truncated }`; for full untruncated payloads use
+`list_stream_messages` filtered by `jid` (surfaced as `raw_messages` when streams
+are omitted).
 
 | | |
 |---|---|
@@ -992,7 +1134,9 @@ Classifies a healthy long-wait as such rather than flagging it as stalled.
 |-------|------|----------|-------------|
 | workflow_id | string | Yes | Workflow (job) ID to diagnose |
 | app_id | string | No | HotMesh namespace / DB schema (default: durable) |
-| max_events | integer | No | Cap on execution events returned, most recent kept (default: 500). Use `list_stream_messages` for full payloads. |
+| include | string[] | No | Heavy sections to add: `events`, `streams`. Omit for the compact verdict. |
+| verbosity | string | No | `summary` (default, verdict only) or `full` (events + streams) |
+| max_events | integer | No | Cap on execution events returned when included, most recent kept (default: 500). Use `list_stream_messages` for full payloads. |
 
 ### find_stalled_jobs
 

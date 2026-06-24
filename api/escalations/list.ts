@@ -36,6 +36,7 @@ export async function listEscalations(
     offset?: number;
     sort_by?: string;
     order?: string;
+    search?: string;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
@@ -57,6 +58,7 @@ export async function listEscalations(
       offset: input.offset,
       sort_by: input.sort_by,
       order: input.order,
+      search: input.search,
       visibleRoles,
     });
     return { status: 200, data: result };
@@ -92,6 +94,7 @@ export async function listAvailableEscalations(
     offset?: number;
     sort_by?: string;
     order?: string;
+    search?: string;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
@@ -110,6 +113,7 @@ export async function listAvailableEscalations(
       offset: input.offset,
       sort_by: input.sort_by,
       order: input.order,
+      search: input.search,
       visibleRoles,
     });
     return { status: 200, data: result };

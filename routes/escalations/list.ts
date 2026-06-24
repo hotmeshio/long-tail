@@ -48,6 +48,7 @@ export function registerListRoutes(router: Router): void {
         offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
         sort_by: req.query.sort_by as string,
         order: req.query.order as string,
+        search: req.query.search as string,
       },
       req.auth!,
     );
@@ -70,6 +71,7 @@ export function registerListRoutes(router: Router): void {
         offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
         sort_by: req.query.sort_by as string,
         order: req.query.order as string,
+        search: req.query.search as string,
       },
       req.auth!,
     );
