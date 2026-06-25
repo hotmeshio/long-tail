@@ -6,7 +6,7 @@ export const ENSURE_ROLE_EXISTS =
 
 /** Fetch roles for a single user, ordered by creation time. */
 export const GET_ROLES_BY_USER_ID =
-  'SELECT role, type, created_at FROM lt_user_roles WHERE user_id = $1 ORDER BY created_at';
+  'SELECT role, type, read_scope, write_scope, created_at FROM lt_user_roles WHERE user_id = $1 ORDER BY created_at';
 
 /** Fetch a user row by external_id. */
 export const GET_USER_BY_EXTERNAL_ID =
@@ -23,7 +23,7 @@ export const GET_USER_BY_EMAIL =
   `SELECT * FROM lt_users WHERE email = $1 LIMIT 1`;
 
 export const INSERT_USER_ROLE_IGNORE =
-  `INSERT INTO lt_user_roles (user_id, role, type) VALUES ($1, $2, $3)
+  `INSERT INTO lt_user_roles (user_id, role, type, read_scope, write_scope) VALUES ($1, $2, $3, $4, $5)
    ON CONFLICT DO NOTHING`;
 
 export const GET_USER_BY_ID =
@@ -36,7 +36,7 @@ export const VERIFY_USER_BY_ID =
 /** Fetch user + roles in a single query. Returns one row per role (or one row with nulls if no roles). */
 export const GET_USER_WITH_ROLES =
   `SELECT u.id, u.external_id, u.display_name, u.status, u.metadata,
-          r.role, r.type AS role_type
+          r.role, r.type AS role_type, r.read_scope, r.write_scope
    FROM lt_users u
    LEFT JOIN lt_user_roles r ON r.user_id = u.id
    WHERE u.external_id = $1
@@ -49,13 +49,16 @@ export const DELETE_USER_BY_ID =
 
 /** Batch-load roles for many users (avoids N+1). */
 export const GET_ROLES_BY_USER_IDS =
-  'SELECT user_id, role, type, created_at FROM lt_user_roles WHERE user_id = ANY($1) ORDER BY created_at';
+  'SELECT user_id, role, type, read_scope, write_scope, created_at FROM lt_user_roles WHERE user_id = ANY($1) ORDER BY created_at';
 
-/** Upsert a user–role assignment, promoting the type if the row exists. */
+/** Upsert a user–role assignment, promoting the type/scope if the row exists. */
 export const UPSERT_USER_ROLE =
-  `INSERT INTO lt_user_roles (user_id, role, type) VALUES ($1, $2, $3)
-   ON CONFLICT (user_id, role) DO UPDATE SET type = EXCLUDED.type
-   RETURNING role, type, created_at`;
+  `INSERT INTO lt_user_roles (user_id, role, type, read_scope, write_scope) VALUES ($1, $2, $3, $4, $5)
+   ON CONFLICT (user_id, role) DO UPDATE SET
+     type = EXCLUDED.type,
+     read_scope = EXCLUDED.read_scope,
+     write_scope = EXCLUDED.write_scope
+   RETURNING role, type, read_scope, write_scope, created_at`;
 
 export const DELETE_USER_ROLE =
   'DELETE FROM lt_user_roles WHERE user_id = $1 AND role = $2';
@@ -65,6 +68,10 @@ export const HAS_ROLE =
 
 export const HAS_ROLE_TYPE =
   'SELECT 1 FROM lt_user_roles WHERE user_id = $1 AND type = $2 LIMIT 1';
+
+/** Fetch the management tier + scope for one (user, role) — used for write enforcement. */
+export const GET_ROLE_SCOPE =
+  'SELECT type, read_scope, write_scope FROM lt_user_roles WHERE user_id = $1 AND role = $2 LIMIT 1';
 
 // ─── RBAC ────────────────────────────────────────────────────────────────────
 

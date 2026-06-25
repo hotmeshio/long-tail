@@ -1,6 +1,5 @@
 import * as escalationService from '../../services/escalation';
-import { validateIds, checkBulkPermission, hasGlobalEscalationAccess } from './helpers';
-import * as userService from '../../services/user';
+import { validateIds, checkBulkPermission, assertWriteAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 /**
@@ -20,11 +19,10 @@ export async function cancelSingleEscalation(
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
 
-    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
-    if (!hasGlobal) {
-      const hasRole = await userService.hasRole(auth.userId, escalation.role);
-      if (!hasRole) return { status: 403, error: 'Forbidden' };
-    }
+    // Cancel ("delete") is a write verb: write_all may cancel any item in the role,
+    // write_self may cancel an item assigned to them, read-only members may not.
+    const denied = await assertWriteAccess(auth.userId, escalation);
+    if (denied) return denied;
 
     const cancelled = await escalationService.cancelEscalation(id);
     if (!cancelled) {

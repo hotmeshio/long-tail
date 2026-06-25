@@ -1,6 +1,6 @@
 import * as userService from '../services/user';
 import type { LTApiResult } from '../types/sdk';
-import type { LTRoleType } from '../types';
+import type { LTReadScope, LTRoleType, LTWriteScope } from '../types';
 
 /**
  * List users with optional filters for role, role type, status, and pagination.
@@ -65,7 +65,7 @@ export async function createUser(input: {
   email?: string;
   display_name?: string;
   password?: string;
-  roles?: { role: string; type: string }[];
+  roles?: { role: string; type: string; read_scope?: string; write_scope?: string }[];
   metadata?: Record<string, any>;
 }): Promise<LTApiResult> {
   try {
@@ -79,6 +79,17 @@ export async function createUser(input: {
             status: 400,
             error: 'Each role must have a role name and type (superadmin, admin, member)',
           };
+        }
+        if (r.read_scope !== undefined && !userService.isValidReadScope(r.read_scope)) {
+          return { status: 400, error: 'read_scope must be self or all' };
+        }
+        if (r.write_scope !== undefined && !userService.isValidWriteScope(r.write_scope)) {
+          return { status: 400, error: 'write_scope must be none, self, or all' };
+        }
+        const read = (r.read_scope ?? userService.DEFAULT_READ_SCOPE) as LTReadScope;
+        const write = (r.write_scope ?? userService.DEFAULT_WRITE_SCOPE) as LTWriteScope;
+        if (!userService.isValidScopePair(read, write)) {
+          return { status: 400, error: 'write_scope=all requires read_scope=all' };
         }
       }
     }
@@ -183,6 +194,8 @@ export async function addUserRole(input: {
   id: string;
   role: string;
   type: string;
+  read_scope?: string;
+  write_scope?: string;
 }): Promise<LTApiResult> {
   try {
     if (!input.role || !input.type) {
@@ -191,7 +204,23 @@ export async function addUserRole(input: {
     if (!userService.isValidRoleType(input.type)) {
       return { status: 400, error: 'type must be superadmin, admin, or member' };
     }
-    const result = await userService.addUserRole(input.id, input.role, input.type);
+    // Work-surface scope (optional; defaults to all/all = full worker). Only
+    // meaningful for `member`; admin/superadmin normalize to all/all.
+    if (input.read_scope !== undefined && !userService.isValidReadScope(input.read_scope)) {
+      return { status: 400, error: 'read_scope must be self or all' };
+    }
+    if (input.write_scope !== undefined && !userService.isValidWriteScope(input.write_scope)) {
+      return { status: 400, error: 'write_scope must be none, self, or all' };
+    }
+    const read = (input.read_scope ?? userService.DEFAULT_READ_SCOPE) as LTReadScope;
+    const write = (input.write_scope ?? userService.DEFAULT_WRITE_SCOPE) as LTWriteScope;
+    if (!userService.isValidScopePair(read, write)) {
+      return { status: 400, error: 'write_scope=all requires read_scope=all (cannot act on what you cannot see)' };
+    }
+    const result = await userService.addUserRole(input.id, input.role, input.type, {
+      read_scope: read,
+      write_scope: write,
+    });
     return { status: 201, data: result };
   } catch (err: any) {
     return { status: 500, error: err.message };

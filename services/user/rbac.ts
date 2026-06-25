@@ -1,7 +1,9 @@
 import { getPool } from '../../lib/db';
+import type { LTReadScope, LTWriteScope } from '../../types';
 
 import { hasRoleType, getUserRoles } from './roles';
-import { IS_GROUP_ADMIN } from './sql';
+import { effectiveScope } from './scope';
+import { GET_ROLE_SCOPE, IS_GROUP_ADMIN } from './sql';
 
 // ─── RBAC helpers ─────────────────────────────────────────────────────────────
 
@@ -45,6 +47,34 @@ export async function hasGlobalEscalationAccess(userId: string): Promise<boolean
   if (await isSuperAdmin(userId)) return true;
   const roles = await getUserRoles(userId);
   return roles.some((r) => r.role === 'admin' && r.type === 'admin');
+}
+
+/**
+ * Resolve the user's effective scope for a single role — the breadth at which
+ * they may SEARCH (read) and ACT (write). One indexed PK lookup on lt_user_roles.
+ * Returns `null` when the user is not a member of the role.
+ *
+ * The management tier (admin/superadmin) short-circuits both axes to `'all'` via
+ * effectiveScope. Callers that already hold global access should skip this.
+ */
+export async function getRoleScope(
+  userId: string,
+  role: string,
+): Promise<{ read: LTReadScope; write: LTWriteScope } | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_SCOPE, [userId, role]);
+  if (rows.length === 0) return null;
+  const { type, read_scope, write_scope } = rows[0];
+  return effectiveScope(type, read_scope, write_scope);
+}
+
+/**
+ * Effective WRITE scope for a role: `'all'` (act on any item), `'self'` (only
+ * items assigned to the user), or `'none'` (read-only, or not a member).
+ */
+export async function getRoleWriteScope(userId: string, role: string): Promise<LTWriteScope> {
+  const scope = await getRoleScope(userId, role);
+  return scope ? scope.write : 'none';
 }
 
 /**

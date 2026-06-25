@@ -99,3 +99,18 @@ Create an escalation and pause the workflow until a human responds. Returns a si
 | type | string | No | Escalation type classification (default: "mcp") |
 | subtype | string | No | Escalation subtype (default: "wait_for_human") |
 | priority | number | No | Priority: 1 (highest) to 4 (lowest) (default: 1) |
+
+## Scope and One-Time Users
+
+Escalations created by these tools land in the target role's queue. Each member of that role sees and acts on them according to their work-surface scope — two axes carried by the role membership alongside its `type` (`member`, `admin`, or `superadmin`):
+
+- `read_scope` (`self` | `all`) governs which escalations a member sees. `read_all` shows the whole role queue; `read_self` shows only items assigned to the member (`assigned_to = user`).
+- `write_scope` (`none` | `self` | `all`) governs which a member may claim and resolve. `write_self` acts only on the member's own assigned items; `write_all` acts on the whole queue. The constraint is write ⊆ read — you cannot act on what you cannot see.
+
+An `admin` or `superadmin` member ignores scope and always acts on the whole queue. The defaults are `all`/`all` — the full-queue worker.
+
+`get_available_work` lists pending, unassigned escalations for a role: the shared pool that whole-queue (`write_all`) workers pull from. A `write_self` member does not draw from this pool — their item is pre-assigned to them.
+
+### The one-time-user pattern
+
+To route a single escalation to a named person, set `assigned_to` when creating it — the `assigned_to` field on `escalate_and_wait` pre-claims the item for that user — and provision that person as a `member` of the role with `read_self` + `write_self`. The result is a scoped single-item surface: they see and act on exactly that one escalation, with no access to the rest of the queue. The scoped membership is provisioned through the platform's user and escalation APIs (see the [Roles API](../http/roles.md)); these MCP tools supply the `assigned_to` pre-claim.

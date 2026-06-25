@@ -403,7 +403,11 @@ export async function findByMetadata(
  * match zero rows. Returns `{ escalation, isExtension, candidatesExist }` or
  * null when nothing was claimed.
  *
- * @param allowedRoles — roles the caller can claim (null = no filter / global)
+ * @param allowedRoles — write_all roles the caller can claim (null = global / no
+ *   filter). The SDK applies a flat `role = ANY` filter and cannot express the
+ *   write_self ownership predicate, so self-scope members are intentionally
+ *   excluded from claim-by-metadata (their items are pre-claimed and resolved
+ *   by id). Self-scope claim-by-metadata would require a HotMesh SDK predicate.
  */
 export async function claimByMetadata(
   key: string,
@@ -479,15 +483,22 @@ export async function resolveByMetadataAtomic(
   userId: string,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
-  allowedRoles?: string[] | null,
+  writeAllRoles?: string[] | null,
+  writeSelfRoles?: string[] | null,
 ): Promise<ResolveByMetadataResult> {
   await ensureEscalationCompatView();
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
   const payloadJson = JSON.stringify(resolverPayload);
   const metaPatch = metadata ? JSON.stringify(metadata) : null;
-  const roles = allowedRoles ?? null;
-  const { rows } = await pool.query(RESOLVE_BY_METADATA_ATOMIC, [filter, userId, payloadJson, metaPatch, roles]);
+  // null write_all roles = global (no filter). A scoped caller passes its arrays
+  // (possibly empty); the write_self branch matches only rows assigned to userId.
+  const allRoles = writeAllRoles ?? null;
+  const selfRoles = writeSelfRoles ?? null;
+  const { rows } = await pool.query(
+    RESOLVE_BY_METADATA_ATOMIC,
+    [filter, userId, payloadJson, metaPatch, allRoles, selfRoles],
+  );
 
   if (rows.length === 0) return { outcome: 'not_found' };
 

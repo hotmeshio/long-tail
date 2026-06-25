@@ -5,7 +5,7 @@ import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemer
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { getVisibleRoles } from './helpers';
+import { assertWriteAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Orchestrator ─────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
  */
 export async function resolveEscalation(
   input: { id: string; resolverPayload: Record<string, any> },
-  _auth: LTApiAuth,
+  auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
     const { id, resolverPayload } = input;
@@ -37,6 +37,12 @@ export async function resolveEscalation(
     if (!escalation) return { status: 404, error: 'Escalation not found' };
     if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
+
+    // Resolve ("ack") is a write verb. This is the one-time-user path: a write_self
+    // owner submitting their own pre-claimed form (assigned_to = them) is allowed;
+    // read-only members and non-members are denied. Global access bypasses.
+    const denied = await assertWriteAccess(auth.userId, escalation);
+    if (denied) return denied;
 
     // Path A: conditionLT signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
@@ -100,10 +106,9 @@ export async function resolveBySignalKey(
     if (!escalation) return { status: 404, error: 'Escalation not found' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
 
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles && !visibleRoles.includes(escalation.role)) {
-      return { status: 404, error: 'Escalation not found' };
-    }
+    // Resolve is a write verb — scope-gate it (write_self may resolve only its own item).
+    const denied = await assertWriteAccess(auth.userId, escalation);
+    if (denied) return { status: 404, error: 'Escalation not found' };
 
     return resolveViaSignalKey(escalation, resolverPayload);
   } catch (err: any) {

@@ -54,6 +54,8 @@ Get all tasks and escalations for a process (origin_id).
 
 ## Escalations
 
+Escalations belong to a role's queue. Which of them a person sees and acts on is set by their work-surface scope: a role membership carries a `type` (`member`, `admin`, or `superadmin`) plus `read_scope` (`self` | `all`) — which escalations a member sees — and `write_scope` (`none` | `self` | `all`) — which they may claim, resolve, or cancel — with write ⊆ read. `read_self`/`write_self` narrows a member to items assigned to them (`assigned_to = user`); an `admin` or `superadmin` acts on the whole queue. The tools below operate at whole-queue breadth and need a role permitted to act on the target (see [Access](#access) above). The `assigned_to` filter on `find_escalations` pairs with this model — it narrows results to one user's items, the same surface a `read_self` member sees. Defaults are `all`/`all`. See the [Roles API](../http/roles.md) for the full scope model.
+
 ### find_escalations
 
 Search escalations with optional filters and sorting. Returns full records
@@ -659,11 +661,13 @@ Create a new user account with optional roles.
 | external_id | string | Yes | External identifier |
 | display_name | string | No | Display name |
 | email | string | No | Email address |
-| roles | object[] | No | Roles array (each: role, type: superadmin/admin/member) |
+| roles | object[] | No | Roles array (each: `role`, `type`: superadmin/admin/member, optional `read_scope`, `write_scope`) |
+
+Each role entry may carry a member work-surface scope: `read_scope` (`self` \| `all`, default `all`) and `write_scope` (`none` \| `self` \| `all`, default `all`), with write ⊆ read. This is how a one-time user is provisioned — e.g. `{ "role": "customer-triage", "type": "member", "read_scope": "self", "write_scope": "self" }` for someone who only handles their own pre-assigned escalation.
 
 ### add_user_role
 
-Assign a role to a user.
+Assign a role to a user. For a `member`, optional scope narrows the work surface.
 
 | | |
 |---|---|
@@ -676,6 +680,8 @@ Assign a role to a user.
 | user_id | string | Yes | User ID |
 | role | string | Yes | Role name |
 | type | string | Yes | Role type: superadmin, admin, or member |
+| read_scope | string | No | Member search breadth: `self` or `all` (default `all`) |
+| write_scope | string | No | Member claim/ack/delete breadth: `none`, `self`, or `all` (default `all`) |
 
 ### remove_user_role
 

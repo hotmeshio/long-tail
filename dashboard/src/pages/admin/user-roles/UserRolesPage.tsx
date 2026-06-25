@@ -7,6 +7,12 @@ import { StickyPagination } from '../../../components/common/data/StickyPaginati
 import { Modal } from '../../../components/common/modal/Modal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
+import {
+  SCOPE_PRESETS,
+  DEFAULT_SCOPE_VALUE,
+  scopePreset,
+  scopeLabel,
+} from '../../../lib/roleScope';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
 
 export function UserRolesPage() {
@@ -22,24 +28,40 @@ export function UserRolesPage() {
   const [editingUser, setEditingUser] = useState<LTUserRecord | null>(null);
   const [newRole, setNewRole] = useState('');
   const [newRoleType, setNewRoleType] = useState<LTRoleType>('member');
+  // Work-surface scope only applies to `member`; admin/superadmin act on all.
+  const [newScope, setNewScope] = useState(DEFAULT_SCOPE_VALUE);
 
   const total = data?.total ?? 0;
 
   const handleAddRole = () => {
     if (!editingUser || !newRole.trim()) return;
+    const preset = newRoleType === 'member' ? scopePreset(newScope) : scopePreset(DEFAULT_SCOPE_VALUE);
     addRole.mutate(
-      { userId: editingUser.id, role: newRole.trim(), type: newRoleType },
+      {
+        userId: editingUser.id,
+        role: newRole.trim(),
+        type: newRoleType,
+        read_scope: preset.read_scope,
+        write_scope: preset.write_scope,
+      },
       {
         onSuccess: () => {
           setNewRole('');
           setNewRoleType('member');
+          setNewScope(DEFAULT_SCOPE_VALUE);
           setEditingUser((prev) =>
             prev
               ? {
                   ...prev,
                   roles: [
                     ...(prev.roles ?? []),
-                    { role: newRole.trim(), type: newRoleType, created_at: new Date().toISOString() },
+                    {
+                      role: newRole.trim(),
+                      type: newRoleType,
+                      read_scope: preset.read_scope,
+                      write_scope: preset.write_scope,
+                      created_at: new Date().toISOString(),
+                    },
                   ],
                 }
               : null,
@@ -164,6 +186,11 @@ export function UserRolesPage() {
                         <span className="text-[10px] text-text-tertiary">
                           ({r.type})
                         </span>
+                        {r.type === 'member' && (
+                          <span className="text-[10px] text-text-tertiary">
+                            · {scopeLabel(r.read_scope, r.write_scope)}
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => handleRemoveRole(editingUser.id, r.role)}
@@ -218,6 +245,22 @@ export function UserRolesPage() {
                         <option value="superadmin">superadmin</option>
                       </select>
                     </div>
+                    {newRoleType === 'member' && (
+                      <div>
+                        <label className="block text-[10px] text-text-tertiary mb-1">
+                          Scope
+                        </label>
+                        <select
+                          value={newScope}
+                          onChange={(e) => setNewScope(e.target.value)}
+                          className="select text-xs"
+                        >
+                          {SCOPE_PRESETS.map((p) => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <button
                       onClick={handleAddRole}
                       disabled={!newRole || addRole.isPending}

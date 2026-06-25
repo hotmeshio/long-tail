@@ -239,7 +239,7 @@ When SSO is configured and a request arrives without a Bearer token, `requireAut
 
 Roles are resolved once during the token exchange (not per-request) and baked into the JWT — the same pattern as the built-in login. When the host system changes a user's roles, the new roles take effect on the next token refresh.
 
-If `roleMap` is provided, only mapped roles are assigned. If omitted, host role names are passed through directly as LT role names. Roles named `superadmin` or `admin` are assigned the corresponding role type; all others default to `member`.
+If `roleMap` is provided, only mapped roles are assigned. If omitted, host role names are passed through directly as LT role names. Roles named `superadmin` or `admin` are assigned the corresponding role type; all others default to `member`. Provisioned `member` grants take the default work-surface scope of `read_all`/`write_all` — the full-queue worker. Narrower scopes (for one-time or read-only users) are set through the [Roles API](api/http/roles.md#work-surface-scope) or the dashboard Scope picker.
 
 ### Standalone Deployments
 

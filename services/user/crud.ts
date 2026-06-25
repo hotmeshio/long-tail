@@ -14,6 +14,7 @@ import {
   INSERT_USER,
   INSERT_USER_ROLE_IGNORE,
 } from './sql';
+import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
 import type { CreateUserInput, UpdateUserInput } from './types';
 
 // ─── Private helpers (exported for internal use by auth.ts) ──────────────────
@@ -32,7 +33,13 @@ async function attachRolesToMany(users: any[]): Promise<LTUserRecord[]> {
   const roleMap = new Map<string, LTUserRole[]>();
   for (const row of rows) {
     const list = roleMap.get(row.user_id) || [];
-    list.push({ role: row.role, type: row.type, created_at: row.created_at });
+    list.push({
+      role: row.role,
+      type: row.type,
+      read_scope: row.read_scope,
+      write_scope: row.write_scope,
+      created_at: row.created_at,
+    });
     roleMap.set(row.user_id, list);
   }
   return users.map((u) => ({ ...u, roles: roleMap.get(u.id) || [] }));
@@ -62,7 +69,13 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
     for (const r of input.roles) {
       // Ensure the role exists in lt_roles (FK constraint)
       await pool.query(ENSURE_ROLE_EXISTS, [r.role]);
-      await pool.query(INSERT_USER_ROLE_IGNORE, [user.id, r.role, r.type]);
+      // admin/superadmin normalize to ('all','all'); members store requested scope.
+      const eff = effectiveScope(
+        r.type,
+        r.read_scope ?? DEFAULT_READ_SCOPE,
+        r.write_scope ?? DEFAULT_WRITE_SCOPE,
+      );
+      await pool.query(INSERT_USER_ROLE_IGNORE, [user.id, r.role, r.type, eff.read, eff.write]);
     }
   }
 

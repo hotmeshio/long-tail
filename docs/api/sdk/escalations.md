@@ -2,6 +2,15 @@
 
 Manage human-in-the-loop escalations -- list, claim, resolve, and bulk-operate on workflow escalations.
 
+## Work-Surface Scope
+
+Escalation methods enforce the caller's role work-surface scope server-side; the SDK method signatures are unchanged. For a `member`:
+
+- `read_scope` governs **search** — `list`, `listAvailable`, `findByMetadata`, `getStats`, and a single `get` return only the escalations the member is allowed to see. `read_scope=self` limits this to items assigned to the member; `read_scope=all` exposes the whole role queue.
+- `write_scope` governs **claim / ack (resolve) / delete (cancel)** — a member with `write_scope=self` may only `claim`, `resolve`, and `cancel` items already assigned to them. `release`, `escalate`, and `create` (standalone) are queue-management verbs and require `write_scope=all`.
+
+`admin` and `superadmin` ignore scope and act on the whole queue. Scope is set when a role is assigned — see [`lt.users.addRole`](users.md) and [Roles API — Work-Surface Scope](../http/roles.md).
+
 ## create
 
 Create an escalation. The caller must hold the target role or be a superadmin.
@@ -662,7 +671,7 @@ const result = await lt.escalations.claimByMetadata({
 | `metadata` | `object` | No | Merge into escalation metadata (single atomic SQL call with the claim) |
 | `provisionIfAbsent` | `object` | No | JIT-provision the assignee if they don't exist or lack the required role (superadmin only) |
 
-`provisionIfAbsent` accepts `{ displayName?, email?, roles?: [{ role, type? }] }`. Only callers with global escalation access can use this flag. The happy path (user exists, has role) adds zero extra queries.
+`provisionIfAbsent` accepts `{ displayName?, email?, roles?: [{ role, type?, read_scope?, write_scope? }] }`. Each role entry forwards the optional work-surface scope fields `read_scope` (`self` or `all`, default `all`) and `write_scope` (`none`, `self`, or `all`, default `all`), subject to the **write ⊆ read** constraint; scope is ignored for `admin`/`superadmin`. To JIT-provision a one-time user who sees and acts on exactly the item being claimed, provision them `read_scope: 'self'` + `write_scope: 'self'`. Only callers with global escalation access can use this flag. The happy path (user exists, has role) adds zero extra queries.
 
 **Returns:** `LTApiResult<{ escalation, isExtension }>` -- 404 if no match, 409 if already claimed.
 

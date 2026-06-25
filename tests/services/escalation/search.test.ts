@@ -45,12 +45,14 @@ describe('listEscalations — server-side search path', () => {
     expect(sql).toContain('ILIKE');
     expect(sql).toContain('metadata::text ILIKE');
     expect(params[8]).toBe('orderId'); // search term ($9)
-    expect(params[9]).toBe(25);        // limit ($10)
-    expect(params[10]).toBe(0);        // offset ($11)
+    expect(params[9]).toBeNull();      // selfRoles ($10) — no self scope
+    expect(params[10]).toBeNull();     // meUserId ($11)
+    expect(params[11]).toBe(25);       // limit ($12)
+    expect(params[12]).toBe(0);        // offset ($13)
 
-    // Count shares the 9 filter params, no limit/offset
+    // Count shares the 11 filter params (incl. selfRoles/meUserId), no limit/offset
     const [, countParams] = countCall()!;
-    expect(countParams).toHaveLength(9);
+    expect(countParams).toHaveLength(11);
     expect(countParams[8]).toBe('orderId');
   });
 
@@ -90,6 +92,26 @@ describe('listEscalations — server-side search path', () => {
     await listEscalations({ status: 'pending', limit: 25, offset: 0 });
     expect(mockList).toHaveBeenCalled();
     expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('routes through raw SQL (not the SDK) when read_self scope is present, even with no search', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+    await listEscalations({
+      visibleRoles: ['reviewer'],
+      selfRoles: ['customer-triage'],
+      meUserId: 'user-9',
+      limit: 25,
+      offset: 0,
+    });
+
+    // SDK list cannot express (role ∈ selfRoles AND assigned_to = me) → SQL path
+    expect(mockList).not.toHaveBeenCalled();
+    const [sql, params] = selectCall()!;
+    expect(sql).toContain('assigned_to = $11');
+    expect(params[2]).toEqual(['reviewer']);          // allRoles ($3)
+    expect(params[8]).toBeNull();                      // search ($9) — absent
+    expect(params[9]).toEqual(['customer-triage']);    // selfRoles ($10)
+    expect(params[10]).toBe('user-9');                 // meUserId ($11)
   });
 });
 

@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock dependencies
+// Mock dependencies. Keep the pure scope helpers (effectiveScope etc.) real;
+// only stub the DB-touching user functions the scope partition + assignee
+// resolution depend on.
 vi.mock('../../services/escalation');
-vi.mock('../../services/user');
+vi.mock('../../services/user', async (importActual) => {
+  const actual = await importActual<typeof import('../../services/user')>();
+  return {
+    ...actual,
+    hasGlobalEscalationAccess: vi.fn(),
+    getUserRoles: vi.fn(),
+    getUserByExternalId: vi.fn(),
+    createUser: vi.fn(),
+  };
+});
 vi.mock('../../lib/events/publish', () => ({
   publishEscalationEvent: vi.fn(),
 }));
@@ -75,7 +86,9 @@ describe('findByMetadata', () => {
 
   it('scopes results by visible roles for non-global user', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
-    mockGetUserRoles.mockResolvedValue([{ role: 'reviewer', type: 'member', created_at: new Date() } as any]);
+    mockGetUserRoles.mockResolvedValue([
+      { role: 'reviewer', type: 'member', read_scope: 'all', write_scope: 'all', created_at: new Date() } as any,
+    ]);
     const esc = makeEscalation({ role: 'operator' });
     mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
 
@@ -138,17 +151,36 @@ describe('claimByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('passes scoped roles for non-global user', async () => {
+  it('passes scoped write_all roles for non-global user', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
-    mockGetUserRoles.mockResolvedValue([{ role: 'operator', type: 'member' } as any]);
+    mockGetUserRoles.mockResolvedValue([
+      { role: 'operator', type: 'member', read_scope: 'all', write_scope: 'all', created_at: new Date() } as any,
+    ]);
     const esc = makeEscalation();
     mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
 
     await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
-    // Non-global user passes their roles as allowedRoles
+    // Non-global user passes their write_all roles as allowedRoles (write_self
+    // roles are excluded — the SDK claim-by-metadata cannot enforce ownership).
     expect(mockClaimByMetadata).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid', undefined, undefined, ['operator'],
+    );
+  });
+
+  it('excludes write_self roles from claim-by-metadata for non-global user', async () => {
+    mockHasGlobalAccess.mockResolvedValue(false);
+    mockGetUserRoles.mockResolvedValue([
+      { role: 'customer-triage', type: 'member', read_scope: 'self', write_scope: 'self', created_at: new Date() } as any,
+    ]);
+    const esc = makeEscalation();
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
+
+    await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
+
+    // Only write_self roles → empty write_all set → SQL matches nothing.
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined, undefined, [],
     );
   });
 
@@ -315,9 +347,10 @@ describe('resolveByMetadata', () => {
       metadata: { completedBy: 'jimbo' },
     }, SYSTEM_AUTH);
 
+    // Global caller → both write-scope filters null (no role filter).
     expect(mockResolveByMetadataAtomic).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid',
-      { approved: true }, { completedBy: 'jimbo' }, null,
+      { approved: true }, { completedBy: 'jimbo' }, null, null,
     );
   });
 });

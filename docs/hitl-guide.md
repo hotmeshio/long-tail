@@ -456,6 +456,31 @@ await ltCreateEscalation({
 });
 ```
 
+### Work-Surface Scope
+
+A `member` of a role carries a work-surface scope that narrows what they see and act on within that queue: `read_scope` (`self` | `all`) governs which escalations they see, and `write_scope` (`none` | `self` | `all`) governs which they can claim, resolve, or cancel. `self` means escalations assigned to that member (`assigned_to = user`); `all` means the whole role queue. `admin` and `superadmin` always work the whole queue. See the [Roles API](api/http/roles.md#work-surface-scope) for the five member profiles and the assignment contract.
+
+### One-Time and Pre-Assigned Users
+
+To route a single item to a named person, assign the escalation to them and provision them with `read_scope=self` + `write_scope=self`. The workflow sets `assigned_to` to the person's user ID (a pre-claim) when it creates the escalation, then provisions or updates that user as a `member` with self/self scope on the target role. They land directly on that one item — a just-in-time form scoped by RBAC, with no access to the rest of the queue and no direct table access. An update or follow-up is simply another workflow firing another escalation to that same person.
+
+```typescript
+// Pre-assign the escalation to a specific person and route a one-time form to them
+await ltCreateEscalation({
+  role: 'customer-triage',
+  assigned_to: userId,        // pre-claim — durable, keyed off the user, not the soft-lock TTL
+  description: 'Confirm your shipping address',
+  metadata: {
+    form_schema: {
+      title: 'Confirm Address',
+      properties: { address: { type: 'string' }, confirmed: { type: 'boolean' } },
+      required: ['confirmed'],
+    },
+  },
+});
+// The person is provisioned as a member of `customer-triage` with read_scope=self, write_scope=self.
+```
+
 ### Escalation Chains
 
 Users can escalate to other roles via the "Escalate" tab:

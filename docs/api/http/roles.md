@@ -6,15 +6,40 @@ Role management endpoints are nested under `/api/users/:id/roles`. All endpoints
 
 ## Role Types
 
-Every role assignment has a `type` that controls management permissions. All three types can claim and resolve escalations for their role.
+Every role assignment has a `type` that controls management permissions.
 
 | Type | Permissions |
 |------|-------------|
-| `member` | Claim and resolve escalations for this role |
-| `admin` | Everything a member can do, plus manage users within this role |
+| `member` | Work the role's task queue at the breadth set by its work-surface scope (see below) |
+| `admin` | Everything a member can do on the whole queue, plus manage users within this role |
 | `superadmin` | Full access — manage all roles, all users, system configuration |
 
 A user can hold multiple roles with different types. For example, a user might be a `member` of `reviewer` and an `admin` of `senior-reviewer`.
+
+## Work-Surface Scope
+
+A role is a task queue with four verbs — **search**, **claim**, **ack** (resolve), **delete** (cancel). A `member` carries two orthogonal scope axes that set the breadth of those verbs. `admin` and `superadmin` ignore scope and always act on the whole queue.
+
+| Axis | Values | Governs |
+|------|--------|---------|
+| `read_scope` | `self`, `all` | **search** — which escalations the member sees |
+| `write_scope` | `none`, `self`, `all` | **claim / ack / delete** — which escalations the member may act on |
+
+`self` means escalations assigned to the member (`assigned_to = user`); `all` means the whole role queue. The only constraint is **write ⊆ read** — you cannot act on what you cannot see — so `write_scope=all` requires `read_scope=all`. Both default to `all`, which is the full-queue worker.
+
+The five member profiles:
+
+| read_scope | write_scope | Profile |
+|-----------|------------|---------|
+| `all` | `all` | Full worker — search and act on the whole queue (default) |
+| `all` | `self` | See the whole queue, act only on own items (e.g. a chat-style room) |
+| `self` | `self` | Own items only — a one-time user filling in their pre-assigned form |
+| `all` | `none` | Read-only observer / auditor of the queue |
+| `self` | `none` | Read-only view of one's own items |
+
+Releasing and escalating are queue-management verbs (they move an item out of the member's hands) and require `write_scope=all`; creating a standalone escalation likewise requires `write_scope=all`. A member with `write_scope=self` may only claim/ack/delete items already assigned to them.
+
+This makes one-time and limited-surface users first-class: a workflow can assign an escalation to a named person (pre-claim) and provision them as `read_self` + `write_self`, and they see and act on exactly that one item — no access to the rest of the queue, no table, just the JIT form the workflow routed to them.
 
 ## Special Roles
 
@@ -26,7 +51,7 @@ Three role names have fixed types and elevated permissions:
 | `engineer` | `admin` | Full (builder) | Engineer role only | Assign users to `engineer` role |
 | `admin` | `admin` | Escalations + user management | All roles — role filter ignored | Assign users to any non-special role. Bulk actions on all escalations |
 
-All other role names are dynamic. A dynamic role can have type `member` (claim/resolve escalations) or `admin` (plus manage users within that role and bulk actions).
+All other role names are dynamic. A dynamic role can have type `member` (work the queue at its read/write scope) or `admin` (whole-queue access plus manage users within that role and bulk actions).
 
 ## Dashboard Access
 
@@ -36,9 +61,9 @@ The dashboard adapts to the authenticated user's access tier:
 |------|-----------|------|
 | **Builder** | `superadmin` or `engineer` role | Full dashboard: workflows, pipelines, MCP, design, storage, admin, all home page sections |
 | **Operations** | Any role with `admin` type | Home page (escalations only), escalation pages, user/role management (scoped to their roles) |
-| **Operator** | Any role with `member` type | Home page (escalations only), escalation pages |
+| **Operator** | Any role with `member` type | Home page (escalations only), escalation pages — scoped to the member's read scope |
 
-Bulk escalation actions (bulk claim, assign, triage, escalate) require `admin` or `superadmin` type. Plain `member` users work on escalations one at a time.
+Bulk escalation actions (bulk claim, assign, triage, escalate) require `admin` or `superadmin` type. Plain `member` users work on escalations one at a time. A member whose read scope is `self` lands directly on their own item in user mode — the queue list and aggregate stats reflect only `read_all` memberships.
 
 ## API Access by Tier
 
@@ -61,6 +86,8 @@ When assigning roles via `POST /api/users/:id/roles`, the caller's own roles det
 | `superadmin` | Any role, any type (including `superadmin/superadmin`) |
 | `engineer` | Any role up to `admin` type (never `superadmin` type) |
 | `*/admin` (non-builder) | `member` or `admin` type for roles they themselves hold |
+
+A caller who may assign a role may set any work-surface scope (`read_scope`/`write_scope`) on it. Scope is a refinement of a `member` grant; it is ignored for `admin`/`superadmin`, which always act on the whole queue.
 
 ## List roles for a user
 
@@ -113,11 +140,13 @@ POST /api/users/:id/roles
 |-------|------|----------|-------------|
 | `role` | `string` | yes | Role name (e.g., `reviewer`) |
 | `type` | `string` | yes | `superadmin`, `admin`, or `member` |
+| `read_scope` | `string` | no | `self` or `all` (default `all`). Search breadth for a `member`; ignored for admin/superadmin |
+| `write_scope` | `string` | no | `none`, `self`, or `all` (default `all`). Claim/ack/delete breadth for a `member` |
 
-**Example request:**
+**Example request** — a one-time user who works only their own assigned item:
 
 ```json
-{ "role": "reviewer", "type": "member" }
+{ "role": "customer-triage", "type": "member", "read_scope": "self", "write_scope": "self" }
 ```
 
 **Response 201:**
@@ -125,8 +154,10 @@ POST /api/users/:id/roles
 ```json
 {
   "user_id": "b2c3d4e5-...",
-  "role": "reviewer",
+  "role": "customer-triage",
   "type": "member",
+  "read_scope": "self",
+  "write_scope": "self",
   "created_at": "2025-01-15T12:00:00.000Z"
 }
 ```
@@ -139,6 +170,10 @@ POST /api/users/:id/roles
 
 ```json
 { "error": "type must be superadmin, admin, or member" }
+```
+
+```json
+{ "error": "write_scope=all requires read_scope=all (cannot act on what you cannot see)" }
 ```
 
 A user can hold each role at most once. The primary key is `(user_id, role)`. Adding a role that already exists will return an error.

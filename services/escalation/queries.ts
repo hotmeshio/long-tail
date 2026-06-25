@@ -48,12 +48,14 @@ async function searchEscalations(params: {
   status?: LTEscalationStatus;
   role?: string;
   roles?: string[];
+  selfRoles?: string[];
+  meUserId?: string;
   type?: string;
   subtype?: string;
   priority?: number;
   assigned_to?: string;
   available?: boolean;
-  search: string;
+  search?: string;
   limit: number;
   offset: number;
   sort_by?: string;
@@ -63,7 +65,8 @@ async function searchEscalations(params: {
   const pool = getPool();
   // Coerce empty strings to NULL so an absent filter (e.g. assigned_to='') does
   // not become `column = ''` and match zero rows. Mirrors the SDK path's
-  // `if (filters.x)` truthiness guards.
+  // `if (filters.x)` truthiness guards. An empty search term means "no free-text
+  // filter" — this path also serves scoped (self-role) listing with no search.
   const filterArgs = [
     params.status || null,
     params.role || null,
@@ -73,7 +76,9 @@ async function searchEscalations(params: {
     params.priority ?? null,
     params.assigned_to || null,
     params.available ?? null,
-    params.search,
+    params.search || null,
+    params.selfRoles && params.selfRoles.length ? params.selfRoles : null,
+    params.meUserId || null,
   ];
   const orderBy = buildSearchOrderBy(params.sort_by, params.order);
   const [rows, countRows] = await Promise.all([
@@ -113,19 +118,26 @@ export async function listEscalations(filters: {
   limit?: number;
   offset?: number;
   visibleRoles?: string[];
+  selfRoles?: string[];
+  meUserId?: string;
   sort_by?: string;
   order?: string;
   search?: string;
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   // Active claim semantics: assigned_to-active and `claimed` both mean "held now".
   const heldNow = !!(filters.assigned_to || filters.claimed);
+  const hasSelfScope = !!(filters.selfRoles && filters.selfRoles.length);
 
-  // Free-text search → server-side SQL path (the SDK list() has no free-text).
-  if (filters.search) {
+  // Free-text search OR read_self scoping → server-side SQL path. The SDK list()
+  // has no free-text and cannot express the (role ∈ selfRoles AND assigned_to=me)
+  // self-scope branch, so both route through the raw-SQL search query.
+  if (filters.search || hasSelfScope) {
     return searchEscalations({
       status: filters.status,
       role: filters.role,
       roles: filters.visibleRoles,
+      selfRoles: filters.selfRoles,
+      meUserId: filters.meUserId,
       type: filters.type,
       subtype: filters.subtype,
       priority: filters.priority,
@@ -177,16 +189,23 @@ export async function listAvailableEscalations(filters: {
   limit?: number;
   offset?: number;
   visibleRoles?: string[];
+  selfRoles?: string[];
+  meUserId?: string;
   sort_by?: string;
   order?: string;
   search?: string;
 }): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
-  // Free-text search → server-side SQL path (available = pending + no active claim).
-  if (filters.search) {
+  const hasSelfScope = !!(filters.selfRoles && filters.selfRoles.length);
+
+  // Free-text search OR read_self scoping → server-side SQL path
+  // (available = pending + no active claim).
+  if (filters.search || hasSelfScope) {
     return searchEscalations({
       status: 'pending',
       role: filters.role,
       roles: filters.visibleRoles,
+      selfRoles: filters.selfRoles,
+      meUserId: filters.meUserId,
       type: filters.type,
       subtype: filters.subtype,
       priority: filters.priority,

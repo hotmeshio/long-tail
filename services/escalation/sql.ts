@@ -45,15 +45,27 @@ WHERE status = 'pending'
  * `metadata::text ILIKE` scans the JSONB as text (the GIN index is containment-only
  * and cannot serve ILIKE) — bounded in practice by the other filters and the page.
  *
- * $1 status, $2 role, $3 roles (text[] visibleRoles), $4 type, $5 subtype,
- * $6 priority, $7 assigned_to, $8 available (bool), $9 search.
- * The list query adds $10 limit, $11 offset.
+ * Role-scope visibility ($3 allRoles, $10 selfRoles, $11 meUserId):
+ *   - global access  → $3 NULL and $10 NULL → no role filter (sees everything)
+ *   - read_all roles → row.role ∈ $3
+ *   - read_self roles → row.role ∈ $10 AND row.assigned_to = $11 (only the user's own)
+ * The branches union, so a user with mixed scope (read_all on some roles, read_self
+ * on others) is filtered correctly in one pass. `assigned_to` is indexed
+ * (idx_lt_escalations_assigned), so the self-branch is index-served at scale.
+ *
+ * $1 status, $2 role, $3 allRoles (text[]), $4 type, $5 subtype, $6 priority,
+ * $7 assigned_to, $8 available (bool), $9 search, $10 selfRoles (text[]),
+ * $11 meUserId. The list query adds $12 limit, $13 offset.
  */
 const SEARCH_ESCALATIONS_WHERE = `\
   FROM public.lt_escalations
   WHERE ($1::text IS NULL OR status = $1)
     AND ($2::text IS NULL OR role = $2)
-    AND ($3::text[] IS NULL OR role = ANY($3))
+    AND (
+         ($3::text[] IS NULL AND $10::text[] IS NULL)
+      OR ($3::text[] IS NOT NULL AND role = ANY($3))
+      OR ($10::text[] IS NOT NULL AND role = ANY($10) AND assigned_to = $11)
+    )
     AND ($4::text IS NULL OR type = $4)
     AND ($5::text IS NULL OR subtype = $5)
     AND ($6::int IS NULL OR priority = $6)
@@ -70,7 +82,7 @@ const SEARCH_ESCALATIONS_WHERE = `\
        OR metadata::text ILIKE '%' || $9 || '%'
     ))`;
 
-/** Count matching the search WHERE (params $1–$9). */
+/** Count matching the search WHERE (params $1–$11). */
 export const COUNT_SEARCH_ESCALATIONS = `SELECT COUNT(*)::int AS total\n${SEARCH_ESCALATIONS_WHERE}`;
 
 /**
@@ -78,7 +90,7 @@ export const COUNT_SEARCH_ESCALATIONS = `SELECT COUNT(*)::int AS total\n${SEARCH
  * (never raw user input), so it is safe to interpolate; everything else is bound.
  */
 export function searchEscalationsQuery(orderBy: string): string {
-  return `SELECT *\n${SEARCH_ESCALATIONS_WHERE}\n  ORDER BY ${orderBy}\n  LIMIT $10 OFFSET $11`;
+  return `SELECT *\n${SEARCH_ESCALATIONS_WHERE}\n  ORDER BY ${orderBy}\n  LIMIT $12 OFFSET $13`;
 }
 
 /**
@@ -101,7 +113,13 @@ export function searchEscalationsQuery(orderBy: string): string {
  * The `resolved` CTE still skips signal_id rows — the workflow resolves durably.
  *
  * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
- * $4 = metadata patch (jsonb, nullable), $5 = allowed roles (text[], null = no filter)
+ * $4 = metadata patch (jsonb, nullable), $5 = write_all roles (text[], null = global /
+ * no filter), $6 = write_self roles (text[], nullable).
+ *
+ * Write-scope is folded into the same FOR UPDATE statement (no TOCTOU): the row
+ * is resolvable if the caller has global access ($5 NULL), or the row's role is in
+ * their write_all set, or the row's role is in their write_self set AND it is
+ * already assigned to them ($2). assigned_to is indexed, so the self-branch scales.
  */
 export const RESOLVE_BY_METADATA_ATOMIC = `\
 WITH target AS MATERIALIZED (
@@ -109,7 +127,11 @@ WITH target AS MATERIALIZED (
   FROM public.hmsh_escalations
   WHERE metadata @> $1::jsonb
     AND status = 'pending'
-    AND ($5::text[] IS NULL OR role = ANY($5))
+    AND (
+         $5::text[] IS NULL
+      OR role = ANY($5)
+      OR (role = ANY($6::text[]) AND assigned_to = $2)
+    )
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE

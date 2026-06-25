@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { LTUserRecord, LTRoleType } from './types';
+import type { LTUserRecord, LTRoleType, LTReadScope, LTWriteScope } from './types';
 
 interface UserListResponse {
   users: LTUserRecord[];
@@ -97,14 +97,18 @@ export function useAddUserRole() {
       userId,
       role,
       type,
+      read_scope,
+      write_scope,
     }: {
       userId: string;
       role: string;
       type: LTRoleType;
+      read_scope?: LTReadScope;
+      write_scope?: LTWriteScope;
     }) =>
       apiFetch(`/users/${userId}/roles`, {
         method: 'POST',
-        body: JSON.stringify({ role, type }),
+        body: JSON.stringify({ role, type, read_scope, write_scope }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });

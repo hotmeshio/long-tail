@@ -63,6 +63,18 @@ export function registerUserTools(server: McpServer): void {
       inputSchema: createUserSchema,
     },
     async (args: z.infer<typeof createUserSchema>) => {
+      // roles carry optional read_scope/write_scope (default all/all); createUser
+      // normalizes admin/superadmin to all/all and stores member scope verbatim.
+      for (const r of args.roles) {
+        const read = r.read_scope ?? userService.DEFAULT_READ_SCOPE;
+        const write = r.write_scope ?? userService.DEFAULT_WRITE_SCOPE;
+        if (!userService.isValidScopePair(read, write)) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `write_scope=all requires read_scope=all (role "${r.role}")` }],
+          };
+        }
+      }
       const user = await userService.createUser({
         external_id: args.external_id,
         display_name: args.display_name,
@@ -80,11 +92,26 @@ export function registerUserTools(server: McpServer): void {
     'add_user_role',
     {
       title: 'Add User Role',
-      description: 'Assign a role to a user. Role type: member, admin, or superadmin.',
+      description:
+        'Assign a role to a user. Role type: member, admin, or superadmin. For a ' +
+        'member, optional read_scope/write_scope set the work-surface (e.g. ' +
+        'read_scope=self + write_scope=self for a one-time user who only handles ' +
+        'their own pre-assigned escalation).',
       inputSchema: addUserRoleSchema,
     },
     async (args: z.infer<typeof addUserRoleSchema>) => {
-      const result = await userService.addUserRole(args.user_id, args.role, args.type);
+      const read = args.read_scope ?? userService.DEFAULT_READ_SCOPE;
+      const write = args.write_scope ?? userService.DEFAULT_WRITE_SCOPE;
+      if (!userService.isValidScopePair(read, write)) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: 'write_scope=all requires read_scope=all' }],
+        };
+      }
+      const result = await userService.addUserRole(args.user_id, args.role, args.type, {
+        read_scope: args.read_scope,
+        write_scope: args.write_scope,
+      });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
       };
