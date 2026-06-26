@@ -74,6 +74,11 @@ backward-compatible **view** over it — `SELECT *` plus a computed `available`
 column — so existing read queries and the public API are unchanged. Indexes are
 managed by the SDK on `hmsh_escalations` (see below).
 
+Role read/write scope does **not** add columns here. An escalation carries a `role`
+and an optional `assigned_to`; work-surface scope lives on the membership table
+(`lt_user_roles`) and is applied at read time. `condition()` / `conditionLT()` and
+the escalation engine are unaffected.
+
 The columns below are the `hmsh_escalations` table. The public API record
 (`LTEscalationRecord`) is mapped from these: the JSONB `envelope` /
 `escalation_payload` / `resolver_payload` are serialized to JSON **strings**, and
