@@ -45,7 +45,7 @@ describe('AdminSidebar — RBAC preserved', () => {
     expect(screen.getByText('Accounts')).toBeInTheDocument();
     // Builder-only affordances stay hidden
     expect(screen.queryByText('Infrastructure')).not.toBeInTheDocument();
-    expect(screen.queryByText('Roles & Permissions')).not.toBeInTheDocument();
+    expect(screen.queryByText('Roles')).not.toBeInTheDocument();
     expect(screen.queryByText('DB Maintenance')).not.toBeInTheDocument();
   });
 });

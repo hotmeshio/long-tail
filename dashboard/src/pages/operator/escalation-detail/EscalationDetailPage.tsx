@@ -15,6 +15,7 @@ import {
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
 import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { EscalationTimeline } from '../../../components/common/display/EscalationTimeline';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
@@ -223,18 +224,22 @@ export function EscalationDetailPage() {
 
   const headerActions = (
     <div className="flex items-center gap-2">
-      {viewToggle}
       <ListToolbar
         onRefresh={() => refetch()}
         isFetching={isFetching}
         apiPath={`/escalations/${esc.id}`}
       />
+      {viewToggle && <div className="ml-4">{viewToggle}</div>}
     </div>
   );
 
   return (
     <div className="min-h-[calc(100vh-9rem)] flex flex-col">
-      <PageHeader title="Escalation" actions={headerActions} />
+      <PageHeader
+        title="Escalation"
+        actions={headerActions}
+        center={<EscalationTimeline esc={esc} className="w-[25%] shrink-0" />}
+      />
 
       <EscalationHero
         esc={esc}

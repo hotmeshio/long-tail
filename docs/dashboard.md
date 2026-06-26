@@ -187,13 +187,13 @@ Lists all durable workflow runs across the system.
 
 User Accounts and Service Accounts live on the same page, separated by a tab toggle.
 
-- **User Accounts** — human operators. Create users, assign display names, and grant roles. Roles determine which escalations a user can see and claim, and which workflows they can invoke from the dashboard. A `member` grant carries a work-surface scope (read/write breadth) chosen from the Scope picker; see [Roles and Permissions](#roles-and-permissions).
+- **User Accounts** — human operators. Create users, assign display names, and grant roles. Roles determine which escalations a user can see and claim, and which workflows they can invoke from the dashboard. A `member` grant carries a work-surface scope (read/write breadth) chosen from the Scope picker; see [Roles](#roles).
 - **Service Accounts** — programmatic callers (bots, CI pipelines, external systems). Each service account has an API key for authentication. Assign roles to control access just like human users. Service accounts with the `reviewer` role can claim and resolve escalations programmatically.
 - **Role assignment** — both account types participate in the same role system. Click any account to edit roles, change display name, or manage credentials.
 
 **API:** `GET /api/users` lists accounts. `POST /api/users` creates. `PUT /api/users/:id/roles` assigns roles.
 
-### Roles and Permissions
+### Roles
 
 Define roles and configure escalation chains that control how work flows between teams.
 

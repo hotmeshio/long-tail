@@ -10,12 +10,14 @@ export interface ScopePreset {
   write_scope: LTWriteScope;
 }
 
+// Labels are parallel and structured around the two axes (see / act) so the
+// difference between profiles is scannable, not a run-on sentence.
 export const SCOPE_PRESETS: ScopePreset[] = [
-  { value: 'all|all', label: 'Search & act on all', read_scope: 'all', write_scope: 'all' },
-  { value: 'all|self', label: 'See all, act on own', read_scope: 'all', write_scope: 'self' },
-  { value: 'self|self', label: 'Own items only', read_scope: 'self', write_scope: 'self' },
-  { value: 'all|none', label: 'Read-only — whole queue', read_scope: 'all', write_scope: 'none' },
-  { value: 'self|none', label: 'Read-only — own items', read_scope: 'self', write_scope: 'none' },
+  { value: 'all|all', label: 'See all · act on all', read_scope: 'all', write_scope: 'all' },
+  { value: 'all|self', label: 'See all · act on self', read_scope: 'all', write_scope: 'self' },
+  { value: 'self|self', label: 'See self · act on self', read_scope: 'self', write_scope: 'self' },
+  { value: 'all|none', label: 'See all · read-only', read_scope: 'all', write_scope: 'none' },
+  { value: 'self|none', label: 'See self · read-only', read_scope: 'self', write_scope: 'none' },
 ];
 
 export const DEFAULT_SCOPE_VALUE = 'all|all';
@@ -26,10 +28,4 @@ export function scopeKey(read: LTReadScope, write: LTWriteScope): string {
 
 export function scopePreset(value: string): ScopePreset {
   return SCOPE_PRESETS.find((p) => p.value === value) ?? SCOPE_PRESETS[0];
-}
-
-/** Short label for a member's scope, e.g. "see all, act on own". Empty for admin tiers. */
-export function scopeLabel(read: LTReadScope, write: LTWriteScope): string {
-  return SCOPE_PRESETS.find((p) => p.read_scope === read && p.write_scope === write)?.label
-    ?? `${read}/${write}`;
 }
