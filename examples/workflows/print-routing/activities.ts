@@ -19,9 +19,10 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { getConnection } from '../../../lib/db';
 import * as escalationService from '../../../services/escalation';
 import * as escalationApi from '../../../api/escalations';
-import type { ClaimedGroup, FacetOrder, FacetQuery } from '../../../types';
+import type { ClaimedGroup, FacetQuery } from '../../../types';
 
 import { manifestFacets } from './manifest';
+import { composePriorityOrder } from './priority';
 import {
   ORDER_POND,
   PRINTER_POND,
@@ -58,11 +59,13 @@ export async function enqueueOrderUnits(input: {
   originId: string;
   /** Which of the order's unit indices to enqueue this pass (all, then just the deficit). */
   unitIndices: number[];
+  /** A reprint group (a deficit re-run) leads the queue under the reprint rule. */
+  reprint: boolean;
   role: string;
   orderSignal: string;
   workflowId: string;
 }): Promise<{ originId: string; created: number }> {
-  const { order, originId, unitIndices, role, orderSignal, workflowId } = input;
+  const { order, originId, unitIndices, reprint, role, orderSignal, workflowId } = input;
   const orderSize = unitIndices.length; // the group is complete at this many — deficit-sized on a reprint
   for (const idx of unitIndices) {
     const facets = manifestFacets(order, idx, orderSignal, orderSize);
@@ -77,7 +80,7 @@ export async function enqueueOrderUnits(input: {
       task_queue: PRINT_ROUTING_QUEUE,
       workflow_type: PRINT_WORKFLOWS.ORDER,
       envelope: JSON.stringify({ orderId: originId, unitIndex: idx, customerId: order.customerId }),
-      metadata: { ...facets, source: PRINT_SOURCE },
+      metadata: { ...facets, [PRINT_FACETS.REPRINT]: reprint, source: PRINT_SOURCE },
     });
   }
   return { originId, created: orderSize };
@@ -85,17 +88,10 @@ export async function enqueueOrderUnits(input: {
 
 // ── Broker step 1: anticipate capacity, claim orders by priority ─────────────
 
-/** Sort claimable orders by jeopardy (soonest deadline), large orders first. */
-function jeopardyOrder(): FacetOrder[] {
-  return [
-    { field: `metadata.${PRINT_FACETS.MUST_COMPLETE_BY}`, numeric: true, direction: 'asc' },
-    { field: `metadata.${PRINT_FACETS.ORDER_SIZE}`, numeric: true, direction: 'desc' },
-  ];
-}
-
 /**
  * Read the free printers (availability is a query, not a hash), bucket them by
- * capability, and claim that many complete orders per bucket in jeopardy order.
+ * capability, and claim that many complete orders per bucket in PRIORITY order —
+ * the ordered, pluggable rule list the broker was handed, not a fixed sort.
  * Claiming demand sized to anticipated supply is what keeps priority the deciding
  * factor and stops the broker from over-claiming orders it cannot place.
  */
@@ -104,6 +100,7 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
   const orderPond = ORDER_POND[kind];
   const printerPond = PRINTER_POND[kind];
   const consumer = input.brokerId ?? `broker-${kind}`;
+  const orderBy = composePriorityOrder(input.priorityRules);
 
   const { escalations } = await escalationService.searchByFacets({
     role: printerPond,
@@ -131,7 +128,7 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
       role: orderPond,
       available: true,
       facets: { [PRINT_FACETS.FILAMENT]: filament, [PRINT_FACETS.SIZE_CLASS]: sizeClass },
-      orderBy: jeopardyOrder(),
+      orderBy,
     };
     const groups = await escalationService.claimGroups(query, consumer, {
       limit: count,

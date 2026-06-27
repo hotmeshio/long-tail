@@ -6,6 +6,7 @@
  * order's declared fields into the metadata the reaper queries.
  */
 
+import { isKeyAccount } from './priority';
 import type { OrderFacets, PrintOrderData } from './types';
 
 export function manifestFacets(
@@ -25,5 +26,6 @@ export function manifestFacets(
     approvedAt: order.approvedAt,
     mustCompleteBy: order.mustCompleteBy,
     orderSignal,
+    keyAccount: isKeyAccount(order.customerId),
   };
 }

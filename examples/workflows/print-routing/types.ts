@@ -99,6 +99,8 @@ export const PRINT_FACETS = {
   APPROVED_AT: 'approvedAt',
   MUST_COMPLETE_BY: 'mustCompleteBy',
   ORDER_SIGNAL: 'orderSignal',
+  KEY_ACCOUNT: 'keyAccount',
+  REPRINT: 'reprint',
 } as const;
 
 /** Printer advert facets. `STATE` says who resolves it: broker vs technician. */
@@ -159,6 +161,8 @@ export interface OrderFacets {
   approvedAt: number;
   mustCompleteBy: number;
   orderSignal: string;
+  /** Whether this order belongs to a key account — a priority-rule facet. */
+  keyAccount: boolean;
 }
 
 export interface PrintOrderResult {
@@ -273,6 +277,8 @@ export interface BrokerData {
   idleRuns?: number;
   /** Orders claimed but not yet placed on a printer — carried across continueAsNew. */
   carried?: ClaimedOrderBucket[];
+  /** Ordered priority-rule names (see priority.ts). Defaults to the standing policy. */
+  priorityRules?: string[];
 }
 
 export interface BrokerTotals {

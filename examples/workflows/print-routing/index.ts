@@ -94,7 +94,7 @@ export async function printOrder(envelope: LTEnvelope): Promise<any> {
   while (outstanding.length > 0 && attempt < MAX_PRINT_ATTEMPTS) {
     const orderSignal = `order-done-${ctx.workflowId}-a${attempt}`;
     const originId = attempt === 0 ? orderId : `${orderId}#a${attempt}`;
-    await enqueueOrderUnits({ order, originId, unitIndices: outstanding, role, orderSignal, workflowId: ctx.workflowId });
+    await enqueueOrderUnits({ order, originId, unitIndices: outstanding, reprint: attempt > 0, role, orderSignal, workflowId: ctx.workflowId });
 
     const done = (await Durable.workflow.condition<OrderDoneSignal>(orderSignal)) as OrderDoneSignal;
 
@@ -231,7 +231,7 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
   // 2. Claim fresh demand only once the backlog is placed — when printers are
   //    scarce, holding the backlog beats piling on claims we cannot put to work.
   if (unplaced.length === 0) {
-    const fresh = await claimOrdersForCapacity({ diabetic: d.diabetic, brokerId: d.brokerId });
+    const fresh = await claimOrdersForCapacity({ diabetic: d.diabetic, brokerId: d.brokerId, priorityRules: d.priorityRules });
     if (fresh.matched > 0) {
       const r = await lockPrintersAndHandoff({
         diabetic: d.diabetic, brokerId: d.brokerId, brokerWorkflowId: ctx.workflowId, tick, phase: 'f', buckets: fresh.buckets,

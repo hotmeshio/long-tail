@@ -47,7 +47,7 @@ query, not a hash.
 | --- | --- |
 | Capability — the hard wall | `role` (diabetic vs standard, for both ponds) |
 | Capability — soft match | `metadata` facets `@>` (`filament`, `sizeClass`) |
-| Preference — what runs first | `orderBy` over facets (jeopardy `mustCompleteBy`, then size) |
+| Priority — what runs first | a pluggable ordered rule list composed into `orderBy` (see `priority.ts`) |
 | An order | one `origin_id` group, claimed all-or-nothing (`claimGroups`) |
 | A printer set | batch-locked by facet (`claimByFacets`, `SKIP LOCKED`); unplaced orders carried |
 | A printer advertises | `conditionLT` writes the advert and suspends the printer |
@@ -132,8 +132,8 @@ let { pairings, unplaced } = await lockPrintersAndHandoff({ buckets: carried, ph
 
 // 2. Claim fresh demand only once the backlog is placed, then place it too.
 if (!unplaced.length) {
-  const fresh = await claimOrdersForCapacity({ diabetic });   // free adverts → buckets →
-  //   claimGroups by priority (jeopardy: mustCompleteBy↑, then orderSize↓), sized to supply
+  const fresh = await claimOrdersForCapacity({ diabetic, priorityRules });  // free adverts → buckets →
+  //   claimGroups in PRIORITY order — the broker's pluggable rule list, sized to supply
   const r = await lockPrintersAndHandoff({ buckets: fresh.buckets, phase: 'f', ... });
   pairings.push(...r.pairings); unplaced.push(...r.unplaced);
 }
@@ -152,7 +152,10 @@ Three ideas carry the design:
 - **Anticipate, then claim by priority.** `lockPrintersAndHandoff` batch-claims printers
   by facet (`claimByFacets`, `FOR UPDATE SKIP LOCKED`) and resolves each advert with
   `{ orderId, callbackKey }` — the handoff. Claiming demand sized to anticipated supply
-  keeps **priority** the deciding factor.
+  keeps **priority** the deciding factor — and priority is a *business* decision: the
+  broker composes an ordered list of named rules (`priority.ts` — past-due, key-account,
+  reprint, FIFO) into the claim's `orderBy`. Reorder the list, or hand a broker a different
+  one, and the queue reorders — no broker change, no deploy.
 - **Carry, don't release.** When a tick claims more orders than it can place (a printer
   slipped away, or a second broker won the race), the surplus is **carried** — still
   claimed — and placed on a later tick. Holding beats release+reclaim churn, and partial
@@ -244,6 +247,7 @@ it is an aggregation over those rows. No side-store to keep in sync.
 | File | Role |
 | --- | --- |
 | `types.ts` | Policy: roles (demand + supply + signoff ponds), facet keys, lifecycle constants, shapes |
+| `priority.ts` | Pluggable priority rules — named sort fragments composed into the claim `orderBy` |
 | `manifest.ts` | The manifest — computes each insole's searchable facet set |
 | `activities.ts` | `enqueueOrderUnits`, `claimOrdersForCapacity`, `lockPrintersAndHandoff`, `settleOrder`, `runPrintJob`, `technicianRefill`, `inspectorSignoff`, `signalOrder` |
 | `index.ts` | `printOrder`, `printer`, `printBroker`, `farmTechnician`, `farmInspector` |
@@ -258,8 +262,10 @@ Three workflow tests prove it:
 - `print-routing-carry.test.ts` — **carry-forward**: two brokers contend for two printers
   and nine orders; claims that lose the printer race are carried, not released, so every
   order converges exactly once with no orphan, duplicate, or livelock.
-- `print-routing-defect.test.ts` — **failure as an outcome**: clean orders pass inspection;
-  a flawed order is printed but the farmer rejects exactly its defective unit (`failedUnits`).
+- `print-routing-defect.test.ts` — **convergence**: a flawed order reprints exactly its
+  rejected unit through the same funnel until intent ≡ actual (clean orders converge in one pass).
+- `print-routing-priority.test.ts` — **pluggable priority**: with one printer and equal
+  deadlines, a key account jumps ahead of orders that arrived before it.
 
 ## Running it
 
