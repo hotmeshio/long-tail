@@ -10,6 +10,15 @@ import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
+import * as printRoutingWorkflow from './workflows/print-routing';
+import {
+  PRINT_FARM_DIABETIC,
+  PRINT_FARM_STANDARD,
+  PRINTER_POOL_DIABETIC,
+  PRINTER_POOL_STANDARD,
+  PRINT_FARMER_DIABETIC,
+  PRINT_FARMER_STANDARD,
+} from './workflows/print-routing/types';
 
 // ── Role constants ──────────────────────────────────────────────────────────
 
@@ -178,6 +187,74 @@ const workstationConfig: LTWorkerConfig = {
   },
 };
 
+const printOrderConfig: LTWorkerConfig = {
+  description: 'Print order — the enqueuer. Writes the order\'s insole escalations as one origin group (capability + jeopardy facets in metadata), then parks until the print farm prints them all and wakes it. Diabetic orders route to an isolated role queue.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINT_FARM_STANDARD,
+  roles: [PRINT_FARM_DIABETIC, PRINT_FARM_STANDARD],
+  envelopeSchema: {
+    data: {
+      customerId: 'acme',
+      diabetic: false,
+      filament: 'pla',
+      sizeClass: 'standard',
+      approvedAt: 0,
+      mustCompleteBy: 0,
+      units: [{ side: 'L' }, { side: 'R' }, { side: 'L' }, { side: 'R' }],
+    },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const printerConfig: LTWorkerConfig = {
+  description: 'Printer — a durable workflow for one machine. It advertises itself as an escalation (ready/needs-filament), waits to be claimed, and advances its lifecycle on the run outcome: 3 runs between filament refills, end-of-life at 10 runs. The fleet\'s whole story is a query over these adverts.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINTER_POOL_STANDARD,
+  roles: [PRINTER_POOL_DIABETIC, PRINTER_POOL_STANDARD],
+  envelopeSchema: {
+    data: { printerId: 'printer-1', diabetic: false, filament: 'pla', sizeClass: 'standard' },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const printBrokerConfig: LTWorkerConfig = {
+  description: 'Print broker — the market maker, one singleton per fleet. Queries available printer adverts (supply), claims a printer and a matching complete order (demand) by capability in jeopardy order, prints in parallel, and resolves both. Throttles when idle and continueAsNew\'s to run durably forever.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINTER_POOL_STANDARD,
+  roles: [PRINTER_POOL_DIABETIC, PRINTER_POOL_STANDARD, PRINT_FARM_DIABETIC, PRINT_FARM_STANDARD, PRINT_FARMER_DIABETIC, PRINT_FARMER_STANDARD],
+  envelopeSchema: {
+    data: { diabetic: false, tickSeconds: 1, idleTickSeconds: 5 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const farmTechnicianConfig: LTWorkerConfig = {
+  description: 'Farm technician — resolves printer needs-filament adverts ("added filament"), one singleton per fleet. The human stand-in; in production a dashboard operator claims and resolves these.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINTER_POOL_STANDARD,
+  roles: [PRINTER_POOL_DIABETIC, PRINTER_POOL_STANDARD],
+  envelopeSchema: {
+    data: { diabetic: false, tickSeconds: 1, idleTickSeconds: 5 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const farmInspectorConfig: LTWorkerConfig = {
+  description: 'Farm inspector — the farmer. Signs off completed orders: resolves each order-done signoff escalation the broker raises after a print finishes, which wakes the order. The human stand-in; in production a dashboard operator inspects and signs off. One singleton per fleet.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINT_FARMER_STANDARD,
+  roles: [PRINT_FARMER_DIABETIC, PRINT_FARMER_STANDARD],
+  envelopeSchema: {
+    data: { diabetic: false, tickSeconds: 1, idleTickSeconds: 5 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 // ── Worker exports ──────────────────────────────────────────────────────────
 
 /**
@@ -196,4 +273,9 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
+  { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
+  { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },
+  { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printBroker, config: printBrokerConfig },
+  { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmTechnician, config: farmTechnicianConfig },
+  { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmInspector, config: farmInspectorConfig },
 ];

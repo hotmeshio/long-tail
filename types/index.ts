@@ -21,6 +21,15 @@ export {
 } from './escalation';
 
 export type {
+  FacetRangeOp,
+  FacetRange,
+  FacetOrder,
+  FacetQuery,
+  ClaimedGroup,
+  GroupSummary,
+} from './facets';
+
+export type {
   LTReturn,
   LTEscalation,
   LTActivity,
