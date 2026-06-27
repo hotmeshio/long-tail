@@ -234,24 +234,42 @@ it is an aggregation over those rows. No side-store to keep in sync.
 
 - **Printers** are launched on a `Virtual.cron` (or by a fleet-onboarding flow); a
   retired printer is replaced by starting a fresh `printer` workflow.
-- **Brokers and the technician** run on a cron; the throttle keeps idle ticks cheap, and
-  `continueAsNew` keeps execution history bounded. Several brokers may share a fleet —
-  they contend through `SKIP LOCKED` claims and carry what they cannot place, so they
-  never split an order or starve, they only converge a little slower.
+- **Brokers, technician, and inspector** are looping singletons; the throttle keeps idle
+  ticks cheap and `continueAsNew` keeps execution history bounded.
 - **Outcomes re-enter from reality** — a print head's sensor, a vision-inspection
   webhook, or a human all resolve the same advert. The escalation boundary is the only
   place the physical and digital worlds touch.
 
+### Efficiency
+
+- **Throughput scales by running more brokers (and inspectors/technicians).** They contend
+  through `SKIP LOCKED` claims and carry what they cannot place, so they never split an
+  order or starve — they only converge a little slower. This is the horizontal lever; the
+  `print-routing-carry.test.ts` proves two contending brokers stay correct.
+- **The harvest is serial, and that is ~optimal.** Every job is dispatched up front, so the
+  fleet prints concurrently; awaiting the callbacks in turn collects them in ~max(print-time),
+  not the sum. (Concurrent `condition()` waits are *not* safe in one workflow — they race the
+  durable wait registration and deadlock — so true fan-in would need a child workflow per job.)
+- **Tunable knobs** on `BrokerData`: `claimMinutes` (claim TTL — short so an orphaned claim
+  recovers in minutes, not the 30-min default), `maxAdverts` (per-tick capacity horizon — a
+  fleet larger than this is served by more brokers), and the pacing `tickSeconds` /
+  `idleTickSeconds` / `maxIdleRuns`.
+- **It polls, by necessity.** Durable workflows cannot subscribe to events — only Agents can
+  (`services/agent/trigger-registry.ts` arms subscriptions to `system.escalation.*.created`).
+  An agent that wakes a broker on each new `ready` advert is the event-driven path that would
+  eliminate idle ticks; the polling loop is the portable default.
+
 ## Files
 
-| File | Role |
+The directory is the map — one file per actor, barrel-loaded:
+
+| Path | Role |
 | --- | --- |
-| `types.ts` | Policy: roles (demand + supply + signoff ponds), facet keys, lifecycle constants, shapes |
-| `priority.ts` | Pluggable priority rules — named sort fragments composed into the claim `orderBy` |
-| `capability.ts` | Soft capability — eligible printer size-classes per order (xl→standard overflow) |
-| `manifest.ts` | The manifest — computes each insole's searchable facet set |
-| `activities.ts` | `enqueueOrderUnits`, `claimOrdersForCapacity`, `lockPrintersAndHandoff`, `settleOrder`, `runPrintJob`, `technicianRefill`, `inspectorSignoff`, `signalOrder` |
-| `index.ts` | `printOrder`, `printer`, `printBroker`, `farmTechnician`, `farmInspector` |
+| `index.ts` | Barrel — re-exports the five workflows |
+| `types.ts` | Roles (demand + supply + signoff ponds), facet keys, lifecycle constants, shapes |
+| `policy/` | The pluggable strategy: `priority.ts` (priority rules), `capability.ts` (soft fit + overflow), `manifest.ts` (facet set) |
+| `workflows/` | The five actors: `order.ts`, `printer.ts`, `broker.ts`, `technician.ts`, `inspector.ts` (+ `proxy.ts` shared activity handles) |
+| `activities/` | Their side effects: `order.ts`, `broker.ts`, `printer.ts`, `technician.ts`, `inspector.ts`, `signal.ts` |
 
 Three workflow tests prove it:
 

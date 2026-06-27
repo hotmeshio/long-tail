@@ -5,7 +5,7 @@ import {
   DEFAULT_PRIORITY_RULES,
   PRIORITY_RULES,
   isKeyAccount,
-} from '../../examples/workflows/print-routing/priority';
+} from '../../examples/workflows/print-routing/policy/priority';
 
 // The pluggable priority layer: routing's fourth stage made a business decision.
 // The broker composes an ordered list of named rules into a FacetOrder[]; the

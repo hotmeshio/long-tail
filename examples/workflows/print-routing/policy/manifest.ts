@@ -1,13 +1,13 @@
 /**
  * Manifest — at enqueue, it computes the searchable facet set for each insole of
  * an order: the capabilities a printer must have (filament, size), the jeopardy
- * deadline, the unit count, and the order's wake signal. In production it would
- * also resolve the candidate printer set from the catalog; here it normalizes the
- * order's declared fields into the metadata the reaper queries.
+ * deadline, the unit count, the key-account flag, and the order's wake signal. In
+ * production it would also resolve the candidate printer set from the catalog; here
+ * it normalizes the order's declared fields into the metadata the broker queries.
  */
 
 import { isKeyAccount } from './priority';
-import type { OrderFacets, PrintOrderData } from './types';
+import type { OrderFacets, PrintOrderData } from '../types';
 
 export function manifestFacets(
   order: PrintOrderData,

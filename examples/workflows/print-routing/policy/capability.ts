@@ -7,7 +7,7 @@
  * orders first and lets the leftovers absorb standard overflow.
  */
 
-import type { SizeClass } from './types';
+import type { SizeClass } from '../types';
 
 /** Printer size-classes that can serve an order of this size, in preference order. */
 export function eligiblePrinterClasses(orderSizeClass: SizeClass): SizeClass[] {

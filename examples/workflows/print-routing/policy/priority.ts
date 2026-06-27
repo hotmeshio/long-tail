@@ -10,9 +10,9 @@
  * in the broker, no deploy. This is the funnel's fourth stage made pluggable.
  */
 
-import type { FacetOrder } from '../../../types';
+import type { FacetOrder } from '../../../../types';
 
-import { PRINT_FACETS } from './types';
+import { PRINT_FACETS } from '../types';
 
 /** Customers whose orders jump the queue (safe generic ids; a real fleet keys off CRM). */
 export const KEY_ACCOUNTS: ReadonlySet<string> = new Set(['kacct-1', 'kacct-2']);

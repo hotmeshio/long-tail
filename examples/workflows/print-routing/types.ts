@@ -128,6 +128,20 @@ export const EOL_RUNS = 10;
 /** An order gives up reprinting a stubborn defect after this many attempts. */
 export const MAX_PRINT_ATTEMPTS = 5;
 
+/**
+ * How long a broker holds a claim before it expires back to the pool. Short, so an
+ * orphaned claim (a crash mid-handoff) recovers in minutes rather than the 30-min
+ * platform default. Overridable per broker via `BrokerData.claimMinutes`.
+ */
+export const DEFAULT_BROKER_CLAIM_MINUTES = 5;
+
+/**
+ * Cap on `ready` adverts a broker reads per tick — its capacity horizon. A fleet
+ * larger than this is served by running more brokers. Overridable via
+ * `BrokerData.maxAdverts`.
+ */
+export const DEFAULT_MAX_ADVERTS = 200;
+
 // ── Order shapes (demand) ────────────────────────────────────────────────────
 
 export type SizeClass = 'xl' | 'standard';
@@ -277,8 +291,12 @@ export interface BrokerData {
   idleRuns?: number;
   /** Orders claimed but not yet placed on a printer — carried across continueAsNew. */
   carried?: ClaimedOrderBucket[];
-  /** Ordered priority-rule names (see priority.ts). Defaults to the standing policy. */
+  /** Ordered priority-rule names (see policy/priority.ts). Defaults to the standing policy. */
   priorityRules?: string[];
+  /** Claim TTL in minutes (orphan-recovery floor). Defaults to DEFAULT_BROKER_CLAIM_MINUTES. */
+  claimMinutes?: number;
+  /** Max `ready` adverts read per tick (capacity horizon). Defaults to DEFAULT_MAX_ADVERTS. */
+  maxAdverts?: number;
 }
 
 export interface BrokerTotals {

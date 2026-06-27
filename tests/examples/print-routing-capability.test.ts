@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { eligiblePrinterClasses, canServe } from '../../examples/workflows/print-routing/capability';
+import { eligiblePrinterClasses, canServe } from '../../examples/workflows/print-routing/policy/capability';
 
 // Soft capability: the funnel's second stage. A standard order overflows to a larger
 // xl printer; an xl order is a hard fit (xl-only). The role wall is still the hard cull.
