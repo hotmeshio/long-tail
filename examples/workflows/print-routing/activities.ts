@@ -19,10 +19,11 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { getConnection } from '../../../lib/db';
 import * as escalationService from '../../../services/escalation';
 import * as escalationApi from '../../../api/escalations';
-import type { ClaimedGroup, FacetQuery } from '../../../types';
+import type { ClaimedGroup } from '../../../types';
 
 import { manifestFacets } from './manifest';
 import { composePriorityOrder } from './priority';
+import { eligiblePrinterClasses } from './capability';
 import {
   ORDER_POND,
   PRINTER_POND,
@@ -110,34 +111,41 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
     limit: 200,
   });
 
-  const capacity = new Map<string, { filament: string; sizeClass: SizeClass; count: number }>();
+  // Free printers per filament, split by size — xl is the scarce, larger machine.
+  const capacity = new Map<string, { xl: number; std: number }>();
   for (const e of escalations) {
     const m = (e.metadata ?? {}) as Record<string, any>;
     const filament = m[PRINTER_FACETS.FILAMENT];
     const sizeClass = m[PRINTER_FACETS.SIZE_CLASS] as SizeClass;
-    const key = `${filament}|${sizeClass}`;
-    const slot = capacity.get(key) ?? { filament, sizeClass, count: 0 };
-    slot.count += 1;
-    capacity.set(key, slot);
+    const slot = capacity.get(filament) ?? { xl: 0, std: 0 };
+    if (sizeClass === 'xl') slot.xl += 1;
+    else slot.std += 1;
+    capacity.set(filament, slot);
   }
+
+  const claim = (filament: string, sizeClass: SizeClass, limit: number) =>
+    escalationService.claimGroups(
+      {
+        role: orderPond,
+        available: true,
+        facets: { [PRINT_FACETS.FILAMENT]: filament, [PRINT_FACETS.SIZE_CLASS]: sizeClass },
+        orderBy,
+      },
+      consumer,
+      { limit, sizeFacet: PRINT_FACETS.ORDER_SIZE },
+    );
 
   const buckets: ClaimedOrderBucket[] = [];
   let matched = 0;
-  for (const { filament, sizeClass, count } of capacity.values()) {
-    const query: FacetQuery = {
-      role: orderPond,
-      available: true,
-      facets: { [PRINT_FACETS.FILAMENT]: filament, [PRINT_FACETS.SIZE_CLASS]: sizeClass },
-      orderBy,
-    };
-    const groups = await escalationService.claimGroups(query, consumer, {
-      limit: count,
-      sizeFacet: PRINT_FACETS.ORDER_SIZE,
-    });
-    if (groups.length) {
-      buckets.push({ filament, sizeClass, groups });
-      matched += groups.length;
-    }
+  for (const [filament, { xl, std }] of capacity) {
+    // xl orders claim xl printers first (the scarce resource, a hard fit).
+    const xlGroups = xl > 0 ? await claim(filament, 'xl', xl) : [];
+    // standard orders fall to standard printers, with leftover xl printers as overflow.
+    const stdCapacity = std + (xl - xlGroups.length);
+    const stdGroups = stdCapacity > 0 ? await claim(filament, 'standard', stdCapacity) : [];
+    // Push xl before standard so the lock step spends xl printers on xl orders first.
+    if (xlGroups.length) { buckets.push({ filament, sizeClass: 'xl', groups: xlGroups }); matched += xlGroups.length; }
+    if (stdGroups.length) { buckets.push({ filament, sizeClass: 'standard', groups: stdGroups }); matched += stdGroups.length; }
   }
   return { buckets, matched };
 }
@@ -175,39 +183,47 @@ export async function lockPrintersAndHandoff(input: {
 
   for (const bucket of input.buckets) {
     if (!bucket.groups.length) continue;
-    const printers = await escalationService.claimByFacets(
-      {
-        role: printerPond,
-        facets: {
-          [PRINTER_FACETS.STATE]: PRINTER_STATE.READY,
-          [PRINTER_FACETS.FILAMENT]: bucket.filament,
-          [PRINTER_FACETS.SIZE_CLASS]: bucket.sizeClass,
+    // Try each eligible printer size-class in preference order: a standard order
+    // takes a standard printer first, then overflows to a larger xl printer; an xl
+    // order is xl-only. Orders with no machine this pass are carried.
+    let remaining = bucket.groups;
+    for (const printerClass of eligiblePrinterClasses(bucket.sizeClass)) {
+      if (!remaining.length) break;
+      const printers = await escalationService.claimByFacets(
+        {
+          role: printerPond,
+          facets: {
+            [PRINTER_FACETS.STATE]: PRINTER_STATE.READY,
+            [PRINTER_FACETS.FILAMENT]: bucket.filament,
+            [PRINTER_FACETS.SIZE_CLASS]: printerClass,
+          },
         },
-      },
-      consumer,
-      { limit: bucket.groups.length },
-    );
+        consumer,
+        { limit: remaining.length },
+      );
 
-    const place = Math.min(printers.length, bucket.groups.length);
-    for (let i = 0; i < place; i++) {
-      const group = bucket.groups[i];
-      const advert = printers[i];
-      const m = (advert.metadata ?? {}) as Record<string, any>;
-      const printerId = m[PRINTER_FACETS.PRINTER_ID];
-      const callbackKey = `cb-${input.brokerWorkflowId}-${printerId}-t${input.tick}-${input.phase}${seq++}`;
-      const job: PrinterJobPayload = {
-        orderId: group.originId,
-        units: group.members.length,
-        callbackKey,
-        brokerWorkflowId: input.brokerWorkflowId,
-      };
-      await escalationApi.resolveEscalation({ id: advert.id, resolverPayload: job }, { userId: consumer });
-      pairings.push({ callbackKey, printerId, group });
+      const place = Math.min(printers.length, remaining.length);
+      for (let i = 0; i < place; i++) {
+        const group = remaining[i];
+        const advert = printers[i];
+        const m = (advert.metadata ?? {}) as Record<string, any>;
+        const printerId = m[PRINTER_FACETS.PRINTER_ID];
+        const callbackKey = `cb-${input.brokerWorkflowId}-${printerId}-t${input.tick}-${input.phase}${seq++}`;
+        const job: PrinterJobPayload = {
+          orderId: group.originId,
+          units: group.members.length,
+          callbackKey,
+          brokerWorkflowId: input.brokerWorkflowId,
+        };
+        await escalationApi.resolveEscalation({ id: advert.id, resolverPayload: job }, { userId: consumer });
+        pairings.push({ callbackKey, printerId, group });
+      }
+      remaining = remaining.slice(place);
     }
 
-    if (place < bucket.groups.length) {
+    if (remaining.length) {
       // No printer for these orders this tick — carry them, still claimed.
-      unplaced.push({ filament: bucket.filament, sizeClass: bucket.sizeClass, groups: bucket.groups.slice(place) });
+      unplaced.push({ filament: bucket.filament, sizeClass: bucket.sizeClass, groups: remaining });
     }
   }
   return { pairings, unplaced };

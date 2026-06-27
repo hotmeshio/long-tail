@@ -46,7 +46,7 @@ query, not a hash.
 | Routing concept | General primitive |
 | --- | --- |
 | Capability — the hard wall | `role` (diabetic vs standard, for both ponds) |
-| Capability — soft match | `metadata` facets `@>` (`filament`, `sizeClass`) |
+| Capability — soft match | `metadata` facets `@>` (`filament`); size fits with xl→standard overflow (`capability.ts`) |
 | Priority — what runs first | a pluggable ordered rule list composed into `orderBy` (see `priority.ts`) |
 | An order | one `origin_id` group, claimed all-or-nothing (`claimGroups`) |
 | A printer set | batch-locked by facet (`claimByFacets`, `SKIP LOCKED`); unplaced orders carried |
@@ -248,6 +248,7 @@ it is an aggregation over those rows. No side-store to keep in sync.
 | --- | --- |
 | `types.ts` | Policy: roles (demand + supply + signoff ponds), facet keys, lifecycle constants, shapes |
 | `priority.ts` | Pluggable priority rules — named sort fragments composed into the claim `orderBy` |
+| `capability.ts` | Soft capability — eligible printer size-classes per order (xl→standard overflow) |
 | `manifest.ts` | The manifest — computes each insole's searchable facet set |
 | `activities.ts` | `enqueueOrderUnits`, `claimOrdersForCapacity`, `lockPrintersAndHandoff`, `settleOrder`, `runPrintJob`, `technicianRefill`, `inspectorSignoff`, `signalOrder` |
 | `index.ts` | `printOrder`, `printer`, `printBroker`, `farmTechnician`, `farmInspector` |
@@ -266,6 +267,8 @@ Three workflow tests prove it:
   rejected unit through the same funnel until intent ≡ actual (clean orders converge in one pass).
 - `print-routing-priority.test.ts` — **pluggable priority**: with one printer and equal
   deadlines, a key account jumps ahead of orders that arrived before it.
+- `print-routing-overflow.test.ts` — **soft capability**: standard orders overflow onto the
+  xl machine when standard capacity is full; an xl order stays a hard fit (xl-only).
 
 ## Running it
 

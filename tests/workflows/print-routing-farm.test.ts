@@ -141,13 +141,14 @@ describe('print farm — a fleet draining concurrently (multi-printer, capabilit
     const insolesPrinted = results.reduce((sum, r) => sum + r.data.units, 0);
     expect(insolesPrinted).toBe(totalInsoles);
 
-    // Hard capability wall: xl orders ran ONLY on the xl machine; standard orders
-    // ran ONLY on standard machines. The broker never crossed a capability bucket.
+    // Capability: an xl order is a HARD fit — only the xl machine. A standard order
+    // runs on a standard machine or overflows to the larger xl one (soft capability).
+    const allPrinterIds = [...stdPrinterIds, xlPrinterId];
     const byOrder = new Map(results.map((r) => [r.data.orderId, r.data.printerId]));
     for (const o of orders) {
       const printerUsed = byOrder.get(o.orderId!);
       if (o.sizeClass === 'xl') expect(printerUsed).toBe(xlPrinterId);
-      else expect(stdPrinterIds).toContain(printerUsed);
+      else expect(allPrinterIds).toContain(printerUsed);
     }
 
     // It is a farm, not one machine: standard work spread across the fleet.
