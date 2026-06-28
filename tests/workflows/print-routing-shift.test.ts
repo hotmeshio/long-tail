@@ -124,11 +124,14 @@ describe('print shift — the invocable entry target runs the farm end to end', 
     expect(escalations.length).toBeGreaterThanOrEqual(12); // ≥1 per printed order + reprints
     for (const row of escalations) {
       expect(row.metadata?.outcome).toBe('success');
-      expect(typeof row.metadata?.durationMs).toBe('number');
-      expect(row.metadata?.durationMs).toBeGreaterThanOrEqual(0);
       expect(typeof row.metadata?.unitsPrinted).toBe('number');
       // Intent preserved alongside the outcome — one row, the whole story.
       expect(row.metadata?.printerId).toBeTruthy();
+      // Boundary duration is inherent in the row, not a stored field: created_at
+      // (handoff) → resolved_at (done). No read, no stored copy.
+      expect(row.created_at).toBeTruthy();
+      expect(row.resolved_at).toBeTruthy();
+      expect(new Date(row.resolved_at!).getTime()).toBeGreaterThanOrEqual(new Date(row.created_at).getTime());
     }
   }, 180_000);
 });

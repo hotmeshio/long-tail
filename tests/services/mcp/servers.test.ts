@@ -573,6 +573,33 @@ describe('MCP integration', () => {
       expect(dbRecord!.status).toBe('resolved');
     });
 
+    it('should record outcome metadata on the row via claim_and_resolve', async () => {
+      const createResult = await mcpClient.callTool({
+        name: 'escalate_to_human',
+        arguments: { role: 'reviewer', message: 'outcome metadata test', data: { orderId: 'order-9' } },
+      });
+      const { escalation_id } = JSON.parse((createResult.content as any[])[0].text);
+
+      // Resolve AND stamp the outcome onto the row — a read/write service account
+      // recording what happened, queryable next to what was asked.
+      await mcpClient.callTool({
+        name: 'claim_and_resolve',
+        arguments: {
+          escalation_id,
+          resolver_id: 'agent-7',
+          payload: { approved: true },
+          metadata: { outcome: 'approved', reviewedBy: 'agent-7', durationMs: 1500 },
+        },
+      });
+
+      const dbRecord = await escalationService.getEscalation(escalation_id);
+      expect(dbRecord!.status).toBe('resolved');
+      // The outcome patch is merged onto the GIN-indexed metadata.
+      expect(dbRecord!.metadata!.outcome).toBe('approved');
+      expect(dbRecord!.metadata!.reviewedBy).toBe('agent-7');
+      expect(dbRecord!.metadata!.durationMs).toBe(1500);
+    });
+
     it('should complete a full escalation lifecycle via MCP protocol', async () => {
       const uniqueRole = `lifecycle-${Date.now()}`;
 

@@ -65,11 +65,16 @@ export async function conditionLT<T = Record<string, any>>(
       retry: { maximumAttempts: 3 },
     });
 
-    // Strip $escalation_id before passing as resolver payload
-    const { $escalation_id: _, ...resolverPayload } = raw;
+    // Strip the injected control keys ($escalation_id, $escalation_metadata) before the
+    // payload is returned to the caller. The outcome patch ($escalation_metadata, set by
+    // the resolve orchestrator's signal paths) rides INTO the single atomic resolve below
+    // so it merges in the same guarded UPDATE — never a separate write.
+    const { $escalation_id: _id, $escalation_metadata: metadata, ...resolverPayload } = raw as
+      typeof raw & { $escalation_metadata?: Record<string, any> };
     await ltResolveEscalation({
       escalationId,
       resolverPayload: resolverPayload as Record<string, any>,
+      metadata: metadata as Record<string, any> | undefined,
     });
 
     return resolverPayload as unknown as T;

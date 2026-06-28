@@ -213,6 +213,44 @@ describe('Escalation routes', () => {
       const body = await res.json() as any;
       expect(body.error).toContain('not found');
     });
+
+    it('records the outcome metadata patch on the row', async () => {
+      // A plain notification-style escalation — no workflow to resume.
+      const createRes = await fetch(`${ctx.BASE}/escalations`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          type: 'resolve-meta-route-test',
+          role: 'reviewer',
+          description: 'outcome metadata via route',
+          metadata: { intended: true, orderId: `route-meta-${Date.now()}` },
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const created = await createRes.json() as any;
+
+      // Resolve with a resolver payload AND an outcome metadata patch.
+      const resolveRes = await fetch(`${ctx.BASE}/escalations/${created.id}/resolve`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          resolverPayload: { acknowledged: true },
+          metadata: { outcome: 'approved', durationMs: 900 },
+        }),
+      });
+      expect(resolveRes.status).toBe(200);
+
+      // The row carries intent and outcome, merged on the same record.
+      const getRes = await fetch(`${ctx.BASE}/escalations/${created.id}`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      expect(getRes.status).toBe(200);
+      const row = await getRes.json() as any;
+      expect(row.status).toBe('resolved');
+      expect(row.metadata.intended).toBe(true);      // intent preserved
+      expect(row.metadata.outcome).toBe('approved');  // outcome recorded
+      expect(row.metadata.durationMs).toBe(900);
+    });
   });
 
   // ── Metadata-based operations ──────────────────────────────────────────

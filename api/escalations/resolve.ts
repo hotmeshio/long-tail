@@ -24,11 +24,11 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
  * tokens (15-minute TTL) so plaintext never enters the signal store.
  */
 export async function resolveEscalation(
-  input: { id: string; resolverPayload: Record<string, any> },
+  input: { id: string; resolverPayload: Record<string, any>; metadata?: Record<string, any> },
   _auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { id, resolverPayload } = input;
+    const { id, resolverPayload, metadata } = input;
     if (!resolverPayload) {
       return { status: 400, error: 'resolverPayload is required' };
     }
@@ -38,16 +38,22 @@ export async function resolveEscalation(
     if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
 
+    // `metadata` (the outcome patch) is never written separately — it rides WITH the
+    // resolverPayload to whichever path performs the resolve, so it merges inside the
+    // single status='pending'-guarded UPDATE (HotMesh `resolve(metadata)`). Paths that
+    // resolve here pass it as the 3rd arg; paths that resume a workflow carry it on the
+    // signal so the downstream resolve commits it atomically.
+
     // Path A: conditionLT signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
     if (metadataSignalId && escalation.workflow_id && escalation.task_queue && escalation.workflow_type) {
-      return resolveViaConditionSignal(escalation, resolverPayload);
+      return resolveViaConditionSignal(escalation, resolverPayload, metadata);
     }
 
     // Path B: waitFor signal routing
     const signalRouting = (escalation.metadata as any)?.signal_routing;
     if (signalRouting?.signalId) {
-      return resolveViaSignalRouting(escalation, resolverPayload);
+      return resolveViaSignalRouting(escalation, resolverPayload, metadata);
     }
 
     // Path 0: efficient (atomic) escalation — signal_key resumes in place.
@@ -55,7 +61,7 @@ export async function resolveEscalation(
     // `condition(signalId, config)`. The SDK's resolve marks it resolved AND
     // delivers the signal to `signal_key`, resuming THIS job — no re-run.
     if (escalation.signal_key) {
-      return resolveViaSignalKey(escalation, resolverPayload);
+      return resolveViaSignalKey(escalation, resolverPayload, metadata);
     }
 
     // Path C: escalation strategy may redirect to triage
@@ -64,18 +70,18 @@ export async function resolveEscalation(
     if (strategy) {
       const directive = await strategy.onResolution({ escalation, resolverPayload, envelope });
       if (directive.action === 'triage') {
-        return resolveViaTriage(escalation, resolverPayload, directive.triageEnvelope);
+        return resolveViaTriage(escalation, resolverPayload, directive.triageEnvelope, metadata);
       }
     }
 
-    // Path D: notification-only — no workflow to restart
+    // Path D: notification-only — no workflow to restart. One atomic resolve.
     if (!escalation.workflow_type || !escalation.task_queue) {
-      await escalationService.resolveEscalation(escalation.id, resolverPayload);
+      await escalationService.resolveEscalation(escalation.id, resolverPayload, metadata);
       return { status: 200, data: { acknowledged: true, escalationId: escalation.id } };
     }
 
     // Path E: standard re-run
-    return resolveViaRerun(escalation, envelope, resolverPayload);
+    return resolveViaRerun(escalation, envelope, resolverPayload, metadata);
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -88,11 +94,11 @@ export async function resolveEscalation(
  * the id lookup. RBAC-scoped to the caller's visible roles.
  */
 export async function resolveBySignalKey(
-  input: { signalKey: string; resolverPayload: Record<string, any> },
+  input: { signalKey: string; resolverPayload: Record<string, any>; metadata?: Record<string, any> },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { signalKey, resolverPayload } = input;
+    const { signalKey, resolverPayload, metadata } = input;
     if (!signalKey) return { status: 400, error: 'signalKey is required' };
     if (!resolverPayload) return { status: 400, error: 'resolverPayload is required' };
 
@@ -105,7 +111,7 @@ export async function resolveBySignalKey(
       return { status: 404, error: 'Escalation not found' };
     }
 
-    return resolveViaSignalKey(escalation, resolverPayload);
+    return resolveViaSignalKey(escalation, resolverPayload, metadata);
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -117,6 +123,7 @@ export async function resolveBySignalKey(
 async function resolveViaConditionSignal(
   escalation: any,
   resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
 ): Promise<LTApiResult> {
   const signalId = (escalation.metadata as any).signal_id;
   const client = createClient();
@@ -125,7 +132,14 @@ async function resolveViaConditionSignal(
     escalation.workflow_type,
     escalation.workflow_id,
   );
-  await handle.signal(signalId, { ...resolverPayload, $escalation_id: escalation.id });
+  // The row is resolved downstream by the workflow's `conditionLT` → `ltResolveEscalation`.
+  // Carry the outcome patch on the signal ($escalation_metadata, symmetric to $escalation_id)
+  // so it merges inside that single atomic resolve — never a separate write here.
+  await handle.signal(signalId, {
+    ...resolverPayload,
+    $escalation_id: escalation.id,
+    ...(metadata ? { $escalation_metadata: metadata } : {}),
+  });
 
   // Event published by service layer (services/escalation/crud.ts)
   return signaledResult(escalation, escalation.workflow_id);
@@ -140,9 +154,12 @@ async function resolveViaConditionSignal(
 async function resolveViaSignalKey(
   escalation: any,
   resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
 ): Promise<LTApiResult> {
   const signalPayload = await redactPasswords(resolverPayload, (escalation.metadata as any)?.form_schema);
-  const resolved = await escalationService.resolveEscalation(escalation.id, signalPayload);
+  // One atomic call: status→resolved, signal delivered, and the outcome patch merged
+  // into the GIN-indexed metadata — all inside the single WHERE-guarded UPDATE.
+  const resolved = await escalationService.resolveEscalation(escalation.id, signalPayload, metadata);
   if (!resolved) {
     return { status: 409, error: 'Escalation not available for resolution' };
   }
@@ -154,16 +171,20 @@ async function resolveViaSignalKey(
 async function resolveViaSignalRouting(
   escalation: any,
   resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
 ): Promise<LTApiResult> {
   const signalRouting = (escalation.metadata as any).signal_routing;
   const signalPayload = await redactPasswords(resolverPayload, (escalation.metadata as any)?.form_schema);
 
   if (signalRouting.engine === 'yaml' && signalRouting.hookTopic && signalRouting.appId) {
+    // YAML resolves transactionally inside the workflow — carry the patch on the signal
+    // so it commits with that resolve, never as a separate write.
     const engine = await getYamlEngine(signalRouting.appId);
     await engine.signal(signalRouting.hookTopic, {
       ...signalPayload,
       escalationId: escalation.id,
       job_id: signalRouting.jobId,
+      ...(metadata ? { $escalation_metadata: metadata } : {}),
     });
   } else if (signalRouting.workflowId) {
     const client = createClient();
@@ -173,9 +194,9 @@ async function resolveViaSignalRouting(
     await handle.signal(signalRouting.signalId, signalPayload);
   }
 
-  // YAML workflows resolve transactionally inside the workflow; only resolve here for Durable
+  // Durable resolves here — one atomic call carries the outcome patch.
   if (signalRouting.engine !== 'yaml') {
-    await escalationService.resolveEscalation(escalation.id, resolverPayload);
+    await escalationService.resolveEscalation(escalation.id, resolverPayload, metadata);
   }
 
   // Event published by service layer (services/escalation/crud.ts)
@@ -187,6 +208,7 @@ async function resolveViaTriage(
   escalation: any,
   resolverPayload: Record<string, any>,
   triageEnvelope: any,
+  metadata?: Record<string, any>,
 ): Promise<LTApiResult> {
   const triageWorkflowId = `triage-${escalation.id}-${Date.now()}`;
   const client = createClient();
@@ -216,7 +238,7 @@ async function resolveViaTriage(
   await escalationService.resolveEscalation(escalation.id, {
     ...resolverPayload,
     _lt: { ...resolverPayload._lt, triaged: true, triageWorkflowId },
-  });
+  }, metadata);
 
   // Event published by service layer (services/escalation/crud.ts)
   return {
@@ -230,9 +252,12 @@ async function resolveViaRerun(
   escalation: any,
   envelope: Record<string, any>,
   resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
 ): Promise<LTApiResult> {
   envelope.resolver = resolverPayload;
-  envelope.lt = { ...envelope.lt, escalationId: escalation.id };
+  // Carry the outcome patch on the rerun envelope so the downstream resolve (when the
+  // re-run completes) commits it atomically — not a separate write to the old row.
+  envelope.lt = { ...envelope.lt, escalationId: escalation.id, escalationMetadata: metadata };
 
   const newWorkflowId = `rerun-${escalation.id}-${Date.now()}`;
   const client = createClient();

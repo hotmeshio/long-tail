@@ -11,10 +11,13 @@ import { loggerRegistry } from '../../../lib/logger';
 export async function ltResolveEscalation(input: {
   escalationId: string;
   resolverPayload: Record<string, any>;
+  /** Outcome patch merged into the row inside the same atomic resolve (see resolveEscalation). */
+  metadata?: Record<string, any>;
 }): Promise<void> {
   const result = await escalationService.resolveEscalation(
     input.escalationId,
     input.resolverPayload,
+    input.metadata,
   );
   if (!result) {
     loggerRegistry.warn(`[ltResolveEscalation] Escalation ${input.escalationId} already resolved or not found`);

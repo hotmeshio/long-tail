@@ -233,13 +233,15 @@ it is an aggregation over those rows. No side-store to keep in sync.
 ## The boundary records intent and outcome
 
 A `printing` escalation opens with the **intent** — which machine, which order, the job in
-flight. When the printer finishes, it resolves that same row with the **outcome** — `result`,
-units, and the boundary `durationMs` (`created_at` is the handoff, `resolved_at` is done). One
-atomic write, one row, both halves of the story:
+flight. When the printer finishes, it resolves that same row with the **outcome** — `result`
+and units — in one atomic call: the status-guarded UPDATE marks the row resolved, resumes the
+broker, and merges the outcome facets, together or not at all. The boundary **duration** is not
+stored: the row's own `created_at` (handoff) → `resolved_at` (done) *is* the duration, derived
+by query. One row, both halves of the story:
 
 ```typescript
 searchByFacets({ role: 'printer-pool-diabetic', facets: { state: 'printing', outcome: 'success' } });
-// → every completed print: which printer, which order, how long it took — @>-queryable
+// → every completed print: which printer, which order — resolved_at − created_at is how long it took
 ```
 
 Intent and outcome are the same GIN-indexed row, never a side table to reconcile. The

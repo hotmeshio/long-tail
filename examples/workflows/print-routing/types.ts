@@ -124,25 +124,21 @@ export const PRINTER_STATE = {
 
 /**
  * Outcome facets the printer merges into the `printing` escalation's GIN-indexed
- * metadata when it RESOLVES the row. The
- * creation metadata said "what was intended" (printerId, state=printing); these
- * record "what actually happened" on the same row — `@>`-queryable next to it.
- * `DURATION_MS` is the boundary duration: the escalation's `created_at` (handoff /
- * print start) to `resolved_at` (done). The row alone now tells the whole story.
+ * metadata in the same atomic resolve. The creation metadata said "what was intended"
+ * (printerId, state=printing); these record "what actually happened" on the same row —
+ * `@>`-queryable next to it. The boundary DURATION is not stored: the row's own
+ * `created_at` (handoff / print start) → `resolved_at` (done) is the duration, derivable
+ * by query. The row alone tells the whole story.
  */
 export const OUTCOME_FACETS = {
   OUTCOME: 'outcome',
-  DURATION_MS: 'durationMs',
   UNITS_PRINTED: 'unitsPrinted',
-  COMPLETED_AT: 'completedAt',
 } as const;
 
 /** The outcome patch merged into a `printing` row on resolve. */
 export interface PrintOutcomeFacets {
   outcome: PrintOutcome;
-  durationMs: number;
   unitsPrinted: number;
-  completedAt: string;
 }
 
 export const PRINT_SOURCE = 'print-routing';

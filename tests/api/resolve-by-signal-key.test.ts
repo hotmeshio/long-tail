@@ -13,6 +13,7 @@ import { resolveBySignalKey } from '../../api/escalations/resolve';
 
 const mockGetBySignalKey = vi.mocked(escalationService.getEscalationBySignalKey);
 const mockResolve = vi.mocked(escalationService.resolveEscalation);
+const mockMergeMetadata = vi.mocked(escalationService.updateEscalationMetadata);
 const mockHasGlobalAccess = vi.mocked(userService.hasGlobalEscalationAccess);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
 
@@ -88,7 +89,8 @@ describe('resolveBySignalKey (api)', () => {
     expect(result.status).toBe(200);
     expect((result.data as any).signaled).toBe(true);
     expect((result.data as any).escalationId).toBe('esc-uuid');
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true });
+    // No metadata patch → 3rd arg is undefined; still ONE atomic resolve call.
+    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined);
   });
 
   it('returns 409 when the atomic resolve loses the race (no double-resolve)', async () => {
@@ -97,5 +99,28 @@ describe('resolveBySignalKey (api)', () => {
     mockResolve.mockResolvedValue(null);
     const result = await resolveBySignalKey({ signalKey: 'k', resolverPayload: { approved: true } }, AUTH);
     expect(result.status).toBe(409);
+  });
+
+  it('passes the outcome patch INTO the single atomic resolve (no separate write)', async () => {
+    const esc = makeEscalation();
+    mockGetBySignalKey.mockResolvedValue(esc);
+    mockResolve.mockResolvedValue(makeEscalation({ status: 'resolved' }));
+    const result = await resolveBySignalKey(
+      { signalKey: 'station-done-wf-1', resolverPayload: { approved: true }, metadata: { outcome: 'approved', durationMs: 1200 } },
+      AUTH,
+    );
+    expect(result.status).toBe(200);
+    // The patch rides as the 3rd arg of resolve → merged in the same guarded UPDATE.
+    // It is NEVER written via a separate, non-transactional metadata update.
+    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, { outcome: 'approved', durationMs: 1200 });
+    expect(mockMergeMetadata).not.toHaveBeenCalled();
+  });
+
+  it('omits the patch (3rd arg undefined) when none is given — backward compatible', async () => {
+    mockGetBySignalKey.mockResolvedValue(makeEscalation());
+    mockResolve.mockResolvedValue(makeEscalation({ status: 'resolved' }));
+    await resolveBySignalKey({ signalKey: 'station-done-wf-1', resolverPayload: { approved: true } }, AUTH);
+    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined);
+    expect(mockMergeMetadata).not.toHaveBeenCalled();
   });
 });

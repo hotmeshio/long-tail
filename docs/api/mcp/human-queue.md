@@ -65,7 +65,7 @@ List available escalations for a role. Returns pending, unassigned escalations.
 
 ### claim_and_resolve
 
-Claim an escalation and immediately resolve it with a payload. Atomic operation.
+Claim an escalation and immediately resolve it with a payload. Atomic operation. A read/write service account uses this to close out work and record the outcome in one call.
 
 | | |
 |---|---|
@@ -77,7 +77,24 @@ Claim an escalation and immediately resolve it with a payload. Atomic operation.
 |-------|------|----------|-------------|
 | escalation_id | string | Yes | The escalation ID to claim and resolve |
 | resolver_id | string | Yes | Identifier for who/what is resolving |
-| payload | object | Yes | Resolution payload data |
+| payload | object | Yes | Resolution payload data — resumes the waiting workflow |
+| metadata | object | No | Outcome facets merged into the escalation's metadata: the durable, `@>`-queryable record of what happened (disposition, reviewer, timing). Distinct from `payload`, which is not indexed |
+
+### resolve_escalation
+
+Resolve an already-claimed escalation with a payload. Use when the claim happened externally (e.g. via API).
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| escalation_id | string | Yes | The escalation ID to resolve |
+| payload | object | Yes | Resolution payload data — resumes the waiting workflow |
+| metadata | object | No | Outcome facets merged into the escalation's metadata (see `claim_and_resolve`) |
 
 ### escalate_and_wait
 

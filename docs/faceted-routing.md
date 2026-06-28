@@ -141,12 +141,12 @@ only. "What actually happened" becomes `@>`-queryable next to "what was asked".
 ```typescript
 import { resolveEscalation } from '@hotmeshio/long-tail';
 
-// The work is done; resolve the row AND stamp the outcome onto it.
+// The work is done; resolve the row AND stamp the outcome onto it — one atomic call.
 await resolveEscalation(rowId, { result: 'success' }, {
   outcome: 'success',
-  durationMs: 1_240,   // e.g. created_at (claimed/started) → now (done)
   unitsPrinted: 6,
 });
+// Duration needs no facet: the row's own created_at → resolved_at is the elapsed time.
 ```
 
 The third argument is distinct from the second: `resolverPayload` (arg 2) is delivered to a
@@ -160,7 +160,8 @@ searchByFacets({ role: 'printer-pool-diabetic', facets: { state: 'printing', out
 ```
 
 The print farm leans on this: a printer resolves its in-flight `printing` row with the run's
-result and duration, so the supply pond is also the production log.
+result and units in one atomic call, so the supply pond is also the production log — and the
+row's `created_at` → `resolved_at` is the print duration, no stored field required.
 
 ## Safety
 

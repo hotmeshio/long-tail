@@ -25,15 +25,24 @@ const getAvailableWorkSchema = z.object({
   limit: z.number().optional().default(10).describe('Max results to return'),
 });
 
+/** Outcome facets merged onto the row on resolve — see the field describe(). */
+const outcomeMetadata = z.record(z.any()).optional().describe(
+  'Outcome facets to merge into the escalation\'s metadata on resolve — the durable, ' +
+  'queryable record of what happened (disposition, reviewer, timing). Distinct from ' +
+  'payload, which resumes the waiting workflow and is not indexed.',
+);
+
 const claimAndResolveSchema = z.object({
   escalation_id: z.string().describe('The escalation ID to claim and resolve'),
   resolver_id: z.string().describe('Identifier for who/what is resolving'),
   payload: z.record(z.any()).describe('Resolution payload data'),
+  metadata: outcomeMetadata,
 });
 
 const resolveEscalationSchema = z.object({
   escalation_id: z.string().describe('The escalation ID to resolve'),
   payload: z.record(z.any()).describe('Resolution payload data'),
+  metadata: outcomeMetadata,
 });
 
 const escalateAndWaitSchema = z.object({
@@ -166,7 +175,7 @@ export function registerHumanQueueTools(server: McpServer): void {
     'claim_and_resolve',
     {
       title: 'Claim and Resolve',
-      description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation.',
+      description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation. Optionally pass `metadata` to record the outcome (disposition, timing) onto the row for the audit trail.',
       inputSchema: claimAndResolveSchema,
     },
     async (args: z.infer<typeof claimAndResolveSchema>) => {
@@ -187,6 +196,7 @@ export function registerHumanQueueTools(server: McpServer): void {
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,
+        args.metadata,
       );
       if (!resolved) {
         return {
@@ -215,13 +225,14 @@ export function registerHumanQueueTools(server: McpServer): void {
     'resolve_escalation',
     {
       title: 'Resolve Escalation',
-      description: 'Resolve an already-claimed escalation with a payload. Use when the claim happened externally (e.g. via API).',
+      description: 'Resolve an already-claimed escalation with a payload. Use when the claim happened externally (e.g. via API). Optionally pass `metadata` to record the outcome (disposition, timing) onto the row for the audit trail.',
       inputSchema: resolveEscalationSchema,
     },
     async (args: z.infer<typeof resolveEscalationSchema>) => {
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,
+        args.metadata,
       );
       if (!resolved) {
         return {

@@ -161,6 +161,7 @@ Resolving an escalation starts a new workflow execution with the resolver's payl
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `resolverPayload` | `object` | yes | The reviewer's decision — injected into `envelope.resolver` |
+| `metadata` | `object` | no | Outcome facets merged into the escalation's GIN-indexed metadata. Records *what happened* (disposition, timing) next to *what was asked*; `@>`-queryable. Distinct from `resolverPayload`, which resumes the workflow and is not indexed |
 
 **Example request:**
 
@@ -169,6 +170,11 @@ Resolving an escalation starts a new workflow execution with the resolver's payl
   "resolverPayload": {
     "approved": true,
     "notes": "Content is fine, AI was overly cautious"
+  },
+  "metadata": {
+    "outcome": "approved",
+    "reviewedBy": "alice",
+    "durationMs": 1240
   }
 }
 ```
@@ -239,6 +245,7 @@ For callers that know the deterministic signal id (webhooks — e.g. `signal-sca
 |-------|------|----------|-------------|
 | `signalKey` | `string` | yes | The signal id passed to `conditionLT(signalId, config)` |
 | `resolverPayload` | `object` | yes | The decision payload delivered to the waiting workflow |
+| `metadata` | `object` | no | Outcome facets merged into the row's GIN-indexed metadata (see [Resolve an escalation](#resolve-an-escalation)) |
 
 Returns `404` when the key is unknown, `409` when the escalation is already terminal, and `200 { signaled: true }` on success. RBAC-scoped to the caller's visible roles.
 

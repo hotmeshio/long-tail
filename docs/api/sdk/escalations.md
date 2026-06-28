@@ -259,6 +259,7 @@ Supports two resolution paths: signal-routed (sends payload to a paused workflow
 const result = await lt.escalations.resolve({
   id: 'esc_123',
   resolverPayload: { approved: true, comment: 'Looks good' },
+  metadata: { outcome: 'approved', reviewedBy: 'alice', durationMs: 1_240 },
 });
 ```
 
@@ -267,7 +268,8 @@ const result = await lt.escalations.resolve({
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | Yes | Escalation UUID |
-| `resolverPayload` | `Record<string, any>` | Yes | Human decision data |
+| `resolverPayload` | `Record<string, any>` | Yes | Human decision data — resumes the paused workflow; not indexed |
+| `metadata` | `Record<string, any>` | No | Outcome facets merged into the row's GIN-indexed metadata. Records *what happened* (disposition, timing) next to *what was asked*; `@>`-queryable. See [Recording the outcome](#recording-the-outcome-on-resolve) |
 
 **Returns:** `LTApiResult<{ signaled, escalationId, workflowId }>` (signal path) or `LTApiResult<{ started, escalationId, workflowId }>` (re-run path) -- returns 404 if not found, 409 if not pending.
 
@@ -277,32 +279,30 @@ const result = await lt.escalations.resolve({
 
 ## Recording the outcome on resolve
 
-In-process resolvers (a workflow, an activity, a service) can stamp the **outcome** onto the
-row as they resolve it. The service `resolveEscalation` and the underlying HotMesh
-`client.resolve` take an optional `metadata` patch, merged -- not replaced -- into the row's
-GIN-indexed metadata in the same atomic UPDATE, on the winning resolve only.
+Every resolve path — `resolve`, `resolveBySignalKey`, the HTTP routes, the MCP tools, and the
+in-process `EscalationService.resolveEscalation` — takes an optional `metadata` patch. It is
+merged, not replaced, into the row's GIN-indexed metadata, recording the **outcome** on the
+same row that carried the **intent**.
 
 ```typescript
-import { resolveEscalation } from '@hotmeshio/long-tail';
-
-// Resolve the row (resume any waiter) AND record what happened on the same row.
-await resolveEscalation(id, { result: 'success' }, {
-  outcome: 'success',
-  durationMs: 1_240,
-  reviewedBy: 'alice',
+await lt.escalations.resolve({
+  id: 'esc_123',
+  resolverPayload: { approved: true },           // resumes the workflow; not indexed
+  metadata: { outcome: 'approved', durationMs: 1_240 }, // recorded on the row; @>-queryable
 });
 ```
 
-The `metadata` patch is distinct from `resolverPayload`: the payload is delivered to a waiting
-workflow as `condition()`'s return value and is not indexed; the patch is the durable,
-`@>`-queryable record on the row. The row created with **intent** now also carries the
-**outcome** -- queryable together with no side table:
+The patch is distinct from `resolverPayload`: the payload is delivered to the waiting workflow
+as `condition()`'s return value; the patch is the durable, queryable record. Intent and
+outcome live on one row — no side table:
 
 ```typescript
-findByMetadata('outcome', 'success'); // every resolved row that succeeded — and its duration
+await lt.escalations.findByMetadata({ key: 'outcome', value: 'approved' });
+// every resolved row that was approved — with its disposition and duration
 ```
 
-`resolveEscalationBySignalKey(signalKey, resolverPayload, metadata?)` takes the same patch.
+The in-process library takes the same patch as a third argument:
+`resolveEscalation(id, payload, metadata)` and `resolveEscalationBySignalKey(signalKey, payload, metadata)`.
 
 ---
 
@@ -313,6 +313,16 @@ Wait for a signal and automatically resolve the associated escalation. This is t
 ```typescript
 conditionLT<T>(signalId: string, escalation?: ConditionQueueConfig): Promise<T | false | null>
 ```
+
+### Two ways to pause on an escalation
+
+There are two ways to make a workflow pause as a claimable escalation, and they are not equivalent in cost:
+
+- **Native `condition(signalId, escalationConfig)` — the efficient primitive.** HotMesh's `condition` takes an optional escalation config as its second argument. The row is written inside the workflow's Leg1 checkpoint, with `signal_key = signalId`. Resolving it (`resolve` / `resolveBySignalKey`) marks the row resolved **and** delivers the signal in one guarded transaction, resuming the job in place. No create activity, no enrich step, and **no proxy-activity round-trip on the resume** — the resolve is the whole transaction. This is the path to prefer.
+
+- **`conditionLT(signalId, config?)` — long-tail sugar.** With a config it delegates to the native efficient `condition` above (same atomic behavior — use it freely). Without a config it also supports the older **two-step** pattern: an escalation created separately, where the resume injects `$escalation_id` and `conditionLT` resolves it through a durable `proxyActivity` (`ltResolveEscalation`). That extra activity round-trip is the cost of the two-step form; the efficient form (and native `condition`) avoid it.
+
+Reach for native `condition(signalId, config)` when you want the leanest path; reach for `conditionLT` for the ergonomic wrapper or to support the legacy two-step flow. Both resume the same row, and both accept the resolve-time `metadata` patch (the efficient path merges it in the single guarded UPDATE; the two-step path forwards it through `ltResolveEscalation` into that same atomic resolve).
 
 ### Atomic form (recommended)
 
