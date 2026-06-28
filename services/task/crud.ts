@@ -8,6 +8,9 @@ import {
   GET_TASK,
   GET_TASK_BY_SIGNAL_ID,
   GET_TASK_BY_WORKFLOW_ID,
+  updateTaskById,
+  listTasksCount,
+  listTasksData,
 } from './sql';
 
 export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> {
@@ -34,18 +37,26 @@ export async function createTask(input: CreateTaskInput): Promise<LTTaskRecord> 
       input.status || null,
     ],
   );
-  const task = rows[0];
+  // ON CONFLICT (workflow_id) makes this idempotent: a retried proxyActivity or
+  // re-driven saga re-targets the same row. `_inserted` (xmax = 0) is true only
+  // when this call actually inserted, so the created event fires exactly once.
+  const row = rows[0];
+  const inserted = row._inserted === true;
+  delete row._inserted;
+  const task: LTTaskRecord = row;
 
-  publishTaskEvent({
-    type: 'task.created',
-    source: 'service',
-    workflowId: task.workflow_id || '',
-    workflowName: task.workflow_type || '',
-    taskQueue: task.task_queue || '',
-    taskId: task.id,
-    originId: task.origin_id || undefined,
-    status: task.status || 'pending',
-  });
+  if (inserted) {
+    publishTaskEvent({
+      type: 'task.created',
+      source: 'service',
+      workflowId: task.workflow_id || '',
+      workflowName: task.workflow_type || '',
+      taskQueue: task.task_queue || '',
+      taskId: task.id,
+      originId: task.origin_id || undefined,
+      status: task.status || 'pending',
+    });
+  }
 
   return task;
 }
@@ -82,7 +93,7 @@ export async function updateTask(
 
   values.push(id);
   const { rows } = await pool.query(
-    `UPDATE lt_tasks SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
+    updateTaskById(sets.join(', '), idx),
     values,
   );
   const task = rows[0];
@@ -187,9 +198,9 @@ export async function listTasks(filters: {
   const offset = filters.offset || 0;
 
   const [countResult, dataResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM lt_tasks ${where}`, values),
+    pool.query(listTasksCount(where), values),
     pool.query(
-      `SELECT * FROM lt_tasks ${where} ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+      listTasksData(where, idx++, idx++),
       [...values, limit, offset],
     ),
   ]);

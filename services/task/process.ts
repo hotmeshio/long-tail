@@ -6,6 +6,8 @@ import {
   GET_PROCESS_TASKS,
   processStatsTotals,
   processStatsByType,
+  listProcessesCount,
+  listProcessesData,
 } from './sql';
 
 export async function listProcesses(filters: {
@@ -56,29 +58,9 @@ export async function listProcesses(filters: {
               AND COUNT(*) FILTER (WHERE status = 'needs_intervention') = 0`;
   }
 
-  // Count query — wrap in subquery because of HAVING
-  const countSql = having
-    ? `SELECT COUNT(*) FROM (
-         SELECT origin_id FROM lt_tasks ${where}
-         GROUP BY origin_id ${having}
-       ) sub`
-    : `SELECT COUNT(DISTINCT origin_id) FROM lt_tasks ${where}`;
-
-  const dataSql = `SELECT
-       origin_id,
-       COUNT(*)::int AS task_count,
-       COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
-       COUNT(*) FILTER (WHERE status = 'needs_intervention')::int AS escalated,
-       array_agg(DISTINCT workflow_type) AS workflow_types,
-       MIN(created_at) AS started_at,
-       MAX(COALESCE(completed_at, created_at)) AS last_activity
-     FROM lt_tasks
-     ${where}
-     GROUP BY origin_id
-     ${having}
-     ORDER BY MAX(created_at) DESC
-     LIMIT $${idx++} OFFSET $${idx++}`;
-
+  // Count wraps the grouped set in a subquery when a status HAVING filter is present.
+  const countSql = listProcessesCount(where, having);
+  const dataSql = listProcessesData(where, having, idx++, idx++);
   const dataParams = [...filterParams, limit, offset];
 
   const [countResult, dataResult] = await Promise.all([
