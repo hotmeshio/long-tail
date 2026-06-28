@@ -139,6 +139,43 @@ escCmd.command('resolve-by-meta <key> <value>')
   .option('--meta <json>', 'Merge metadata (JSON object)')
   .action(wrap(esc.resolveByMetadata));
 
+escCmd.command('resolve-by-ids <ids...>')
+  .description('Resolve a set of escalations by id')
+  .requiredOption('--payload <json>', 'Resolver payload (JSON string)')
+  .option('--metadata <json>', 'Merge metadata (JSON object)')
+  .action(wrap(esc.resolveByIds));
+
+escCmd.command('search-facets')
+  .description('Item-level faceted search over a pond (role-scoped)')
+  .requiredOption('--role <role>', 'Pond role to search')
+  .option('--status <status>', 'Filter by status')
+  .option('--available', 'Only available (unclaimed/expired)')
+  .option('--facets <json>', 'Required facets (JSON object)')
+  .option('--limit <n>', 'Max results')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'IDs only')
+  .action(wrap(esc.searchByFacets));
+
+escCmd.command('claim-groups')
+  .description('Batch-claim complete origin groups in priority order')
+  .requiredOption('--role <role>', 'Pond role to claim from')
+  .option('--facets <json>', 'Required facets (JSON object)')
+  .option('--limit <n>', 'Max groups to claim')
+  .option('--duration <minutes>', 'Claim duration in minutes')
+  .option('--size-facet <key>', 'Metadata facet declaring group size')
+  .option('--json', 'JSON output')
+  .action(wrap(esc.claimGroups));
+
+escCmd.command('claim-by-facets')
+  .description('Batch-claim individual rows matching facets')
+  .requiredOption('--role <role>', 'Pond role to claim from')
+  .option('--facets <json>', 'Required facets (JSON object)')
+  .option('--limit <n>', 'Max rows to claim')
+  .option('--duration <minutes>', 'Claim duration in minutes')
+  .option('--all-or-none', 'Claim all matched rows or none')
+  .option('--json', 'JSON output')
+  .action(wrap(esc.claimByFacets));
+
 // ── Workflows ────────────────────────────────────────────────────────────
 
 const wfCmd = program.command('workflows').alias('wf').description('Manage durable workflows');

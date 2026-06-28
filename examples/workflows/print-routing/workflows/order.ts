@@ -36,6 +36,8 @@ export async function printOrder(envelope: LTEnvelope): Promise<any> {
   const role = roleForOrder(order.diabetic);
   const farmerPond = FARMER_POND[fleetKind(order.diabetic)];
 
+  if (!order.operatorId) throw new Error('printOrder requires order.operatorId (the order pond operator)');
+  const operatorId = order.operatorId;
   let outstanding = order.units.map((_, i) => i);
   let attempt = 0;
   let last = { printerId: '', completedAt: '', inspectedBy: '' };
@@ -43,7 +45,7 @@ export async function printOrder(envelope: LTEnvelope): Promise<any> {
   while (outstanding.length > 0 && attempt < MAX_PRINT_ATTEMPTS) {
     const orderSignal = `order-done-${ctx.workflowId}-a${attempt}`;
     const originId = attempt === 0 ? orderId : `${orderId}#a${attempt}`;
-    await enqueueOrderUnits({ order, originId, unitIndices: outstanding, reprint: attempt > 0, role, orderSignal, workflowId: ctx.workflowId });
+    await enqueueOrderUnits({ order, originId, unitIndices: outstanding, reprint: attempt > 0, role, orderSignal, workflowId: ctx.workflowId, operatorId });
 
     const done = (await Durable.workflow.condition<OrderDoneSignal>(orderSignal)) as OrderDoneSignal;
 

@@ -25,6 +25,8 @@ import type { PrinterData, PrinterResult, PrinterJobPayload, RefillPayload } fro
 
 export async function printer(envelope: LTEnvelope): Promise<any> {
   const d = envelope.data as PrinterData;
+  if (!d.operatorId) throw new Error('printer requires data.operatorId (the printer pond operator)');
+  const operatorId = d.operatorId;
   const ctx = Durable.workflow.workflowInfo();
   const printerPond = PRINTER_POND[fleetKind(d.diabetic)];
 
@@ -80,7 +82,7 @@ export async function printer(envelope: LTEnvelope): Promise<any> {
     // A real handoff carries a callback key. Run it, report completion, consume the
     // run. A cancel/timeout (no job) re-advertises without consuming a run.
     if (job && job.callbackKey) {
-      await runPrintJob({ job, printerId: d.printerId });
+      await runPrintJob({ job, printerId: d.printerId, operatorId });
       totalRuns += 1;
       runsUntilRefill -= 1;
     }

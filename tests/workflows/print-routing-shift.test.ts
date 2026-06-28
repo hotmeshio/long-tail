@@ -6,6 +6,7 @@ import { postgres_options, sleepFor } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../lib/db/migrate';
 import { systemEventsConfig } from '../../lib/events/system-events';
+import { seedPrintOperators, type PrintOperators } from '../helpers/print-fleet';
 import {
   printOrder,
   printer,
@@ -50,6 +51,7 @@ const ALL_ROLES = [
 
 describe('print shift — the invocable entry target runs the farm end to end', () => {
   let client: InstanceType<typeof Client>;
+  let operators: PrintOperators;
 
   beforeAll(async () => {
     await connectTelemetry();
@@ -57,6 +59,8 @@ describe('print shift — the invocable entry target runs the farm end to end', 
     await migrate();
     const { getPool } = await import('../../lib/db');
     await getPool().query('DELETE FROM lt_escalations WHERE role = ANY($1::text[])', [ALL_ROLES]);
+    // Robots resolve through the role-gated public API → seed per-pond operators (standard fleet).
+    operators = await seedPrintOperators(false);
 
     const connection = { class: Postgres, options: postgres_options };
     for (const workflow of [printOrder, printer, printBroker, farmTechnician, farmInspector, printShift]) {
@@ -82,7 +86,7 @@ describe('print shift — the invocable entry target runs the farm end to end', 
   it('drains all 12 orders, reprints the defect, powers down, and records each outcome', async () => {
     const suffix = Durable.guid();
     const handle = await client.workflow.start({
-      args: [{ data: { diabetic: false, idleTickSeconds: 1, maxIdleRuns: 12, waveGapSeconds: 1 }, metadata: {} }],
+      args: [{ data: { diabetic: false, idleTickSeconds: 1, maxIdleRuns: 12, waveGapSeconds: 1, brokerId: operators.brokerId, technicianId: operators.technicianId, inspectorId: operators.inspectorId, ordererId: operators.ordererId, printerOperatorId: operators.printerOperatorId }, metadata: {} }],
       taskQueue: PRINT_ROUTING_QUEUE,
       workflowName: PRINT_WORKFLOWS.SHIFT,
       workflowId: `shift-${suffix}`,

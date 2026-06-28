@@ -185,6 +185,10 @@ export interface PrintOrderData {
   mustCompleteBy: number;
   /** Example control: unit indices the farmer finds defective at inspection. */
   failUnits?: number[];
+  /** Order operator — a principal holding the order pond role. The order enqueues its
+   *  demand units through the role-gated public create API, so it runs as this operator.
+   *  Threaded at start/spawn; the order workflow asserts it before enqueuing. */
+  operatorId?: string;
 }
 
 export interface OrderFacets {
@@ -245,6 +249,10 @@ export interface PrinterData {
   totalRuns?: number;
   runsUntilRefill?: number;
   refills?: number;
+  /** Printer operator — a principal holding the printer pond role. The printer resolves
+   *  the broker's callback advert (role = printer pond) through the gated public API.
+   *  Threaded at start/spawn; the printer workflow asserts it before printing. */
+  operatorId?: string;
 }
 
 export interface PrinterResult {
@@ -312,7 +320,10 @@ export interface BrokerPairing {
 
 export interface BrokerData {
   diabetic: boolean;
-  brokerId?: string;
+  /** Broker operator — a principal holding the printer AND order pond roles. The broker
+   *  resolves printer adverts (handoff) and order members (settle) through the gated
+   *  public API, so it must run as an authorized operator. */
+  brokerId: string;
   tickSeconds?: number;
   idleTickSeconds?: number;
   maxIdleRuns?: number;
@@ -335,7 +346,9 @@ export interface BrokerTotals {
 
 export interface TechnicianData {
   diabetic: boolean;
-  technicianId?: string;
+  /** Technician operator — a principal holding the printer pond role. Resolves
+   *  maintenance adverts through the gated public API. */
+  technicianId: string;
   tickSeconds?: number;
   idleTickSeconds?: number;
   maxIdleRuns?: number;
@@ -350,7 +363,9 @@ export interface RefillSummary {
 
 export interface InspectorData {
   diabetic: boolean;
-  inspectorId?: string;
+  /** Inspector operator — a principal holding the farmer pond role. Resolves order
+   *  signoff adverts through the gated public API. */
+  inspectorId: string;
   tickSeconds?: number;
   idleTickSeconds?: number;
   maxIdleRuns?: number;
@@ -372,6 +387,15 @@ export interface SignoffSummary {
 export interface ShiftData {
   /** Which fleet the shift runs against. Defaults to the standard pond. */
   diabetic?: boolean;
+  /** Operators the shift runs its crew as — each a principal holding the pond roles
+   *  its robot resolves through. The shift threads these to the broker/technician/
+   *  inspector children it spawns, the orders it runs, and the printers it launches;
+   *  powerDown runs as the technician (printer role). */
+  brokerId: string;
+  technicianId: string;
+  inspectorId: string;
+  ordererId: string;
+  printerOperatorId: string;
   /** Idle pacing for the dispatcher loops the shift starts (broker/technician/inspector). */
   idleTickSeconds?: number;
   /** How many idle ticks before a dispatcher loop self-terminates. */

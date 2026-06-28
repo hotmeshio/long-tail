@@ -90,3 +90,67 @@ export async function resolveByMetadata(key: string, value: string, opts: { data
   });
   console.log(`\n  ${pc.green('✓')} Resolved by ${key}=${value}\n`);
 }
+
+// --- Faceted routing commands -----------------------------------------------
+
+function parseJsonOption(label: string, raw: string): any {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Invalid JSON for ${label}: ${raw}`);
+  }
+}
+
+export async function resolveByIds(ids: string[], opts: { payload: string; metadata?: string }): Promise<void> {
+  const resolverPayload = parseJsonOption('--payload', opts.payload);
+  const body: any = { ids, resolverPayload };
+  if (opts.metadata) body.metadata = parseJsonOption('--metadata', opts.metadata);
+  const data = await apiFetch<any>('/escalations/resolve-by-ids', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  console.log(`\n  ${pc.green('✓')} Resolved ${data.resolved} escalation(s)\n`);
+}
+
+export async function searchByFacets(opts: { role: string; status?: string; available?: boolean; facets?: string; limit?: string; json?: boolean; quiet?: boolean }): Promise<void> {
+  const query: any = { role: opts.role };
+  if (opts.status) query.status = opts.status;
+  if (opts.available) query.available = true;
+  if (opts.facets) query.facets = parseJsonOption('--facets', opts.facets);
+  if (opts.limit) query.limit = parseInt(opts.limit, 10);
+  const data = await apiFetch<any>('/escalations/search-by-facets', {
+    method: 'POST',
+    body: JSON.stringify(query),
+  });
+  output(data, data.escalations || [], COLUMNS, opts);
+}
+
+export async function claimGroups(opts: { role: string; facets?: string; limit?: string; duration?: string; sizeFacet?: string; json?: boolean }): Promise<void> {
+  const query: any = { role: opts.role };
+  if (opts.facets) query.facets = parseJsonOption('--facets', opts.facets);
+  const body: any = { query };
+  if (opts.limit) body.limit = parseInt(opts.limit, 10);
+  if (opts.duration) body.durationMinutes = parseInt(opts.duration, 10);
+  if (opts.sizeFacet) body.sizeFacet = opts.sizeFacet;
+  const data = await apiFetch<any>('/escalations/claim-groups', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
+  console.log(`\n  ${pc.green('✓')} Claimed ${data.groups?.length || 0} group(s)\n`);
+}
+
+export async function claimByFacets(opts: { role: string; facets?: string; limit?: string; duration?: string; allOrNone?: boolean; json?: boolean }): Promise<void> {
+  const query: any = { role: opts.role };
+  if (opts.facets) query.facets = parseJsonOption('--facets', opts.facets);
+  const body: any = { query };
+  if (opts.limit) body.limit = parseInt(opts.limit, 10);
+  if (opts.duration) body.durationMinutes = parseInt(opts.duration, 10);
+  if (opts.allOrNone) body.allOrNone = true;
+  const data = await apiFetch<any>('/escalations/claim-by-facets', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
+  console.log(`\n  ${pc.green('✓')} Claimed ${data.claimed?.length || 0} escalation(s)\n`);
+}

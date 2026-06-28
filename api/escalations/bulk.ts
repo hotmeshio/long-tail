@@ -242,7 +242,15 @@ async function startTriageWorkflow(
     } catch {}
   }
 
-  const triageWorkflowId = `triage-${escalation.id}-${Date.now()}`;
+  // Deterministic id: an escalation is terminal-once, so `triage-<id>` is unique for
+  // its lifetime. A retry re-targets the same triage job (HotMesh upserts jobs by
+  // (workflowId, app_id)) instead of spawning a duplicate. NOTE: the bulk flow
+  // resolves the set FIRST (bulkResolveForTriage) then starts triage per row, so a
+  // crash between the set-resolve and a given start leaves that escalation
+  // resolved-but-not-triaged — a retry's resolveMany returns only freshly-resolved
+  // rows and will not re-drive it. Closing that gap needs a durable orchestrator
+  // (resolve+triage in one workflow); tracked as a follow-up, not fixed here.
+  const triageWorkflowId = `triage-${escalation.id}`;
 
   const triageEnvelope = {
     data: {

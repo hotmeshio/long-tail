@@ -126,6 +126,43 @@ export async function resolveEscalation(
 }
 
 /**
+ * Resolve a SET of escalations by id in ONE guarded statement
+ * (`UPDATE … WHERE id = ANY($ids) AND status='pending'`). Returns the rows that
+ * won the resolve (already-terminal ids are excluded by the guard), and publishes
+ * a resolved event per winner.
+ *
+ * Use this over a per-row `resolveEscalation` loop when every row takes the SAME
+ * resolverPayload and the rows are woken collectively (or are bookkeeping rows with
+ * no signal_key). NOTE: unlike the single `resolve`, this does NOT deliver per-row
+ * signals — `resolveMany` is UPDATE-only. Do not use it for signal_key adverts whose
+ * resolution must wake a parked workflow; those require the per-row `resolveEscalation`
+ * (which delivers the signal).
+ */
+export async function resolveEscalationsByIds(
+  ids: string[],
+  resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
+): Promise<LTEscalationRecord[]> {
+  if (ids.length === 0) return [];
+  const client = await escalations();
+  const rows = await client.resolveMany({ ids, resolverPayload, metadata });
+  const records = toEscalationRecords(rows);
+  for (const escalation of records) {
+    publishEscalationEvent({
+      type: 'escalation.resolved',
+      source: 'service',
+      workflowId: escalation.workflow_id || '',
+      workflowName: escalation.workflow_type || '',
+      taskQueue: escalation.task_queue || '',
+      escalationId: escalation.id,
+      status: 'resolved',
+      data: {},
+    });
+  }
+  return records;
+}
+
+/**
  * Look up an efficient (atomic) escalation by its `signal_key` — the signal id
  * passed to `conditionLT(signalId, config)` / `condition(signalId, config)`.
  * Returns null when no row carries that key.
@@ -338,15 +375,6 @@ export async function cancelEscalationsByWorkflowId(
   return rows.length;
 }
 
-export async function updateEscalationMetadata(
-  id: string,
-  patch: Record<string, any>,
-): Promise<LTEscalationRecord | null> {
-  const client = await escalations();
-  const entry = await client.update({ id, metadata: patch });
-  return entry ? toEscalationRecord(entry) : null;
-}
-
 export async function enrichEscalationRouting(
   id: string,
   metadataPatch: Record<string, any>,
@@ -384,12 +412,22 @@ export async function getEscalationsByOriginId(
 
 // --- Metadata candidate key lookups -----------------------------------------
 
+/**
+ * Find escalations by a metadata key/value, RBAC-scoped IN SQL.
+ *
+ * `allowedRoles` flows into BOTH the page query and the count: `undefined` =
+ * global (no role filter); a `string[]` filters `role = ANY(...)` (an empty array
+ * matches nothing). Filtering in SQL — never client-side over a fetched page — is
+ * what keeps `total` correct and pagination intact (a client-side filter shrinks a
+ * page and reports the wrong total).
+ */
 export async function findByMetadata(
   key: string,
   value: string,
   status?: string,
   limit = 50,
   offset = 0,
+  allowedRoles?: string[],
 ): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   const client = await escalations();
   const metadata = { [key]: value };
@@ -397,6 +435,7 @@ export async function findByMetadata(
     client.list({
       metadata,
       status,
+      roles: allowedRoles,
       orderBy: [
         { column: 'priority', direction: 'asc' },
         { column: 'created_at', direction: 'asc' },
@@ -404,7 +443,7 @@ export async function findByMetadata(
       limit,
       offset,
     }),
-    client.count({ metadata, status }),
+    client.count({ metadata, status, roles: allowedRoles }),
   ]);
   return { escalations: toEscalationRecords(rows), total };
 }

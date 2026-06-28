@@ -89,7 +89,7 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
       ),
     );
     await Promise.all(
-      pairings.map((p, i) => settleOrder({ group: p.group, printerId: p.printerId, done: dones[i] as PrintCallbackPayload })),
+      pairings.map((p, i) => settleOrder({ group: p.group, printerId: p.printerId, done: dones[i] as PrintCallbackPayload, brokerId: d.brokerId })),
     );
   }
 

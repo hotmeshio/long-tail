@@ -6,7 +6,7 @@ import { postgres_options, sleepFor } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../lib/db/migrate';
 import { systemEventsConfig } from '../../lib/events/system-events';
-import { buildEolPrinter, buildEolOrders } from '../helpers/print-fleet';
+import { buildEolPrinter, buildEolOrders, seedPrintOperators, type PrintOperators } from '../helpers/print-fleet';
 import {
   printOrder,
   printer,
@@ -52,6 +52,7 @@ const ALL_ROLES = [
 
 describe('print farm — printers as durable workflows (advert lifecycle)', () => {
   let client: InstanceType<typeof Client>;
+  let operators: PrintOperators;
 
   beforeAll(async () => {
     await connectTelemetry();
@@ -59,6 +60,8 @@ describe('print farm — printers as durable workflows (advert lifecycle)', () =
     await migrate();
     const { getPool } = await import('../../lib/db');
     await getPool().query('DELETE FROM lt_escalations WHERE role = ANY($1::text[])', [ALL_ROLES]);
+    // Robots resolve through the role-gated public API → seed per-pond operators.
+    operators = await seedPrintOperators(true);
 
     const connection = { class: Postgres, options: postgres_options };
     for (const workflow of [printOrder, printer, printBroker, farmTechnician, farmInspector]) {
@@ -89,7 +92,7 @@ describe('print farm — printers as durable workflows (advert lifecycle)', () =
 
     // Supply: the printer advertises itself. Outsiders: the broker and technician.
     const printerHandle = await client.workflow.start({
-      args: [{ data: printerSpec, metadata: {} }],
+      args: [{ data: { ...printerSpec, operatorId: operators.printerOperatorId }, metadata: {} }],
       taskQueue: PRINT_ROUTING_QUEUE,
       workflowName: PRINT_WORKFLOWS.PRINTER,
       workflowId: printerSpec.printerId,
@@ -102,7 +105,7 @@ describe('print farm — printers as durable workflows (advert lifecycle)', () =
     await client.workflow.start({
       args: [{
         data: {
-          diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000,
+          diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, brokerId: operators.brokerId,
         },
         metadata: {},
       }],
@@ -113,7 +116,7 @@ describe('print farm — printers as durable workflows (advert lifecycle)', () =
     });
     await client.workflow.start({
       args: [{
-        data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000 },
+        data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, technicianId: operators.technicianId },
         metadata: {},
       }],
       taskQueue: PRINT_ROUTING_QUEUE,
@@ -123,7 +126,7 @@ describe('print farm — printers as durable workflows (advert lifecycle)', () =
     });
     await client.workflow.start({
       args: [{
-        data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000 },
+        data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, inspectorId: operators.inspectorId },
         metadata: {},
       }],
       taskQueue: PRINT_ROUTING_QUEUE,
@@ -136,7 +139,7 @@ describe('print farm — printers as durable workflows (advert lifecycle)', () =
     const orderHandles = await Promise.all(
       orders.map((order) =>
         client.workflow.start({
-          args: [{ data: order, metadata: {} }],
+          args: [{ data: { ...order, operatorId: operators.ordererId }, metadata: {} }],
           taskQueue: PRINT_ROUTING_QUEUE,
           workflowName: PRINT_WORKFLOWS.ORDER,
           workflowId: order.orderId!,

@@ -56,21 +56,24 @@ export async function printShift(envelope: LTEnvelope): Promise<any> {
       taskQueue: PRINT_ROUTING_QUEUE,
       workflowName: PRINT_WORKFLOWS.PRINTER,
       workflowId: spec.printerId,
-      args: [{ data: spec, metadata: {} }],
+      args: [{ data: { ...spec, operatorId: d.printerOperatorId }, metadata: {} }],
       expire,
     });
   }
+  // Each crew member runs as its own operator — a principal holding exactly the pond
+  // role its robot resolves through. The shift threads those operators to its children.
   const loopData = { diabetic, idleTickSeconds, maxIdleRuns };
-  for (const [name, role] of [
-    [PRINT_WORKFLOWS.BROKER, 'broker'],
-    [PRINT_WORKFLOWS.TECHNICIAN, 'technician'],
-    [PRINT_WORKFLOWS.INSPECTOR, 'inspector'],
-  ] as const) {
+  const crew = [
+    { name: PRINT_WORKFLOWS.BROKER, role: 'broker', data: { ...loopData, brokerId: d.brokerId } },
+    { name: PRINT_WORKFLOWS.TECHNICIAN, role: 'technician', data: { ...loopData, technicianId: d.technicianId } },
+    { name: PRINT_WORKFLOWS.INSPECTOR, role: 'inspector', data: { ...loopData, inspectorId: d.inspectorId } },
+  ] as const;
+  for (const member of crew) {
     await Durable.workflow.startChild({
       taskQueue: PRINT_ROUTING_QUEUE,
-      workflowName: name,
-      workflowId: `${role}-${suffix}`,
-      args: [{ data: loopData, metadata: {} }],
+      workflowName: member.name,
+      workflowId: `${member.role}-${suffix}`,
+      args: [{ data: member.data, metadata: {} }],
       expire,
     });
   }
@@ -89,7 +92,7 @@ export async function printShift(envelope: LTEnvelope): Promise<any> {
           taskQueue: PRINT_ROUTING_QUEUE,
           workflowName: PRINT_WORKFLOWS.ORDER,
           workflowId: order.orderId!,
-          args: [{ data: order, metadata: {} }],
+          args: [{ data: { ...order, operatorId: d.ordererId }, metadata: {} }],
           expire,
         }),
       ),
@@ -102,7 +105,7 @@ export async function printShift(envelope: LTEnvelope): Promise<any> {
   //    (a printer mid-job re-advertises, then the next sweep catches it). Bounded.
   let retired = 0;
   for (let sweep = 0; sweep < SHIFT_DEFAULTS.maxPowerDownSweeps; sweep++) {
-    const { poweredDown } = await powerDownIdlePrinters({ diabetic, printerIds });
+    const { poweredDown } = await powerDownIdlePrinters({ diabetic, printerIds, operatorId: d.technicianId });
     retired += poweredDown;
     if (retired >= printerIds.length) break;
     await Durable.workflow.sleep('1 second');

@@ -24,6 +24,24 @@ export function registerResolveRoutes(router: Router): void {
   });
 
   /**
+   * POST /api/escalations/resolve-by-ids
+   * Resolve a SET of escalations by id in one guarded statement (set-based sibling of
+   * /:id/resolve). RBAC: scoped callers may only resolve rows whose role they hold.
+   * Body: { ids: string[], resolverPayload: Record<string, any>, metadata?: Record<string, any> }
+   */
+  router.post('/resolve-by-ids', async (req, res) => {
+    const result = await api.resolveByIds(
+      {
+        ids: req.body?.ids,
+        resolverPayload: req.body?.resolverPayload,
+        metadata: req.body?.metadata,
+      },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * POST /api/escalations/:id/resolve
    * Resolve a pending escalation with a human-provided payload. Routes by
    * escalation shape: efficient (signal_key) resumes the job in place; legacy

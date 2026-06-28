@@ -5,6 +5,7 @@ import { registerBulkRoutes } from './bulk';
 import { registerMetadataRoutes } from './metadata';
 import { registerSingleRoutes } from './single';
 import { registerResolveRoutes } from './resolve';
+import { registerFacetRoutes } from './facets';
 
 const router = Router();
 
@@ -19,6 +20,9 @@ registerBulkRoutes(router);
 
 // GET /by-metadata, POST /claim-by-metadata, POST /resolve-by-metadata
 registerMetadataRoutes(router);
+
+// POST /search-by-facets, /claim-groups, /claim-by-facets
+registerFacetRoutes(router);
 
 // PATCH /:id/escalate, GET /by-workflow/:workflowId,
 // GET /:id, POST /:id/claim, POST /:id/release

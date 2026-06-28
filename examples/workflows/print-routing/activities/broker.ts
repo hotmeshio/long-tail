@@ -9,8 +9,7 @@
  *   settleOrder              → resolve an order's insoles and wake the order workflow
  */
 
-import * as escalationService from '../../../../services/escalation';
-import * as escalationApi from '../../../../api/escalations';
+import { createClient } from '../../../../sdk';
 import type { ClaimedGroup } from '../../../../types';
 
 import { composePriorityOrder, eligiblePrinterClasses } from '../policy';
@@ -50,17 +49,22 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
   const kind = fleetKind(input.diabetic);
   const orderPond = ORDER_POND[kind];
   const printerPond = PRINTER_POND[kind];
-  const consumer = input.brokerId ?? `broker-${kind}`;
   const orderBy = composePriorityOrder(input.priorityRules);
   const durationMinutes = input.claimMinutes ?? DEFAULT_BROKER_CLAIM_MINUTES;
 
-  const { escalations } = await escalationService.searchByFacets({
+  // The broker runs as its operator — a principal holding the printer + order pond
+  // roles. Bind the auth once on the SDK client; every call goes through it.
+  const lt = createClient({ auth: { userId: input.brokerId } });
+
+  const ready = await lt.escalations.searchByFacets({
     role: printerPond,
     status: 'pending',
     available: true,
     facets: { [PRINTER_FACETS.STATE]: PRINTER_STATE.READY },
     limit: input.maxAdverts ?? DEFAULT_MAX_ADVERTS,
   });
+  if (ready.status !== 200) throw new Error(`searchByFacets failed: ${ready.error}`);
+  const { escalations } = ready.data;
 
   // Free printers per filament, split by size — xl is the scarce, larger machine.
   const capacity = new Map<string, { xl: number; std: number }>();
@@ -74,17 +78,21 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
     capacity.set(filament, slot);
   }
 
-  const claim = (filament: string, sizeClass: SizeClass, limit: number) =>
-    escalationService.claimGroups(
-      {
+  const claim = async (filament: string, sizeClass: SizeClass, limit: number): Promise<ClaimedGroup[]> => {
+    const res = await lt.escalations.claimGroups({
+      query: {
         role: orderPond,
         available: true,
         facets: { [PRINT_FACETS.FILAMENT]: filament, [PRINT_FACETS.SIZE_CLASS]: sizeClass },
         orderBy,
       },
-      consumer,
-      { limit, durationMinutes, sizeFacet: PRINT_FACETS.ORDER_SIZE },
-    );
+      limit,
+      durationMinutes,
+      sizeFacet: PRINT_FACETS.ORDER_SIZE,
+    });
+    if (res.status !== 200) throw new Error(`claimGroups failed: ${res.error}`);
+    return res.data.groups;
+  };
 
   const buckets: ClaimedOrderBucket[] = [];
   let matched = 0;
@@ -119,7 +127,8 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
  */
 export async function lockPrintersAndHandoff(input: {
   diabetic: boolean;
-  brokerId?: string;
+  /** Broker operator — holds the printer pond role (resolves adverts via the public API). */
+  brokerId: string;
   brokerWorkflowId: string;
   tick: number;
   phase: string;
@@ -128,19 +137,21 @@ export async function lockPrintersAndHandoff(input: {
 }): Promise<{ pairings: BrokerPairing[]; unplaced: ClaimedOrderBucket[] }> {
   const kind = fleetKind(input.diabetic);
   const printerPond = PRINTER_POND[kind];
-  const consumer = input.brokerId ?? `broker-${kind}`;
   const durationMinutes = input.claimMinutes ?? DEFAULT_BROKER_CLAIM_MINUTES;
   const pairings: BrokerPairing[] = [];
   const unplaced: ClaimedOrderBucket[] = [];
   let seq = 0;
+
+  // The broker runs as its operator (printer pond role) — auth bound once on the client.
+  const lt = createClient({ auth: { userId: input.brokerId } });
 
   for (const bucket of input.buckets) {
     if (!bucket.groups.length) continue;
     let remaining = bucket.groups;
     for (const printerClass of eligiblePrinterClasses(bucket.sizeClass)) {
       if (!remaining.length) break;
-      const printers = await escalationService.claimByFacets(
-        {
+      const locked = await lt.escalations.claimByFacets({
+        query: {
           role: printerPond,
           facets: {
             [PRINTER_FACETS.STATE]: PRINTER_STATE.READY,
@@ -148,9 +159,11 @@ export async function lockPrintersAndHandoff(input: {
             [PRINTER_FACETS.SIZE_CLASS]: printerClass,
           },
         },
-        consumer,
-        { limit: remaining.length, durationMinutes },
-      );
+        limit: remaining.length,
+        durationMinutes,
+      });
+      if (locked.status !== 200) throw new Error(`claimByFacets failed: ${locked.error}`);
+      const printers = locked.data.claimed;
 
       const place = Math.min(printers.length, remaining.length);
       for (let i = 0; i < place; i++) {
@@ -165,7 +178,10 @@ export async function lockPrintersAndHandoff(input: {
           callbackKey,
           brokerWorkflowId: input.brokerWorkflowId,
         };
-        await escalationApi.resolveEscalation({ id: advert.id, resolverPayload: job }, { userId: consumer });
+        // Resolve as the broker operator. A printer advert is an efficient (signal_key)
+        // row, so this marks it resolved AND delivers the job to the parked printer in
+        // one atomic call.
+        await lt.escalations.resolve({ id: advert.id, resolverPayload: job });
         pairings.push({ callbackKey, printerId, group });
       }
       remaining = remaining.slice(place);
@@ -185,11 +201,16 @@ export async function settleOrder(input: {
   group: ClaimedGroup;
   printerId: string;
   done: PrintCallbackPayload;
+  /** Broker operator — a principal holding the order pond role (RBAC). */
+  brokerId: string;
 }): Promise<void> {
-  const { group, printerId, done } = input;
-  for (const member of group.members) {
-    await escalationService.resolveEscalation(member.id, { printerId });
-  }
+  const { group, printerId, done, brokerId } = input;
+  // One set-based resolve over the whole origin group — `WHERE id = ANY AND
+  // status='pending'` in a single statement. Members are bookkeeping demand adverts
+  // (no signal_key); the order is woken collectively by the signalOrder below, so no
+  // per-row signal delivery is needed and the N+1 loop (partial-failure window) is gone.
+  const lt = createClient({ auth: { userId: brokerId } });
+  await lt.escalations.resolveByIds({ ids: group.members.map((m) => m.id), resolverPayload: { printerId } });
   const head = group.members[0];
   const meta = (head.metadata ?? {}) as Record<string, any>;
   await signalOrder({

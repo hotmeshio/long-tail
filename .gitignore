@@ -164,3 +164,7 @@ CLAUDE.md
 
 # HotMesh compiled deploy artifacts (regenerated on deploy)
 .hotmesh.*.json
+
+# Local audit working notes / plan docs (never checked in)
+/TRANSACTIONALITY-AUDIT.md
+/AUDIT-PLAN.md

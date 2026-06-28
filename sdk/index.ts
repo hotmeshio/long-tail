@@ -110,6 +110,8 @@ export function createClient(options: LTClientOptions = {}) {
       claim: bindAuth(escalationsApi.claimEscalation, auth),
       release: bindAuth(escalationsApi.releaseEscalation, auth),
       resolve: bindAuth(escalationsApi.resolveEscalation, auth),
+      resolveBySignalKey: bindAuth(escalationsApi.resolveBySignalKey, auth),
+      resolveByIds: bindAuth(escalationsApi.resolveByIds, auth),
       releaseExpired: escalationsApi.releaseExpiredClaims,
       updatePriority: bindAuth(escalationsApi.updatePriority, auth),
       bulkClaim: bindAuth(escalationsApi.bulkClaim, auth),
@@ -119,6 +121,10 @@ export function createClient(options: LTClientOptions = {}) {
       findByMetadata: bindAuth(escalationsApi.findByMetadata, auth),
       claimByMetadata: bindAuth(escalationsApi.claimByMetadata, auth),
       resolveByMetadata: bindAuth(escalationsApi.resolveByMetadata, auth),
+      // Faceted-routing surface (pond search + batch claim), RBAC-scoped to the caller's role.
+      searchByFacets: bindAuth(escalationsApi.searchByFacets, auth),
+      claimGroups: bindAuth(escalationsApi.claimGroups, auth),
+      claimByFacets: bindAuth(escalationsApi.claimByFacets, auth),
     },
 
     // ── Workflows ──────────────────────────────────────────────────────────

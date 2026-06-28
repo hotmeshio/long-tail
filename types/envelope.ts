@@ -45,6 +45,13 @@ export interface LTEnvelope {
     scopes?: string[];
     escalationId?: string;
     escalationStatus?: string;
+    /**
+     * Outcome patch carried on a re-run envelope. Merged into the prior
+     * escalation's GIN-indexed metadata inside the interceptor's atomic resolve
+     * (services/interceptor/lifecycle.ts → ltResolveEscalation), never written
+     * separately. Set by the resolve orchestrator's re-run path.
+     */
+    escalationMetadata?: Record<string, any>;
     originId?: string;
     parentId?: string;
     signalId?: string;

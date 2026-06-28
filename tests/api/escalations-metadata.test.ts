@@ -65,7 +65,8 @@ describe('findByMetadata', () => {
 
     await findByMetadata({ key: 'orderId', value: 'order-123', status: 'pending' }, SYSTEM_AUTH);
 
-    expect(mockFindByMetadata).toHaveBeenCalledWith('orderId', 'order-123', 'pending', undefined, undefined);
+    // Global caller (beforeEach) → no role filter (6th arg undefined).
+    expect(mockFindByMetadata).toHaveBeenCalledWith('orderId', 'order-123', 'pending', undefined, undefined, undefined);
   });
 
   it('returns 400 when key or value missing', async () => {
@@ -73,16 +74,18 @@ describe('findByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('scopes results by visible roles for non-global user', async () => {
+  it('scopes by visible roles IN SQL for a non-global user (no client-side filter)', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
     mockGetUserRoles.mockResolvedValue([{ role: 'reviewer', type: 'member', created_at: new Date() } as any]);
-    const esc = makeEscalation({ role: 'operator' });
-    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
+    mockFindByMetadata.mockResolvedValue({ escalations: [], total: 0 });
 
     const result = await findByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
     expect(result.status).toBe(200);
-    expect(result.data.escalations).toHaveLength(0);
+    // The caller's roles flow INTO the query as the 6th arg — the SQL does the
+    // filtering and the count, so `total` stays correct across pages. The controller
+    // never filters a fetched page client-side.
+    expect(mockFindByMetadata).toHaveBeenCalledWith('orderId', 'order-123', undefined, undefined, undefined, ['reviewer']);
   });
 });
 

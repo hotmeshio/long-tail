@@ -23,6 +23,13 @@ export function registerListRoutes(router: Router): void {
         envelope: req.body?.envelope,
         metadata: req.body?.metadata,
         escalation_payload: req.body?.escalation_payload,
+        // Workflow-linkage (optional): an advert for a running workflow.
+        origin_id: req.body?.origin_id,
+        parent_id: req.body?.parent_id,
+        task_id: req.body?.task_id,
+        workflow_id: req.body?.workflow_id,
+        task_queue: req.body?.task_queue,
+        workflow_type: req.body?.workflow_type,
       },
       req.auth!,
     );

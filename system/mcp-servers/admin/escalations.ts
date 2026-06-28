@@ -37,6 +37,10 @@ import {
   bulkAssignSchema,
   bulkEscalateSchema,
   updatePrioritySchema,
+  resolveByIdsSchema,
+  searchByFacetsSchema,
+  claimGroupsSchema,
+  claimByFacetsSchema,
 } from './schemas';
 
 let systemPrincipalId: string | null = null;
@@ -281,6 +285,93 @@ export function registerEscalationTools(server: McpServer): void {
     async (args: z.infer<typeof resolveBySignalKeySchema>) => {
       const result = await escalationApi.resolveBySignalKey(
         { signalKey: args.signalKey, resolverPayload: args.resolverPayload },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/resolve-by-ids
+  (server as any).registerTool(
+    'resolve_by_ids',
+    {
+      title: 'Resolve by IDs',
+      description:
+        'Resolve a SET of escalations by id in one guarded statement. RBAC-scoped: ' +
+        'callers may only resolve rows whose role they hold. For bookkeeping rows woken ' +
+        'collectively (no per-row signal delivery).',
+      inputSchema: resolveByIdsSchema,
+    },
+    async (args: z.infer<typeof resolveByIdsSchema>) => {
+      const result = await escalationApi.resolveByIds(
+        { ids: args.ids, resolverPayload: args.resolverPayload, metadata: args.metadata },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/search-by-facets
+  (server as any).registerTool(
+    'search_by_facets',
+    {
+      title: 'Search by Facets',
+      description:
+        'Faceted search over a pond, scoped to the caller\'s role. Filter by status, ' +
+        'availability, and metadata facets; sort by columns; page with limit/offset.',
+      inputSchema: searchByFacetsSchema,
+    },
+    async (args: z.infer<typeof searchByFacetsSchema>) => {
+      const result = await escalationApi.searchByFacets(args as any, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/claim-groups
+  (server as any).registerTool(
+    'claim_groups',
+    {
+      title: 'Claim Groups',
+      description:
+        'Batch-claim complete origin groups (orders) in priority order over a pond, ' +
+        'assigned to the calling principal. RBAC-scoped to the pond role.',
+      inputSchema: claimGroupsSchema,
+    },
+    async (args: z.infer<typeof claimGroupsSchema>) => {
+      const result = await escalationApi.claimGroups(
+        { query: args.query as any, limit: args.limit, durationMinutes: args.durationMinutes, sizeFacet: args.sizeFacet },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/claim-by-facets
+  (server as any).registerTool(
+    'claim_by_facets',
+    {
+      title: 'Claim by Facets',
+      description:
+        'Batch-claim individual rows matching a facet query (FOR UPDATE SKIP LOCKED), ' +
+        'assigned to the calling principal. With allOrNone, commits only the full set. ' +
+        'RBAC-scoped to the pond role.',
+      inputSchema: claimByFacetsSchema,
+    },
+    async (args: z.infer<typeof claimByFacetsSchema>) => {
+      const result = await escalationApi.claimByFacets(
+        { query: args.query as any, limit: args.limit, durationMinutes: args.durationMinutes, allOrNone: args.allOrNone },
         await systemAuth(),
       );
       if (result.error) {

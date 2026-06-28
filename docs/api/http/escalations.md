@@ -916,3 +916,72 @@ Single atomic query finds the pending escalation by metadata, auto-claims if unc
   "workflowId": "..."
 }
 ```
+
+## Resolve a set of escalations
+
+```
+POST /api/escalations/resolve-by-ids
+```
+
+Resolve many escalations in one guarded statement — the set-based sibling of `POST /:id/resolve`. Used for bookkeeping rows that are woken collectively (it does not deliver a per-row signal). RBAC: a scoped caller may only resolve rows whose role they hold (global principals are unrestricted).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | yes | Escalation ids to resolve as one set |
+| `resolverPayload` | `object` | yes | Payload applied to every row |
+| `metadata` | `object` | no | Outcome patch merged into each row's GIN-indexed metadata |
+
+**Response 200:** `{ "resolved": <count>, "escalationIds": [...] }` — only the rows that were still `pending` are resolved and returned.
+
+## Faceted search
+
+```
+POST /api/escalations/search-by-facets
+```
+
+Item-level faceted search over a single pond `role`, scoped to the caller's role. The body is a faceted query.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | `string` | yes | Pond role to search |
+| `status` | `string` | no | e.g. `pending` |
+| `available` | `boolean` | no | Only rows not currently claimed |
+| `facets` | `object` | no | Metadata facet equality filters |
+| `orderBy` | `{ column, direction }[]` | no | Sort order |
+| `limit` / `offset` | `integer` | no | Paging |
+
+**Response 200:** `{ "escalations": [...], "total": <n> }`.
+
+## Claim groups
+
+```
+POST /api/escalations/claim-groups
+```
+
+Batch-claim complete origin groups (e.g. all units of an order) in priority order over a pond, assigned to the caller. RBAC-scoped to the pond role.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | FacetQuery | yes | The pond/facet selector (see search-by-facets) |
+| `limit` | `integer` | no | Max groups to claim |
+| `durationMinutes` | `integer` | no | Claim TTL |
+| `sizeFacet` | `string` | no | Metadata key holding the group size |
+
+**Response 200:** `{ "groups": [...] }`.
+
+## Claim by facets
+
+```
+POST /api/escalations/claim-by-facets
+```
+
+Batch-claim individual rows matching a facet query (`FOR UPDATE SKIP LOCKED`), assigned to the caller. With `allOrNone`, commits only when the full `limit` is acquired. RBAC-scoped to the pond role.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | FacetQuery | yes | The pond/facet selector |
+| `limit` | `integer` | no | Max rows to claim |
+| `durationMinutes` | `integer` | no | Claim TTL |
+| `allOrNone` | `boolean` | no | Commit only if the full set was acquired |
+
+**Response 200:** `{ "claimed": [...] }`.

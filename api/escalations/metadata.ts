@@ -17,16 +17,13 @@ export async function findByMetadata(
     if (!input.key || !input.value) {
       return { status: 400, error: 'key and value are required' };
     }
-    const result = await escalationService.findByMetadata(
-      input.key, input.value, input.status, input.limit, input.offset,
-    );
-    // RBAC: scope to visible roles
+    // RBAC scoped IN SQL: undefined = global (no filter), string[] = the caller's
+    // visible roles. Filtering here (controller-side, over a fetched page) would
+    // shrink the page and report a wrong total — the filter must reach the query.
     const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles) {
-      const roleSet = new Set(visibleRoles);
-      result.escalations = result.escalations.filter(e => roleSet.has(e.role));
-      result.total = result.escalations.length;
-    }
+    const result = await escalationService.findByMetadata(
+      input.key, input.value, input.status, input.limit, input.offset, visibleRoles,
+    );
     return { status: 200, data: result };
   } catch (err: any) {
     return { status: 500, error: err.message };

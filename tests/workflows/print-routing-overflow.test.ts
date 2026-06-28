@@ -6,6 +6,7 @@ import { postgres_options, sleepFor } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../lib/db/migrate';
 import { systemEventsConfig } from '../../lib/events/system-events';
+import { seedPrintOperators, type PrintOperators } from '../helpers/print-fleet';
 import {
   printOrder,
   printer,
@@ -44,6 +45,7 @@ const ALL_ROLES = [
 
 describe('print farm — standard work overflows to the xl machine (soft capability)', () => {
   let client: InstanceType<typeof Client>;
+  let operators: PrintOperators;
 
   beforeAll(async () => {
     await connectTelemetry();
@@ -51,6 +53,8 @@ describe('print farm — standard work overflows to the xl machine (soft capabil
     await migrate();
     const { getPool } = await import('../../lib/db');
     await getPool().query('DELETE FROM lt_escalations WHERE role = ANY($1::text[])', [ALL_ROLES]);
+    // Robots resolve through the role-gated public API → seed per-pond operators.
+    operators = await seedPrintOperators(true);
 
     const connection = { class: Postgres, options: postgres_options };
     for (const workflow of [printOrder, printer, printBroker, farmTechnician, farmInspector]) {
@@ -90,7 +94,7 @@ describe('print farm — standard work overflows to the xl machine (soft capabil
     // Fleet: one standard machine, one xl machine.
     for (const [id, sizeClass] of [[stdPrinterId, 'standard'], [xlPrinterId, 'xl']] as const) {
       await client.workflow.start({
-        args: [{ data: { printerId: id, diabetic: true, filament: 'pla', sizeClass }, metadata: {} }],
+        args: [{ data: { printerId: id, diabetic: true, filament: 'pla', sizeClass, operatorId: operators.printerOperatorId }, metadata: {} }],
         taskQueue: PRINT_ROUTING_QUEUE,
         workflowName: PRINT_WORKFLOWS.PRINTER,
         workflowId: id,
@@ -99,7 +103,7 @@ describe('print farm — standard work overflows to the xl machine (soft capabil
     }
     for (const wf of [PRINT_WORKFLOWS.BROKER, PRINT_WORKFLOWS.TECHNICIAN, PRINT_WORKFLOWS.INSPECTOR]) {
       await client.workflow.start({
-        args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000 }, metadata: {} }],
+        args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, brokerId: operators.brokerId, technicianId: operators.technicianId, inspectorId: operators.inspectorId }, metadata: {} }],
         taskQueue: PRINT_ROUTING_QUEUE,
         workflowName: wf,
         workflowId: `${wf}-${suffix}`,
@@ -110,7 +114,7 @@ describe('print farm — standard work overflows to the xl machine (soft capabil
     const handles = await Promise.all(
       orders.map((order) =>
         client.workflow.start({
-          args: [{ data: order, metadata: {} }],
+          args: [{ data: { ...order, operatorId: operators.ordererId }, metadata: {} }],
           taskQueue: PRINT_ROUTING_QUEUE,
           workflowName: PRINT_WORKFLOWS.ORDER,
           workflowId: order.orderId!,

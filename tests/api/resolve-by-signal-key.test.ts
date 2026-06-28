@@ -13,7 +13,6 @@ import { resolveBySignalKey } from '../../api/escalations/resolve';
 
 const mockGetBySignalKey = vi.mocked(escalationService.getEscalationBySignalKey);
 const mockResolve = vi.mocked(escalationService.resolveEscalation);
-const mockMergeMetadata = vi.mocked(escalationService.updateEscalationMetadata);
 const mockHasGlobalAccess = vi.mocked(userService.hasGlobalEscalationAccess);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
 
@@ -111,9 +110,9 @@ describe('resolveBySignalKey (api)', () => {
     );
     expect(result.status).toBe(200);
     // The patch rides as the 3rd arg of resolve → merged in the same guarded UPDATE.
-    // It is NEVER written via a separate, non-transactional metadata update.
+    // It is NEVER written via a separate, non-transactional metadata update
+    // (no separate-write method exists on the service surface).
     expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, { outcome: 'approved', durationMs: 1200 });
-    expect(mockMergeMetadata).not.toHaveBeenCalled();
   });
 
   it('omits the patch (3rd arg undefined) when none is given — backward compatible', async () => {
@@ -121,6 +120,5 @@ describe('resolveBySignalKey (api)', () => {
     mockResolve.mockResolvedValue(makeEscalation({ status: 'resolved' }));
     await resolveBySignalKey({ signalKey: 'station-done-wf-1', resolverPayload: { approved: true } }, AUTH);
     expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined);
-    expect(mockMergeMetadata).not.toHaveBeenCalled();
   });
 });

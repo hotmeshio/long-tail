@@ -10,7 +10,7 @@
  *                         work no longer needs so nothing lingers after the floor clears.
  */
 
-import * as escalationService from '../../../../services/escalation';
+import { createClient } from '../../../../sdk';
 
 import {
   fleetKind,
@@ -131,24 +131,33 @@ export async function buildShiftPlan(input: {
 export async function powerDownIdlePrinters(input: {
   diabetic: boolean;
   printerIds: string[];
+  /** Operator running the sweep — a principal holding the printer pond role. */
+  operatorId: string;
 }): Promise<{ poweredDown: number; printerIds: string[] }> {
-  const { diabetic, printerIds } = input;
+  const { diabetic, printerIds, operatorId } = input;
   const printerPond = PRINTER_POND[fleetKind(diabetic)];
   const mine = new Set(printerIds);
 
-  const { escalations } = await escalationService.searchByFacets({
+  // Run as a printer-pond operator. Bind auth once on the SDK client.
+  const lt = createClient({ auth: { userId: operatorId } });
+
+  const ready = await lt.escalations.searchByFacets({
     role: printerPond,
     facets: { [PRINTER_FACETS.STATE]: PRINTER_STATE.READY },
     status: 'pending',
     available: true,
     limit: 200,
   });
+  if (ready.status !== 200) throw new Error(`searchByFacets failed: ${ready.error}`);
 
-  const idle = escalations.filter((e) => mine.has(String(e.metadata?.[PRINTER_FACETS.PRINTER_ID])));
+  const idle = ready.data.escalations.filter((e: any) => mine.has(String(e.metadata?.[PRINTER_FACETS.PRINTER_ID])));
   const downed: string[] = [];
+  // Each READY advert is a signal_key row whose resolution must DELIVER
+  // `{ powerdown: true }` as the condition's return value so the printer breaks its
+  // loop and retires — so it stays per-row, not set-based. Each is `pending`-guarded.
   for (const advert of idle) {
-    const resolved = await escalationService.resolveEscalation(advert.id, { powerdown: true });
-    if (resolved) downed.push(String(advert.metadata?.[PRINTER_FACETS.PRINTER_ID]));
+    const res = await lt.escalations.resolve({ id: advert.id, resolverPayload: { powerdown: true } });
+    if (res.status === 200) downed.push(String(advert.metadata?.[PRINTER_FACETS.PRINTER_ID]));
   }
   return { poweredDown: downed.length, printerIds: downed };
 }

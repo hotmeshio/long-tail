@@ -177,8 +177,9 @@ everywhere. Here it is automated so the example self-drains; in production a das
 operator claims and resolves these.
 
 ```typescript
-const adverts = await searchByFacets({ role: printerPool, status: 'pending', facets: { state: 'maintenance' } });
-for (const advert of adverts) await escalationApi.resolveEscalation(advert.id, { action: 'added-filament' });
+const lt = createClient({ auth: { userId: technicianId } });   // runs as a printer-pond operator
+const adverts = await lt.escalations.searchByFacets({ role: printerPool, status: 'pending', facets: { state: 'maintenance' } });
+for (const advert of adverts.data.escalations) await lt.escalations.resolve({ id: advert.id, resolverPayload: { action: 'added-filament' } });
 ```
 
 ## Actor 5 — `farmInspector` (signoff)
@@ -195,10 +196,11 @@ unit is printed and a cycle spent, but the output is bad — the order records e
 units the farmer rejected (`failedUnits`), the signal the convergence loop will reprint.
 
 ```typescript
-const pending = await searchByFacets({ role: farmerPool, status: 'pending' });
-for (const e of pending) {
+const lt = createClient({ auth: { userId: inspectorId } });   // runs as a farmer-pond operator
+const pending = await lt.escalations.searchByFacets({ role: farmerPool, status: 'pending' });
+for (const e of pending.data.escalations) {
   const failedUnits = e.metadata.failUnits ?? [];   // units the farmer rejects (none = clean)
-  await escalationApi.resolveEscalation(e.id, { passed: failedUnits.length === 0, failedUnits, inspectedBy });
+  await lt.escalations.resolve({ id: e.id, resolverPayload: { passed: failedUnits.length === 0, failedUnits, inspectedBy } });
 }
 // resolving wakes the parked order, which returns with the inspection on its result
 ```
@@ -223,7 +225,7 @@ Because every transition is a row, a printer's entire life — every run, every 
 its retirement — is recoverable from the supply pond:
 
 ```typescript
-searchByFacets({ role: 'printer-pool-diabetic', facets: { printerId: 'printer-1' } });
+lt.escalations.searchByFacets({ role: 'printer-pool-diabetic', facets: { printerId: 'printer-1' } });
 // → the full trail: 10 resolved `ready` adverts + 3 resolved `maintenance` adverts
 ```
 
@@ -240,7 +242,7 @@ stored: the row's own `created_at` (handoff) → `resolved_at` (done) *is* the d
 by query. One row, both halves of the story:
 
 ```typescript
-searchByFacets({ role: 'printer-pool-diabetic', facets: { state: 'printing', outcome: 'success' } });
+lt.escalations.searchByFacets({ role: 'printer-pool-diabetic', facets: { state: 'printing', outcome: 'success' } });
 // → every completed print: which printer, which order — resolved_at − created_at is how long it took
 ```
 

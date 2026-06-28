@@ -6,7 +6,7 @@ import { postgres_options, sleepFor } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../lib/db/migrate';
 import { systemEventsConfig } from '../../lib/events/system-events';
-import { buildFarm, buildFarmOrders } from '../helpers/print-fleet';
+import { buildFarm, buildFarmOrders, seedPrintOperators, type PrintOperators } from '../helpers/print-fleet';
 import {
   printOrder,
   printer,
@@ -47,6 +47,7 @@ const ALL_ROLES = [
 
 describe('print farm — a fleet draining concurrently (multi-printer, capability)', () => {
   let client: InstanceType<typeof Client>;
+  let operators: PrintOperators;
 
   beforeAll(async () => {
     await connectTelemetry();
@@ -54,6 +55,8 @@ describe('print farm — a fleet draining concurrently (multi-printer, capabilit
     await migrate();
     const { getPool } = await import('../../lib/db');
     await getPool().query('DELETE FROM lt_escalations WHERE role = ANY($1::text[])', [ALL_ROLES]);
+    // Robots resolve through the role-gated public API → seed per-pond operators.
+    operators = await seedPrintOperators(true);
 
     const connection = { class: Postgres, options: postgres_options };
     for (const workflow of [printOrder, printer, printBroker, farmTechnician, farmInspector]) {
@@ -88,7 +91,7 @@ describe('print farm — a fleet draining concurrently (multi-printer, capabilit
     // Supply: launch the whole fleet. Each machine advertises itself.
     for (const spec of fleet) {
       await client.workflow.start({
-        args: [{ data: spec, metadata: {} }],
+        args: [{ data: { ...spec, operatorId: operators.printerOperatorId }, metadata: {} }],
         taskQueue: PRINT_ROUTING_QUEUE,
         workflowName: PRINT_WORKFLOWS.PRINTER,
         workflowId: spec.printerId,
@@ -97,21 +100,21 @@ describe('print farm — a fleet draining concurrently (multi-printer, capabilit
     }
     // One broker + technician for the diabetic fleet. They run until afterAll.
     await client.workflow.start({
-      args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000 }, metadata: {} }],
+      args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, brokerId: operators.brokerId }, metadata: {} }],
       taskQueue: PRINT_ROUTING_QUEUE,
       workflowName: PRINT_WORKFLOWS.BROKER,
       workflowId: `${PRINT_WORKFLOWS.BROKER}-${suffix}`,
       expire: 600,
     });
     await client.workflow.start({
-      args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000 }, metadata: {} }],
+      args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, technicianId: operators.technicianId }, metadata: {} }],
       taskQueue: PRINT_ROUTING_QUEUE,
       workflowName: PRINT_WORKFLOWS.TECHNICIAN,
       workflowId: `${PRINT_WORKFLOWS.TECHNICIAN}-${suffix}`,
       expire: 600,
     });
     await client.workflow.start({
-      args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000 }, metadata: {} }],
+      args: [{ data: { diabetic: true, idleTickSeconds: 1, maxIdleRuns: 1_000_000, inspectorId: operators.inspectorId }, metadata: {} }],
       taskQueue: PRINT_ROUTING_QUEUE,
       workflowName: PRINT_WORKFLOWS.INSPECTOR,
       workflowId: `${PRINT_WORKFLOWS.INSPECTOR}-${suffix}`,
@@ -122,7 +125,7 @@ describe('print farm — a fleet draining concurrently (multi-printer, capabilit
     const orderHandles = await Promise.all(
       orders.map((order) =>
         client.workflow.start({
-          args: [{ data: order, metadata: {} }],
+          args: [{ data: { ...order, operatorId: operators.ordererId }, metadata: {} }],
           taskQueue: PRINT_ROUTING_QUEUE,
           workflowName: PRINT_WORKFLOWS.ORDER,
           workflowId: order.orderId!,

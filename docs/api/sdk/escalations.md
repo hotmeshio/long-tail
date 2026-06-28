@@ -748,3 +748,80 @@ const result = await lt.escalations.resolveByMetadata({
 **Returns:** `LTApiResult<{ escalation }>` for non-signal, `LTApiResult<{ signaled, escalationId, workflowId }>` for signal-backed. 404 if no match.
 
 **Auth:** Required
+
+## resolveByIds
+
+Resolve a set of escalations by id in one guarded statement (the set-based sibling of `resolve`). For bookkeeping rows woken collectively — it does not deliver a per-row signal. RBAC: a scoped caller may only resolve rows whose role they hold.
+
+```typescript
+const result = await lt.escalations.resolveByIds({
+  ids: ['esc_1', 'esc_2', 'esc_3'],
+  resolverPayload: { printerId: 'p-7' },
+  metadata: { outcome: 'settled' },
+});
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ids` | `string[]` | Yes | Escalation ids to resolve as one set |
+| `resolverPayload` | `Record<string, any>` | Yes | Payload applied to every row |
+| `metadata` | `Record<string, any>` | No | Outcome patch merged into each row |
+
+**Returns:** `LTApiResult<{ resolved: number; escalationIds: string[] }>` — only still-`pending` rows are resolved.
+
+## resolveBySignalKey
+
+Resolve an efficient (atomic) escalation directly by its `signal_key` and resume the waiting workflow in place. For callers that know the deterministic signal id and want to skip the id lookup. RBAC-scoped to the escalation's role.
+
+```typescript
+const result = await lt.escalations.resolveBySignalKey({
+  signalKey: 'signal-scan-ar-order-42',
+  resolverPayload: { approved: true },
+});
+```
+
+**Returns:** `LTApiResult<{ signaled: true; escalationId; workflowId }>`.
+
+## searchByFacets
+
+Item-level faceted search over a single pond `role`, scoped to the caller's role. The faceted-routing read primitive.
+
+```typescript
+const result = await lt.escalations.searchByFacets({
+  role: 'printer-pool-diabetic',
+  status: 'pending',
+  available: true,
+  facets: { state: 'ready' },
+  limit: 50,
+});
+```
+
+**Returns:** `LTApiResult<{ escalations; total }>`.
+
+## claimGroups
+
+Batch-claim complete origin groups (e.g. all units of an order) in priority order over a pond, assigned to the caller. RBAC-scoped to the pond role.
+
+```typescript
+const result = await lt.escalations.claimGroups({
+  query: { role: 'print-farm-diabetic', available: true, facets: { filament: 'pla', size_class: 'standard' } },
+  limit: 4,
+  durationMinutes: 30,
+  sizeFacet: 'order_size',
+});
+```
+
+**Returns:** `LTApiResult<{ groups }>`.
+
+## claimByFacets
+
+Batch-claim individual rows matching a facet query (`FOR UPDATE SKIP LOCKED`), assigned to the caller. With `allOrNone`, commits only when the full `limit` is acquired. RBAC-scoped to the pond role.
+
+```typescript
+const result = await lt.escalations.claimByFacets({
+  query: { role: 'printer-pool-diabetic', facets: { state: 'ready', filament: 'pla' } },
+  limit: 3,
+});
+```
+
+**Returns:** `LTApiResult<{ claimed }>`.

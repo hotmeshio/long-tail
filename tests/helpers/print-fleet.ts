@@ -1,9 +1,82 @@
+import { Durable } from '@hotmeshio/hotmesh';
+
+import * as userService from '../../services/user';
+import {
+  fleetKind,
+  ORDER_POND,
+  PRINTER_POND,
+  FARMER_POND,
+} from '../../examples/workflows/print-routing/types';
 import type {
   PrinterData,
   PrintOrderData,
   Side,
   SizeClass,
 } from '../../examples/workflows/print-routing/types';
+
+/** The operator principals a fleet's robots resolve through (see seedPrintOperators). */
+export interface PrintOperators {
+  brokerId: string;
+  technicianId: string;
+  inspectorId: string;
+  ordererId: string;
+  printerOperatorId: string;
+}
+
+/**
+ * Seed the per-pond operator principals the print-routing robots run as. Every
+ * escalation operation flows through the role-gated public API (superadmin / admin /
+ * exact role), so each robot must run as a principal holding exactly the pond role it
+ * acts on:
+ *   broker      → printer pond (handoff) + order pond (settle/claim)
+ *   technician  → printer pond (refill, power-down)
+ *   inspector   → farmer pond (signoff)
+ *   orderer     → order pond (enqueue demand units)
+ *   printer     → printer pond (resolve the broker's callback advert)
+ * This is the realistic, teachable shape — the example proves the gated path, not an
+ * open door. Returns the operators' user ids to thread into the robot start data.
+ */
+export async function seedPrintOperators(diabetic: boolean): Promise<PrintOperators> {
+  const kind = fleetKind(diabetic);
+  const suffix = Durable.guid().slice(0, 8);
+  const [broker, technician, inspector, orderer, printer] = await Promise.all([
+    userService.createUser({
+      external_id: `print-broker-${kind}-${suffix}`,
+      display_name: `Print Broker (${kind})`,
+      roles: [
+        { role: PRINTER_POND[kind], type: 'member' },
+        { role: ORDER_POND[kind], type: 'member' },
+      ],
+    }),
+    userService.createUser({
+      external_id: `print-technician-${kind}-${suffix}`,
+      display_name: `Print Technician (${kind})`,
+      roles: [{ role: PRINTER_POND[kind], type: 'member' }],
+    }),
+    userService.createUser({
+      external_id: `print-inspector-${kind}-${suffix}`,
+      display_name: `Print Inspector (${kind})`,
+      roles: [{ role: FARMER_POND[kind], type: 'member' }],
+    }),
+    userService.createUser({
+      external_id: `print-orderer-${kind}-${suffix}`,
+      display_name: `Print Orderer (${kind})`,
+      roles: [{ role: ORDER_POND[kind], type: 'member' }],
+    }),
+    userService.createUser({
+      external_id: `print-printer-${kind}-${suffix}`,
+      display_name: `Print Printer Operator (${kind})`,
+      roles: [{ role: PRINTER_POND[kind], type: 'member' }],
+    }),
+  ]);
+  return {
+    brokerId: broker.id,
+    technicianId: technician.id,
+    inspectorId: inspector.id,
+    ordererId: orderer.id,
+    printerOperatorId: printer.id,
+  };
+}
 
 /** One diabetic printer that serves the EOL lane (pla / standard). */
 export function buildEolPrinter(suffix: string): PrinterData {

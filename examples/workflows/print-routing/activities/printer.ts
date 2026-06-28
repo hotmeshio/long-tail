@@ -15,7 +15,7 @@
  * it on the first try; retry briefly until it exists.
  */
 
-import * as escalationService from '../../../../services/escalation';
+import { createClient } from '../../../../sdk';
 
 import { OUTCOME_FACETS } from '../types';
 import type { PrinterJobPayload, PrintCallbackPayload, PrintOutcomeFacets } from '../types';
@@ -23,8 +23,15 @@ import type { PrinterJobPayload, PrintCallbackPayload, PrintOutcomeFacets } from
 export async function runPrintJob(input: {
   job: PrinterJobPayload;
   printerId: string;
+  /** Printer operator — a principal holding the printer pond role (resolves the
+   *  broker's callback advert, which carries role = printerPond). */
+  operatorId: string;
 }): Promise<void> {
-  const { job, printerId } = input;
+  const { job, printerId, operatorId } = input;
+
+  // Run as the printer operator — a principal holding the printer pond role (the
+  // broker's callback advert carries role = printer pond).
+  const lt = createClient({ auth: { userId: operatorId } });
 
   const payload: PrintCallbackPayload = {
     result: 'success',
@@ -39,10 +46,16 @@ export async function runPrintJob(input: {
   };
 
   for (let attempt = 0; attempt < 25; attempt++) {
-    // One guarded UPDATE: resume the broker AND record the outcome on the same row.
-    const resolved = await escalationService.resolveEscalationBySignalKey(job.callbackKey, payload, outcome);
-    if (resolved) return;
-    await new Promise((r) => setTimeout(r, 200)); // the broker's `printing` row not open yet
+    // One guarded UPDATE through the public API: resume the broker AND record the
+    // outcome on the same row. 404 = the broker's `printing` row isn't open yet (retry).
+    const res = await lt.escalations.resolveBySignalKey({
+      signalKey: job.callbackKey,
+      resolverPayload: payload,
+      metadata: outcome,
+    });
+    if (res.status === 200) return;
+    if (res.status !== 404) throw new Error(`callback resolve failed (${res.status}): ${res.error ?? ''}`);
+    await new Promise((r) => setTimeout(r, 200));
   }
   throw new Error(`callback escalation ${job.callbackKey} never opened`);
 }

@@ -564,3 +564,41 @@ export const findOrphanedSignalsSchema = z.object({
   within_hours: z.number().int().min(1).max(720).optional().default(24).describe('Recent time window to scan, in hours (default: 24, max: 720). Bounds the scan of the partitioned worker_streams table — widen deliberately to reach older orphans.'),
   limit: z.number().int().min(1).max(500).optional().default(100).describe('Max results (default: 100, max: 500)'),
 });
+
+// ── Faceted routing + set resolve ───────────────────────────────────────────
+
+/** A faceted query over a pond — filter/sort by columns and metadata facets. */
+export const facetQuerySchema = z.object({
+  role: z.string().describe('Pond role to target (the escalation role)'),
+  status: z.string().optional().describe("Status filter (e.g. 'pending')"),
+  available: z.boolean().optional().describe('Only rows not currently claimed'),
+  facets: z.record(z.any()).optional().describe('Metadata facet equality filters'),
+  orderBy: z.array(z.object({
+    column: z.string(),
+    direction: z.enum(['asc', 'desc']),
+  })).optional().describe('Sort order over columns'),
+  limit: z.number().int().min(1).optional(),
+  offset: z.number().int().min(0).optional(),
+});
+
+export const resolveByIdsSchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation ids to resolve as one set'),
+  resolverPayload: z.record(z.any()).describe('Resolution payload applied to every row'),
+  metadata: z.record(z.any()).optional().describe('Outcome patch merged into each row'),
+});
+
+export const searchByFacetsSchema = facetQuerySchema;
+
+export const claimGroupsSchema = z.object({
+  query: facetQuerySchema,
+  limit: z.number().int().min(1).optional().describe('Max groups to claim'),
+  durationMinutes: z.number().int().min(1).optional().describe('Claim TTL in minutes'),
+  sizeFacet: z.string().optional().describe('Metadata key holding the group size'),
+});
+
+export const claimByFacetsSchema = z.object({
+  query: facetQuerySchema,
+  limit: z.number().int().min(1).optional().describe('Max rows to claim'),
+  durationMinutes: z.number().int().min(1).optional().describe('Claim TTL in minutes'),
+  allOrNone: z.boolean().optional().describe('Commit only if the full limit was acquired'),
+});

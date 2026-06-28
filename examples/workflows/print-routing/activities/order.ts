@@ -4,7 +4,7 @@
  * group is complete (claimable) at `unitIndices.length` members.
  */
 
-import * as escalationService from '../../../../services/escalation';
+import { createClient } from '../../../../sdk';
 
 import { manifestFacets } from '../policy';
 import {
@@ -26,12 +26,18 @@ export async function enqueueOrderUnits(input: {
   role: string;
   orderSignal: string;
   workflowId: string;
+  /** Order operator — a principal holding the order pond role (api create is gated). */
+  operatorId: string;
 }): Promise<{ originId: string; created: number }> {
-  const { order, originId, unitIndices, reprint, role, orderSignal, workflowId } = input;
+  const { order, originId, unitIndices, reprint, role, orderSignal, workflowId, operatorId } = input;
   const orderSize = unitIndices.length; // the group is complete at this many — deficit-sized on a reprint
+
+  // Run as the order operator — a principal holding the order pond role (create is gated).
+  const lt = createClient({ auth: { userId: operatorId } });
+
   for (const idx of unitIndices) {
     const facets = manifestFacets(order, idx, orderSignal, orderSize);
-    await escalationService.createEscalation({
+    const res = await lt.escalations.create({
       type: PRINT_WORKFLOWS.ORDER,
       subtype: `unit-${idx}`,
       description: `Print ${facets.side} insole (unit ${idx}) — order ${originId}`,
@@ -44,6 +50,7 @@ export async function enqueueOrderUnits(input: {
       envelope: JSON.stringify({ orderId: originId, unitIndex: idx, customerId: order.customerId }),
       metadata: { ...facets, [PRINT_FACETS.REPRINT]: reprint, source: PRINT_SOURCE },
     });
+    if (res.status !== 201) throw new Error(`create escalation failed: ${res.error}`);
   }
   return { originId, created: orderSize };
 }

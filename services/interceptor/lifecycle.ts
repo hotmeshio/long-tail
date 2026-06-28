@@ -71,9 +71,13 @@ export async function resolveReRun(
   const isRealEscalation = isReRun && escalationId && !escalationId.startsWith('auto-triage-');
 
   if (isRealEscalation) {
+    // Thread the outcome patch carried on the re-run envelope so it merges into the
+    // prior escalation's metadata inside this SAME atomic resolve — never a separate
+    // write. (resolve orchestrator Path E sets envelope.lt.escalationMetadata.)
     await activities.ltResolveEscalation({
       escalationId: escalationId!,
       resolverPayload: envelope!.resolver!,
+      metadata: envelope!.lt?.escalationMetadata,
     });
 
     // escalation.resolved event published by service layer (services/escalation/crud.ts)

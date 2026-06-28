@@ -33,6 +33,14 @@ export async function createEscalation(
     envelope?: string;
     metadata?: Record<string, any>;
     escalation_payload?: string;
+    // Workflow-linkage (optional): set when the escalation is an advert for a running
+    // workflow — e.g. an order enqueuing demand units for the broker to claim.
+    origin_id?: string;
+    parent_id?: string;
+    task_id?: string;
+    workflow_id?: string;
+    task_queue?: string;
+    workflow_type?: string;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
@@ -63,6 +71,12 @@ export async function createEscalation(
       envelope: input.envelope ?? '{}',
       metadata: input.metadata,
       escalation_payload: input.escalation_payload,
+      origin_id: input.origin_id,
+      parent_id: input.parent_id,
+      task_id: input.task_id,
+      workflow_id: input.workflow_id,
+      task_queue: input.task_queue,
+      workflow_type: input.workflow_type,
     });
 
     // Event published by service layer (services/escalation/crud.ts)

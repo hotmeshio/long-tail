@@ -25,7 +25,7 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
  */
 export async function resolveEscalation(
   input: { id: string; resolverPayload: Record<string, any>; metadata?: Record<string, any> },
-  _auth: LTApiAuth,
+  auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
     const { id, resolverPayload, metadata } = input;
@@ -35,6 +35,16 @@ export async function resolveEscalation(
 
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
+
+    // RBAC parity with resolveBySignalKey: a role-scoped caller may only resolve
+    // escalations whose role is visible to them. Global-access principals
+    // (superadmin/admin/system) get `undefined` → no filter. 404 (not 403) so the
+    // existence of out-of-scope escalations is not disclosed.
+    const visibleRoles = await getVisibleRoles(auth.userId);
+    if (visibleRoles && !visibleRoles.includes(escalation.role)) {
+      return { status: 404, error: 'Escalation not found' };
+    }
+
     if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
 
@@ -112,6 +122,44 @@ export async function resolveBySignalKey(
     }
 
     return resolveViaSignalKey(escalation, resolverPayload, metadata);
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Resolve a SET of escalations by id in one guarded statement (the public,
+ * set-based sibling of {@link resolveEscalation}). Delegates to the SDK's
+ * `client.resolveMany` via the service layer.
+ *
+ * RBAC: a scoped caller may only resolve rows whose role they hold. `role` is
+ * immutable per escalation, so this authorization read (`getEscalationRoles`)
+ * does not race the guarded `resolveMany` that follows — and global principals
+ * skip it entirely. Use for bookkeeping rows woken collectively; it does NOT
+ * deliver per-row signals (see services `resolveEscalationsByIds`).
+ */
+export async function resolveByIds(
+  input: { ids: string[]; resolverPayload: Record<string, any>; metadata?: Record<string, any> },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    const { ids, resolverPayload, metadata } = input;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return { status: 400, error: 'ids must be a non-empty array' };
+    }
+    if (!resolverPayload) return { status: 400, error: 'resolverPayload is required' };
+
+    const visibleRoles = await getVisibleRoles(auth.userId);
+    if (visibleRoles) {
+      const roleSet = new Set(visibleRoles);
+      const roles = await escalationService.getEscalationRoles(ids);
+      if (roles.some((r) => !roleSet.has(r))) {
+        return { status: 404, error: 'One or more escalations not found' };
+      }
+    }
+
+    const resolved = await escalationService.resolveEscalationsByIds(ids, resolverPayload, metadata);
+    return { status: 200, data: { resolved: resolved.length, escalationIds: resolved.map((e) => e.id) } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -195,8 +243,13 @@ async function resolveViaSignalRouting(
   }
 
   // Durable resolves here — one atomic call carries the outcome patch.
+  // Persist the SAME redacted payload that was delivered to the signal: the raw
+  // resolverPayload (with plaintext passwords) must never land in resolver_payload.
+  // Ordering is crash-safe-forward: the signal is delivered BEFORE this resolve, so a
+  // crash in between leaves the row `pending` and a retry re-signals (a no-op to an
+  // already-resumed workflow) then resolves — never a resolved row with a stuck workflow.
   if (signalRouting.engine !== 'yaml') {
-    await escalationService.resolveEscalation(escalation.id, resolverPayload, metadata);
+    await escalationService.resolveEscalation(escalation.id, signalPayload, metadata);
   }
 
   // Event published by service layer (services/escalation/crud.ts)
@@ -210,7 +263,11 @@ async function resolveViaTriage(
   triageEnvelope: any,
   metadata?: Record<string, any>,
 ): Promise<LTApiResult> {
-  const triageWorkflowId = `triage-${escalation.id}-${Date.now()}`;
+  // Deterministic id: an escalation is terminal-once, so `triage-<id>` is unique for
+  // its lifetime. A retry after a mid-saga crash re-targets the SAME job key (HotMesh
+  // upserts jobs by (workflowId, app_id)) instead of spawning a duplicate triage —
+  // and the final resolve below is the `status='pending'`-guarded arbiter.
+  const triageWorkflowId = `triage-${escalation.id}`;
   const client = createClient();
 
   await taskService.createTask({
@@ -259,7 +316,11 @@ async function resolveViaRerun(
   // re-run completes) commits it atomically — not a separate write to the old row.
   envelope.lt = { ...envelope.lt, escalationId: escalation.id, escalationMetadata: metadata };
 
-  const newWorkflowId = `rerun-${escalation.id}-${Date.now()}`;
+  // Deterministic id (see resolveViaTriage): `rerun-<id>` is unique per escalation
+  // lifetime, so a retry re-targets the same job rather than spawning a duplicate
+  // re-run. The old escalation is resolved downstream by the interceptor when the
+  // re-run executes (services/interceptor/lifecycle.ts), which is `pending`-guarded.
+  const newWorkflowId = `rerun-${escalation.id}`;
   const client = createClient();
 
   await client.workflow.start({
