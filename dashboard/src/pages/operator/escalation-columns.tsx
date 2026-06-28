@@ -1,14 +1,20 @@
-import { Link } from 'react-router-dom';
-import { ExternalLink, Circle, Bell, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Circle, Bell, Clock, ChevronRight } from 'lucide-react';
 import type { Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
-import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { CountdownTimer } from '../../components/common/display/CountdownTimer';
+import { JsonViewer } from '../../components/common/data/JsonViewer';
+import { formatAgoCompact, formatDateTime } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
 import type { LTEscalationRecord } from '../../api/types';
+
+// Shared cell text: a consistent resting shade for every cell, sharpening to
+// the primary text colour when the row is hovered. Cells (and pills via their
+// `inherit` tone) all read this single source so the whole row darkens as one.
+const CELL_TEXT = 'text-text-secondary transition-colors group-hover/row:text-text-primary';
 
 /** Status dot — rendered inline before summary. */
 function StatusDot({ row }: { row: LTEscalationRecord }) {
@@ -29,63 +35,114 @@ function StatusDot({ row }: { row: LTEscalationRecord }) {
   return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-active text-status-active" />;
 }
 
+/**
+ * Metadata cell — a compact `{ key, key +N }` preview that expands inline to the
+ * pretty-printed JSON. The same metadata the faceted query filters on, visible per row.
+ */
+function MetadataCell({ metadata }: { metadata: Record<string, unknown> | null }) {
+  const [open, setOpen] = useState(false);
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return <span className="text-[11px] text-text-tertiary">—</span>;
+  }
+  const keys = Object.keys(metadata);
+  const preview = `${keys.slice(0, 2).join(', ')}${keys.length > 2 ? ` +${keys.length - 2}` : ''}`;
+  // Width is fixed by the wrapper so toggling never changes the column width —
+  // the JSON viewer reveals with an animated row-height transition, and long
+  // lines scroll horizontally inside the cell rather than widening it.
+  return (
+    <div className="w-full">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className={`inline-flex max-w-full items-center gap-1 font-mono text-[11px] ${CELL_TEXT}`}
+        title={open ? 'Collapse metadata' : 'Expand metadata'}
+      >
+        <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <span className="truncate">{`{ ${preview} }`}</span>
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+      >
+        <div className="overflow-hidden">
+          <div className="mt-1 overflow-x-auto" onClick={(e) => e.stopPropagation()}>
+            {/* defaultCollapsed → root expanded, nested objects collapsed (one level). */}
+            <JsonViewer data={metadata} defaultCollapsed />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Base columns shared by all escalation list pages. */
 export const ESCALATION_COLUMNS: Column<LTEscalationRecord>[] = [
   {
     key: 'description',
     label: 'Summary',
     render: (row) => (
-      <div className="flex items-start gap-2 overflow-hidden">
-        <span className="mt-1 shrink-0"><StatusDot row={row} /></span>
-        <div className="min-w-0 overflow-hidden">
-          <p className="text-xs text-text-primary truncate">{row.description || row.type}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <WorkflowPill type={row.type} />
-            {row.subtype && row.subtype !== row.type && (
-              <span className="text-[10px] text-text-tertiary whitespace-nowrap">{row.subtype}</span>
-            )}
-          </div>
-        </div>
+      <div className="flex items-center gap-2 overflow-hidden">
+        <span className="shrink-0"><StatusDot row={row} /></span>
+        <span className={`truncate text-xs ${CELL_TEXT}`}>{row.description || row.type}</span>
       </div>
     ),
     className: 'max-w-0',
   },
   {
-    key: 'task_id',
-    label: 'Task',
-    render: (row) =>
-      row.task_id ? (
-        <Link
-          to={`/workflows/tasks/detail/${row.task_id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="group/task inline-flex items-center gap-1 text-xs font-mono text-text-secondary hover:text-accent transition-colors"
-        >
-          {row.task_id.slice(0, 12)}…
-          <ExternalLink size={10} className="opacity-0 group-hover/task:opacity-100 transition-opacity" />
-        </Link>
-      ) : (
-        <span className="text-xs text-text-tertiary">—</span>
-      ),
-    className: 'w-36 whitespace-nowrap',
+    key: 'workflow_type',
+    label: 'Workflow',
+    // The workflow function name (e.g. `richForm`, `basicSignal`) lives in
+    // workflow_type; `type` is the escalation category. Fall back to type for
+    // standalone escalations with no workflow.
+    render: (row) => <WorkflowPill type={row.workflow_type || row.type} />,
+    className: 'w-40 whitespace-nowrap',
+  },
+  {
+    key: 'metadata',
+    label: 'Metadata',
+    render: (row) => <MetadataCell metadata={row.metadata} />,
+    // Fixed width — never grows on expand (the viewer reveals via row-height).
+    // Given extra room (borrowed from priority/ago/actions) so JSON wraps less.
+    className: 'w-80 max-w-[19rem] align-top',
   },
   {
     key: 'role',
     label: 'Role',
-    render: (row) => <RolePill role={row.role} />,
+    render: (row) => (
+      <span className={CELL_TEXT}>
+        <RolePill role={row.role} size="md" tone="inherit" />
+      </span>
+    ),
     className: 'w-28',
   },
   {
     key: 'priority',
     label: 'Priority',
-    render: (row) => <PriorityBadge priority={row.priority} />,
-    className: 'w-20',
+    render: (row) => (
+      <span className={CELL_TEXT}>
+        <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
+      </span>
+    ),
+    className: 'w-14',
     sortable: true,
   },
   {
-    key: 'created_at',
+    key: 'created_time',
     label: 'Created',
-    render: (row) => <TimestampCell date={row.created_at} />,
-    className: 'w-40',
+    render: (row) => (
+      <span className={`text-[11px] font-mono whitespace-nowrap ${CELL_TEXT}`} title={row.created_at}>
+        {formatDateTime(row.created_at)}
+      </span>
+    ),
+    className: 'w-40 whitespace-nowrap',
+  },
+  {
+    key: 'created_at',
+    label: 'Ago',
+    render: (row) => (
+      <span className={`text-xs tabular-nums ${CELL_TEXT}`} title={row.created_at}>
+        {formatAgoCompact(row.created_at)}
+      </span>
+    ),
+    className: 'w-12 whitespace-nowrap',
     sortable: true,
   },
 ];
@@ -158,6 +215,7 @@ export function EscalationFilterBar({
   roles,
   types,
   showStatus = false,
+  showSearch = true,
   actions,
 }: {
   filters: { role: string; type: string; priority: string; status?: string; search?: string };
@@ -165,6 +223,9 @@ export function EscalationFilterBar({
   roles: string[];
   types: string[];
   showStatus?: boolean;
+  // Free-text search lives here by default, but the faceted page folds it into
+  // the drawer instead so there's a single search surface.
+  showSearch?: boolean;
   actions?: React.ReactNode;
 }) {
   return (
@@ -195,12 +256,14 @@ export function EscalationFilterBar({
         onChange={(v) => setFilter('priority', v)}
         options={PRIORITY_OPTIONS}
       />
-      <FilterInput
-        label="Search"
-        value={filters.search ?? ''}
-        onChange={(v) => setFilter('search', v)}
-        placeholder="ID, workflow, origin…"
-      />
+      {showSearch && (
+        <FilterInput
+          label="Search"
+          value={filters.search ?? ''}
+          onChange={(v) => setFilter('search', v)}
+          placeholder="ID, workflow, origin…"
+        />
+      )}
     </FilterBar>
   );
 }

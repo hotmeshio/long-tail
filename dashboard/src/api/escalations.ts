@@ -7,7 +7,21 @@ interface EscalationListResponse {
   total: number;
 }
 
-interface EscalationFilters {
+export interface FacetRange { facet: string; op: '<' | '<=' | '>' | '>=' | '='; value: number }
+export interface FacetOrder { field: string; direction?: 'asc' | 'desc'; numeric?: boolean }
+
+/** The faceted-query elements shared by the list/available hooks. */
+export interface FacetFilters {
+  roles?: string[];
+  facets?: Record<string, unknown>;
+  block?: Record<string, unknown>[];
+  range?: FacetRange[];
+  exists?: string[];
+  available?: boolean;
+  orderBy?: FacetOrder[];
+}
+
+interface EscalationFilters extends FacetFilters {
   status?: string;
   role?: string;
   type?: string;
@@ -22,6 +36,17 @@ interface EscalationFilters {
   search?: string;
   enabled?: boolean;
   staleTime?: number;
+}
+
+/** JSON-encode the faceted-query elements onto the URL (the route JSON-parses them). */
+function appendFacetParams(params: URLSearchParams, f: FacetFilters): void {
+  if (f.facets && Object.keys(f.facets).length) params.set('facets', JSON.stringify(f.facets));
+  if (f.block?.length) params.set('block', JSON.stringify(f.block));
+  if (f.range?.length) params.set('range', JSON.stringify(f.range));
+  if (f.exists?.length) params.set('exists', JSON.stringify(f.exists));
+  if (f.roles?.length) params.set('roles', JSON.stringify(f.roles));
+  if (f.orderBy?.length) params.set('orderBy', JSON.stringify(f.orderBy));
+  if (f.available !== undefined) params.set('available', String(f.available));
 }
 
 export interface EscalationStats {
@@ -48,6 +73,16 @@ export function useEscalationTypes() {
   });
 }
 
+/** Distinct top-level metadata facet keys the caller may query (role-scoped). */
+export function useFacetKeys(enabled = true) {
+  return useQuery<{ keys: string[] }>({
+    queryKey: ['escalationFacetKeys'],
+    queryFn: () => apiFetch('/escalations/facet-keys'),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
 export function useEscalations(filters: EscalationFilters) {
   const { enabled = true, staleTime, ...rest } = filters;
   const params = new URLSearchParams();
@@ -63,6 +98,7 @@ export function useEscalations(filters: EscalationFilters) {
   if (rest.sort_by) params.set('sort_by', rest.sort_by);
   if (rest.order) params.set('order', rest.order);
   if (rest.search) params.set('search', rest.search);
+  appendFacetParams(params, rest);
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', rest],
@@ -84,6 +120,7 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
   if (rest.sort_by) params.set('sort_by', rest.sort_by);
   if (rest.order) params.set('order', rest.order);
   if (rest.search) params.set('search', rest.search);
+  appendFacetParams(params, rest);
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', 'available', rest],

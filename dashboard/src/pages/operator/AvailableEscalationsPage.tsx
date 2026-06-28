@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
 import { useAccess } from '../../hooks/useAccess';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
   useAvailableEscalations,
   useEscalationTypes,
+  useFacetKeys,
   useClaimEscalation,
   useSetEscalationPriority,
   useBulkClaimEscalations,
@@ -13,7 +16,9 @@ import {
   useBulkEscalateToRole,
   useBulkTriageEscalations,
   useBulkCancelEscalations,
+  type FacetFilters,
 } from '../../api/escalations';
+import { FacetedFilterPanel } from './FacetedFilterPanel';
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
 import { useRoles } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
@@ -26,7 +31,7 @@ import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
-import { Lock } from 'lucide-react';
+import { Lock, SlidersHorizontal, X } from 'lucide-react';
 import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
@@ -48,6 +53,23 @@ export function AvailableEscalationsPage() {
   const [customClaimMinutes, setCustomClaimMinutes] = useState(0);
   const onCustomClaimChange = useCallback((m: number) => setCustomClaimMinutes(m), []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Faceted query — DEEP-LINKED in the URL (a shared link reproduces the exact query).
+  // The drawer is the editor surface; fetched keys feed the autocomplete.
+  const [facetDrawerOpen, setFacetDrawerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const facetFilters = useMemo<FacetFilters>(() => parseFacetParams(searchParams), [searchParams]);
+  const setFacetFilters = useCallback((next: FacetFilters) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      writeFacetParams(p, next);
+      p.delete('page');
+      return p;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const { data: facetKeysData } = useFacetKeys(facetDrawerOpen);
+  // The free-text term now lives in the drawer alongside the facets, so it counts
+  // toward the active-query badge and is cleared by the drawer's Clear.
+  const activeFacetCount = facetCount(facetFilters) + (filters.search ? 1 : 0);
   const [triageModalOpen, setTriageModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -85,6 +107,8 @@ export function AvailableEscalationsPage() {
     sort_by: sort.sort_by || 'created_at',
     order: sort.order || 'desc',
     search: debouncedSearch || undefined,
+    // Faceted metadata query (composes with role-scope + the basic filters in SQL).
+    ...facetFilters,
   };
 
   const availableQuery = useAvailableEscalations({
@@ -115,6 +139,14 @@ export function AvailableEscalationsPage() {
     order: sort.order || 'desc',
     limit: pagination.pageSize,
     offset: pagination.offset,
+    // Faceted query — JSON-encoded so the copy-URL/curl reproduces the exact query.
+    facets: facetFilters.facets && Object.keys(facetFilters.facets).length ? JSON.stringify(facetFilters.facets) : undefined,
+    block: facetFilters.block?.length ? JSON.stringify(facetFilters.block) : undefined,
+    range: facetFilters.range?.length ? JSON.stringify(facetFilters.range) : undefined,
+    exists: facetFilters.exists?.length ? JSON.stringify(facetFilters.exists) : undefined,
+    roles: facetFilters.roles?.length ? JSON.stringify(facetFilters.roles) : undefined,
+    orderBy: facetFilters.orderBy?.length ? JSON.stringify(facetFilters.orderBy) : undefined,
+    available: facetFilters.available != null ? String(facetFilters.available) : undefined,
   });
 
   // Search is server-side (full result set), so results and total come straight
@@ -224,10 +256,12 @@ export function AvailableEscalationsPage() {
             icon={Lock}
             title="Claim escalation"
             onClick={() => setClaimTarget(row)}
+            colorClass="text-accent/75 hover:text-accent"
+            size="sm"
           />
         </RowActionGroup>
       ),
-      className: 'w-16 text-right',
+      className: 'w-10 text-right',
     },
   ];
 
@@ -241,18 +275,79 @@ export function AvailableEscalationsPage() {
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
         showStatus
+        showSearch={false}
         actions={
-          <ListToolbar
-            onRefresh={() => refetch()}
-            isFetching={isFetching}
-            apiPath={apiPath}
-          />
+          <>
+            <ListToolbar
+              onRefresh={() => refetch()}
+              isFetching={isFetching}
+              apiPath={apiPath}
+            />
+            <button
+              onClick={() => setFacetDrawerOpen((v) => !v)}
+              className="relative ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
+              title="Faceted query"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {activeFacetCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-[9px] font-medium text-white">
+                  {activeFacetCount}
+                </span>
+              )}
+            </button>
+          </>
         }
       />
 
-      {selectedIds.size > 0 && (
-        <BulkActionBar
-          selectedCount={selectedIds.size}
+      {/* Faceted query — slide-out drawer (deep-linked state), portaled so fixed positioning
+          works. Always mounted so it slides open/closed with a subtle transition. */}
+      {createPortal(
+        <div
+          className={`fixed right-0 bottom-0 w-[420px] z-40 border-l border-surface-border bg-surface overflow-y-auto shadow-lg transition-transform duration-200 ease-out ${facetDrawerOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'}`}
+          style={{ top: '3.5rem' }}
+          aria-hidden={!facetDrawerOpen}
+        >
+          <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-surface border-b border-surface-border/50">
+            <span className="text-xs font-medium text-text-primary">Faceted query</span>
+            <div className="flex items-center gap-2">
+              {activeFacetCount > 0 && (
+                <button
+                  onClick={() => { setFacetFilters({}); setFilter('search', ''); }}
+                  className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                onClick={() => setFacetDrawerOpen(false)}
+                className="p-1 rounded hover:bg-surface-hover text-text-tertiary hover:text-text-primary transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="px-4 py-2">
+            <p className="mb-2 text-[11px] leading-snug text-text-tertiary">
+              Free-text recall plus precise metadata facets — they compose in one SQL query.
+              Facet keys are the ones that actually exist in your visible escalations; the
+              whole query is shareable via the URL.
+            </p>
+            <FacetedFilterPanel
+              value={facetFilters}
+              onChange={setFacetFilters}
+              facetKeys={facetKeysData?.keys ?? []}
+              search={filters.search ?? ''}
+              onSearchChange={(v) => setFilter('search', v)}
+            />
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* Always mounted so the bar can animate in AND out as the selection changes. */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
           onClearSelection={() => setSelectedIds(new Set())}
           onSetPriority={handleSetPriority}
           onClaim={handleBulkClaim}
@@ -268,7 +363,6 @@ export function AvailableEscalationsPage() {
           isCancelPending={bulkCancel.isPending}
           availableRoles={rolesData?.roles ?? []}
         />
-      )}
 
       {queryError && (
         <div className="mb-4 px-4 py-3 rounded-md bg-status-error/10 border border-status-error/20 text-xs text-status-error">

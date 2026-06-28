@@ -43,25 +43,18 @@ function renderColumn(colKey: string, row: LTEscalationRecord) {
 }
 
 describe('ESCALATION_COLUMNS', () => {
-  // ── Summary column (status dot + description + type) ──
-  it('renders description with type pill', () => {
+  // ── Summary column (status dot + description only, one line) ──
+  it('renders the description as the summary, without an inline pill', () => {
     renderColumn('description', makeEscalation({ type: 'review-content', subtype: 'quality-check', description: 'Content needs review' }));
     expect(screen.getByText('Content needs review')).toBeInTheDocument();
-    expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('quality-check')).toBeInTheDocument();
+    // The workflow/type now live in their own columns, not inside the summary cell.
+    expect(screen.queryByText('quality-check')).not.toBeInTheDocument();
   });
 
-  // ── Task column ──
-  it('renders dash when no task_id', () => {
-    renderColumn('task_id', makeEscalation({ task_id: null }));
-    expect(screen.getByText('—')).toBeInTheDocument();
-  });
-
-  it('renders truncated task_id as link', () => {
-    renderColumn('task_id', makeEscalation({ task_id: 'abcdef12-3456-7890-abcd-ef1234567890' }));
-    const link = screen.getByText('abcdef12-345…');
-    expect(link).toBeInTheDocument();
-    expect(link.closest('a')).toHaveAttribute('href', '/workflows/tasks/detail/abcdef12-3456-7890-abcd-ef1234567890');
+  // ── Workflow column (the workflow_type name, e.g. richForm) ──
+  it('renders the workflow name (workflow_type) as a pill', () => {
+    renderColumn('workflow_type', makeEscalation({ type: 'intake', workflow_type: 'richForm' }));
+    expect(screen.getByText('richForm')).toBeInTheDocument();
   });
 
   // ── Role column ──
@@ -76,11 +69,26 @@ describe('ESCALATION_COLUMNS', () => {
     expect(screen.getByText('P1')).toBeInTheDocument();
   });
 
-  // ── Created column ──
-  it('renders created_at as TimeAgo', () => {
+  // ── Ago column (compact relative time) ──
+  it('renders created_at as a compact "ago" value', () => {
     renderColumn('created_at', makeEscalation());
-    // TimeAgo renders something like "just now" or "0s ago"
-    expect(screen.getByText(/ago|now/i)).toBeInTheDocument();
+    // formatAgoCompact → "now", "0s", "5m", "3h", "2d" …
+    expect(screen.getByText(/^(now|\d+(s|m|h|d|w|mo|y))$/)).toBeInTheDocument();
+  });
+
+  // ── Metadata column (compact preview, expands to JSON) ──
+  it('renders a dash when metadata is empty', () => {
+    renderColumn('metadata', makeEscalation({ metadata: null }));
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('previews metadata keys and expands to the JSON viewer on click', () => {
+    renderColumn('metadata', makeEscalation({ metadata: { confidence: 0.65, flags: 'x', extra: 1 } }));
+    expect(screen.getByText('{ confidence, flags +1 }')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle(/expand metadata/i));
+    // The interactive JSON viewer renders the values (e.g. the number 0.65),
+    // which the collapsed key preview does not.
+    expect(screen.getByText('0.65')).toBeInTheDocument();
   });
 });
 

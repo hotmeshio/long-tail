@@ -173,6 +173,44 @@ export async function searchEscalationsFaceted(opts: {
   return { escalations: toEscalationRecords(rows.rows as any), total: countRows.rows[0]?.total ?? 0 };
 }
 
+/**
+ * Distinct top-level metadata facet KEYS visible to the caller — feeds the faceted
+ * UI's key autocomplete so it only ever offers facets that ACTUALLY exist in the
+ * caller's rows (a key in metadata, not description text). Role-scoped with the same
+ * predicate as the list; only object-typed metadata is unpacked (`jsonb_object_keys`).
+ */
+export async function listFacetKeys(opts: {
+  global?: boolean;
+  visibleRoles?: string[];
+  selfRoles?: string[];
+  meUserId?: string;
+}): Promise<string[]> {
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  const params: unknown[] = [];
+  const clauses: string[] = ["jsonb_typeof(metadata) = 'object'"];
+
+  if (!opts.global) {
+    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
+    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
+    const mi = params.push(opts.meUserId || null);
+    clauses.push(
+      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
+        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
+        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
+    );
+  }
+
+  const { rows } = await pool.query(
+    `SELECT DISTINCT jsonb_object_keys(metadata) AS key
+       FROM public.lt_escalations
+      WHERE ${clauses.join('\n        AND ')}
+      ORDER BY key`,
+    params,
+  );
+  return rows.map((r: any) => r.key as string);
+}
+
 export async function getEscalationStats(
   visibleRoles?: string[],
   period?: string,

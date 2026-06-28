@@ -120,6 +120,16 @@ export function registerListRoutes(router: Router): void {
   });
 
   /**
+   * GET /api/escalations/facet-keys
+   * Distinct top-level metadata facet keys visible to the caller (role-scoped).
+   * Powers the faceted-query UI's key autocomplete.
+   */
+  router.get('/facet-keys', async (req, res) => {
+    const result = await api.listFacetKeys(undefined, req.auth!);
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * GET /api/escalations/stats
    * Aggregated escalation statistics.
    * RBAC: superadmin sees all; others scoped to their roles.

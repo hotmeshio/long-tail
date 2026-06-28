@@ -103,6 +103,7 @@ export function createClient(options: LTClientOptions = {}) {
       list: bindAuth(escalationsApi.listEscalations, auth),
       listAvailable: bindAuth(escalationsApi.listAvailableEscalations, auth),
       listTypes: escalationsApi.listDistinctTypes,
+      listFacetKeys: bindAuth(escalationsApi.listFacetKeys, auth),
       getStats: bindAuth(escalationsApi.getEscalationStats, auth),
       get: bindAuth(escalationsApi.getEscalation, auth),
       getByWorkflowId: escalationsApi.getEscalationsByWorkflowId,

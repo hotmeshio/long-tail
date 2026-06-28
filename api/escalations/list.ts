@@ -211,6 +211,31 @@ export async function listAvailableEscalations(
 }
 
 /**
+ * List the distinct top-level metadata facet KEYS visible to the caller. Powers the
+ * faceted-query UI's key autocomplete — only keys that actually exist in the caller's
+ * (role-scoped) escalations are offered, never description-only text.
+ *
+ * @returns `{ status: 200, data: { keys: string[] } }`
+ */
+export async function listFacetKeys(_input: unknown, auth: LTApiAuth): Promise<LTApiResult> {
+  try {
+    const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
+      return { status: 200, data: { keys: [] } };
+    }
+    const keys = await escalationService.listFacetKeys({
+      global: scope.global,
+      visibleRoles: scope.global ? undefined : scope.allRoles,
+      selfRoles: scope.global ? undefined : scope.selfRoles,
+      meUserId: auth.userId,
+    });
+    return { status: 200, data: { keys } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
  * List all distinct escalation type values.
  *
  * @returns `{ status: 200, data: { types: string[] } }`

@@ -35,11 +35,18 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof BulkActionBar>
 }
 
 describe('BulkActionBar', () => {
+  // AI is the single source of truth for the Triage button — seed it enabled by
+  // default so the AI-on path is exercised; the gating test overrides it.
+  beforeEach(() => {
+    localStorage.clear();
+    queryClient.setQueryData(['settings'], { ai: { enabled: true } });
+  });
+
   it('renders selected count and all action controls', () => {
     renderBar();
 
     expect(screen.getByText('5 selected')).toBeInTheDocument();
-    expect(screen.getByText('Assign to...')).toBeInTheDocument();
+    expect(screen.getByText('Assign to…')).toBeInTheDocument();
     expect(screen.getByText('Triage')).toBeInTheDocument();
     expect(screen.getByText('Clear')).toBeInTheDocument();
   });
@@ -52,7 +59,7 @@ describe('BulkActionBar', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getByText('Assign to...'));
+    fireEvent.click(screen.getByText('Assign to…'));
     expect(props.onAssign).toHaveBeenCalledOnce();
   });
 
@@ -83,15 +90,25 @@ describe('BulkActionBar', () => {
   it('disables all controls when assign is pending', () => {
     renderBar({ isAssignPending: true });
 
-    expect(screen.getByText('Assigning...')).toBeDisabled();
+    expect(screen.getByText('Assigning…')).toBeDisabled();
     expect(screen.getByText('Triage')).toBeDisabled();
-    expect(screen.getByText('Processing...')).toBeInTheDocument();
+    expect(screen.getByText('Processing…')).toBeInTheDocument();
   });
 
   it('disables all controls when any action is pending', () => {
     renderBar({ isClaimPending: true });
 
-    expect(screen.getByText('Assign to...')).toBeDisabled();
+    expect(screen.getByText('Assign to…')).toBeDisabled();
     expect(screen.getByText('Triage')).toBeDisabled();
+  });
+
+  it('hides the Triage button when AI is disabled', () => {
+    queryClient.setQueryData(['settings'], { ai: { enabled: false } });
+    renderBar();
+
+    // The LLM-powered action is gone, but the non-AI controls remain.
+    expect(screen.queryByText('Triage')).not.toBeInTheDocument();
+    expect(screen.getByText('Assign to…')).toBeInTheDocument();
+    expect(screen.getByText('5 selected')).toBeInTheDocument();
   });
 });

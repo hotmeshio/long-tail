@@ -11,13 +11,17 @@ export function RowAction({
   onClick,
   colorClass = 'text-text-tertiary hover:text-accent',
   alwaysVisible,
+  size = 'md',
 }: {
   icon: LucideIcon;
   title: string;
   onClick: (e: React.MouseEvent) => void;
   colorClass?: string;
   alwaysVisible?: boolean;
+  /** `md` is the standard 18px action; `sm` is a tighter 16px icon. */
+  size?: 'sm' | 'md';
 }) {
+  const iconSize = size === 'sm' ? 'w-4 h-4' : 'w-[18px] h-[18px]';
   return (
     <button
       onClick={(e) => {
@@ -29,7 +33,7 @@ export function RowAction({
       } ${colorClass}`}
       title={title}
     >
-      <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
+      <Icon className={iconSize} strokeWidth={1.5} />
     </button>
   );
 }

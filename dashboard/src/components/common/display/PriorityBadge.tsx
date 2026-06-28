@@ -12,9 +12,29 @@ const priorityStyles: Record<number, string> = {
   4: 'text-text-tertiary',
 };
 
-export function PriorityBadge({ priority }: { priority: number }) {
+// Severity weight without colour, for the `inherit` tone (colour comes from the row).
+const priorityWeight: Record<number, string> = {
+  1: 'font-semibold',
+  2: 'font-medium',
+};
+
+export function PriorityBadge({
+  priority,
+  size = 'md',
+  tone = 'severity',
+}: {
+  priority: number;
+  size?: 'sm' | 'md';
+  /** `severity` colours by priority; `inherit` takes the surrounding text colour. */
+  tone?: 'severity' | 'inherit';
+}) {
+  const sizeClass = size === 'sm' ? 'text-[11px]' : 'text-xs';
+  const toneClass =
+    tone === 'inherit'
+      ? `text-inherit ${priorityWeight[priority] ?? ''}`
+      : priorityStyles[priority] ?? 'text-text-secondary';
   return (
-    <span className={`text-xs ${priorityStyles[priority] ?? 'text-text-secondary'}`}>
+    <span className={`${sizeClass} ${toneClass}`}>
       {priorityLabels[priority] ?? `P${priority}`}
     </span>
   );

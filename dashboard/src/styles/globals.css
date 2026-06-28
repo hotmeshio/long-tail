@@ -28,9 +28,10 @@
            hover:bg-surface-hover transition-colors duration-150;
   }
 
-  /* Centralized row hover — lavender tint instead of pure gray */
+  /* Centralized row hover — no background tint on hover (kept intentionally flat).
+     Row selection is signalled by the accent left-border, not a hover fill. */
   .row-hover {
-    @apply transition-colors duration-100 hover:bg-surface-hover;
+    @apply transition-colors duration-100;
   }
 
   .input {
