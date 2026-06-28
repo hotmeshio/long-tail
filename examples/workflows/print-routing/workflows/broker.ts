@@ -11,6 +11,13 @@ import { Durable } from '@hotmeshio/hotmesh';
 import type { LTEnvelope } from '../../../../types';
 
 import { claimOrdersForCapacity, lockPrintersAndHandoff, settleOrder, LOOP_DEFAULTS } from './proxy';
+import {
+  fleetKind,
+  PRINTER_POND,
+  PRINT_WORKFLOWS,
+  PRINTER_FACETS,
+  PRINTER_STATE,
+} from '../types';
 import type {
   BrokerData,
   BrokerTotals,
@@ -22,6 +29,7 @@ import type {
 export async function printBroker(envelope: LTEnvelope): Promise<any> {
   const d = envelope.data as BrokerData;
   const ctx = Durable.workflow.workflowInfo();
+  const printerPond = PRINTER_POND[fleetKind(d.diabetic)];
   const cumulative: BrokerTotals = d.cumulative ?? { ordersPrinted: 0, runs: 0 };
   const tick = cumulative.runs; // deterministic per-tick counter — callback-key uniqueness
   const carried: ClaimedOrderBucket[] = d.carried ?? [];
@@ -57,14 +65,32 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
     }
   }
 
-  // 3. Harvest. Every job was dispatched up front, so the fleet prints concurrently;
-  //    awaiting the callbacks in turn collects them in ~max(print-time), not the sum
-  //    (a callback that arrives while we wait on an earlier one is stored and ready).
-  //    Concurrent `condition()` waits are NOT safe here — they race the durable wait
-  //    registration and deadlock — so the harvest is a serial loop.
-  for (const p of pairings) {
-    const done = (await Durable.workflow.condition<PrintCallbackPayload>(p.callbackKey)) as PrintCallbackPayload;
-    await settleOrder({ group: p.group, printerId: p.printerId, done });
+  // 3. Harvest in parallel — each wait is an ESCALATION at the digital/physical
+  //    boundary. Every callback key opens a `printing` escalation (the in-flight job,
+  //    queryable: created-at = print start, resolved-at = done, the duration between).
+  //    The printer reports its outcome by RESOLVING that row, which both resumes this
+  //    collated wait and records the outcome on the row. The fleet prints concurrently
+  //    and we wait concurrently, so a tick takes ~max(print-time). Settle in parallel.
+  if (pairings.length) {
+    const dones = await Promise.all(
+      pairings.map((p) =>
+        Durable.workflow.condition<PrintCallbackPayload>(p.callbackKey, {
+          role: printerPond,
+          type: PRINT_WORKFLOWS.PRINTER,
+          subtype: PRINTER_STATE.PRINTING,
+          priority: 2,
+          description: `Printer ${p.printerId} printing order ${p.group.originId}`,
+          metadata: {
+            [PRINTER_FACETS.PRINTER_ID]: p.printerId,
+            [PRINTER_FACETS.STATE]: PRINTER_STATE.PRINTING,
+            orderId: p.group.originId,
+          },
+        }),
+      ),
+    );
+    await Promise.all(
+      pairings.map((p, i) => settleOrder({ group: p.group, printerId: p.printerId, done: dones[i] as PrintCallbackPayload })),
+    );
   }
 
   cumulative.ordersPrinted += pairings.length;

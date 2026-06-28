@@ -255,6 +255,26 @@ const farmInspectorConfig: LTWorkerConfig = {
   },
 };
 
+const printShiftConfig: LTWorkerConfig = {
+  description:
+    'Print shift — the entry target. One click runs the whole farm end to end: it powers on the fleet (a near-EOL machine and a fresh one) plus the dispatcher, technician, and inspector, then feeds 12 orders through in three flavor waves — priority (a key-account order jumps the queue), a defect (the fixpoint loop reprints it), and a closing run that drives the refills and a retirement. The dispatcher works the floor until it is idle and the shift drains; idle machines are then powered down so nothing lingers. The whole run is a query over the escalation trail: what was intended, what happened, how long each print took, what was retried.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINT_FARM_STANDARD,
+  roles: [
+    PRINT_FARM_DIABETIC,
+    PRINT_FARM_STANDARD,
+    PRINTER_POOL_DIABETIC,
+    PRINTER_POOL_STANDARD,
+    PRINT_FARMER_DIABETIC,
+    PRINT_FARMER_STANDARD,
+  ],
+  envelopeSchema: {
+    data: { diabetic: false, idleTickSeconds: 1, maxIdleRuns: 12, waveGapSeconds: 1 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 // ── Worker exports ──────────────────────────────────────────────────────────
 
 /**
@@ -278,4 +298,5 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printBroker, config: printBrokerConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmTechnician, config: farmTechnicianConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmInspector, config: farmInspectorConfig },
+  { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printShift, config: printShiftConfig },
 ];

@@ -8,3 +8,4 @@ export * from './printer';
 export * from './technician';
 export * from './inspector';
 export * from './signal';
+export * from './shift';

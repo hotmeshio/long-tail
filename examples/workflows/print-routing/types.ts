@@ -72,6 +72,8 @@ export const PRINT_WORKFLOWS = {
   BROKER: 'printBroker',
   TECHNICIAN: 'farmTechnician',
   INSPECTOR: 'farmInspector',
+  /** The invocable entry target — runs the whole farm end-to-end. */
+  SHIFT: 'printShift',
 } as const;
 
 /** Escalation type for an order-done signoff the farmer inspects. */
@@ -116,7 +118,32 @@ export const PRINTER_FACETS = {
 export const PRINTER_STATE = {
   READY: 'ready',
   MAINTENANCE: 'maintenance',
+  /** A job in flight — the broker's callback escalation, resolved by the printer. */
+  PRINTING: 'printing',
 } as const;
+
+/**
+ * Outcome facets the printer merges into the `printing` escalation's GIN-indexed
+ * metadata when it RESOLVES the row. The
+ * creation metadata said "what was intended" (printerId, state=printing); these
+ * record "what actually happened" on the same row — `@>`-queryable next to it.
+ * `DURATION_MS` is the boundary duration: the escalation's `created_at` (handoff /
+ * print start) to `resolved_at` (done). The row alone now tells the whole story.
+ */
+export const OUTCOME_FACETS = {
+  OUTCOME: 'outcome',
+  DURATION_MS: 'durationMs',
+  UNITS_PRINTED: 'unitsPrinted',
+  COMPLETED_AT: 'completedAt',
+} as const;
+
+/** The outcome patch merged into a `printing` row on resolve. */
+export interface PrintOutcomeFacets {
+  outcome: PrintOutcome;
+  durationMs: number;
+  unitsPrinted: number;
+  completedAt: string;
+}
 
 export const PRINT_SOURCE = 'print-routing';
 
@@ -248,6 +275,12 @@ export interface PrinterJobPayload {
   units: number;
   callbackKey: string;
   brokerWorkflowId: string;
+  /**
+   * Power-down command: a `ready` advert resolved with this (no callback key)
+   * retires the machine instead of running a job. The shift uses it to bound an
+   * idle printer once the floor is clear — the boundary commands the machine.
+   */
+  powerdown?: boolean;
 }
 
 /** The printer's completion report, signaled back to the broker's callback key. */
@@ -332,4 +365,47 @@ export interface InspectorData {
 export interface SignoffSummary {
   signedOff: number;
   orderIds: string[];
+}
+
+// ── Shift (the invocable entry target) ───────────────────────────────────────
+
+/**
+ * `printShift` input — the knobs the dashboard (or a test) can set. Everything
+ * defaults; an empty `{}` runs the standard full-lifecycle scenario.
+ */
+export interface ShiftData {
+  /** Which fleet the shift runs against. Defaults to the standard pond. */
+  diabetic?: boolean;
+  /** Idle pacing for the dispatcher loops the shift starts (broker/technician/inspector). */
+  idleTickSeconds?: number;
+  /** How many idle ticks before a dispatcher loop self-terminates. */
+  maxIdleRuns?: number;
+  /** Illustrative beat between flavor waves (a visible `Durable.sleep` in the trace). */
+  waveGapSeconds?: number;
+}
+
+/** One flavor of work — a wave of orders exercising a single dimension. */
+export interface ShiftWave {
+  name: string;
+  orders: PrintOrderData[];
+}
+
+/** The scenario the shift drives: a fleet (supply) and waves of orders (demand). */
+export interface ShiftPlan {
+  fleet: PrinterData[];
+  waves: ShiftWave[];
+}
+
+/** What a completed shift reports — the headline numbers, derived from results. */
+export interface ShiftResult {
+  shiftId: string;
+  diabetic: boolean;
+  ordersPlaced: number;
+  ordersPrinted: number;
+  insolesPrinted: number;
+  reprints: number;
+  /** Idle machines the shift powered down once the floor cleared (EOL retirements
+   *  happen on their own and show in the escalation trail, not this count). */
+  printersPoweredDown: number;
+  waves: { name: string; orders: number }[];
 }

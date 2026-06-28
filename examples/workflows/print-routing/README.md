@@ -230,6 +230,22 @@ searchByFacets({ role: 'printer-pool-diabetic', facets: { printerId: 'printer-1'
 Utilization, failure rate, current assignments, lifetime runs, remaining life — all of
 it is an aggregation over those rows. No side-store to keep in sync.
 
+## The boundary records intent and outcome
+
+A `printing` escalation opens with the **intent** — which machine, which order, the job in
+flight. When the printer finishes, it resolves that same row with the **outcome** — `result`,
+units, and the boundary `durationMs` (`created_at` is the handoff, `resolved_at` is done). One
+atomic write, one row, both halves of the story:
+
+```typescript
+searchByFacets({ role: 'printer-pool-diabetic', facets: { state: 'printing', outcome: 'success' } });
+// → every completed print: which printer, which order, how long it took — @>-queryable
+```
+
+Intent and outcome are the same GIN-indexed row, never a side table to reconcile. The
+escalation queries answer it all: work to do, work done, time taken, what was retried, what
+retired and when.
+
 ## Production shape
 
 - **Printers** are launched on a `Virtual.cron` (or by a fleet-onboarding flow); a
@@ -246,10 +262,10 @@ it is an aggregation over those rows. No side-store to keep in sync.
   through `SKIP LOCKED` claims and carry what they cannot place, so they never split an
   order or starve — they only converge a little slower. This is the horizontal lever; the
   `print-routing-carry.test.ts` proves two contending brokers stay correct.
-- **The harvest is serial, and that is ~optimal.** Every job is dispatched up front, so the
-  fleet prints concurrently; awaiting the callbacks in turn collects them in ~max(print-time),
-  not the sum. (Concurrent `condition()` waits are *not* safe in one workflow — they race the
-  durable wait registration and deadlock — so true fan-in would need a child workflow per job.)
+- **The harvest is parallel.** Every job is dispatched up front; the broker then awaits all the
+  callbacks in one collated `Promise.all` and settles them together. A tick costs ~max(print-time),
+  not the sum. Each wait is a `printing` escalation, resumed when the printer resolves the row —
+  the same write that records the outcome.
 - **Tunable knobs** on `BrokerData`: `claimMinutes` (claim TTL — short so an orphaned claim
   recovers in minutes, not the 30-min default), `maxAdverts` (per-tick capacity horizon — a
   fleet larger than this is served by more brokers), and the pacing `tickSeconds` /
@@ -265,11 +281,11 @@ The directory is the map — one file per actor, barrel-loaded:
 
 | Path | Role |
 | --- | --- |
-| `index.ts` | Barrel — re-exports the five workflows |
-| `types.ts` | Roles (demand + supply + signoff ponds), facet keys, lifecycle constants, shapes |
+| `index.ts` | Barrel — re-exports the five actors plus `printShift`, the entry target |
+| `types.ts` | Roles (demand + supply + signoff ponds), facet keys (incl. `OUTCOME_FACETS`), lifecycle constants, shapes |
 | `policy/` | The pluggable strategy: `priority.ts` (priority rules), `capability.ts` (soft fit + overflow), `manifest.ts` (facet set) |
-| `workflows/` | The five actors: `order.ts`, `printer.ts`, `broker.ts`, `technician.ts`, `inspector.ts` (+ `proxy.ts` shared activity handles) |
-| `activities/` | Their side effects: `order.ts`, `broker.ts`, `printer.ts`, `technician.ts`, `inspector.ts`, `signal.ts` |
+| `workflows/` | The five actors: `order.ts`, `printer.ts`, `broker.ts`, `technician.ts`, `inspector.ts`, plus `shift.ts` (the entry target) and `proxy.ts` (shared activity handles) |
+| `activities/` | Their side effects: `order.ts`, `broker.ts`, `printer.ts`, `technician.ts`, `inspector.ts`, `signal.ts`, `shift.ts` (scenario + power-down) |
 
 Three workflow tests prove it:
 
@@ -287,11 +303,33 @@ Three workflow tests prove it:
   deadlines, a key account jumps ahead of orders that arrived before it.
 - `print-routing-overflow.test.ts` — **soft capability**: standard orders overflow onto the
   xl machine when standard capacity is full; an xl order stays a hard fit (xl-only).
+- `print-routing-shift.test.ts` — **the entry target**: one `printShift` runs the whole farm
+  end to end (12 orders, three flavor waves), drains, powers down idle machines, and proves
+  every finished print recorded its outcome + duration on the `printing` row.
 
 ## Running it
 
-Enable the examples (`examples: true`), start a printer, then a broker, technician, and
-inspector for its fleet, and enqueue orders with `printOrder`:
+### One click — `printShift`
+
+`printShift` is the entry target: invoking it runs the whole farm. It powers on the fleet
+(a near-end-of-life machine and a fresh one) plus the dispatcher, technician, and inspector,
+then feeds twelve orders through three flavor waves — **priority** (a key-account order jumps
+the queue), a **defect** (the fixpoint loop reprints it), and a **closing** run that drives
+the refills and a retirement. The dispatcher works the floor until it is idle, the shift
+drains, and idle machines are powered down so nothing lingers. Everything defaults:
+
+```json
+// printShift — an empty data object runs the standard full-lifecycle scenario
+{ "data": { "diabetic": false, "idleTickSeconds": 1, "maxIdleRuns": 12, "waveGapSeconds": 1 } }
+```
+
+The result is the headline (orders printed, insoles, reprints, machines powered down); the
+detail is the escalation trail — every `printing` row carries its outcome and duration.
+
+### By hand — the actors
+
+To drive the actors yourself: enable the examples (`examples: true`), start a printer, then a
+broker, technician, and inspector for its fleet, and enqueue orders with `printOrder`:
 
 ```json
 // printer

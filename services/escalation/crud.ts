@@ -93,13 +93,21 @@ export async function claimEscalation(
  * orchestrator (api/escalations/resolve.ts); service-created rows have no
  * signal_key, so this never delivers a signal itself. Returns null when the
  * row is missing or already terminal.
+ *
+ * `metadata` (optional) is merged — not replaced — into the resolved row's
+ * GIN-indexed `metadata` in the same atomic UPDATE, and only on the winning
+ * resolve. It records "what actually happened" (outcome, duration, measured
+ * results) into the `@>`-queryable surface alongside the creation metadata
+ * ("what was intended"). Distinct from `resolverPayload`, which is delivered to
+ * the waiting workflow as `condition()`'s return value and is not GIN-indexed.
  */
 export async function resolveEscalation(
   id: string,
   resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
 ): Promise<LTEscalationRecord | null> {
   const client = await escalations();
-  const result = await client.resolve({ id, resolverPayload });
+  const result = await client.resolve({ id, resolverPayload, metadata });
   if (!result.ok) return null;
 
   const escalation = toEscalationRecord(result.entry);
@@ -140,14 +148,18 @@ export async function getEscalationBySignalKey(
  * is delegated to `resolveEscalation`, whose `client.resolve` uses FOR UPDATE +
  * `WHERE status = 'pending'` so exactly one concurrent caller commits. No status
  * pre-check (that would be a TOCTOU window) — the atomic resolve is the arbiter.
+ *
+ * `metadata` (optional) records the resolution outcome into the row's
+ * GIN-indexed metadata atomically — see {@link resolveEscalation}.
  */
 export async function resolveEscalationBySignalKey(
   signalKey: string,
   resolverPayload: Record<string, any>,
+  metadata?: Record<string, any>,
 ): Promise<LTEscalationRecord | null> {
   const escalation = await getEscalationBySignalKey(signalKey);
   if (!escalation) return null;
-  return resolveEscalation(escalation.id, resolverPayload);
+  return resolveEscalation(escalation.id, resolverPayload, metadata);
 }
 
 /**

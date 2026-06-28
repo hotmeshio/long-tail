@@ -72,6 +72,11 @@ export async function printer(envelope: LTEnvelope): Promise<any> {
       envelope: { printerId: d.printerId, state: PRINTER_STATE.READY },
     });
 
+    // A power-down command (a `ready` advert resolved with no job) retires the
+    // machine early — the shift clears an idle printer once the floor is empty so
+    // nothing lingers. The boundary commands the machine.
+    if (job && job.powerdown) break;
+
     // A real handoff carries a callback key. Run it, report completion, consume the
     // run. A cancel/timeout (no job) re-advertises without consuming a run.
     if (job && job.callbackKey) {

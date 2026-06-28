@@ -158,6 +158,24 @@ export async function reviewWorkflow(envelope: LTEnvelope) {
 
 ---
 
+## Recording the Outcome on Resolution
+
+An escalation row is created carrying **intent** — what was asked, who it routed to. When an in-process resolver (a workflow, an activity, a service) resolves it, it can stamp the **outcome** onto the same row. `resolveEscalation` takes an optional third argument, a `metadata` patch merged into the row's GIN-indexed metadata in the same atomic update:
+
+```typescript
+import { resolveEscalation } from '@hotmeshio/long-tail';
+
+await resolveEscalation(id, { approved: true }, {
+  outcome: 'approved',
+  reviewedBy: 'alice',
+  durationMs: elapsed,   // time the request was open, if you track it
+});
+```
+
+This is distinct from the resolver payload. The payload (argument two) resumes the paused workflow and is not indexed; the metadata patch (argument three) is the durable, queryable record on the row. Use it for the audit trail and analytics — disposition, reviewer, time-to-resolve — so the escalation table answers *what was asked, what was decided, and how long it took* without a parallel log. `resolveEscalationBySignalKey` takes the same patch.
+
+---
+
 ## JSON Schema Form Authoring
 
 The dashboard renders forms automatically from JSON Schema. No frontend code needed.

@@ -275,6 +275,37 @@ const result = await lt.escalations.resolve({
 
 ---
 
+## Recording the outcome on resolve
+
+In-process resolvers (a workflow, an activity, a service) can stamp the **outcome** onto the
+row as they resolve it. The service `resolveEscalation` and the underlying HotMesh
+`client.resolve` take an optional `metadata` patch, merged -- not replaced -- into the row's
+GIN-indexed metadata in the same atomic UPDATE, on the winning resolve only.
+
+```typescript
+import { resolveEscalation } from '@hotmeshio/long-tail';
+
+// Resolve the row (resume any waiter) AND record what happened on the same row.
+await resolveEscalation(id, { result: 'success' }, {
+  outcome: 'success',
+  durationMs: 1_240,
+  reviewedBy: 'alice',
+});
+```
+
+The `metadata` patch is distinct from `resolverPayload`: the payload is delivered to a waiting
+workflow as `condition()`'s return value and is not indexed; the patch is the durable,
+`@>`-queryable record on the row. The row created with **intent** now also carries the
+**outcome** -- queryable together with no side table:
+
+```typescript
+findByMetadata('outcome', 'success'); // every resolved row that succeeded — and its duration
+```
+
+`resolveEscalationBySignalKey(signalKey, resolverPayload, metadata?)` takes the same patch.
+
+---
+
 ## conditionLT (workflow helper)
 
 Wait for a signal and automatically resolve the associated escalation. This is the counterpart to `executeLT` — where `executeLT` wraps `startChild` + `condition`, `conditionLT` wraps `condition` + escalation resolution.

@@ -11,9 +11,19 @@
  *                   off, harvests, settles.
  *   farmTechnician  Resolves needs-filament adverts.
  *   farmInspector   The farmer. Signs off finished orders (and triggers reprints).
+ *   printShift      The invocable entry target. One click runs the whole farm:
+ *                   powers on the fleet + dispatcher, feeds order flavors in waves,
+ *                   drains, then retires idle machines. Bounded end to end.
  *
  * The directory is the map: `workflows/` (the actors), `activities/` (their side
  * effects), `policy/` (capability, priority, manifest), `types.ts`. See README.md.
  */
 
-export { printOrder, printer, printBroker, farmTechnician, farmInspector } from './workflows';
+export {
+  printOrder,
+  printer,
+  printBroker,
+  farmTechnician,
+  farmInspector,
+  printShift,
+} from './workflows';

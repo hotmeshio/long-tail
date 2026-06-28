@@ -15,6 +15,7 @@ worked policy built entirely on these primitives.
 - [Reads](#reads)
 - [Atomic claims](#atomic-claims)
 - [The dispatcher pattern](#the-dispatcher-pattern)
+- [Recording the outcome on resolve](#recording-the-outcome-on-resolve)
 - [Safety](#safety)
 
 ## The model
@@ -129,6 +130,37 @@ const printers = await claimByFacets(supplyQuery, consumer, { limit: orders.leng
 
 See the [print-routing example](../examples/workflows/print-routing/README.md) for the full
 two-sided market, carry-forward under contention, and the inspection/convergence loop.
+
+## Recording the outcome on resolve
+
+A row is created carrying **intent** — the facets that route and claim it. Resolving it can
+record the **outcome** onto the same row: pass a `metadata` patch and it is merged (not
+replaced) into the GIN-indexed metadata in the same atomic UPDATE, on the winning resolve
+only. "What actually happened" becomes `@>`-queryable next to "what was asked".
+
+```typescript
+import { resolveEscalation } from '@hotmeshio/long-tail';
+
+// The work is done; resolve the row AND stamp the outcome onto it.
+await resolveEscalation(rowId, { result: 'success' }, {
+  outcome: 'success',
+  durationMs: 1_240,   // e.g. created_at (claimed/started) → now (done)
+  unitsPrinted: 6,
+});
+```
+
+The third argument is distinct from the second: `resolverPayload` (arg 2) is delivered to a
+waiting workflow as `condition()`'s return value and is **not** indexed; the `metadata` patch
+(arg 3) is the durable, queryable record on the row. With both, the row alone answers what was
+asked, what happened, and how long it took:
+
+```typescript
+searchByFacets({ role: 'printer-pool-diabetic', facets: { state: 'printing', outcome: 'success' } });
+// → every completed job: which consumer, which origin, how long — no side table to reconcile
+```
+
+The print farm leans on this: a printer resolves its in-flight `printing` row with the run's
+result and duration, so the supply pond is also the production log.
 
 ## Safety
 

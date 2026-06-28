@@ -15,6 +15,8 @@ export const {
   runPrintJob,
   technicianRefill,
   inspectorSignoff,
+  buildShiftPlan,
+  powerDownIdlePrinters,
 } = Durable.workflow.proxyActivities<typeof activities>({
   activities,
   retry: { maximumAttempts: 3 },
