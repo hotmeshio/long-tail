@@ -16,6 +16,23 @@ export const INSERT_ESCALATION_CHAIN = `
   VALUES ($1, $2)
   ON CONFLICT DO NOTHING`;
 
+/**
+ * Add an escalation chain in ONE atomic statement: ensure both role FK targets
+ * exist, then insert the source→target link. Postgres checks the chain's FK to
+ * lt_roles at statement end (after the sibling ensure CTEs run), so brand-new
+ * roles are valid targets. Replaces the former ensure+ensure+insert three-call
+ * saga, which had no transaction guarding the writes together.
+ */
+export const ADD_ESCALATION_CHAIN = `
+  WITH ensured_source AS (
+    INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING
+  ), ensured_target AS (
+    INSERT INTO lt_roles (role) VALUES ($2) ON CONFLICT DO NOTHING
+  )
+  INSERT INTO lt_config_role_escalations (source_role, target_role)
+  VALUES ($1, $2)
+  ON CONFLICT DO NOTHING`;
+
 export const DELETE_ESCALATION_CHAIN = `
   DELETE FROM lt_config_role_escalations
   WHERE source_role = $1 AND target_role = $2`;

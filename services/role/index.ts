@@ -4,6 +4,7 @@ import {
   GET_ESCALATION_TARGETS,
   GET_ALL_ESCALATION_CHAINS,
   INSERT_ESCALATION_CHAIN,
+  ADD_ESCALATION_CHAIN,
   DELETE_ESCALATION_CHAIN,
   DELETE_ESCALATION_CHAINS_BY_SOURCE,
   CHECK_ESCALATION_CHAIN_EXISTS,
@@ -45,9 +46,8 @@ export async function addEscalationChain(
   targetRole: string,
 ): Promise<void> {
   const pool = getPool();
-  await pool.query(ENSURE_ROLE_EXISTS, [sourceRole]);
-  await pool.query(ENSURE_ROLE_EXISTS, [targetRole]);
-  await pool.query(INSERT_ESCALATION_CHAIN, [sourceRole, targetRole]);
+  // One atomic statement: ensure both role FK targets + insert the chain link.
+  await pool.query(ADD_ESCALATION_CHAIN, [sourceRole, targetRole]);
 }
 
 /**
