@@ -23,10 +23,21 @@ export async function addUserRole(
   type: LTRoleType,
 ): Promise<LTUserRole> {
   const pool = getPool();
-  // Ensure the role exists in lt_roles (FK constraint)
-  await pool.query(ENSURE_ROLE_EXISTS, [role]);
-  const { rows } = await pool.query(UPSERT_USER_ROLE, [userId, role, type]);
-  return rows[0];
+  // Ensure-role (FK target) and the user-role upsert commit together so a
+  // failure between them cannot leave the FK target without its assignment.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(ENSURE_ROLE_EXISTS, [role]);
+    const { rows } = await client.query(UPSERT_USER_ROLE, [userId, role, type]);
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function removeUserRole(userId: string, role: string): Promise<boolean> {

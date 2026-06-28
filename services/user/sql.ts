@@ -14,17 +14,34 @@ export const GET_USER_BY_EXTERNAL_ID =
 
 // ─── User CRUD ───────────────────────────────────────────────────────────────
 
-export const INSERT_USER =
-  `INSERT INTO lt_users (external_id, email, display_name, status, metadata, password_hash, oauth_provider, oauth_provider_id)
-   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-   RETURNING *`;
+/**
+ * Create a user and its role assignments in ONE atomic statement. The user row,
+ * the lt_roles FK targets ($9 = role names), and the lt_user_roles links
+ * ($9 names × $10 types) all commit together — a failure can never leave a
+ * half-provisioned user with a partial role set, and there is no per-role N+1.
+ * Role names/types are passed as parallel text[] arrays (empty arrays → no roles).
+ * Postgres checks the lt_user_roles→lt_roles FK at statement end, after the
+ * sibling role-ensure CTE has run, so brand-new roles are valid FK targets.
+ */
+export const CREATE_USER_WITH_ROLES =
+  `WITH new_user AS (
+     INSERT INTO lt_users (external_id, email, display_name, status, metadata, password_hash, oauth_provider, oauth_provider_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *
+   ), ensured_roles AS (
+     INSERT INTO lt_roles (role)
+     SELECT DISTINCT unnest($9::text[])
+     ON CONFLICT DO NOTHING
+   ), assigned_roles AS (
+     INSERT INTO lt_user_roles (user_id, role, type)
+     SELECT (SELECT id FROM new_user), x.role, x.type
+     FROM unnest($9::text[], $10::text[]) AS x(role, type)
+     ON CONFLICT DO NOTHING
+   )
+   SELECT * FROM new_user`;
 
 export const GET_USER_BY_EMAIL =
   `SELECT * FROM lt_users WHERE email = $1 LIMIT 1`;
-
-export const INSERT_USER_ROLE_IGNORE =
-  `INSERT INTO lt_user_roles (user_id, role, type) VALUES ($1, $2, $3)
-   ON CONFLICT DO NOTHING`;
 
 export const GET_USER_BY_ID =
   'SELECT * FROM lt_users WHERE id = $1';

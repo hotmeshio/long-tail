@@ -26,26 +26,43 @@ export async function seedAdmin(input: SeedAdminInput): Promise<string> {
 
   const existing = await getUserByExternalId(externalId);
   if (existing) {
-    // Ensure existing user has the superadmin role
-    const roles = await getUserRoles(existing.id);
-    const hasSuperadmin = roles.some(
-      (r) => r.role === 'superadmin' && r.type === 'superadmin',
-    );
-    if (!hasSuperadmin) {
-      await addUserRole(existing.id, 'superadmin', 'superadmin');
-      loggerRegistry.info(`[seed-admin] granted superadmin role to ${externalId}`);
-    }
-    loggerRegistry.info(`[seed-admin] ${externalId} already exists, skipping creation`);
-    return existing.id;
+    return ensureSuperadmin(existing.id, externalId);
   }
 
-  const user = await createUser({
-    external_id: externalId,
-    email: email || undefined,
-    display_name: displayName || externalId,
-    password: password || undefined,
-    roles: [{ role: 'superadmin', type: 'superadmin' }],
-  });
-  loggerRegistry.info(`[seed-admin] created superadmin user: ${externalId}`);
-  return user.id;
+  // Create. Concurrent container startups can both reach here; external_id UNIQUE
+  // is the arbiter — on the loser's 23505, adopt the winner's row instead of
+  // crashing the boot sequence.
+  try {
+    const user = await createUser({
+      external_id: externalId,
+      email: email || undefined,
+      display_name: displayName || externalId,
+      password: password || undefined,
+      roles: [{ role: 'superadmin', type: 'superadmin' }],
+    });
+    loggerRegistry.info(`[seed-admin] created superadmin user: ${externalId}`);
+    return user.id;
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      const winner = await getUserByExternalId(externalId);
+      if (winner) {
+        return ensureSuperadmin(winner.id, externalId);
+      }
+    }
+    throw err;
+  }
+}
+
+/** Ensure an existing user carries the superadmin role; returns its id. */
+async function ensureSuperadmin(userId: string, externalId: string): Promise<string> {
+  const roles = await getUserRoles(userId);
+  const hasSuperadmin = roles.some(
+    (r) => r.role === 'superadmin' && r.type === 'superadmin',
+  );
+  if (!hasSuperadmin) {
+    await addUserRole(userId, 'superadmin', 'superadmin');
+    loggerRegistry.info(`[seed-admin] granted superadmin role to ${externalId}`);
+  }
+  loggerRegistry.info(`[seed-admin] ${externalId} already exists, skipping creation`);
+  return userId;
 }

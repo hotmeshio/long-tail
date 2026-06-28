@@ -28,37 +28,57 @@ export async function ssoProvision(
 
   const existing = await getUserByExternalId(identity.externalId);
   if (existing) {
-    // Sync roles: ensure all resolved roles exist on the user
-    const currentRoles = await getUserRoles(existing.id);
-    for (const lr of ltRoles) {
-      const has = currentRoles.some((r) => r.role === lr.role);
-      if (!has) {
-        await addUserRole(existing.id, lr.role, lr.type as LTRoleType);
-      }
-    }
-    const updatedRoles = await getUserRoles(existing.id);
-    return {
-      userId: existing.id,
-      roles: updatedRoles.map((r) => ({ role: r.role, type: r.type })),
-      created: false,
-    };
+    return syncExistingUser(existing.id, ltRoles);
   }
 
-  // Create new user
-  const user = await createUser({
-    external_id: identity.externalId,
-    email: identity.email || undefined,
-    display_name: identity.displayName || identity.externalId,
-    roles: ltRoles.map((r) => ({ role: r.role, type: r.type as LTRoleType })),
-    metadata: identity.metadata,
-  });
+  // Create new user. Two concurrent first-logins for the same identity can both
+  // pass the existence check above; external_id UNIQUE is the arbiter. The loser's
+  // insert raises 23505 — adopt the winner's committed row and sync roles rather
+  // than failing the login.
+  try {
+    const user = await createUser({
+      external_id: identity.externalId,
+      email: identity.email || undefined,
+      display_name: identity.displayName || identity.externalId,
+      roles: ltRoles.map((r) => ({ role: r.role, type: r.type as LTRoleType })),
+      metadata: identity.metadata,
+    });
 
-  loggerRegistry.info(`[lt-sso] provisioned user: ${identity.externalId} → ${user.id}`);
+    loggerRegistry.info(`[lt-sso] provisioned user: ${identity.externalId} → ${user.id}`);
 
+    return {
+      userId: user.id,
+      roles: (user.roles || []).map((r) => ({ role: r.role, type: r.type })),
+      created: true,
+    };
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      const winner = await getUserByExternalId(identity.externalId);
+      if (winner) {
+        return syncExistingUser(winner.id, ltRoles);
+      }
+    }
+    throw err;
+  }
+}
+
+/** Ensure all resolved roles exist on an already-provisioned user. */
+async function syncExistingUser(
+  userId: string,
+  ltRoles: Array<{ role: string; type: string }>,
+): Promise<ProvisionedUser> {
+  const currentRoles = await getUserRoles(userId);
+  for (const lr of ltRoles) {
+    const has = currentRoles.some((r) => r.role === lr.role);
+    if (!has) {
+      await addUserRole(userId, lr.role, lr.type as LTRoleType);
+    }
+  }
+  const updatedRoles = await getUserRoles(userId);
   return {
-    userId: user.id,
-    roles: (user.roles || []).map((r) => ({ role: r.role, type: r.type })),
-    created: true,
+    userId,
+    roles: updatedRoles.map((r) => ({ role: r.role, type: r.type })),
+    created: false,
   };
 }
 

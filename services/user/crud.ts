@@ -4,15 +4,13 @@ import { getPool } from '../../lib/db';
 import type { LTUserRecord, LTUserRole, LTRoleType, LTUserStatus } from '../../types';
 
 import {
+  CREATE_USER_WITH_ROLES,
   DELETE_USER_BY_ID,
-  ENSURE_ROLE_EXISTS,
   GET_ROLES_BY_USER_ID,
   GET_ROLES_BY_USER_IDS,
   GET_USER_BY_EMAIL,
   GET_USER_BY_EXTERNAL_ID,
   GET_USER_BY_ID,
-  INSERT_USER,
-  INSERT_USER_ROLE_IGNORE,
 } from './sql';
 import type { CreateUserInput, UpdateUserInput } from './types';
 
@@ -45,7 +43,14 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
   const passwordHash = input.password
     ? await bcrypt.hash(input.password, 10)
     : null;
-  const { rows } = await pool.query(INSERT_USER, [
+
+  // One atomic statement creates the user, ensures the role FK targets, and links
+  // the assignments — no partial-roles window, no per-role N+1. Roles travel as
+  // parallel text[] arrays.
+  const roleNames = (input.roles || []).map((r) => r.role);
+  const roleTypes = (input.roles || []).map((r) => r.type);
+
+  const { rows } = await pool.query(CREATE_USER_WITH_ROLES, [
       input.external_id,
       input.email || null,
       input.display_name || null,
@@ -54,19 +59,12 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
       passwordHash,
       input.oauth_provider || null,
       input.oauth_provider_id || null,
+      roleNames,
+      roleTypes,
     ],
   );
-  const user = rows[0];
 
-  if (input.roles && input.roles.length > 0) {
-    for (const r of input.roles) {
-      // Ensure the role exists in lt_roles (FK constraint)
-      await pool.query(ENSURE_ROLE_EXISTS, [r.role]);
-      await pool.query(INSERT_USER_ROLE_IGNORE, [user.id, r.role, r.type]);
-    }
-  }
-
-  return attachRoles(user);
+  return attachRoles(rows[0]);
 }
 
 export async function getUser(id: string): Promise<LTUserRecord | null> {
