@@ -12,6 +12,7 @@ import {
   GET_USER_BY_EXTERNAL_ID,
   GET_USER_BY_ID,
 } from './sql';
+import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
 import type { CreateUserInput, UpdateUserInput } from './types';
 
 // ─── Private helpers (exported for internal use by auth.ts) ──────────────────
@@ -30,7 +31,13 @@ async function attachRolesToMany(users: any[]): Promise<LTUserRecord[]> {
   const roleMap = new Map<string, LTUserRole[]>();
   for (const row of rows) {
     const list = roleMap.get(row.user_id) || [];
-    list.push({ role: row.role, type: row.type, created_at: row.created_at });
+    list.push({
+      role: row.role,
+      type: row.type,
+      read_scope: row.read_scope,
+      write_scope: row.write_scope,
+      created_at: row.created_at,
+    });
     roleMap.set(row.user_id, list);
   }
   return users.map((u) => ({ ...u, roles: roleMap.get(u.id) || [] }));
@@ -45,10 +52,20 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
     : null;
 
   // One atomic statement creates the user, ensures the role FK targets, and links
-  // the assignments — no partial-roles window, no per-role N+1. Roles travel as
-  // parallel text[] arrays.
+  // the assignments — no partial-roles window, no per-role N+1. Roles + their
+  // effective scope travel as parallel text[] arrays. admin/superadmin normalize
+  // to ('all','all'); members store the requested scope.
   const roleNames = (input.roles || []).map((r) => r.role);
   const roleTypes = (input.roles || []).map((r) => r.type);
+  const effScopes = (input.roles || []).map((r) =>
+    effectiveScope(
+      r.type,
+      r.read_scope ?? DEFAULT_READ_SCOPE,
+      r.write_scope ?? DEFAULT_WRITE_SCOPE,
+    ),
+  );
+  const roleReadScopes = effScopes.map((e) => e.read);
+  const roleWriteScopes = effScopes.map((e) => e.write);
 
   const { rows } = await pool.query(CREATE_USER_WITH_ROLES, [
       input.external_id,
@@ -61,6 +78,8 @@ export async function createUser(input: CreateUserInput): Promise<LTUserRecord> 
       input.oauth_provider_id || null,
       roleNames,
       roleTypes,
+      roleReadScopes,
+      roleWriteScopes,
     ],
   );
 

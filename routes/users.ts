@@ -75,15 +75,18 @@ router.get('/:id/roles', async (req, res) => {
 /**
  * POST /api/users/:id/roles
  * Add a role to a user.
- * Body: { role, type } — type must be superadmin, admin, or member
+ * Body: { role, type, read_scope?, write_scope? } — type must be superadmin,
+ * admin, or member. read_scope (self|all) and write_scope (none|self|all) refine
+ * a member's work surface; they default to all/all and are ignored for admin/superadmin.
  *
- * Scoping rules:
+ * Scoping rules (management tier):
  * - superadmin: can assign any role/type
  * - engineer: can assign up to admin type, but never superadmin type
  * - role/admin (non-builder): can only assign member/admin for roles they hold
+ * A caller who may assign a role may set any work-surface scope on it.
  */
 router.post('/:id/roles', requireAdmin, async (req, res) => {
-  const { role, type } = req.body || {};
+  const { role, type, read_scope, write_scope } = req.body || {};
   const userId = req.auth!.userId;
 
   // Superadmin bypasses all scoping
@@ -109,7 +112,7 @@ router.post('/:id/roles', requireAdmin, async (req, res) => {
     }
   }
 
-  const result = await api.addUserRole({ id: req.params.id as string, role, type });
+  const result = await api.addUserRole({ id: req.params.id as string, role, type, read_scope, write_scope });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

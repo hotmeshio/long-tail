@@ -4,14 +4,16 @@ import { BookOpen } from 'lucide-react';
 interface PageHeaderProps {
   title: string;
   actions?: ReactNode;
+  /** Optional element centered between the title and the actions (e.g. a sparkline). */
+  center?: ReactNode;
   /** Hash link to open the docs drawer to a specific section, e.g. "#docs=dashboard.md#workflow-registry" */
   docsHash?: string;
 }
 
-export function PageHeader({ title, actions, docsHash }: PageHeaderProps) {
+export function PageHeader({ title, actions, center, docsHash }: PageHeaderProps) {
   return (
     <div className="flex items-center gap-4 mb-10">
-      <div className="flex items-center gap-2 flex-1">
+      <div className="flex items-center gap-2 flex-1 min-w-0">
         <h1 className="text-3xl font-light text-text-primary">{title}</h1>
         {docsHash && (
           <button
@@ -23,7 +25,10 @@ export function PageHeader({ title, actions, docsHash }: PageHeaderProps) {
           </button>
         )}
       </div>
-      {actions && <div className="flex items-center gap-3">{actions}</div>}
+      {center}
+      {actions && (
+        <div className={`flex items-center gap-3 ${center ? 'flex-1 justify-end' : ''}`}>{actions}</div>
+      )}
     </div>
   );
 }

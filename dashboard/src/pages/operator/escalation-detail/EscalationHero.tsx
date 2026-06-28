@@ -6,40 +6,29 @@ import { CountdownTimer } from '../../../components/common/display/CountdownTime
 import { Collapsible } from '../../../components/common/layout/Collapsible';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { CopyableId } from '../../../components/common/display/CopyableId';
+import { MetaCell } from '../../../components/common/display/MetaCell';
 import { UserName } from '../../../components/common/display/UserName';
 import { isAckEscalation } from '../../../lib/escalation';
 import { useAccess } from '../../../hooks/useAccess';
 import type { LTEscalationRecord } from '../../../api/types';
 
-const VALUE_TRUNCATE = 48;
+const VALUE_TRUNCATE = 56;
 
-function MetadataField({ label, value }: { label: string; value: unknown }) {
+/** A metadata value (often JSON/BSON), monospace, truncated with click-to-expand. */
+function MetaValue({ value }: { value: unknown }) {
   const [expanded, setExpanded] = useState(false);
   const str = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
-  const long = str.length > VALUE_TRUNCATE;
-
+  if (str.length <= VALUE_TRUNCATE) {
+    return <span className="font-mono break-all" title={str}>{str}</span>;
+  }
   return (
-    <div className="text-left max-w-xs">
-      <span className="text-[9px] text-text-quaternary">{label}</span>
-      {long && !expanded ? (
-        <button
-          onClick={() => setExpanded(true)}
-          className="block text-[11px] font-mono text-text-secondary hover:text-accent transition-colors text-left"
-          title={str}
-        >
-          {str.slice(0, VALUE_TRUNCATE)}…
-        </button>
-      ) : long && expanded ? (
-        <button
-          onClick={() => setExpanded(false)}
-          className="block text-[11px] font-mono text-text-secondary break-all text-left"
-        >
-          {str}
-        </button>
-      ) : (
-        <p className="text-[11px] font-mono text-text-secondary">{str}</p>
-      )}
-    </div>
+    <button
+      onClick={() => setExpanded((e) => !e)}
+      title={str}
+      className="font-mono break-all text-left hover:text-accent transition-colors"
+    >
+      {expanded ? str : `${str.slice(0, VALUE_TRUNCATE)}…`}
+    </button>
   );
 }
 
@@ -76,97 +65,78 @@ export function EscalationHero({
           </p>
         )}
 
-        {/* Meta grid — subtle background band */}
-        <div className="bg-surface-sunken/50 rounded-md px-5 py-4 flex flex-wrap gap-x-8 gap-y-4 items-end">
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Status</p>
-            <StatusBadge status={esc.status} />
-          </div>
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Assigned to Role</p>
-            <RolePill role={esc.role} size="md" />
-          </div>
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
-            <span className="text-xs text-text-secondary"><DateValue date={esc.created_at} /></span>
-          </div>
-          {claimed && esc.assigned_to && (
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Claimed By</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-primary">
-                <User className="w-3 h-3 text-accent/75" />
+        {/* Row 1 — primary meta, evenly distributed cells */}
+        <div className="flex gap-1 items-stretch">
+          <MetaCell label="Status"><StatusBadge status={esc.status} /></MetaCell>
+          <MetaCell label="Assigned to Role"><RolePill role={esc.role} size="md" /></MetaCell>
+          {/* Claim provenance shows while the claim is live or once terminal
+              (resolved/cancelled). A timed-out claim on an open escalation has
+              reverted to waiting, so it is not shown as claimed. */}
+          {(claimed || isTerminal) && esc.assigned_to && (
+            <MetaCell label="Claimed By">
+              <span className="inline-flex items-center gap-1.5 font-medium text-text-primary">
+                <User className="w-3 h-3 shrink-0 text-accent/75" />
                 <UserName userId={esc.assigned_to} />
               </span>
-            </div>
+            </MetaCell>
           )}
-          {claimed && esc.claimed_at && (
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Claimed</p>
-              <span className="text-xs text-text-secondary"><DateValue date={esc.claimed_at} /></span>
-            </div>
+          <MetaCell label="Created"><DateValue date={esc.created_at} /></MetaCell>
+          {(claimed || isTerminal) && esc.claimed_at && (
+            <MetaCell label="Claimed"><DateValue date={esc.claimed_at} /></MetaCell>
           )}
           {claimed && !isTerminal && esc.assigned_until && (
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Time Remaining</p>
-              <span className="text-xs"><CountdownTimer until={esc.assigned_until} /></span>
-            </div>
+            <MetaCell label="Time Remaining"><CountdownTimer until={esc.assigned_until} /></MetaCell>
           )}
           {esc.resolved_at && (
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Completed</p>
-              <span className="text-xs text-status-success"><DateValue date={esc.resolved_at} /></span>
-            </div>
+            <MetaCell label="Completed"><span className="text-status-success"><DateValue date={esc.resolved_at} /></span></MetaCell>
           )}
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Priority</p>
-            <span className="text-xs text-text-secondary">P{esc.priority}</span>
-          </div>
+          <MetaCell label="Priority">P{esc.priority}</MetaCell>
           {isBuilder && (
-            <div>
-              <button
-                onClick={onToggleDetails}
-                className="text-text-tertiary/50 hover:text-accent transition-colors"
-                title={showDetails ? 'Hide details' : 'Show details'}
-              >
-                <Info className={`w-3.5 h-3.5 transition-opacity duration-200 ${showDetails ? 'opacity-100 text-accent' : 'opacity-60'}`} />
-              </button>
-            </div>
+            <button
+              onClick={onToggleDetails}
+              title={showDetails ? 'Hide details' : 'Show details'}
+              className="shrink-0 rounded-lg bg-surface-sunken/60 px-3 flex items-center text-text-tertiary/60 hover:text-accent transition-colors"
+            >
+              <Info className={`w-3.5 h-3.5 ${showDetails ? 'text-accent' : ''}`} />
+            </button>
           )}
         </div>
 
         {isBuilder && (
         <Collapsible open={showDetails}>
-          <div className="mt-px bg-surface-sunken/30 rounded-b-md px-5 py-4 flex flex-wrap gap-x-8 gap-y-4 border-t border-surface-border/30">
-            <CopyableId label="Escalation ID" value={esc.id} />
+          {/* Row 2 — identifiers */}
+          <div className="flex gap-1 mt-1">
+            <MetaCell tier={2} label="Escalation ID"><CopyableId bare value={esc.id} /></MetaCell>
             {esc.task_id && (
-              <CopyableId label="Task ID" value={esc.task_id} href={isBuilder ? `/workflows/tasks/detail/${esc.task_id}` : undefined} />
+              <MetaCell tier={2} label="Task ID"><CopyableId bare value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} /></MetaCell>
             )}
-            <CopyableId label="Workflow Name" value={esc.workflow_type} href={isBuilder && esc.workflow_type ? `/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}` : undefined} />
-            <CopyableId label="Workflow ID" value={esc.workflow_id} href={isBuilder && esc.workflow_id ? `/workflows/executions/${esc.workflow_id}` : undefined} />
-            <CopyableId label="Task Queue" value={esc.task_queue} href={isBuilder && esc.task_queue ? `/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}` : undefined} />
+            {esc.workflow_type && (
+              <MetaCell tier={2} label="Workflow Name"><CopyableId bare value={esc.workflow_type} href={`/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}`} /></MetaCell>
+            )}
+            {esc.workflow_id && (
+              <MetaCell tier={2} label="Workflow ID"><CopyableId bare value={esc.workflow_id} href={`/workflows/executions/${esc.workflow_id}`} /></MetaCell>
+            )}
+            {esc.task_queue && (
+              <MetaCell tier={2} label="Task Queue"><CopyableId bare value={esc.task_queue} href={`/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}`} /></MetaCell>
+            )}
             {esc.origin_id && esc.origin_id !== esc.workflow_id && (
-              <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
+              <MetaCell tier={2} label="Origin"><CopyableId bare value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} /></MetaCell>
             )}
             {esc.trace_id && (
-              <CopyableId
-                label="Trace"
-                value={esc.trace_id}
-                href={traceUrl ? traceUrl.replace('{traceId}', esc.trace_id) : undefined}
-                external
-              />
+              <MetaCell tier={2} label="Trace">
+                <CopyableId bare value={esc.trace_id} href={traceUrl ? traceUrl.replace('{traceId}', esc.trace_id) : undefined} external />
+              </MetaCell>
             )}
           </div>
-          {/* Metadata key-value pairs */}
-          {esc.metadata && Object.keys(esc.metadata).length > 0 && (
-            <div className="px-5 py-3 border-t border-surface-border/20">
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Metadata</p>
-              <div className="flex flex-wrap gap-x-6 gap-y-2">
-                {Object.entries(esc.metadata)
-                  .filter(([k]) => !k.startsWith('_'))
-                  .map(([key, value]) => (
-                    <MetadataField key={key} label={key} value={value} />
-                  ))}
-              </div>
+
+          {/* Row 3 — metadata (BSON), an even grid that wraps */}
+          {esc.metadata && Object.keys(esc.metadata).filter((k) => !k.startsWith('_')).length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1 mt-1">
+              {Object.entries(esc.metadata)
+                .filter(([k]) => !k.startsWith('_'))
+                .map(([key, value]) => (
+                  <MetaCell key={key} tier={3} label={key}><MetaValue value={value} /></MetaCell>
+                ))}
             </div>
           )}
         </Collapsible>
@@ -209,7 +179,7 @@ export function EscalationHero({
             <DateValue date={esc.created_at} />
           </span>
         </div>
-        {esc.assigned_to && (
+        {(claimed || isTerminal) && esc.assigned_to && (
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Claimed by</p>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text-primary">

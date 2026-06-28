@@ -1,7 +1,6 @@
 import * as escalationService from '../../services/escalation';
-import * as userService from '../../services/user';
 
-import { hasGlobalEscalationAccess, ensureRoleMembership, type ProvisionIfAbsent } from './helpers';
+import { assertWriteAccess, assertQueueManageAccess, ensureRoleMembership, type ProvisionIfAbsent } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 /**
@@ -28,22 +27,17 @@ export async function claimEscalation(
       return { status: 404, error: 'Escalation not found' };
     }
 
-    // Happy path: try claim assuming user has the role
-    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
-    if (!hasGlobal) {
-      const userHasRole = await userService.hasRole(auth.userId, escalation.role);
-      if (!userHasRole) {
-        // Unhappy path: provision role if flag present, then retry
-        const provisioned = await ensureRoleMembership(
-          auth.userId, escalation.role, auth.userId, provisionIfAbsent,
-        );
-        if (!provisioned) {
-          return {
-            status: 403,
-            error: `You must have the "${escalation.role}" role to claim this escalation`,
-          };
-        }
-      }
+    // Write-scope gate: write_all may claim any item in the role; write_self may
+    // only (re)claim an item already assigned to them (extension); read-only and
+    // non-members are denied. Global access bypasses.
+    const writeDenied = await assertWriteAccess(auth.userId, escalation);
+    if (writeDenied) {
+      // Unhappy path: a global caller may JIT-provision their own role membership
+      // (ensureRoleMembership requires global authority, so this no-ops otherwise).
+      const provisioned = await ensureRoleMembership(
+        auth.userId, escalation.role, auth.userId, provisionIfAbsent,
+      );
+      if (!provisioned) return writeDenied;
     }
 
     const result = await escalationService.claimEscalation(id, auth.userId, durationMinutes);
@@ -72,6 +66,14 @@ export async function releaseEscalation(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
+    const escalation = await escalationService.getEscalation(input.id);
+    if (!escalation) return { status: 404, error: 'Escalation not found' };
+
+    // Releasing returns the item to the pool — a queue-management verb. A
+    // self-scope owner cannot release (it would forfeit access to their own item).
+    const manageDenied = await assertQueueManageAccess(auth.userId, escalation.role);
+    if (manageDenied) return manageDenied;
+
     const result = await escalationService.releaseEscalation(input.id, auth.userId);
     if (!result) {
       return { status: 409, error: 'Escalation not found or not claimed by you' };

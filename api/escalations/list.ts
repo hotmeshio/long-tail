@@ -1,5 +1,5 @@
 import * as escalationService from '../../services/escalation';
-import { getVisibleRoles } from './helpers';
+import { getEscalationReadScope } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── List routes ────────────────────────────────────────────────────────────
@@ -41,8 +41,8 @@ export async function listEscalations(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles && visibleRoles.length === 0) {
+    const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
       return { status: 200, data: { escalations: [], total: 0 } };
     }
 
@@ -59,7 +59,9 @@ export async function listEscalations(
       sort_by: input.sort_by,
       order: input.order,
       search: input.search,
-      visibleRoles,
+      visibleRoles: scope.global ? undefined : scope.allRoles,
+      selfRoles: scope.global ? undefined : scope.selfRoles,
+      meUserId: auth.userId,
     });
     return { status: 200, data: result };
   } catch (err: any) {
@@ -99,8 +101,8 @@ export async function listAvailableEscalations(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles && visibleRoles.length === 0) {
+    const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
       return { status: 200, data: { escalations: [], total: 0 } };
     }
 
@@ -114,7 +116,9 @@ export async function listAvailableEscalations(
       sort_by: input.sort_by,
       order: input.order,
       search: input.search,
-      visibleRoles,
+      visibleRoles: scope.global ? undefined : scope.allRoles,
+      selfRoles: scope.global ? undefined : scope.selfRoles,
+      meUserId: auth.userId,
     });
     return { status: 200, data: result };
   } catch (err: any) {
@@ -148,8 +152,11 @@ export async function getEscalationStats(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles && visibleRoles.length === 0) {
+    // Aggregate stats reflect read_all roles only. read_self memberships get the
+    // single-item surface (auto user-mode), not a queue-overview dashboard, so
+    // their items are deliberately not aggregated here (and not leaked in counts).
+    const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0) {
       return {
         status: 200,
         data: {
@@ -162,7 +169,10 @@ export async function getEscalationStats(
         },
       };
     }
-    const stats = await escalationService.getEscalationStats(visibleRoles, input.period);
+    const stats = await escalationService.getEscalationStats(
+      scope.global ? undefined : scope.allRoles,
+      input.period,
+    );
     return { status: 200, data: stats };
   } catch (err: any) {
     return { status: 500, error: err.message };

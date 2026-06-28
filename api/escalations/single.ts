@@ -1,7 +1,6 @@
 import * as escalationService from '../../services/escalation';
-import * as userService from '../../services/user';
 import * as roleService from '../../services/role';
-import { hasGlobalEscalationAccess } from './helpers';
+import { assertReadAccess, assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Single-escalation routes ───────────────────────────────────────────────
@@ -25,13 +24,8 @@ export async function getEscalation(
       return { status: 404, error: 'Escalation not found' };
     }
 
-    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
-    if (!hasGlobal) {
-      const userHasRole = await userService.hasRole(auth.userId, escalation.role);
-      if (!userHasRole) {
-        return { status: 403, error: 'Not authorized to view this escalation' };
-      }
-    }
+    const denied = await assertReadAccess(auth.userId, escalation);
+    if (denied) return denied;
 
     return { status: 200, data: escalation };
   } catch (err: any) {
@@ -85,6 +79,11 @@ export async function escalateToRole(
     if (escalation.status !== 'pending') {
       return { status: 409, error: 'Escalation is not pending' };
     }
+
+    // Escalating routes the item to another role — a queue-management verb that
+    // self-scope owners and read-only members may not perform.
+    const manageDenied = await assertQueueManageAccess(auth.userId, escalation.role);
+    if (manageDenied) return manageDenied;
 
     const canEscalate = await roleService.canEscalateTo(auth.userId, escalation.role, targetRole);
     if (!canEscalate) {

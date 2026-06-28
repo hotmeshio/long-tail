@@ -2,7 +2,13 @@ import { useState, useMemo } from 'react';
 import { useRoles } from '../../../api/roles';
 import { useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
-import { RolePill } from '../../../components/common/display/RolePill';
+import { User } from 'lucide-react';
+import { ScopeBadge } from '../../../components/common/display/ScopeBadge';
+import {
+  SCOPE_PRESETS,
+  DEFAULT_SCOPE_VALUE,
+  scopePreset,
+} from '../../../lib/roleScope';
 
 export function RolePanel({ user }: { user: LTUserRecord | null }) {
   const { data: allRolesData } = useRoles();
@@ -10,6 +16,8 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
   const removeRole = useRemoveUserRole();
   const [newRole, setNewRole] = useState('');
   const [newType, setNewType] = useState<LTRoleType>('member');
+  // Work-surface scope applies to `member`; admin/superadmin act on the whole queue.
+  const [newScope, setNewScope] = useState(DEFAULT_SCOPE_VALUE);
 
   const allRoles = allRolesData?.roles ?? [];
   const currentRoles = user?.roles ?? [];
@@ -21,9 +29,16 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
 
   const handleAdd = () => {
     if (!user || !newRole.trim()) return;
+    const preset = newType === 'member' ? scopePreset(newScope) : scopePreset(DEFAULT_SCOPE_VALUE);
     addRole.mutate(
-      { userId: user.id, role: newRole.trim(), type: newType },
-      { onSuccess: () => { setNewRole(''); setNewType('member'); } },
+      {
+        userId: user.id,
+        role: newRole.trim(),
+        type: newType,
+        read_scope: preset.read_scope,
+        write_scope: preset.write_scope,
+      },
+      { onSuccess: () => { setNewRole(''); setNewType('member'); setNewScope(DEFAULT_SCOPE_VALUE); } },
     );
   };
 
@@ -52,17 +67,26 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
           {currentRoles.length === 0 ? (
             <p className="text-xs text-text-tertiary">No roles assigned.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 items-start">
               {currentRoles.map((r) => (
                 <span
                   key={r.role}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
+                  className="flex items-center gap-2.5 pl-2.5 pr-2 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
                 >
-                  <RolePill role={r.role} />
-                  <span className="text-[9px] text-text-tertiary">{r.type}</span>
+                  <span className="inline-flex items-center gap-1 w-24 shrink-0 min-w-0">
+                    <User className="w-2.5 h-2.5 shrink-0 text-accent/75" />
+                    <span className="truncate" title={r.role}>{r.role}</span>
+                  </span>
+                  <span className="w-14 shrink-0 text-[9px] uppercase tracking-wide text-text-tertiary">{r.type}</span>
+                  {r.type === 'member' && (
+                    <>
+                      <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
+                      <ScopeBadge read={r.read_scope} write={r.write_scope} />
+                    </>
+                  )}
                   <button
                     onClick={() => handleRemove(r.role)}
-                    className="text-text-tertiary hover:text-status-error transition-colors ml-0.5"
+                    className="shrink-0 text-text-tertiary hover:text-status-error transition-colors ml-1"
                     title={`Remove ${r.role}`}
                   >
                     &times;
@@ -82,6 +106,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
                   className="select text-xs font-mono flex-1"
+                  aria-label="Role"
                 >
                   <option value="">Select a role...</option>
                   {available.map((r) => (
@@ -92,6 +117,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                   value={newType}
                   onChange={(e) => setNewType(e.target.value as LTRoleType)}
                   className="select text-xs w-24"
+                  aria-label="Role type"
                 >
                   <option value="member">member</option>
                   <option value="admin">admin</option>
@@ -105,6 +131,21 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                   {addRole.isPending ? '...' : 'Add'}
                 </button>
               </div>
+              {newType === 'member' && (
+                <div className="mt-2">
+                  <label className="block text-[10px] text-text-tertiary mb-1">Scope</label>
+                  <select
+                    value={newScope}
+                    onChange={(e) => setNewScope(e.target.value)}
+                    className="select text-xs w-full"
+                    aria-label="Work-surface scope"
+                  >
+                    {SCOPE_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {addRole.error && (
                 <p className="text-[10px] text-status-error mt-1">{(addRole.error as Error).message}</p>
               )}

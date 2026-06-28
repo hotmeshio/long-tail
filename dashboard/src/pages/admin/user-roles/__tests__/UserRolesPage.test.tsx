@@ -16,7 +16,7 @@ const mockUsers = {
       status: 'active' as const,
       metadata: null,
       roles: [
-        { role: 'operator', type: 'member' as const, created_at: '2025-01-01T00:00:00Z' },
+        { role: 'operator', type: 'member' as const, read_scope: 'all' as const, write_scope: 'all' as const, created_at: '2025-01-01T00:00:00Z' },
         { role: 'reviewer', type: 'admin' as const, created_at: '2025-01-02T00:00:00Z' },
       ],
       created_at: '2025-01-01T00:00:00Z',
@@ -128,11 +128,8 @@ describe('UserRolesPage', () => {
 
     // Modal title includes user name
     expect(screen.getByText('Roles — Alice')).toBeInTheDocument();
-    // Current roles listed
+    // Modal lists the user's current roles (one Remove control per role).
     expect(screen.getByText('Current Roles')).toBeInTheDocument();
-    expect(screen.getByText('(member)')).toBeInTheDocument();
-    expect(screen.getByText('(admin)')).toBeInTheDocument();
-    // Remove buttons
     const removeButtons = screen.getAllByText('Remove');
     expect(removeButtons).toHaveLength(2);
   });
@@ -176,7 +173,7 @@ describe('UserRolesPage', () => {
       {
         ...origUsers[0],
         roles: [
-          { role: 'operator', type: 'member' as const, created_at: '2025-01-01T00:00:00Z' },
+          { role: 'operator', type: 'member' as const, read_scope: 'all' as const, write_scope: 'all' as const, created_at: '2025-01-01T00:00:00Z' },
           { role: 'reviewer', type: 'admin' as const, created_at: '2025-01-02T00:00:00Z' },
           { role: 'auditor', type: 'member' as const, created_at: '2025-01-03T00:00:00Z' },
         ],
@@ -209,8 +206,9 @@ describe('UserRolesPage', () => {
     // Click Add
     await user.click(screen.getByText('Add'));
 
+    // member defaults to the full-worker scope (read_all + write_all)
     expect(mockAddRole.mutate).toHaveBeenCalledWith(
-      { userId: 'u1', role: 'auditor', type: 'member' },
+      { userId: 'u1', role: 'auditor', type: 'member', read_scope: 'all', write_scope: 'all' },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });

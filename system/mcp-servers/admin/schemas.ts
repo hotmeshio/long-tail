@@ -209,6 +209,17 @@ export const listUsersSchema = z.object({
   offset: z.number().int().min(0).optional().default(0),
 });
 
+// Work-surface scope for a `member` grant. read governs search breadth, write
+// governs claim/ack/delete breadth; admin/superadmin ignore scope (act on all).
+// The write ⊆ read constraint (write_scope='all' requires read_scope='all') is
+// validated in the handler so these stay plain object shapes for the tool registry.
+const scopeFields = {
+  read_scope: z.enum(['self', 'all']).optional()
+    .describe("Member search breadth: 'self' (own items) or 'all' (whole queue). Default all"),
+  write_scope: z.enum(['none', 'self', 'all']).optional()
+    .describe("Member claim/ack/delete breadth: 'none', 'self' (own items), or 'all'. Default all"),
+};
+
 export const createUserSchema = z.object({
   external_id: z.string().describe('Stable user identifier'),
   display_name: z.string().optional(),
@@ -216,13 +227,15 @@ export const createUserSchema = z.object({
   roles: z.array(z.object({
     role: z.string(),
     type: z.enum(['superadmin', 'admin', 'member']),
-  })).optional().default([]).describe('Roles to assign on creation'),
+    ...scopeFields,
+  })).optional().default([]).describe('Roles to assign on creation (each with optional work-surface scope)'),
 });
 
 export const addUserRoleSchema = z.object({
   user_id: z.string().describe('User UUID'),
   role: z.string().describe('Role name'),
   type: z.enum(['superadmin', 'admin', 'member']).describe('Permission level'),
+  ...scopeFields,
 });
 
 export const removeUserRoleSchema = z.object({

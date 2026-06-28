@@ -1,6 +1,10 @@
 import * as escalationService from '../../services/escalation';
-import * as userService from '../../services/user';
-import { getVisibleRoles, resolveAssignee, type ProvisionIfAbsent } from './helpers';
+import {
+  getEscalationReadScope,
+  getEscalationWriteScope,
+  resolveAssignee,
+  type ProvisionIfAbsent,
+} from './helpers';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 /**
@@ -17,12 +21,16 @@ export async function findByMetadata(
     if (!input.key || !input.value) {
       return { status: 400, error: 'key and value are required' };
     }
-    // RBAC scoped IN SQL: undefined = global (no filter), string[] = the caller's
-    // visible roles. Filtering here (controller-side, over a fetched page) would
-    // shrink the page and report a wrong total — the filter must reach the query.
-    const visibleRoles = await getVisibleRoles(auth.userId);
+    // RBAC scoped IN SQL: the caller's read scope (read_all roles see every match;
+    // read_self roles see only matches assigned to them) reaches the scoped query's
+    // WHERE and COUNT. Global access → no filter. Never filter a fetched page
+    // controller-side — that shrinks the page and reports a wrong total.
+    const scope = await getEscalationReadScope(auth.userId);
     const result = await escalationService.findByMetadata(
-      input.key, input.value, input.status, input.limit, input.offset, visibleRoles,
+      input.key, input.value, input.status, input.limit, input.offset,
+      scope.global
+        ? undefined
+        : { allRoles: scope.allRoles, selfRoles: scope.selfRoles, meUserId: auth.userId },
     );
     return { status: 200, data: result };
   } catch (err: any) {
@@ -50,8 +58,12 @@ export async function claimByMetadata(
     if ('error' in resolved) return resolved.error;
     const claimUserId = resolved.userId;
 
-    // Resolve allowed roles: null = global access (no filter), string[] = scoped
-    const allowedRoles = await resolveAllowedRoles(auth.userId);
+    // Write-scope: global → no filter; otherwise restrict to write_all roles. The
+    // SDK claim-by-metadata uses a flat role filter and cannot enforce write_self
+    // ownership, so self-scope members are excluded from this path (their items
+    // are pre-claimed and acted on by id).
+    const writeScope = await getEscalationWriteScope(auth.userId);
+    const allowedRoles = writeScope.global ? null : writeScope.allRoles;
 
     const result = await escalationService.claimByMetadata(
       input.key, input.value, claimUserId, input.durationMinutes,
@@ -101,11 +113,17 @@ export async function resolveByMetadata(
     if ('error' in resolved) return resolved.error;
     const resolveUserId = resolved.userId;
 
-    const allowedRoles = await resolveAllowedRoles(auth.userId);
+    // Write-scope folds into the atomic resolve SQL: global → no filter; otherwise
+    // write_all roles match any item, write_self roles match only items assigned
+    // to the resolver. A non-global caller cannot pass a foreign assignee, so the
+    // self-branch (assigned_to = resolveUserId) is the caller's own items.
+    const writeScope = await getEscalationWriteScope(auth.userId);
+    const writeAllRoles = writeScope.global ? null : writeScope.allRoles;
+    const writeSelfRoles = writeScope.global ? null : writeScope.selfRoles;
 
     const result = await escalationService.resolveByMetadataAtomic(
       input.key, input.value, resolveUserId,
-      input.resolverPayload, input.metadata, allowedRoles,
+      input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
     );
 
     if (result.outcome === 'not_found') {
@@ -156,17 +174,3 @@ export async function resolveByMetadata(
   }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Resolve the set of roles the caller is allowed to act on.
- * Returns null for global access (superadmin/admin), or string[] for scoped users.
- */
-async function resolveAllowedRoles(userId: string): Promise<string[] | null> {
-  if (await userService.hasGlobalEscalationAccess(userId)) return null;
-  const userRoles = await userService.getUserRoles(userId);
-  // Return the user's roles (may be empty → SQL filters out all rows).
-  // System/service accounts that need unrestricted access should be
-  // seeded with the superadmin role via start({ seed: { admin } }).
-  return userRoles.map(r => r.role);
-}

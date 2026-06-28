@@ -41,8 +41,8 @@ GET /api/users?role=reviewer&status=active&limit=10
       "created_at": "2025-01-10T08:00:00.000Z",
       "updated_at": "2025-01-10T08:00:00.000Z",
       "roles": [
-        { "user_id": "b2c3d4e5-...", "role": "reviewer", "type": "member", "created_at": "2025-01-10T08:00:00.000Z" },
-        { "user_id": "b2c3d4e5-...", "role": "senior-reviewer", "type": "admin", "created_at": "2025-01-10T08:00:00.000Z" }
+        { "user_id": "b2c3d4e5-...", "role": "reviewer", "type": "member", "read_scope": "all", "write_scope": "all", "created_at": "2025-01-10T08:00:00.000Z" },
+        { "user_id": "b2c3d4e5-...", "role": "senior-reviewer", "type": "admin", "read_scope": "all", "write_scope": "all", "created_at": "2025-01-10T08:00:00.000Z" }
       ]
     }
   ],
@@ -92,22 +92,27 @@ Each element in `roles`:
 |-------|------|----------|-------------|
 | `role` | `string` | yes | Role name |
 | `type` | `string` | yes | `superadmin`, `admin`, or `member` |
+| `read_scope` | `string` | no | `self` or `all` (default `all`). Search breadth for a `member`; ignored for admin/superadmin |
+| `write_scope` | `string` | no | `none`, `self`, or `all` (default `all`). Claim/ack/delete breadth for a `member` |
+
+`read_scope` and `write_scope` set the work-surface scope of a `member` grant — how much of the role's queue the user can see and act on. Both default to `all` (the full-queue worker), so a `member` written without scope works the whole queue. The constraint is **write ⊆ read**: `write_scope=all` requires `read_scope=all`. See the [Work-Surface Scope](roles.md#work-surface-scope) section of the Roles API for the five member profiles.
 
 **Example request:**
 
 ```json
 {
-  "external_id": "jane",
-  "email": "jane@acme.com",
-  "display_name": "Jane Chen",
+  "external_id": "new-user",
+  "email": "new-user@example.com",
+  "display_name": "New User",
   "roles": [
     { "role": "reviewer", "type": "member" },
+    { "role": "customer-triage", "type": "member", "read_scope": "self", "write_scope": "self" },
     { "role": "senior-reviewer", "type": "admin" }
   ]
 }
 ```
 
-**Response 201:** The created user object with roles array.
+**Response 201:** The created user object with roles array. Each returned role object includes its `read_scope` and `write_scope`.
 
 **Response 400:**
 
@@ -117,6 +122,10 @@ Each element in `roles`:
 
 ```json
 { "error": "Each role must have a role name and type (superadmin, admin, member)" }
+```
+
+```json
+{ "error": "write_scope=all requires read_scope=all" }
 ```
 
 **Response 409:**

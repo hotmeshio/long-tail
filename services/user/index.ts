@@ -16,6 +16,16 @@ export {
   hasRole,
   hasRoleType,
 } from './roles';
-export { isSuperAdmin, isGroupAdmin, canManageRole, hasGlobalEscalationAccess, hasRolesAsAdmin } from './rbac';
+export { isSuperAdmin, isGroupAdmin, canManageRole, hasGlobalEscalationAccess, hasRolesAsAdmin, getRoleScope, getRoleWriteScope } from './rbac';
+export {
+  READ_SCOPES,
+  WRITE_SCOPES,
+  DEFAULT_READ_SCOPE,
+  DEFAULT_WRITE_SCOPE,
+  isValidReadScope,
+  isValidWriteScope,
+  isValidScopePair,
+  effectiveScope,
+} from './scope';
 export { verifyPassword } from './auth';
 export { seedAdmin } from './seed-admin';

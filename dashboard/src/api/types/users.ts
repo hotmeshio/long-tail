@@ -1,9 +1,15 @@
 export type LTUserStatus = 'active' | 'inactive' | 'suspended';
 export type LTRoleType = 'superadmin' | 'admin' | 'member';
 
+/** Work-surface scope axes for a member: read = search breadth, write = act breadth. */
+export type LTReadScope = 'self' | 'all';
+export type LTWriteScope = 'none' | 'self' | 'all';
+
 export interface LTUserRole {
   role: string;
   type: LTRoleType;
+  read_scope: LTReadScope;
+  write_scope: LTWriteScope;
   created_at: string;
 }
 

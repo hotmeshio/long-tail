@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import { useRoles } from '../../../api/roles';
 import { Modal } from '../../../components/common/modal/Modal';
+import { ScopeBadge } from '../../../components/common/display/ScopeBadge';
+import {
+  SCOPE_PRESETS,
+  DEFAULT_SCOPE_VALUE,
+  scopePreset,
+} from '../../../lib/roleScope';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
 
 export function RoleManagementModal({
@@ -18,6 +24,8 @@ export function RoleManagementModal({
   const { data: rolesData } = useRoles();
   const [newRole, setNewRole] = useState('');
   const [newRoleType, setNewRoleType] = useState<LTRoleType>('member');
+  // Work-surface scope applies to `member`; admin/superadmin act on the whole queue.
+  const [newScope, setNewScope] = useState(DEFAULT_SCOPE_VALUE);
   const [localRoles, setLocalRoles] = useState(user?.roles ?? []);
 
   const [prevUser, setPrevUser] = useState(user);
@@ -26,20 +34,35 @@ export function RoleManagementModal({
     setLocalRoles(user?.roles ?? []);
     setNewRole('');
     setNewRoleType('member');
+    setNewScope(DEFAULT_SCOPE_VALUE);
   }
 
   const handleAdd = () => {
     if (!user || !newRole.trim()) return;
+    const preset = newRoleType === 'member' ? scopePreset(newScope) : scopePreset(DEFAULT_SCOPE_VALUE);
     addRole.mutate(
-      { userId: user.id, role: newRole.trim(), type: newRoleType },
+      {
+        userId: user.id,
+        role: newRole.trim(),
+        type: newRoleType,
+        read_scope: preset.read_scope,
+        write_scope: preset.write_scope,
+      },
       {
         onSuccess: () => {
           setLocalRoles((prev) => [
             ...prev,
-            { role: newRole.trim(), type: newRoleType, created_at: new Date().toISOString() },
+            {
+              role: newRole.trim(),
+              type: newRoleType,
+              read_scope: preset.read_scope,
+              write_scope: preset.write_scope,
+              created_at: new Date().toISOString(),
+            },
           ]);
           setNewRole('');
           setNewRoleType('member');
+          setNewScope(DEFAULT_SCOPE_VALUE);
         },
       },
     );
@@ -78,9 +101,15 @@ export function RoleManagementModal({
                     key={r.role}
                     className="flex items-center justify-between px-3 py-2 bg-surface-sunken rounded-md"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-text-primary">{r.role}</span>
-                      <span className="text-[10px] text-text-tertiary">({r.type})</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-sm font-mono text-text-primary w-28 shrink-0 truncate" title={r.role}>{r.role}</span>
+                      <span className="w-14 shrink-0 text-[9px] uppercase tracking-wide text-text-tertiary">{r.type}</span>
+                      {r.type === 'member' && (
+                        <>
+                          <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
+                          <ScopeBadge read={r.read_scope} write={r.write_scope} />
+                        </>
+                      )}
                     </div>
                     <button
                       onClick={() => handleRemove(r.role)}
@@ -124,12 +153,28 @@ export function RoleManagementModal({
                       value={newRoleType}
                       onChange={(e) => setNewRoleType(e.target.value as LTRoleType)}
                       className="select text-xs"
+                      aria-label="Role type"
                     >
                       <option value="member">member</option>
                       <option value="admin">admin</option>
                       <option value="superadmin">superadmin</option>
                     </select>
                   </div>
+                  {newRoleType === 'member' && (
+                    <div>
+                      <label className="block text-[10px] text-text-tertiary mb-1">Scope</label>
+                      <select
+                        value={newScope}
+                        onChange={(e) => setNewScope(e.target.value)}
+                        className="select text-xs"
+                        aria-label="Work-surface scope"
+                      >
+                        {SCOPE_PRESETS.map((p) => (
+                          <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <button
                     onClick={handleAdd}
                     disabled={!newRole || addRole.isPending}

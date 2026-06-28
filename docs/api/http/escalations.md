@@ -16,6 +16,16 @@ Claiming is implicit: `assigned_to` is set and `assigned_until` is set to a futu
 
 `cancelled` is a terminal state. A cancelled escalation cannot be claimed, resolved, or re-cancelled. When a workflow is terminated (`POST /api/workflows/:workflowId/terminate`), HotMesh automatically cancels any pending escalations tied to that workflow. Escalations can also be cancelled directly via `POST /api/escalations/:id/cancel`.
 
+## Work-Surface Scope
+
+A role is a task queue with four verbs — **search** (list/get), **claim**, **ack** (resolve), **delete** (cancel). A `member`'s grant carries `read_scope` (`self` | `all`) and `write_scope` (`none` | `self` | `all`) that set the breadth of those verbs on a given role's escalations. `admin` and `superadmin` ignore scope and act on the whole queue.
+
+- `read_scope` governs which escalations a member **sees** — list, `/available`, get-by-id, find-by-metadata, and stats. `self` means escalations assigned to the member (`assigned_to = user`); `all` means the whole role queue.
+- `write_scope` governs which escalations a member may **act on** — claim, resolve, cancel. `self` means only items already assigned to them; `none` is read-only.
+- Releasing and escalating are queue-management verbs and require `write_scope=all`. Creating a standalone escalation (`POST /api/escalations`) requires `write_scope=all` or global escalation access.
+
+Defaults are `read_scope=all` and `write_scope=all` — the full-queue worker — so a plain `member` works the whole queue. See [Work-Surface Scope](roles.md#work-surface-scope) in the Roles API for the five member profiles and the **write ⊆ read** constraint.
+
 ## List escalations
 
 ```
@@ -108,6 +118,8 @@ GET /api/escalations/:id
 |-----------|-------------|
 | `id` | Escalation UUID |
 
+**Scope:** Enforces read scope. A `member` with `read_scope=self` sees only escalations assigned to them; an item outside their read surface returns 404.
+
 **Response 200:** A single escalation object.
 
 **Response 404:**
@@ -125,6 +137,8 @@ POST /api/escalations/:id/claim
 Locks the escalation so no other reviewer can pick it up. The lock is time-boxed — if the reviewer doesn't resolve it within the duration, the escalation returns to the available queue automatically.
 
 The `userId` is read from the auth token (`req.auth.userId`), not from the request body.
+
+**Scope:** Governed by write scope. A `member` with `write_scope=self` may claim only items already assigned to them; `write_scope=none` cannot claim.
 
 **Request body:**
 
@@ -155,6 +169,8 @@ POST /api/escalations/:id/resolve
 ```
 
 Resolving an escalation starts a new workflow execution with the resolver's payload injected into `envelope.resolver`. The workflow re-runs, hits the `if (envelope.resolver)` branch, and completes with the human's decision as the final result.
+
+**Scope:** Governed by write scope (resolve is the **ack** verb). A `member` with `write_scope=self` may resolve only items assigned to them; `write_scope=none` cannot resolve.
 
 **Request body:**
 
@@ -384,7 +400,7 @@ Returns distinct escalation type values across all escalations.
 GET /api/escalations/stats
 ```
 
-Aggregated escalation statistics. RBAC-scoped: superadmins see all; others see only their roles.
+Aggregated escalation statistics. RBAC-scoped: superadmins see all; others see only their roles. The aggregate reflects `read_all` memberships only — a member's `read_scope=self` items are not aggregated here, since self-scope members get the single-item surface rather than a queue dashboard.
 
 **Query parameters:**
 
@@ -580,7 +596,7 @@ Resolve multiple escalations and start AI triage workflows (mcpTriage) for each.
 PATCH /api/escalations/:id/escalate
 ```
 
-Reassign a single escalation to a different role. The caller must be authorized to escalate from the current role to the target role (checked via escalation chains).
+Reassign a single escalation to a different role. The caller must be authorized to escalate from the current role to the target role (checked via escalation chains). Escalating is a queue-management verb and requires `write_scope=all` for a `member`.
 
 **Path parameters:**
 
@@ -730,7 +746,7 @@ Cancel multiple escalations at once. Skips any that are already terminal.
 POST /api/escalations/:id/release
 ```
 
-Release a claimed escalation back to the available pool. Only the user who holds the current claim can release it.
+Release a claimed escalation back to the available pool. Only the user who holds the current claim can release it. Releasing is a queue-management verb and requires `write_scope=all` for a `member`.
 
 **Path parameters:**
 
@@ -797,6 +813,8 @@ All three endpoints accept an optional `assignee` field — an `external_id` fro
 GET /api/escalations/by-metadata?key=orderId&value=order-123
 ```
 
+Scoped to the caller's read access. A `member` with `read_scope=self` matches only escalations assigned to them.
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `key` | `string` | **Required.** Metadata field name |
@@ -822,6 +840,8 @@ POST /api/escalations/claim-by-metadata
 
 Finds one available (pending + unassigned/expired) escalation matching the metadata and claims it atomically.
 
+**Scope:** For non-global callers this is scoped to `write_scope=all` roles. Self-scope members are excluded here — their items are pre-claimed and resolved by id, not discovered through the queue.
+
 **Body:**
 
 ```json
@@ -842,22 +862,22 @@ Finds one available (pending + unassigned/expired) escalation matching the metad
 | `metadata` | `object` | Additional metadata to merge (new keys added, existing overwritten) |
 | `provisionIfAbsent` | `object` | JIT-provision the assignee if they don't exist (superadmin only) |
 
-**`provisionIfAbsent`** — when the `assignee` doesn't exist in `lt_users` or lacks the escalation's role, provision them inline:
+**`provisionIfAbsent`** — when the `assignee` doesn't exist in `lt_users` or lacks the escalation's role, provision them inline. Each role entry accepts optional `read_scope` and `write_scope`, so a global caller can JIT-provision a one-time user with `read_scope=self` + `write_scope=self` and pre-claim their item in the same call:
 
 ```json
 {
   "key": "orderId",
   "value": "order-123",
-  "assignee": "jane.doe",
+  "assignee": "new-user",
   "provisionIfAbsent": {
-    "displayName": "Jane Doe",
-    "email": "jane@example.com",
-    "roles": [{ "role": "station-operator", "type": "member" }]
+    "displayName": "New User",
+    "email": "new-user@example.com",
+    "roles": [{ "role": "operator", "type": "member", "read_scope": "self", "write_scope": "self" }]
   }
 }
 ```
 
-Only callers with global escalation access (superadmin, admin/admin) can use this flag. The user is created with the declared roles if absent. If the user exists but lacks a required role, the role is added. The happy path (user exists, has role) adds zero extra queries.
+Only callers with global escalation access (superadmin, admin/admin) can use this flag. The user is created with the declared roles if absent. If the user exists but lacks a required role, the role is added. The happy path (user exists, has role) adds zero extra queries. A user provisioned at `read_self` + `write_self` sees and acts on exactly the one item the workflow routed to them.
 
 **Response 200:**
 
@@ -876,7 +896,7 @@ Only callers with global escalation access (superadmin, admin/admin) can use thi
 POST /api/escalations/resolve-by-metadata
 ```
 
-Single atomic query finds the pending escalation by metadata, auto-claims if unclaimed, and resolves it. RBAC is enforced in the SQL WHERE clause.
+Single atomic query finds the pending escalation by metadata, auto-claims if unclaimed, and resolves it. RBAC is enforced in the SQL WHERE clause. Write scope is honored here: a `member` with `write_scope=self` may resolve their own assigned item atomically, which is how a one-time user completes the form routed to them.
 
 **Signal guard:** If the escalation has `metadata.signal_id` (created by `conditionLT`), the SQL does NOT resolve it directly. Instead, the endpoint signals the running workflow — `conditionLT` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
 

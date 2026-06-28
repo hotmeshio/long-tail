@@ -70,8 +70,18 @@ const result = await lt.users.create({
 | `external_id` | `string` | Yes | External system identifier |
 | `email` | `string` | No | Email address |
 | `display_name` | `string` | No | Display name |
-| `roles` | `{ role: string; type: string }[]` | No | Initial role assignments (type: `superadmin`, `admin`, or `member`) |
+| `roles` | `{ role: string; type: string; read_scope?: string; write_scope?: string }[]` | No | Initial role assignments (type: `superadmin`, `admin`, or `member`) |
 | `metadata` | `Record<string, any>` | No | Arbitrary key-value metadata |
+
+Each role entry forwards the optional work-surface scope fields `read_scope` (`self` or `all`, default `all`) and `write_scope` (`none`, `self`, or `all`, default `all`) to the API. Scope refines a `member` grant and is ignored for `admin`/`superadmin`. The constraint is **write ⊆ read** — `write_scope=all` requires `read_scope=all`. The default `all`/`all` is the full-queue worker. See [Roles API — Work-Surface Scope](../http/roles.md) for the five member profiles.
+
+```typescript
+// A one-time user who sees and acts only on their own pre-assigned item
+const result = await lt.users.create({
+  external_id: 'new-user',
+  roles: [{ role: 'customer-triage', type: 'member', read_scope: 'self', write_scope: 'self' }],
+});
+```
 
 **Returns:** `LTApiResult<User>` (status 201) -- returns 409 if `external_id` already exists.
 
@@ -166,6 +176,21 @@ const result = await lt.users.addRole({
 | `id` | `string` | Yes | User UUID |
 | `role` | `string` | Yes | Role name to assign |
 | `type` | `string` | Yes | Role type (`superadmin`, `admin`, or `member`) |
+| `read_scope` | `string` | No | `self` or `all` (default `all`). Search breadth for a `member`; ignored for admin/superadmin |
+| `write_scope` | `string` | No | `none`, `self`, or `all` (default `all`). Claim/ack/delete breadth for a `member` |
+
+`read_scope` and `write_scope` are the work-surface scope axes for a `member` grant: `read_scope` governs which escalations the member sees in search; `write_scope` governs which they may claim, ack (resolve), or delete (cancel). `self` means items assigned to the member; `all` means the whole role queue. The constraint is **write ⊆ read** — `write_scope=all` requires `read_scope=all`. Both default to `all` (full-queue worker), and both are ignored for `admin`/`superadmin`, which always act on the whole queue. The returned role object includes `read_scope` and `write_scope`. See [Roles API — Work-Surface Scope](../http/roles.md) for the five member profiles.
+
+```typescript
+// See the whole queue, act only on own items (e.g. a chat-style room)
+const result = await lt.users.addRole({
+  id: 'user_123',
+  role: 'reviewer',
+  type: 'member',
+  read_scope: 'all',
+  write_scope: 'self',
+});
+```
 
 **Returns:** `LTApiResult<UserRole>` (status 201)
 

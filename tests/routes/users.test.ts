@@ -199,6 +199,64 @@ describe('User routes', () => {
       expect(body.error).toContain('role');
     });
 
+    it('POST /api/users/:id/roles persists read_scope/write_scope for a member', async () => {
+      const res = await fetch(`${ctx.BASE}/users/${userId}/roles`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          role: 'customer-triage', type: 'member',
+          read_scope: 'self', write_scope: 'self',
+        }),
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json() as any;
+      expect(body.read_scope).toBe('self');
+      expect(body.write_scope).toBe('self');
+
+      // Read-back through GET reflects the stored scope.
+      const get = await fetch(`${ctx.BASE}/users/${userId}/roles`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      const roles = (await get.json() as any).roles;
+      const ct = roles.find((r: any) => r.role === 'customer-triage');
+      expect(ct).toMatchObject({ type: 'member', read_scope: 'self', write_scope: 'self' });
+
+      await fetch(`${ctx.BASE}/users/${userId}/roles/customer-triage`, {
+        method: 'DELETE', headers: authHeaders(ctx.builderToken),
+      });
+    });
+
+    it('POST /api/users/:id/roles rejects write_scope=all with read_scope=self (write ⊆ read)', async () => {
+      const res = await fetch(`${ctx.BASE}/users/${userId}/roles`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          role: 'reviewer', type: 'member',
+          read_scope: 'self', write_scope: 'all',
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json() as any;
+      expect(body.error).toContain('write_scope=all requires read_scope=all');
+    });
+
+    it('POST /api/users/:id/roles defaults a member to all/all when scope omitted', async () => {
+      // Use a throwaway role so this does not disturb the shared `reviewer` fixture
+      // the following DELETE test depends on.
+      const res = await fetch(`${ctx.BASE}/users/${userId}/roles`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ role: 'scope-default-tmp', type: 'member' }),
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json() as any;
+      expect(body.read_scope).toBe('all');
+      expect(body.write_scope).toBe('all');
+      await fetch(`${ctx.BASE}/users/${userId}/roles/scope-default-tmp`, {
+        method: 'DELETE', headers: authHeaders(ctx.builderToken),
+      });
+    });
+
     it('DELETE /api/users/:id/roles/:role removes the role', async () => {
       const res = await fetch(`${ctx.BASE}/users/${userId}/roles/reviewer`, {
         method: 'DELETE',

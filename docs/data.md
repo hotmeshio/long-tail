@@ -74,6 +74,11 @@ backward-compatible **view** over it — `SELECT *` plus a computed `available`
 column — so existing read queries and the public API are unchanged. Indexes are
 managed by the SDK on `hmsh_escalations` (see below).
 
+Role read/write scope does **not** add columns here. An escalation carries a `role`
+and an optional `assigned_to`; work-surface scope lives on the membership table
+(`lt_user_roles`) and is applied at read time. `condition()` / `conditionLT()` and
+the escalation engine are unaffected.
+
 The columns below are the `hmsh_escalations` table. The public API record
 (`LTEscalationRecord`) is mapped from these: the JSONB `envelope` /
 `escalation_payload` / `resolver_payload` are serialized to JSON **strings**, and
@@ -179,12 +184,14 @@ Maps users to roles. Each user can hold multiple roles with different permission
 |--------|------|---------|-------------|
 | `user_id` | `UUID NOT NULL` | — | FK to `lt_users(id)`, CASCADE on delete |
 | `role` | `TEXT NOT NULL` | — | Role name (e.g., `reviewer`, `senior-reviewer`) |
-| `type` | `TEXT NOT NULL` | `'member'` | `superadmin`, `admin`, or `member` |
+| `type` | `TEXT NOT NULL` | `'member'` | `superadmin`, `admin`, or `member` — the management tier |
+| `read_scope` | `TEXT NOT NULL` | `'all'` | `self` or `all` — search breadth for a `member`: which escalations in the role queue the member sees. `self` = items where `assigned_to = user`; `all` = the whole queue. Ignored for `admin`/`superadmin`, which always see the whole queue. |
+| `write_scope` | `TEXT NOT NULL` | `'all'` | `none`, `self`, or `all` — claim/ack/delete breadth for a `member`. `none` = read-only; `self` = items assigned to the member; `all` = the whole queue. Ignored for `admin`/`superadmin`. |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | When the role was assigned |
 
 Primary key: `(user_id, role)` — a user can hold each role at most once.
 
-Type is enforced by a CHECK constraint: `type IN ('superadmin', 'admin', 'member')`.
+Type is enforced by a CHECK constraint: `type IN ('superadmin', 'admin', 'member')`. Scope is enforced by CHECK constraints: `read_scope IN ('self', 'all')`, `write_scope IN ('none', 'self', 'all')`, and **write ⊆ read** — `write_scope = 'all'` requires `read_scope = 'all'` (a member cannot act on what it cannot see). Both scopes default to `all`, the full-queue worker.
 
 ### lt_bot_api_keys
 

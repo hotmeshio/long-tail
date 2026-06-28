@@ -22,7 +22,7 @@ export function AdminSidebar({ isBuilder = false }: { isBuilder?: boolean }) {
 
   const identityItems: NavItem[] = [
     { to: '/admin/users', label: 'Accounts', icon: Users },
-    ...(isBuilder ? [{ to: '/admin/roles', label: 'Roles & Permissions', icon: Tag }] : []),
+    ...(isBuilder ? [{ to: '/admin/roles', label: 'Roles', icon: Tag }] : []),
   ];
 
   const infraItems: NavItem[] = [

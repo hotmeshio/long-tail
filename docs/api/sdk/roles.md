@@ -2,6 +2,17 @@
 
 Manage roles and escalation chain routing between roles.
 
+## Work-Surface Scope
+
+A role is a task queue worked by its members. Each `member` assignment carries two work-surface scope axes that set how much of the queue that member touches:
+
+- `read_scope` (`self` or `all`, default `all`) governs **search** — which escalations the member sees.
+- `write_scope` (`none`, `self`, or `all`, default `all`) governs **claim / ack (resolve) / delete (cancel)** — which escalations the member may act on.
+
+`self` means items assigned to the member; `all` means the whole role queue. The constraint is **write ⊆ read** — `write_scope=all` requires `read_scope=all`. `admin` and `superadmin` ignore scope and always act on the whole queue. The default `all`/`all` is the full-queue worker.
+
+Scope is set when a role is assigned to a user, via [`lt.users.addRole`](users.md) and [`lt.users.create`](users.md). See [Roles API — Work-Surface Scope](../http/roles.md) for the five member profiles.
+
 ## list
 
 List all distinct role names in the system.

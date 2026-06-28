@@ -187,18 +187,19 @@ Lists all durable workflow runs across the system.
 
 User Accounts and Service Accounts live on the same page, separated by a tab toggle.
 
-- **User Accounts** — human operators. Create users, assign display names, and grant roles. Roles determine which escalations a user can see and claim, and which workflows they can invoke from the dashboard.
+- **User Accounts** — human operators. Create users, assign display names, and grant roles. Roles determine which escalations a user can see and claim, and which workflows they can invoke from the dashboard. A `member` grant carries a work-surface scope (read/write breadth) chosen from the Scope picker; see [Roles](#roles).
 - **Service Accounts** — programmatic callers (bots, CI pipelines, external systems). Each service account has an API key for authentication. Assign roles to control access just like human users. Service accounts with the `reviewer` role can claim and resolve escalations programmatically.
 - **Role assignment** — both account types participate in the same role system. Click any account to edit roles, change display name, or manage credentials.
 
 **API:** `GET /api/users` lists accounts. `POST /api/users` creates. `PUT /api/users/:id/roles` assigns roles.
 
-### Roles and Permissions
+### Roles
 
 Define roles and configure escalation chains that control how work flows between teams.
 
 - **Role list** — all roles in the system with their type (admin, operator, custom). Click to view assigned users.
 - **Create Role** — add a new role. Roles referenced in workflow configs are auto-created, but you can also create them here for organizational clarity.
+- **Scope picker** — when granting a role at `member` type, a Scope picker offers the five named work-surface profiles: full worker (`all`/`all`, default), see-all-act-own (`all`/`self`), own-items-only (`self`/`self`), read-only auditor (`all`/`none`), and read-only own (`self`/`none`). `admin` and `superadmin` grants show no Scope picker — they always work the whole queue. The picker enforces **write ⊆ read**, so a write breadth wider than the read breadth cannot be selected.
 - **Escalation chains** — define source → target role mappings. When a reviewer escalates, the chain determines which roles receive the escalation next. Chains are directional (reviewer → engineer → admin) and support multiple targets per source.
 
 **API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
@@ -245,8 +246,8 @@ The central queue for all escalation activity across every workflow.
 
 - **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
 - **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
-- **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations.
-- **Resolve** — after claiming, submit a resolver payload (pre-filled from the workflow's `resolver_schema` if configured). Resolution triggers a workflow re-run with the resolver data injected.
+- **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations. The queue list and aggregate stats reflect `read_all` memberships — a member scoped to `read_self` lands directly on their own assigned item in user mode rather than browsing the full queue.
+- **Resolve** — after claiming, submit a resolver payload (pre-filled from the workflow's `resolver_schema` if configured). Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
 - **Escalate** — forward a claimed escalation to a higher-tier role via the escalation chain.
 
 **API:** `GET /api/escalations` lists with filters. `POST /api/escalations/:id/claim` claims. `POST /api/escalations/:id/resolve` resolves.

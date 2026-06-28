@@ -32,6 +32,7 @@ const mockGet = vi.mocked(escalationService.getEscalation);
 const mockResolve = vi.mocked(escalationService.resolveEscalation);
 const mockHasGlobalAccess = vi.mocked(userService.hasGlobalEscalationAccess);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
+const mockGetRoleScope = vi.mocked(userService.getRoleScope);
 
 const AUTH = { userId: 'user-uuid' };
 
@@ -64,6 +65,18 @@ describe('resolveEscalation (by-id) — RBAC parity', () => {
 
     expect(result.status).toBe(404);
     // No mutation when out of scope — the by-id path now matches resolveBySignalKey.
+    expect(mockResolve).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 (not 404) when the caller can see the role but lacks write access', async () => {
+    // read_all → may see the escalation; write_self + not assigned to them → may not act.
+    mockHasGlobalAccess.mockResolvedValue(false);
+    mockGetRoleScope.mockResolvedValue({ read: 'all', write: 'self' } as any);
+    mockGet.mockResolvedValue(makeEscalation({ role: 'operator', assigned_to: 'someone-else' }));
+
+    const result = await resolveEscalation({ id: 'esc-uuid', resolverPayload: { approved: true } }, AUTH);
+
+    expect(result.status).toBe(403);
     expect(mockResolve).not.toHaveBeenCalled();
   });
 

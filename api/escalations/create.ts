@@ -1,6 +1,5 @@
 import * as escalationService from '../../services/escalation';
-import * as userService from '../../services/user';
-import { hasGlobalEscalationAccess } from './helpers';
+import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Create ────────────────────────────────────────────────────────────────
@@ -53,13 +52,11 @@ export async function createEscalation(
       return { status: 400, error: 'role is required' };
     }
 
-    // RBAC: caller must hold the target role or be superadmin
-    const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
-    if (!hasGlobal) {
-      const userHasRole = await userService.hasRole(auth.userId, role);
-      if (!userHasRole) {
-        return { status: 403, error: `You must hold the "${role}" role or be a superadmin to create escalations for it` };
-      }
+    // RBAC: creating an escalation injects work into a role's queue — a write_all
+    // (or global) action. read-only and self-scope members may not create.
+    const denied = await assertQueueManageAccess(auth.userId, role);
+    if (denied) {
+      return { status: 403, error: `You must have write access to the "${role}" role or be a superadmin to create escalations for it` };
     }
 
     const escalation = await escalationService.createEscalation({

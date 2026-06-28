@@ -14,6 +14,37 @@ Each workflow execution carries three pieces of identity:
 
 **Credentials** — OAuth tokens and API keys available to the principal. Resolved at runtime through a cascade: principal's stored credentials, then the initiating user's credentials, then system environment variables.
 
+## Work-Surface Scope
+
+Identity says *who* a principal is. Work-surface scope says *what* that principal sees and does within a role's queue. It is the fourth axis, orthogonal to initiator, principal, and credentials.
+
+A role is a task queue with four verbs — **search**, **claim**, **ack** (resolve), **delete** (cancel). A `member` grant carries two scope axes stored on `lt_user_roles` that set the breadth of those verbs:
+
+- `read_scope` (`self` | `all`, default `all`) — governs **search**: which escalations the member sees. `self` = items assigned to the member (`assigned_to = user`); `all` = the whole role queue.
+- `write_scope` (`none` | `self` | `all`, default `all`) — governs **claim / ack / delete**: which escalations the member may act on. `none` = read-only.
+
+The constraint is **write ⊆ read** — you cannot act on what you cannot see — so `write_scope=all` requires `read_scope=all`. `admin` and `superadmin` ignore scope and always act on the whole queue. The default `all`/`all` is the full-queue worker.
+
+The five member profiles:
+
+| read_scope | write_scope | Profile |
+|-----------|------------|---------|
+| `all` | `all` | Full worker — search and act on the whole queue (default) |
+| `all` | `self` | See the whole queue, act only on own items (e.g. a chat-style room) |
+| `self` | `self` | Own items only — a one-time user filling in their pre-assigned form |
+| `all` | `none` | Read-only observer / auditor of the queue |
+| `self` | `none` | Read-only view of one's own items |
+
+### One-Time Users
+
+Scope makes limited-surface users first-class. A workflow assigns an escalation to a named person — a pre-claim, setting `assigned_to` to that user — and provisions them as a `member` with `read_scope=self` and `write_scope=self`. They see and act on exactly that one item: a just-in-time form surface scoped by RBAC, with no access to the rest of the queue and no direct table access. A follow-up or update is simply another workflow firing another escalation to that same person. Because `self` scope keys off durable `assigned_to` (independent of the soft-lock claim TTL), the assignment persists until the workflow resolves it.
+
+See the [Roles API](api/http/roles.md#work-surface-scope) for the assignment contract and the [HITL Guide](hitl-guide.md#role-based-routing) for the workflow-side flow.
+
+### Enforcement
+
+Scope folds into the SQL, so it is atomic with no TOCTOU window. Read scope becomes part of the escalation search query — a member sees a row when `role ∈ allRoles OR (role ∈ selfRoles AND assigned_to = me)`. Write scope folds into the atomic resolve-by-metadata query and gates the by-id claim/resolve/cancel paths. `assigned_to` is indexed, so `self` scope scales to large queues.
+
 ## Workflow Types and IAM
 
 Long Tail has three workflow types (see the [Workflows Guide](workflows.md#three-workflow-types) for full details). IAM applies to all three:

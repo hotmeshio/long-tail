@@ -5,7 +5,7 @@ import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemer
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { getVisibleRoles } from './helpers';
+import { assertReadAccess, assertWriteAccess, getEscalationWriteScope } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Orchestrator ─────────────────────────────────────────────────────────
@@ -36,17 +36,19 @@ export async function resolveEscalation(
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
 
-    // RBAC parity with resolveBySignalKey: a role-scoped caller may only resolve
-    // escalations whose role is visible to them. Global-access principals
-    // (superadmin/admin/system) get `undefined` → no filter. 404 (not 403) so the
-    // existence of out-of-scope escalations is not disclosed.
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles && !visibleRoles.includes(escalation.role)) {
-      return { status: 404, error: 'Escalation not found' };
-    }
-
     if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
+
+    // Hybrid RBAC for resolve ("ack", a write verb). Non-disclosure first: an
+    // escalation the caller cannot even SEE returns 404 (matches resolveBySignalKey —
+    // do not reveal out-of-scope rows). One they CAN see but cannot act on returns an
+    // informative 403 (e.g. a write_self owner whose item isn't assigned to them).
+    // Global access bypasses both.
+    if (await assertReadAccess(auth.userId, escalation)) {
+      return { status: 404, error: 'Escalation not found' };
+    }
+    const denied = await assertWriteAccess(auth.userId, escalation);
+    if (denied) return denied;
 
     // `metadata` (the outcome patch) is never written separately — it rides WITH the
     // resolverPayload to whichever path performs the resolve, so it merges inside the
@@ -116,10 +118,9 @@ export async function resolveBySignalKey(
     if (!escalation) return { status: 404, error: 'Escalation not found' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
 
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles && !visibleRoles.includes(escalation.role)) {
-      return { status: 404, error: 'Escalation not found' };
-    }
+    // Resolve is a write verb — scope-gate it (write_self may resolve only its own item).
+    const denied = await assertWriteAccess(auth.userId, escalation);
+    if (denied) return { status: 404, error: 'Escalation not found' };
 
     return resolveViaSignalKey(escalation, resolverPayload, metadata);
   } catch (err: any) {
@@ -149,11 +150,19 @@ export async function resolveByIds(
     }
     if (!resolverPayload) return { status: 400, error: 'resolverPayload is required' };
 
-    const visibleRoles = await getVisibleRoles(auth.userId);
-    if (visibleRoles) {
-      const roleSet = new Set(visibleRoles);
-      const roles = await escalationService.getEscalationRoles(ids);
-      if (roles.some((r) => !roleSet.has(r))) {
+    // Bulk resolve ("ack") is a write verb, gated PER ITEM: write_all roles may
+    // resolve any item in the role; write_self roles may resolve only items assigned
+    // to the caller (same rule single-resolve applies via assertWriteAccess). Global
+    // bypasses. A missing id or any out-of-scope item → 404 (non-disclosure), and
+    // nothing is resolved.
+    const writeScope = await getEscalationWriteScope(auth.userId);
+    if (!writeScope.global) {
+      const allSet = new Set(writeScope.allRoles);
+      const selfSet = new Set(writeScope.selfRoles);
+      const rows = await escalationService.getEscalationScopeRows(ids);
+      const writable = (r: { role: string; assigned_to: string | null }): boolean =>
+        allSet.has(r.role) || (selfSet.has(r.role) && r.assigned_to === auth.userId);
+      if (rows.length !== ids.length || !rows.every(writable)) {
         return { status: 404, error: 'One or more escalations not found' };
       }
     }

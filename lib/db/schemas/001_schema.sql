@@ -99,11 +99,16 @@ CREATE OR REPLACE TRIGGER lt_users_updated_at
 -- ─── lt_user_roles ───────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lt_user_roles (
-  user_id    UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
-  role       TEXT NOT NULL REFERENCES lt_roles(role),
-  type       TEXT NOT NULL DEFAULT 'member' CHECK (type IN ('superadmin', 'admin', 'member')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (user_id, role)
+  user_id     UUID NOT NULL REFERENCES lt_users(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL REFERENCES lt_roles(role),
+  type        TEXT NOT NULL DEFAULT 'member' CHECK (type IN ('superadmin', 'admin', 'member')),
+  -- Work-surface scope (orthogonal to `type`, ignored for admin/superadmin).
+  -- read governs search, write governs claim/ack/delete. write ⊆ read.
+  read_scope  TEXT NOT NULL DEFAULT 'all' CHECK (read_scope IN ('self', 'all')),
+  write_scope TEXT NOT NULL DEFAULT 'all' CHECK (write_scope IN ('none', 'self', 'all')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, role),
+  CONSTRAINT chk_lt_user_roles_scope CHECK (NOT (write_scope = 'all' AND read_scope = 'self'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_lt_user_roles_type ON lt_user_roles (type);

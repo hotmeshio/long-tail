@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock dependencies
+// Mock dependencies. Keep the pure scope helpers (effectiveScope etc.) real;
+// only stub the DB-touching user functions the scope partition + assignee
+// resolution depend on.
 vi.mock('../../services/escalation');
-vi.mock('../../services/user');
+vi.mock('../../services/user', async (importActual) => {
+  const actual = await importActual<typeof import('../../services/user')>();
+  return {
+    ...actual,
+    hasGlobalEscalationAccess: vi.fn(),
+    getUserRoles: vi.fn(),
+    getUserByExternalId: vi.fn(),
+    createUser: vi.fn(),
+  };
+});
 vi.mock('../../lib/events/publish', () => ({
   publishEscalationEvent: vi.fn(),
 }));
@@ -74,18 +85,29 @@ describe('findByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('scopes by visible roles IN SQL for a non-global user (no client-side filter)', async () => {
+  it('scopes by read access IN SQL for a non-global user (no client-side filter)', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
-    mockGetUserRoles.mockResolvedValue([{ role: 'reviewer', type: 'member', created_at: new Date() } as any]);
-    mockFindByMetadata.mockResolvedValue({ escalations: [], total: 0 });
+    mockGetUserRoles.mockResolvedValue([
+      { role: 'reviewer', type: 'member', read_scope: 'all', write_scope: 'all', created_at: new Date() } as any,
+    ]);
+    // The service already applied the role-scope filter in SQL; the controller
+    // returns its result as-is.
+    const esc = makeEscalation({ role: 'reviewer' });
+    mockFindByMetadata.mockResolvedValue({ escalations: [esc as any], total: 1 });
 
     const result = await findByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
     expect(result.status).toBe(200);
-    // The caller's roles flow INTO the query as the 6th arg — the SQL does the
-    // filtering and the count, so `total` stays correct across pages. The controller
+    // The caller's read scope flows INTO the query as the 6th arg — the SQL does the
+    // filtering AND the count, so `total` stays correct across pages. The controller
     // never filters a fetched page client-side.
-    expect(mockFindByMetadata).toHaveBeenCalledWith('orderId', 'order-123', undefined, undefined, undefined, ['reviewer']);
+    expect(mockFindByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', undefined, undefined, undefined,
+      { allRoles: ['reviewer'], selfRoles: [], meUserId: 'system-uuid' },
+    );
+    // Returned unchanged — no client-side filter shrinking the page or total.
+    expect(result.data.total).toBe(1);
+    expect(result.data.escalations).toHaveLength(1);
   });
 });
 
@@ -141,17 +163,36 @@ describe('claimByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('passes scoped roles for non-global user', async () => {
+  it('passes scoped write_all roles for non-global user', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
-    mockGetUserRoles.mockResolvedValue([{ role: 'operator', type: 'member' } as any]);
+    mockGetUserRoles.mockResolvedValue([
+      { role: 'operator', type: 'member', read_scope: 'all', write_scope: 'all', created_at: new Date() } as any,
+    ]);
     const esc = makeEscalation();
     mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
 
     await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
 
-    // Non-global user passes their roles as allowedRoles
+    // Non-global user passes their write_all roles as allowedRoles (write_self
+    // roles are excluded — the SDK claim-by-metadata cannot enforce ownership).
     expect(mockClaimByMetadata).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid', undefined, undefined, ['operator'],
+    );
+  });
+
+  it('excludes write_self roles from claim-by-metadata for non-global user', async () => {
+    mockHasGlobalAccess.mockResolvedValue(false);
+    mockGetUserRoles.mockResolvedValue([
+      { role: 'customer-triage', type: 'member', read_scope: 'self', write_scope: 'self', created_at: new Date() } as any,
+    ]);
+    const esc = makeEscalation();
+    mockClaimByMetadata.mockResolvedValue({ escalation: esc as any, isExtension: false, candidatesExist: 1 });
+
+    await claimByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
+
+    // Only write_self roles → empty write_all set → SQL matches nothing.
+    expect(mockClaimByMetadata).toHaveBeenCalledWith(
+      'orderId', 'order-123', 'system-uuid', undefined, undefined, [],
     );
   });
 
@@ -318,9 +359,10 @@ describe('resolveByMetadata', () => {
       metadata: { completedBy: 'jimbo' },
     }, SYSTEM_AUTH);
 
+    // Global caller → both write-scope filters null (no role filter).
     expect(mockResolveByMetadataAtomic).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid',
-      { approved: true }, { completedBy: 'jimbo' }, null,
+      { approved: true }, { completedBy: 'jimbo' }, null, null,
     );
   });
 });

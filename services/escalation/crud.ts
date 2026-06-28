@@ -1,8 +1,9 @@
 import { getPool } from '../../lib/db';
 import { publishEscalationEvent } from '../../lib/events/publish';
-import type { LTEscalationRecord } from '../../types';
+import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 
 import { escalations, ensureEscalationCompatView } from './client';
+import { listEscalations } from './queries';
 import {
   toEscalationRecord,
   toEscalationRecords,
@@ -251,6 +252,24 @@ export async function getEscalationRoles(ids: string[]): Promise<string[]> {
 }
 
 /**
+ * Fetch (id, role, assigned_to) for a set of escalation IDs — the minimal fields a
+ * write-scope gate needs to authorize a BULK action per item: write_all by role,
+ * write_self by ownership (assigned_to = caller). One query, no N+1.
+ */
+export async function getEscalationScopeRows(
+  ids: string[],
+): Promise<{ id: string; role: string; assigned_to: string | null }[]> {
+  if (ids.length === 0) return [];
+  const client = await escalations();
+  const rows = await client.list({ ids, limit: LOOKUP_LIMIT });
+  return rows.map((r) => ({
+    id: r.id as string,
+    role: r.role as string,
+    assigned_to: (r.assigned_to as string | null) ?? null,
+  }));
+}
+
+/**
  * Release a single escalation claim back to the available pool.
  * Only the assigned user (or superadmin via route) may release.
  */
@@ -427,25 +446,23 @@ export async function findByMetadata(
   status?: string,
   limit = 50,
   offset = 0,
-  allowedRoles?: string[],
+  scope?: { allRoles?: string[]; selfRoles?: string[]; meUserId?: string },
 ): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
-  const client = await escalations();
-  const metadata = { [key]: value };
-  const [rows, total] = await Promise.all([
-    client.list({
-      metadata,
-      status,
-      roles: allowedRoles,
-      orderBy: [
-        { column: 'priority', direction: 'asc' },
-        { column: 'created_at', direction: 'asc' },
-      ],
-      limit,
-      offset,
-    }),
-    client.count({ metadata, status, roles: allowedRoles }),
-  ]);
-  return { escalations: toEscalationRecords(rows), total };
+  // Route through the scoped list query so BOTH the role-scope filter
+  // (role ∈ allRoles OR (role ∈ selfRoles AND assigned_to = me)) AND the count
+  // run in SQL — never a client-side filter over a fetched page. allRoles travel
+  // as the flat `roles` filter; selfRoles + meUserId engage the raw-SQL scoped path.
+  return listEscalations({
+    metadata: { [key]: value },
+    status: status as LTEscalationStatus | undefined,
+    visibleRoles: scope?.allRoles,
+    selfRoles: scope?.selfRoles,
+    meUserId: scope?.meUserId,
+    sort_by: 'priority',
+    order: 'asc',
+    limit,
+    offset,
+  });
 }
 
 /**
@@ -454,7 +471,11 @@ export async function findByMetadata(
  * match zero rows. Returns `{ escalation, isExtension, candidatesExist }` or
  * null when nothing was claimed.
  *
- * @param allowedRoles — roles the caller can claim (null = no filter / global)
+ * @param allowedRoles — write_all roles the caller can claim (null = global / no
+ *   filter). The SDK applies a flat `role = ANY` filter and cannot express the
+ *   write_self ownership predicate, so self-scope members are intentionally
+ *   excluded from claim-by-metadata (their items are pre-claimed and resolved
+ *   by id). Self-scope claim-by-metadata would require a HotMesh SDK predicate.
  */
 export async function claimByMetadata(
   key: string,
@@ -530,15 +551,22 @@ export async function resolveByMetadataAtomic(
   userId: string,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
-  allowedRoles?: string[] | null,
+  writeAllRoles?: string[] | null,
+  writeSelfRoles?: string[] | null,
 ): Promise<ResolveByMetadataResult> {
   await ensureEscalationCompatView();
   const pool = getPool();
   const filter = JSON.stringify({ [key]: value });
   const payloadJson = JSON.stringify(resolverPayload);
   const metaPatch = metadata ? JSON.stringify(metadata) : null;
-  const roles = allowedRoles ?? null;
-  const { rows } = await pool.query(RESOLVE_BY_METADATA_ATOMIC, [filter, userId, payloadJson, metaPatch, roles]);
+  // null write_all roles = global (no filter). A scoped caller passes its arrays
+  // (possibly empty); the write_self branch matches only rows assigned to userId.
+  const allRoles = writeAllRoles ?? null;
+  const selfRoles = writeSelfRoles ?? null;
+  const { rows } = await pool.query(
+    RESOLVE_BY_METADATA_ATOMIC,
+    [filter, userId, payloadJson, metaPatch, allRoles, selfRoles],
+  );
 
   if (rows.length === 0) return { outcome: 'not_found' };
 

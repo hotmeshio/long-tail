@@ -354,6 +354,14 @@ Returns:
 
 Returns `isError: true` if the escalation isn't available (already claimed, already resolved, or doesn't exist).
 
+### Scope and one-time users
+
+An escalation created here lands in the target role's queue, where each member sees and acts on it according to their work-surface scope. A role membership carries a `type` (`member`, `admin`, or `superadmin`) plus two scope axes: `read_scope` (`self` | `all`) sets which escalations a member sees, and `write_scope` (`none` | `self` | `all`) sets which they may claim and resolve, with write ⊆ read. A `read_all` member sees the whole queue; a `read_self` member sees only items assigned to them. An `admin` or `superadmin` always acts on the whole queue. The defaults, `all`/`all`, are the full-queue worker.
+
+`get_available_work` returns the pending, unassigned items for a role — the shared pool that whole-queue (`write_all`) workers draw from. A `write_self` member does not pull from the pool; their item is pre-assigned to them.
+
+The one-time-user pattern builds on this. A workflow routes a single escalation to a named person by setting `assigned_to` when it creates the escalation — the `assigned_to` field on `escalate_and_wait` pre-claims the item — and that person is provisioned as a `member` of the role with `read_self` + `write_self`. They then see and act on exactly that one item: a scoped, single-item surface with no access to the rest of the queue. The scoped membership is provisioned through the platform's user and escalation APIs (see the [Roles API](api/http/roles.md)); the escalate tools supply the `assigned_to` pre-claim.
+
 ### Connecting
 
 **In-process (testing or co-located agents):**
