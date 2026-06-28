@@ -160,6 +160,7 @@ export async function listUsers(filters: {
   role?: string;
   roleType?: LTRoleType;
   status?: LTUserStatus;
+  search?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ users: LTUserRecord[]; total: number }> {
@@ -182,6 +183,14 @@ export async function listUsers(filters: {
   if (filters.status) {
     conditions.push(`u.status = $${idx++}`);
     values.push(filters.status);
+  }
+  if (filters.search) {
+    // Server-side free-text over the user's display fields — one term, one param.
+    const i = idx++;
+    conditions.push(
+      `(u.display_name ILIKE '%' || $${i} || '%' OR u.email ILIKE '%' || $${i} || '%' OR u.external_id ILIKE '%' || $${i} || '%')`,
+    );
+    values.push(filters.search);
   }
 
   const join = needsJoin ? 'INNER JOIN lt_user_roles r ON r.user_id = u.id' : '';

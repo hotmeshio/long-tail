@@ -8,6 +8,7 @@ import type { LTReadScope, LTRoleType, LTWriteScope } from '../types';
  * @param input.role — filter by role name
  * @param input.roleType — filter by role type (superadmin, admin, member)
  * @param input.status — filter by user status
+ * @param input.search — free-text match on display name, email, or external_id
  * @param input.limit — maximum number of users to return
  * @param input.offset — number of users to skip for pagination
  * @returns `{ status: 200, data: User[] }` on success
@@ -16,6 +17,7 @@ export async function listUsers(input: {
   role?: string;
   roleType?: LTRoleType;
   status?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }): Promise<LTApiResult> {

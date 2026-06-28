@@ -280,6 +280,29 @@ describe('user service', () => {
       const page = await userService.listUsers({ limit: 1, offset: 0 });
       expect(page.users.length).toBeLessThanOrEqual(1);
     });
+
+    it('should filter users by free-text search across name, email, and external_id', async () => {
+      const u = await userService.createUser({
+        external_id: 'srch-zoltan-1',
+        email: 'zoltan@example.com',
+        display_name: 'Zoltan Search',
+      });
+      try {
+        const byName = await userService.listUsers({ search: 'zoltan sea' });
+        expect(byName.users.some((x) => x.id === u.id)).toBe(true);
+
+        const byEmail = await userService.listUsers({ search: 'zoltan@exa' });
+        expect(byEmail.users.some((x) => x.id === u.id)).toBe(true);
+
+        const byExternalId = await userService.listUsers({ search: 'srch-zoltan' });
+        expect(byExternalId.users.some((x) => x.id === u.id)).toBe(true);
+
+        const noMatch = await userService.listUsers({ search: 'zzz-no-such-user-zzz' });
+        expect(noMatch.users.some((x) => x.id === u.id)).toBe(false);
+      } finally {
+        await userService.deleteUser(u.id);
+      }
+    });
   });
 
   // ── 5. Cascade delete ─────────────────────────────────────────────────

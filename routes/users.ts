@@ -10,13 +10,14 @@ const router = Router();
 /**
  * GET /api/users
  * List users with optional filters.
- * Query: ?role=reviewer&roleType=admin&status=active&limit=50&offset=0
+ * Query: ?role=reviewer&roleType=admin&status=active&search=ada&limit=50&offset=0
  */
 router.get('/', async (req, res) => {
   const result = await api.listUsers({
     role: req.query.role as string,
     roleType: req.query.roleType as any,
     status: req.query.status as any,
+    search: req.query.search as string,
     limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
     offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
   });

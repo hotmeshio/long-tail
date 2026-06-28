@@ -11,6 +11,7 @@ interface UserFilters {
   role?: string;
   roleType?: string;
   status?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -20,6 +21,7 @@ export function useUsers(filters: UserFilters = {}) {
   if (filters.role) params.set('role', filters.role);
   if (filters.roleType) params.set('roleType', filters.roleType);
   if (filters.status) params.set('status', filters.status);
+  if (filters.search) params.set('search', filters.search);
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
 

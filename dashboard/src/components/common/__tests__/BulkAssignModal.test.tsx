@@ -44,11 +44,26 @@ const mockUsers = [
   },
 ];
 
+// Search is now server-side: the hook receives the term and returns matches.
+// The mock mirrors the backend ILIKE so the search test exercises the real path
+// (component → hook param → filtered result), not a removed client-side filter.
 vi.mock('../../../api/users', () => ({
-  useUsers: () => ({
-    data: { users: mockUsers, total: mockUsers.length },
-    isLoading: false,
-  }),
+  useUsers: (filters: { search?: string } = {}) => {
+    const q = (filters.search ?? '').toLowerCase();
+    const users = q
+      ? mockUsers.filter(
+          (u) =>
+            u.display_name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q),
+        )
+      : mockUsers;
+    return { data: { users, total: users.length }, isLoading: false };
+  },
+}));
+
+// Identity debounce so the search term reaches the hook synchronously in tests.
+vi.mock('../../../hooks/useDebouncedValue', () => ({
+  useDebouncedValue: (v: unknown) => v,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

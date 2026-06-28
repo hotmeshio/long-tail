@@ -1,9 +1,10 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Modal } from './Modal';
 import { CustomDurationPicker } from '../form/CustomDurationPicker';
 import { useUsers } from '../../../api/users';
 import { useAuth } from '../../../hooks/useAuth';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import type { LTUserRecord } from '../../../api/types';
 
 interface BulkAssignModalProps {
@@ -37,22 +38,17 @@ export function BulkAssignModal({
   const roleFilter =
     !isSuperAdmin && selectedRoles.length === 1 ? selectedRoles[0] : undefined;
 
+  // Search is resolved server-side (ILIKE on name/email/external_id) so it matches
+  // every user, not just a fetched slice — no client-side filtering over a cap.
+  const debouncedSearch = useDebouncedValue(search, 250);
   const { data: usersData, isLoading: usersLoading } = useUsers({
     role: roleFilter,
     status: 'active',
+    search: debouncedSearch.trim() || undefined,
     limit: 200,
   });
 
-  const filteredUsers = useMemo(() => {
-    const users = usersData?.users ?? [];
-    if (!search.trim()) return users;
-    const q = search.toLowerCase();
-    return users.filter(
-      (u) =>
-        u.display_name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q),
-    );
-  }, [usersData?.users, search]);
+  const users = usersData?.users ?? [];
 
   const handleClose = () => {
     setStep('user');
@@ -107,12 +103,12 @@ export function BulkAssignModal({
                   Loading users...
                 </p>
               )}
-              {!usersLoading && filteredUsers.length === 0 && (
+              {!usersLoading && users.length === 0 && (
                 <p className="text-xs text-text-tertiary p-3">
                   No users found
                 </p>
               )}
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <button
                   key={user.id}
                   onClick={() => handleSelectUser(user)}
