@@ -5,9 +5,11 @@ import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 
 import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
+import { buildFacetWhere, buildFacetOrder } from './facet-sql';
 import type { EscalationStats } from './types';
 import { SORTABLE_COLUMNS } from './types';
 import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS } from './sql';
+import type { FacetQuery } from '../../types';
 
 type SdkListParams = Types.ListEscalationsParams;
 type OrderBy = NonNullable<SdkListParams['orderBy']>;
@@ -91,6 +93,84 @@ async function searchEscalations(params: {
     escalations: toEscalationRecords(rows.rows as any),
     total: countRows.rows[0]?.total ?? 0,
   };
+}
+
+/**
+ * Scoped faceted search — the HUMAN operations query. Composes the read-scope
+ * predicate (global → none; else `role ∈ allRoles OR (role ∈ selfRoles AND
+ * assigned_to = me)`) with the full FacetQuery language (`buildFacetWhere`:
+ * facets `@>`, block, numeric range, exists, status, available) plus the extra
+ * top-level filters (type/subtype/priority/assigned_to) and free-text, then orders
+ * by `buildFacetOrder` (columns + `metadata.<key>`). Every value is bound; the
+ * COUNT shares the WHERE so totals stay correct across pages — no client-side
+ * filtering. Reads go through the `public.lt_escalations` view.
+ */
+export async function searchEscalationsFaceted(opts: {
+  global?: boolean;
+  visibleRoles?: string[]; // read_all roles
+  selfRoles?: string[];    // read_self roles
+  meUserId?: string;
+  facet: FacetQuery;       // role/roles/status/available/facets/block/range/exists/orderBy
+  type?: string;
+  subtype?: string;
+  priority?: number;
+  assigned_to?: string;
+  search?: string;
+  limit: number;
+  offset: number;
+}): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  const params: unknown[] = [];
+  const clauses: string[] = [];
+
+  // 1. Read-scope predicate (skip entirely for global access).
+  if (!opts.global) {
+    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
+    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
+    const mi = params.push(opts.meUserId || null);
+    clauses.push(
+      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
+        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
+        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
+    );
+  }
+
+  // 2. Faceted predicate (role/roles/status/available/facets/block/range/exists).
+  const facetClause = buildFacetWhere(opts.facet, params);
+  if (facetClause !== 'TRUE') clauses.push(facetClause);
+
+  // 3. Extra top-level filters not expressed by FacetQuery.
+  if (opts.type) clauses.push(`type = $${params.push(opts.type)}`);
+  if (opts.subtype) clauses.push(`subtype = $${params.push(opts.subtype)}`);
+  if (opts.priority != null) clauses.push(`priority = $${params.push(opts.priority)}`);
+  if (opts.assigned_to) clauses.push(`assigned_to = $${params.push(opts.assigned_to)}`);
+
+  // 4. Free-text (same fields as the list search path).
+  if (opts.search) {
+    const i = params.push(opts.search);
+    clauses.push(
+      `(description ILIKE '%' || $${i} || '%' OR type ILIKE '%' || $${i} || '%'
+        OR subtype ILIKE '%' || $${i} || '%' OR role ILIKE '%' || $${i} || '%'
+        OR workflow_id ILIKE '%' || $${i} || '%' OR origin_id ILIKE '%' || $${i} || '%'
+        OR id::text ILIKE '%' || $${i} || '%' OR metadata::text ILIKE '%' || $${i} || '%')`,
+    );
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join('\n  AND ')}` : '';
+  const orderBy = buildFacetOrder(opts.facet.orderBy);
+  const countParams = [...params];
+  const li = params.push(opts.limit);
+  const oi = params.push(opts.offset);
+
+  const [rows, countRows] = await Promise.all([
+    pool.query(
+      `SELECT * FROM public.lt_escalations ${where} ORDER BY ${orderBy} LIMIT $${li} OFFSET $${oi}`,
+      params,
+    ),
+    pool.query(`SELECT COUNT(*)::int AS total FROM public.lt_escalations ${where}`, countParams),
+  ]);
+  return { escalations: toEscalationRecords(rows.rows as any), total: countRows.rows[0]?.total ?? 0 };
 }
 
 export async function getEscalationStats(

@@ -2,6 +2,16 @@ import { Router } from 'express';
 
 import * as api from '../../api/escalations';
 
+/**
+ * Parse a JSON-encoded query param (facets/block/range/exists/orderBy/roles) so the
+ * full faceted query rides on a GET URL — keeps the dashboard's copy-URL/curl path
+ * reproducible. Returns undefined on absent/invalid JSON (never throws to the caller).
+ */
+function jsonParam(v: unknown): any {
+  if (typeof v !== 'string' || !v) return undefined;
+  try { return JSON.parse(v); } catch { return undefined; }
+}
+
 export function registerListRoutes(router: Router): void {
   /**
    * POST /api/escalations
@@ -56,6 +66,14 @@ export function registerListRoutes(router: Router): void {
         sort_by: req.query.sort_by as string,
         order: req.query.order as string,
         search: req.query.search as string,
+        // Faceted query elements (JSON-encoded on the URL).
+        roles: jsonParam(req.query.roles),
+        facets: jsonParam(req.query.facets),
+        block: jsonParam(req.query.block),
+        range: jsonParam(req.query.range),
+        exists: jsonParam(req.query.exists),
+        orderBy: jsonParam(req.query.orderBy),
+        available: req.query.available != null ? req.query.available === 'true' : undefined,
       },
       req.auth!,
     );
@@ -79,6 +97,13 @@ export function registerListRoutes(router: Router): void {
         sort_by: req.query.sort_by as string,
         order: req.query.order as string,
         search: req.query.search as string,
+        // Faceted query elements (JSON-encoded on the URL).
+        roles: jsonParam(req.query.roles),
+        facets: jsonParam(req.query.facets),
+        block: jsonParam(req.query.block),
+        range: jsonParam(req.query.range),
+        exists: jsonParam(req.query.exists),
+        orderBy: jsonParam(req.query.orderBy),
       },
       req.auth!,
     );

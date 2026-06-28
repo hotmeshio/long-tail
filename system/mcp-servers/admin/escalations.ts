@@ -91,6 +91,9 @@ export function registerEscalationTools(server: McpServer): void {
         'assigned_to, priority), free-text `search`, and sorting. `search` matches ' +
         'across description, type/subtype, role, workflow/origin id, and metadata values ' +
         '(e.g. a correlation key like an order id) server-side over the full result set. ' +
+        'Also supports FACETED metadata query — `facets` (metadata @> containment), `block` ' +
+        '(exclusion), `range` (numeric), `exists` (key present), `roles`, `available`, and ' +
+        '`orderBy` (incl. metadata.<key>) — all role-scoped and run in SQL. ' +
         'Returns full records including metadata, workflow linkage, assignment, and signal_key.',
       inputSchema: findEscalationsSchema,
     },
@@ -108,6 +111,14 @@ export function registerEscalationTools(server: McpServer): void {
           offset: args.offset,
           sort_by: args.sort_by,
           order: args.order,
+          // Faceted metadata query (composes with role-scope in SQL).
+          roles: args.roles,
+          facets: args.facets,
+          block: args.block,
+          range: args.range,
+          exists: args.exists,
+          available: args.available,
+          orderBy: args.orderBy,
         },
         await systemAuth(),
       );

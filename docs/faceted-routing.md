@@ -163,6 +163,52 @@ The print farm leans on this: a printer resolves its in-flight `printing` row wi
 result and units in one atomic call, so the supply pond is also the production log — and the
 row's `created_at` → `resolved_at` is the print duration, no stored field required.
 
+## The human / operations query
+
+The same query language is also the operations team's read surface. Where the dispatcher
+sections above target a **single pond** for a workflow consumer, a **person** — a superadmin, or
+a member of several roles — queries "what work needs doing / was done" across **their** roles by
+the same facets, through the scoped list API.
+
+```typescript
+import { createClient } from '@hotmeshio/long-tail/sdk';
+const lt = createClient({ auth }); // auth carries the caller's userId
+
+// Faceted, role-scoped, paginated — the filter AND the count run in SQL.
+const res = await lt.escalations.list({
+  status: 'pending',
+  facets: { flags: 'too_short' },                 // metadata @> (GIN-served)
+  range: [{ facet: 'confidence', op: '<=', value: 0.7 }],
+  exists: ['needsReview'],
+  block: [{ outcome: 'success' }],                // exclude completed
+  orderBy: [{ field: 'metadata.confidence', numeric: true, direction: 'asc' }],
+  limit: 50, offset: 0,
+});
+// res.data → { escalations, total }
+```
+
+`list` and `listAvailable` accept the FacetQuery elements (`facets`, `block`, `range`, `exists`,
+`roles`, `available`, `orderBy`) on top of the plain filters. When any are present the request
+runs through the scoped faceted query; otherwise the simple list path is used.
+
+**Role scope is enforced in SQL, not in the controller.** The result is the read-scope predicate
+ANDed with the facets:
+
+- **superadmin / admin-of-admin** (global) — every role's queue, no role filter.
+- **`read_all` on a role** — the whole pond for that role.
+- **`read_self` on a role** — only items assigned to the caller (`assigned_to = me`).
+
+A caller may **narrow** within their scope (pass `role`/`roles`) but can never **widen** past it —
+a `role` they don't hold simply matches nothing. The page total is computed by the same WHERE, so
+pagination stays correct; the controller never filters a fetched page client-side.
+
+Over HTTP the faceted elements are JSON-encoded query params, so the whole query rides on a GET
+URL and the dashboard's copy-URL / copy-curl reproduces the exact request:
+
+```
+GET /api/escalations?status=pending&facets=%7B%22flags%22%3A%22too_short%22%7D&range=%5B%7B%22facet%22%3A%22confidence%22%2C%22op%22%3A%22%3C%3D%22%2C%22value%22%3A0.7%7D%5D
+```
+
 ## Safety
 
 - **Parameterized** — every value is a bound parameter; only audited column names, metadata

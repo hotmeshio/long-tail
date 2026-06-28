@@ -1,8 +1,33 @@
 import * as escalationService from '../../services/escalation';
 import { getEscalationReadScope } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
+import type { FacetRange, FacetOrder } from '../../types';
 
 // ── List routes ────────────────────────────────────────────────────────────
+
+/** Faceted-query elements a human caller may add to the scoped list/available query. */
+export interface FacetInput {
+  roles?: string[];
+  facets?: Record<string, any>;
+  block?: Record<string, any>[];
+  range?: FacetRange[];
+  exists?: string[];
+  available?: boolean;
+  orderBy?: FacetOrder[];
+}
+
+/** True when the caller asked for anything the plain list path can't express. */
+function hasFacetQuery(i: FacetInput): boolean {
+  return !!(
+    i.facets ||
+    i.block?.length ||
+    i.range?.length ||
+    i.exists?.length ||
+    i.orderBy?.length ||
+    i.roles?.length ||
+    i.available != null
+  );
+}
 
 /**
  * List escalations with optional filters.
@@ -37,13 +62,44 @@ export async function listEscalations(
     sort_by?: string;
     order?: string;
     search?: string;
-  },
+  } & FacetInput,
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
     const scope = await getEscalationReadScope(auth.userId);
     if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
       return { status: 200, data: { escalations: [], total: 0 } };
+    }
+
+    // Faceted path: the read-scope predicate composes with the full FacetQuery
+    // language (facets/block/range/exists/metadata-sort) IN SQL — the caller's
+    // role(s) can only NARROW within their scope, never widen past it.
+    if (hasFacetQuery(input)) {
+      const result = await escalationService.searchEscalationsFaceted({
+        global: scope.global,
+        visibleRoles: scope.global ? undefined : scope.allRoles,
+        selfRoles: scope.global ? undefined : scope.selfRoles,
+        meUserId: auth.userId,
+        facet: {
+          role: input.role,
+          roles: input.roles,
+          status: input.status,
+          available: input.available ?? (input.claimed ? false : undefined),
+          facets: input.facets,
+          block: input.block,
+          range: input.range,
+          exists: input.exists,
+          orderBy: input.orderBy,
+        },
+        type: input.type,
+        subtype: input.subtype,
+        priority: input.priority,
+        assigned_to: input.assigned_to,
+        search: input.search,
+        limit: input.limit ?? 50,
+        offset: input.offset ?? 0,
+      });
+      return { status: 200, data: result };
     }
 
     const result = await escalationService.listEscalations({
@@ -97,13 +153,41 @@ export async function listAvailableEscalations(
     sort_by?: string;
     order?: string;
     search?: string;
-  },
+  } & FacetInput,
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
     const scope = await getEscalationReadScope(auth.userId);
     if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
       return { status: 200, data: { escalations: [], total: 0 } };
+    }
+
+    // Faceted path — same as listEscalations but pinned to the available pool.
+    if (hasFacetQuery(input)) {
+      const result = await escalationService.searchEscalationsFaceted({
+        global: scope.global,
+        visibleRoles: scope.global ? undefined : scope.allRoles,
+        selfRoles: scope.global ? undefined : scope.selfRoles,
+        meUserId: auth.userId,
+        facet: {
+          role: input.role,
+          roles: input.roles,
+          status: 'pending',
+          available: true,
+          facets: input.facets,
+          block: input.block,
+          range: input.range,
+          exists: input.exists,
+          orderBy: input.orderBy,
+        },
+        type: input.type,
+        subtype: input.subtype,
+        priority: input.priority,
+        search: input.search,
+        limit: input.limit ?? 50,
+        offset: input.offset ?? 0,
+      });
+      return { status: 200, data: result };
     }
 
     const result = await escalationService.listAvailableEscalations({

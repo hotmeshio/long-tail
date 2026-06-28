@@ -40,6 +40,23 @@ export const findEscalationsSchema = z.object({
   order: z.enum(['asc', 'desc']).optional().describe('Sort direction for sort_by'),
   limit: z.number().int().min(1).max(100).optional().default(5),
   offset: z.number().int().min(0).optional().default(0),
+  // Faceted metadata query (role-scoped in SQL). A "facet" is a key/value INSIDE the
+  // row's metadata JSONB, matched by containment (metadata @>), GIN-served.
+  roles: z.array(z.string()).optional().describe('Restrict to these roles (role = ANY); narrows within scope, never widens past it'),
+  facets: z.record(z.any()).optional().describe('Required metadata facets — metadata @> facets (AND). e.g. { filament: "pla" } means metadata.filament == "pla"'),
+  block: z.array(z.record(z.any())).optional().describe('Exclude rows whose metadata contains ANY of these facet sets: NOT (metadata @> ANY(block))'),
+  range: z.array(z.object({
+    facet: z.string(),
+    op: z.enum(['<', '<=', '>', '>=', '=']),
+    value: z.number(),
+  })).optional().describe('Numeric ranges over a metadata facet, e.g. { facet: "confidence", op: "<=", value: 0.7 }'),
+  exists: z.array(z.string()).optional().describe('Metadata keys that must be present: metadata ? key'),
+  available: z.boolean().optional().describe('true = only unclaimed/expired; false = only held now'),
+  orderBy: z.array(z.object({
+    field: z.string(),
+    direction: z.enum(['asc', 'desc']).optional(),
+    numeric: z.boolean().optional(),
+  })).optional().describe('Sort by a column or a metadata path written "metadata.<key>" (set numeric for numeric sort)'),
 });
 
 export const getEscalationSchema = z.object({

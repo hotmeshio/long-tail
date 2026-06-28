@@ -61,6 +61,18 @@ const result = await lt.escalations.list({
   role: 'reviewer',
   limit: 25,
 });
+
+// Faceted query — a "facet" is a key/value INSIDE the row's metadata JSONB. The
+// filter AND the count run in SQL, role-scoped; nothing is filtered client-side.
+const faceted = await lt.escalations.list({
+  status: 'pending',
+  facets: { flags: 'too_short' },                  // metadata @> { flags: 'too_short' }
+  range: [{ facet: 'confidence', op: '<=', value: 0.7 }],
+  block: [{ outcome: 'success' }],                 // exclude completed
+  exists: ['needsReview'],
+  orderBy: [{ field: 'metadata.confidence', numeric: true, direction: 'asc' }],
+  limit: 50,
+});
 ```
 
 **Parameters:**
@@ -69,14 +81,25 @@ const result = await lt.escalations.list({
 |-------|------|----------|-------------|
 | `status` | `string` | No | Filter by `pending`, `resolved`, or `cancelled` |
 | `role` | `string` | No | Filter by assigned role |
+| `roles` | `string[]` | No | Restrict to these roles (`role = ANY`) — narrows within the caller's scope, never widens past it |
 | `type` | `string` | No | Filter by workflow type |
 | `subtype` | `string` | No | Filter by subtype |
 | `assigned_to` | `string` | No | Filter by assigned user ID |
 | `priority` | `number` | No | Filter by priority (1--4) |
+| `facets` | `Record<string, any>` | No | Required metadata facets — `metadata @> facets` (AND, GIN-served). `{ k: v }` means `metadata.k == v` for a top-level scalar; for nested/arrays it is JSONB **containment** |
+| `block` | `Record<string, any>[]` | No | Exclude rows whose metadata contains ANY of these facet sets — `NOT (metadata @> ANY(block))` |
+| `range` | `{ facet, op, value }[]` | No | Numeric range over a metadata facet, e.g. `{ facet: 'confidence', op: '<=', value: 0.7 }` |
+| `exists` | `string[]` | No | Metadata keys that must be present — `metadata ? key` |
+| `available` | `boolean` | No | `true` = unclaimed/expired only; `false` = held now |
 | `limit` | `number` | No | Max results (default: 50) |
 | `offset` | `number` | No | Pagination offset |
 | `sort_by` | `string` | No | Column to sort by (e.g. `created_at`, `priority`) |
 | `order` | `string` | No | `asc` or `desc` |
+| `orderBy` | `{ field, direction?, numeric? }[]` | No | Multi-key sort over columns or a metadata path written `metadata.<key>` (set `numeric` for numeric sort) |
+
+When any faceted element (`facets`/`block`/`range`/`exists`/`roles`/`available`/`orderBy`) is
+present the request runs through the scoped faceted query; otherwise the simple list path is used.
+See [Faceted Routing — the human / operations query](../../faceted-routing.md#the-human--operations-query).
 
 **Returns:** `LTApiResult<{ escalations, total }>`
 
@@ -107,6 +130,9 @@ const result = await lt.escalations.listAvailable({
 | `offset` | `number` | No | Pagination offset |
 | `sort_by` | `string` | No | Column to sort by |
 | `order` | `string` | No | `asc` or `desc` |
+
+Also accepts the same faceted parameters as [`list`](#list) (`facets`, `block`, `range`,
+`exists`, `roles`, `orderBy`), pinned to the available pool.
 
 **Returns:** `LTApiResult<{ escalations, total }>`
 

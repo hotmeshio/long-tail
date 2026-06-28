@@ -11,13 +11,26 @@ const COLUMNS = [
   { key: 'created_at', label: 'Created', width: 12, format: formatTime },
 ];
 
-interface ListOptions { status?: string; role?: string; limit?: string; json?: boolean; quiet?: boolean }
+interface ListOptions {
+  status?: string; role?: string; limit?: string; json?: boolean; quiet?: boolean;
+  facets?: string; block?: string; range?: string; exists?: string; roles?: string;
+  available?: string; orderBy?: string;
+}
 
 export async function listEscalations(opts: ListOptions): Promise<void> {
   const params = new URLSearchParams();
   if (opts.status) params.set('status', opts.status);
   if (opts.role) params.set('role', opts.role);
   if (opts.limit) params.set('limit', opts.limit);
+  // Faceted query elements travel as JSON-encoded query params (the route JSON-parses
+  // them). parseJsonOption validates the input and throws a friendly error on bad JSON.
+  if (opts.facets) params.set('facets', JSON.stringify(parseJsonOption('--facets', opts.facets)));
+  if (opts.block) params.set('block', JSON.stringify(parseJsonOption('--block', opts.block)));
+  if (opts.range) params.set('range', JSON.stringify(parseJsonOption('--range', opts.range)));
+  if (opts.exists) params.set('exists', JSON.stringify(parseJsonOption('--exists', opts.exists)));
+  if (opts.roles) params.set('roles', JSON.stringify(parseJsonOption('--roles', opts.roles)));
+  if (opts.orderBy) params.set('orderBy', JSON.stringify(parseJsonOption('--order-by', opts.orderBy)));
+  if (opts.available != null) params.set('available', opts.available);
   const data = await apiFetch<any>(`/escalations?${params}`);
   output(data, data.escalations || [], COLUMNS, opts);
 }

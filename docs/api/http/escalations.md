@@ -41,8 +41,33 @@ GET /api/escalations
 | `type` | `string` | Filter by escalation type |
 | `subtype` | `string` | Filter by subtype |
 | `assigned_to` | `string` | Filter by claimer's user ID |
+| `priority` | `integer` | Filter by priority (1–4) |
+| `search` | `string` | Free-text across description/type/role/ids/metadata values (server-side) |
+| `sort_by` / `order` | `string` | Single-column sort + direction (`asc`/`desc`) |
 | `limit` | `integer` | Max results (default: 50) |
 | `offset` | `integer` | Pagination offset (default: 0) |
+
+**Faceted query parameters** (JSON-encoded — a "facet" is a key/value *inside* the row's
+`metadata` JSONB; the filter and count run in SQL, role-scoped):
+
+| Parameter | JSON shape | Description |
+|-----------|-----------|-------------|
+| `facets` | object | Required facets — `metadata @> facets`. `{"flags":"too_short"}` ≡ `metadata.flags == "too_short"` for a top-level scalar (containment for nested/arrays) |
+| `block` | array of objects | Exclude rows containing ANY set — `NOT (metadata @> ANY(block))` |
+| `range` | array of `{facet, op, value}` | Numeric range, op ∈ `< <= > >= =`, e.g. `[{"facet":"confidence","op":"<=","value":0.7}]` |
+| `exists` | array of strings | Keys that must be present — `metadata ? key` |
+| `roles` | array of strings | Restrict to these roles (narrows within scope, never widens) |
+| `available` | `true`/`false` | `true` = unclaimed/expired only; `false` = held now |
+| `orderBy` | array of `{field, direction?, numeric?}` | Sort by column or `metadata.<key>` |
+
+When any faceted parameter is present the request runs through the scoped faceted query.
+Example (URL-encode the JSON values):
+
+```
+GET /api/escalations?status=pending&facets={"flags":"too_short"}&range=[{"facet":"confidence","op":"<=","value":0.7}]
+```
+
+See [Faceted Routing — the human / operations query](../../faceted-routing.md#the-human--operations-query).
 
 **Response 200:**
 
