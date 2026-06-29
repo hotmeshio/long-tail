@@ -63,8 +63,20 @@
   }
 
   .section-header {
-    @apply block text-xs font-semibold uppercase tracking-widest text-accent/80
-           mb-3 pb-1.5 border-b border-surface-border/30;
+    @apply block mb-3 pb-1.5 border-b border-surface-border/30;
+    font-size: 1.05rem;
+    font-weight: 300;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.03em;
+    color: #5C2069;
+  }
+
+  .section-h2 {
+    font-size: 1.05rem;
+    font-weight: 300;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.03em;
+    color: #5C2069;
   }
 }
 

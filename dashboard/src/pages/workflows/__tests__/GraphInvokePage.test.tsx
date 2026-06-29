@@ -35,10 +35,10 @@ beforeEach(() => {
 describe('GraphInvokePage', () => {
   it('renders the flow selector with active flows', () => {
     render(<GraphInvokePage />, { wrapper });
-    expect(screen.getByText('Select Flow')).toBeInTheDocument();
+    expect(screen.getByText('Graph Flows')).toBeInTheDocument();
     expect(screen.getByText('hello_world')).toBeInTheDocument();
     expect(screen.getByText('farewell')).toBeInTheDocument();
-    expect(screen.getByText('Choose a flow to get started')).toBeInTheDocument();
+    expect(screen.getByText('Select a flow')).toBeInTheDocument();
   });
 
   it('queries only active flows', () => {

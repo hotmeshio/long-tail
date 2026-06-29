@@ -16,8 +16,8 @@ export function ChoreographySidebar({ aiEnabled = false, isBuilder = false }: { 
   }
 
   const entries: NavEntry[] = [
+    { to: '/topics', label: 'Event Topics', icon: Radio },
     { to: '/agents', label: aiEnabled ? 'Agents' : 'Automations', icon: Bot },
-    { to: '/topics', label: 'Topics', icon: Radio },
     { to: '/capabilities', label: 'Capabilities', icon: Zap },
   ];
 

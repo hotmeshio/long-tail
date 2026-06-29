@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Settings } from 'lucide-react';
-import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
+import { DateValue } from '../../components/common/display/DateValue';
 import { useJobs, useWorkflowConfigs, useDiscoveredWorkflows } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useNamespace } from '../../hooks/useNamespace';
@@ -12,7 +12,7 @@ import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
+import { FilterBar, FilterSelect, FilterDivider } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
@@ -48,37 +48,36 @@ function buildColumns(
   return [
     {
       key: 'workflow_id',
-      label: 'Workflow ID / Type',
+      label: 'Workflow ID',
       render: (row) => {
         const dotClass = STATUS_DOT[jobStatusMap[row.status] ?? row.status] ?? 'bg-status-pending';
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
-          <div className="flex items-start gap-2 min-w-0">
-            <span className={`w-1.5 h-1.5 shrink-0 rounded-full mt-1.5 ${dotClass}${pulseClass}`} title={row.status} />
-            <div className="min-w-0">
-              <span className="font-mono text-xs text-text-primary truncate block">
-                {row.workflow_id}
-              </span>
-              <div className="mt-0.5">
-                <WorkflowPill type={row.entity} variant={tierMap.get(row.entity) ?? 'durable'} size="xs" />
-              </div>
-            </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${dotClass}${pulseClass}`} title={row.status} />
+            <span className="font-mono text-xs text-text-primary truncate">{row.workflow_id}</span>
           </div>
         );
       },
     },
     {
+      key: 'entity',
+      label: 'Type',
+      render: (row) => <WorkflowPill type={row.entity} variant={tierMap.get(row.entity) ?? 'durable'} size="xs" />,
+      className: 'w-44 shrink-0',
+    },
+    {
       key: 'created_at',
       label: 'Created',
-      render: (row) => <TimestampCell date={row.created_at} />,
-      className: 'w-40',
+      render: (row) => <DateValue date={row.created_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
+      className: 'w-32',
       sortable: true,
     },
     {
       key: 'updated_at',
       label: 'Updated',
-      render: (row) => <TimestampCell date={row.updated_at} />,
-      className: 'w-40',
+      render: (row) => <DateValue date={row.updated_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
+      className: 'w-32',
       sortable: true,
     },
     {
@@ -224,12 +223,14 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
           onChange={(e) => setSearchInput(e.target.value)}
           className="input text-[11px] py-1 px-2 w-56"
         />
+        <FilterDivider />
         <FilterSelect
           label="Type"
           value={filters.entity}
           onChange={(v) => setFilter('entity', v)}
           options={entities.map((e) => ({ value: e, label: e }))}
         />
+        <FilterDivider />
         <FilterSelect
           label="Status"
           value={filters.status}
@@ -240,6 +241,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
             { value: 'failed', label: 'Failed' },
           ]}
         />
+        <FilterDivider />
         <FilterSelect
           label="Tier"
           value={filters.tier === 'all' ? '' : filters.tier}

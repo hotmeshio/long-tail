@@ -1,5 +1,18 @@
 import { formatDistanceToNowStrict, format } from 'date-fns';
 
+/** Locale-formatted integer with commas: 1234567 → "1,234,567" */
+export function formatCount(n: number): string {
+  return n.toLocaleString();
+}
+
+/** Compact count for tight spaces: <1K plain, ≥1K → "1.2K", ≥1M → "1.2M", ≥1B → "1.2B" */
+export function formatCountCompact(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return n.toLocaleString();
+}
+
 /**
  * Format an ISO date string as a relative time ago (e.g., "30s ago", "5m ago").
  */

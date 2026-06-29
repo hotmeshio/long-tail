@@ -24,7 +24,7 @@ export function OrchestrationSidebar() {
         '/workflows/tasks',
       ],
       items: [
-        { to: '/workflows/registry', label: 'Configure', icon: SlidersHorizontal },
+        { to: '/workflows/registry', label: 'Registry', icon: SlidersHorizontal },
         { to: '/workflows/durable/invoke', label: 'Invoke', icon: Play },
         { to: '/workflows/executions', label: 'Executions', icon: ListChecks },
       ],

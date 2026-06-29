@@ -22,7 +22,7 @@ function SectionHeader({ icon: Icon, color, children }: { icon: React.ElementTyp
   return (
     <div className="flex items-center gap-2 mb-3 pb-2 border-b border-surface-border">
       <Icon className={`w-4 h-4 ${color}`} strokeWidth={1.5} />
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-accent/80">{children}</h2>
+      <h2 className="section-h2">{children}</h2>
     </div>
   );
 }

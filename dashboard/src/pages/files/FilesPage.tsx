@@ -146,7 +146,7 @@ export function FilesPage() {
       />
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-hidden pr-6">
         <PageHeader
           title="Files"
           docsHash="#docs:dashboard.md:files"

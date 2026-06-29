@@ -87,7 +87,7 @@ export function DataTable<T>({
               <th
                 key={col.key}
                 onClick={isSortable ? () => onSort(col.key) : undefined}
-                className={`${inline ? '' : 'sticky top-[2.75rem] z-10 '}bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.className ?? ''} ${
+                className={`${inline ? '' : 'sticky top-[60px] z-10 '}bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.className ?? ''} ${
                   isSortable ? 'cursor-pointer select-none group/sorthead hover:text-text-secondary transition-colors' : ''
                 }`}
               >
@@ -111,7 +111,7 @@ export function DataTable<T>({
             onClick={onRowClick ? () => onRowClick(row) : undefined}
             className={`group/row border-b last:border-b-0 transition-colors duration-100 ${
               onRowClick ? 'cursor-pointer row-hover' : ''
-            } ${isActive ? 'bg-accent/5 border-l-2 border-l-accent' : ''} ${rowClassName ? rowClassName(row) : ''}`}
+            } ${isActive ? 'border-l-2 border-l-accent' : ''} ${rowClassName ? rowClassName(row) : ''}`}
           >
             {columns.map((col) => (
               <td

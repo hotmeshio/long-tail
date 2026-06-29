@@ -1,3 +1,5 @@
+import { formatCount } from '../../../lib/format';
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 interface PaginationProps {
@@ -26,7 +28,7 @@ export function Pagination({
     <div className="flex items-center justify-between pt-4">
       <div className="flex items-center gap-4">
         <p className="text-xs text-text-tertiary">
-          {start}&ndash;{end} of {total}
+          {formatCount(start)}&ndash;{formatCount(end)} of {formatCount(total)}
         </p>
         {onPageSizeChange && (
           <select

@@ -64,7 +64,7 @@ describe('TopicsPage', () => {
   it('renders page header', async () => {
     fetchSpy.mockResolvedValue(jsonResponse(MOCK_TOPICS));
     render(<TopicsPage />, { wrapper: createWrapper() });
-    expect(screen.getByText('Topic Catalog')).toBeDefined();
+    expect(screen.getByText('Event Topics')).toBeDefined();
   });
 
   it('renders topic names after loading', async () => {
@@ -83,8 +83,9 @@ describe('TopicsPage', () => {
     render(<TopicsPage />, { wrapper: createWrapper() });
 
     await screen.findByText('task.created');
-    expect(screen.getByText('task')).toBeDefined();
-    expect(screen.getByText('workflow')).toBeDefined();
+    // Category labels appear in both row pills and filter bar buttons
+    expect(screen.getAllByText('task').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('workflow').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders descriptions', async () => {
@@ -99,13 +100,15 @@ describe('TopicsPage', () => {
     fetchSpy.mockResolvedValue(jsonResponse({ topics: [], total: 0 }));
     render(<TopicsPage />, { wrapper: createWrapper() });
 
-    const empty = await screen.findByText('No topics registered yet');
+    const empty = await screen.findByText('No topics registered yet.');
     expect(empty).toBeDefined();
   });
 
-  it('renders category filter', () => {
+  it('renders category filter', async () => {
     fetchSpy.mockResolvedValue(jsonResponse(MOCK_TOPICS));
     render(<TopicsPage />, { wrapper: createWrapper() });
-    expect(screen.getByText('Category')).toBeDefined();
+    await screen.findByText('task.created');
+    // Filter bar renders "All" tab + one tab per category
+    expect(screen.getByText('All')).toBeDefined();
   });
 });

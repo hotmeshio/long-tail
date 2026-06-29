@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Inbox, ScrollText, GitBranch, Layers, ExternalLink, BookOpen,
 } from 'lucide-react';
+import { formatCountCompact } from '../../lib/format';
 import { useAvailableEscalations, useEscalations } from '../../api/escalations';
 import { useJobs } from '../../api/workflows';
 import { useMcpRuns } from '../../api/pipelines';
@@ -35,9 +36,9 @@ function SectionHeader({ icon: Icon, color, docsHash, count, children, actions }
     <div className="flex items-center justify-between mb-4 pb-2 border-b border-surface-border">
       <div className="flex items-center gap-2">
         <Icon className={`w-4.5 h-4.5 ${color || 'text-accent/60'}`} strokeWidth={1.5} />
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-accent/80">{children}</h2>
+        <h2 className="section-h2">{children}</h2>
         {count !== undefined && count > 0 && (
-          <span className="text-[10px] text-text-quaternary tabular-nums">{count}</span>
+          <span className="text-[10px] text-text-quaternary tabular-nums">{formatCountCompact(count)}</span>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -209,7 +210,7 @@ export function HomePage() {
       <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
 
       {/* ── Row 1: Available Escalations | My Escalations ────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 min-h-[35vh]">
 
         {/* Col 1: Available Escalations */}
         <div>
