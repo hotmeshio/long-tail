@@ -68,6 +68,16 @@ router.delete('/escalation-chains', requireBuilder, async (req, res) => {
 // ── Parameterized routes (must come AFTER named routes) ───────────────────
 
 /**
+ * PATCH /api/roles/:role
+ * Update role metadata. Requires builder.
+ * Body: { title?, description?, form_schema?, properties?, ops_visible?, parent_role? }
+ */
+router.patch('/:role', requireBuilder, async (req, res) => {
+  const result = await api.updateRole({ role: req.params.role as string, ...req.body });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/roles/:role/escalation-targets
  * Get allowed escalation targets for a specific role.
  */

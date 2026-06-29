@@ -119,6 +119,9 @@ const RolesPage = lazy(() =>
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
 );
+const OperationsPage = lazy(() =>
+  import('./pages/operations/OperationsPage').then((m) => ({ default: m.OperationsPage })),
+);
 const ControlPlanePage = lazy(() =>
   import('./pages/admin/controlplane').then((m) => ({ default: m.ControlPlanePage })),
 );
@@ -313,6 +316,14 @@ const router = createBrowserRouter([
               { path: 'mcp/servers/:serverId', element: <Lazy><McpServerDetailPage /></Lazy> },
             ],
           },
+        ],
+      },
+
+      // Operations: admin-level overview of active work across stations
+      {
+        element: <RequireRole roleTypes={['admin', 'superadmin']} />,
+        children: [
+          { path: 'operations', element: <Lazy><OperationsPage /></Lazy> },
         ],
       },
 

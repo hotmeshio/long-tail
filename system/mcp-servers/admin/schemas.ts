@@ -273,6 +273,16 @@ export const addEscalationChainSchema = z.object({
   target_role: z.string().describe('Destination role for escalation'),
 });
 
+export const updateRoleSchema = z.object({
+  role: z.string().describe('Role key to update'),
+  title: z.string().nullable().optional().describe('Display name shown on role cards and station views'),
+  description: z.string().nullable().optional().describe('Short description of this role\'s purpose'),
+  form_schema: z.record(z.any()).nullable().optional().describe('JSON Schema for the escalation resolve form (overridden by workflow-level resolver_schema)'),
+  properties: z.record(z.any()).nullable().optional().describe('Open bag for station metadata: sla_minutes, target_per_hour, icon, color, etc.'),
+  ops_visible: z.boolean().optional().describe('When true, role appears as a station card on the /operations view'),
+  parent_role: z.string().nullable().optional().describe('Parent role in the process dependency graph (nullable; roots have no parent)'),
+});
+
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────
 
 export const pruneSchema = z.object({

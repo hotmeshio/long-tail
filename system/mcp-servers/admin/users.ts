@@ -14,6 +14,7 @@ import {
   listRolesSchema,
   createRoleSchema,
   addEscalationChainSchema,
+  updateRoleSchema,
 } from './schemas';
 
 export function registerUserTools(server: McpServer): void {
@@ -205,6 +206,38 @@ export function registerUserTools(server: McpServer): void {
             target_role: args.target_role,
           }),
         }],
+      };
+    },
+  );
+
+  // mirrors PATCH /api/roles/:role
+  (server as any).registerTool(
+    'update_role',
+    {
+      title: 'Update Role',
+      description:
+        'Update role metadata: display name, description, form schema, properties ' +
+        '(SLA targets, throughput goals), ops_visible flag, and parent role ' +
+        'for the process dependency graph.',
+      inputSchema: updateRoleSchema,
+    },
+    async (args: z.infer<typeof updateRoleSchema>) => {
+      const updated = await roleService.updateRoleMetadata(args.role, {
+        title: args.title,
+        description: args.description,
+        form_schema: args.form_schema as Record<string, any> | null | undefined,
+        properties: args.properties as Record<string, any> | null | undefined,
+        ops_visible: args.ops_visible,
+        parent_role: args.parent_role,
+      });
+      if (!updated) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Role '${args.role}' not found` }) }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(updated) }],
       };
     },
   );

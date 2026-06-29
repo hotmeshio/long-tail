@@ -8,9 +8,11 @@ import {
 export function EscalationPanel({
   selectedRole,
   allRoles,
+  embedded = false,
 }: {
   selectedRole: string | null;
   allRoles: string[];
+  embedded?: boolean;
 }) {
   const { data: chainsData } = useEscalationChains();
   const addChain = useAddEscalationChain();
@@ -44,82 +46,86 @@ export function EscalationPanel({
 
   const isSuperAdmin = selectedRole === 'superadmin';
 
+  const body = !selectedRole ? (
+    <p className="text-xs text-text-tertiary">Select a role to manage its escalation targets.</p>
+  ) : isSuperAdmin ? (
+    <div>
+      <p className="text-sm font-mono text-text-primary mb-2">{selectedRole}</p>
+      <p className="text-xs text-text-tertiary">Superadmins can escalate to any role implicitly.</p>
+    </div>
+  ) : (
+    <div className="space-y-4">
+      {!embedded && (
+        <div>
+          <p className="text-sm font-mono text-text-primary">{selectedRole}</p>
+          <p className="text-[10px] text-text-tertiary mt-0.5">Can escalate to:</p>
+        </div>
+      )}
+      {embedded && (
+        <p className="text-[11px] text-text-tertiary">
+          When a work item cannot be resolved, <span className="font-mono">{selectedRole}</span> can hand it off to:
+        </p>
+      )}
+
+      {targets.length === 0 ? (
+        <p className="text-xs text-text-tertiary">No escalation targets configured.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {targets.map((target) => (
+            <span
+              key={target}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary font-mono"
+            >
+              {target}
+              <button
+                onClick={() => handleRemove(target)}
+                className="text-text-tertiary hover:text-status-error transition-colors"
+                title={`Remove ${target}`}
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {available.length > 0 && (
+        <div className="pt-3 border-t border-surface-border">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+            Add Target
+          </p>
+          <div className="flex items-center gap-2">
+            <select
+              value={newTarget}
+              onChange={(e) => setNewTarget(e.target.value)}
+              className="select text-xs font-mono flex-1"
+            >
+              <option value="">Select a role...</option>
+              {available.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleAdd}
+              disabled={!newTarget || addChain.isPending}
+              className="btn-primary text-xs"
+            >
+              {addChain.isPending ? 'Adding...' : 'Add'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (embedded) return <div>{body}</div>;
+
   return (
     <div className="border-l border-surface-border pl-6 min-h-[300px]">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
         Escalation Routing
       </p>
-
-      {!selectedRole ? (
-        <p className="text-xs text-text-tertiary">
-          Select a role to manage its escalation targets.
-        </p>
-      ) : isSuperAdmin ? (
-        <div>
-          <p className="text-sm font-mono text-text-primary mb-2">{selectedRole}</p>
-          <p className="text-xs text-text-tertiary">
-            Superadmins can escalate to any role implicitly.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm font-mono text-text-primary">{selectedRole}</p>
-            <p className="text-[10px] text-text-tertiary mt-0.5">Can escalate to:</p>
-          </div>
-
-          {targets.length === 0 ? (
-            <p className="text-xs text-text-tertiary">
-              No escalation targets configured.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {targets.map((target) => (
-                <span
-                  key={target}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary font-mono"
-                >
-                  {target}
-                  <button
-                    onClick={() => handleRemove(target)}
-                    className="text-text-tertiary hover:text-status-error transition-colors"
-                    title={`Remove ${target}`}
-                  >
-                    &times;
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {available.length > 0 && (
-            <div className="pt-3 border-t border-surface-border">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
-                Add Target
-              </p>
-              <div className="flex items-center gap-2">
-                <select
-                  value={newTarget}
-                  onChange={(e) => setNewTarget(e.target.value)}
-                  className="select text-xs font-mono flex-1"
-                >
-                  <option value="">Select a role...</option>
-                  {available.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleAdd}
-                  disabled={!newTarget || addChain.isPending}
-                  className="btn-primary text-xs"
-                >
-                  {addChain.isPending ? 'Adding...' : 'Add'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {body}
     </div>
   );
 }

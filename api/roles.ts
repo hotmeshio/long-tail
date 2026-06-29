@@ -170,6 +170,40 @@ export async function replaceEscalationTargets(input: {
 }
 
 /**
+ * Update role metadata (title, description, form_schema, properties, ops_visible, parent_role).
+ * Fields omitted from input are left unchanged. form_schema and parent_role can be set to null.
+ */
+export async function updateRole(input: {
+  role: string;
+  title?: string | null;
+  description?: string | null;
+  form_schema?: Record<string, any> | null;
+  properties?: Record<string, any> | null;
+  ops_visible?: boolean;
+  parent_role?: string | null;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.role) {
+      return { status: 400, error: 'role is required' };
+    }
+    const updated = await roleService.updateRoleMetadata(input.role, {
+      title: input.title,
+      description: input.description,
+      form_schema: input.form_schema,
+      properties: input.properties,
+      ops_visible: input.ops_visible,
+      parent_role: input.parent_role,
+    });
+    if (!updated) {
+      return { status: 404, error: `Role '${input.role}' not found` };
+    }
+    return { status: 200, data: updated };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
  * Delete a role from the system. Requires admin privileges.
  *
  * Returns 409 if the role cannot be deleted (e.g., still assigned to users).

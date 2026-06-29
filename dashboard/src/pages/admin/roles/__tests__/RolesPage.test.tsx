@@ -8,9 +8,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockRoles = {
   roles: [
-    { role: 'admin', user_count: 3, chain_count: 2, workflow_count: 1 },
-    { role: 'reviewer', user_count: 0, chain_count: 0, workflow_count: 0 },
-    { role: 'operator', user_count: 5, chain_count: 1, workflow_count: 4 },
+    {
+      role: 'admin', title: 'Administrator', description: null,
+      form_schema: null, properties: {}, ops_visible: false, parent_role: null,
+      user_count: 3, chain_count: 2, workflow_count: 1,
+    },
+    {
+      role: 'reviewer', title: null, description: null,
+      form_schema: null, properties: {}, ops_visible: false, parent_role: null,
+      user_count: 0, chain_count: 0, workflow_count: 0,
+    },
+    {
+      role: 'operator', title: 'Station Operator', description: null,
+      form_schema: null, properties: {}, ops_visible: true, parent_role: null,
+      user_count: 5, chain_count: 1, workflow_count: 4,
+    },
   ],
 };
 
@@ -32,6 +44,7 @@ vi.mock('../../../../api/roles', () => ({
   useRoleDetails: () => ({ data: roleDetailsData, isLoading: false }),
   useDeleteRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useCreateRole: () => ({ mutate: vi.fn(), isPending: false, error: null, reset: vi.fn() }),
+  useUpdateRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useEscalationChains: () => ({ data: mockChains }),
   useAddEscalationChain: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveEscalationChain: () => ({ mutate: vi.fn(), isPending: false }),
@@ -66,60 +79,81 @@ describe('RolesPage', () => {
     expect(screen.getByText('Add Role')).toBeInTheDocument();
   });
 
-  it('renders role rows in the table', () => {
+  it('renders role rows in the list', () => {
     renderPage();
     expect(screen.getByText('admin')).toBeInTheDocument();
     expect(screen.getByText('reviewer')).toBeInTheDocument();
     expect(screen.getByText('operator')).toBeInTheDocument();
   });
 
-  it('renders column headers', () => {
+  it('renders role titles when set', () => {
     renderPage();
-    expect(screen.getByText('Role')).toBeInTheDocument();
-    expect(screen.getByText('Users')).toBeInTheDocument();
-    expect(screen.getByText('Escalations')).toBeInTheDocument();
-    expect(screen.getByText('Workflows')).toBeInTheDocument();
+    expect(screen.getByText('Administrator')).toBeInTheDocument();
+    expect(screen.getByText('Station Operator')).toBeInTheDocument();
   });
 
-  it('displays user, chain, and workflow counts', () => {
+  it('shows ops badge for ops_visible roles', () => {
     renderPage();
-    // admin: 3 users, 2 escalations, 1 workflow
-    expect(screen.getByText('3')).toBeInTheDocument();
-    // operator: 5 users, 1 escalation, 4 workflows
-    expect(screen.getByText('5')).toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
+    // operator has ops_visible: true — badge renders "ops" text
+    const opsBadges = screen.getAllByText('ops');
+    expect(opsBadges.length).toBeGreaterThan(0);
   });
 
-  it('renders escalation routing panel', () => {
+  it('shows Role Detail placeholder when nothing is selected', () => {
     renderPage();
-    expect(screen.getByText('Escalation Routing')).toBeInTheDocument();
-    expect(screen.getByText('Select a role to manage its escalation targets.')).toBeInTheDocument();
+    expect(screen.getByText('Role Detail')).toBeInTheDocument();
+    expect(screen.getByText(/Select a role to view/)).toBeInTheDocument();
   });
 
   it('shows empty message when no roles exist', () => {
     roleDetailsData = emptyRoles;
     renderPage();
-    expect(screen.getByText('No roles found')).toBeInTheDocument();
+    expect(screen.getByText('No roles found.')).toBeInTheDocument();
   });
 
-  it('shows escalation targets when a role is clicked', async () => {
+  it('opens detail panel when a role is clicked', async () => {
     renderPage();
-    // Click the operator row to select it
     await userEvent.click(screen.getByText('operator'));
-    // EscalationPanel should show the selected role and its targets
-    expect(screen.getByText('Can escalate to:')).toBeInTheDocument();
-    // The escalation target has a remove button with a title attribute
+    // Detail panel shows the role key in heading
+    expect(screen.getAllByText('operator').length).toBeGreaterThanOrEqual(1);
+    // Info tab is active by default — shows Display Name label
+    expect(screen.getByText('Display Name')).toBeInTheDocument();
+  });
+
+  it('shows escalation targets when Escalations tab is clicked', async () => {
+    renderPage();
+    await userEvent.click(screen.getByText('operator'));
+    await userEvent.click(screen.getByText('Escalations'));
+    // EscalationPanel shows escalation targets
     expect(screen.getByTitle('Remove admin')).toBeInTheDocument();
   });
 
-  it('shows superadmin message for superadmin role', async () => {
+  it('shows superadmin implicit escalation message', async () => {
     roleDetailsData = {
       roles: [
-        { role: 'superadmin', user_count: 1, chain_count: 0, workflow_count: 0 },
+        {
+          role: 'superadmin', title: null, description: null,
+          form_schema: null, properties: {}, ops_visible: false, parent_role: null,
+          user_count: 1, chain_count: 0, workflow_count: 0,
+        },
       ],
     };
     renderPage();
     await userEvent.click(screen.getByText('superadmin'));
+    await userEvent.click(screen.getByText('Escalations'));
     expect(screen.getByText('Superadmins can escalate to any role implicitly.')).toBeInTheDocument();
+  });
+
+  it('shows search bar', () => {
+    renderPage();
+    expect(screen.getByPlaceholderText(/Search \d+ roles/)).toBeInTheDocument();
+  });
+
+  it('filters roles when searching', async () => {
+    renderPage();
+    const search = screen.getByPlaceholderText(/Search \d+ roles/);
+    await userEvent.type(search, 'admin');
+    expect(screen.getByText('admin')).toBeInTheDocument();
+    expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
   });
 });

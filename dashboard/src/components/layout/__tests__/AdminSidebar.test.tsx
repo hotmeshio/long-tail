@@ -9,6 +9,10 @@ vi.mock('../../../api/settings', () => ({
   useSettings: () => mockSettings(),
 }));
 
+vi.mock('../../../hooks/useAccess', () => ({
+  useAccess: () => ({ isBuilder: false, isOps: false, canBulk: false }),
+}));
+
 import { AdminSidebar } from '../AdminSidebar';
 
 function wrapper({ children }: { children: React.ReactNode }) {

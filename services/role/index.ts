@@ -12,13 +12,15 @@ import {
   LIST_ROLES,
   DELETE_ROLE,
   LIST_ROLES_WITH_DETAILS,
+  UPDATE_ROLE_METADATA,
+  GET_ROLE_FORM_SCHEMA,
   COUNT_USER_ROLE_REFS,
   COUNT_CHAIN_REFS,
   COUNT_WORKFLOW_REFS,
   COUNT_ACTIVE_ESCALATION_REFS,
 } from './sql';
 
-import type { EscalationChain, RoleDetail } from './types';
+import type { EscalationChain, RoleDetail, UpdateRoleInput } from './types';
 
 /**
  * Get the roles a given source role can escalate to.
@@ -133,6 +135,38 @@ export async function listRolesWithDetails(): Promise<RoleDetail[]> {
 export async function createRole(role: string): Promise<void> {
   const pool = getPool();
   await pool.query(ENSURE_ROLE_EXISTS, [role]);
+}
+
+/**
+ * Update role metadata (title, description, form_schema, properties, ops_visible, parent_role).
+ * Only fields present in the input are updated; omitted fields are left unchanged.
+ * form_schema and parent_role are always set (null clears them).
+ */
+export async function updateRoleMetadata(
+  role: string,
+  input: UpdateRoleInput,
+): Promise<RoleDetail | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(UPDATE_ROLE_METADATA, [
+    role,
+    input.title ?? null,
+    input.description ?? null,
+    input.form_schema !== undefined ? JSON.stringify(input.form_schema) : null,
+    input.properties !== undefined ? JSON.stringify(input.properties) : null,
+    input.ops_visible ?? null,
+    input.parent_role !== undefined ? input.parent_role : null,
+  ]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Fetch form_schema for a role (used as default escalation form when workflow
+ * config does not specify a resolver_schema).
+ */
+export async function getRoleFormSchema(role: string): Promise<Record<string, any> | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_FORM_SCHEMA, [role]);
+  return rows[0]?.form_schema ?? null;
 }
 
 /**

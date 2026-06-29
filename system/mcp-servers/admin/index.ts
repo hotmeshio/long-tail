@@ -53,7 +53,7 @@ import { registerExportTools } from './exports';
 import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
 
-const TOOL_COUNT = 83;
+const TOOL_COUNT = 84;
 
 let server: McpServer | null = null;
 
