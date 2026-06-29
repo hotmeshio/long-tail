@@ -214,7 +214,12 @@ window.addEventListener('auth:unauthorized', () => {
   const base = (window as any).__LT_BASE__ || '';
   const loginPath = `${base}/login`;
   if (window.location.pathname !== loginPath) {
-    window.location.href = `${loginPath}?returnTo=${encodeURIComponent(window.location.pathname)}`;
+    // Strip the base prefix so React Router's basename doesn't double-apply it
+    const fullPath = window.location.pathname + window.location.search;
+    const relativePath = base && fullPath.startsWith(base)
+      ? fullPath.slice(base.length) || '/'
+      : fullPath;
+    window.location.href = `${loginPath}?returnTo=${encodeURIComponent(relativePath)}`;
   }
 });
 
