@@ -277,13 +277,13 @@ function WorkflowRow({
       <div className="min-w-0 space-y-1 pt-0.5">
         {escRoles.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <ShieldCheck className="w-3 h-3 text-text-quaternary shrink-0" title="Escalation roles" />
+            <span title="Escalation roles"><ShieldCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
             {escRoles.map((r) => <RolePill key={`e-${r}`} role={r} />)}
           </div>
         )}
         {invokeRoles.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <UserCheck className="w-3 h-3 text-text-quaternary shrink-0" title="Invocation roles" />
+            <span title="Invocation roles"><UserCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
             {invokeRoles.map((r) => <RolePill key={`i-${r}`} role={r} />)}
           </div>
         )}
