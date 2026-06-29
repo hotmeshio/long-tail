@@ -169,7 +169,7 @@ function UserAccountsPanel() {
         />
       </FilterBar>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
         {/* Left — users table */}
         <div className="overflow-x-clip">
           <DataTable
@@ -193,7 +193,9 @@ function UserAccountsPanel() {
         </div>
 
         {/* Right — role management panel */}
-        <RolePanel user={activeUser} />
+        <div className="sticky top-4">
+          <RolePanel user={activeUser} />
+        </div>
       </div>
 
       <CreateUserModal open={showCreate} onClose={() => setShowCreate(false)} />

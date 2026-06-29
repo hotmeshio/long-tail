@@ -94,29 +94,29 @@ export function StartWorkflowPage() {
     <div>
       <PageHeader title="Invoke" docsHash="#docs:dashboard.md:invoke-workflow" />
 
-      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Start a Procedural flow — a durable workflow that checkpoints every step and resumes where it
-        left off. The same work runs in compiled form under Orchestrate › Graph.
-      </p>
-
       {invocableConfigs.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-sm text-text-primary mb-1">No invocable workflows</p>
           <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <WorkflowSelector
-            configs={invocableConfigs}
-            selectedType={selectedType}
-            onSelect={handleSelect}
-            tierMap={tierMap}
-            activeTypes={activeTypes}
-          />
+        <div className="grid grid-cols-3 gap-8 items-start">
 
+          {/* ── Left: workflow list (2 cols) ── */}
+          <div className="col-span-2">
+            <WorkflowSelector
+              configs={invocableConfigs}
+              selectedType={selectedType}
+              onSelect={handleSelect}
+              tierMap={tierMap}
+              activeTypes={activeTypes}
+            />
+          </div>
+
+          {/* ── Right: invoke form (1 col, sticky) ── */}
           <div
             ref={panelRef}
-            className={`lg:col-span-2 transition-all duration-200 ease-out ${
+            className={`sticky top-4 transition-all duration-200 ease-out ${
               panelVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
             }`}
           >
@@ -127,11 +127,12 @@ export function StartWorkflowPage() {
                 <div className="w-12 h-12 rounded-full bg-accent/[0.06] flex items-center justify-center mb-4">
                   <Play className="w-5 h-5 text-accent/50" />
                 </div>
-                <p className="text-sm text-text-secondary mb-1">Invoke</p>
-                <p className="text-xs text-text-quaternary">Choose a workflow to get started</p>
+                <p className="text-sm text-text-secondary mb-1">Select a workflow</p>
+                <p className="text-xs text-text-quaternary">Choose one from the list to configure and invoke it.</p>
               </div>
             )}
           </div>
+
         </div>
       )}
     </div>

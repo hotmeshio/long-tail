@@ -8,8 +8,8 @@ import { useNamespace } from '../../hooks/useNamespace';
 import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
-import { TimestampCell } from '../../components/common/display/TimestampCell';
 import { ElapsedCell } from '../../components/common/display/ElapsedCell';
+import { DateValue } from '../../components/common/display/DateValue';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect } from '../../components/common/data/FilterBar';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
@@ -42,40 +42,39 @@ function buildColumns(
   return [
     {
       key: 'workflow_id',
-      label: 'Run ID / Tool',
+      label: 'Run ID',
       render: (row) => {
         const dotClass = STATUS_DOT[statusMap[row.status] ?? row.status] ?? 'bg-status-pending';
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
-          <div className="flex items-start gap-2 min-w-0">
-            <span className={`w-1.5 h-1.5 shrink-0 rounded-full mt-1.5 ${dotClass}${pulseClass}`} title={row.status} />
-            <div className="min-w-0">
-              <span className="font-mono text-xs text-text-primary truncate block">
-                {row.workflow_id}
-              </span>
-              <div className="mt-0.5">
-                {row.entity
-                  ? <WorkflowPill type={row.entity} variant="pipeline" size="xs" />
-                  : <span className="text-[10px] text-text-tertiary">—</span>}
-              </div>
-            </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${dotClass}${pulseClass}`} title={row.status} />
+            <span className="font-mono text-xs text-text-primary truncate">{row.workflow_id}</span>
           </div>
         );
       },
     },
     {
+      key: 'entity',
+      label: 'Tool',
+      render: (row) => row.entity
+        ? <WorkflowPill type={row.entity} variant="pipeline" size="xs" />
+        : <span className="text-[10px] text-text-tertiary">—</span>,
+      className: 'w-44 shrink-0',
+    },
+    {
       key: 'created_at',
       label: 'Created',
       sortable: true,
-      render: (row) => <TimestampCell date={row.created_at} />,
-      className: 'w-40',
+      render: (row) => <DateValue date={row.created_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
+      className: 'w-32',
     },
     {
       key: 'updated_at',
       label: 'Updated',
       sortable: true,
-      render: (row) => <TimestampCell date={row.updated_at} />,
-      className: 'w-40',
+      render: (row) => <DateValue date={row.updated_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
+      className: 'w-32',
     },
     {
       key: 'duration',

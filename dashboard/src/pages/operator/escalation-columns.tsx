@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Circle, Bell, Clock, ChevronRight } from 'lucide-react';
 import type { Column } from '../../components/common/data/DataTable';
-import { FilterBar, FilterSelect, FilterInput } from '../../components/common/data/FilterBar';
+import { FilterBar, FilterSelect, FilterInput, FilterDivider } from '../../components/common/data/FilterBar';
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
@@ -231,12 +231,15 @@ export function EscalationFilterBar({
   return (
     <FilterBar actions={actions}>
       {showStatus && (
-        <FilterSelect
-          label="Status"
-          value={filters.status ?? ''}
-          onChange={(v) => setFilter('status', v)}
-          options={STATUS_OPTIONS}
-        />
+        <>
+          <FilterSelect
+            label="Status"
+            value={filters.status ?? ''}
+            onChange={(v) => setFilter('status', v)}
+            options={STATUS_OPTIONS}
+          />
+          <FilterDivider />
+        </>
       )}
       <FilterSelect
         label="Role"
@@ -244,12 +247,14 @@ export function EscalationFilterBar({
         onChange={(v) => setFilter('role', v)}
         options={roles.map((r) => ({ value: r, label: r }))}
       />
+      <FilterDivider />
       <FilterSelect
         label="Type"
         value={filters.type}
         onChange={(v) => setFilter('type', v)}
         options={types.map((t) => ({ value: t, label: t }))}
       />
+      <FilterDivider />
       <FilterSelect
         label="Priority"
         value={filters.priority}
@@ -257,12 +262,15 @@ export function EscalationFilterBar({
         options={PRIORITY_OPTIONS}
       />
       {showSearch && (
-        <FilterInput
-          label="Search"
-          value={filters.search ?? ''}
-          onChange={(v) => setFilter('search', v)}
-          placeholder="ID, workflow, origin…"
-        />
+        <>
+          <FilterDivider />
+          <FilterInput
+            label="Search"
+            value={filters.search ?? ''}
+            onChange={(v) => setFilter('search', v)}
+            placeholder="ID, workflow, origin…"
+          />
+        </>
       )}
     </FilterBar>
   );

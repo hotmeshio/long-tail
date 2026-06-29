@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Search } from 'lucide-react';
 import { useBots, useDeleteBot } from '../../../api/bots';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
@@ -28,6 +28,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
   const [editingBot, setEditingBot] = useState<BotRecord | null>(null);
   const [selectedBot, setSelectedBot] = useState<BotRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotRecord | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data, isLoading } = useBots({
     limit: pagination.pageSize,
@@ -41,6 +42,17 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
     if (!selectedBot) return null;
     return bots.find((b) => b.id === selectedBot.id) ?? selectedBot;
   }, [bots, selectedBot]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return bots;
+    const q = search.toLowerCase();
+    return bots.filter(
+      (b) =>
+        (b.display_name ?? '').toLowerCase().includes(q) ||
+        b.external_id.toLowerCase().includes(q) ||
+        (b.description ?? '').toLowerCase().includes(q),
+    );
+  }, [bots, search]);
 
   const columns: Column<BotRecord>[] = [
     {
@@ -131,11 +143,27 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
         />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="overflow-x-clip">
+          {/* Sticky search bar */}
+          <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
+            <div className="bg-[#F7F7F7] rounded-lg px-5 py-2">
+              <div className="relative w-1/2">
+                <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Search ${bots.length} service accounts…`}
+                  className="w-full pl-5 py-1 text-sm bg-transparent border-b border-surface-border/60 text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
           <DataTable
             columns={columns}
-            data={bots}
+            data={filtered}
             keyFn={(row) => row.id}
             isLoading={isLoading}
             emptyMessage="No service accounts yet"
@@ -153,7 +181,9 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
           />
         </div>
 
-        <BotDetailPanel bot={activeBot} />
+        <div className="sticky top-4">
+          <BotDetailPanel bot={activeBot} />
+        </div>
       </div>
 
       <CreateBotModal open={showCreate} onClose={() => setShowCreate(false)} />

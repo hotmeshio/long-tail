@@ -62,54 +62,58 @@ export function CapabilitiesPage() {
     <div>
       <PageHeader title="Capabilities" />
 
-      {/* Category tabs + search */}
-      {!isLoading && categories.length > 0 && (
-        <div className="flex items-center gap-5 mb-10">
-          <button
-            onClick={() => setActiveCategory(null)}
-            className={`flex flex-col items-center gap-1 transition-colors ${
-              activeCategory === null ? 'text-accent' : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-          >
-            <LayoutGrid className="w-5 h-5" strokeWidth={1.5} />
-            <span className="text-[9px] font-medium">All</span>
-          </button>
-          {categories.map((cat) => {
-            const meta = CATEGORY_META[cat.name] ?? CATEGORY_META.Other;
-            const Icon = meta.icon;
-            const isActive = activeCategory === cat.name;
-            return (
-              <button
-                key={cat.name}
-                onClick={() => setActiveCategory(isActive ? null : cat.name)}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  isActive ? meta.color : 'text-text-quaternary hover:text-text-secondary'
-                }`}
-              >
-                <Icon className="w-5 h-5" strokeWidth={1.5} />
-                <span className="text-[9px] font-medium">{cat.name}</span>
-              </button>
-            );
-          })}
-          <span className="flex-1" />
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-quaternary" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${totalTools} capabilities…`}
-              className="pl-9 pr-3 py-1.5 text-sm bg-surface-sunken border border-surface-border rounded-md text-text-primary placeholder:text-text-quaternary focus:outline-none focus:ring-1 focus:ring-accent/50 w-56"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Two-panel grid — list always shares space with the run panel */}
+      {/* Two-panel grid */}
       <div className="grid grid-cols-3 gap-8 items-start">
 
-        {/* ── Left: capability list (2 cols) ── */}
+        {/* ── Left: filter bar + capability list (2 cols) ── */}
         <div className="col-span-2">
+
+          {/* Sticky: category tabs + search — spans only the list column */}
+          {!isLoading && categories.length > 0 && (
+            <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
+            <div className="bg-[#F7F7F7] rounded-lg px-5 pt-3 pb-3 flex items-center gap-5">
+              <button
+                onClick={() => setActiveCategory(null)}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  activeCategory === null ? 'text-accent' : 'text-text-quaternary hover:text-text-secondary'
+                }`}
+              >
+                <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
+                <span className="text-[9px] font-medium">All</span>
+              </button>
+              {categories.map((cat) => {
+                const meta = CATEGORY_META[cat.name] ?? CATEGORY_META.Other;
+                const Icon = meta.icon;
+                const isActive = activeCategory === cat.name;
+                return (
+                  <button
+                    key={cat.name}
+                    onClick={() => setActiveCategory(isActive ? null : cat.name)}
+                    className={`flex flex-col items-center gap-1 transition-colors ${
+                      isActive ? meta.color : 'text-text-quaternary hover:text-text-secondary'
+                    }`}
+                  >
+                    <Icon className="w-3 h-3" strokeWidth={1.5} />
+                    <span className="text-[9px] font-medium">{cat.name}</span>
+                  </button>
+                );
+              })}
+              <span className="flex-1" />
+              <div className="relative">
+                <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Search ${totalTools} capabilities…`}
+                  className="pl-5 py-1 text-sm bg-transparent border-b border-surface-border/60 text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors w-48"
+                />
+              </div>
+            </div>
+            </div>
+          )}
+
+          {/* Capability list */}
           {isLoading ? (
             <div className="animate-pulse space-y-8">
               {[1, 2, 3].map((i) => (
@@ -137,9 +141,9 @@ export function CapabilitiesPage() {
                 const Icon = meta.icon;
                 return (
                   <div key={category.name}>
-                    <div className="flex items-center gap-2 mb-1 pb-2 border-b border-surface-border">
-                      <Icon className={`w-4 h-4 ${meta.color}`} strokeWidth={1.5} />
-                      <h2 className="text-xs font-semibold uppercase tracking-widest text-accent/80">{category.name}</h2>
+                    <div className="sticky top-[78px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
+                      <Icon className={`w-3 h-3 ${meta.color}`} strokeWidth={1.5} />
+                      <h2 className="section-h2">{category.name}</h2>
                       <span className="text-xs text-text-quaternary">{category.tools.length}</span>
                     </div>
                     <div className="divide-y divide-surface-border/30">
@@ -215,10 +219,9 @@ function ToolRow({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}
-      className={`group py-3 px-3 -mx-3 rounded-md cursor-pointer transition-colors text-left ${
-        isSelected ? 'bg-accent/[0.06]' : 'hover:bg-surface-hover/60'
-      }`}
+      className="group relative py-3 px-3 -mx-3 rounded-md cursor-pointer transition-colors text-left"
     >
+      {isSelected && <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full" />}
       <div className="flex items-center justify-between gap-3 mb-1">
         <ToolPill name={tool.name} size="md" />
         <div className="flex items-center gap-2 shrink-0">
@@ -229,7 +232,7 @@ function ToolRow({
           />
         </div>
       </div>
-      <p className="text-[11px] text-text-tertiary leading-relaxed line-clamp-2 pl-0.5">
+      <p className="text-[11px] text-text-tertiary group-hover:text-text-secondary leading-relaxed line-clamp-2 pl-0.5 transition-colors">
         {tool.description}
       </p>
     </div>

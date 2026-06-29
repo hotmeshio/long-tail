@@ -1,29 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useDiscoveredWorkflows,
   useDeleteWorkflowConfig,
 } from '../../../api/workflows';
-import { ShieldCheck, ShieldPlus, ShieldOff, Settings, Wrench, Play, UserCheck } from 'lucide-react';
-import { DataTable, type Column } from '../../../components/common/data/DataTable';
+import {
+  Search, Server, LayoutGrid,
+  ShieldCheck, ShieldPlus, ShieldOff, Settings, Wrench, Play, UserCheck,
+} from 'lucide-react';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
-import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
-import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
-import { useFilterParams } from '../../../hooks/useFilterParams';
-import type { DiscoveredWorkflow } from '../../../api/types';
-import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
-import { TaskQueuePill } from '../../../components/common/display/TaskQueuePill';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
+import { PageHeader } from '../../../components/common/layout/PageHeader';
+import type { DiscoveredWorkflow } from '../../../api/types';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Tier badge ─────────────────────────────────────────────────────────────────
 
-function matchesSearch(wf: DiscoveredWorkflow, search: string): boolean {
-  const q = search.toLowerCase();
-  return (
-    wf.workflow_type.toLowerCase().includes(q) ||
-    (wf.description ?? '').toLowerCase().includes(q)
-  );
+function TierBadge({ tier }: { tier: string }) {
+  if (tier === 'certified')
+    return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-status-success"><ShieldCheck className="w-3 h-3" />Certified</span>;
+  if (tier === 'configured')
+    return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><Settings className="w-3 h-3" />Configured</span>;
+  return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-quaternary"><Wrench className="w-3 h-3" />Durable</span>;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -32,147 +30,45 @@ export function WorkflowConfigsPage() {
   const navigate = useNavigate();
   const { data, isLoading } = useDiscoveredWorkflows();
   const deleteConfig = useDeleteWorkflowConfig();
-  const { filters, setFilter } = useFilterParams({
-    filters: { search: '', queue: '', role: '', tier: '' },
-  });
 
-  const [searchInput, setSearchInput] = useState(filters.search);
+  const [search, setSearch] = useState('');
+  const [activeQueue, setActiveQueue] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  // Debounce search input
-  useEffect(() => {
-    if (searchInput === filters.search) return;
-    const timer = setTimeout(() => setFilter('search', searchInput), 300);
-    return () => clearTimeout(timer);
-  }, [searchInput, setFilter, filters.search]);
+  const allWorkflows: DiscoveredWorkflow[] = data ?? [];
 
-  const allWorkflows = data ?? [];
-
-  // Derive facet options from data
   const queues = useMemo(
     () => [...new Set(allWorkflows.map((w) => w.task_queue).filter(Boolean) as string[])].sort(),
     [allWorkflows],
   );
-  const roles = useMemo(
-    () => [...new Set(allWorkflows.flatMap((w) => w.roles ?? []))].sort(),
-    [allWorkflows],
-  );
 
-  // Apply client-side filters
-  const workflows = useMemo(() => {
-    let result = allWorkflows;
-    if (filters.search) result = result.filter((w) => matchesSearch(w, filters.search));
-    if (filters.queue) result = result.filter((w) => w.task_queue === filters.queue);
-    if (filters.role) result = result.filter((w) => (w.roles ?? []).includes(filters.role));
-    if (filters.tier) result = result.filter((w) => w.tier === filters.tier);
-    return result;
-  }, [allWorkflows, filters]);
+  const grouped = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const targetQueues = activeQueue ? [activeQueue] : queues;
+    return targetQueues
+      .map((queue) => ({
+        queue,
+        workflows: allWorkflows.filter(
+          (w) =>
+            w.task_queue === queue &&
+            (!q ||
+              w.workflow_type.toLowerCase().includes(q) ||
+              w.description?.toLowerCase().includes(q)),
+        ),
+      }))
+      .filter((g) => g.workflows.length > 0);
+  }, [allWorkflows, queues, search, activeQueue]);
 
-  const columns: Column<DiscoveredWorkflow>[] = [
-    {
-      key: 'workflow_type',
-      label: 'Workflow',
-      className: 'max-w-xs',
-      render: (row) => (
-        <div className="min-w-0">
-          <WorkflowPill type={row.workflow_type} size="md" variant={row.tier === 'certified' ? 'certified' : row.tier === 'configured' ? 'configured' : 'durable'} />
-          {row.description && (
-            <p className="text-[10px] leading-tight text-text-quaternary mt-0.5">{row.description}</p>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'task_queue',
-      label: 'Queue',
-      render: (row) => row.task_queue ? <TaskQueuePill queue={row.task_queue} /> : <span className="text-xs text-text-tertiary">—</span>,
-      className: 'whitespace-nowrap',
-    },
-    {
-      key: 'tier',
-      label: 'Tier',
-      render: (row) => {
-        if (row.tier === 'certified') return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><ShieldCheck className="w-3 h-3" />Certified</span>;
-        if (row.tier === 'configured') return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><Settings className="w-3 h-3" />Configured</span>;
-        return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><Wrench className="w-3 h-3" />Durable</span>;
-      },
-      className: 'whitespace-nowrap',
-    },
-    {
-      key: 'roles',
-      label: 'Access',
-      render: (row) => {
-        if (!row.registered) return <span className="text-xs text-text-tertiary">—</span>;
-        const escRoles = row.roles ?? [];
-        const invokeRoles = row.invocation_roles ?? [];
-        if (!escRoles.length && !invokeRoles.length) return <span className="text-xs text-text-tertiary">—</span>;
-        return (
-          <div className="space-y-1.5">
-            {escRoles.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span title="Escalation roles"><ShieldCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
-                <div className="flex gap-1 flex-wrap">{escRoles.map((r) => <RolePill key={`e-${r}`} role={r} />)}</div>
-              </div>
-            )}
-            {invokeRoles.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span title="Invocation roles"><UserCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
-                <div className="flex gap-1 flex-wrap">{invokeRoles.map((r) => <RolePill key={`i-${r}`} role={r} />)}</div>
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'actions',
-      label: '',
-      render: (row) => (
-        <RowActionGroup>
-          {row.invocable && (
-            <RowAction
-              icon={Play}
-              title="Invoke workflow"
-              onClick={() => navigate(`/workflows/start?type=${encodeURIComponent(row.workflow_type)}&mode=now`)}
-              colorClass="text-text-tertiary hover:text-status-success"
-            />
-          )}
-          {row.tier === 'durable' && (
-            <RowAction
-              icon={Wrench}
-              title="Configure workflow"
-              onClick={() => navigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(row.workflow_type)}&task_queue=${encodeURIComponent(row.task_queue ?? '')}`)}
-              colorClass="text-text-tertiary hover:text-status-info"
-            />
-          )}
-          {row.tier === 'configured' && (
-            <RowAction
-              icon={ShieldPlus}
-              title="Certify workflow"
-              onClick={() => navigate(`/workflows/registry/${encodeURIComponent(row.workflow_type)}`)}
-              colorClass="text-text-tertiary hover:text-status-success"
-            />
-          )}
-          {row.registered && (
-            <RowAction
-              icon={ShieldOff}
-              title="Remove configuration"
-              onClick={() => setConfirmDelete(row.workflow_type)}
-              colorClass="text-text-tertiary hover:text-status-warning"
-            />
-          )}
-        </RowActionGroup>
-      ),
-      className: 'w-16 text-right',
-    },
-  ];
-
-  const handleDelete = () => {
-    if (!confirmDelete) return;
-    deleteConfig.mutate(confirmDelete, {
-      onSuccess: () => setConfirmDelete(null),
-    });
-  };
+  // Workflows with no queue
+  const ungrouped = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (activeQueue) return [];
+    return allWorkflows.filter(
+      (w) =>
+        !w.task_queue &&
+        (!q || w.workflow_type.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)),
+    );
+  }, [allWorkflows, search, activeQueue]);
 
   const handleRowClick = (row: DiscoveredWorkflow) => {
     if (row.registered) {
@@ -182,77 +78,281 @@ export function WorkflowConfigsPage() {
     }
   };
 
+  const handleDelete = () => {
+    if (!confirmDelete) return;
+    deleteConfig.mutate(confirmDelete, { onSuccess: () => setConfirmDelete(null) });
+  };
+
   return (
     <div>
       <PageHeader
-        title="Configure"
+        title="Registered Workflows"
         docsHash="#docs:dashboard.md:workflow-registry"
         actions={
-          <button
-            onClick={() => navigate('/workflows/registry/new')}
-            className="btn-primary text-xs"
-          >
+          <button onClick={() => navigate('/workflows/registry/new')} className="btn-primary text-xs">
             Register Workflow
           </button>
         }
       />
 
-      <p className="text-sm text-text-secondary mb-6 max-w-2xl leading-relaxed">
-        Procedural flows — durable workflows written as readable TypeScript. Register one here to
-        make it invocable and to route its escalations through RBAC roles.
-      </p>
+      {/* Sticky filter bar: queue tabs + search */}
+      {!isLoading && queues.length > 0 && (
+        <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
+        <div className="bg-[#F7F7F7] rounded-lg px-5 pt-3 pb-3 flex items-center gap-5">
+          <button
+            onClick={() => setActiveQueue(null)}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeQueue === null ? 'text-accent' : 'text-text-quaternary hover:text-text-secondary'
+            }`}
+          >
+            <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
+            <span className="text-[9px] font-medium">All</span>
+          </button>
+          {queues.map((queue) => {
+            const isActive = activeQueue === queue;
+            const label = queue.length > 16 ? queue.slice(0, 14) + '…' : queue;
+            return (
+              <button
+                key={queue}
+                onClick={() => setActiveQueue(isActive ? null : queue)}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  isActive ? 'text-accent' : 'text-text-quaternary hover:text-text-secondary'
+                }`}
+                title={queue}
+              >
+                <Server className="w-3 h-3" strokeWidth={1.5} />
+                <span className="text-[9px] font-medium">{label}</span>
+              </button>
+            );
+          })}
+          <span className="flex-1" />
+          <div className="relative">
+            <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${allWorkflows.length} workflows…`}
+              className="pl-5 py-1 text-sm bg-transparent border-b border-surface-border/60 text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors w-52"
+            />
+          </div>
+        </div>
+        </div>
+      )}
 
-      <FilterBar>
-        <input
-          type="text"
-          placeholder="Search workflow type..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="input text-[11px] py-1 px-2 w-56"
-        />
-        <FilterSelect
-          label="Queue"
-          value={filters.queue}
-          onChange={(v) => setFilter('queue', v)}
-          options={queues.map((q) => ({ value: q, label: q }))}
-        />
-        <FilterSelect
-          label="Tier"
-          value={filters.tier}
-          onChange={(v) => setFilter('tier', v)}
-          options={[
-            { value: 'certified', label: 'Certified' },
-            { value: 'configured', label: 'Configured' },
-            { value: 'durable', label: 'Durable' },
-          ]}
-        />
-        <FilterSelect
-          label="Role"
-          value={filters.role}
-          onChange={(v) => setFilter('role', v)}
-          options={roles.map((r) => ({ value: r, label: r }))}
-        />
-      </FilterBar>
+      {/* Content */}
+      {isLoading ? (
+        <LoadingSkeleton />
+      ) : grouped.length === 0 && ungrouped.length === 0 ? (
+        <p className="text-sm text-text-tertiary mt-8">
+          {search || activeQueue ? 'No workflows match your filter.' : 'No workflows discovered yet.'}
+        </p>
+      ) : (
+        <div className="space-y-10">
+          {grouped.map(({ queue, workflows }) => (
+            <div key={queue}>
+              <div className="sticky top-[78px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
+                <Server className="w-3 h-3 text-accent" strokeWidth={1.5} />
+                <h2 className="section-h2">{queue}</h2>
+                <span className="text-xs text-text-quaternary">{workflows.length}</span>
+              </div>
+              <WorkflowTableHeader />
+              <div className="divide-y divide-surface-border/30">
+                {workflows.map((wf) => (
+                  <WorkflowRow
+                    key={wf.workflow_type}
+                    wf={wf}
+                    onRowClick={handleRowClick}
+                    onDelete={setConfirmDelete}
+                    onNavigate={navigate}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
 
-      <DataTable
-        columns={columns}
-        data={workflows}
-        keyFn={(row) => row.workflow_type}
-        onRowClick={handleRowClick}
-        isLoading={isLoading}
-        emptyMessage="No workflows found"
-      />
+          {ungrouped.length > 0 && (
+            <div>
+              <div className="sticky top-[78px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
+                <Wrench className="w-3 h-3 text-text-quaternary" strokeWidth={1.5} />
+                <h2 className="section-h2">No Queue</h2>
+                <span className="text-xs text-text-quaternary">{ungrouped.length}</span>
+              </div>
+              <WorkflowTableHeader />
+              <div className="divide-y divide-surface-border/30">
+                {ungrouped.map((wf) => (
+                  <WorkflowRow
+                    key={wf.workflow_type}
+                    wf={wf}
+                    onRowClick={handleRowClick}
+                    onDelete={setConfirmDelete}
+                    onNavigate={navigate}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Delete confirmation modal */}
       <ConfirmDeleteModal
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
         title="De-certify Workflow"
-        description={<>Remove certification from <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This removes interceptor guarantees, escalation chains, and invocation role constraints. The workflow will continue running as a standard durable workflow.</>}
+        description={
+          <>
+            Remove certification from{' '}
+            <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This
+            removes interceptor guarantees, escalation chains, and invocation role constraints. The
+            workflow will continue running as a standard durable workflow.
+          </>
+        }
         isPending={deleteConfig.isPending}
         error={deleteConfig.error as Error | null}
       />
+    </div>
+  );
+}
+
+// ── Column layout ─────────────────────────────────────────────────────────────
+// [Workflow 1fr] [Tier 7rem] [Access 13rem] [Actions 4.5rem]
+const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_7rem_13rem_4.5rem] gap-x-6 items-start';
+
+function WorkflowTableHeader() {
+  return (
+    <div className={`${ROW_GRID} px-3 pb-2 pt-1`}>
+      <span className="text-[10px] font-medium text-text-quaternary">Workflow</span>
+      <span className="text-[10px] font-medium text-text-quaternary">Tier</span>
+      <span className="text-[10px] font-medium text-text-quaternary">Access</span>
+      <span />
+    </div>
+  );
+}
+
+// ── Workflow row ───────────────────────────────────────────────────────────────
+
+function WorkflowRow({
+  wf,
+  onRowClick,
+  onDelete,
+  onNavigate,
+}: {
+  wf: DiscoveredWorkflow;
+  onRowClick: (wf: DiscoveredWorkflow) => void;
+  onDelete: (type: string) => void;
+  onNavigate: (path: string) => void;
+}) {
+  const escRoles = wf.roles ?? [];
+  const invokeRoles = wf.invocation_roles ?? [];
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onRowClick(wf)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onRowClick(wf); }}
+      className={`group ${ROW_GRID} py-2.5 px-3 -mx-3 rounded-md cursor-pointer transition-colors`}
+    >
+      {/* Col 1: Workflow name + description */}
+      <div className="min-w-0">
+        <WorkflowPill
+          type={wf.workflow_type}
+          size="md"
+          variant={wf.tier === 'certified' ? 'certified' : wf.tier === 'configured' ? 'configured' : 'durable'}
+        />
+        {wf.description && (
+          <p className="mt-0.5 text-[10px] text-text-tertiary group-hover:text-text-secondary leading-snug line-clamp-2 transition-colors">
+            {wf.description}
+          </p>
+        )}
+      </div>
+
+      {/* Col 2: Tier */}
+      <div className="pt-0.5">
+        <TierBadge tier={wf.tier ?? 'durable'} />
+      </div>
+
+      {/* Col 3: Access — escalation roles then invocation roles */}
+      <div className="min-w-0 space-y-1 pt-0.5">
+        {escRoles.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <ShieldCheck className="w-3 h-3 text-text-quaternary shrink-0" title="Escalation roles" />
+            {escRoles.map((r) => <RolePill key={`e-${r}`} role={r} />)}
+          </div>
+        )}
+        {invokeRoles.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <UserCheck className="w-3 h-3 text-text-quaternary shrink-0" title="Invocation roles" />
+            {invokeRoles.map((r) => <RolePill key={`i-${r}`} role={r} />)}
+          </div>
+        )}
+        {escRoles.length === 0 && invokeRoles.length === 0 && (
+          <span className="text-xs text-text-quaternary">—</span>
+        )}
+      </div>
+
+      {/* Col 4: Actions — revealed on hover */}
+      <div className="flex items-center justify-end gap-2.5 pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {wf.invocable && (
+          <button
+            title="Invoke workflow"
+            onClick={(e) => { e.stopPropagation(); onNavigate(`/workflows/start?type=${encodeURIComponent(wf.workflow_type)}&mode=now`); }}
+            className="text-text-quaternary hover:text-status-success transition-colors"
+          >
+            <Play className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {wf.tier === 'durable' && (
+          <button
+            title="Configure workflow"
+            onClick={(e) => { e.stopPropagation(); onNavigate(`/workflows/registry/new?workflow_type=${encodeURIComponent(wf.workflow_type)}&task_queue=${encodeURIComponent(wf.task_queue ?? '')}`); }}
+            className="text-text-quaternary hover:text-status-info transition-colors"
+          >
+            <Wrench className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {wf.tier === 'configured' && (
+          <button
+            title="Certify workflow"
+            onClick={(e) => { e.stopPropagation(); onNavigate(`/workflows/registry/${encodeURIComponent(wf.workflow_type)}`); }}
+            className="text-text-quaternary hover:text-status-success transition-colors"
+          >
+            <ShieldPlus className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {wf.registered && (
+          <button
+            title="Remove configuration"
+            onClick={(e) => { e.stopPropagation(); onDelete(wf.workflow_type); }}
+            className="text-text-quaternary hover:text-status-warning transition-colors"
+          >
+            <ShieldOff className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Loading skeleton ───────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="animate-pulse space-y-8 mt-4">
+      {[1, 2].map((i) => (
+        <div key={i}>
+          <div className="h-4 bg-surface-sunken rounded w-36 mb-4" />
+          <div className="space-y-4">
+            {[1, 2, 3].map((j) => (
+              <div key={j} className="space-y-1.5">
+                <div className="h-3 bg-surface-sunken rounded w-48" />
+                <div className="h-3 bg-surface-sunken rounded w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -107,7 +107,7 @@ describe('StartWorkflowPage', () => {
 
   it('renders workflow selector with all invocable workflows', () => {
     renderPage();
-    expect(screen.getByText('Select Workflow')).toBeInTheDocument();
+    expect(screen.getByText('Workflows')).toBeInTheDocument();
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
     expect(screen.getByText('processClaim')).toBeInTheDocument();
     // every procedural workflow carries the 'durable' namespace pill
@@ -121,7 +121,7 @@ describe('StartWorkflowPage', () => {
 
   it('shows prompt to select a workflow when none is selected', () => {
     renderPage();
-    expect(screen.getByText('Choose a workflow to get started')).toBeInTheDocument();
+    expect(screen.getByText('Select a workflow')).toBeInTheDocument();
   });
 
   it('shows loading skeleton when configs are loading', () => {

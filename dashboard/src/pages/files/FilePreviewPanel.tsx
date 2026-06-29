@@ -115,7 +115,7 @@ export function FilePreviewPanel({ filePath, onClose, onDeleted }: FilePreviewPa
                 title="Share with signed URL"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-status-success" /> : <Link className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Copied' : 'Share'}</span>
+                <span>Share</span>
               </button>
               {showShareMenu && (
                 <div className="absolute top-full left-0 mt-1 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-20 min-w-[120px]">

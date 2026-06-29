@@ -88,7 +88,7 @@ describe('WorkflowConfigsPage', () => {
 
   it('renders page header and Register Workflow button', () => {
     renderPage();
-    expect(screen.getByText('Configure')).toBeInTheDocument();
+    expect(screen.getByText('Registered Workflows')).toBeInTheDocument();
     expect(screen.getByText('Register Workflow')).toBeInTheDocument();
   });
 
@@ -100,12 +100,14 @@ describe('WorkflowConfigsPage', () => {
     expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
   });
 
-  it('renders filter bar with search, queue, tier, and role controls', () => {
+  it('renders filter bar with search and queue tab controls', () => {
     renderPage();
-    expect(screen.getByPlaceholderText('Search workflow type...')).toBeInTheDocument();
-    expect(screen.getAllByText('Queue').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Tier').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Role').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByPlaceholderText(/Search \d+ workflows/)).toBeInTheDocument();
+    // "All" tab is always shown in the queue filter bar
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+    // Queue-specific tabs derived from data
+    expect(screen.getByRole('button', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'examples' })).toBeInTheDocument();
   });
 
   it('renders loading skeleton when loading', () => {
@@ -123,128 +125,109 @@ describe('WorkflowConfigsPage', () => {
       isLoading: false,
     } as any);
     renderPage();
-    expect(screen.getByText('No workflows found')).toBeInTheDocument();
+    expect(screen.getByText('No workflows discovered yet.')).toBeInTheDocument();
   });
 
   // ── Tier column ──
 
-  it('renders tier pills for certified, configured, and durable workflows', () => {
+  it('renders tier badges for certified, configured, and durable workflows', () => {
     renderPage();
-    // 2 in table + 1 in filter dropdown option
-    expect(screen.getAllByText('Certified').length).toBe(3);
-    // 1 in table + 1 in filter dropdown option
-    expect(screen.getAllByText('Configured').length).toBe(2);
-    // 1 in table + 1 in filter dropdown option
-    expect(screen.getAllByText('Durable').length).toBe(2);
+    // review-content + kitchen-sink are certified
+    expect(screen.getAllByText('Certified').length).toBe(2);
+    // basic-echo is configured
+    expect(screen.getAllByText('Configured').length).toBe(1);
+    // unregistered-flow is durable
+    expect(screen.getAllByText('Durable').length).toBe(1);
   });
 
   // ── Filter: Queue ──
 
   it('filters by queue', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    // Queue is the first select
-    fireEvent.change(selects[0], { target: { value: 'examples' } });
+    // Click the 'examples' queue tab button
+    fireEvent.click(screen.getByRole('button', { name: 'examples' }));
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
   });
 
-  // ── Filter: Tier ──
+  // ── Queue section grouping ──
 
-  it('filters by tier (certified)', () => {
+  it('groups workflows under their queue section header', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    // Tier is the second select (Queue, Tier, Role)
-    fireEvent.change(selects[1], { target: { value: 'certified' } });
-    expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
-    expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
-    expect(screen.queryByText('unregistered-flow')).not.toBeInTheDocument();
+    // Each queue renders as an h2 section header AND a filter tab — at least one of each
+    expect(screen.getByRole('heading', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'examples' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'user-queue' })).toBeInTheDocument();
   });
 
-  it('filters by tier (durable)', () => {
+  it('shows all queue tabs in the filter bar', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'durable' } });
-    expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
-    expect(screen.queryByText('review-content')).not.toBeInTheDocument();
+    // All queues derived from data appear as tab buttons
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'examples' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'user-queue' })).toBeInTheDocument();
   });
 
-  // ── Filter: Role ──
+  // ── Filter: access column ──
 
-  it('filters by role', () => {
+  it('renders access column with escalation and invocation role indicators', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    // Role is the third select
-    fireEvent.change(selects[2], { target: { value: 'admin' } });
-    expect(screen.getByText('review-content')).toBeInTheDocument();
-    expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
+    // review-content + kitchen-sink have escalation roles
+    expect(screen.getAllByTitle('Escalation roles').length).toBe(2);
   });
 
   // ── Filter: Search ──
 
-  it('filters by search text (workflow_type)', async () => {
-    vi.useFakeTimers();
+  it('filters by search text (workflow_type)', () => {
     renderPage();
-    const input = screen.getByPlaceholderText('Search workflow type...');
+    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
     fireEvent.change(input, { target: { value: 'kitchen' } });
-    // Debounce fires after 300ms
-    await act(() => vi.advanceTimersByTime(300));
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-    vi.useRealTimers();
   });
 
-  it('filters by search text (description)', async () => {
-    vi.useFakeTimers();
+  it('filters by search text (description)', () => {
     renderPage();
-    const input = screen.getByPlaceholderText('Search workflow type...');
+    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
     fireEvent.change(input, { target: { value: 'demo' } });
-    await act(() => vi.advanceTimersByTime(300));
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-    vi.useRealTimers();
   });
 
   // ── Combined filters ──
 
-  it('combines queue + role filters', () => {
+  it('combines queue tab + search filters', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[0], { target: { value: 'default' } });
-    fireEvent.change(selects[2], { target: { value: 'reviewer' } });
-    // review-content is in default queue with reviewer role
+    // Activate the 'default' queue tab
+    fireEvent.click(screen.getByRole('button', { name: 'default' }));
+    // Then narrow by search
+    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
+    fireEvent.change(input, { target: { value: 'review' } });
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    // basic-echo is in default queue but has no roles
     expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
     expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
   });
 
   // ── Facet options ──
 
-  it('derives queue options from data', () => {
+  it('derives queue tabs from data', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    const queueSelect = selects[0];
-    const options = Array.from(queueSelect.querySelectorAll('option')).map(
-      (o) => o.textContent,
-    );
-    expect(options).toContain('All');
-    expect(options).toContain('default');
-    expect(options).toContain('examples');
+    // All button always present
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+    // One tab per unique task_queue value
+    expect(screen.getByRole('button', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'examples' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'user-queue' })).toBeInTheDocument();
   });
 
-  it('derives role options from data', () => {
+  it('derives role pills from workflow access data', () => {
     renderPage();
-    const selects = screen.getAllByRole('combobox');
-    const roleSelect = selects[2];
-    const options = Array.from(roleSelect.querySelectorAll('option')).map(
-      (o) => o.textContent,
-    );
-    expect(options).toContain('All');
-    expect(options).toContain('reviewer');
-    expect(options).toContain('admin');
+    // reviewer appears across multiple workflows
+    expect(screen.getAllByText('reviewer').length).toBeGreaterThanOrEqual(1);
+    // admin appears for review-content escalation roles
+    expect(screen.getAllByText('admin').length).toBeGreaterThanOrEqual(1);
   });
 
   // ── Column rendering ──
@@ -290,14 +273,14 @@ describe('WorkflowConfigsPage', () => {
     expect(screen.getByTitle('Open docs for this page')).toBeInTheDocument();
   });
 
-  it('renders escalation role icons for certified workflows', () => {
+  it('renders escalation role icons for workflows with escalation roles', () => {
     renderPage();
     const escIcons = screen.getAllByTitle('Escalation roles');
     // review-content + kitchen-sink have escalation roles
     expect(escIcons.length).toBe(2);
   });
 
-  it('renders invocation role icons when invocation_roles are set', () => {
+  it('renders invocation role icon when invocation_roles are set', () => {
     vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: [makeWorkflow({ invocation_roles: ['engineer', 'superadmin'] })],
       isLoading: false,
@@ -314,32 +297,28 @@ describe('filter helpers (via rendering)', () => {
     vi.clearAllMocks();
   });
 
-  it('search is case-insensitive', async () => {
+  it('search is case-insensitive', () => {
     vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: WORKFLOWS,
       isLoading: false,
     } as any);
-    vi.useFakeTimers();
     renderPage();
-    const input = screen.getByPlaceholderText('Search workflow type...');
+    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
     fireEvent.change(input, { target: { value: 'REVIEW' } });
-    await act(() => vi.advanceTimersByTime(300));
     expect(screen.getByText('review-content')).toBeInTheDocument();
-    vi.useRealTimers();
   });
 
-  it('clearing filter restores all results', () => {
+  it('clearing queue filter restores all results', () => {
     vi.mocked(useDiscoveredWorkflows).mockReturnValue({
       data: WORKFLOWS,
       isLoading: false,
     } as any);
     renderPage();
-    const selects = screen.getAllByRole('combobox');
     // Filter to examples queue
-    fireEvent.change(selects[0], { target: { value: 'examples' } });
+    fireEvent.click(screen.getByRole('button', { name: 'examples' }));
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-    // Clear filter
-    fireEvent.change(selects[0], { target: { value: '' } });
+    // Click 'All' to restore all results
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
     expect(screen.getByText('review-content')).toBeInTheDocument();
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
   });
