@@ -1,4 +1,6 @@
 import * as roleService from '../services/role';
+import { isRoleHomeView, ROLE_HOME_VIEWS } from '../services/role';
+import type { RoleHomeView } from '../services/role';
 import type { LTApiResult } from '../types/sdk';
 
 /**
@@ -55,6 +57,124 @@ export async function createRole(input: {
     }
     await roleService.createRole(trimmed);
     return { status: 201, data: { role: trimmed } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Get a role's self-describing config (title / purpose / metadata schema / home_view).
+ *
+ * @param input.role — the role to read
+ * @returns `{ status: 200, data: { config } }`, or 404 if the role is unknown
+ */
+export async function getRoleConfig(input: { role: string }): Promise<LTApiResult> {
+  try {
+    const config = await roleService.getRoleConfig(input.role);
+    if (!config) return { status: 404, error: `Role not found: ${input.role}` };
+    return { status: 200, data: { config } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Patch a role's config. Requires admin privileges. Only provided fields change.
+ * An invalid `metadata_schema` or `home_view` is rejected with 400.
+ *
+ * @returns `{ status: 200, data: { config } }` with the updated config
+ */
+export async function updateRoleConfig(input: {
+  role: string;
+  title?: string | null;
+  purpose?: string | null;
+  metadata_schema?: Record<string, any> | null;
+  home_view?: RoleHomeView | null;
+}): Promise<LTApiResult> {
+  try {
+    if (input.home_view != null && !isRoleHomeView(input.home_view)) {
+      return {
+        status: 400,
+        error: `home_view must be one of: ${Object.values(ROLE_HOME_VIEWS).join(', ')}`,
+      };
+    }
+    await roleService.updateRoleConfig(input.role, {
+      title: input.title,
+      purpose: input.purpose,
+      metadataSchema: input.metadata_schema,
+      homeView: input.home_view,
+    });
+    const config = await roleService.getRoleConfig(input.role);
+    return { status: 200, data: { config } };
+  } catch (err: any) {
+    // The service throws on an uncompilable metadata schema — a client error.
+    if (typeof err.message === 'string' && err.message.startsWith('Invalid metadata_schema')) {
+      return { status: 400, error: err.message };
+    }
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * List a role's dials (goal rate / crew per station).
+ *
+ * @returns `{ status: 200, data: { dials: RoleDial[] } }`
+ */
+export async function getRoleDials(input: { role: string }): Promise<LTApiResult> {
+  try {
+    const dials = await roleService.getRoleDials(input.role);
+    return { status: 200, data: { dials } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Upsert one station's per-unit TAT target. Requires admin privileges.
+ *
+ * @returns `{ status: 200, data: { role, station, target_tat_seconds } }`
+ */
+export async function upsertRoleDial(input: {
+  role: string;
+  station: string;
+  target_tat_seconds: number;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.station || typeof input.station !== 'string' || !input.station.trim()) {
+      return { status: 400, error: 'station is required' };
+    }
+    if (
+      typeof input.target_tat_seconds !== 'number' ||
+      !Number.isFinite(input.target_tat_seconds) ||
+      input.target_tat_seconds <= 0
+    ) {
+      return { status: 400, error: 'target_tat_seconds must be a positive number (seconds per unit)' };
+    }
+    await roleService.upsertRoleDial(input.role, input.station, {
+      targetTatSeconds: input.target_tat_seconds,
+    });
+    return {
+      status: 200,
+      data: { role: input.role, station: input.station, target_tat_seconds: input.target_tat_seconds },
+    };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Remove one station's dial from a role. Requires admin privileges.
+ *
+ * @returns `{ status: 200, data: { removed: true } }`, or 404 if absent
+ */
+export async function deleteRoleDial(input: {
+  role: string;
+  station: string;
+}): Promise<LTApiResult> {
+  try {
+    const removed = await roleService.deleteRoleDial(input.role, input.station);
+    if (!removed) return { status: 404, error: 'Dial not found' };
+    return { status: 200, data: { removed: true } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

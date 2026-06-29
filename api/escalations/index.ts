@@ -7,3 +7,10 @@ export { resolveEscalation, resolveBySignalKey, resolveByIds } from './resolve';
 export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
 export { cancelSingleEscalation, bulkCancel } from './cancel';
 export { searchByFacets, claimGroups, claimByFacets } from './facets';
+export {
+  getAttainment,
+  getServicerProfile,
+  setBaseline as setAttainmentBaseline,
+  getBaseline as getAttainmentBaseline,
+  listBaselines as listAttainmentBaselines,
+} from './attainment';

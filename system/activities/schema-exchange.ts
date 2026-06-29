@@ -67,6 +67,28 @@ export function validateSchema(
 }
 
 /**
+ * Validate that a value is itself a usable JSON Schema document.
+ *
+ * Unlike `validateSchema` (which compiles a schema and checks data against it),
+ * this only confirms the schema *compiles* — used before persisting a
+ * caller-supplied schema (e.g. a role's escalation metadata contract) so an
+ * unusable schema is rejected at the boundary instead of failing later.
+ */
+export function validateSchemaDocument(
+  schema: unknown,
+): { valid: boolean; errors: string[] } {
+  if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) {
+    return { valid: false, errors: ['schema must be a JSON Schema object'] };
+  }
+  try {
+    ajv.compile(normalizeSchema(schema) as Record<string, unknown>);
+    return { valid: true, errors: [] };
+  } catch (err: any) {
+    return { valid: false, errors: [err?.message ?? 'invalid JSON Schema'] };
+  }
+}
+
+/**
  * Exchange data with an external service endpoint under schema enforcement.
  *
  * 1. If request_schema provided, validate body before sending.

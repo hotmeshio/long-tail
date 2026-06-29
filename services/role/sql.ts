@@ -92,6 +92,64 @@ export const LIST_ROLES_WITH_DETAILS = `
   LEFT JOIN workflow_counts wc ON wc.role = r.role
   ORDER BY r.role`;
 
+// ─── Role surface config (title / purpose / schema / home_view) ────────────
+
+export const GET_ROLE_CONFIG = `
+  SELECT role, title, purpose, metadata_schema, home_view
+  FROM lt_roles
+  WHERE role = $1`;
+
+/**
+ * Upsert a role's self-describing config in ONE atomic statement. On a new role
+ * it inserts with the provided values; on an existing role COALESCE keeps the
+ * current value wherever the patch is NULL — so a partial patch never clobbers
+ * unrelated fields. EXCLUDED is the proposed insert row.
+ *
+ * Note: a data-modifying CTE that inserts the role would NOT be visible to a
+ * sibling UPDATE's scan in the same statement, so a single INSERT … ON CONFLICT
+ * (not ensure-CTE + UPDATE) is the correct atomic form here.
+ */
+export const UPSERT_ROLE_META = `
+  INSERT INTO lt_roles (role, title, purpose, metadata_schema, home_view)
+  VALUES ($1, $2, $3, $4::jsonb, $5)
+  ON CONFLICT (role) DO UPDATE SET
+    title           = COALESCE(EXCLUDED.title, lt_roles.title),
+    purpose         = COALESCE(EXCLUDED.purpose, lt_roles.purpose),
+    metadata_schema = COALESCE(EXCLUDED.metadata_schema, lt_roles.metadata_schema),
+    home_view       = COALESCE(EXCLUDED.home_view, lt_roles.home_view)`;
+
+// ─── Role dials (declared per-unit TAT target per station) ─────────────────
+
+// NUMERIC casts to float8 so the driver returns JS numbers, not strings.
+export const GET_ROLE_DIALS = `
+  SELECT
+    role,
+    station_key,
+    target_tat_seconds::float8 AS target_tat_seconds,
+    created_at,
+    updated_at
+  FROM lt_role_dials
+  WHERE role = $1
+  ORDER BY station_key`;
+
+/**
+ * Upsert a dial in ONE atomic statement: ensure the role FK target exists, then
+ * insert/update the per-unit TAT target. Postgres checks the dial's FK to
+ * lt_roles at statement end (after the ensure CTE runs), so a brand-new role is a
+ * valid target — the same pattern as ADD_ESCALATION_CHAIN.
+ */
+export const UPSERT_ROLE_DIAL = `
+  WITH ensured AS (
+    INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING
+  )
+  INSERT INTO lt_role_dials (role, station_key, target_tat_seconds)
+  VALUES ($1, $2, $3)
+  ON CONFLICT (role, station_key) DO UPDATE SET
+    target_tat_seconds = EXCLUDED.target_tat_seconds`;
+
+export const DELETE_ROLE_DIAL = `
+  DELETE FROM lt_role_dials WHERE role = $1 AND station_key = $2`;
+
 // ─── Reference checks (used before role deletion) ──────────────────────────
 
 export const COUNT_USER_ROLE_REFS = `

@@ -71,6 +71,35 @@ export function buildFacetWhere(q: FacetQuery, params: unknown[]): string {
   return clauses.length ? clauses.join('\n  AND ') : 'TRUE';
 }
 
+/**
+ * The read-scope a caller searches at. Mirrors the EscalationReadScope partition:
+ * `global` sees everything; otherwise rows are visible where the role is in
+ * `visibleRoles` (read_all), or in `selfRoles` (read_self) AND assigned to them.
+ */
+export interface ReadScope {
+  global?: boolean;
+  visibleRoles?: string[]; // read_all roles
+  selfRoles?: string[];    // read_self roles
+  meUserId?: string;
+}
+
+/**
+ * Build the read-scope WHERE clause, pushing bound params into `params`. Returns
+ * null for global access (no filter). Single-sourced here and reused by the list,
+ * facet-key, and attainment queries so visibility SQL is audited in one place.
+ * Columns are unqualified — use only where `lt_escalations` is the sole table in
+ * scope (or expose its columns through a CTE).
+ */
+export function buildReadScopeWhere(scope: ReadScope, params: unknown[]): string | null {
+  if (scope.global) return null;
+  const ai = params.push(scope.visibleRoles?.length ? scope.visibleRoles : null);
+  const si = params.push(scope.selfRoles?.length ? scope.selfRoles : null);
+  const mi = params.push(scope.meUserId || null);
+  return `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
+        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
+        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`;
+}
+
 const DEFAULT_ORDER = 'priority ASC, created_at ASC';
 
 /** Build an injection-safe ORDER BY mixing top-level columns and metadata facets. */

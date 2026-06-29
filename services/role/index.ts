@@ -16,9 +16,19 @@ import {
   COUNT_CHAIN_REFS,
   COUNT_WORKFLOW_REFS,
   COUNT_ACTIVE_ESCALATION_REFS,
+  GET_ROLE_CONFIG,
+  UPSERT_ROLE_META,
+  GET_ROLE_DIALS,
+  UPSERT_ROLE_DIAL,
+  DELETE_ROLE_DIAL,
 } from './sql';
+import { validateSchemaDocument } from '../../system/activities/schema-exchange';
 
-import type { EscalationChain, RoleDetail } from './types';
+import type { EscalationChain, RoleDetail, RoleConfig, RoleConfigPatch, RoleDial, RoleDialInput } from './types';
+
+export type { EscalationChain, RoleDetail, RoleConfig, RoleConfigPatch, RoleDial, RoleDialInput } from './types';
+export { ROLE_HOME_VIEWS, DEFAULT_HOME_VIEW, isRoleHomeView } from './constants';
+export type { RoleHomeView } from './constants';
 
 /**
  * Get the roles a given source role can escalate to.
@@ -133,6 +143,72 @@ export async function listRolesWithDetails(): Promise<RoleDetail[]> {
 export async function createRole(role: string): Promise<void> {
   const pool = getPool();
   await pool.query(ENSURE_ROLE_EXISTS, [role]);
+}
+
+// ─── Role surface config (title / purpose / schema / home_view) ────────────
+
+/**
+ * Read a role's self-describing config. Returns null if the role is unknown.
+ */
+export async function getRoleConfig(role: string): Promise<RoleConfig | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_CONFIG, [role]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Patch a role's config (title / purpose / metadata schema / home_view). Only
+ * provided fields change; the others are preserved. A supplied metadata schema
+ * is validated as a compilable JSON Schema BEFORE any write — an unusable schema
+ * is rejected at the boundary, never persisted.
+ */
+export async function updateRoleConfig(role: string, patch: RoleConfigPatch): Promise<void> {
+  if (patch.metadataSchema !== undefined && patch.metadataSchema !== null) {
+    const result = validateSchemaDocument(patch.metadataSchema);
+    if (!result.valid) {
+      throw new Error(`Invalid metadata_schema: ${result.errors.join('; ')}`);
+    }
+  }
+  const pool = getPool();
+  await pool.query(UPSERT_ROLE_META, [
+    role,
+    patch.title ?? null,
+    patch.purpose ?? null,
+    patch.metadataSchema != null ? JSON.stringify(patch.metadataSchema) : null,
+    patch.homeView ?? null,
+  ]);
+}
+
+// ─── Role dials (goal rate / crew per station) ─────────────────────────────
+
+/**
+ * List a role's dials — one per station, each with its promised goal rate.
+ */
+export async function getRoleDials(role: string): Promise<RoleDial[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_DIALS, [role]);
+  return rows;
+}
+
+/**
+ * Upsert one station's per-unit TAT target (atomic ON CONFLICT; ensures the role FK).
+ */
+export async function upsertRoleDial(
+  role: string,
+  stationKey: string,
+  dial: RoleDialInput,
+): Promise<void> {
+  const pool = getPool();
+  await pool.query(UPSERT_ROLE_DIAL, [role, stationKey, dial.targetTatSeconds]);
+}
+
+/**
+ * Remove one station's dial from a role. Returns false if it did not exist.
+ */
+export async function deleteRoleDial(role: string, stationKey: string): Promise<boolean> {
+  const pool = getPool();
+  const { rowCount } = await pool.query(DELETE_ROLE_DIAL, [role, stationKey]);
+  return (rowCount ?? 0) > 0;
 }
 
 /**

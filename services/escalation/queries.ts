@@ -5,7 +5,7 @@ import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 
 import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
-import { buildFacetWhere, buildFacetOrder } from './facet-sql';
+import { buildFacetWhere, buildFacetOrder, buildReadScopeWhere } from './facet-sql';
 import type { EscalationStats } from './types';
 import { SORTABLE_COLUMNS } from './types';
 import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS } from './sql';
@@ -125,16 +125,8 @@ export async function searchEscalationsFaceted(opts: {
   const clauses: string[] = [];
 
   // 1. Read-scope predicate (skip entirely for global access).
-  if (!opts.global) {
-    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
-    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
-    const mi = params.push(opts.meUserId || null);
-    clauses.push(
-      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
-        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
-        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
-    );
-  }
+  const scopeClause = buildReadScopeWhere(opts, params);
+  if (scopeClause) clauses.push(scopeClause);
 
   // 2. Faceted predicate (role/roles/status/available/facets/block/range/exists).
   const facetClause = buildFacetWhere(opts.facet, params);
@@ -190,16 +182,8 @@ export async function listFacetKeys(opts: {
   const params: unknown[] = [];
   const clauses: string[] = ["jsonb_typeof(metadata) = 'object'"];
 
-  if (!opts.global) {
-    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
-    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
-    const mi = params.push(opts.meUserId || null);
-    clauses.push(
-      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
-        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
-        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
-    );
-  }
+  const scopeClause = buildReadScopeWhere(opts, params);
+  if (scopeClause) clauses.push(scopeClause);
 
   const { rows } = await pool.query(
     `SELECT DISTINCT jsonb_object_keys(metadata) AS key

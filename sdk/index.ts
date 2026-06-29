@@ -189,6 +189,18 @@ export function createClient(options: LTClientOptions = {}) {
       removeEscalationChain: rolesApi.removeEscalationChain,
       getEscalationTargets: rolesApi.getEscalationTargets,
       replaceEscalationTargets: rolesApi.replaceEscalationTargets,
+      // Role-as-surface config + goal dials.
+      getConfig: rolesApi.getRoleConfig,
+      updateConfig: rolesApi.updateRoleConfig,
+      getDials: rolesApi.getRoleDials,
+      upsertDial: rolesApi.upsertRoleDial,
+      deleteDial: rolesApi.deleteRoleDial,
+      // Role-overview attainment (the role is the pivot — RBAC-scoped to the caller).
+      getAttainment: bindAuth(escalationsApi.getAttainment, auth),
+      getServicerProfile: bindAuth(escalationsApi.getServicerProfile, auth),
+      setBaseline: bindAuth(escalationsApi.setAttainmentBaseline, auth),
+      getBaseline: bindAuth(escalationsApi.getAttainmentBaseline, auth),
+      listBaselines: bindAuth(escalationsApi.listAttainmentBaselines, auth),
     },
 
     // ── Auth ───────────────────────────────────────────────────────────────
