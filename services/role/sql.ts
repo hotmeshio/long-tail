@@ -60,17 +60,26 @@ export const DELETE_ROLE = `
 
 export const UPDATE_ROLE_METADATA = `
   UPDATE lt_roles SET
-    title       = COALESCE($2, title),
-    description = COALESCE($3, description),
-    form_schema = $4,
-    properties  = COALESCE($5::jsonb, properties),
-    ops_visible = COALESCE($6, ops_visible),
-    parent_role = $7
+    title           = $2,
+    description     = $3,
+    form_schema     = $4,
+    metadata_schema = $5,
+    properties      = COALESCE($6::jsonb, '{}'::jsonb),
+    ops_visible     = $7,
+    parent_role     = $8,
+    sla_minutes     = $9,
+    target_per_hour = $10,
+    worker_count    = $11
   WHERE role = $1
-  RETURNING role, title, description, form_schema, properties, ops_visible, parent_role`;
+  RETURNING
+    role, title, description, form_schema, metadata_schema, properties,
+    ops_visible, parent_role, sla_minutes, target_per_hour, worker_count`;
 
 export const GET_ROLE_FORM_SCHEMA = `
   SELECT form_schema FROM lt_roles WHERE role = $1`;
+
+export const GET_ROLE_METADATA_SCHEMA = `
+  SELECT metadata_schema FROM lt_roles WHERE role = $1`;
 
 // ─── Role detail aggregation ────────────────────────────────────────────────
 
@@ -100,9 +109,13 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.title,
     r.description,
     r.form_schema,
+    r.metadata_schema,
     r.properties,
     r.ops_visible,
     r.parent_role,
+    r.sla_minutes,
+    r.target_per_hour,
+    r.worker_count,
     COALESCE(uc.cnt, 0) AS user_count,
     COALESCE(cc.cnt, 0) AS chain_count,
     COALESCE(wc.cnt, 0) AS workflow_count

@@ -40,6 +40,23 @@ export const VALID_PERIODS: Record<string, string> = {
   '30d': '30 days',
 };
 
+export interface StationMetricPeriod {
+  p99: number | null;
+  p50: number | null;
+  avg: number | null;
+  max: number | null;
+}
+
+export interface StationMetric {
+  role: string;
+  pending: number;
+  claimed: number;
+  resolved: number;
+  in_arrears: number;
+  wait: StationMetricPeriod;
+  work: StationMetricPeriod;
+}
+
 /** Columns allowed for user-chosen ORDER BY. */
 export const SORTABLE_COLUMNS = new Set([
   'created_at', 'updated_at', 'priority', 'resolved_at', 'role', 'type',

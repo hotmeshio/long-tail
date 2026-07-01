@@ -226,9 +226,13 @@ export function registerUserTools(server: McpServer): void {
         title: args.title,
         description: args.description,
         form_schema: args.form_schema as Record<string, any> | null | undefined,
+        metadata_schema: args.metadata_schema as Record<string, any> | null | undefined,
         properties: args.properties as Record<string, any> | null | undefined,
         ops_visible: args.ops_visible,
         parent_role: args.parent_role,
+        sla_minutes: args.sla_minutes,
+        target_per_hour: args.target_per_hour,
+        worker_count: args.worker_count,
       });
       if (!updated) {
         return {

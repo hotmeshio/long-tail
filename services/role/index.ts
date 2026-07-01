@@ -14,6 +14,7 @@ import {
   LIST_ROLES_WITH_DETAILS,
   UPDATE_ROLE_METADATA,
   GET_ROLE_FORM_SCHEMA,
+  GET_ROLE_METADATA_SCHEMA,
   COUNT_USER_ROLE_REFS,
   COUNT_CHAIN_REFS,
   COUNT_WORKFLOW_REFS,
@@ -151,10 +152,14 @@ export async function updateRoleMetadata(
     role,
     input.title ?? null,
     input.description ?? null,
-    input.form_schema !== undefined ? JSON.stringify(input.form_schema) : null,
-    input.properties !== undefined ? JSON.stringify(input.properties) : null,
-    input.ops_visible ?? null,
-    input.parent_role !== undefined ? input.parent_role : null,
+    input.form_schema != null ? JSON.stringify(input.form_schema) : null,
+    input.metadata_schema != null ? JSON.stringify(input.metadata_schema) : null,
+    JSON.stringify(input.properties ?? {}),
+    input.ops_visible ?? false,
+    input.parent_role ?? null,
+    input.sla_minutes ?? null,
+    input.target_per_hour ?? null,
+    input.worker_count ?? null,
   ]);
   return rows[0] ?? null;
 }
@@ -167,6 +172,17 @@ export async function getRoleFormSchema(role: string): Promise<Record<string, an
   const pool = getPool();
   const { rows } = await pool.query(GET_ROLE_FORM_SCHEMA, [role]);
   return rows[0]?.form_schema ?? null;
+}
+
+/**
+ * Fetch metadata_schema for a role. Used at escalation creation time to
+ * validate the caller-supplied metadata bag, and by the faceted-query UI
+ * to surface expected keys before any data exists.
+ */
+export async function getRoleMetadataSchema(role: string): Promise<Record<string, any> | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_METADATA_SCHEMA, [role]);
+  return rows[0]?.metadata_schema ?? null;
 }
 
 /**

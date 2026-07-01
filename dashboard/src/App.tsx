@@ -116,6 +116,9 @@ const UsersPage = lazy(() =>
 const RolesPage = lazy(() =>
   import('./pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
 );
+const RoleDetailPage = lazy(() =>
+  import('./pages/admin/roles/RoleDetailPage').then((m) => ({ default: m.RoleDetailPage })),
+);
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
 );
@@ -343,6 +346,7 @@ const router = createBrowserRouter([
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
           { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
+          { path: 'admin/roles/:role', element: <Lazy><RoleDetailPage /></Lazy> },
           {
             element: <RequireFeature flag="dbMaintenance" />,
             children: [

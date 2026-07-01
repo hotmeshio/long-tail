@@ -170,17 +170,21 @@ export async function replaceEscalationTargets(input: {
 }
 
 /**
- * Update role metadata (title, description, form_schema, properties, ops_visible, parent_role).
- * Fields omitted from input are left unchanged. form_schema and parent_role can be set to null.
+ * Update role metadata. Fields omitted from input are left unchanged.
+ * form_schema, metadata_schema, and parent_role can be set to null to clear them.
  */
 export async function updateRole(input: {
   role: string;
   title?: string | null;
   description?: string | null;
   form_schema?: Record<string, any> | null;
+  metadata_schema?: Record<string, any> | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
   parent_role?: string | null;
+  sla_minutes?: number | null;
+  target_per_hour?: number | null;
+  worker_count?: number | null;
 }): Promise<LTApiResult> {
   try {
     if (!input.role) {
@@ -190,9 +194,13 @@ export async function updateRole(input: {
       title: input.title,
       description: input.description,
       form_schema: input.form_schema,
+      metadata_schema: input.metadata_schema,
       properties: input.properties,
       ops_visible: input.ops_visible,
       parent_role: input.parent_role,
+      sla_minutes: input.sla_minutes,
+      target_per_hour: input.target_per_hour,
+      worker_count: input.worker_count,
     });
     if (!updated) {
       return { status: 404, error: `Role '${input.role}' not found` };

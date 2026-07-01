@@ -16,6 +16,7 @@ import { useAccess } from '../../hooks/useAccess';
  * for any admin (Accounts; Roles only for builders), while Infrastructure is
  * builder-only — so an admin who could see Identity & Access but not
  * Infrastructure still sees exactly that.
+ * Operations lives in ChoreographySidebar, not here.
  */
 export function AdminSidebar({ isBuilder = false }: { isBuilder?: boolean }) {
   const { data: settings } = useSettings();

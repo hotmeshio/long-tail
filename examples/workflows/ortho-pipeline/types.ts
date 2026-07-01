@@ -1,4 +1,4 @@
-export const ORTHO_STAGES = ['design', 'review', 'print', 'grid', 'glue', 'finish', 'qa', 'ship'] as const;
+export const ORTHO_STAGES = ['design', 'review', 'print', 'grind', 'glue', 'finish', 'qa', 'ship'] as const;
 export type OrthoStage = typeof ORTHO_STAGES[number];
 
 export interface OrthoOrder {

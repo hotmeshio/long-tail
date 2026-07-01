@@ -1,6 +1,10 @@
+import Ajv from 'ajv';
 import * as escalationService from '../../services/escalation';
+import * as roleService from '../../services/role';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
+
+const ajv = new Ajv({ allErrors: true });
 
 // ── Create ────────────────────────────────────────────────────────────────
 
@@ -57,6 +61,19 @@ export async function createEscalation(
     const denied = await assertQueueManageAccess(auth.userId, role);
     if (denied) {
       return { status: 403, error: `You must have write access to the "${role}" role or be a superadmin to create escalations for it` };
+    }
+
+    // Validate metadata against the role's declared schema (if any).
+    if (input.metadata) {
+      const schema = await roleService.getRoleMetadataSchema(role);
+      if (schema) {
+        const validate = ajv.compile(schema);
+        const valid = validate(input.metadata);
+        if (!valid) {
+          const msgs = (validate.errors ?? []).map((e) => `${e.instancePath || '(root)'} ${e.message}`).join('; ');
+          return { status: 400, error: `metadata does not match the role schema: ${msgs}` };
+        }
+      }
     }
 
     const escalation = await escalationService.createEscalation({

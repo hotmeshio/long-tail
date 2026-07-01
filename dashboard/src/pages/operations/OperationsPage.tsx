@@ -1,349 +1,400 @@
-import { useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Users, AlertTriangle, Eye, GitBranch, ArrowRight, ChevronRight } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRoleDetails, type RoleDetail } from '../../api/roles';
-import { useEscalationStats } from '../../api/escalations';
+import { useStationMetrics } from '../../api/escalations';
+import type { StationMetric } from '../../api/escalations';
+import { useSocketIOSubscription } from '../../hooks/useSocketIO';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { MembraneChart, type ChartStation } from './MembraneChart';
+import { StationDetailPanel } from './StationDetailPanel';
+
+const REFRESH_INTERVAL_MS = 10_000;
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+const PERIODS = ['1h', '24h', '7d', '30d'] as const;
+type Period = (typeof PERIODS)[number];
+
+interface OrderedStation {
+  role: RoleDetail;
+  depth: number;
+}
+
+// ── Topological sort — BFS, tracking actual depth ─────────────────────────────
+
+function topoSort(roles: RoleDetail[]): OrderedStation[] {
+  const opsRoles = roles.filter((r) => r.ops_visible);
+  const roleMap = new Map(opsRoles.map((r) => [r.role, r]));
+  const result: OrderedStation[] = [];
+  const visited = new Set<string>();
+
+  // Roots: no parent, or parent not in ops set
+  const queue: OrderedStation[] = opsRoles
+    .filter((r) => !r.parent_role || !roleMap.has(r.parent_role))
+    .map((r) => ({ role: r, depth: 0 }));
+
+  while (queue.length > 0) {
+    const item = queue.shift()!;
+    if (visited.has(item.role.role)) continue;
+    visited.add(item.role.role);
+    result.push(item);
+    // Children get depth + 1
+    opsRoles
+      .filter((c) => c.parent_role === item.role.role && !visited.has(c.role))
+      .forEach((c) => queue.push({ role: c, depth: item.depth + 1 }));
+  }
+
+  // Any unreachable (cycles / dangling)
+  opsRoles
+    .filter((r) => !visited.has(r.role))
+    .forEach((r) => result.push({ role: r, depth: 0 }));
+
+  return result;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildDependencyTree(
-  roles: RoleDetail[],
-): { root: RoleDetail; children: RoleDetail[] }[] {
-  const opsRoles = roles.filter((r) => r.ops_visible);
-  const roots = opsRoles.filter((r) => !r.parent_role || !opsRoles.find((p) => p.role === r.parent_role));
-  return roots.map((root) => ({
-    root,
-    children: opsRoles.filter((r) => r.parent_role === root.role),
-  }));
+function fmtMin(v: number | null): string {
+  if (v == null) return '—';
+  if (v < 1) {
+    const s = Math.round(v * 60);
+    return s <= 0 ? '< 1s' : `${s}s`;
+  }
+  if (v < 60) return `${v.toFixed(0)}m`;
+  return `${(v / 60).toFixed(1)}h`;
 }
 
-// ── Station card ──────────────────────────────────────────────────────────────
+function pressureBar(pending: number, target: number | null) {
+  if (!target) return { pct: null, color: 'bg-surface-border' };
+  const ratio = pending / target;
+  const pct = Math.round(ratio * 100);
+  // Yellow: backlog (> 100%). Red: idle / under-staffed (< 20%). Green: healthy.
+  const color = ratio > 1.0 ? 'bg-amber-400' : ratio < 0.2 ? 'bg-red-400' : 'bg-emerald-400';
+  return { pct, color };
+}
 
-function StationCard({
+// ── Station table row ─────────────────────────────────────────────────────────
+
+function StationRow({
   role,
-  pending,
-  claimed,
-  children,
-  stats,
+  depth,
+  metric,
+  selected,
+  onClick,
 }: {
   role: RoleDetail;
-  pending: number;
-  claimed: number;
-  children: RoleDetail[];
-  stats: { by_role: { role: string; pending: number; claimed: number }[] } | undefined;
+  depth: number;
+  metric: StationMetric | undefined;
+  selected: boolean;
+  onClick: () => void;
 }) {
-  const total = pending + claimed;
-  const slaMinutes = (role.properties as any)?.sla_minutes as number | undefined;
-  const targetPerHour = (role.properties as any)?.target_per_hour as number | undefined;
-  const isOverloaded = targetPerHour && pending > targetPerHour;
+  const pending = metric?.pending ?? 0;
+  const claimed = metric?.claimed ?? 0;
+  const resolved = metric?.resolved ?? 0;
+  const inArrears = metric?.in_arrears ?? 0;
+  const target = role.target_per_hour ?? null;
+  const { pct, color } = pressureBar(pending, target);
+  const barWidth = pct != null ? Math.min(100, pct) : 0;
 
   return (
-    <div className="space-y-2">
-      <Link
-        to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}`}
-        className="block group"
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
+        className={`grid items-center gap-4 py-3.5 cursor-pointer transition-colors ${
+          selected ? 'border-l-2 border-accent' : 'pl-0.5'
+        }`}
+        style={{ gridTemplateColumns: '1fr 56px 56px 60px 72px 72px 104px' }}
       >
+        {/* Role name — indented by depth */}
         <div
-          className={`rounded-none border-l-2 pl-4 py-3 pr-3 transition-colors ${
-            isOverloaded
-              ? 'border-status-warning bg-[#fffbf0]'
-              : total === 0
-              ? 'border-surface-border'
-              : 'border-accent/40 hover:border-accent'
-          }`}
+          className="flex items-center gap-1.5 min-w-0"
+          style={{ paddingLeft: depth * 20 }}
         >
-          {/* Role name + badges */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-mono font-medium text-text-primary group-hover:text-accent transition-colors">
-                  {role.role}
-                </span>
-                {role.title && (
-                  <span className="text-xs text-text-secondary">{role.title}</span>
-                )}
-              </div>
-              {role.description && (
-                <p className="text-[11px] text-text-tertiary mt-0.5 line-clamp-2">
-                  {role.description}
-                </p>
-              )}
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-text-quaternary group-hover:text-accent transition-colors mt-0.5 shrink-0" />
-          </div>
-
-          {/* Metrics row */}
-          <div className="flex items-center gap-4 mt-3">
-            <div className="flex flex-col items-center">
-              <span className={`text-lg font-semibold tabular-nums leading-tight ${pending > 0 ? 'text-text-primary' : 'text-text-quaternary'}`}>
-                {pending}
-              </span>
-              <span className="text-[9px] text-text-quaternary uppercase tracking-wider">pending</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className={`text-lg font-semibold tabular-nums leading-tight ${claimed > 0 ? 'text-accent' : 'text-text-quaternary'}`}>
-                {claimed}
-              </span>
-              <span className="text-[9px] text-text-quaternary uppercase tracking-wider">active</span>
-            </div>
-            {slaMinutes && (
-              <div className="flex flex-col items-center ml-auto">
-                <span className="text-xs font-medium text-text-secondary tabular-nums">{slaMinutes}m</span>
-                <span className="text-[9px] text-text-quaternary uppercase tracking-wider">SLA</span>
-              </div>
-            )}
-            {targetPerHour && (
-              <div className="flex flex-col items-center">
-                <span className={`text-xs font-medium tabular-nums ${isOverloaded ? 'text-status-warning' : 'text-text-secondary'}`}>
-                  {targetPerHour}/h
-                </span>
-                <span className="text-[9px] text-text-quaternary uppercase tracking-wider">target</span>
-              </div>
-            )}
-          </div>
-
-          {/* Overload warning */}
-          {isOverloaded && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <AlertTriangle className="w-3 h-3 text-status-warning shrink-0" />
-              <span className="text-[10px] text-status-warning">
-                {pending - targetPerHour!} above hourly target
-              </span>
-            </div>
+          <span
+            className={`font-mono font-bold text-text-primary truncate ${
+              depth === 0 ? 'text-[11px]' : 'text-[10px]'
+            }`}
+          >
+            {role.role}
+          </span>
+          {role.title && (
+            <span className="text-[10px] text-text-tertiary truncate">{role.title}</span>
           )}
         </div>
-      </Link>
 
-      {/* Child stations */}
-      {children.length > 0 && (
-        <div className="ml-4 pl-4 border-l border-surface-border/60 space-y-1.5">
-          {children.map((child) => {
-            const childStats = stats?.by_role.find((s) => s.role === child.role);
-            return (
-              <Link
-                key={child.role}
-                to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([child.role]))}`}
-                className="flex items-center justify-between gap-3 py-1.5 group"
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <ChevronRight className="w-3 h-3 text-text-quaternary shrink-0" />
-                  <span className="text-xs font-mono text-text-secondary group-hover:text-accent transition-colors truncate">
-                    {child.role}
-                  </span>
-                  {child.title && (
-                    <span className="text-[10px] text-text-tertiary truncate">{child.title}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {(childStats?.pending ?? 0) > 0 && (
-                    <span className="text-xs font-medium text-text-primary tabular-nums">
-                      {childStats!.pending}
-                    </span>
-                  )}
-                  {(childStats?.claimed ?? 0) > 0 && (
-                    <span className="text-xs font-medium text-accent tabular-nums">
-                      {childStats!.claimed}
-                    </span>
-                  )}
-                  {!childStats?.pending && !childStats?.claimed && (
-                    <span className="text-[10px] text-text-quaternary">idle</span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Summary bar ───────────────────────────────────────────────────────────────
-
-function SummaryBar({
-  roles,
-  stats,
-}: {
-  roles: RoleDetail[];
-  stats: { pending: number; claimed: number; by_role: { role: string; pending: number; claimed: number }[] } | undefined;
-}) {
-  const opsRoles = roles.filter((r) => r.ops_visible);
-  const totalPending = stats?.pending ?? 0;
-  const totalActive = stats?.claimed ?? 0;
-  const stationsAboveTarget = opsRoles.filter((r) => {
-    const target = (r.properties as any)?.target_per_hour as number | undefined;
-    if (!target) return false;
-    const roleStat = stats?.by_role.find((s) => s.role === r.role);
-    return (roleStat?.pending ?? 0) > target;
-  }).length;
-
-  return (
-    <div className="flex items-center gap-8 py-4 border-b border-surface-border mb-6">
-      <div>
-        <div className="flex items-center gap-1.5 text-text-quaternary mb-1">
-          <Eye className="w-3 h-3" />
-          <span className="text-[10px] uppercase tracking-wider">Stations</span>
-        </div>
-        <span className="text-2xl font-semibold text-text-primary">{opsRoles.length}</span>
-      </div>
-      <div className="w-px h-8 bg-surface-border" />
-      <div>
-        <div className="flex items-center gap-1.5 text-text-quaternary mb-1">
-          <Clock className="w-3 h-3" />
-          <span className="text-[10px] uppercase tracking-wider">Pending</span>
-        </div>
-        <span className={`text-2xl font-semibold ${totalPending > 0 ? 'text-text-primary' : 'text-text-quaternary'}`}>
-          {totalPending}
+        {/* Pending */}
+        <span
+          className={`text-xs font-mono tabular-nums text-right ${
+            pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
+          }`}
+        >
+          {pending}
         </span>
-      </div>
-      <div className="w-px h-8 bg-surface-border" />
-      <div>
-        <div className="flex items-center gap-1.5 text-text-quaternary mb-1">
-          <Users className="w-3 h-3" />
-          <span className="text-[10px] uppercase tracking-wider">Active</span>
-        </div>
-        <span className={`text-2xl font-semibold ${totalActive > 0 ? 'text-accent' : 'text-text-quaternary'}`}>
-          {totalActive}
+
+        {/* Active */}
+        <span
+          className={`text-xs font-mono tabular-nums text-right ${
+            claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'
+          }`}
+        >
+          {claimed}
         </span>
-      </div>
-      {stationsAboveTarget > 0 && (
-        <>
-          <div className="w-px h-8 bg-surface-border" />
-          <div>
-            <div className="flex items-center gap-1.5 text-status-warning mb-1">
-              <AlertTriangle className="w-3 h-3" />
-              <span className="text-[10px] uppercase tracking-wider">Over target</span>
-            </div>
-            <span className="text-2xl font-semibold text-status-warning">{stationsAboveTarget}</span>
+
+        {/* Resolved */}
+        <span className="text-xs font-mono tabular-nums text-right text-text-quaternary">
+          {resolved}
+        </span>
+
+        {/* P99 wait */}
+        <span className="text-xs font-mono tabular-nums text-right text-text-secondary">
+          {fmtMin(metric?.wait.p99 ?? null)}
+        </span>
+
+        {/* P99 work */}
+        <span className="text-xs font-mono tabular-nums text-right text-text-secondary">
+          {fmtMin(metric?.work.p99 ?? null)}
+        </span>
+
+        {/* Pressure mini-bar */}
+        <div className="flex items-center gap-2">
+          <div className="w-12 h-1.5 bg-surface-sunken rounded-full overflow-hidden shrink-0">
+            <div className={`h-full rounded-full ${color}`} style={{ width: `${barWidth}%` }} />
           </div>
-        </>
+          <span
+            className={`text-[10px] font-mono tabular-nums ${
+              pct != null && pct > 100
+                ? 'text-amber-500 font-semibold'
+                : pct != null && pct < 20
+                ? 'text-red-500'
+                : 'text-text-quaternary'
+            }`}
+          >
+            {pct != null ? `${pct}%` : '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* In-arrears sub-row */}
+      {inArrears > 0 && (
+        <div
+          className="flex items-center gap-1.5 pb-2"
+          style={{ paddingLeft: depth * 18 + (depth > 0 ? 20 : 4) }}
+        >
+          <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+          <Link
+            to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}&sort_by=created_at&order=asc`}
+            className="text-[10px] text-red-400 hover:text-red-500 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {inArrears} past SLA — view oldest first →
+          </Link>
+        </div>
       )}
+    </>
+  );
+}
+
+// ── Table header ──────────────────────────────────────────────────────────────
+
+function TableHead() {
+  const cols = ['ROLE', 'PENDING', 'ACTIVE', 'RESOLVED', 'P99 WAIT', 'P99 WORK', 'PRESSURE'];
+  return (
+    <div
+      className="grid items-center gap-4 py-1.5 border-b border-surface-border mb-0.5"
+      style={{ gridTemplateColumns: '1fr 56px 56px 60px 72px 72px 104px' }}
+    >
+      {cols.map((col, i) => (
+        <span
+          key={col}
+          className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary ${
+            i > 0 && i < 6 ? 'text-right' : ''
+          }`}
+        >
+          {col}
+        </span>
+      ))}
     </div>
   );
 }
+
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function OperationsPage() {
+  const [period, setPeriod] = useState<Period>('24h');
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const queryClient = useQueryClient();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const invalidateMetrics = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['stationMetrics'] });
+  }, [queryClient]);
+
+  // Debounced invalidate for socket events — burst of resolves collapses to one refetch.
+  const debouncedInvalidate = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(invalidateMetrics, 600);
+  }, [invalidateMetrics]);
+
+  // Socket.IO: refresh on any escalation event (resolved, claimed, released).
+  useSocketIOSubscription('lt.events.system.escalation.>', debouncedInvalidate);
+
+  // Fallback auto-refresh every REFRESH_INTERVAL_MS.
+  useEffect(() => {
+    const id = setInterval(invalidateMetrics, REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [invalidateMetrics]);
+
   const { data: roleData, isLoading: rolesLoading, refetch: refetchRoles } = useRoleDetails();
-  const { data: stats, isLoading: statsLoading, isFetching, refetch: refetchStats } = useEscalationStats();
+  const {
+    data: metricsData,
+    isLoading: metricsLoading,
+    refetch: refetchMetrics,
+  } = useStationMetrics(period);
 
   const roles = roleData?.roles ?? [];
-  const opsRoles = roles.filter((r) => r.ops_visible);
-  const stationTree = useMemo(() => buildDependencyTree(roles), [roles]);
+  const metrics = metricsData?.stations ?? [];
 
-  const isLoading = rolesLoading || statsLoading;
+  // BFS-ordered stations with exact depth tracked
+  const ordered = useMemo((): OrderedStation[] => topoSort(roles), [roles]);
 
-  const handleRefresh = () => { refetchRoles(); refetchStats(); };
+  const chartStations = useMemo(
+    (): ChartStation[] =>
+      ordered.map(({ role: r }) => ({
+        role: r.role,
+        title: r.title,
+        parent_role: r.parent_role,
+        target_per_hour: r.target_per_hour ?? null,
+        metric: metrics.find((m) => m.role === r.role),
+      })),
+    [ordered, metrics],
+  );
+
+  const selectedRoleDetail =
+    ordered.find(({ role }) => role.role === selectedRole)?.role ?? null;
+
+  const isLoading = rolesLoading || metricsLoading;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([refetchRoles(), refetchMetrics()]);
+    setRefreshing(false);
+  };
+
+  const handleSelect = (role: string) =>
+    setSelectedRole((prev) => (prev === role ? null : role));
+
+  const periodSelector = (
+    <div className="flex items-center gap-0.5">
+      {PERIODS.map((p) => (
+        <button
+          key={p}
+          onClick={() => setPeriod(p)}
+          className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors ${
+            period === p
+              ? 'bg-accent/10 text-accent font-semibold'
+              : 'text-text-quaternary hover:text-text-secondary'
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Operations"
         docsHash="#docs:dashboard.md:operations"
+        center={periodSelector}
         actions={
           <div className="flex items-center gap-3">
-            <Link to="/admin/roles" className="btn-secondary text-xs flex items-center gap-1.5">
-              <Eye className="w-3 h-3" />
-              Configure Stations
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-text-quaternary hover:text-text-secondary transition-colors disabled:opacity-40"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <Link to="/admin/roles" className="btn-secondary text-xs">
+              Configure
             </Link>
-            <ListToolbar onRefresh={handleRefresh} isFetching={isFetching} apiPath="/escalations/stats" />
           </div>
         }
       />
 
       {isLoading ? (
         <div className="animate-pulse space-y-6 mt-4">
-          <div className="h-16 bg-surface-sunken rounded w-full" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-28 bg-surface-sunken rounded" />
+          <div className="h-8 bg-surface-sunken rounded w-64" />
+          <div className="h-64 bg-surface-sunken rounded w-full" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-8 bg-surface-sunken rounded w-full" />
             ))}
           </div>
         </div>
-      ) : opsRoles.length === 0 ? (
+      ) : ordered.length === 0 ? (
         <div className="mt-8">
-          <p className="text-sm text-text-secondary mb-2">No stations configured yet.</p>
+          <p className="text-sm text-text-secondary mb-2">No stations configured.</p>
           <p className="text-xs text-text-tertiary">
             Go to{' '}
             <Link to="/admin/roles" className="text-accent hover:underline">
               Roles
             </Link>{' '}
-            and enable <strong>Visible in Operations view</strong> on roles that represent physical or
-            digital stations.
+            and enable <strong>Visible in Operations</strong> on roles that represent pipeline
+            stations.
           </p>
         </div>
       ) : (
-        <>
-          <SummaryBar roles={roles} stats={stats} />
+        /* Two-pane layout: upper chart (fixed), lower list (scrollable in-place) */
+        <div className="flex flex-col flex-1 min-h-0">
 
-          {stationTree.length > 0 ? (
-            <div className="space-y-8">
-              {stationTree.map(({ root, children }) => {
-                const rootStats = stats?.by_role.find((s) => s.role === root.role);
-                return (
-                  <StationCard
-                    key={root.role}
-                    role={root}
-                    pending={rootStats?.pending ?? 0}
-                    claimed={rootStats?.claimed ?? 0}
-                    children={children}
-                    stats={stats}
-                  />
-                );
-              })}
+          {/* Upper: 50vh — chart floats in generous space, persistent right panel */}
+          <div className="h-[50vh] flex-none flex items-stretch overflow-hidden">
+            {/* Chart — SVG centered vertically in available space */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
+              <MembraneChart
+                stations={chartStations}
+                selectedRole={selectedRole}
+                onSelect={handleSelect}
+              />
+            </div>
+            {/* Vertical divider — inset so it doesn't touch top/bottom */}
+            <div className="w-px bg-surface-border shrink-0 self-stretch my-8" />
+            {/* Right panel — always visible */}
+            <StationDetailPanel
+              role={selectedRoleDetail}
+              allMetrics={metrics}
+              onClose={() => setSelectedRole(null)}
+            />
+          </div>
 
-              {/* Standalone ops roles that aren't in the tree (no parent, not a parent) */}
-              {opsRoles
-                .filter(
-                  (r) =>
-                    !r.parent_role &&
-                    !stationTree.find((t) => t.root.role === r.role),
-                )
-                .map((role) => {
-                  const roleStat = stats?.by_role.find((s) => s.role === role.role);
-                  return (
-                    <StationCard
-                      key={role.role}
-                      role={role}
-                      pending={roleStat?.pending ?? 0}
-                      claimed={roleStat?.claimed ?? 0}
-                      children={[]}
-                      stats={stats}
-                    />
-                  );
-                })}
+          {/* Lower: scrollable role list */}
+          <div className="flex-1 min-h-0 overflow-y-auto border-t border-surface-border">
+            <TableHead />
+            <div className="divide-y divide-surface-border/30">
+              {ordered.map(({ role, depth }) => (
+                <StationRow
+                  key={role.role}
+                  role={role}
+                  depth={depth}
+                  metric={metrics.find((m) => m.role === role.role)}
+                  selected={selectedRole === role.role}
+                  onClick={() => handleSelect(role.role)}
+                />
+              ))}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {opsRoles.map((role) => {
-                const roleStat = stats?.by_role.find((s) => s.role === role.role);
-                return (
-                  <StationCard
-                    key={role.role}
-                    role={role}
-                    pending={roleStat?.pending ?? 0}
-                    claimed={roleStat?.claimed ?? 0}
-                    children={[]}
-                    stats={stats}
-                  />
-                );
-              })}
-            </div>
-          )}
+          </div>
 
-          {/* Process dependency legend */}
-          {opsRoles.some((r) => r.parent_role) && (
-            <div className="mt-8 pt-4 border-t border-surface-border flex items-center gap-2">
-              <GitBranch className="w-3 h-3 text-text-quaternary" />
-              <span className="text-[10px] text-text-tertiary">
-                Indented stations depend on the parent process above them.
-              </span>
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   );

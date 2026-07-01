@@ -278,19 +278,18 @@ const printShiftConfig: LTWorkerConfig = {
 
 const orthoPipelineConfig: LTWorkerConfig = {
   description:
-    'Ortho pipeline — MCP-operable 8-stage manufacturing workflow (design → review → print → grid → glue → finish → qa → ship). Each stage creates an escalation atomically via conditionLT and suspends; resolving via ortho_complete_stage auto-resumes the next stage. Drive the full order lifecycle with AI or human operators.',
+    'Ortho pipeline — MCP-operable 8-stage manufacturing workflow (design → review → print → grind → glue → finish → qa → ship). Each stage creates an escalation atomically via conditionLT and suspends; resolving via ortho_complete_stage auto-resumes the next stage. Drive the full order lifecycle with AI or human operators.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: REVIEWER,
-  roles: [...CERTIFIED_ROLES, 'design', 'review', 'print', 'grid', 'glue', 'finish', 'qa', 'ship'],
+  roles: [...CERTIFIED_ROLES, 'design', 'review', 'print', 'grind', 'glue', 'finish', 'qa', 'ship'],
   envelopeSchema: {
     data: { order_id: 'ORD-001', item_type: 'insole-standard' },
     metadata: { source: 'dashboard' },
   },
-  resolverSchema: {
-    notes: 'Stage completed successfully.',
-    outcome: {},
-  },
+  // No resolverSchema — each stage role declares its own form_schema in seed-ortho.ts.
+  // The dashboard cascade: metadata.form_schema > workflow resolver_schema > role form_schema.
+  // For ortho, role form_schema is the source of truth, picked up automatically.
 };
 
 // ── Worker exports ──────────────────────────────────────────────────────────

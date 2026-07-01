@@ -13,6 +13,8 @@ vi.mock('../../../hooks/useAccess', () => ({
   useAccess: () => ({ isBuilder: false, isOps: false, canBulk: false }),
 }));
 
+// Operations moved to ChoreographySidebar — AdminSidebar no longer renders it.
+
 import { AdminSidebar } from '../AdminSidebar';
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -51,6 +53,11 @@ describe('AdminSidebar — RBAC preserved', () => {
     expect(screen.queryByText('Infrastructure')).not.toBeInTheDocument();
     expect(screen.queryByText('Roles')).not.toBeInTheDocument();
     expect(screen.queryByText('DB Maintenance')).not.toBeInTheDocument();
+  });
+
+  it('does NOT render an Operations section (it moved to ChoreographySidebar)', () => {
+    render(<AdminSidebar isBuilder />, { wrapper });
+    expect(screen.queryByText('Operations')).not.toBeInTheDocument();
   });
 });
 

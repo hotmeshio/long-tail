@@ -70,7 +70,7 @@ router.delete('/escalation-chains', requireBuilder, async (req, res) => {
 /**
  * PATCH /api/roles/:role
  * Update role metadata. Requires builder.
- * Body: { title?, description?, form_schema?, properties?, ops_visible?, parent_role? }
+ * Body: { title?, description?, form_schema?, metadata_schema?, properties?, ops_visible?, parent_role?, sla_minutes?, target_per_hour?, worker_count? }
  */
 router.patch('/:role', requireBuilder, async (req, res) => {
   const result = await api.updateRole({ role: req.params.role as string, ...req.body });

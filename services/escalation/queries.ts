@@ -6,8 +6,8 @@ import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
 import { buildFacetWhere, buildFacetOrder } from './facet-sql';
-import type { EscalationStats } from './types';
-import { SORTABLE_COLUMNS } from './types';
+import type { EscalationStats, StationMetric } from './types';
+import { SORTABLE_COLUMNS, VALID_PERIODS } from './types';
 import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS } from './sql';
 import type { FacetQuery } from '../../types';
 
@@ -208,7 +208,33 @@ export async function listFacetKeys(opts: {
       ORDER BY key`,
     params,
   );
-  return rows.map((r: any) => r.key as string);
+  const actualKeys = new Set(rows.map((r: any) => r.key as string));
+
+  // Also surface keys declared in metadata_schema for visible roles — so the
+  // autocomplete offers expected keys even before any data has been created.
+  const roleFilter = opts.global
+    ? null
+    : [...(opts.visibleRoles ?? []), ...(opts.selfRoles ?? [])];
+
+  if (roleFilter === null || roleFilter.length > 0) {
+    const schemaParam = roleFilter === null ? null : roleFilter;
+    const { rows: schemaRows } = await pool.query(
+      `SELECT metadata_schema FROM lt_roles
+        WHERE metadata_schema IS NOT NULL
+          AND ($1::text[] IS NULL OR role = ANY($1))`,
+      [schemaParam],
+    );
+    for (const row of schemaRows) {
+      const schema = row.metadata_schema;
+      if (schema?.properties && typeof schema.properties === 'object') {
+        for (const key of Object.keys(schema.properties)) {
+          actualKeys.add(key);
+        }
+      }
+    }
+  }
+
+  return [...actualKeys].sort();
 }
 
 export async function getEscalationStats(
@@ -365,4 +391,88 @@ export async function listAvailableEscalations(filters: {
   ]);
 
   return { escalations: toEscalationRecords(rows), total };
+}
+
+const STATION_METRICS_SQL = `
+SELECT
+  e.role,
+  COUNT(*) FILTER (WHERE e.status = 'pending')::int AS pending,
+  COUNT(*) FILTER (
+    WHERE e.status = 'pending' AND e.assigned_to IS NOT NULL AND e.assigned_until > NOW()
+  )::int AS claimed,
+  COUNT(*) FILTER (
+    WHERE e.status = 'resolved' AND e.resolved_at >= NOW() - $2::interval
+  )::int AS resolved,
+  COUNT(*) FILTER (
+    WHERE e.status = 'pending'
+      AND (r.properties->>'sla_minutes') IS NOT NULL
+      AND e.created_at + ((r.properties->>'sla_minutes')::numeric * INTERVAL '1 minute') < NOW()
+  )::int AS in_arrears,
+  ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
+    ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
+    AS p99_wait_min,
+  ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
+    ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
+    AS p50_wait_min,
+  ROUND((AVG(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
+    AS avg_wait_min,
+  ROUND((MAX(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
+    AS max_wait_min,
+  ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
+    ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
+      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
+    AS p99_work_min,
+  ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
+    ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
+      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
+    AS p50_work_min,
+  ROUND((AVG(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
+      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
+    AS avg_work_min,
+  ROUND((MAX(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
+      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
+    AS max_work_min
+FROM lt_escalations e
+JOIN lt_roles r ON r.role = e.role
+WHERE ($1::text[] IS NULL OR e.role = ANY($1::text[]))
+GROUP BY e.role
+`;
+
+export async function getStationMetrics(
+  visibleRoles: string[] | undefined,
+  period?: string,
+): Promise<StationMetric[]> {
+  const intervalStr = VALID_PERIODS[period ?? ''] ?? '24 hours';
+  const pool = getPool();
+  const { rows } = await pool.query(STATION_METRICS_SQL, [
+    visibleRoles ?? null,
+    intervalStr,
+  ]);
+  return rows.map((r: any): StationMetric => ({
+    role: r.role,
+    pending: r.pending ?? 0,
+    claimed: r.claimed ?? 0,
+    resolved: r.resolved ?? 0,
+    in_arrears: r.in_arrears ?? 0,
+    wait: {
+      p99: r.p99_wait_min != null ? Number(r.p99_wait_min) : null,
+      p50: r.p50_wait_min != null ? Number(r.p50_wait_min) : null,
+      avg: r.avg_wait_min != null ? Number(r.avg_wait_min) : null,
+      max: r.max_wait_min != null ? Number(r.max_wait_min) : null,
+    },
+    work: {
+      p99: r.p99_work_min != null ? Number(r.p99_work_min) : null,
+      p50: r.p50_work_min != null ? Number(r.p50_work_min) : null,
+      avg: r.avg_work_min != null ? Number(r.avg_work_min) : null,
+      max: r.max_work_min != null ? Number(r.max_work_min) : null,
+    },
+  }));
 }

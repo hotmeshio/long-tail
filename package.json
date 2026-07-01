@@ -43,6 +43,7 @@
     "token": "ts-node scripts/token.ts",
     "process": "tsx scripts/process.ts",
     "demo": "bash scripts/demo.sh",
+    "ortho:populate": "ts-node scripts/ortho-populate.ts",
     "dashboard:install": "cd dashboard && npm install",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",

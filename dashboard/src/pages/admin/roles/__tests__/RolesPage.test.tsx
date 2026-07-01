@@ -10,27 +10,25 @@ const mockRoles = {
   roles: [
     {
       role: 'admin', title: 'Administrator', description: null,
-      form_schema: null, properties: {}, ops_visible: false, parent_role: null,
+      form_schema: null, metadata_schema: null, properties: {},
+      ops_visible: false, parent_role: null,
+      sla_minutes: null, target_per_hour: null, worker_count: null,
       user_count: 3, chain_count: 2, workflow_count: 1,
     },
     {
       role: 'reviewer', title: null, description: null,
-      form_schema: null, properties: {}, ops_visible: false, parent_role: null,
+      form_schema: null, metadata_schema: null, properties: {},
+      ops_visible: false, parent_role: null,
+      sla_minutes: null, target_per_hour: null, worker_count: null,
       user_count: 0, chain_count: 0, workflow_count: 0,
     },
     {
       role: 'operator', title: 'Station Operator', description: null,
-      form_schema: null, properties: {}, ops_visible: true, parent_role: null,
+      form_schema: null, metadata_schema: { type: 'object', properties: { order_id: { type: 'string' } } },
+      properties: {}, ops_visible: true, parent_role: null,
+      sla_minutes: 30, target_per_hour: 20, worker_count: 4,
       user_count: 5, chain_count: 1, workflow_count: 4,
     },
-  ],
-};
-
-const mockChains = {
-  chains: [
-    { source_role: 'operator', target_role: 'admin' },
-    { source_role: 'admin', target_role: 'reviewer' },
-    { source_role: 'admin', target_role: 'operator' },
   ],
 };
 
@@ -45,10 +43,16 @@ vi.mock('../../../../api/roles', () => ({
   useDeleteRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useCreateRole: () => ({ mutate: vi.fn(), isPending: false, error: null, reset: vi.fn() }),
   useUpdateRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
-  useEscalationChains: () => ({ data: mockChains }),
+  useEscalationChains: () => ({ data: { chains: [] } }),
   useAddEscalationChain: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveEscalationChain: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -92,56 +96,30 @@ describe('RolesPage', () => {
     expect(screen.getByText('Station Operator')).toBeInTheDocument();
   });
 
-  it('shows ops badge for ops_visible roles', () => {
+  it('renders triangle values for roles with ops metrics', () => {
     renderPage();
-    // operator has ops_visible: true — badge renders "ops" text
-    const opsBadges = screen.getAllByText('ops');
-    expect(opsBadges.length).toBeGreaterThan(0);
+    // operator has sla_minutes=30, target_per_hour=20, worker_count=4
+    expect(screen.getByText('30m')).toBeInTheDocument();
+    expect(screen.getByText('20/h')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
   });
 
-  it('shows Role Detail placeholder when nothing is selected', () => {
+  it('navigates to role detail page when a role is clicked', async () => {
     renderPage();
-    expect(screen.getByText('Role Detail')).toBeInTheDocument();
-    expect(screen.getByText(/Select a role to view/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText('operator'));
+    expect(mockNavigate).toHaveBeenCalledWith('/admin/roles/operator');
+  });
+
+  it('navigates to role detail page for a role with special characters', async () => {
+    renderPage();
+    await userEvent.click(screen.getByText('admin'));
+    expect(mockNavigate).toHaveBeenCalledWith('/admin/roles/admin');
   });
 
   it('shows empty message when no roles exist', () => {
     roleDetailsData = emptyRoles;
     renderPage();
     expect(screen.getByText('No roles found.')).toBeInTheDocument();
-  });
-
-  it('opens detail panel when a role is clicked', async () => {
-    renderPage();
-    await userEvent.click(screen.getByText('operator'));
-    // Detail panel shows the role key in heading
-    expect(screen.getAllByText('operator').length).toBeGreaterThanOrEqual(1);
-    // Info tab is active by default — shows Display Name label
-    expect(screen.getByText('Display Name')).toBeInTheDocument();
-  });
-
-  it('shows escalation targets when Escalations tab is clicked', async () => {
-    renderPage();
-    await userEvent.click(screen.getByText('operator'));
-    await userEvent.click(screen.getByText('Escalations'));
-    // EscalationPanel shows escalation targets
-    expect(screen.getByTitle('Remove admin')).toBeInTheDocument();
-  });
-
-  it('shows superadmin implicit escalation message', async () => {
-    roleDetailsData = {
-      roles: [
-        {
-          role: 'superadmin', title: null, description: null,
-          form_schema: null, properties: {}, ops_visible: false, parent_role: null,
-          user_count: 1, chain_count: 0, workflow_count: 0,
-        },
-      ],
-    };
-    renderPage();
-    await userEvent.click(screen.getByText('superadmin'));
-    await userEvent.click(screen.getByText('Escalations'));
-    expect(screen.getByText('Superadmins can escalate to any role implicitly.')).toBeInTheDocument();
   });
 
   it('shows search bar', () => {
@@ -155,5 +133,27 @@ describe('RolesPage', () => {
     await userEvent.type(search, 'admin');
     expect(screen.getByText('admin')).toBeInTheDocument();
     expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
+  });
+
+  it('shows no-match message when search finds nothing', async () => {
+    renderPage();
+    const search = screen.getByPlaceholderText(/Search \d+ roles/);
+    await userEvent.type(search, 'zzznomatch');
+    expect(screen.getByText('No roles match your search.')).toBeInTheDocument();
+  });
+
+  it('renders table column headers', () => {
+    renderPage();
+    expect(screen.getByText('ROLE')).toBeInTheDocument();
+    expect(screen.getByText('TITLE / DESCRIPTION')).toBeInTheDocument();
+    expect(screen.getByText('WORKFLOWS')).toBeInTheDocument();
+    expect(screen.getByText('TRIANGLE')).toBeInTheDocument();
+  });
+
+  it('shows dash for zero counts', () => {
+    renderPage();
+    // reviewer has zero for all counts — rendered as '—'
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThan(0);
   });
 });

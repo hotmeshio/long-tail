@@ -278,9 +278,13 @@ export const updateRoleSchema = z.object({
   title: z.string().nullable().optional().describe('Display name shown on role cards and station views'),
   description: z.string().nullable().optional().describe('Short description of this role\'s purpose'),
   form_schema: z.record(z.any()).nullable().optional().describe('JSON Schema for the escalation resolve form (overridden by workflow-level resolver_schema)'),
-  properties: z.record(z.any()).nullable().optional().describe('Open bag for station metadata: sla_minutes, target_per_hour, icon, color, etc.'),
-  ops_visible: z.boolean().optional().describe('When true, role appears as a station card on the /operations view'),
+  metadata_schema: z.record(z.any()).nullable().optional().describe('JSON Schema declaring the expected shape of lt_escalations.metadata for this role. Drives creation-time validation and faceted-query key autocomplete.'),
+  properties: z.record(z.any()).nullable().optional().describe('Free user-owned bag (icon, color, tags, etc.). No reserved keys — use the typed columns below for operational values.'),
+  ops_visible: z.boolean().optional().describe('When true, role appears as a station on the /operations view'),
   parent_role: z.string().nullable().optional().describe('Parent role in the process dependency graph (nullable; roots have no parent)'),
+  sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. Part of the ops triangle: target_per_hour = worker_count / (sla_minutes / 60)'),
+  target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the pressure membrane baseline.'),
+  worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). Part of the ops triangle.'),
 });
 
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────

@@ -130,6 +130,20 @@ export function registerListRoutes(router: Router): void {
   });
 
   /**
+   * GET /api/escalations/station-metrics
+   * Per-role P99/P50/avg/max wait + work times, resolved count, and in-arrears
+   * count. Drives the COO operations membrane chart.
+   * RBAC: superadmin sees all; others scoped to their roles.
+   */
+  router.get('/station-metrics', async (req, res) => {
+    const result = await api.getStationMetrics(
+      { period: (req.query.period as string) || undefined },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * GET /api/escalations/stats
    * Aggregated escalation statistics.
    * RBAC: superadmin sees all; others scoped to their roles.

@@ -41,7 +41,7 @@ export async function orthoPipeline(envelope: LTEnvelope): Promise<unknown> {
       subtype: stage,
       role: stage,
       description: `${stage} — order ${order_id} (${item_type})`,
-      metadata: { signal_id: signalId, order_id, item_type, stage, ...orderMetadata },
+      metadata: { order_id, item_type, stage, ...orderMetadata },
     });
 
     results.push({

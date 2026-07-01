@@ -287,3 +287,22 @@ export async function getEscalationStats(
     return { status: 500, error: err.message };
   }
 }
+
+export async function getStationMetrics(
+  input: { period?: string },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0) {
+      return { status: 200, data: { stations: [] } };
+    }
+    const stations = await escalationService.getStationMetrics(
+      scope.global ? undefined : scope.allRoles,
+      input.period,
+    );
+    return { status: 200, data: { stations } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
