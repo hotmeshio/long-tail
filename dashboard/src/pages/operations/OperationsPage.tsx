@@ -14,7 +14,7 @@ const REFRESH_INTERVAL_MS = 10_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-const PERIODS = ['1h', '24h', '7d', '30d'] as const;
+const PERIODS = ['15m', '1h', '24h', '7d', '30d'] as const;
 type Period = (typeof PERIODS)[number];
 
 interface OrderedStation {
@@ -66,13 +66,31 @@ function fmtMin(v: number | null): string {
   return `${(v / 60).toFixed(1)}h`;
 }
 
-function pressureBar(pending: number, target: number | null) {
-  if (!target) return { pct: null, color: 'bg-surface-border' };
-  const ratio = pending / target;
-  const pct = Math.round(ratio * 100);
-  // Yellow: backlog (> 100%). Red: idle / under-staffed (< 20%). Green: healthy.
-  const color = ratio > 1.0 ? 'bg-amber-400' : ratio < 0.2 ? 'bg-red-400' : 'bg-emerald-400';
-  return { pct, color };
+function pressureBar(
+  pending: number,
+  target: number | null,
+  throughputPct: number | null,
+  resolved: number,
+) {
+  if (!target) return { pct: null, color: 'bg-surface-border', historical: false };
+
+  if (pending > 0) {
+    const ratio = pending / target;
+    const pct = Math.round(ratio * 100);
+    // Amber: backlog. Orange: some work but well under pace. Green: healthy.
+    const color = ratio > 1.0 ? 'bg-amber-400' : ratio < 0.2 ? 'bg-orange-400' : 'bg-emerald-400';
+    return { pct, color, historical: false };
+  }
+
+  // Idle: use period throughput efficiency rather than real-time pressure.
+  // resolved=0 means nothing happened in this window → no data, not failing.
+  if (resolved === 0 || throughputPct == null) {
+    return { pct: null, color: 'bg-surface-border', historical: true };
+  }
+  const ratio = throughputPct / 100;
+  const pct = Math.round(throughputPct);
+  const color = ratio > 1.0 ? 'bg-amber-400' : ratio < 0.2 ? 'bg-surface-border' : 'bg-emerald-400';
+  return { pct, color, historical: true };
 }
 
 // ── Station table row ─────────────────────────────────────────────────────────
@@ -95,7 +113,7 @@ function StationRow({
   const resolved = metric?.resolved ?? 0;
   const inArrears = metric?.in_arrears ?? 0;
   const target = role.target_per_hour ?? null;
-  const { pct, color } = pressureBar(pending, target);
+  const { pct, color, historical } = pressureBar(pending, target, metric?.throughput_pct ?? null, resolved);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
 
   return (
@@ -169,12 +187,11 @@ function StationRow({
             className={`text-[10px] font-mono tabular-nums ${
               pct != null && pct > 100
                 ? 'text-amber-500 font-semibold'
-                : pct != null && pct < 20
-                ? 'text-red-500'
                 : 'text-text-quaternary'
             }`}
+            title={historical ? 'Throughput efficiency for the selected period' : undefined}
           >
-            {pct != null ? `${pct}%` : '—'}
+            {pct != null ? `${pct}%${historical ? '↩' : ''}` : '—'}
           </span>
         </div>
       </div>

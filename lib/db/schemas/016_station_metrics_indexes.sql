@@ -1,0 +1,13 @@
+-- Station-metrics indexes on hmsh_escalations
+--
+-- hmsh_escalations is created by HotMesh at runtime, AFTER migrate() runs.
+-- These indexes cannot be created here because the table does not yet exist
+-- when this migration file executes.
+--
+-- The indexes are created in services/escalation/client.ts:installEscalationCompatView()
+-- which runs after HotMesh has bootstrapped, under advisory lock 8675310.
+-- That is the single authoritative creation path.
+--
+-- This migration file exists only to claim the 016 slot in the sequence
+-- so the numbering stays stable. It is intentionally a no-op.
+SELECT 1;

@@ -80,7 +80,7 @@ describe('RolesPage', () => {
   it('renders page header with title and Add Role button', () => {
     renderPage();
     expect(screen.getByText('Roles')).toBeInTheDocument();
-    expect(screen.getByText('Add Role')).toBeInTheDocument();
+    expect(screen.getByText('+ Add Role')).toBeInTheDocument();
   });
 
   it('renders role rows in the list', () => {
@@ -99,8 +99,9 @@ describe('RolesPage', () => {
   it('renders triangle values for roles with ops metrics', () => {
     renderPage();
     // operator has sla_minutes=30, target_per_hour=20, worker_count=4
-    expect(screen.getByText('30m')).toBeInTheDocument();
-    expect(screen.getByText('20/h')).toBeInTheDocument();
+    // units (m / /h) appear only in the column headers (SLA/M, Target/h)
+    expect(screen.getByText('30')).toBeInTheDocument();
+    expect(screen.getByText('20')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
   });
 
@@ -144,10 +145,10 @@ describe('RolesPage', () => {
 
   it('renders table column headers', () => {
     renderPage();
-    expect(screen.getByText('ROLE')).toBeInTheDocument();
-    expect(screen.getByText('TITLE / DESCRIPTION')).toBeInTheDocument();
-    expect(screen.getByText('WORKFLOWS')).toBeInTheDocument();
-    expect(screen.getByText('TRIANGLE')).toBeInTheDocument();
+    expect(screen.getByText('Role')).toBeInTheDocument();
+    expect(screen.getByText('Label')).toBeInTheDocument();
+    expect(screen.getByText('Member Count')).toBeInTheDocument();
+    expect(screen.getByText('SLA/M')).toBeInTheDocument();
   });
 
   it('shows dash for zero counts', () => {

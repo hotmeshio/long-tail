@@ -73,6 +73,8 @@ async function installEscalationCompatView(): Promise<void> {
     await client.query('SELECT pg_advisory_lock($1)', [COMPAT_VIEW_LOCK_ID]);
     await client.query(MIGRATE_AND_RENAME_LEGACY_TABLE);
     await client.query(CREATE_COMPAT_VIEW);
+    await client.query(ENSURE_RESOLVED_INDEX);
+    await client.query(ENSURE_CLAIMED_INDEX);
     loggerRegistry.info('[escalation] lt_escalations compatibility view ensured');
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [COMPAT_VIEW_LOCK_ID]).catch(() => {});
@@ -145,3 +147,18 @@ CREATE OR REPLACE VIEW public.lt_escalations AS
   SELECT *,
     (assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()) AS available
   FROM public.hmsh_escalations;`;
+
+// Two separate constants so each is sent as its own client.query() call.
+// A single multi-statement string would execute both in autocommit mode;
+// a dropped connection after the first leaves asymmetric index state.
+// Separate calls under the same advisory lock are individually atomic and
+// IF NOT EXISTS makes each idempotent across retries.
+const ENSURE_RESOLVED_INDEX = `\
+CREATE INDEX IF NOT EXISTS idx_hmsh_escalations_role_resolved_at
+  ON public.hmsh_escalations (role, resolved_at DESC)
+  WHERE status = 'resolved'`;
+
+const ENSURE_CLAIMED_INDEX = `\
+CREATE INDEX IF NOT EXISTS idx_hmsh_escalations_role_claimed_at
+  ON public.hmsh_escalations (role, created_at DESC)
+  WHERE claimed_at IS NOT NULL`;

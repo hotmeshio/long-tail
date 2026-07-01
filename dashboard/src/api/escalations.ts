@@ -71,6 +71,7 @@ export interface StationMetric {
   claimed: number;
   resolved: number;
   in_arrears: number;
+  throughput_pct: number | null;
   wait: StationMetricPeriod;
   work: StationMetricPeriod;
 }

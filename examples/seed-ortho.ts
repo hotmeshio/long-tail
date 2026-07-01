@@ -7,8 +7,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Design',
     description: 'Create the orthotic design specification.',
     parent_role: null,
-    sla_minutes: 30,
-    target_per_hour: 8,
+    sla_minutes: 3,
+    target_per_hour: 20,
     form_schema: {
       properties: {
         spec_version: { type: 'string',  title: 'Spec Version', default: 'v1' },
@@ -25,8 +25,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Review',
     description: 'Validate design against clinical requirements.',
     parent_role: 'design',
-    sla_minutes: 20,
-    target_per_hour: 12,
+    sla_minutes: 3,
+    target_per_hour: 20,
     form_schema: {
       properties: {
         approved:        { type: 'boolean', title: 'Approved' },
@@ -40,8 +40,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Print',
     description: 'Queue the design for 3D printing.',
     parent_role: 'review',
-    sla_minutes: 60,
-    target_per_hour: 4,
+    sla_minutes: 4,
+    target_per_hour: 18,
     form_schema: {
       properties: {
         filament_type:   { type: 'string', title: 'Filament', enum: ['pla', 'tpu', 'petg', 'nylon'] },
@@ -57,8 +57,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Grind',
     description: 'Grind and align the printed substrate.',
     parent_role: 'print',
-    sla_minutes: 20,
-    target_per_hour: 10,
+    sla_minutes: 3,
+    target_per_hour: 21,
     form_schema: {
       properties: {
         alignment_ok: { type: 'boolean', title: 'Alignment Verified' },
@@ -73,8 +73,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Glue',
     description: 'Bond the orthotic layers together.',
     parent_role: 'grind',
-    sla_minutes: 15,
-    target_per_hour: 15,
+    sla_minutes: 3,
+    target_per_hour: 22,
     form_schema: {
       properties: {
         adhesive_type:  { type: 'string',  title: 'Adhesive', enum: ['contact', 'heat-activated', 'solvent'] },
@@ -90,8 +90,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Finish',
     description: 'Apply final finishing and edge smoothing.',
     parent_role: 'glue',
-    sla_minutes: 20,
-    target_per_hour: 12,
+    sla_minutes: 3,
+    target_per_hour: 20,
     form_schema: {
       properties: {
         surface_quality: { type: 'string',  title: 'Surface Quality', enum: ['good', 'acceptable', 'rework'] },
@@ -106,8 +106,8 @@ const ORTHO_ROLE_DATA = [
     title: 'QA',
     description: 'Quality assurance check before shipment.',
     parent_role: 'finish',
-    sla_minutes: 15,
-    target_per_hour: 16,
+    sla_minutes: 2,
+    target_per_hour: 22,
     form_schema: {
       properties: {
         passed:        { type: 'boolean', title: 'QA Passed' },
@@ -122,8 +122,8 @@ const ORTHO_ROLE_DATA = [
     title: 'Ship',
     description: 'Package and dispatch the completed orthotic.',
     parent_role: 'qa',
-    sla_minutes: 10,
-    target_per_hour: 20,
+    sla_minutes: 2,
+    target_per_hour: 24,
     form_schema: {
       properties: {
         carrier:          { type: 'string', title: 'Carrier', enum: ['fedex', 'ups', 'usps', 'dhl', 'local'] },

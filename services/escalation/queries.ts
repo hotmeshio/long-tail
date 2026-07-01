@@ -8,7 +8,7 @@ import { toEscalationRecords } from './map';
 import { buildFacetWhere, buildFacetOrder } from './facet-sql';
 import type { EscalationStats, StationMetric } from './types';
 import { SORTABLE_COLUMNS, VALID_PERIODS } from './types';
-import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS } from './sql';
+import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS, STATION_METRICS_SQL } from './sql';
 import type { FacetQuery } from '../../types';
 
 type SdkListParams = Types.ListEscalationsParams;
@@ -393,59 +393,6 @@ export async function listAvailableEscalations(filters: {
   return { escalations: toEscalationRecords(rows), total };
 }
 
-const STATION_METRICS_SQL = `
-SELECT
-  e.role,
-  COUNT(*) FILTER (WHERE e.status = 'pending')::int AS pending,
-  COUNT(*) FILTER (
-    WHERE e.status = 'pending' AND e.assigned_to IS NOT NULL AND e.assigned_until > NOW()
-  )::int AS claimed,
-  COUNT(*) FILTER (
-    WHERE e.status = 'resolved' AND e.resolved_at >= NOW() - $2::interval
-  )::int AS resolved,
-  COUNT(*) FILTER (
-    WHERE e.status = 'pending'
-      AND (r.properties->>'sla_minutes') IS NOT NULL
-      AND e.created_at + ((r.properties->>'sla_minutes')::numeric * INTERVAL '1 minute') < NOW()
-  )::int AS in_arrears,
-  ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS p99_wait_min,
-  ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS p50_wait_min,
-  ROUND((AVG(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS avg_wait_min,
-  ROUND((MAX(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS max_wait_min,
-  ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS p99_work_min,
-  ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS p50_work_min,
-  ROUND((AVG(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS avg_work_min,
-  ROUND((MAX(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS max_work_min
-FROM lt_escalations e
-JOIN lt_roles r ON r.role = e.role
-WHERE ($1::text[] IS NULL OR e.role = ANY($1::text[]))
-GROUP BY e.role
-`;
-
 export async function getStationMetrics(
   visibleRoles: string[] | undefined,
   period?: string,
@@ -462,6 +409,7 @@ export async function getStationMetrics(
     claimed: r.claimed ?? 0,
     resolved: r.resolved ?? 0,
     in_arrears: r.in_arrears ?? 0,
+    throughput_pct: r.throughput_pct != null ? Number(r.throughput_pct) : null,
     wait: {
       p99: r.p99_wait_min != null ? Number(r.p99_wait_min) : null,
       p50: r.p50_wait_min != null ? Number(r.p50_wait_min) : null,

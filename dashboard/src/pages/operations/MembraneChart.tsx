@@ -64,22 +64,40 @@ export function MembraneChart({ stations, selectedRole, onSelect }: MembraneChar
   // Index for looking up parent x
   const xMap = new Map(stations.map((s, i) => [s.role, xOf(i)]));
 
-  // Active points — stations with a target_per_hour
-  const activePts = stations
+  // Solid curve — real-time queue pressure (pending / target).
+  // Sits at 0 when queue is clear; only rises when backlog builds.
+  const pressurePts = stations
     .map((s, i) => {
       if (!s.target_per_hour) return null;
-      const pressure = (s.metric?.pending ?? 0) / s.target_per_hour;
-      return { idx: i, x: xOf(i), pressure };
+      const pending = s.metric?.pending ?? 0;
+      return { idx: i, x: xOf(i), pressure: pending / s.target_per_hour };
     })
     .filter(Boolean) as { idx: number; x: number; pressure: number }[];
 
-  const hasTargets = activePts.length > 0;
-  const maxPressure = Math.max(2.0, ...activePts.map((p) => p.pressure));
+  // Dotted curve — period throughput efficiency (resolved / expected × 100%).
+  // Shows what was actually achieved in the selected window vs the target rate.
+  // Switching from 15m (idle) to 1h (70 orders ran) lifts this curve above baseline.
+  const throughputPts = stations
+    .map((s, i) => {
+      if (!s.target_per_hour || s.metric?.throughput_pct == null) return null;
+      return { idx: i, x: xOf(i), pressure: s.metric.throughput_pct / 100 };
+    })
+    .filter(Boolean) as { idx: number; x: number; pressure: number }[];
+
+  const hasTargets = pressurePts.length > 0 || throughputPts.length > 0;
+  const maxPressure = Math.max(
+    2.0,
+    ...pressurePts.map((p) => p.pressure),
+    ...throughputPts.map((p) => p.pressure),
+  );
   const yScale = (p: number) => MT + chartH * (1 - p / maxPressure);
   const baseline = yScale(1.0);
 
-  const splinePts = activePts.map((p) => ({ x: p.x, y: yScale(p.pressure) }));
+  const splinePts = pressurePts.map((p) => ({ x: p.x, y: yScale(p.pressure) }));
   const splinePath = catmullPath(splinePts);
+  const throughputSplinePts = throughputPts.map((p) => ({ x: p.x, y: yScale(p.pressure) }));
+  const throughputSplinePath = catmullPath(throughputSplinePts);
+
   const areaPath =
     splinePts.length >= 2
       ? `${splinePath} L ${splinePts.at(-1)!.x.toFixed(1)} ${bottom} L ${splinePts[0].x.toFixed(1)} ${bottom} Z`
@@ -145,7 +163,33 @@ export function MembraneChart({ stations, selectedRole, onSelect }: MembraneChar
         </>
       )}
 
-      {/* Membrane curve */}
+      {/* Throughput efficiency curve — dotted, shows period output vs target rate.
+           Switching periods lifts/drops this curve; the baseline stays fixed at 100%. */}
+      {throughputSplinePath && (
+        <path
+          d={throughputSplinePath}
+          fill="none"
+          stroke="#6366f1"
+          strokeWidth={1.5}
+          strokeDasharray="5 3"
+          strokeLinecap="round"
+          opacity={0.55}
+        />
+      )}
+      {throughputSplinePts.length > 0 && (
+        <text
+          x={right + 6}
+          y={throughputSplinePts.at(-1)!.y + 3.5}
+          fontSize={8}
+          fill="#6366f1"
+          fontFamily="ui-sans-serif, sans-serif"
+          opacity={0.7}
+        >
+          eff
+        </text>
+      )}
+
+      {/* Membrane curve — solid, real-time queue pressure */}
       {splinePath && (
         <path
           d={splinePath}
@@ -160,43 +204,59 @@ export function MembraneChart({ stations, selectedRole, onSelect }: MembraneChar
       {/* Station circles + labels */}
       {stations.map((s, i) => {
         const x = xOf(i);
-        const activeEntry = activePts.find((p) => p.idx === i);
+        const pEntry = pressurePts.find((p) => p.idx === i);
+        const tEntry = throughputPts.find((p) => p.idx === i);
         const pending = s.metric?.pending ?? 0;
+        const resolved = s.metric?.resolved ?? 0;
         const inArrears = s.metric?.in_arrears ?? 0;
-        const pressure = activeEntry ? pending / s.target_per_hour! : null;
-        const cy = pressure !== null ? yScale(pressure) : baseline;
+        const throughputPct = s.metric?.throughput_pct ?? null;
+
+        // Active queue pressure (only meaningful when pending > 0).
+        const queuePressure = pEntry ? pEntry.pressure : null;
+        // Circle sits on the queue-pressure curve when active, throughput curve when idle.
+        const circlePressure = pEntry != null
+          ? (pending > 0 ? queuePressure! : (tEntry?.pressure ?? 0))
+          : null;
+        const cy = circlePressure !== null ? yScale(circlePressure) : baseline;
 
         // Circle radius: always at least 13 so it's clickable; scales with pending
         const r = Math.max(13, Math.min(22, 9 + pending / 12));
 
         const isSelected = s.role === selectedRole;
         const isHovered = hoveredIdx === i;
-        const isHot = pressure !== null && pressure > 1.0;
-        // Yellow when the station is idling under its target (< 20%) — over-staffed.
-        const isIdle = pressure !== null && pressure < 0.2 && s.target_per_hour !== null;
+        // Color semantics: only active backlog drives amber/red — idle is never red.
+        const isHot  = pending > 0 && queuePressure != null && queuePressure > 1.0;
+        const isUnder = pending > 0 && queuePressure != null && queuePressure < 0.2;
+        const isIdle  = pending === 0;
+        const idleHasData = isIdle && (resolved > 0 || (throughputPct != null && throughputPct > 0));
+        const idleHot = isIdle && idleHasData && (throughputPct ?? 0) > 100;
 
         const stroke =
-          pressure === null ? '#cbd5e1'
-          : isHot ? '#f59e0b'
-          : isIdle ? '#ef4444'
-          : '#10b981';
+          circlePressure === null ? '#cbd5e1'
+          : isHot   ? '#f59e0b'
+          : isUnder ? '#f97316'
+          : isIdle && !idleHasData ? '#cbd5e1'   // no data this period → grey
+          : idleHot ? '#f59e0b'                   // high throughput period → amber
+          : '#10b981';                             // healthy (active or good throughput)
         const fill =
-          pressure === null ? '#f8fafc'
-          : isHot ? 'rgba(245,158,11,0.13)'
-          : isIdle ? 'rgba(239,68,68,0.14)'
+          circlePressure === null ? '#f8fafc'
+          : isHot   ? 'rgba(245,158,11,0.13)'
+          : isUnder ? 'rgba(249,115,22,0.13)'
+          : isIdle && !idleHasData ? '#f8fafc'
+          : idleHot ? 'rgba(245,158,11,0.10)'
           : 'rgba(16,185,129,0.13)';
 
-        // Tooltip string
-        const pressureStr =
-          pressure !== null
-            ? `${Math.round(pressure * 100)}% pressure`
-            : 'no target set';
+        const throughputLabel = throughputPct != null && throughputPct > 0
+          ? `${Math.round(throughputPct)}% eff`
+          : null;
         const tooltip =
           pending > 0
-            ? `${pending} pending · ${pressureStr}`
-            : pressureStr === 'no target set'
+            ? `${pending} pending · ${Math.round((queuePressure ?? 0) * 100)}% pressure`
+            : !s.target_per_hour
             ? 'idle · no target set'
-            : 'idle';
+            : throughputLabel
+            ? `idle · ${throughputLabel}`
+            : 'idle — no data this period';
 
         // Clamp tooltip so it doesn't go outside the viewBox
         const tipW = tooltip.length * 5.8 + 20;
@@ -245,7 +305,7 @@ export function MembraneChart({ stations, selectedRole, onSelect }: MembraneChar
                 y={r >= 16 ? cy + 4 : cy - r - 5}
                 textAnchor="middle"
                 fontSize={r >= 16 ? 10 : 8.5}
-                fill={pressure === null ? '#64748b' : isHot ? '#d97706' : isIdle ? '#dc2626' : '#059669'}
+                fill={stroke === '#cbd5e1' ? '#64748b' : isHot ? '#d97706' : isUnder ? '#ea580c' : '#059669'}
                 fontFamily="ui-monospace, monospace"
                 fontWeight="700"
               >

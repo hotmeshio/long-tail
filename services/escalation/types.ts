@@ -34,6 +34,7 @@ export interface EscalationStats {
 }
 
 export const VALID_PERIODS: Record<string, string> = {
+  '15m': '15 minutes',
   '1h': '1 hour',
   '24h': '24 hours',
   '7d': '7 days',
@@ -53,6 +54,8 @@ export interface StationMetric {
   claimed: number;
   resolved: number;
   in_arrears: number;
+  /** resolved_in_period / (target_per_hour × period_hours) × 100. Null when no target set. */
+  throughput_pct: number | null;
   wait: StationMetricPeriod;
   work: StationMetricPeriod;
 }
