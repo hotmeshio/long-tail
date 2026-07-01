@@ -89,7 +89,9 @@ function pressureBar(
   }
   const ratio = throughputPct / 100;
   const pct = Math.round(throughputPct);
-  const color = ratio > 1.0 ? 'bg-amber-400' : ratio < 0.2 ? 'bg-surface-border' : 'bg-emerald-400';
+  // Amber: above baseline (produced more than target). Neutral otherwise —
+  // below-target throughput isn't a positive green signal, just normal data.
+  const color = ratio > 1.0 ? 'bg-amber-400' : 'bg-surface-border';
   return { pct, color, historical: true };
 }
 
@@ -97,13 +99,11 @@ function pressureBar(
 
 function StationRow({
   role,
-  depth,
   metric,
   selected,
   onClick,
 }: {
   role: RoleDetail;
-  depth: number;
   metric: StationMetric | undefined;
   selected: boolean;
   onClick: () => void;
@@ -128,15 +128,10 @@ function StationRow({
         }`}
         style={{ gridTemplateColumns: '1fr 56px 56px 60px 72px 72px 104px' }}
       >
-        {/* Role name — indented by depth */}
-        <div
-          className="flex items-center gap-1.5 min-w-0"
-          style={{ paddingLeft: depth * 20 }}
-        >
+        {/* Role name */}
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
-            className={`font-mono font-bold text-text-primary truncate ${
-              depth === 0 ? 'text-[11px]' : 'text-[10px]'
-            }`}
+            className="font-mono font-bold text-text-primary truncate text-[11px]"
           >
             {role.role}
           </span>
@@ -198,10 +193,7 @@ function StationRow({
 
       {/* In-arrears sub-row */}
       {inArrears > 0 && (
-        <div
-          className="flex items-center gap-1.5 pb-2"
-          style={{ paddingLeft: depth * 18 + (depth > 0 ? 20 : 4) }}
-        >
+        <div className="flex items-center gap-1.5 pb-2 pl-1">
           <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
           <Link
             to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}&sort_by=created_at&order=asc`}
@@ -219,7 +211,7 @@ function StationRow({
 // ── Table header ──────────────────────────────────────────────────────────────
 
 function TableHead() {
-  const cols = ['ROLE', 'PENDING', 'ACTIVE', 'RESOLVED', 'P99 WAIT', 'P99 WORK', 'PRESSURE'];
+  const cols = ['ROLE', 'PENDING', 'ACTIVE', 'RESOLVED', 'P99 WAIT', 'P99 WORK', 'TREND'];
   return (
     <div
       className="grid items-center gap-4 py-1.5 border-b border-surface-border mb-0.5"
@@ -371,38 +363,39 @@ export function OperationsPage() {
           </p>
         </div>
       ) : (
-        /* Two-pane layout: upper chart (fixed), lower list (scrollable in-place) */
+        /* Console layout: fixed header (above) → flexible middle → fixed table (30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
-          {/* Upper: 50vh — chart floats in generous space, persistent right panel */}
-          <div className="h-[50vh] flex-none flex items-stretch overflow-hidden">
-            {/* Chart — SVG centered vertically in available space */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
+          {/* Middle row: flexible height — SVG fills left, sidebar fixed-width right */}
+          <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
+            {/* SVG chart — scales to fill available space */}
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden p-4">
               <MembraneChart
                 stations={chartStations}
                 selectedRole={selectedRole}
                 onSelect={handleSelect}
               />
             </div>
-            {/* Vertical divider — inset so it doesn't touch top/bottom */}
-            <div className="w-px bg-surface-border shrink-0 self-stretch my-8" />
-            {/* Right panel — always visible */}
+            {/* Vertical divider */}
+            <div className="w-px bg-surface-border shrink-0 self-stretch" />
+            {/* Right sidebar — fixed width, scrolls its own content */}
             <StationDetailPanel
               role={selectedRoleDetail}
               allMetrics={metrics}
+              orderedRoles={ordered.map((o) => o.role)}
+              globalPeriod={period}
               onClose={() => setSelectedRole(null)}
             />
           </div>
 
-          {/* Lower: scrollable role list */}
-          <div className="flex-1 min-h-0 overflow-y-auto border-t border-surface-border">
+          {/* Bottom row: fixed 30vh — table header sticky, rows scroll */}
+          <div className="h-[30vh] flex-none flex flex-col border-t border-surface-border overflow-hidden">
             <TableHead />
-            <div className="divide-y divide-surface-border/30">
-              {ordered.map(({ role, depth }) => (
+            <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-surface-border/30">
+              {ordered.map(({ role }) => (
                 <StationRow
                   key={role.role}
                   role={role}
-                  depth={depth}
                   metric={metrics.find((m) => m.role === role.role)}
                   selected={selectedRole === role.role}
                   onClick={() => handleSelect(role.role)}

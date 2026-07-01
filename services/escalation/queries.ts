@@ -405,10 +405,10 @@ export async function getStationMetrics(
   ]);
   return rows.map((r: any): StationMetric => ({
     role: r.role,
-    pending: r.pending ?? 0,
-    claimed: r.claimed ?? 0,
-    resolved: r.resolved ?? 0,
-    in_arrears: r.in_arrears ?? 0,
+    pending: Number(r.pending ?? 0),
+    claimed: Number(r.claimed ?? 0),
+    resolved: Number(r.resolved ?? 0),
+    in_arrears: Number(r.in_arrears ?? 0),
     throughput_pct: r.throughput_pct != null ? Number(r.throughput_pct) : null,
     wait: {
       p99: r.p99_wait_min != null ? Number(r.p99_wait_min) : null,

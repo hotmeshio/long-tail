@@ -8,6 +8,8 @@ import type { RoleDetail } from '../../api/roles';
 interface StationDetailPanelProps {
   role: RoleDetail | null;
   allMetrics: StationMetric[];
+  orderedRoles: RoleDetail[];
+  globalPeriod: string;
   onClose: () => void;
 }
 
@@ -167,66 +169,138 @@ function RoleView({ role, onClose }: { role: RoleDetail; onClose: () => void }) 
   );
 }
 
-function OverviewPanel({ allMetrics, period }: { allMetrics: StationMetric[]; period: Period }) {
-  const totalPending  = allMetrics.reduce((s, m) => s + m.pending, 0);
-  const totalResolved = allMetrics.reduce((s, m) => s + m.resolved, 0);
-  const totalClaimed  = allMetrics.reduce((s, m) => s + m.claimed, 0);
+function OverviewPanel({
+  allMetrics,
+  orderedRoles,
+  period,
+}: {
+  allMetrics: StationMetric[];
+  orderedRoles: RoleDetail[];
+  period: string;
+}) {
+  const totalPending  = allMetrics.reduce((s, m) => s + m.pending,    0);
+  const totalResolved = allMetrics.reduce((s, m) => s + m.resolved,   0);
   const totalArrears  = allMetrics.reduce((s, m) => s + m.in_arrears, 0);
-  const total = totalPending + totalResolved;
-  const flow  = total > 0 ? Math.round((totalResolved / total) * 100) : null;
+
+  const metricByRole    = new Map(allMetrics.map((m) => [m.role, m]));
+  const stationsAtRisk  = allMetrics.filter((m) => m.in_arrears > 0).length;
+  const stationsWithLoad = allMetrics.filter((m) => m.pending > 0).length;
 
   return (
     <>
-      <p className="text-[10px] text-text-quaternary uppercase tracking-wider mb-4">
-        Flow overview · {period}
+      <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-3">
+        Pipeline · {period}
       </p>
 
-      {/* Volume totals */}
-      <div className="grid grid-cols-3 gap-2 mb-5">
-        {[
-          { n: totalPending,  label: 'pending',  hot: totalPending > 0 },
-          { n: totalResolved, label: 'resolved',  hot: false },
-          { n: totalClaimed,  label: 'active',    hot: totalClaimed > 0 },
-        ].map(({ n, label, hot }) => (
-          <div key={label}>
-            <div className={`text-xl font-light tabular-nums ${hot ? 'text-text-primary' : 'text-text-quaternary'}`}>{n}</div>
-            <div className="text-[9px] text-text-quaternary uppercase tracking-wider">{label}</div>
-          </div>
-        ))}
+      {/* Health headline */}
+      <div className="mb-4">
+        {stationsAtRisk > 0 ? (
+          <p className="text-[11px] text-red-400">
+            {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} past SLA
+          </p>
+        ) : stationsWithLoad > 0 ? (
+          <p className="text-[11px] text-amber-400">
+            {stationsWithLoad} station{stationsWithLoad > 1 ? 's' : ''} with backlog
+          </p>
+        ) : totalResolved > 0 ? (
+          <p className="text-[11px] text-emerald-500">Flowing — no backlog</p>
+        ) : (
+          <p className="text-[11px] text-text-quaternary">No activity</p>
+        )}
       </div>
 
-      {flow !== null && (
-        <div className="flex items-baseline gap-1.5 mb-4">
-          <span className={`text-3xl font-light tabular-nums ${flow >= 80 ? 'text-emerald-500' : flow >= 40 ? 'text-amber-500' : 'text-text-secondary'}`}>
-            {flow}%
+      {/* Key counters */}
+      <div className="space-y-1.5 mb-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Pending</span>
+          <span className={`text-xs font-mono tabular-nums ${totalPending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'}`}>
+            {totalPending}
           </span>
-          <span className="text-[10px] text-text-quaternary">throughput</span>
         </div>
-      )}
-
-      {totalArrears > 0 && (
-        <div className="flex items-center gap-1.5 mb-4">
-          <span className="text-sm font-light text-red-500 tabular-nums">{totalArrears}</span>
-          <span className="text-[10px] text-red-400">items past SLA</span>
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Resolved · {period}</span>
+          <span className="text-xs font-mono tabular-nums text-text-secondary">{totalResolved}</span>
         </div>
-      )}
+        {totalArrears > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Past SLA</span>
+            <span className="text-xs font-mono tabular-nums text-red-500 font-semibold">{totalArrears}</span>
+          </div>
+        )}
+      </div>
 
-      <p className="text-[10px] text-text-quaternary leading-relaxed mt-auto pb-2">
-        Click a role in the chart or table to inspect its queue metrics.
+      {/* Divider + column headers */}
+      <div className="border-t border-surface-border/40 pt-2 mb-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[8px] text-text-quaternary uppercase tracking-wider flex-1">Station</span>
+          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">pend</span>
+          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">actv</span>
+          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">res</span>
+        </div>
+      </div>
+
+      {/* Station list in pipeline order */}
+      <div className="space-y-0.5">
+        {orderedRoles.map((r) => {
+          const m         = metricByRole.get(r.role);
+          const pending   = m?.pending    ?? 0;
+          const claimed   = m?.claimed    ?? 0;
+          const resolved  = m?.resolved   ?? 0;
+          const inArrears = m?.in_arrears ?? 0;
+          const label     = r.title || r.role;
+          const hasAlert  = inArrears > 0;
+          const hasLoad   = pending > 0;
+
+          return (
+            <div key={r.role} className="flex items-center gap-2 py-0.5">
+              <span
+                className={`text-[10px] font-mono flex-1 truncate ${
+                  hasAlert ? 'text-red-400' : hasLoad ? 'text-text-primary' : 'text-text-quaternary'
+                }`}
+              >
+                {label}
+                {hasAlert && (
+                  <span className="ml-1 text-[8px] text-red-400 font-semibold">SLA</span>
+                )}
+              </span>
+              <span
+                className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${
+                  hasAlert ? 'text-red-400' : hasLoad ? 'text-text-primary font-semibold' : 'text-text-quaternary'
+                }`}
+              >
+                {pending > 0 ? pending : '—'}
+              </span>
+              <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${claimed > 0 ? 'text-accent' : 'text-text-quaternary'}`}>
+                {claimed > 0 ? claimed : '—'}
+              </span>
+              <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'}`}>
+                {resolved > 0 ? resolved : '—'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-[9px] text-text-quaternary mt-5">
+        Select a station for queue detail.
       </p>
     </>
   );
 }
 
-export function StationDetailPanel({ role, allMetrics, onClose }: StationDetailPanelProps) {
-  const [overviewPeriod] = useState<Period>('24h');
-
+export function StationDetailPanel({
+  role,
+  allMetrics,
+  orderedRoles,
+  globalPeriod,
+  onClose,
+}: StationDetailPanelProps) {
   return (
-    <div className="w-[280px] shrink-0 px-6 py-8 flex flex-col overflow-y-auto">
+    <div className="w-[280px] shrink-0 px-6 py-8 flex flex-col overflow-y-auto min-h-0">
       {role ? (
         <RoleView role={role} onClose={onClose} />
       ) : (
-        <OverviewPanel allMetrics={allMetrics} period={overviewPeriod} />
+        <OverviewPanel allMetrics={allMetrics} orderedRoles={orderedRoles} period={globalPeriod} />
       )}
     </div>
   );

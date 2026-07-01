@@ -73,8 +73,13 @@ async function installEscalationCompatView(): Promise<void> {
     await client.query('SELECT pg_advisory_lock($1)', [COMPAT_VIEW_LOCK_ID]);
     await client.query(MIGRATE_AND_RENAME_LEGACY_TABLE);
     await client.query(CREATE_COMPAT_VIEW);
-    await client.query(ENSURE_RESOLVED_INDEX);
-    await client.query(ENSURE_CLAIMED_INDEX);
+    // Drop narrow predecessors before creating covering replacements so the
+    // old indexes do not persist as write-overhead-only duplicates.
+    await client.query(DROP_OLD_RESOLVED_INDEX);
+    await client.query(DROP_OLD_CLAIMED_INDEX);
+    await client.query(ENSURE_PENDING_INDEX);
+    await client.query(ENSURE_RESOLVED_COVER_INDEX);
+    await client.query(ENSURE_CLAIMED_COVER_INDEX);
     loggerRegistry.info('[escalation] lt_escalations compatibility view ensured');
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [COMPAT_VIEW_LOCK_ID]).catch(() => {});
@@ -148,17 +153,51 @@ CREATE OR REPLACE VIEW public.lt_escalations AS
     (assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()) AS available
   FROM public.hmsh_escalations;`;
 
-// Two separate constants so each is sent as its own client.query() call.
-// A single multi-statement string would execute both in autocommit mode;
-// a dropped connection after the first leaves asymmetric index state.
-// Separate calls under the same advisory lock are individually atomic and
-// IF NOT EXISTS makes each idempotent across retries.
-const ENSURE_RESOLVED_INDEX = `\
-CREATE INDEX IF NOT EXISTS idx_hmsh_escalations_role_resolved_at
-  ON public.hmsh_escalations (role, resolved_at DESC)
+// Each index constant is sent as a separate client.query() call so a dropped
+// connection after one statement does not leave asymmetric index state.
+// IF NOT EXISTS / IF EXISTS makes every statement idempotent across retries
+// and multi-container restarts. All run inside the advisory lock so concurrent
+// containers are serialized and never race on CREATE / DROP.
+//
+// Index design — three partial covering indexes for STATION_METRICS_SQL:
+//
+//   idx_hmsh_esc_pending_role_created
+//     Covers: live_counts CTE (pending, claimed, in_arrears).
+//     Partial WHERE status='pending' keeps it tight; no namespace/app_id prefix
+//     so the planner can use it without those leading columns.
+//
+//   idx_hmsh_esc_resolved_cover
+//     Covers: period_metrics CTE (resolved count + all latency percentiles).
+//     Including claimed_at and created_at makes it an index-only scan candidate
+//     for PERCENTILE_CONT(resolved_at - claimed_at) and (claimed_at - created_at).
+//     Supersedes the old narrow idx_hmsh_escalations_role_resolved_at.
+//
+//   idx_hmsh_esc_claimed_cover
+//     Covers: any query needing wait-time on in-flight (not yet resolved) items,
+//     and non-metrics paths that filter on claimed_at IS NOT NULL.
+//     Supersedes the old narrow idx_hmsh_escalations_role_claimed_at.
+
+// ── Drop narrow predecessors (idempotent; no-op after first migration) ──────
+
+const DROP_OLD_RESOLVED_INDEX = `
+DROP INDEX IF EXISTS idx_hmsh_escalations_role_resolved_at`;
+
+const DROP_OLD_CLAIMED_INDEX = `
+DROP INDEX IF EXISTS idx_hmsh_escalations_role_claimed_at`;
+
+// ── Covering replacements ────────────────────────────────────────────────────
+
+const ENSURE_PENDING_INDEX = `\
+CREATE INDEX IF NOT EXISTS idx_hmsh_esc_pending_role_created
+  ON public.hmsh_escalations (role, created_at DESC)
+  WHERE status = 'pending'`;
+
+const ENSURE_RESOLVED_COVER_INDEX = `\
+CREATE INDEX IF NOT EXISTS idx_hmsh_esc_resolved_cover
+  ON public.hmsh_escalations (role, resolved_at DESC, claimed_at, created_at)
   WHERE status = 'resolved'`;
 
-const ENSURE_CLAIMED_INDEX = `\
-CREATE INDEX IF NOT EXISTS idx_hmsh_escalations_role_claimed_at
-  ON public.hmsh_escalations (role, created_at DESC)
+const ENSURE_CLAIMED_COVER_INDEX = `\
+CREATE INDEX IF NOT EXISTS idx_hmsh_esc_claimed_cover
+  ON public.hmsh_escalations (role, created_at DESC, claimed_at)
   WHERE claimed_at IS NOT NULL`;

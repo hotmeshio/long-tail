@@ -197,74 +197,102 @@ LEFT JOIN resolved ON resolved.id = target.id`;
  *   - Percentile distributions: P99/P50/avg/max for wait (queue time) and work (processing)
  *
  * Parameters:
- *   $1  TEXT[]   — role filter (NULL = all roles)
+ *   $1  TEXT[]   — role filter (NULL = all roles / superadmin)
  *   $2  INTERVAL — time window (e.g. '24 hours', '15 minutes')
  *
- * Index coverage (see migration 016):
- *   - pending/claimed:     idx_lt_escalations_available_v2  (role, priority, created_at) WHERE status='pending'
- *   - resolved in period:  idx_lt_escalations_role_resolved_at (role, resolved_at DESC) WHERE status='resolved'
- *   - wait-time percentile: idx_lt_escalations_role_claimed_at  (role, created_at DESC) WHERE claimed_at IS NOT NULL
+ * Three-CTE design — each CTE targets a different partial index to avoid a
+ * full-table scan as row counts grow:
  *
- * Uses first-class columns sla_minutes and target_per_hour from lt_roles (migration 015).
- * MAX() wraps the join columns so Postgres accepts them without requiring GROUP BY on lt_roles columns.
+ *   role_targets   lt_roles pk scan (tiny — drives outer LEFT JOINs)
+ *   live_counts    idx_hmsh_esc_pending_role_created  (role, created_at DESC)
+ *                  WHERE status='pending'
+ *                  → pending count, active-claim count, in_arrears
+ *   period_metrics idx_hmsh_esc_resolved_cover  (role, resolved_at DESC, claimed_at, created_at)
+ *                  WHERE status='resolved'
+ *                  → resolved count, throughput_pct, all latency percentiles
+ *                  (index-only scan candidate once table > 10k rows)
+ *
+ * Latency semantics: wait and work times are computed over CLOSED work
+ * (status='resolved' in the period) rather than mixing resolved + in-flight
+ * items. This gives a cleaner "how did completed work perform?" answer for
+ * a COO dashboard.
+ *
+ * Roles with no escalations still appear (driven by role_targets), so all
+ * configured ops-visible stations show in the chart even when idle.
  */
 export const STATION_METRICS_SQL = `
+WITH
+role_targets AS (
+  SELECT role, target_per_hour, sla_minutes
+  FROM lt_roles
+  WHERE ($1::text[] IS NULL OR role = ANY($1::text[]))
+),
+live_counts AS (
+  SELECT
+    e.role,
+    COUNT(*)                                                                         AS pending,
+    COUNT(*) FILTER (WHERE e.assigned_to IS NOT NULL AND e.assigned_until > NOW())  AS claimed,
+    COUNT(*) FILTER (
+      WHERE rt.sla_minutes IS NOT NULL
+        AND e.created_at < NOW() - (rt.sla_minutes * INTERVAL '1 minute')
+    )                                                                                AS in_arrears
+  FROM hmsh_escalations e
+  JOIN role_targets rt ON rt.role = e.role
+  WHERE e.status = 'pending'
+  GROUP BY e.role
+),
+period_metrics AS (
+  SELECT
+    e.role,
+    COUNT(*)                                                                         AS resolved,
+    ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
+      ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS p99_wait_min,
+    ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
+      ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS p50_wait_min,
+    ROUND((AVG(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS avg_wait_min,
+    ROUND((MAX(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS max_wait_min,
+    ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
+      ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS p99_work_min,
+    ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
+      ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS p50_work_min,
+    ROUND((AVG(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS avg_work_min,
+    ROUND((MAX(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
+      FILTER (WHERE e.claimed_at IS NOT NULL))::numeric, 3)                        AS max_work_min
+  FROM hmsh_escalations e
+  WHERE e.status = 'resolved'
+    AND e.resolved_at >= NOW() - $2::interval
+    AND ($1::text[] IS NULL OR e.role = ANY($1::text[]))
+  GROUP BY e.role
+)
 SELECT
-  e.role,
-  COUNT(*) FILTER (WHERE e.status = 'pending')::int AS pending,
-  COUNT(*) FILTER (
-    WHERE e.status = 'pending' AND e.assigned_to IS NOT NULL AND e.assigned_until > NOW()
-  )::int AS claimed,
-  COUNT(*) FILTER (
-    WHERE e.status = 'resolved' AND e.resolved_at >= NOW() - $2::interval
-  )::int AS resolved,
-  COUNT(*) FILTER (
-    WHERE e.status = 'pending'
-      AND r.sla_minutes IS NOT NULL
-      AND e.created_at + (r.sla_minutes * INTERVAL '1 minute') < NOW()
-  )::int AS in_arrears,
-  ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS p99_wait_min,
-  ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS p50_wait_min,
-  ROUND((AVG(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS avg_wait_min,
-  ROUND((MAX(EXTRACT(EPOCH FROM (e.claimed_at - e.created_at)) / 60)
-    FILTER (WHERE e.claimed_at IS NOT NULL AND e.created_at >= NOW() - $2::interval))::numeric, 3)
-    AS max_wait_min,
-  ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS p99_work_min,
-  ROUND((PERCENTILE_CONT(0.50) WITHIN GROUP (
-    ORDER BY EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS p50_work_min,
-  ROUND((AVG(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS avg_work_min,
-  ROUND((MAX(EXTRACT(EPOCH FROM (e.resolved_at - e.claimed_at)) / 60)
-    FILTER (WHERE e.resolved_at IS NOT NULL AND e.claimed_at IS NOT NULL
-      AND e.resolved_at >= NOW() - $2::interval))::numeric, 3)
-    AS max_work_min,
+  rt.role,
+  COALESCE(lc.pending,    0)    AS pending,
+  COALESCE(lc.claimed,    0)    AS claimed,
+  COALESCE(pm.resolved,   0)    AS resolved,
+  COALESCE(lc.in_arrears, 0)    AS in_arrears,
   ROUND(
-    (COUNT(*) FILTER (WHERE e.status = 'resolved' AND e.resolved_at >= NOW() - $2::interval)::numeric
-      / NULLIF(
-          MAX(r.target_per_hour) * EXTRACT(EPOCH FROM $2::interval) / 3600.0,
-          0
-        )
-      * 100)::numeric, 1
-  ) AS throughput_pct
-FROM lt_escalations e
-JOIN lt_roles r ON r.role = e.role
-WHERE ($1::text[] IS NULL OR e.role = ANY($1::text[]))
-GROUP BY e.role
+    (COALESCE(pm.resolved, 0)::numeric
+      / NULLIF(rt.target_per_hour::numeric * EXTRACT(EPOCH FROM $2::interval) / 3600.0, 0)
+      * 100
+    )::numeric, 1
+  )                             AS throughput_pct,
+  pm.p99_wait_min,
+  pm.p50_wait_min,
+  pm.avg_wait_min,
+  pm.max_wait_min,
+  pm.p99_work_min,
+  pm.p50_work_min,
+  pm.avg_work_min,
+  pm.max_work_min
+FROM role_targets rt
+LEFT JOIN live_counts   lc ON lc.role = rt.role
+LEFT JOIN period_metrics pm ON pm.role = rt.role
+ORDER BY rt.role
 `;

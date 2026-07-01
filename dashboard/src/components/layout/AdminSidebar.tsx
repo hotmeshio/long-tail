@@ -4,11 +4,9 @@ import {
   Tag,
   Network,
   Braces,
-  LayoutDashboard,
 } from 'lucide-react';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSettings } from '../../api/settings';
-import { useAccess } from '../../hooks/useAccess';
 
 /**
  * Admin navigation. "Identity & Access" and "Infrastructure" are top-level
@@ -20,7 +18,6 @@ import { useAccess } from '../../hooks/useAccess';
  */
 export function AdminSidebar({ isBuilder = false }: { isBuilder?: boolean }) {
   const { data: settings } = useSettings();
-  const { isOps } = useAccess();
   // Default-on: only hide DB Maintenance when the deployment explicitly disables it.
   const showMaintenance = settings?.features?.dbMaintenance !== false;
 
@@ -35,13 +32,8 @@ export function AdminSidebar({ isBuilder = false }: { isBuilder?: boolean }) {
     ...(showMaintenance ? [{ to: '/admin/maintenance', label: 'DB Maintenance', icon: Database }] : []),
   ];
 
-  const opsItems: NavItem[] = [
-    { to: '/operations', label: 'Operations', icon: LayoutDashboard },
-  ];
-
   return (
     <>
-      {(isOps || isBuilder) && <SidebarNav heading="Operations" entries={opsItems} />}
       <SidebarNav heading="Identity & Access" entries={identityItems} />
       {isBuilder && <SidebarNav heading="Infrastructure" entries={infraItems} />}
     </>
