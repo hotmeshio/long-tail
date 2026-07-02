@@ -55,9 +55,15 @@ WHERE status = 'pending'
  * (idx_lt_escalations_assigned), so the self-branch is index-served at scale.
  *
  * $1 status, $2 role, $3 allRoles (text[]), $4 type, $5 subtype, $6 priority,
- * $7 assigned_to, $8 available (bool), $9 search (exact id/workflow_id/origin_id
+ * $7 assigned_to, $8 available (bool), $9 search (exact workflow_id/origin_id
  * match), $10 selfRoles (text[]), $11 meUserId, $12 metadata (jsonb containment,
- * GIN-served). The list query adds $13 limit, $14 offset.
+ * GIN-served), $13 search-as-uuid (the search term when it parses as a UUID,
+ * else NULL). The list query adds $14 limit, $15 offset.
+ *
+ * The id arm binds $13::uuid instead of comparing id::text = $9: casting the
+ * uuid COLUMN to text has no index path, and one unindexable arm forces the
+ * whole OR off BitmapOr into a full scan of escalation history. With the
+ * app-side parse, all three arms are index-served (origin/workflow btrees, PK).
  *
  * `metadata @> $12` is exact JSONB containment (the GIN index serves it) — this is
  * how findByMetadata routes through the scoped query so its role-scope filter and
@@ -78,9 +84,10 @@ const SEARCH_ESCALATIONS_WHERE = `\
     AND ($7::text IS NULL OR assigned_to = $7)
     AND ($8::boolean IS NULL OR available = $8)
     AND ($12::jsonb IS NULL OR metadata @> $12)
-    AND ($9::text IS NULL OR origin_id = $9 OR workflow_id = $9 OR id::text = $9)`;
+    AND ($9::text IS NULL OR origin_id = $9 OR workflow_id = $9
+      OR ($13::uuid IS NOT NULL AND id = $13::uuid))`;
 
-/** Count matching the search WHERE (params $1–$12). */
+/** Count matching the search WHERE (params $1–$13). */
 export const COUNT_SEARCH_ESCALATIONS = `SELECT COUNT(*)::int AS total\n${SEARCH_ESCALATIONS_WHERE}`;
 
 /**
@@ -88,7 +95,7 @@ export const COUNT_SEARCH_ESCALATIONS = `SELECT COUNT(*)::int AS total\n${SEARCH
  * (never raw user input), so it is safe to interpolate; everything else is bound.
  */
 export function searchEscalationsQuery(orderBy: string): string {
-  return `SELECT *\n${SEARCH_ESCALATIONS_WHERE}\n  ORDER BY ${orderBy}\n  LIMIT $13 OFFSET $14`;
+  return `SELECT *\n${SEARCH_ESCALATIONS_WHERE}\n  ORDER BY ${orderBy}\n  LIMIT $14 OFFSET $15`;
 }
 
 /**

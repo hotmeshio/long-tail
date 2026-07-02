@@ -1,10 +1,27 @@
-import Ajv from 'ajv';
+import Ajv, { type ValidateFunction } from 'ajv';
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
-const ajv = new Ajv({ allErrors: true });
+// strict: false — role metadata_schemas use the project's house extension
+// keywords (x-lt-widget etc., the same style as seeded form_schemas); Ajv 8's
+// strict mode throws at compile on any unknown keyword, which would turn every
+// metadata-bearing create for that role into a 500.
+const ajv = new Ajv({ allErrors: true, strict: false });
+
+// Compiled validators cached per role, keyed by the schema's serialized form
+// so an admin's schema edit invalidates the stale validator on the next create.
+const validatorCache = new Map<string, { key: string; validate: ValidateFunction }>();
+
+function compileRoleValidator(role: string, schema: Record<string, any>): ValidateFunction {
+  const key = JSON.stringify(schema);
+  const cached = validatorCache.get(role);
+  if (cached && cached.key === key) return cached.validate;
+  const validate = ajv.compile(schema);
+  validatorCache.set(role, { key, validate });
+  return validate;
+}
 
 // ── Create ────────────────────────────────────────────────────────────────
 
@@ -67,7 +84,17 @@ export async function createEscalation(
     if (input.metadata) {
       const schema = await roleService.getRoleMetadataSchema(role);
       if (schema) {
-        const validate = ajv.compile(schema);
+        let validate: ValidateFunction;
+        try {
+          validate = compileRoleValidator(role, schema);
+        } catch (compileErr: any) {
+          // A broken stored schema is the role admin's bug, not the creator's —
+          // name it explicitly instead of surfacing an opaque 500.
+          return {
+            status: 422,
+            error: `metadata_schema for role "${role}" is not a valid JSON Schema: ${compileErr.message}`,
+          };
+        }
         const valid = validate(input.metadata);
         if (!valid) {
           const msgs = (validate.errors ?? []).map((e) => `${e.instancePath || '(root)'} ${e.message}`).join('; ');

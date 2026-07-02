@@ -41,6 +41,16 @@ function buildSearchOrderBy(sortBy?: string, order?: string): string {
   return 'priority ASC, created_at ASC';
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The id arm of the correlation search binds a uuid param only when the term
+ * parses as one — comparing `id::text = $term` casts the uuid column and has
+ * no index path, which drags the whole OR into a full history scan.
+ */
+const asUuidOrNull = (term: string | null | undefined): string | null =>
+  term && UUID_RE.test(term) ? term : null;
+
 /**
  * Server-side free-text search over the `lt_escalations` view. Runs when a
  * caller supplies a non-empty `search` term — the SDK `client.list()` cannot do
@@ -84,6 +94,7 @@ async function searchEscalations(params: {
     params.selfRoles && params.selfRoles.length ? params.selfRoles : null,
     params.meUserId || null,
     params.metadata ? JSON.stringify(params.metadata) : null,
+    asUuidOrNull(params.search),
   ];
   const orderBy = buildSearchOrderBy(params.sort_by, params.order);
   const [rows, countRows] = await Promise.all([
@@ -149,11 +160,13 @@ export async function searchEscalationsFaceted(opts: {
   if (opts.assigned_to) clauses.push(`assigned_to = $${params.push(opts.assigned_to)}`);
 
   // 4. Correlation-id match (exact) — same fields as the list search path.
-  // Equality keeps it index-served (origin_id / workflow_id btree, id pk); metadata
-  // is searched precisely via the facets above, never a full-table text scan.
+  // Equality keeps it index-served (origin_id / workflow_id btree, id pk); the
+  // id arm binds a pre-parsed uuid so the PK can serve it, and metadata is
+  // searched precisely via the facets above, never a full-table text scan.
   if (opts.search) {
     const i = params.push(opts.search);
-    clauses.push(`(origin_id = $${i} OR workflow_id = $${i} OR id::text = $${i})`);
+    const u = params.push(asUuidOrNull(opts.search));
+    clauses.push(`(origin_id = $${i} OR workflow_id = $${i} OR ($${u}::uuid IS NOT NULL AND id = $${u}::uuid))`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join('\n  AND ')}` : '';
@@ -237,13 +250,14 @@ export async function listFacetKeys(opts: {
 }
 
 // Escalation stats back the home + overview surfaces and refresh on every
-// escalation event. The SDK's stats query scans all role rows across all statuses
-// and history (aggregates over an unbounded `base` CTE), so an event burst or
-// several concurrent viewers would re-run that scan repeatedly. Cache the result
-// briefly (single-flight) so the burst collapses to one scan per window — the
-// same lever as the station period metrics. Pending/claimed counts on an overview
-// tolerate a few seconds of staleness; the operator's live queue is uncached.
-const ESCALATION_STATS_CACHE_TTL_MS = 10_000;
+// escalation event. As of hotmesh 0.25.0 the SDK stats query reads three
+// bounded, index-only sources (pending backlog, created window, resolved
+// window), so it is cheap enough to run per-request — this short single-flight
+// window exists purely to collapse the refetch burst a busy escalation stream
+// triggers (every event → every open dashboard refetches at once). Local
+// writes clear the cache (see crud.ts publishEscalationChange), so a refetch
+// on this container always observes its own write.
+const ESCALATION_STATS_CACHE_TTL_MS = 2_500;
 const escalationStatsCache = new TtlCache<EscalationStats>(ESCALATION_STATS_CACHE_TTL_MS);
 
 export async function getEscalationStats(
@@ -412,10 +426,21 @@ export async function listAvailableEscalations(filters: {
 const STATION_PERIOD_CACHE_TTL_MS = 30_000;
 const stationPeriodCache = new TtlCache<Record<string, unknown>[]>(STATION_PERIOD_CACHE_TTL_MS);
 
-/** Test hook: drop cached period metrics AND escalation stats so tests observe fresh rows. */
-export function resetStationMetricsCache(): void {
+/**
+ * Drop cached aggregates (period metrics + escalation stats). Called by the
+ * write paths in crud.ts alongside each escalation event publish: the event
+ * tells dashboards "data changed", so the very next fetch on this container
+ * must recompute rather than serve the pre-change aggregate for up to a TTL.
+ * Cross-container staleness within the TTL remains and is acceptable.
+ */
+export function invalidateEscalationAggregates(): void {
   stationPeriodCache.clear();
   escalationStatsCache.clear();
+}
+
+/** Test hook: drop cached period metrics AND escalation stats so tests observe fresh rows. */
+export function resetStationMetricsCache(): void {
+  invalidateEscalationAggregates();
 }
 
 const toNum = (v: unknown): number | null => (v != null ? Number(v) : null);
@@ -424,7 +449,12 @@ export async function getStationMetrics(
   visibleRoles: string[] | undefined,
   period?: string,
 ): Promise<StationMetric[]> {
-  const intervalStr = VALID_PERIODS[period ?? ''] ?? '24 hours';
+  await ensureEscalationCompatView();
+  // hasOwnProperty: a caller-supplied period like 'constructor' must fall back
+  // to 24h, not resolve to an inherited Object.prototype member.
+  const intervalStr = period && Object.prototype.hasOwnProperty.call(VALID_PERIODS, period)
+    ? VALID_PERIODS[period]
+    : '24 hours';
   const roles = visibleRoles ?? null;
   const pool = getPool();
 

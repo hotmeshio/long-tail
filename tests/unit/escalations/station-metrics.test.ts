@@ -5,6 +5,13 @@ vi.mock('../../../lib/db', () => ({
   getPool: vi.fn(),
 }));
 
+// getStationMetrics awaits the compat-view ensure before querying (like every
+// other read path); the view install is client.ts's concern, not this unit's.
+vi.mock('../../../services/escalation/client', () => ({
+  escalations: vi.fn(),
+  ensureEscalationCompatView: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { getPool } from '../../../lib/db';
 import { getStationMetrics, resetStationMetricsCache } from '../../../services/escalation/queries';
 

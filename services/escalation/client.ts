@@ -87,21 +87,54 @@ async function installEscalationCompatView(): Promise<void> {
       throw err;
     }
 
-    // Index maintenance runs AFTER the swap, in autocommit — deliberately
-    // outside the swap transaction so a slow index build never extends the
-    // window the table is exclusively locked for the rename. Each statement is
-    // idempotent (IF EXISTS / IF NOT EXISTS), so a crash here self-heals on the
-    // next boot without disturbing the view. Drop the narrow predecessors first
-    // so the old indexes do not linger as write-overhead-only duplicates.
+    // Superseded-index drops run AFTER the swap, in autocommit — instant
+    // catalog operations, idempotent across retries and multi-container
+    // restarts. hmsh 0.25.0's stats indexes (idx_hmsh_esc_stats_pending /
+    // _created / _resolved, shipped by the SDK's own deploy) serve the backlog
+    // and window aggregates these earlier app-layer indexes covered, so
+    // keeping them would only amplify every insert/claim/resolve write.
     await client.query(DROP_OLD_RESOLVED_INDEX);
     await client.query(DROP_OLD_CLAIMED_INDEX);
-    await client.query(ENSURE_PENDING_INDEX);
-    await client.query(ENSURE_RESOLVED_COVER_INDEX);
-    await client.query(ENSURE_CLAIMED_COVER_INDEX);
+    await client.query(DROP_SUPERSEDED_PENDING_INDEX);
+    await client.query(DROP_UNCONSUMED_CLAIMED_COVER_INDEX);
     loggerRegistry.info('[escalation] lt_escalations compatibility view ensured');
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [COMPAT_VIEW_LOCK_ID]).catch(() => {});
     client.release();
+  }
+
+  // The one index long-tail still owns builds OUTSIDE the advisory lock:
+  // CREATE INDEX CONCURRENTLY waits on every transaction holding a snapshot,
+  // and sibling containers parked inside `SELECT pg_advisory_lock(...)` hold
+  // exactly that — building inside the critical section would stall the build
+  // against its own waiters. Out here the build blocks nothing (writes proceed
+  // during CONCURRENTLY) and nothing blocks it.
+  await ensureResolvedCoverIndex();
+}
+
+/**
+ * Idempotent, concurrent-boot-safe build of idx_hmsh_esc_resolved_cover.
+ *
+ * A crashed CONCURRENTLY build leaves an INVALID index behind, and
+ * `CREATE INDEX CONCURRENTLY IF NOT EXISTS` would then skip it forever — so
+ * validity is checked first and an invalid leftover is dropped and rebuilt.
+ * A create that loses a cross-container race logs and defers to the next
+ * boot, which observes the winner's valid index and no-ops.
+ */
+async function ensureResolvedCoverIndex(): Promise<void> {
+  const pool = getPool();
+  try {
+    const { rows } = await pool.query(RESOLVED_COVER_INDEX_STATE);
+    if (rows[0]?.valid === true) return;
+    if (rows.length > 0) {
+      await pool.query('DROP INDEX IF EXISTS idx_hmsh_esc_resolved_cover');
+    }
+    await pool.query(ENSURE_RESOLVED_COVER_INDEX);
+    loggerRegistry.info('[escalation] idx_hmsh_esc_resolved_cover ensured');
+  } catch (err: any) {
+    loggerRegistry.warn(
+      `[escalation] resolved-cover index build deferred to next boot: ${err.message}`,
+    );
   }
 }
 
@@ -171,31 +204,23 @@ CREATE OR REPLACE VIEW public.lt_escalations AS
     (assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()) AS available
   FROM public.hmsh_escalations;`;
 
-// Each index constant is sent as a separate client.query() call so a dropped
-// connection after one statement does not leave asymmetric index state.
-// IF NOT EXISTS / IF EXISTS makes every statement idempotent across retries
-// and multi-container restarts. All run inside the advisory lock so concurrent
-// containers are serialized and never race on CREATE / DROP.
+// Index ownership — hmsh 0.25.0 ships the general aggregate indexes on
+// hmsh_escalations (idx_hmsh_esc_stats_pending covers the pending backlog
+// incl. assigned_to/assigned_until; _stats_created and _stats_resolved bound
+// the created/resolved windows). Long-tail keeps exactly ONE app-layer index:
 //
-// Index design — three partial covering indexes for STATION_METRICS_SQL:
+//   idx_hmsh_esc_resolved_cover (role, resolved_at DESC, claimed_at, created_at)
+//     WHERE status = 'resolved'
+//     Serves STATION_PERIOD_METRICS_SQL: the (role, resolved_at ≥ window)
+//     prefix bounds each station's percentile scan to its own window, and the
+//     trailing claimed_at/created_at feed PERCENTILE_CONT(resolved_at -
+//     claimed_at) and (claimed_at - created_at) from the index.
 //
-//   idx_hmsh_esc_pending_role_created
-//     Covers: live_counts CTE (pending, claimed, in_arrears).
-//     Partial WHERE status='pending' keeps it tight; no namespace/app_id prefix
-//     so the planner can use it without those leading columns.
-//
-//   idx_hmsh_esc_resolved_cover
-//     Covers: period_metrics CTE (resolved count + all latency percentiles).
-//     Including claimed_at and created_at makes it an index-only scan candidate
-//     for PERCENTILE_CONT(resolved_at - claimed_at) and (claimed_at - created_at).
-//     Supersedes the old narrow idx_hmsh_escalations_role_resolved_at.
-//
-//   idx_hmsh_esc_claimed_cover
-//     Covers: any query needing wait-time on in-flight (not yet resolved) items,
-//     and non-metrics paths that filter on claimed_at IS NOT NULL.
-//     Supersedes the old narrow idx_hmsh_escalations_role_claimed_at.
+// Everything else this branch once created is dropped below: the pending
+// index duplicated _stats_pending, and the claimed cover had no consuming
+// query — both were pure write amplification on the hot claim/resolve path.
 
-// ── Drop narrow predecessors (idempotent; no-op after first migration) ──────
+// ── Drops: superseded or branch-era-only names (idempotent no-ops elsewhere) ─
 
 const DROP_OLD_RESOLVED_INDEX = `
 DROP INDEX IF EXISTS idx_hmsh_escalations_role_resolved_at`;
@@ -203,19 +228,23 @@ DROP INDEX IF EXISTS idx_hmsh_escalations_role_resolved_at`;
 const DROP_OLD_CLAIMED_INDEX = `
 DROP INDEX IF EXISTS idx_hmsh_escalations_role_claimed_at`;
 
-// ── Covering replacements ────────────────────────────────────────────────────
+const DROP_SUPERSEDED_PENDING_INDEX = `
+DROP INDEX IF EXISTS idx_hmsh_esc_pending_role_created`;
 
-const ENSURE_PENDING_INDEX = `\
-CREATE INDEX IF NOT EXISTS idx_hmsh_esc_pending_role_created
-  ON public.hmsh_escalations (role, created_at DESC)
-  WHERE status = 'pending'`;
+const DROP_UNCONSUMED_CLAIMED_COVER_INDEX = `
+DROP INDEX IF EXISTS idx_hmsh_esc_claimed_cover`;
+
+// ── The station-percentile cover ─────────────────────────────────────────────
+
+/** Reports existence + validity so a crash-orphaned INVALID build is rebuilt. */
+const RESOLVED_COVER_INDEX_STATE = `
+SELECT i.indisvalid AS valid
+FROM pg_class c
+JOIN pg_index i ON i.indexrelid = c.oid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relname = 'idx_hmsh_esc_resolved_cover' AND n.nspname = 'public'`;
 
 const ENSURE_RESOLVED_COVER_INDEX = `\
-CREATE INDEX IF NOT EXISTS idx_hmsh_esc_resolved_cover
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hmsh_esc_resolved_cover
   ON public.hmsh_escalations (role, resolved_at DESC, claimed_at, created_at)
   WHERE status = 'resolved'`;
-
-const ENSURE_CLAIMED_COVER_INDEX = `\
-CREATE INDEX IF NOT EXISTS idx_hmsh_esc_claimed_cover
-  ON public.hmsh_escalations (role, created_at DESC, claimed_at)
-  WHERE claimed_at IS NOT NULL`;

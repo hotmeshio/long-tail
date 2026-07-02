@@ -78,10 +78,23 @@ describe('searchEscalationsFaceted — scoped faceted query', () => {
     const [sql, params] = selectCall()!;
     expect(sql).toContain('origin_id = $');
     expect(sql).toContain('workflow_id = $');
-    expect(sql).toContain('id::text = $');
+    // The id arm uses a pre-parsed uuid param — id::text has no index path and
+    // would force the whole OR into a sequential scan.
+    expect(sql).toContain('::uuid');
+    expect(sql).not.toContain('id::text');
     expect(sql).not.toContain('ILIKE');
     expect(sql).not.toContain('metadata::text');
     expect(params).toContain('ORD-42');
+  });
+
+  it('binds the uuid arm when the search term is an escalation id', async () => {
+    const uuid = '01234567-89ab-4cde-8f01-23456789abcd';
+    await searchEscalationsFaceted({
+      global: true, facet: {}, search: uuid, limit: 10, offset: 0,
+    });
+    const [sql, params] = selectCall()!;
+    expect(sql).toContain('id = $');
+    expect(params.filter((p: unknown) => p === uuid)).toHaveLength(2);
   });
 
   it('a metadata facet with no status spans all statuses (no status clause emitted)', async () => {

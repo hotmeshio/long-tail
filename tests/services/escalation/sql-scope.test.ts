@@ -18,8 +18,8 @@ describe('search SQL — read-scope self branch', () => {
     expect(sql).toContain('$3::text[] IS NULL AND $10::text[] IS NULL');
   });
 
-  it('paginates after the scope + metadata params ($13 limit, $14 offset)', () => {
-    expect(sql).toContain('LIMIT $13 OFFSET $14');
+  it('paginates after the scope + metadata + uuid params ($14 limit, $15 offset)', () => {
+    expect(sql).toContain('LIMIT $14 OFFSET $15');
   });
 
   it('the count query shares the scope predicate (no limit/offset)', () => {

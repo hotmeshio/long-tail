@@ -32,6 +32,13 @@ export class TtlCache<T> {
     const hit = this.store.get(key);
     if (hit && Date.now() - hit.at < this.ttlMs) return hit.value;
 
+    // Sweep every expired entry on each miss. Keys embed the caller's role
+    // set × period, so without eviction the map accretes one row-array per
+    // distinct viewer cohort for the life of the process.
+    for (const [k, entry] of this.store) {
+      if (Date.now() - entry.at >= this.ttlMs) this.store.delete(k);
+    }
+
     const value = compute();
     this.store.set(key, { at: Date.now(), value });
     try {

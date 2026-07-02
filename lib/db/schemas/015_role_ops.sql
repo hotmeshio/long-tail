@@ -21,18 +21,30 @@ ALTER TABLE lt_roles
   ADD COLUMN IF NOT EXISTS metadata_schema  JSONB;
 
 -- Migrate values that lived in the properties bag (common key names).
+-- The bag is user-owned free text, so every cast is guarded: only JSON numbers
+-- and numeric strings are promoted. An unparseable value (e.g. "30 min") is
+-- left in the bag rather than aborting the migration transaction and
+-- crash-looping every container at boot.
 UPDATE lt_roles
 SET sla_minutes = (properties->>'sla_minutes')::numeric
-WHERE (properties ? 'sla_minutes') AND sla_minutes IS NULL;
+WHERE sla_minutes IS NULL
+  AND (jsonb_typeof(properties->'sla_minutes') = 'number'
+       OR properties->>'sla_minutes' ~ '^[0-9]+(\.[0-9]+)?$');
 
 UPDATE lt_roles
 SET sla_minutes = (properties->>'tat_minutes')::numeric
-WHERE (properties ? 'tat_minutes') AND sla_minutes IS NULL;
+WHERE sla_minutes IS NULL
+  AND (jsonb_typeof(properties->'tat_minutes') = 'number'
+       OR properties->>'tat_minutes' ~ '^[0-9]+(\.[0-9]+)?$');
 
 UPDATE lt_roles
 SET target_per_hour = (properties->>'target_per_hour')::numeric
-WHERE (properties ? 'target_per_hour') AND target_per_hour IS NULL;
+WHERE target_per_hour IS NULL
+  AND (jsonb_typeof(properties->'target_per_hour') = 'number'
+       OR properties->>'target_per_hour' ~ '^[0-9]+(\.[0-9]+)?$');
 
 UPDATE lt_roles
 SET worker_count = (properties->>'worker_count')::numeric
-WHERE (properties ? 'worker_count') AND worker_count IS NULL;
+WHERE worker_count IS NULL
+  AND (jsonb_typeof(properties->'worker_count') = 'number'
+       OR properties->>'worker_count' ~ '^[0-9]+(\.[0-9]+)?$');
