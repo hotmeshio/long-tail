@@ -7,6 +7,7 @@ import {
   createAuthMiddleware,
   requireAuth,
   requireAdmin,
+  requireRoleManager,
   signToken,
 } from '../../modules/auth';
 import type { AuthPayload, LTAuthAdapter } from '../../types';
@@ -240,6 +241,44 @@ describe('Pluggable auth system', () => {
       let adminNextCalled = false;
       await requireAdmin(req, res, () => { adminNextCalled = true; });
       expect(adminNextCalled).toBe(false);
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  // ── requireRoleManager ───────────────────────────────────────────────
+
+  describe('requireRoleManager (admin type, superadmin, or engineer)', () => {
+    it('should allow role=admin via JWT claim', async () => {
+      const token = signToken({ userId: 'admin-user', role: 'admin' });
+      const { req, res, next, wasNextCalled } = mockReqRes(`Bearer ${token}`);
+      await requireAuth(req, res, next);
+      expect(wasNextCalled()).toBe(true);
+
+      let managerNextCalled = false;
+      await requireRoleManager(req, res, () => { managerNextCalled = true; });
+      expect(managerNextCalled).toBe(true);
+    });
+
+    it('should allow role=superadmin via JWT claim', async () => {
+      const token = signToken({ userId: 'sa-user', role: 'superadmin' });
+      const { req, res, next, wasNextCalled } = mockReqRes(`Bearer ${token}`);
+      await requireAuth(req, res, next);
+      expect(wasNextCalled()).toBe(true);
+
+      let managerNextCalled = false;
+      await requireRoleManager(req, res, () => { managerNextCalled = true; });
+      expect(managerNextCalled).toBe(true);
+    });
+
+    it('should reject role=reviewer via JWT claim', async () => {
+      const token = signToken({ userId: 'rev-user', role: 'reviewer' });
+      const { req, res, next, wasNextCalled } = mockReqRes(`Bearer ${token}`);
+      await requireAuth(req, res, next);
+      expect(wasNextCalled()).toBe(true);
+
+      let managerNextCalled = false;
+      await requireRoleManager(req, res, () => { managerNextCalled = true; });
+      expect(managerNextCalled).toBe(false);
       expect(res.statusCode).toBe(403);
     });
   });

@@ -187,43 +187,38 @@ SELECT
 FROM target
 LEFT JOIN resolved ON resolved.id = target.id`;
 
+// ---------------------------------------------------------------------------
+// Station metrics — split into two queries with very different cost profiles.
+//
+// The Operations dashboard refreshes on every escalation socket event (a
+// debounced burst) plus a periodic fallback. Computing percentiles on that hot
+// path is wasteful: percentile aggregates sort every qualifying resolved row,
+// while the live counts are cheap and bounded. So the two halves are separated:
+//
+//   STATION_LIVE_COUNTS_SQL    — pending / claimed / in_arrears. Cheap, always
+//                                run fresh. Scans only pending rows (backlog is
+//                                bounded no matter how much history accrues).
+//   STATION_PERIOD_METRICS_SQL — resolved / throughput / latency percentiles.
+//                                Expensive, slow-changing; the service layer
+//                                caches it (~30s) and shares it across the
+//                                refresh burst and all concurrent viewers.
+//
+// Both drive off role_targets so every configured role appears even when idle,
+// and the service merges them by role into one StationMetric per station.
+// ---------------------------------------------------------------------------
+
 /**
- * Station-metrics aggregation — one row per role.
+ * Live counts — pending, active claims, and past-SLA (in_arrears) per role.
  *
- * Produces all columns needed by the Operations dashboard:
- *   - Real-time counts: pending, claimed (actively held), in_arrears (past SLA)
- *   - Period counts: resolved in the selected window
- *   - Throughput efficiency: resolved / expected output × 100 (null when no target set)
- *   - Percentile distributions: P99/P50/avg/max for wait (queue time) and work (processing)
+ * $1 TEXT[] — role filter (NULL = all roles / superadmin).
  *
- * Parameters:
- *   $1  TEXT[]   — role filter (NULL = all roles / superadmin)
- *   $2  INTERVAL — time window (e.g. '24 hours', '15 minutes')
- *
- * Three-CTE design — each CTE targets a different partial index to avoid a
- * full-table scan as row counts grow:
- *
- *   role_targets   lt_roles pk scan (tiny — drives outer LEFT JOINs)
- *   live_counts    idx_hmsh_esc_pending_role_created  (role, created_at DESC)
- *                  WHERE status='pending'
- *                  → pending count, active-claim count, in_arrears
- *   period_metrics idx_hmsh_esc_resolved_cover  (role, resolved_at DESC, claimed_at, created_at)
- *                  WHERE status='resolved'
- *                  → resolved count, throughput_pct, all latency percentiles
- *                  (index-only scan candidate once table > 10k rows)
- *
- * Latency semantics: wait and work times are computed over CLOSED work
- * (status='resolved' in the period) rather than mixing resolved + in-flight
- * items. This gives a cleaner "how did completed work perform?" answer for
- * a COO dashboard.
- *
- * Roles with no escalations still appear (driven by role_targets), so all
- * configured ops-visible stations show in the chart even when idle.
+ * Hits idx_hmsh_esc_pending_role_created (role, created_at DESC) WHERE
+ * status='pending'. The pending working set is bounded by real backlog depth,
+ * so this stays cheap as historical volume grows — safe on the hot refresh path.
  */
-export const STATION_METRICS_SQL = `
-WITH
-role_targets AS (
-  SELECT role, target_per_hour, sla_minutes
+export const STATION_LIVE_COUNTS_SQL = `
+WITH role_targets AS (
+  SELECT role, sla_minutes
   FROM lt_roles
   WHERE ($1::text[] IS NULL OR role = ANY($1::text[]))
 ),
@@ -240,6 +235,38 @@ live_counts AS (
   JOIN role_targets rt ON rt.role = e.role
   WHERE e.status = 'pending'
   GROUP BY e.role
+)
+SELECT
+  rt.role,
+  COALESCE(lc.pending,    0) AS pending,
+  COALESCE(lc.claimed,    0) AS claimed,
+  COALESCE(lc.in_arrears, 0) AS in_arrears
+FROM role_targets rt
+LEFT JOIN live_counts lc ON lc.role = rt.role
+ORDER BY rt.role
+`;
+
+/**
+ * Period metrics — resolved count, throughput efficiency, and P99/P50/avg/max
+ * latency for wait (queue time) and work (processing) per role.
+ *
+ * $1 TEXT[]   — role filter (NULL = all roles / superadmin).
+ * $2 INTERVAL — time window (e.g. '24 hours', '15 minutes').
+ *
+ * Hits idx_hmsh_esc_resolved_cover (role, resolved_at DESC, claimed_at,
+ * created_at) WHERE status='resolved' — a covering index, so the percentile
+ * scan is index-only. PERCENTILE_CONT still sorts the qualifying set in memory,
+ * which is why the service caches this result rather than running it per event.
+ *
+ * Latency is computed over CLOSED work (status='resolved' in the period), not a
+ * mix of resolved + in-flight — a clean "how did completed work perform?" read.
+ * throughput_pct is NULL when the role has no target_per_hour (NULLIF guard).
+ */
+export const STATION_PERIOD_METRICS_SQL = `
+WITH role_targets AS (
+  SELECT role, target_per_hour
+  FROM lt_roles
+  WHERE ($1::text[] IS NULL OR role = ANY($1::text[]))
 ),
 period_metrics AS (
   SELECT
@@ -273,16 +300,13 @@ period_metrics AS (
 )
 SELECT
   rt.role,
-  COALESCE(lc.pending,    0)    AS pending,
-  COALESCE(lc.claimed,    0)    AS claimed,
-  COALESCE(pm.resolved,   0)    AS resolved,
-  COALESCE(lc.in_arrears, 0)    AS in_arrears,
+  COALESCE(pm.resolved, 0) AS resolved,
   ROUND(
     (COALESCE(pm.resolved, 0)::numeric
       / NULLIF(rt.target_per_hour::numeric * EXTRACT(EPOCH FROM $2::interval) / 3600.0, 0)
       * 100
     )::numeric, 1
-  )                             AS throughput_pct,
+  )                        AS throughput_pct,
   pm.p99_wait_min,
   pm.p50_wait_min,
   pm.avg_wait_min,
@@ -292,7 +316,6 @@ SELECT
   pm.avg_work_min,
   pm.max_work_min
 FROM role_targets rt
-LEFT JOIN live_counts   lc ON lc.role = rt.role
 LEFT JOIN period_metrics pm ON pm.role = rt.role
 ORDER BY rt.role
 `;

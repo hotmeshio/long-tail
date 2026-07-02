@@ -158,7 +158,7 @@ function RoleView({ role, onClose }: { role: RoleDetail; onClose: () => void }) 
       {/* View queue */}
       <div className="mt-4 border-t border-surface-border/40 pt-3">
         <Link
-          to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}`}
+          to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
           className="flex items-center gap-1.5 text-[10px] text-accent hover:underline"
         >
           View full queue

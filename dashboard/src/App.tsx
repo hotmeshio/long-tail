@@ -336,17 +336,17 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
+          { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
+          { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
+          { path: 'admin/roles/:role', element: <Lazy><RoleDetailPage /></Lazy> },
         ],
       },
 
-      // Admin: Builder-only (roles, bots, infrastructure)
+      // Admin: Builder-only (bots, infrastructure)
       {
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
-          { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
-          { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
-          { path: 'admin/roles/:role', element: <Lazy><RoleDetailPage /></Lazy> },
           {
             element: <RequireFeature flag="dbMaintenance" />,
             children: [

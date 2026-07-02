@@ -71,11 +71,12 @@ function fetchStreamStats(appId: string, duration: string, stream?: string) {
 
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
-export function useControlPlaneApps() {
+export function useControlPlaneApps(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['controlplane', 'apps'],
     queryFn: fetchApps,
     staleTime: 60_000,
+    enabled: options?.enabled ?? true,
   });
 }
 

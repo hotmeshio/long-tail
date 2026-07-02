@@ -17,6 +17,16 @@ const REFRESH_INTERVAL_MS = 10_000;
 const PERIODS = ['15m', '1h', '24h', '7d', '30d'] as const;
 type Period = (typeof PERIODS)[number];
 
+// Window length in hours — used to express the target as a count for the
+// selected window (target_per_hour × hours), e.g. 22/h over 15m ≈ 5 expected.
+const PERIOD_HOURS: Record<Period, number> = {
+  '15m': 0.25,
+  '1h': 1,
+  '24h': 24,
+  '7d': 168,
+  '30d': 720,
+};
+
 interface OrderedStation {
   role: RoleDetail;
   depth: number;
@@ -126,7 +136,7 @@ function StationRow({
         className={`grid items-center gap-4 py-3.5 cursor-pointer transition-colors ${
           selected ? 'border-l-2 border-accent' : 'pl-0.5'
         }`}
-        style={{ gridTemplateColumns: '1fr 56px 56px 60px 72px 72px 104px' }}
+        style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
       >
         {/* Role name */}
         <div className="flex items-center gap-1.5 min-w-0">
@@ -139,6 +149,15 @@ function StationRow({
             <span className="text-[10px] text-text-tertiary truncate">{role.title}</span>
           )}
         </div>
+
+        {/* Target / hour */}
+        <span
+          className={`text-xs font-mono tabular-nums text-right ${
+            target != null ? 'text-text-secondary' : 'text-text-quaternary'
+          }`}
+        >
+          {target != null ? target : '—'}
+        </span>
 
         {/* Pending */}
         <span
@@ -211,17 +230,17 @@ function StationRow({
 // ── Table header ──────────────────────────────────────────────────────────────
 
 function TableHead() {
-  const cols = ['ROLE', 'PENDING', 'ACTIVE', 'RESOLVED', 'P99 WAIT', 'P99 WORK', 'TREND'];
+  const cols = ['ROLE', 'TARGET/H', 'PENDING', 'ACTIVE', 'RESOLVED', 'P99 WAIT', 'P99 WORK', 'TREND'];
   return (
     <div
       className="grid items-center gap-4 py-1.5 border-b border-surface-border mb-0.5"
-      style={{ gridTemplateColumns: '1fr 56px 56px 60px 72px 72px 104px' }}
+      style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
     >
       {cols.map((col, i) => (
         <span
           key={col}
           className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary ${
-            i > 0 && i < 6 ? 'text-right' : ''
+            i > 0 && i < 7 ? 'text-right' : ''
           }`}
         >
           {col}
@@ -374,6 +393,7 @@ export function OperationsPage() {
                 stations={chartStations}
                 selectedRole={selectedRole}
                 onSelect={handleSelect}
+                periodHours={PERIOD_HOURS[period]}
               />
             </div>
             {/* Vertical divider */}

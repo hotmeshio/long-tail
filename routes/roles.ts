@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { requireBuilder } from '../modules/auth';
+import { requireRoleManager } from '../modules/auth';
 import * as api from '../api/roles';
 
 const router = Router();
@@ -28,7 +28,7 @@ router.get('/details', async (_req, res) => {
  * Create a standalone role. Requires admin.
  * Body: { role: string }
  */
-router.post('/', requireBuilder, async (req, res) => {
+router.post('/', requireRoleManager, async (req, res) => {
   const { role } = req.body || {};
   const result = await api.createRole({ role });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -48,7 +48,7 @@ router.get('/escalation-chains', async (_req, res) => {
  * Add a single escalation chain entry. Requires admin.
  * Body: { source_role: string, target_role: string }
  */
-router.post('/escalation-chains', requireBuilder, async (req, res) => {
+router.post('/escalation-chains', requireRoleManager, async (req, res) => {
   const { source_role, target_role } = req.body || {};
   const result = await api.addEscalationChain({ source_role, target_role });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -59,7 +59,7 @@ router.post('/escalation-chains', requireBuilder, async (req, res) => {
  * Remove a single escalation chain entry. Requires admin.
  * Body: { source_role: string, target_role: string }
  */
-router.delete('/escalation-chains', requireBuilder, async (req, res) => {
+router.delete('/escalation-chains', requireRoleManager, async (req, res) => {
   const { source_role, target_role } = req.body || {};
   const result = await api.removeEscalationChain({ source_role, target_role });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -69,10 +69,10 @@ router.delete('/escalation-chains', requireBuilder, async (req, res) => {
 
 /**
  * PATCH /api/roles/:role
- * Update role metadata. Requires builder.
+ * Update role metadata. Requires admin.
  * Body: { title?, description?, form_schema?, metadata_schema?, properties?, ops_visible?, parent_role?, sla_minutes?, target_per_hour?, worker_count? }
  */
-router.patch('/:role', requireBuilder, async (req, res) => {
+router.patch('/:role', requireRoleManager, async (req, res) => {
   const result = await api.updateRole({ role: req.params.role as string, ...req.body });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -91,7 +91,7 @@ router.get('/:role/escalation-targets', async (req, res) => {
  * Replace escalation targets for a role. Requires admin.
  * Body: { targets: string[] }
  */
-router.put('/:role/escalation-targets', requireBuilder, async (req, res) => {
+router.put('/:role/escalation-targets', requireRoleManager, async (req, res) => {
   const { targets } = req.body || {};
   const result = await api.replaceEscalationTargets({ role: req.params.role as string, targets });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -101,7 +101,7 @@ router.put('/:role/escalation-targets', requireBuilder, async (req, res) => {
  * DELETE /api/roles/:role
  * Delete a role if it has no references. Requires admin.
  */
-router.delete('/:role', requireBuilder, async (req, res) => {
+router.delete('/:role', requireRoleManager, async (req, res) => {
   const result = await api.deleteRole({ role: req.params.role as string });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

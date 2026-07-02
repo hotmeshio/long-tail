@@ -130,7 +130,7 @@ export function useProcesses(filters?: {
   workflow_type?: string;
   status?: string;
   search?: string;
-}) {
+}, options?: { enabled?: boolean }) {
   const params = new URLSearchParams();
   if (filters?.limit) params.set('limit', String(filters.limit));
   if (filters?.offset !== undefined) params.set('offset', String(filters.offset));
@@ -141,6 +141,7 @@ export function useProcesses(filters?: {
   return useQuery<ProcessListResponse>({
     queryKey: ['processes', filters],
     queryFn: () => apiFetch(`/tasks/processes?${params}`),
+    enabled: options?.enabled ?? true,
   });
 }
 

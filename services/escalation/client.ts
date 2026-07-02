@@ -71,10 +71,28 @@ async function installEscalationCompatView(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1)', [COMPAT_VIEW_LOCK_ID]);
-    await client.query(MIGRATE_AND_RENAME_LEGACY_TABLE);
-    await client.query(CREATE_COMPAT_VIEW);
-    // Drop narrow predecessors before creating covering replacements so the
-    // old indexes do not persist as write-overhead-only duplicates.
+
+    // Atomic table→view swap. The legacy-row migration + RENAME and the
+    // CREATE VIEW commit together, so `lt_escalations` is never momentarily
+    // absent — a concurrent reader sees either the old table or the new view,
+    // never nothing. Postgres DDL is transactional, so a crash mid-swap rolls
+    // back cleanly and the next container retries from a consistent state.
+    try {
+      await client.query('BEGIN');
+      await client.query(MIGRATE_AND_RENAME_LEGACY_TABLE);
+      await client.query(CREATE_COMPAT_VIEW);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    }
+
+    // Index maintenance runs AFTER the swap, in autocommit — deliberately
+    // outside the swap transaction so a slow index build never extends the
+    // window the table is exclusively locked for the rename. Each statement is
+    // idempotent (IF EXISTS / IF NOT EXISTS), so a crash here self-heals on the
+    // next boot without disturbing the view. Drop the narrow predecessors first
+    // so the old indexes do not linger as write-overhead-only duplicates.
     await client.query(DROP_OLD_RESOLVED_INDEX);
     await client.query(DROP_OLD_CLAIMED_INDEX);
     await client.query(ENSURE_PENDING_INDEX);

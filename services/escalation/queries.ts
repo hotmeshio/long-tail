@@ -8,7 +8,8 @@ import { toEscalationRecords } from './map';
 import { buildFacetWhere, buildFacetOrder } from './facet-sql';
 import type { EscalationStats, StationMetric } from './types';
 import { SORTABLE_COLUMNS, VALID_PERIODS } from './types';
-import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS, STATION_METRICS_SQL } from './sql';
+import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS, STATION_LIVE_COUNTS_SQL, STATION_PERIOD_METRICS_SQL } from './sql';
+import { TtlCache } from './metrics-cache';
 import type { FacetQuery } from '../../types';
 
 type SdkListParams = Types.ListEscalationsParams;
@@ -393,34 +394,62 @@ export async function listAvailableEscalations(filters: {
   return { escalations: toEscalationRecords(rows), total };
 }
 
+// Period metrics (percentiles + throughput) are expensive and slow-changing, so
+// they are cached ~30s and shared, via single-flight, across the socket-driven
+// refresh burst and all concurrent viewers. Live counts are never cached — they
+// refresh on every event. Per-container cache; 30-60s staleness is acceptable.
+const STATION_PERIOD_CACHE_TTL_MS = 30_000;
+const stationPeriodCache = new TtlCache<Record<string, unknown>[]>(STATION_PERIOD_CACHE_TTL_MS);
+
+/** Test hook: drop cached period metrics so unit tests observe fresh rows. */
+export function resetStationMetricsCache(): void {
+  stationPeriodCache.clear();
+}
+
+const toNum = (v: unknown): number | null => (v != null ? Number(v) : null);
+
 export async function getStationMetrics(
   visibleRoles: string[] | undefined,
   period?: string,
 ): Promise<StationMetric[]> {
   const intervalStr = VALID_PERIODS[period ?? ''] ?? '24 hours';
+  const roles = visibleRoles ?? null;
   const pool = getPool();
-  const { rows } = await pool.query(STATION_METRICS_SQL, [
-    visibleRoles ?? null,
-    intervalStr,
+
+  // Live counts: always fresh (cheap — bounded pending working set).
+  // Period metrics: cached ~30s, single-flight (expensive percentile sort).
+  const cacheKey = `${period ?? '24h'}::${roles ? [...roles].sort().join(',') : 'ALL'}`;
+  const [countsResult, periodRows] = await Promise.all([
+    pool.query(STATION_LIVE_COUNTS_SQL, [roles]),
+    stationPeriodCache.resolve(
+      cacheKey,
+      async () => (await pool.query(STATION_PERIOD_METRICS_SQL, [roles, intervalStr])).rows,
+    ),
   ]);
-  return rows.map((r: any): StationMetric => ({
-    role: r.role,
-    pending: Number(r.pending ?? 0),
-    claimed: Number(r.claimed ?? 0),
-    resolved: Number(r.resolved ?? 0),
-    in_arrears: Number(r.in_arrears ?? 0),
-    throughput_pct: r.throughput_pct != null ? Number(r.throughput_pct) : null,
-    wait: {
-      p99: r.p99_wait_min != null ? Number(r.p99_wait_min) : null,
-      p50: r.p50_wait_min != null ? Number(r.p50_wait_min) : null,
-      avg: r.avg_wait_min != null ? Number(r.avg_wait_min) : null,
-      max: r.max_wait_min != null ? Number(r.max_wait_min) : null,
-    },
-    work: {
-      p99: r.p99_work_min != null ? Number(r.p99_work_min) : null,
-      p50: r.p50_work_min != null ? Number(r.p50_work_min) : null,
-      avg: r.avg_work_min != null ? Number(r.avg_work_min) : null,
-      max: r.max_work_min != null ? Number(r.max_work_min) : null,
-    },
-  }));
+
+  const periodByRole = new Map<string, any>(periodRows.map((r: any) => [r.role, r]));
+
+  return countsResult.rows.map((c: any): StationMetric => {
+    const p = periodByRole.get(c.role);
+    return {
+      role: c.role,
+      pending: Number(c.pending ?? 0),
+      claimed: Number(c.claimed ?? 0),
+      resolved: Number(p?.resolved ?? 0),
+      in_arrears: Number(c.in_arrears ?? 0),
+      throughput_pct: p?.throughput_pct != null ? Number(p.throughput_pct) : null,
+      wait: {
+        p99: toNum(p?.p99_wait_min),
+        p50: toNum(p?.p50_wait_min),
+        avg: toNum(p?.avg_wait_min),
+        max: toNum(p?.max_wait_min),
+      },
+      work: {
+        p99: toNum(p?.p99_work_min),
+        p50: toNum(p?.p50_work_min),
+        avg: toNum(p?.avg_work_min),
+        max: toNum(p?.max_work_min),
+      },
+    };
+  });
 }

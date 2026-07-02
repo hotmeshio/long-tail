@@ -13,7 +13,7 @@ interface McpRunFilters {
   order?: string;
 }
 
-export function useMcpRuns(filters: McpRunFilters = {}) {
+export function useMcpRuns(filters: McpRunFilters = {}, options?: { enabled?: boolean }) {
   const params = new URLSearchParams();
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
@@ -27,6 +27,7 @@ export function useMcpRuns(filters: McpRunFilters = {}) {
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['mcpRuns', filters],
     queryFn: () => apiFetch(`/pipelines?${params}`),
+    enabled: options?.enabled ?? true,
   });
 }
 

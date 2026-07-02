@@ -65,7 +65,7 @@ function ShellLayout() {
             {isBuilder && <OrchestrationSidebar />}
             {isBuilder && aiEnabled && <DesignSidebar />}
             {isBuilder && <StorageSidebar />}
-            {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} />}
+            {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} isOps={isOps} />}
           </nav>
 
           {/* Collapse / Expand toggle */}

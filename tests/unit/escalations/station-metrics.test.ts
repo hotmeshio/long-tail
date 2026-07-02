@@ -6,7 +6,7 @@ vi.mock('../../../lib/db', () => ({
 }));
 
 import { getPool } from '../../../lib/db';
-import { getStationMetrics } from '../../../services/escalation/queries';
+import { getStationMetrics, resetStationMetricsCache } from '../../../services/escalation/queries';
 
 const mockQuery = vi.fn();
 vi.mocked(getPool).mockReturnValue({ query: mockQuery } as any);
@@ -33,7 +33,9 @@ describe('VALID_PERIODS', () => {
 // ── getStationMetrics (service) ───────────────────────────────────────────────
 
 describe('getStationMetrics', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  // The period-metrics half is cached in-process; clear it so each test starts
+  // from a cold cache and observes its own mock rows.
+  beforeEach(() => { vi.clearAllMocks(); resetStationMetricsCache(); });
 
   function mockRow(overrides: Record<string, any> = {}): Record<string, any> {
     return {
@@ -126,5 +128,30 @@ describe('getStationMetrics', () => {
     mockQuery.mockResolvedValue({ rows: [] });
     const result = await getStationMetrics(['nobody'], '24h');
     expect(result).toEqual([]);
+  });
+
+  it('merges live counts with period metrics into one station', async () => {
+    mockQuery.mockResolvedValue({ rows: [mockRow()] });
+    const [station] = await getStationMetrics(undefined, '24h');
+    // counts come from the live query, percentiles/throughput from the period query
+    expect(station.pending).toBe(5);
+    expect(station.claimed).toBe(1);
+    expect(station.resolved).toBe(42);
+    expect(station.throughput_pct).toBe(87.5);
+    expect(station.work.p99).toBeCloseTo(0.667);
+  });
+
+  it('serves period metrics from cache on a repeat call but re-queries live counts', async () => {
+    mockQuery.mockResolvedValue({ rows: [mockRow()] });
+
+    await getStationMetrics(undefined, '24h');
+    const afterFirst = mockQuery.mock.calls.length;   // 2: live counts + period metrics
+
+    await getStationMetrics(undefined, '24h');
+    const afterSecond = mockQuery.mock.calls.length;
+
+    // Second call re-runs only the live-counts query; period metrics are cached.
+    expect(afterFirst).toBe(2);
+    expect(afterSecond - afterFirst).toBe(1);
   });
 });
