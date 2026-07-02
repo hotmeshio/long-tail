@@ -77,7 +77,7 @@ export async function createAdminServer(options?: {
   registerWorkflowTools(instance);          //  3 tools
   registerMcpServerTools(instance);         //  4 tools
   registerYamlWorkflowTools(instance);      //  5 tools
-  registerUserTools(instance);              //  7 tools (users + roles)
+  registerUserTools(instance);              //  8 tools (users + roles)
   registerMaintenanceTools(instance);       //  1 tool
   registerAgentTools(instance);             //  5 tools
   registerAgentSubscriptionTools(instance); //  3 tools

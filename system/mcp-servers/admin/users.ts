@@ -216,9 +216,10 @@ export function registerUserTools(server: McpServer): void {
     {
       title: 'Update Role',
       description:
-        'Update role metadata: display name, description, form schema, properties ' +
-        '(SLA targets, throughput goals), ops_visible flag, and parent role ' +
-        'for the process dependency graph.',
+        'Update role metadata with PATCH semantics — omitted fields keep their ' +
+        'values. Covers display name, description, form/metadata schemas, the ' +
+        'free properties bag, ops_visible flag, parent role, and the typed ' +
+        'operational targets (sla_minutes, target_per_hour, worker_count).',
       inputSchema: updateRoleSchema,
     },
     async (args: z.infer<typeof updateRoleSchema>) => {

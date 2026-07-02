@@ -282,9 +282,9 @@ export const updateRoleSchema = z.object({
   properties: z.record(z.any()).nullable().optional().describe('Free user-owned bag (icon, color, tags, etc.). No reserved keys — use the typed columns below for operational values.'),
   ops_visible: z.boolean().optional().describe('When true, role appears as a station on the /operations view'),
   parent_role: z.string().nullable().optional().describe('Parent role in the process dependency graph (nullable; roots have no parent)'),
-  sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. Part of the ops triangle: target_per_hour = worker_count / (sla_minutes / 60)'),
-  target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the pressure membrane baseline.'),
-  worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). Part of the ops triangle.'),
+  sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. One of the capacity settings: target_per_hour = worker_count / (sla_minutes / 60)'),
+  target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the station pace baseline on the Operations view.'),
+  worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
 });
 
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────
