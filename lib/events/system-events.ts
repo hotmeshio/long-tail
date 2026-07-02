@@ -32,6 +32,9 @@ const ESCALATION_STATUS_BY_VERB: Record<string, string> = {
   reassigned: 'pending',
   resolved: 'resolved',
   cancelled: 'cancelled',
+  // hotmesh 0.25.1: the SLA timer on a condition(config + timeout) wait fired
+  // first — the engine transitioned the row and emitted .expired.
+  expired: 'expired',
 };
 
 /**

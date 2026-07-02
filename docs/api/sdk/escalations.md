@@ -79,7 +79,7 @@ const faceted = await lt.escalations.list({
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `status` | `string` | No | Filter by `pending`, `resolved`, or `cancelled` |
+| `status` | `string` | No | Filter by `pending`, `resolved`, `cancelled`, or `expired` |
 | `role` | `string` | No | Filter by assigned role |
 | `roles` | `string[]` | No | Restrict to these roles (`role = ANY`) — narrows within the caller's scope, never widens past it |
 | `type` | `string` | No | Filter by workflow type |
@@ -366,7 +366,7 @@ Pass an escalation config as the second argument. The escalation row is written 
 
 `conditionLT` returns `T | false | null`:
 - `T` — the resolver's payload (normal resolution)
-- `false` — the escalation timed out (if a timeout was configured)
+- `false` — the SLA timer fired first (`config.timeout`); the row is now `status='expired'`
 - `null` — the escalation was cancelled (workflow terminated or explicit `POST /api/escalations/:id/cancel`)
 
 Always guard for `null` and `false` before accessing the payload:
@@ -387,15 +387,31 @@ export async function stationWorker(envelope: LTEnvelope) {
     workflowType: 'stationWorker',
     metadata: { orderId: envelope.data.orderId, station: 'qc' },
     envelope: { instructions: 'Review and approve or reject' },
+    timeout: '24h',   // SLA for this worklist row (hotmesh 0.25.1+)
   });
 
-  if (!decision) {
-    // null = cancelled, false = timeout
+  if (decision === false) {
+    // SLA passed: the workflow resumed on the timer and the engine transitioned
+    // the row pending → expired atomically. A late resolve returns
+    // already-expired, and system.escalation.{id}.expired fired for dashboards.
+    return { type: 'return' as const, data: { autoRejected: 'sla' } };
+  }
+  if (decision === null) {
     return { type: 'return' as const, data: { cancelled: true } };
   }
   // decision is clean — the escalation was resolved by the resolve endpoint
 }
 ```
+
+### SLA-gated waits (`timeout`)
+
+`ConditionQueueConfig.timeout` (hotmesh 0.25.1+) arms the same resume timer as
+`condition(signalId, '24h')` **in the same single Leg1 write** that creates the
+escalation row. The race is resolved atomically on both sides: a signal that
+arrives first resolves the row normally and the timer is inert; a timer that
+fires first resumes the workflow with `false` and expires the row in a guarded
+UPDATE, so operators can never resolve into a workflow that already moved on.
+`expiresAt`, by contrast, is display metadata on the row — it arms nothing.
 
 ### Two-step form
 

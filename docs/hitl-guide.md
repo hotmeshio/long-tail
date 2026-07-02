@@ -62,11 +62,16 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
       },
     },
     envelope: { data: envelope.data },
+    timeout: '72h',   // SLA: resume with false + expire the row if unresolved
   });
 
-  if (!decision) {
-    // null = escalation was cancelled (workflow terminated or explicit cancel)
-    // false = escalation timed out
+  if (decision === false) {
+    // SLA timer fired first — the row is already status='expired' (engine-side,
+    // atomic) and a late resolve returns already-expired. Branch to fallback.
+    return { type: 'return' as const, data: { autoRejected: 'sla' } };
+  }
+  if (decision === null) {
+    // escalation was cancelled (workflow terminated or explicit cancel)
     return { type: 'return' as const, data: { cancelled: true } };
   }
 
@@ -77,6 +82,10 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
   }
 }
 ```
+
+The `timeout` field (hotmesh 0.25.1+) makes the wait SLA-gated in the same
+single Leg1 write: one `conditionLT` call yields the worklist row AND the
+resume timer. Omit it for an open-ended wait.
 
 #### Two-step form
 

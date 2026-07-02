@@ -112,9 +112,9 @@ describe('STATUS_OPTIONS', () => {
     expect(values).toContain('cancelled');
   });
 
-  it('includes all four status values', () => {
+  it('includes every terminal and live status value', () => {
     const values = STATUS_OPTIONS.map((o) => o.value);
-    expect(values).toEqual(expect.arrayContaining(['available', 'claimed', 'resolved', 'cancelled']));
+    expect(values).toEqual(expect.arrayContaining(['available', 'claimed', 'resolved', 'cancelled', 'expired']));
   });
 
   it('renders cancelled status option in filter bar when showStatus is true', () => {

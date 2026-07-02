@@ -1,7 +1,9 @@
 export type LTEscalationStatus =
   | 'pending'
   | 'resolved'
-  | 'cancelled';
+  | 'cancelled'
+  /** SLA timer on a `conditionLT`/`condition` wait fired first — the workflow resumed with `false`; the row is terminal */
+  | 'expired';
 
 export type LTEscalationPriority = 1 | 2 | 3 | 4;
 

@@ -29,7 +29,7 @@ export const getProcessDetailSchema = z.object({
 // ── escalations (routes/escalations/) ───────────────────────────────────────
 
 export const findEscalationsSchema = z.object({
-  status: z.enum(['pending', 'resolved', 'cancelled']).optional().describe('Filter by status'),
+  status: z.enum(['pending', 'resolved', 'cancelled', 'expired']).optional().describe('Filter by status'),
   role: z.string().optional().describe('Filter by target role'),
   type: z.string().optional().describe('Filter by escalation type'),
   subtype: z.string().optional().describe('Filter by escalation subtype'),

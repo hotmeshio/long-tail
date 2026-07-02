@@ -98,6 +98,7 @@ export function AvailableEscalationsPage() {
   const apiStatus = isClaimed ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
     : statusFilter === 'cancelled' ? 'cancelled'
+    : statusFilter === 'expired' ? 'expired'
     : isAvailable ? undefined
     : undefined;
 
