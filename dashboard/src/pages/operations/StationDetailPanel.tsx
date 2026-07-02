@@ -13,8 +13,12 @@ interface StationDetailPanelProps {
   onClose: () => void;
 }
 
-const PERIODS = ['1h', '24h', '7d', '30d'] as const;
+// Mirrors OperationsPage's selector — the panel reports the same windows the
+// chart can show, and opens on whichever one the chart has selected.
+const PERIODS = ['15m', '1h', '24h', '7d', '30d'] as const;
 type Period = (typeof PERIODS)[number];
+
+const isPeriod = (p: string): p is Period => (PERIODS as readonly string[]).includes(p);
 
 function fmt(min: number | null): string {
   if (min == null) return '—';
@@ -55,8 +59,10 @@ function PeriodSelector({ period, onChange }: { period: Period; onChange: (p: Pe
   );
 }
 
-function RoleView({ role, onClose }: { role: RoleDetail; onClose: () => void }) {
-  const [period, setPeriod] = useState<Period>('24h');
+function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPeriod: string; onClose: () => void }) {
+  // Open on the chart's selected window so the panel's numbers agree with the
+  // chart beside it; the local selector still lets the viewer drill around.
+  const [period, setPeriod] = useState<Period>(isPeriod(globalPeriod) ? globalPeriod : '24h');
   const { data } = useStationMetrics(period);
   const metric = data?.stations.find((s) => s.role === role.role);
   const slaMinutes = role.sla_minutes ?? undefined;
@@ -98,7 +104,7 @@ function RoleView({ role, onClose }: { role: RoleDetail; onClose: () => void }) 
 
       <PeriodSelector period={period} onChange={setPeriod} />
 
-      {/* Ops triangle */}
+      {/* Capacity settings */}
       {(targetPerHour || slaMinutes || workerCount) && (
         <div className="flex items-center gap-4 mb-4 text-[10px]">
           {targetPerHour && (
@@ -155,10 +161,11 @@ function RoleView({ role, onClose }: { role: RoleDetail; onClose: () => void }) 
         )}
       </div>
 
-      {/* View queue */}
+      {/* View queue — the facet URL parser reads `roles` as a JSON array; a
+          bare `role=` param is ignored and would show every role's queue. */}
       <div className="mt-4 border-t border-surface-border/40 pt-3">
         <Link
-          to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
+          to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}`}
           className="flex items-center gap-1.5 text-[10px] text-accent hover:underline"
         >
           View full queue
@@ -203,9 +210,9 @@ function OverviewPanel({
             {stationsWithLoad} station{stationsWithLoad > 1 ? 's' : ''} with backlog
           </p>
         ) : totalResolved > 0 ? (
-          <p className="text-[11px] text-emerald-500">Flowing — no backlog</p>
+          <p className="text-[11px] text-emerald-500">Flowing — queue clear</p>
         ) : (
-          <p className="text-[11px] text-text-quaternary">No activity</p>
+          <p className="text-[11px] text-text-quaternary">Quiet — awaiting work</p>
         )}
       </div>
 
@@ -298,7 +305,7 @@ export function StationDetailPanel({
   return (
     <div className="w-[280px] shrink-0 px-6 py-8 flex flex-col overflow-y-auto min-h-0">
       {role ? (
-        <RoleView role={role} onClose={onClose} />
+        <RoleView role={role} globalPeriod={globalPeriod} onClose={onClose} />
       ) : (
         <OverviewPanel allMetrics={allMetrics} orderedRoles={orderedRoles} period={globalPeriod} />
       )}

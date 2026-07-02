@@ -117,7 +117,9 @@ describe('ortho pipeline (8-stage Leg1 condition loop)', () => {
       expect(esc.type).toBe('ortho-stage');
       expect(esc.subtype).toBe(stage);
 
-      const resolution = buildStageResolution(stage, orderId);
+      // completed_at rides in the resolver payload (as ortho_complete_stage
+      // stamps it) — the workflow reads it from the signal, never the clock.
+      const resolution = { ...buildStageResolution(stage, orderId), completed_at: new Date().toISOString() };
       const result = await escalationApi.resolveEscalation(
         { id: esc.id, resolverPayload: resolution },
         { userId: operatorId },

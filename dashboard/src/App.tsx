@@ -322,9 +322,11 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Operations: admin-level overview of active work across stations
+      // Operations: overview of active work across stations. Engineer is
+      // included because the sidebar shows Operations to every builder —
+      // the route gate and the nav entry must admit the same audience.
       {
-        element: <RequireRole roleTypes={['admin', 'superadmin']} />,
+        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'operations', element: <Lazy><OperationsPage /></Lazy> },
         ],

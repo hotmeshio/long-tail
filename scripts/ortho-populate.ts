@@ -110,7 +110,7 @@ async function resolveBatch(batchTag: string): Promise<number> {
 
       try {
         await api('POST', `/api/escalations/${esc.id}/resolve`, {
-          resolverPayload: { approved: true, station: esc.role },
+          resolverPayload: { approved: true, station: esc.role, completed_at: new Date().toISOString() },
         });
         totalResolved++;
         resolved++;

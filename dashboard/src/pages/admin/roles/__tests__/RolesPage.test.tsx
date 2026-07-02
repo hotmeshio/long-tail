@@ -117,10 +117,10 @@ describe('RolesPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/admin/roles/admin');
   });
 
-  it('shows empty message when no roles exist', () => {
+  it('shows a create-role directive when zero roles exist', () => {
     roleDetailsData = emptyRoles;
     renderPage();
-    expect(screen.getByText('No roles found.')).toBeInTheDocument();
+    expect(screen.getByText('Create a role to get started.')).toBeInTheDocument();
   });
 
   it('shows search bar', () => {
@@ -136,11 +136,11 @@ describe('RolesPage', () => {
     expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
   });
 
-  it('shows no-match message when search finds nothing', async () => {
+  it('shows a clear-search directive when search finds nothing', async () => {
     renderPage();
     const search = screen.getByPlaceholderText(/Search \d+ roles/);
     await userEvent.type(search, 'zzznomatch');
-    expect(screen.getByText('No roles match your search.')).toBeInTheDocument();
+    expect(screen.getByText('Clear the search to see all roles.')).toBeInTheDocument();
   });
 
   it('renders table column headers', () => {
@@ -151,10 +151,10 @@ describe('RolesPage', () => {
     expect(screen.getByText('SLA/M')).toBeInTheDocument();
   });
 
-  it('shows dash for zero counts', () => {
+  it('renders unset capacity values as empty cells (never placeholder glyphs)', () => {
     renderPage();
-    // reviewer has zero for all counts — rendered as '—'
-    const dashes = screen.getAllByText('—');
-    expect(dashes.length).toBeGreaterThan(0);
+    // reviewer has zero/unset counts — the cells render empty so copy/paste
+    // and screen readers see exactly what the eye sees.
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 });

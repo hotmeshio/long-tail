@@ -6,8 +6,8 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { CreateRoleModal } from './CreateRoleModal';
 
 // ── Grid columns ──────────────────────────────────────────────────────────────
-// OPS(28px) | ROLE(160px) | LABEL(160px) | DESCRIPTION(1fr) | PRECEDED BY(130px) | ESCALATES TO(160px) | MEMBERS(88px) | OPS-TRIO(204px)
-// The ops-trio is a single combined cell that internally renders SLA/m · Target/h · Staff flush to row edges
+// OPS(28px) | ROLE(160px) | LABEL(160px) | DESCRIPTION(1fr) | PRECEDED BY(130px) | ESCALATES TO(160px) | MEMBERS(88px) | CAPACITY(204px)
+// The capacity block is a single combined cell that internally renders SLA/m · Target/h · Staff flush to row edges
 const GRID = '28px 160px 160px 1fr 130px 160px 88px 204px';
 
 const CELL_TEXT = 'text-text-secondary transition-colors group-hover/row:text-text-primary';
@@ -15,9 +15,9 @@ const HDR = 'text-[9px] font-semibold uppercase tracking-widest text-text-quater
 
 // ── Table header ──────────────────────────────────────────────────────────────
 
-const TRIO_LABEL = `${HDR} text-right flex-1 min-w-0`;
+const CAPACITY_COL_LABEL = `${HDR} text-right flex-1 min-w-0`;
 
-// py lives on each cell, not the grid — lets the trio div stretch flush to row edges
+// py lives on each cell, not the grid — lets the capacity div stretch flush to row edges
 const CELL_PY = 'py-2';
 const ROW_PY = 'py-2.5';
 
@@ -34,11 +34,11 @@ function TableHead() {
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Preceded By</span>
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Escalates To</span>
       <span className={`${HDR} ${CELL_PY} flex items-center justify-end`}>Member Count</span>
-      {/* Trio — no py, stretches to full row height by default (grid stretch alignment) */}
-      <div className="flex gap-3 items-center bg-[#F4F4F4] px-3">
-        <span className={TRIO_LABEL}>SLA/M</span>
-        <span className={TRIO_LABEL}>Target/h</span>
-        <span className={TRIO_LABEL}>Staff</span>
+      {/* Capacity block — no py, stretches to full row height by default (grid stretch alignment) */}
+      <div className="flex gap-3 items-center bg-surface-sunken px-3">
+        <span className={CAPACITY_COL_LABEL}>SLA/M</span>
+        <span className={CAPACITY_COL_LABEL}>Target/h</span>
+        <span className={CAPACITY_COL_LABEL}>Staff</span>
       </div>
     </div>
   );
@@ -46,7 +46,7 @@ function TableHead() {
 
 // ── Role row ──────────────────────────────────────────────────────────────────
 
-const TRIO_VAL = 'text-[11px] tabular-nums text-right flex-1 min-w-0 transition-colors';
+const CAPACITY_COL_VAL = 'text-[11px] tabular-nums text-right flex-1 min-w-0 transition-colors';
 
 function RoleRow({
   role,
@@ -71,7 +71,7 @@ function RoleRow({
       <div className={`flex items-center justify-center ${ROW_PY}`}>
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${role.ops_visible ? 'bg-emerald-500' : 'bg-surface-border'}`}
-          title={role.ops_visible ? 'Visible in Operations' : 'Not in Operations view'}
+          title={role.ops_visible ? 'Visible in Operations' : 'Enable in role settings to show in Operations'}
         />
       </div>
 
@@ -114,23 +114,22 @@ function RoleRow({
         ))}
       </div>
 
-      {/* MEMBER COUNT */}
-      <span className={`flex items-center justify-end text-[11px] tabular-nums ${ROW_PY} transition-colors ${
-        role.user_count > 0 ? CELL_TEXT : 'text-transparent'
-      }`}>
-        {role.user_count || 0}
+      {/* MEMBER COUNT — unset renders empty, not invisible text (screen
+          readers and copy/paste see exactly what the eye sees) */}
+      <span className={`flex items-center justify-end text-[11px] tabular-nums ${ROW_PY} transition-colors ${CELL_TEXT}`}>
+        {role.user_count > 0 ? role.user_count : ''}
       </span>
 
       {/* SLA/m · Target/h · Staff — no py: stretches flush to full row height */}
-      <div className="flex gap-3 items-center bg-[#F4F4F4] px-3">
-        <span className={`${TRIO_VAL} ${role.sla_minutes != null ? CELL_TEXT : 'text-transparent'}`}>
-          {role.sla_minutes ?? '—'}
+      <div className="flex gap-3 items-center bg-surface-sunken px-3">
+        <span className={`${CAPACITY_COL_VAL} ${CELL_TEXT}`}>
+          {role.sla_minutes ?? ''}
         </span>
-        <span className={`${TRIO_VAL} ${role.target_per_hour != null ? CELL_TEXT : 'text-transparent'}`}>
-          {role.target_per_hour ?? '—'}
+        <span className={`${CAPACITY_COL_VAL} ${CELL_TEXT}`}>
+          {role.target_per_hour ?? ''}
         </span>
-        <span className={`${TRIO_VAL} ${role.worker_count != null ? CELL_TEXT : 'text-transparent'}`}>
-          {role.worker_count ?? '—'}
+        <span className={`${CAPACITY_COL_VAL} ${CELL_TEXT}`}>
+          {role.worker_count ?? ''}
         </span>
       </div>
     </div>
@@ -188,7 +187,7 @@ export function RolesPage() {
       {/* Filter bar */}
       {!isLoading && roles.length > 0 && (
         <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-          <div className="bg-[#F7F7F7] rounded-lg px-5 py-3 flex items-center gap-3">
+          <div className="bg-surface-sunken rounded-lg px-5 py-3 flex items-center gap-3">
             <Search className="w-3 h-3 text-text-quaternary shrink-0" />
             <input
               type="text"
@@ -215,7 +214,7 @@ export function RolesPage() {
         </div>
       ) : filtered.length === 0 ? (
         <p className="text-sm text-text-tertiary mt-8">
-          {search ? 'No roles match your search.' : 'No roles found.'}
+          {search ? 'Clear the search to see all roles.' : 'Create a role to get started.'}
         </p>
       ) : (
         <>

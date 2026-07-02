@@ -1,16 +1,13 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useRoleDetails, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
-import { useSocketIOSubscription } from '../../hooks/useSocketIO';
+import { useStationMetricsEvents } from '../../hooks/useEventHooks';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { MembraneChart, type ChartStation } from './MembraneChart';
+import { PaceChart, type ChartStation } from './PaceChart';
 import { StationDetailPanel } from './StationDetailPanel';
-
-const REFRESH_INTERVAL_MS = 10_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -76,7 +73,7 @@ function fmtMin(v: number | null): string {
   return `${(v / 60).toFixed(1)}h`;
 }
 
-function pressureBar(
+function loadBar(
   pending: number,
   target: number | null,
   throughputPct: number | null,
@@ -92,7 +89,7 @@ function pressureBar(
     return { pct, color, historical: false };
   }
 
-  // Idle: use period throughput efficiency rather than real-time pressure.
+  // Idle: use period throughput efficiency rather than the live backlog ratio.
   // resolved=0 means nothing happened in this window → no data, not failing.
   if (resolved === 0 || throughputPct == null) {
     return { pct: null, color: 'bg-surface-border', historical: true };
@@ -123,7 +120,7 @@ function StationRow({
   const resolved = metric?.resolved ?? 0;
   const inArrears = metric?.in_arrears ?? 0;
   const target = role.target_per_hour ?? null;
-  const { pct, color, historical } = pressureBar(pending, target, metric?.throughput_pct ?? null, resolved);
+  const { pct, color, historical } = loadBar(pending, target, metric?.throughput_pct ?? null, resolved);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
 
   return (
@@ -192,7 +189,7 @@ function StationRow({
           {fmtMin(metric?.work.p99 ?? null)}
         </span>
 
-        {/* Pressure mini-bar */}
+        {/* Load mini-bar */}
         <div className="flex items-center gap-2">
           <div className="w-12 h-1.5 bg-surface-sunken rounded-full overflow-hidden shrink-0">
             <div className={`h-full rounded-full ${color}`} style={{ width: `${barWidth}%` }} />
@@ -258,27 +255,10 @@ export function OperationsPage() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const queryClient = useQueryClient();
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const invalidateMetrics = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['stationMetrics'] });
-  }, [queryClient]);
-
-  // Debounced invalidate for socket events — burst of resolves collapses to one refetch.
-  const debouncedInvalidate = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(invalidateMetrics, 600);
-  }, [invalidateMetrics]);
-
-  // Socket.IO: refresh on any escalation event (resolved, claimed, released).
-  useSocketIOSubscription('lt.events.system.escalation.>', debouncedInvalidate);
-
-  // Fallback auto-refresh every REFRESH_INTERVAL_MS.
-  useEffect(() => {
-    const id = setInterval(invalidateMetrics, REFRESH_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [invalidateMetrics]);
+  // Push-driven refresh: every escalation event invalidates ['stationMetrics']
+  // through the central event system (debounced, transport-agnostic). The
+  // header's refresh button covers user-initiated reloads.
+  useStationMetricsEvents();
 
   const { data: roleData, isLoading: rolesLoading, refetch: refetchRoles } = useRoleDetails();
   const {
@@ -371,7 +351,7 @@ export function OperationsPage() {
         </div>
       ) : ordered.length === 0 ? (
         <div className="mt-8">
-          <p className="text-sm text-text-secondary mb-2">No stations configured.</p>
+          <p className="text-sm text-text-secondary mb-2">Stations appear here once roles are marked visible in Operations.</p>
           <p className="text-xs text-text-tertiary">
             Go to{' '}
             <Link to="/admin/roles" className="text-accent hover:underline">
@@ -389,7 +369,7 @@ export function OperationsPage() {
           <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
             {/* SVG chart — scales to fill available space */}
             <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden p-4">
-              <MembraneChart
+              <PaceChart
                 stations={chartStations}
                 selectedRole={selectedRole}
                 onSelect={handleSelect}

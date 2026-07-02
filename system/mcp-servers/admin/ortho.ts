@@ -14,7 +14,7 @@ import * as escalationApi from '../../../api/escalations';
 import * as workflowApi from '../../../api/workflows';
 import { ensureSystemBot } from '../../../services/iam';
 import type { LTApiAuth } from '../../../types/sdk';
-import { ORTHO_STAGES } from '../../../examples/workflows/ortho-pipeline/types';
+import { ORTHO_STAGES, ORTHO_STAGE_TYPE, ORTHO_PIPELINE_WORKFLOW } from '../../../examples/workflows/ortho-pipeline/types';
 
 let systemPrincipalId: string | null = null;
 
@@ -58,21 +58,22 @@ export function registerOrthoTools(server: McpServer): void {
       title: 'Submit Ortho Order',
       description:
         'Start a new orthotic manufacturing order through the 8-stage pipeline ' +
-        '(design → review → print → grid → glue → finish → qa → ship). ' +
+        '(design → review → print → grind → glue → finish → qa → ship). ' +
         'Returns a workflow_id used to track progress. Each stage creates a pending ' +
         'escalation that must be completed via ortho_complete_stage before the next stage begins.',
       inputSchema: orthoSubmitSchema,
     },
     async (args: z.infer<typeof orthoSubmitSchema>) => {
+      const auth = await systemAuth();
       const result = await invokeWorkflow({
-        workflowType: 'orthoPipeline',
+        workflowType: ORTHO_PIPELINE_WORKFLOW,
         data: {
           order_id: args.order_id,
           item_type: args.item_type,
           ...(args.stages ? { stages: args.stages } : {}),
           ...(args.metadata ? { metadata: args.metadata } : {}),
         },
-        auth: { userId: 'lt-system', role: 'superadmin' },
+        auth,
       });
 
       return {
@@ -106,7 +107,7 @@ export function registerOrthoTools(server: McpServer): void {
       const result = await escalationApi.listEscalations(
         {
           status: 'pending',
-          type: 'ortho-stage',
+          type: ORTHO_STAGE_TYPE,
           ...(args.stage ? { subtype: args.stage } : {}),
           limit: args.limit ?? 50,
           sort_by: 'created_at',
@@ -159,6 +160,20 @@ export function registerOrthoTools(server: McpServer): void {
     async (args: z.infer<typeof orthoCompleteStageSchema>) => {
       const auth = await systemAuth();
 
+      // Contract guard: this tool advances pipeline stage gates only. The
+      // general-purpose resolve_escalation tool covers every other type.
+      const detail = await escalationApi.getEscalation({ id: args.escalation_id }, auth);
+      if (detail.status !== 200 || (detail.data as any)?.type !== ORTHO_STAGE_TYPE) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: `Escalation ${args.escalation_id} is ${detail.status !== 200 ? 'unknown' : `type "${(detail.data as any)?.type}"`} — ortho_complete_stage resolves ${ORTHO_STAGE_TYPE} gates. Use resolve_escalation for other types.`,
+            }),
+          }],
+        };
+      }
+
       // Claim first (idempotent if already claimed by us)
       const claimResult = await escalationApi.claimEscalation(
         { id: args.escalation_id, durationMinutes: 60 },
@@ -173,12 +188,14 @@ export function registerOrthoTools(server: McpServer): void {
         };
       }
 
-      // Resolve with stage output
+      // Resolve with stage output. completed_at is stamped here — the durable
+      // workflow reads it from the signal payload (replay-deterministic).
       const resolveResult = await escalationApi.resolveEscalation(
         {
           id: args.escalation_id,
           resolverPayload: {
             notes: args.notes,
+            completed_at: new Date().toISOString(),
             ...(args.outcome ? { outcome: args.outcome } : {}),
           },
         },

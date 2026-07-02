@@ -85,7 +85,7 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
   return (
     <div className="space-y-3">
       {targets.length === 0 ? (
-        <p className="text-[11px] text-text-tertiary">No targets configured.</p>
+        <p className="text-[11px] text-text-tertiary">Add a target role to route hand-offs.</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {targets.map((t) => (
@@ -228,6 +228,8 @@ export function RoleDetailPage() {
     if (Object.keys(newErrors).length || !role) return;
 
     const parseNum = (s: string) => { const v = parseFloat(s); return isNaN(v) ? null : v; };
+    // Staff counts are whole people/machines — round rather than persist 2.5 workers.
+    const parseCount = (s: string) => { const v = parseNum(s); return v == null ? null : Math.round(v); };
 
     updateRole.mutate(
       {
@@ -241,7 +243,7 @@ export function RoleDetailPage() {
         properties: propsResult.value ?? {},
         sla_minutes: parseNum(draft.sla_minutes),
         target_per_hour: parseNum(draft.target_per_hour),
-        worker_count: parseNum(draft.worker_count),
+        worker_count: parseCount(draft.worker_count),
       },
       {
         onSuccess: () => {
@@ -283,14 +285,14 @@ export function RoleDetailPage() {
   const inUse = role.user_count > 0 || role.chain_count > 0 || role.workflow_count > 0;
   const canSave = dirty && !Object.values(errors).some(Boolean);
 
-  // Derived triangle hint
+  // Any two capacity settings derive the third — hint the missing one.
   const sla = parseFloat(draft.sla_minutes);
   const tph = parseFloat(draft.target_per_hour);
   const wc = parseFloat(draft.worker_count);
   const slaOk = !isNaN(sla) && sla > 0;
   const tphOk = !isNaN(tph) && tph > 0;
   const wcOk = !isNaN(wc) && wc > 0;
-  const triangleDerived =
+  const derivedCapacityHint =
     slaOk && wcOk && !tphOk ? `→ target ≈ ${(wc / (sla / 60)).toFixed(1)}/h` :
     slaOk && tphOk && !wcOk ? `→ workers ≈ ${(tph * (sla / 60)).toFixed(1)}` :
     tphOk && wcOk && !slaOk ? `→ SLA ≈ ${(wc / tph * 60).toFixed(0)}m` : null;
@@ -430,7 +432,7 @@ export function RoleDetailPage() {
                 !editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
                   <button onClick={() => startEditingJson('properties')} className="text-[9px] text-accent hover:underline">Edit</button>
                 ) : (
-                  <span className="text-[9px] font-normal normal-case text-text-quaternary">free bag</span>
+                  <span className="text-[9px] font-normal normal-case text-text-quaternary">custom JSON</span>
                 )
               }
             />
@@ -461,7 +463,7 @@ export function RoleDetailPage() {
           <SectionHead
             icon={Triangle}
             color="text-amber-400"
-            label="Operational Triangle"
+            label="Capacity"
             aside={
               <span className="text-[9px] font-semibold uppercase tracking-widest text-text-quaternary">
                 throughput = workers / (sla / 60)
@@ -492,12 +494,12 @@ export function RoleDetailPage() {
               </div>
             ))}
           </div>
-          {triangleDerived && (
-            <p className="text-[10px] text-accent font-mono">{triangleDerived}</p>
+          {derivedCapacityHint && (
+            <p className="text-[10px] text-accent font-mono">{derivedCapacityHint}</p>
           )}
 
           {/* Escalation targets — live */}
-          <div className="rounded-md bg-emerald-50/40 px-4 pt-3 pb-4">
+          <div className="pt-3 pb-4 border-t border-surface-border/40">
             <SectionHead
               icon={Network}
               color="text-text-quaternary"

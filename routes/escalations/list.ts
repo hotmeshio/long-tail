@@ -132,7 +132,7 @@ export function registerListRoutes(router: Router): void {
   /**
    * GET /api/escalations/station-metrics
    * Per-role P99/P50/avg/max wait + work times, resolved count, and in-arrears
-   * count. Drives the COO operations membrane chart.
+   * count. Drives the Operations station pace chart.
    * RBAC: superadmin sees all; others scoped to their roles.
    */
   router.get('/station-metrics', async (req, res) => {

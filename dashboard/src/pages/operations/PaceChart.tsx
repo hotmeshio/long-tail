@@ -9,7 +9,7 @@ export interface ChartStation {
   metric: StationMetric | undefined;
 }
 
-interface MembraneChartProps {
+interface PaceChartProps {
   stations: ChartStation[];
   selectedRole: string | null;
   onSelect: (role: string) => void;
@@ -98,7 +98,7 @@ function spreadLabels<T extends { y: number }>(labels: T[]): (T & { labelY: numb
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
-export function MembraneChart({ stations, selectedRole, onSelect, periodHours }: MembraneChartProps) {
+export function PaceChart({ stations, selectedRole, onSelect, periodHours }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const n = stations.length;
@@ -248,7 +248,7 @@ export function MembraneChart({ stations, selectedRole, onSelect, periodHours }:
 
         const tooltip =
           row.expected == null
-            ? 'idle · no target set'
+            ? 'idle · set a target rate to plot pace'
             : `${row.actual} done · target ${Math.round(row.expected)}`
               + (row.pending > 0 ? ` · ${row.pending} in queue` : '')
               + (row.active > 0 ? ` · ${row.active} active` : '');
