@@ -101,7 +101,8 @@ async function searchEscalations(params: {
  * predicate (global → none; else `role ∈ allRoles OR (role ∈ selfRoles AND
  * assigned_to = me)`) with the full FacetQuery language (`buildFacetWhere`:
  * facets `@>`, block, numeric range, exists, status, available) plus the extra
- * top-level filters (type/subtype/priority/assigned_to) and free-text, then orders
+ * top-level filters (type/subtype/priority/assigned_to) and an exact correlation-id
+ * match (id/workflow_id/origin_id), then orders
  * by `buildFacetOrder` (columns + `metadata.<key>`). Every value is bound; the
  * COUNT shares the WHERE so totals stay correct across pages — no client-side
  * filtering. Reads go through the `public.lt_escalations` view.
@@ -147,15 +148,12 @@ export async function searchEscalationsFaceted(opts: {
   if (opts.priority != null) clauses.push(`priority = $${params.push(opts.priority)}`);
   if (opts.assigned_to) clauses.push(`assigned_to = $${params.push(opts.assigned_to)}`);
 
-  // 4. Free-text (same fields as the list search path).
+  // 4. Correlation-id match (exact) — same fields as the list search path.
+  // Equality keeps it index-served (origin_id / workflow_id btree, id pk); metadata
+  // is searched precisely via the facets above, never a full-table text scan.
   if (opts.search) {
     const i = params.push(opts.search);
-    clauses.push(
-      `(description ILIKE '%' || $${i} || '%' OR type ILIKE '%' || $${i} || '%'
-        OR subtype ILIKE '%' || $${i} || '%' OR role ILIKE '%' || $${i} || '%'
-        OR workflow_id ILIKE '%' || $${i} || '%' OR origin_id ILIKE '%' || $${i} || '%'
-        OR id::text ILIKE '%' || $${i} || '%' OR metadata::text ILIKE '%' || $${i} || '%')`,
-    );
+    clauses.push(`(origin_id = $${i} OR workflow_id = $${i} OR id::text = $${i})`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join('\n  AND ')}` : '';
@@ -238,14 +236,27 @@ export async function listFacetKeys(opts: {
   return [...actualKeys].sort();
 }
 
+// Escalation stats back the home + overview surfaces and refresh on every
+// escalation event. The SDK's stats query scans all role rows across all statuses
+// and history (aggregates over an unbounded `base` CTE), so an event burst or
+// several concurrent viewers would re-run that scan repeatedly. Cache the result
+// briefly (single-flight) so the burst collapses to one scan per window — the
+// same lever as the station period metrics. Pending/claimed counts on an overview
+// tolerate a few seconds of staleness; the operator's live queue is uncached.
+const ESCALATION_STATS_CACHE_TTL_MS = 10_000;
+const escalationStatsCache = new TtlCache<EscalationStats>(ESCALATION_STATS_CACHE_TTL_MS);
+
 export async function getEscalationStats(
   visibleRoles?: string[],
   period?: string,
 ): Promise<EscalationStats> {
-  const client = await escalations();
-  return client.stats({
-    roles: visibleRoles,
-    period: period as '1h' | '24h' | '7d' | '30d' | undefined,
+  const key = `${period ?? '24h'}::${visibleRoles ? [...visibleRoles].sort().join(',') : 'ALL'}`;
+  return escalationStatsCache.resolve(key, async () => {
+    const client = await escalations();
+    return client.stats({
+      roles: visibleRoles,
+      period: period as '1h' | '24h' | '7d' | '30d' | undefined,
+    });
   });
 }
 
@@ -401,9 +412,10 @@ export async function listAvailableEscalations(filters: {
 const STATION_PERIOD_CACHE_TTL_MS = 30_000;
 const stationPeriodCache = new TtlCache<Record<string, unknown>[]>(STATION_PERIOD_CACHE_TTL_MS);
 
-/** Test hook: drop cached period metrics so unit tests observe fresh rows. */
+/** Test hook: drop cached period metrics AND escalation stats so tests observe fresh rows. */
 export function resetStationMetricsCache(): void {
   stationPeriodCache.clear();
+  escalationStatsCache.clear();
 }
 
 const toNum = (v: unknown): number | null => (v != null ? Number(v) : null);

@@ -74,7 +74,7 @@ including `metadata`, workflow linkage, assignment, and `signal_key`.
 | type | string | No | Filter by type |
 | subtype | string | No | Filter by subtype |
 | assigned_to | string | No | Filter by assigned user UUID (active claim holder) |
-| search | string | No | Free-text search across description, type/subtype, role, workflow/origin id, and metadata values (e.g. a correlation key like an order id). Server-side over the full result set. |
+| search | string | No | Exact-match lookup by correlation id — escalation id, workflow id, or origin id (order/ticket). Index-served, server-side over the full result set. To match a value inside metadata (e.g. an order id), use `facets`. |
 | priority | integer | No | Filter by priority |
 | sort_by | string | No | Sort column: created_at, priority, updated_at |
 | order | string | No | Sort direction (asc, desc) for sort_by |

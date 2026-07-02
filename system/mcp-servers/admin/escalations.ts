@@ -88,13 +88,14 @@ export function registerEscalationTools(server: McpServer): void {
       title: 'Find Escalations',
       description:
         'Search escalations with optional filters (status, role, type, subtype, ' +
-        'assigned_to, priority), free-text `search`, and sorting. `search` matches ' +
-        'across description, type/subtype, role, workflow/origin id, and metadata values ' +
-        '(e.g. a correlation key like an order id) server-side over the full result set. ' +
-        'Also supports FACETED metadata query — `facets` (metadata @> containment), `block` ' +
-        '(exclusion), `range` (numeric), `exists` (key present), `roles`, `available`, and ' +
-        '`orderBy` (incl. metadata.<key>) — all role-scoped and run in SQL. ' +
-        'Returns full records including metadata, workflow linkage, assignment, and signal_key.',
+        'assigned_to, priority), correlation-id `search`, and sorting. `search` is an ' +
+        'exact-match lookup by escalation id, workflow id, or origin id (order/ticket) — ' +
+        'index-served over the full result set. To match a value INSIDE metadata ' +
+        '(e.g. an order id), use the FACETED metadata query — `facets` (metadata @> containment), ' +
+        '`block` (exclusion), `range` (numeric), `exists` (key present), `roles`, `available`, and ' +
+        '`orderBy` (incl. metadata.<key>) — all role-scoped, GIN-served, and status-agnostic ' +
+        '(no status filter required). Returns full records including metadata, workflow linkage, ' +
+        'assignment, and signal_key.',
       inputSchema: findEscalationsSchema,
     },
     async (args: z.infer<typeof findEscalationsSchema>) => {

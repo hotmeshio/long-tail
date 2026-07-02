@@ -97,6 +97,7 @@ const escCmd = program.command('escalations').alias('esc').description('Manage e
 escCmd.command('list')
   .option('--status <status>', 'Filter by status (pending, resolved, cancelled)')
   .option('--role <role>', 'Filter by role')
+  .option('--search <term>', 'Exact-match by correlation id (escalation id, workflow id, or origin id). For a value inside metadata, use --facets')
   .option('--limit <n>', 'Max results')
   .option('--facets <json>', 'Required metadata facets, JSON object (metadata @>), e.g. \'{"filament":"pla"}\'')
   .option('--block <json>', 'Exclude rows containing ANY of these facet sets, JSON array')

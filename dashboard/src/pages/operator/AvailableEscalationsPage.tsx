@@ -92,6 +92,9 @@ export function AvailableEscalationsPage() {
   const statusFilter = filters.status || '';
   const isAvailable = statusFilter === 'available';
   const isClaimed = statusFilter === 'claimed';
+  // `all` and `available` both send no status filter. `available` additionally routes
+  // through the available-only query (pending + unclaimed); `all` spans every status so
+  // a metadata facet search returns an order's escalations regardless of where they are.
   const apiStatus = isClaimed ? 'pending'
     : statusFilter === 'resolved' ? 'resolved'
     : statusFilter === 'cancelled' ? 'cancelled'
@@ -329,9 +332,10 @@ export function AvailableEscalationsPage() {
           </div>
           <div className="px-4 py-2">
             <p className="mb-2 text-[11px] leading-snug text-text-tertiary">
-              Free-text recall plus precise metadata facets — they compose in one SQL query.
-              Facet keys are the ones that actually exist in your visible escalations; the
-              whole query is shareable via the URL.
+              Precise metadata facets plus exact correlation-id lookup — they compose in one
+              SQL query. Facet keys are the ones that actually exist in your visible escalations.
+              Set status to <span className="font-medium">All</span> to find an order across every
+              status; the whole query is shareable via the URL.
             </p>
             <FacetedFilterPanel
               value={facetFilters}

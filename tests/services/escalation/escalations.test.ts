@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
@@ -6,6 +6,7 @@ import { postgres_options } from '../../setup';
 import { connectTelemetry, disconnectTelemetry } from '../../setup/telemetry';
 import { migrate } from '../../../lib/db/migrate';
 import * as escalationService from '../../../services/escalation';
+import { resetStationMetricsCache } from '../../../services/escalation/queries';
 import * as userService from '../../../services/user';
 
 const { Connection } = Durable;
@@ -122,6 +123,10 @@ describe('escalation service', () => {
   // RBAC scoping ensures users only see stats for their own roles.
 
   describe('statistics', () => {
+    // Stats are cached briefly in the service; clear so each assertion reads fresh
+    // aggregates rather than a value cached by a sibling test.
+    beforeEach(() => resetStationMetricsCache());
+
     it('should return global stats (no role filter)', async () => {
       const stats = await escalationService.getEscalationStats();
 

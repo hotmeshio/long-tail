@@ -30,21 +30,25 @@ function countCall() {
 }
 
 describe('listEscalations — server-side search path', () => {
-  it('runs the ILIKE SQL (not the SDK list) when search is provided', async () => {
+  it('runs the exact-match id SQL (not the SDK list) when search is provided', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [] })            // SELECT
       .mockResolvedValueOnce({ rows: [{ total: 0 }] }); // COUNT
 
-    const result = await listEscalations({ search: 'orderId', limit: 25, offset: 0 });
+    const result = await listEscalations({ search: 'ORD-42', limit: 25, offset: 0 });
     expect(result).toEqual({ escalations: [], total: 0 });
 
     // SDK list path is bypassed
     expect(mockList).not.toHaveBeenCalled();
 
     const [sql, params] = selectCall()!;
-    expect(sql).toContain('ILIKE');
-    expect(sql).toContain('metadata::text ILIKE');
-    expect(params[8]).toBe('orderId'); // search term ($9)
+    // Exact-match on the correlation ids — index-served, no substring/JSONB text scan.
+    expect(sql).toContain('origin_id = $9');
+    expect(sql).toContain('workflow_id = $9');
+    expect(sql).toContain('id::text = $9');
+    expect(sql).not.toContain('ILIKE');
+    expect(sql).not.toContain('metadata::text');
+    expect(params[8]).toBe('ORD-42'); // search term ($9)
     expect(params[9]).toBeNull();      // selfRoles ($10) — no self scope
     expect(params[10]).toBeNull();     // meUserId ($11)
     expect(params[11]).toBeNull();     // metadata ($12) — no metadata filter
@@ -54,7 +58,7 @@ describe('listEscalations — server-side search path', () => {
     // Count shares the 12 filter params (incl. selfRoles/meUserId/metadata), no limit/offset
     const [, countParams] = countCall()!;
     expect(countParams).toHaveLength(12);
-    expect(countParams[8]).toBe('orderId');
+    expect(countParams[8]).toBe('ORD-42');
   });
 
   it('maps claimed/assigned_to to available=false in the search params', async () => {

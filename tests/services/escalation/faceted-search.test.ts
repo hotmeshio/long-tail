@@ -70,4 +70,27 @@ describe('searchEscalationsFaceted — scoped faceted query', () => {
     const [sql] = selectCall()!;
     expect(sql).toContain('assigned_to = $3');
   });
+
+  it('search is an exact correlation-id match, not a substring/metadata text scan', async () => {
+    await searchEscalationsFaceted({
+      global: true, facet: {}, search: 'ORD-42', limit: 10, offset: 0,
+    });
+    const [sql, params] = selectCall()!;
+    expect(sql).toContain('origin_id = $');
+    expect(sql).toContain('workflow_id = $');
+    expect(sql).toContain('id::text = $');
+    expect(sql).not.toContain('ILIKE');
+    expect(sql).not.toContain('metadata::text');
+    expect(params).toContain('ORD-42');
+  });
+
+  it('a metadata facet with no status spans all statuses (no status clause emitted)', async () => {
+    await searchEscalationsFaceted({
+      global: true, facet: { facets: { orderId: 'o-1' } }, limit: 10, offset: 0,
+    });
+    const [sql] = selectCall()!;
+    // Cross-status by design: "every escalation for this order, regardless of status".
+    expect(sql).toContain('metadata @> $');
+    expect(sql).not.toContain('status =');
+  });
 });

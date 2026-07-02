@@ -91,6 +91,7 @@ const faceted = await lt.escalations.list({
 | `range` | `{ facet, op, value }[]` | No | Numeric range over a metadata facet, e.g. `{ facet: 'confidence', op: '<=', value: 0.7 }` |
 | `exists` | `string[]` | No | Metadata keys that must be present — `metadata ? key` |
 | `available` | `boolean` | No | `true` = unclaimed/expired only; `false` = held now |
+| `search` | `string` | No | Exact-match by correlation id — escalation id, workflow id, or origin id (index-served). To match a value inside metadata, use `facets` instead |
 | `limit` | `number` | No | Max results (default: 50) |
 | `offset` | `number` | No | Pagination offset |
 | `sort_by` | `string` | No | Column to sort by (e.g. `created_at`, `priority`) |

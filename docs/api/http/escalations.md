@@ -42,7 +42,7 @@ GET /api/escalations
 | `subtype` | `string` | Filter by subtype |
 | `assigned_to` | `string` | Filter by claimer's user ID |
 | `priority` | `integer` | Filter by priority (1–4) |
-| `search` | `string` | Free-text across description/type/role/ids/metadata values (server-side) |
+| `search` | `string` | Exact-match by correlation id — escalation id, workflow id, or origin id (server-side, index-served). To match a value inside metadata, use `facets` |
 | `sort_by` / `order` | `string` | Single-column sort + direction (`asc`/`desc`) |
 | `limit` | `integer` | Max results (default: 50) |
 | `offset` | `integer` | Pagination offset (default: 0) |

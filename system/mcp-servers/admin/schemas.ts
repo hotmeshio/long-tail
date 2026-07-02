@@ -34,7 +34,7 @@ export const findEscalationsSchema = z.object({
   type: z.string().optional().describe('Filter by escalation type'),
   subtype: z.string().optional().describe('Filter by escalation subtype'),
   assigned_to: z.string().optional().describe('Filter by assigned user UUID (active claim holder)'),
-  search: z.string().optional().describe('Free-text search across description, type/subtype, role, workflow/origin id, and metadata values (e.g. a correlation key like an order id). Server-side over the full result set.'),
+  search: z.string().optional().describe('Exact-match lookup by correlation id — the escalation id, its workflow id, or origin id (order/ticket). Index-served, server-side over the full result set. To match a value INSIDE metadata (e.g. an order id), use `facets` instead.'),
   priority: z.number().int().min(1).max(4).optional().describe('Filter by priority (1=critical, 4=low)'),
   sort_by: z.enum(['created_at', 'priority', 'updated_at']).optional().describe('Sort column (default: priority asc, then created_at asc)'),
   order: z.enum(['asc', 'desc']).optional().describe('Sort direction for sort_by'),
