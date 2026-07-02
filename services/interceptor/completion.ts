@@ -34,19 +34,6 @@ export async function handleCompletion(
       }
     : result;
 
-  // Publish workflow.completed event
-  publishWorkflowEvent({
-    type: 'workflow.completed',
-    source: 'interceptor',
-    workflowId: state.workflowId,
-    workflowName: state.workflowName,
-    taskQueue: state.taskQueue,
-    taskId: state.taskId,
-    originId: state.envelope?.lt?.originId,
-    status: 'completed',
-    data: augmentedResult.data,
-  });
-
   // Publish milestone event (non-durable side effect, fire-and-forget)
   if (augmentedResult.milestones?.length) {
     publishMilestoneEvent({
@@ -91,6 +78,24 @@ export async function handleCompletion(
       taskQueue: state.taskQueue,
     });
   }
+
+  // Publish workflow.completed LAST — after every interrupting proxy call.
+  // This code is workflow code: each durable activity above interrupts the
+  // function on first dispatch and the whole leg replays, so a fire-and-forget
+  // publish placed before them fires once per replay (observed live as doubled
+  // workflow.completed events). Only the final, uninterrupted execution
+  // reaches this point, so the event publishes exactly once per completion.
+  publishWorkflowEvent({
+    type: 'workflow.completed',
+    source: 'interceptor',
+    workflowId: state.workflowId,
+    workflowName: state.workflowName,
+    taskQueue: state.taskQueue,
+    taskId: state.taskId,
+    originId: state.envelope?.lt?.originId,
+    status: 'completed',
+    data: augmentedResult.data,
+  });
 
   return augmentedResult;
 }
