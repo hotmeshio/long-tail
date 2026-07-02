@@ -231,18 +231,48 @@ Returns all distinct role names known to the system.
 GET /api/roles/details
 ```
 
-Returns all roles with usage counts.
+Returns all roles with metadata and usage counts.
 
 **Response 200:**
 
 ```json
 {
   "roles": [
-    { "role": "reviewer", "user_count": 5 },
-    { "role": "senior-reviewer", "user_count": 2 }
+    {
+      "role": "reviewer",
+      "title": "Document Reviewer",
+      "description": "Reviews flagged documents for compliance",
+      "form_schema": null,
+      "metadata_schema": null,
+      "properties": {},
+      "ops_visible": true,
+      "parent_role": null,
+      "sla_minutes": 30,
+      "target_per_hour": 20,
+      "worker_count": 4,
+      "user_count": 5,
+      "chain_count": 2,
+      "workflow_count": 3
+    }
   ]
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | `string \| null` | Display name separate from the technical role key |
+| `description` | `string \| null` | Human-readable summary |
+| `form_schema` | `object \| null` | JSON Schema for the escalation resolve form (overridden per-workflow by `resolver_schema`) |
+| `metadata_schema` | `object \| null` | JSON Schema declaring the expected shape of `lt_escalations.metadata` for this role. Drives faceted-query key autocomplete and creation-time validation |
+| `properties` | `object` | Free user-owned bag — icons, colors, tags, etc. No reserved keys |
+| `ops_visible` | `boolean` | When `true`, the role appears as a station on the `/operations` view |
+| `parent_role` | `string \| null` | Parent role in the process dependency graph; `null` for root stations |
+| `sla_minutes` | `number \| null` | Target resolution time in minutes (capacity setting) |
+| `target_per_hour` | `number \| null` | Intended throughput — items resolved per hour (capacity setting) |
+| `worker_count` | `number \| null` | Capacity at this station — staff or machine count (capacity setting) |
+| `user_count` | `number` | Number of users assigned this role |
+| `chain_count` | `number` | Number of escalation chain entries referencing this role |
+| `workflow_count` | `number` | Number of workflow configs that reference this role |
 
 ### Create a role
 
@@ -304,6 +334,55 @@ Delete a role if it has no references. Requires admin.
 
 ```json
 { "error": "Cannot delete role" }
+```
+
+### Update a role
+
+```
+PATCH /api/roles/:role
+```
+
+Update role metadata. Only provided fields are changed; omitted fields remain unchanged. `form_schema`, `metadata_schema`, and `parent_role` can be explicitly set to `null` to clear them. Requires role manager (admin type, superadmin, or engineer).
+
+**Path parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `role` | Role key to update |
+
+**Request body** (all fields optional):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | `string \| null` | Display name |
+| `description` | `string \| null` | Short description |
+| `form_schema` | `object \| null` | JSON Schema for the resolve form |
+| `metadata_schema` | `object \| null` | JSON Schema for `lt_escalations.metadata` |
+| `properties` | `object \| null` | Free user-owned bag |
+| `ops_visible` | `boolean` | Include in the `/operations` view |
+| `parent_role` | `string \| null` | Parent in the process dependency graph |
+| `sla_minutes` | `number \| null` | SLA target in minutes |
+| `target_per_hour` | `number \| null` | Throughput target (items per hour) |
+| `worker_count` | `number \| null` | Station capacity |
+
+**Example request** — configure a role as a station in the ops view:
+
+```json
+{
+  "title": "Document Reviewer",
+  "ops_visible": true,
+  "sla_minutes": 30,
+  "target_per_hour": 20,
+  "worker_count": 4
+}
+```
+
+**Response 200:** Updated `RoleDetail` object (same shape as `GET /api/roles/details`).
+
+**Response 404:**
+
+```json
+{ "error": "Role 'unknown-role' not found" }
 ```
 
 ---

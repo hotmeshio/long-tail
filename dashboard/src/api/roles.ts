@@ -8,9 +8,32 @@ export interface EscalationChain {
 
 export interface RoleDetail {
   role: string;
+  title: string | null;
+  description: string | null;
+  form_schema: Record<string, unknown> | null;
+  metadata_schema: Record<string, unknown> | null;
+  properties: Record<string, unknown>;
+  ops_visible: boolean;
+  parent_role: string | null;
+  sla_minutes: number | null;
+  target_per_hour: number | null;
+  worker_count: number | null;
   user_count: number;
   chain_count: number;
   workflow_count: number;
+}
+
+export interface UpdateRoleInput {
+  title?: string | null;
+  description?: string | null;
+  form_schema?: Record<string, unknown> | null;
+  metadata_schema?: Record<string, unknown> | null;
+  properties?: Record<string, unknown> | null;
+  ops_visible?: boolean;
+  parent_role?: string | null;
+  sla_minutes?: number | null;
+  target_per_hour?: number | null;
+  worker_count?: number | null;
 }
 
 export function useRoles() {
@@ -91,6 +114,20 @@ export function useCreateRole() {
       apiFetch('/roles', {
         method: 'POST',
         body: JSON.stringify({ role }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+    },
+  });
+}
+
+export function useUpdateRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ role, ...input }: { role: string } & UpdateRoleInput) =>
+      apiFetch(`/roles/${encodeURIComponent(role)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });

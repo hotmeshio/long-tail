@@ -243,6 +243,46 @@ export const requireBuilder: RequestHandler = async (
 };
 
 /**
+ * Middleware that requires role-management access. Must be placed AFTER requireAuth.
+ *
+ * Grants access to superadmins, admin-type users, and engineers — the backend
+ * equivalent of the dashboard's `isBuilder || isOps`. Ops (admin type) manage
+ * users and roles; builders (superadmin, engineer) are a superset. This is the
+ * gate for reading and writing role definitions.
+ */
+export const requireRoleManager: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (!req.auth?.userId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    // Fast path: trust the JWT role claim for admin/superadmin
+    if (req.auth.role === 'admin' || req.auth.role === 'superadmin') {
+      next();
+      return;
+    }
+    // Slow path: check database for superadmin role type
+    if (await isSuperAdmin(req.auth.userId)) {
+      next();
+      return;
+    }
+    // Check database for engineer role (builder)
+    const { hasRole } = await import('../services/user/roles');
+    if (await hasRole(req.auth.userId, 'engineer')) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: 'Forbidden: role-management access required' });
+  } catch {
+    res.status(403).json({ error: 'Forbidden' });
+  }
+};
+
+/**
  * Generate a JWT token. Utility for tests and token provisioning.
  */
 export function signToken(payload: AuthPayload, expiresIn: string = '24h'): string {

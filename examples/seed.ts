@@ -6,6 +6,7 @@ import { getUserByExternalId, createUser } from '../services/user';
 import { addUserRole, getUserRoles } from '../services/user/roles';
 import { addEscalationChain, createRole } from '../services/role';
 import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS } from './seed-data';
+import { seedOrthoRoles } from './seed-ortho';
 
 // ── Seed functions ───────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ async function seedEscalationChains(): Promise<void> {
  */
 export async function seedExamples(client: any): Promise<void> {
   await seedRoles();
+  await seedOrthoRoles();
   await seedUsers();
   await seedEscalationChains();
 

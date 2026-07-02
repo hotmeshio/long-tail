@@ -91,6 +91,7 @@ const faceted = await lt.escalations.list({
 | `range` | `{ facet, op, value }[]` | No | Numeric range over a metadata facet, e.g. `{ facet: 'confidence', op: '<=', value: 0.7 }` |
 | `exists` | `string[]` | No | Metadata keys that must be present — `metadata ? key` |
 | `available` | `boolean` | No | `true` = unclaimed/expired only; `false` = held now |
+| `search` | `string` | No | Exact-match by correlation id — escalation id, workflow id, or origin id (index-served). To match a value inside metadata, use `facets` instead |
 | `limit` | `number` | No | Max results (default: 50) |
 | `offset` | `number` | No | Pagination offset |
 | `sort_by` | `string` | No | Column to sort by (e.g. `created_at`, `priority`) |
@@ -860,3 +861,47 @@ const result = await lt.escalations.claimByFacets({
 ```
 
 **Returns:** `LTApiResult<{ claimed }>`.
+
+---
+
+## getStationMetrics
+
+Retrieve per-role throughput and latency metrics for all stations visible to the caller. Used by the Operations view to power the pace chart and station table.
+
+```typescript
+const result = await lt.escalations.getStationMetrics({ period: '24h' });
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `period` | `'1h' \| '24h' \| '7d' \| '30d' \| '15m'` | No | Lookback window for resolved/percentile stats (default `'24h'`) |
+
+**Returns:** `LTApiResult<{ stations: StationMetric[] }>`
+
+### StationMetric type
+
+```typescript
+interface StationMetricPeriod {
+  p99: number | null;   // minutes
+  p50: number | null;
+  avg: number | null;
+  max: number | null;
+}
+
+interface StationMetric {
+  role: string;
+  pending: number;        // currently queued (status = pending and not claimed)
+  claimed: number;        // active — claimed and assignment not expired
+  resolved: number;       // resolved within the lookback period
+  in_arrears: number;     // pending items older than sla_minutes
+  throughput_pct: number | null;  // resolved / (target_per_hour × hours) × 100
+  wait: StationMetricPeriod;      // queue time: created_at → claimed_at
+  work: StationMetricPeriod;      // processing time: claimed_at → resolved_at
+}
+```
+
+`pending` reflects the live queue depth regardless of period. `claimed`, `resolved`, and both percentile objects use the lookback window. `in_arrears` is computed from `sla_minutes` on the role — stations without `sla_minutes` always return `0`. `throughput_pct` is `null` when `target_per_hour` is not set.
+
+**Auth:** Same RBAC as `getStats` — callers see only the stations for roles they hold.

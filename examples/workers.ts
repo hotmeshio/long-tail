@@ -11,6 +11,7 @@ import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as printRoutingWorkflow from './workflows/print-routing';
+import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
 import {
   PRINT_FARM_DIABETIC,
   PRINT_FARM_STANDARD,
@@ -275,6 +276,22 @@ const printShiftConfig: LTWorkerConfig = {
   },
 };
 
+const orthoPipelineConfig: LTWorkerConfig = {
+  description:
+    'Ortho pipeline — MCP-operable 8-stage manufacturing workflow (design → review → print → grind → glue → finish → qa → ship). Each stage creates an escalation atomically via conditionLT and suspends; resolving via ortho_complete_stage auto-resumes the next stage. Drive the full order lifecycle with AI or human operators.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, 'design', 'review', 'print', 'grind', 'glue', 'finish', 'qa', 'ship'],
+  envelopeSchema: {
+    data: { order_id: 'ORD-001', item_type: 'insole-standard' },
+    metadata: { source: 'dashboard' },
+  },
+  // No resolverSchema — each stage role declares its own form_schema in seed-ortho.ts.
+  // The dashboard cascade: metadata.form_schema > workflow resolver_schema > role form_schema.
+  // For ortho, role form_schema is the source of truth, picked up automatically.
+};
+
 // ── Worker exports ──────────────────────────────────────────────────────────
 
 /**
@@ -299,4 +316,5 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmTechnician, config: farmTechnicianConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmInspector, config: farmInspectorConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printShift, config: printShiftConfig },
+  { taskQueue: 'long-tail-examples', workflow: orthoPipelineWorkflow.orthoPipeline, config: orthoPipelineConfig },
 ];

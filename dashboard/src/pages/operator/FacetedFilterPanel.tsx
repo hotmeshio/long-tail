@@ -57,7 +57,9 @@ export function FacetedFilterPanel({ value, onChange, facetKeys = [], search = '
   value: FacetFilters;
   onChange: (next: FacetFilters) => void;
   facetKeys?: string[];
-  /** Free-text term — composes with the facets as an extra ILIKE in the same SQL query. */
+  /** Correlation-id term — exact match on escalation id / workflow id / origin id, composed
+   *  with the facets in the same SQL query. Not a substring search; for values inside metadata
+   *  use a facet. */
   search?: string;
   onSearchChange?: (next: string) => void;
 }) {
@@ -92,10 +94,10 @@ export function FacetedFilterPanel({ value, onChange, facetKeys = [], search = '
       </datalist>
 
       {onSearchChange && (
-        <Section title="Text contains" hint="id · text · metadata">
+        <Section title="Match id" hint="id · workflow · origin">
           <input
             className={`${inputCls} w-full`}
-            placeholder="ID, workflow, origin, any text…"
+            placeholder="Exact escalation, workflow, or origin id…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />

@@ -58,6 +58,33 @@ export interface EscalationStats {
   by_type: { type: string; pending: number; claimed: number; resolved: number }[];
 }
 
+export interface StationMetricPeriod {
+  p99: number | null;
+  p50: number | null;
+  avg: number | null;
+  max: number | null;
+}
+
+export interface StationMetric {
+  role: string;
+  pending: number;
+  claimed: number;
+  resolved: number;
+  in_arrears: number;
+  throughput_pct: number | null;
+  wait: StationMetricPeriod;
+  work: StationMetricPeriod;
+}
+
+export function useStationMetrics(period?: string) {
+  const p = period ?? '24h';
+  return useQuery<{ stations: StationMetric[] }>({
+    queryKey: ['stationMetrics', p],
+    queryFn: () => apiFetch(`/escalations/station-metrics?period=${p}`),
+    staleTime: 5_000,
+  });
+}
+
 export function useEscalationStats(period?: string) {
   const params = period ? `?period=${period}` : '';
   return useQuery<EscalationStats>({

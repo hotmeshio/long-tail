@@ -13,6 +13,50 @@ A role is a task queue worked by its members. Each `member` assignment carries t
 
 Scope is set when a role is assigned to a user, via [`lt.users.addRole`](users.md) and [`lt.users.create`](users.md). See [Roles API — Work-Surface Scope](../http/roles.md) for the five member profiles.
 
+## RoleDetail type
+
+`listWithDetails` and `update` return `RoleDetail` objects:
+
+```typescript
+interface RoleDetail {
+  role: string;
+  title: string | null;
+  description: string | null;
+  form_schema: Record<string, any> | null;
+  metadata_schema: Record<string, any> | null;
+  properties: Record<string, any>;
+  ops_visible: boolean;
+  parent_role: string | null;
+  sla_minutes: number | null;
+  target_per_hour: number | null;
+  worker_count: number | null;
+  user_count: number;
+  chain_count: number;
+  workflow_count: number;
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `role` | Unique role key |
+| `title` | Display name shown in the dashboard |
+| `description` | Short description of the role's purpose |
+| `form_schema` | Default JSON Schema for the resolve form; overridden per-escalation by `metadata.form_schema` |
+| `metadata_schema` | JSON Schema for `lt_escalations.metadata`; used for validation and UI hints |
+| `properties` | Free user-owned bag — arbitrary config stored on the role |
+| `ops_visible` | When `true`, the role appears as a station on the Operations view |
+| `parent_role` | Parent role in the process dependency graph; drives the pace chart dependency ordering |
+| `sla_minutes` | SLA target in minutes — items older than this appear in `in_arrears` in station metrics |
+| `target_per_hour` | Throughput target used to compute `throughput_pct` in station metrics |
+| `worker_count` | Station capacity — number of workers expected to be active |
+| `user_count` | Number of users currently assigned to this role |
+| `chain_count` | Number of escalation chain links originating from this role |
+| `workflow_count` | Number of registered workflows that target this role |
+
+The three capacity fields (`sla_minutes`, `target_per_hour`, `worker_count`) power the Operations station detail panel. `ops_visible` controls which roles appear on the `/operations` view. `parent_role` enables the process dependency graph in the pace chart — set it to describe which upstream role feeds this one.
+
+---
+
 ## list
 
 List all distinct role names in the system.
@@ -192,3 +236,40 @@ const result = await lt.roles.replaceEscalationTargets({
 **Returns:** `LTApiResult<{ role, targets }>`
 
 **Auth:** Not required
+
+---
+
+## update
+
+Update a role's metadata. Only provided fields are changed; omitted fields remain unchanged. `form_schema`, `metadata_schema`, and `parent_role` can be set to `null` to clear them.
+
+```typescript
+const result = await lt.roles.update({
+  role: 'reviewer',
+  title: 'Document Reviewer',
+  ops_visible: true,
+  sla_minutes: 30,
+  target_per_hour: 20,
+  worker_count: 4,
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | `string` | Yes | Role key to update |
+| `title` | `string \| null` | No | Display name |
+| `description` | `string \| null` | No | Short description |
+| `form_schema` | `object \| null` | No | JSON Schema for the resolve form |
+| `metadata_schema` | `object \| null` | No | JSON Schema for `lt_escalations.metadata` |
+| `properties` | `object \| null` | No | Free user-owned bag |
+| `ops_visible` | `boolean` | No | Show as a station on the Operations view |
+| `parent_role` | `string \| null` | No | Parent role in the process dependency graph |
+| `sla_minutes` | `number \| null` | No | SLA target in minutes |
+| `target_per_hour` | `number \| null` | No | Throughput target (items per hour) |
+| `worker_count` | `number \| null` | No | Station capacity |
+
+**Returns:** `LTApiResult<RoleDetail>` — the updated role.
+
+**Auth:** Role manager (admin type, superadmin, or engineer)

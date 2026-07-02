@@ -200,8 +200,10 @@ export const PRIORITY_OPTIONS = [
   { value: '4', label: 'P4' },
 ];
 
-/** Status filter options for escalation list pages. */
+/** Status filter options for escalation list pages. `all` spans every status so a
+ *  metadata search (e.g. one order id) returns its escalations regardless of status. */
 export const STATUS_OPTIONS = [
+  { value: 'all', label: 'All' },
   { value: 'available', label: 'Available' },
   { value: 'claimed', label: 'Claimed' },
   { value: 'resolved', label: 'Resolved' },

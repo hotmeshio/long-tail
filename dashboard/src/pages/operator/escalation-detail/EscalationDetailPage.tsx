@@ -19,6 +19,7 @@ import { EscalationTimeline } from '../../../components/common/display/Escalatio
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
+import { useRoleDetails } from '../../../api/roles';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { EscalationActionBar } from './EscalationActionBar';
@@ -65,12 +66,14 @@ export function EscalationDetailPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const { data: escalationTargets } = useEscalationTargets(esc?.role ?? '');
   const { data: workflowConfigs } = useWorkflowConfigs();
+  const { data: roleDetailsData } = useRoleDetails();
   const { data: settings } = useSettings();
 
   const { isBuilder } = useAccess();
   const { isDevMode, toggleMode } = useViewMode(false);
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
+  const roleDetail = roleDetailsData?.roles.find((r) => r.role === esc?.role);
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
   const [activeView, setActiveView] = useState<ActiveView>('resolve');
   const [json, setJson] = useState('{}');
@@ -81,7 +84,8 @@ export function EscalationDetailPage() {
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const resolverSchema = wfConfig?.resolver_schema ?? null;
+  // Workflow-level resolver_schema overrides the role-level form_schema
+  const resolverSchema = wfConfig?.resolver_schema ?? roleDetail?.form_schema ?? null;
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
 

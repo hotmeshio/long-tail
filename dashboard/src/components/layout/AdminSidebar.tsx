@@ -14,15 +14,16 @@ import { useSettings } from '../../api/settings';
  * for any admin (Accounts; Roles only for builders), while Infrastructure is
  * builder-only — so an admin who could see Identity & Access but not
  * Infrastructure still sees exactly that.
+ * Operations lives in ChoreographySidebar, not here.
  */
-export function AdminSidebar({ isBuilder = false }: { isBuilder?: boolean }) {
+export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?: boolean; isOps?: boolean }) {
   const { data: settings } = useSettings();
   // Default-on: only hide DB Maintenance when the deployment explicitly disables it.
   const showMaintenance = settings?.features?.dbMaintenance !== false;
 
   const identityItems: NavItem[] = [
     { to: '/admin/users', label: 'Accounts', icon: Users },
-    ...(isBuilder ? [{ to: '/admin/roles', label: 'Roles', icon: Tag }] : []),
+    ...(isBuilder || isOps ? [{ to: '/admin/roles', label: 'Roles', icon: Tag }] : []),
   ];
 
   const infraItems: NavItem[] = [

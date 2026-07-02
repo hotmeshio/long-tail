@@ -151,6 +151,20 @@ export function useEscalationStatsEvents(): void {
 }
 
 /**
+ * Invalidate station metrics (Operations page + station detail) on escalation
+ * events. Push-driven only: escalation resolves/claims/creates are the sole
+ * things that move the numbers, so the socket event is the complete refresh
+ * signal. The 600ms debounce collapses a resolve burst into one refetch.
+ */
+export function useStationMetricsEvents(): void {
+  const invalidate = useDebouncedInvalidation(600);
+
+  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
+    invalidate([['stationMetrics']]);
+  });
+}
+
+/**
  * Invalidate escalation list queries on escalation events.
  */
 export function useEscalationListEvents(): void {

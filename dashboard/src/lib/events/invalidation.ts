@@ -32,6 +32,7 @@ export function getInvalidationKeys(event: NatsLTEvent): string[][] {
     case 'escalation':
       keys.push(['escalations']);
       keys.push(['escalationStats']);
+      keys.push(['stationMetrics']);
       if (event.workflowId) {
         keys.push(['workflowExecution', event.workflowId]);
       }

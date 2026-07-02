@@ -34,7 +34,7 @@ export const findEscalationsSchema = z.object({
   type: z.string().optional().describe('Filter by escalation type'),
   subtype: z.string().optional().describe('Filter by escalation subtype'),
   assigned_to: z.string().optional().describe('Filter by assigned user UUID (active claim holder)'),
-  search: z.string().optional().describe('Free-text search across description, type/subtype, role, workflow/origin id, and metadata values (e.g. a correlation key like an order id). Server-side over the full result set.'),
+  search: z.string().optional().describe('Exact-match lookup by correlation id — the escalation id, its workflow id, or origin id (order/ticket). Index-served, server-side over the full result set. To match a value INSIDE metadata (e.g. an order id), use `facets` instead.'),
   priority: z.number().int().min(1).max(4).optional().describe('Filter by priority (1=critical, 4=low)'),
   sort_by: z.enum(['created_at', 'priority', 'updated_at']).optional().describe('Sort column (default: priority asc, then created_at asc)'),
   order: z.enum(['asc', 'desc']).optional().describe('Sort direction for sort_by'),
@@ -271,6 +271,20 @@ export const createRoleSchema = z.object({
 export const addEscalationChainSchema = z.object({
   source_role: z.string().describe('Originating role'),
   target_role: z.string().describe('Destination role for escalation'),
+});
+
+export const updateRoleSchema = z.object({
+  role: z.string().describe('Role key to update'),
+  title: z.string().nullable().optional().describe('Display name shown on role cards and station views'),
+  description: z.string().nullable().optional().describe('Short description of this role\'s purpose'),
+  form_schema: z.record(z.any()).nullable().optional().describe('JSON Schema for the escalation resolve form (overridden by workflow-level resolver_schema)'),
+  metadata_schema: z.record(z.any()).nullable().optional().describe('JSON Schema declaring the expected shape of lt_escalations.metadata for this role. Drives creation-time validation and faceted-query key autocomplete.'),
+  properties: z.record(z.any()).nullable().optional().describe('Free user-owned bag (icon, color, tags, etc.). No reserved keys — use the typed columns below for operational values.'),
+  ops_visible: z.boolean().optional().describe('When true, role appears as a station on the /operations view'),
+  parent_role: z.string().nullable().optional().describe('Parent role in the process dependency graph (nullable; roots have no parent)'),
+  sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. One of the capacity settings: target_per_hour = worker_count / (sla_minutes / 60)'),
+  target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the station pace baseline on the Operations view.'),
+  worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
 });
 
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────

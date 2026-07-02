@@ -74,7 +74,7 @@ including `metadata`, workflow linkage, assignment, and `signal_key`.
 | type | string | No | Filter by type |
 | subtype | string | No | Filter by subtype |
 | assigned_to | string | No | Filter by assigned user UUID (active claim holder) |
-| search | string | No | Free-text search across description, type/subtype, role, workflow/origin id, and metadata values (e.g. a correlation key like an order id). Server-side over the full result set. |
+| search | string | No | Exact-match lookup by correlation id — escalation id, workflow id, or origin id (order/ticket). Index-served, server-side over the full result set. To match a value inside metadata (e.g. an order id), use `facets`. |
 | priority | integer | No | Filter by priority |
 | sort_by | string | No | Sort column: created_at, priority, updated_at |
 | order | string | No | Sort direction (asc, desc) for sort_by |
@@ -721,6 +721,30 @@ Create a new role. Lowercase alphanumeric with hyphens/underscores.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | role | string | Yes | Role name |
+
+### update_role
+
+Update a role's metadata: display name, description, form schema, metadata schema, free properties bag, operations visibility, process parent, and the typed operational targets (SLA minutes, throughput goal, worker count). Only provided fields are changed.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | `string` | Yes | Role key to update |
+| `title` | `string \| null` | No | Display name |
+| `description` | `string \| null` | No | Short description |
+| `form_schema` | `object \| null` | No | JSON Schema for the escalation resolve form |
+| `metadata_schema` | `object \| null` | No | JSON Schema for `lt_escalations.metadata` shape validation |
+| `properties` | `object \| null` | No | Free user-owned bag (icon, color, tags, etc.) |
+| `ops_visible` | `boolean` | No | When `true`, role appears as a station on the Operations view |
+| `parent_role` | `string \| null` | No | Parent role in the process dependency graph |
+| `sla_minutes` | `number \| null` | No | Target resolution time in minutes |
+| `target_per_hour` | `number \| null` | No | Throughput goal (items resolved per hour) |
+| `worker_count` | `number \| null` | No | Station capacity (staff or machines) |
 
 ### add_escalation_chain
 
@@ -1428,3 +1452,105 @@ Return the numeric status semaphore for a workflow.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | workflow_id | string | Yes | Workflow ID |
+
+## Ortho Pipeline
+
+AI-operable tools for driving the orthotic manufacturing pipeline. Each order passes through eight sequential stages (design → review → print → grind → glue → finish → qa → ship). The pipeline is a HotMesh durable workflow; each stage suspends at a `conditionLT` checkpoint until an escalation is resolved.
+
+A Claude agent loop calls `ortho_submit` to start an order, polls `ortho_pending` to see what's waiting, drives each stage forward with `ortho_complete_stage`, and monitors progress with `ortho_status`.
+
+### ortho_submit
+
+Start a new orthotic manufacturing order through the 8-stage pipeline.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `order_id` | `string` | Yes | Unique order identifier (e.g. `"ORD-001"`) |
+| `item_type` | `string` | Yes | Item type (e.g. `"insole-standard"`, `"insole-diabetic"`) |
+| `stages` | `string[]` | No | Override the stage sequence. Default: `["design","review","print","grind","glue","finish","qa","ship"]` |
+| `metadata` | `object` | No | Additional order metadata passed through to each stage escalation |
+
+**Returns:** `{ workflow_id, order_id, item_type, stages, message }`
+
+---
+
+### ortho_pending
+
+List open ortho-pipeline stage escalations waiting to be completed.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `stage` | `string` | No | Filter to a specific stage (e.g. `"design"`). Omit to see all stages |
+| `limit` | `integer` | No | Max results (default: 50) |
+
+**Returns:** `{ count, escalations }` where each escalation includes `id`, `stage`, `order_id`, `item_type`, `description`, `created_at`, `workflow_id`.
+
+---
+
+### ortho_complete_stage
+
+Complete a pending ortho pipeline stage. Claims the escalation and resolves it with notes and outcome data. Resolving automatically advances the workflow — a new escalation for the next stage appears within seconds.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `escalation_id` | `string` | Yes | Escalation ID from `ortho_pending` |
+| `notes` | `string` | Yes | Completion notes — what was done, any decisions made |
+| `outcome` | `object` | No | Structured outcome data specific to this stage |
+
+**Returns:** `{ resolved, escalation_id, status, message }`
+
+---
+
+### ortho_status
+
+Get the current status and completed stage results for an ortho pipeline workflow.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `workflow_id` | `string` | Yes | Workflow ID from `ortho_submit` |
+
+**Returns:** `{ workflow_id, status }` where `status` is `"running"` while in progress or `"complete"` with `result` containing all stage outputs once finished.
+
+---
+
+**Agent loop example:**
+
+```
+ortho_submit({ order_id: "ORD-042", item_type: "insole-diabetic" })
+→ { workflow_id: "wf-abc123", stages: ["design", "review", ...] }
+
+ortho_pending({ stage: "design" })
+→ [{ id: "esc-001", stage: "design", order_id: "ORD-042" }]
+
+ortho_complete_stage({ escalation_id: "esc-001", notes: "3mm heel, D-width approved", outcome: { spec_version: "v2" } })
+→ { resolved: true }
+
+... repeat through all 8 stages ...
+
+ortho_status({ workflow_id: "wf-abc123" })
+→ { status: "complete", result: { order_id: "ORD-042", results: [...] } }
+```

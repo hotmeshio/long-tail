@@ -170,6 +170,63 @@ export async function replaceEscalationTargets(input: {
 }
 
 /**
+ * Update role metadata. Fields omitted from input are left unchanged.
+ * form_schema, metadata_schema, and parent_role can be set to null to clear them.
+ */
+export async function updateRole(input: {
+  role: string;
+  title?: string | null;
+  description?: string | null;
+  form_schema?: Record<string, any> | null;
+  metadata_schema?: Record<string, any> | null;
+  properties?: Record<string, any> | null;
+  ops_visible?: boolean;
+  parent_role?: string | null;
+  sla_minutes?: number | null;
+  target_per_hour?: number | null;
+  worker_count?: number | null;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.role) {
+      return { status: 400, error: 'role is required' };
+    }
+    for (const field of ['sla_minutes', 'target_per_hour', 'worker_count'] as const) {
+      const value = input[field];
+      if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+        return { status: 400, error: `${field} must be a non-negative number or null` };
+      }
+    }
+    if (input.worker_count != null && !Number.isInteger(input.worker_count)) {
+      return { status: 400, error: 'worker_count must be a whole number' };
+    }
+    if (input.ops_visible !== undefined && typeof input.ops_visible !== 'boolean') {
+      return { status: 400, error: 'ops_visible must be a boolean' };
+    }
+    if (input.parent_role != null && input.parent_role === input.role) {
+      return { status: 400, error: 'parent_role must reference a different role' };
+    }
+    const updated = await roleService.updateRoleMetadata(input.role, {
+      title: input.title,
+      description: input.description,
+      form_schema: input.form_schema,
+      metadata_schema: input.metadata_schema,
+      properties: input.properties,
+      ops_visible: input.ops_visible,
+      parent_role: input.parent_role,
+      sla_minutes: input.sla_minutes,
+      target_per_hour: input.target_per_hour,
+      worker_count: input.worker_count,
+    });
+    if (!updated) {
+      return { status: 404, error: `Role '${input.role}' not found` };
+    }
+    return { status: 200, data: updated };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
  * Delete a role from the system. Requires admin privileges.
  *
  * Returns 409 if the role cannot be deleted (e.g., still assigned to users).

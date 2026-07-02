@@ -61,11 +61,11 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} />
+            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} />
             {isBuilder && <OrchestrationSidebar />}
             {isBuilder && aiEnabled && <DesignSidebar />}
             {isBuilder && <StorageSidebar />}
-            {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} />}
+            {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} isOps={isOps} />}
           </nav>
 
           {/* Collapse / Expand toggle */}
@@ -98,7 +98,7 @@ function ShellLayout() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div ref={contentRef} className="max-w-dashboard mx-auto px-10 py-10 pb-16 animate-page-in">
+          <div ref={contentRef} className="max-w-dashboard mx-auto px-10 py-10 pb-16 animate-page-in h-full flex flex-col">
             <Outlet />
           </div>
         </main>

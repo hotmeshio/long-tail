@@ -3,7 +3,7 @@ import { publishEscalationEvent } from '../../lib/events/publish';
 import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 
 import { escalations, ensureEscalationCompatView } from './client';
-import { listEscalations } from './queries';
+import { listEscalations, invalidateEscalationAggregates } from './queries';
 import {
   toEscalationRecord,
   toEscalationRecords,
@@ -12,6 +12,18 @@ import {
 } from './map';
 import type { CreateEscalationInput, ClaimResult } from './types';
 import { RESOLVE_BY_METADATA_ATOMIC, RELEASE_EXPIRED_CLAIMS } from './sql';
+
+/**
+ * Every escalation write publishes an event AND drops this container's cached
+ * aggregates — the event triggers a dashboard refetch, which must observe the
+ * write rather than a pre-change aggregate held for up to a cache TTL.
+ */
+function publishEscalationChange(
+  ...args: Parameters<typeof publishEscalationEvent>
+): Promise<void> {
+  invalidateEscalationAggregates();
+  return publishEscalationEvent(...args);
+}
 
 // All escalation state lives in `public.hmsh_escalations` (HotMesh 0.22.3),
 // reached through `client.escalations.*`. The function signatures and return
@@ -46,7 +58,7 @@ export async function createEscalation(
   });
   const escalation = toEscalationRecord(entry);
 
-  publishEscalationEvent({
+  publishEscalationChange({
     type: 'escalation.created',
     source: 'service',
     workflowId: escalation.workflow_id || '',
@@ -75,7 +87,7 @@ export async function claimEscalation(
   if (!result.ok) return null;
 
   const escalation = toEscalationRecord(result.entry);
-  publishEscalationEvent({
+  publishEscalationChange({
     type: 'escalation.claimed',
     source: 'service',
     workflowId: escalation.workflow_id || '',
@@ -112,7 +124,7 @@ export async function resolveEscalation(
   if (!result.ok) return null;
 
   const escalation = toEscalationRecord(result.entry);
-  publishEscalationEvent({
+  publishEscalationChange({
     type: 'escalation.resolved',
     source: 'service',
     workflowId: escalation.workflow_id || '',
@@ -149,7 +161,7 @@ export async function resolveEscalationsByIds(
   const rows = await client.resolveMany({ ids, resolverPayload, metadata });
   const records = toEscalationRecords(rows);
   for (const escalation of records) {
-    publishEscalationEvent({
+    publishEscalationChange({
       type: 'escalation.resolved',
       source: 'service',
       workflowId: escalation.workflow_id || '',
@@ -214,7 +226,7 @@ export async function cancelEscalation(
   if (!result.ok) return null;
 
   const cancelled = toEscalationRecord(result.entry);
-  publishEscalationEvent({
+  publishEscalationChange({
     type: 'escalation.cancelled',
     source: 'service',
     workflowId: cancelled.workflow_id || '',
@@ -282,7 +294,7 @@ export async function releaseEscalation(
   if (!result.ok) return null;
 
   const released = toEscalationRecord(result.entry);
-  publishEscalationEvent({
+  publishEscalationChange({
     type: 'escalation.released',
     source: 'service',
     workflowId: released.workflow_id || '',
@@ -380,7 +392,7 @@ export async function cancelEscalationsByWorkflowId(
   );
 
   for (const row of rows) {
-    publishEscalationEvent({
+    publishEscalationChange({
       type: 'escalation.cancelled',
       source: 'service',
       workflowId: row.workflow_id || '',
@@ -497,7 +509,7 @@ export async function claimByMetadata(
   if (!result.ok) return null;
 
   const escalation = toEscalationRecord(result.entry);
-  publishEscalationEvent({
+  publishEscalationChange({
     type: 'escalation.claimed',
     source: 'service',
     workflowId: escalation.workflow_id || '',
@@ -575,7 +587,7 @@ export async function resolveByMetadataAtomic(
   if (row.outcome === 'resolved') {
     const escalation = toEscalationRecord(row);
 
-    publishEscalationEvent({
+    publishEscalationChange({
       type: 'escalation.resolved',
       source: 'service',
       workflowId: escalation.workflow_id || '',

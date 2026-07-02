@@ -86,8 +86,12 @@ function isToolAllowed(
   const manifest = config?.toolManifest;
   if (!manifest) return true; // no manifest = allow (conservative)
 
+  // Fail closed: a server that publishes a manifest declares its read-safe
+  // surface completely. A tool missing from the manifest is treated as a
+  // write tool — otherwise every newly registered tool ships pre-exposed to
+  // read-scoped callers until someone remembers the manifest entry.
   const entry = manifest.find((t) => t.name === toolName);
-  return entry?.read_safe !== false; // allow if read_safe is true or absent
+  return entry?.read_safe === true;
 }
 
 // ── Unified server creation ──────────────────────────────────────────────────

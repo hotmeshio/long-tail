@@ -12,13 +12,16 @@ import {
   LIST_ROLES,
   DELETE_ROLE,
   LIST_ROLES_WITH_DETAILS,
+  UPDATE_ROLE_METADATA,
+  GET_ROLE_FORM_SCHEMA,
+  GET_ROLE_METADATA_SCHEMA,
   COUNT_USER_ROLE_REFS,
   COUNT_CHAIN_REFS,
   COUNT_WORKFLOW_REFS,
   COUNT_ACTIVE_ESCALATION_REFS,
 } from './sql';
 
-import type { EscalationChain, RoleDetail } from './types';
+import type { EscalationChain, RoleDetail, UpdateRoleInput } from './types';
 
 /**
  * Get the roles a given source role can escalate to.
@@ -128,11 +131,62 @@ export async function listRolesWithDetails(): Promise<RoleDetail[]> {
 }
 
 /**
- * Create a standalone role entry.
+ * Create a standalone role entry. Returns true when the role was created by
+ * this call, false when it already existed — seeders use this to write
+ * default metadata exactly once and leave later admin edits alone.
  */
-export async function createRole(role: string): Promise<void> {
+export async function createRole(role: string): Promise<boolean> {
   const pool = getPool();
-  await pool.query(ENSURE_ROLE_EXISTS, [role]);
+  const { rowCount } = await pool.query(ENSURE_ROLE_EXISTS, [role]);
+  return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Update role metadata with PATCH semantics: a field omitted from the input
+ * (undefined) keeps its current value; explicit null clears it (properties
+ * resets to {}). One atomic UPDATE — see UPDATE_ROLE_METADATA.
+ */
+export async function updateRoleMetadata(
+  role: string,
+  input: UpdateRoleInput,
+): Promise<RoleDetail | null> {
+  const pool = getPool();
+  const provided = (key: keyof UpdateRoleInput) => input[key] !== undefined;
+  const { rows } = await pool.query(UPDATE_ROLE_METADATA, [
+    role,
+    provided('title'), input.title ?? null,
+    provided('description'), input.description ?? null,
+    provided('form_schema'), input.form_schema != null ? JSON.stringify(input.form_schema) : null,
+    provided('metadata_schema'), input.metadata_schema != null ? JSON.stringify(input.metadata_schema) : null,
+    provided('properties'), input.properties != null ? JSON.stringify(input.properties) : null,
+    provided('ops_visible'), input.ops_visible ?? null,
+    provided('parent_role'), input.parent_role ?? null,
+    provided('sla_minutes'), input.sla_minutes ?? null,
+    provided('target_per_hour'), input.target_per_hour ?? null,
+    provided('worker_count'), input.worker_count ?? null,
+  ]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Fetch form_schema for a role (used as default escalation form when workflow
+ * config does not specify a resolver_schema).
+ */
+export async function getRoleFormSchema(role: string): Promise<Record<string, any> | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_FORM_SCHEMA, [role]);
+  return rows[0]?.form_schema ?? null;
+}
+
+/**
+ * Fetch metadata_schema for a role. Used at escalation creation time to
+ * validate the caller-supplied metadata bag, and by the faceted-query UI
+ * to surface expected keys before any data exists.
+ */
+export async function getRoleMetadataSchema(role: string): Promise<Record<string, any> | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_METADATA_SCHEMA, [role]);
+  return rows[0]?.metadata_schema ?? null;
 }
 
 /**

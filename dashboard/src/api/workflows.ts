@@ -69,7 +69,7 @@ export function useJobs(filters: {
   order?: string;
   registered?: string;
   namespace?: string;
-}) {
+}, options?: { enabled?: boolean }) {
   const params = new URLSearchParams();
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
@@ -84,6 +84,7 @@ export function useJobs(filters: {
   return useQuery<{ jobs: LTJob[]; total: number }>({
     queryKey: ['jobs', filters],
     queryFn: () => apiFetch(`/workflow-states/jobs?${params}`),
+    enabled: options?.enabled ?? true,
   });
 }
 

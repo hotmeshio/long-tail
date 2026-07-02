@@ -6,9 +6,10 @@ import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
 import { buildFacetWhere, buildFacetOrder } from './facet-sql';
-import type { EscalationStats } from './types';
-import { SORTABLE_COLUMNS } from './types';
-import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS } from './sql';
+import type { EscalationStats, StationMetric } from './types';
+import { SORTABLE_COLUMNS, VALID_PERIODS } from './types';
+import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS, STATION_LIVE_COUNTS_SQL, STATION_PERIOD_METRICS_SQL } from './sql';
+import { TtlCache } from './metrics-cache';
 import type { FacetQuery } from '../../types';
 
 type SdkListParams = Types.ListEscalationsParams;
@@ -39,6 +40,16 @@ function buildSearchOrderBy(sortBy?: string, order?: string): string {
   }
   return 'priority ASC, created_at ASC';
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The id arm of the correlation search binds a uuid param only when the term
+ * parses as one — comparing `id::text = $term` casts the uuid column and has
+ * no index path, which drags the whole OR into a full history scan.
+ */
+const asUuidOrNull = (term: string | null | undefined): string | null =>
+  term && UUID_RE.test(term) ? term : null;
 
 /**
  * Server-side free-text search over the `lt_escalations` view. Runs when a
@@ -83,6 +94,7 @@ async function searchEscalations(params: {
     params.selfRoles && params.selfRoles.length ? params.selfRoles : null,
     params.meUserId || null,
     params.metadata ? JSON.stringify(params.metadata) : null,
+    asUuidOrNull(params.search),
   ];
   const orderBy = buildSearchOrderBy(params.sort_by, params.order);
   const [rows, countRows] = await Promise.all([
@@ -100,7 +112,8 @@ async function searchEscalations(params: {
  * predicate (global → none; else `role ∈ allRoles OR (role ∈ selfRoles AND
  * assigned_to = me)`) with the full FacetQuery language (`buildFacetWhere`:
  * facets `@>`, block, numeric range, exists, status, available) plus the extra
- * top-level filters (type/subtype/priority/assigned_to) and free-text, then orders
+ * top-level filters (type/subtype/priority/assigned_to) and an exact correlation-id
+ * match (id/workflow_id/origin_id), then orders
  * by `buildFacetOrder` (columns + `metadata.<key>`). Every value is bound; the
  * COUNT shares the WHERE so totals stay correct across pages — no client-side
  * filtering. Reads go through the `public.lt_escalations` view.
@@ -146,15 +159,14 @@ export async function searchEscalationsFaceted(opts: {
   if (opts.priority != null) clauses.push(`priority = $${params.push(opts.priority)}`);
   if (opts.assigned_to) clauses.push(`assigned_to = $${params.push(opts.assigned_to)}`);
 
-  // 4. Free-text (same fields as the list search path).
+  // 4. Correlation-id match (exact) — same fields as the list search path.
+  // Equality keeps it index-served (origin_id / workflow_id btree, id pk); the
+  // id arm binds a pre-parsed uuid so the PK can serve it, and metadata is
+  // searched precisely via the facets above, never a full-table text scan.
   if (opts.search) {
     const i = params.push(opts.search);
-    clauses.push(
-      `(description ILIKE '%' || $${i} || '%' OR type ILIKE '%' || $${i} || '%'
-        OR subtype ILIKE '%' || $${i} || '%' OR role ILIKE '%' || $${i} || '%'
-        OR workflow_id ILIKE '%' || $${i} || '%' OR origin_id ILIKE '%' || $${i} || '%'
-        OR id::text ILIKE '%' || $${i} || '%' OR metadata::text ILIKE '%' || $${i} || '%')`,
-    );
+    const u = params.push(asUuidOrNull(opts.search));
+    clauses.push(`(origin_id = $${i} OR workflow_id = $${i} OR ($${u}::uuid IS NOT NULL AND id = $${u}::uuid))`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join('\n  AND ')}` : '';
@@ -208,17 +220,57 @@ export async function listFacetKeys(opts: {
       ORDER BY key`,
     params,
   );
-  return rows.map((r: any) => r.key as string);
+  const actualKeys = new Set(rows.map((r: any) => r.key as string));
+
+  // Also surface keys declared in metadata_schema for visible roles — so the
+  // autocomplete offers expected keys even before any data has been created.
+  const roleFilter = opts.global
+    ? null
+    : [...(opts.visibleRoles ?? []), ...(opts.selfRoles ?? [])];
+
+  if (roleFilter === null || roleFilter.length > 0) {
+    const schemaParam = roleFilter === null ? null : roleFilter;
+    const { rows: schemaRows } = await pool.query(
+      `SELECT metadata_schema FROM lt_roles
+        WHERE metadata_schema IS NOT NULL
+          AND ($1::text[] IS NULL OR role = ANY($1))`,
+      [schemaParam],
+    );
+    for (const row of schemaRows) {
+      const schema = row.metadata_schema;
+      if (schema?.properties && typeof schema.properties === 'object') {
+        for (const key of Object.keys(schema.properties)) {
+          actualKeys.add(key);
+        }
+      }
+    }
+  }
+
+  return [...actualKeys].sort();
 }
+
+// Escalation stats back the home + overview surfaces and refresh on every
+// escalation event. As of hotmesh 0.25.0 the SDK stats query reads three
+// bounded, index-only sources (pending backlog, created window, resolved
+// window), so it is cheap enough to run per-request — this short single-flight
+// window exists purely to collapse the refetch burst a busy escalation stream
+// triggers (every event → every open dashboard refetches at once). Local
+// writes clear the cache (see crud.ts publishEscalationChange), so a refetch
+// on this container always observes its own write.
+const ESCALATION_STATS_CACHE_TTL_MS = 2_500;
+const escalationStatsCache = new TtlCache<EscalationStats>(ESCALATION_STATS_CACHE_TTL_MS);
 
 export async function getEscalationStats(
   visibleRoles?: string[],
   period?: string,
 ): Promise<EscalationStats> {
-  const client = await escalations();
-  return client.stats({
-    roles: visibleRoles,
-    period: period as '1h' | '24h' | '7d' | '30d' | undefined,
+  const key = `${period ?? '24h'}::${visibleRoles ? [...visibleRoles].sort().join(',') : 'ALL'}`;
+  return escalationStatsCache.resolve(key, async () => {
+    const client = await escalations();
+    return client.stats({
+      roles: visibleRoles,
+      period: period as '1h' | '24h' | '7d' | '30d' | undefined,
+    });
   });
 }
 
@@ -365,4 +417,81 @@ export async function listAvailableEscalations(filters: {
   ]);
 
   return { escalations: toEscalationRecords(rows), total };
+}
+
+// Period metrics (percentiles + throughput) are expensive and slow-changing, so
+// they are cached ~30s and shared, via single-flight, across the socket-driven
+// refresh burst and all concurrent viewers. Live counts are never cached — they
+// refresh on every event. Per-container cache; 30-60s staleness is acceptable.
+const STATION_PERIOD_CACHE_TTL_MS = 30_000;
+const stationPeriodCache = new TtlCache<Record<string, unknown>[]>(STATION_PERIOD_CACHE_TTL_MS);
+
+/**
+ * Drop cached aggregates (period metrics + escalation stats). Called by the
+ * write paths in crud.ts alongside each escalation event publish: the event
+ * tells dashboards "data changed", so the very next fetch on this container
+ * must recompute rather than serve the pre-change aggregate for up to a TTL.
+ * Cross-container staleness within the TTL remains and is acceptable.
+ */
+export function invalidateEscalationAggregates(): void {
+  stationPeriodCache.clear();
+  escalationStatsCache.clear();
+}
+
+/** Test hook: drop cached period metrics AND escalation stats so tests observe fresh rows. */
+export function resetStationMetricsCache(): void {
+  invalidateEscalationAggregates();
+}
+
+const toNum = (v: unknown): number | null => (v != null ? Number(v) : null);
+
+export async function getStationMetrics(
+  visibleRoles: string[] | undefined,
+  period?: string,
+): Promise<StationMetric[]> {
+  await ensureEscalationCompatView();
+  // hasOwnProperty: a caller-supplied period like 'constructor' must fall back
+  // to 24h, not resolve to an inherited Object.prototype member.
+  const intervalStr = period && Object.prototype.hasOwnProperty.call(VALID_PERIODS, period)
+    ? VALID_PERIODS[period]
+    : '24 hours';
+  const roles = visibleRoles ?? null;
+  const pool = getPool();
+
+  // Live counts: always fresh (cheap — bounded pending working set).
+  // Period metrics: cached ~30s, single-flight (expensive percentile sort).
+  const cacheKey = `${period ?? '24h'}::${roles ? [...roles].sort().join(',') : 'ALL'}`;
+  const [countsResult, periodRows] = await Promise.all([
+    pool.query(STATION_LIVE_COUNTS_SQL, [roles]),
+    stationPeriodCache.resolve(
+      cacheKey,
+      async () => (await pool.query(STATION_PERIOD_METRICS_SQL, [roles, intervalStr])).rows,
+    ),
+  ]);
+
+  const periodByRole = new Map<string, any>(periodRows.map((r: any) => [r.role, r]));
+
+  return countsResult.rows.map((c: any): StationMetric => {
+    const p = periodByRole.get(c.role);
+    return {
+      role: c.role,
+      pending: Number(c.pending ?? 0),
+      claimed: Number(c.claimed ?? 0),
+      resolved: Number(p?.resolved ?? 0),
+      in_arrears: Number(c.in_arrears ?? 0),
+      throughput_pct: p?.throughput_pct != null ? Number(p.throughput_pct) : null,
+      wait: {
+        p99: toNum(p?.p99_wait_min),
+        p50: toNum(p?.p50_wait_min),
+        avg: toNum(p?.avg_wait_min),
+        max: toNum(p?.max_wait_min),
+      },
+      work: {
+        p99: toNum(p?.p99_work_min),
+        p50: toNum(p?.p50_work_min),
+        avg: toNum(p?.avg_work_min),
+        max: toNum(p?.max_work_min),
+      },
+    };
+  });
 }

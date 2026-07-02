@@ -39,11 +39,30 @@ export async function migrate(): Promise<void> {
 
       if (rows.length === 0) {
         const sql = fs.readFileSync(path.join(SCHEMAS_DIR, file), 'utf-8');
-        await client.query(sql);
-        await client.query(
-          'INSERT INTO lt_migrations (name) VALUES ($1)',
-          [file],
-        );
+        // Apply the file and record it in ONE transaction. Without this, a crash
+        // between applying the SQL and inserting the tracking row leaves the
+        // migration applied-but-untracked, so the next boot re-runs it. That is
+        // only safe if every migration is idempotent — this wrapper removes that
+        // hidden requirement and makes apply+track atomic across containers
+        // (the advisory lock already serializes them; this closes the gap within
+        // a single file's application).
+        //
+        // Constraint: migration files must NOT use CREATE INDEX CONCURRENTLY —
+        // it is illegal inside a transaction block. Concurrent index builds on
+        // large runtime tables belong in the post-boot path (see
+        // services/escalation/client.ts), not in migrate().
+        try {
+          await client.query('BEGIN');
+          await client.query(sql);
+          await client.query(
+            'INSERT INTO lt_migrations (name) VALUES ($1)',
+            [file],
+          );
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK').catch(() => {});
+          throw err;
+        }
         loggerRegistry.info(`[migrate] applied: ${file}`);
       }
     }

@@ -63,6 +63,8 @@ Shows pending escalations, active workers, pipeline tools, and event transport.
 ltc esc list                              # All escalations
 ltc esc list --status pending             # Pending only
 ltc esc list --role reviewer --limit 10   # Filter by role
+ltc esc list --search wf-abc123           # Exact-match by escalation / workflow / origin id
+ltc esc find-by-meta orderId ORD-42       # Match a value inside metadata (any status)
 ltc esc get abc123                        # Detail view
 ltc esc claim abc123                      # Claim for yourself
 ltc esc claim abc123 --duration 60        # Claim for 60 minutes

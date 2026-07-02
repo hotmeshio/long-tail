@@ -34,11 +34,31 @@ export interface EscalationStats {
 }
 
 export const VALID_PERIODS: Record<string, string> = {
+  '15m': '15 minutes',
   '1h': '1 hour',
   '24h': '24 hours',
   '7d': '7 days',
   '30d': '30 days',
 };
+
+export interface StationMetricPeriod {
+  p99: number | null;
+  p50: number | null;
+  avg: number | null;
+  max: number | null;
+}
+
+export interface StationMetric {
+  role: string;
+  pending: number;
+  claimed: number;
+  resolved: number;
+  in_arrears: number;
+  /** resolved_in_period / (target_per_hour × period_hours) × 100. Null when no target set. */
+  throughput_pct: number | null;
+  wait: StationMetricPeriod;
+  work: StationMetricPeriod;
+}
 
 /** Columns allowed for user-chosen ORDER BY. */
 export const SORTABLE_COLUMNS = new Set([

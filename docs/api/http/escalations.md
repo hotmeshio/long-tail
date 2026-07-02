@@ -42,7 +42,7 @@ GET /api/escalations
 | `subtype` | `string` | Filter by subtype |
 | `assigned_to` | `string` | Filter by claimer's user ID |
 | `priority` | `integer` | Filter by priority (1–4) |
-| `search` | `string` | Free-text across description/type/role/ids/metadata values (server-side) |
+| `search` | `string` | Exact-match by correlation id — escalation id, workflow id, or origin id (server-side, index-served). To match a value inside metadata, use `facets` |
 | `sort_by` / `order` | `string` | Single-column sort + direction (`asc`/`desc`) |
 | `limit` | `integer` | Max results (default: 50) |
 | `offset` | `integer` | Pagination offset (default: 0) |
@@ -419,6 +419,82 @@ Returns distinct escalation type values across all escalations.
 }
 ```
 
+## Station Metrics
+
+```
+GET /api/escalations/station-metrics
+```
+
+Per-role operational metrics for all visible stations. Returns queue depth, throughput efficiency, wait time (creation → claim) and work time (claim → resolution) at multiple percentiles. This drives the Operations pace chart and station detail panel.
+
+RBAC: `superadmin` sees all stations; other roles see only stations for their assigned roles.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `period` | `string` | `24h` | Lookback window for resolved/wait/work metrics. One of `15m`, `1h`, `24h`, `7d`, `30d` |
+
+**Response 200:**
+
+```json
+{
+  "stations": [
+    {
+      "role": "reviewer",
+      "pending": 12,
+      "claimed": 3,
+      "resolved": 45,
+      "in_arrears": 2,
+      "throughput_pct": 112.5,
+      "wait": {
+        "p99": 18.3,
+        "p50": 4.1,
+        "avg": 5.2,
+        "max": 22.0
+      },
+      "work": {
+        "p99": 28.7,
+        "p50": 14.0,
+        "avg": 15.3,
+        "max": 35.1
+      }
+    }
+  ]
+}
+```
+
+**Response fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | `string` | Role key |
+| `pending` | `number` | Escalations currently pending (real-time) |
+| `claimed` | `number` | Escalations actively claimed (real-time) |
+| `resolved` | `number` | Escalations resolved within the selected period |
+| `in_arrears` | `number` | Pending escalations that have exceeded the role's `sla_minutes` target |
+| `throughput_pct` | `number \| null` | `resolved / (target_per_hour × period_hours) × 100`. `null` when the role has no `target_per_hour` set |
+| `wait.p99` | `number \| null` | 99th-percentile wait time in minutes (creation → first claim) within the period. `null` when no resolved items |
+| `wait.p50` | `number \| null` | Median wait time in minutes |
+| `wait.avg` | `number \| null` | Mean wait time in minutes |
+| `wait.max` | `number \| null` | Max wait time in minutes |
+| `work.p99` | `number \| null` | 99th-percentile work time in minutes (claim → resolution) |
+| `work.p50` | `number \| null` | Median work time |
+| `work.avg` | `number \| null` | Mean work time |
+| `work.max` | `number \| null` | Max work time |
+
+**Notes:**
+- `pending` and `claimed` reflect the live queue state, not the selected period.
+- `throughput_pct` above 100 means the station resolved more than its target — ahead of schedule. Below 100 means behind.
+- `in_arrears` counts items whose age exceeds the role's `sla_minutes`; it is 0 when `sla_minutes` is not configured for the role.
+- Time values are in decimal minutes.
+
+**Example:** Fetch station metrics for the last hour:
+
+```
+GET /api/escalations/station-metrics?period=1h
+```
+
 ## Get escalation stats
 
 ```
@@ -431,7 +507,7 @@ Aggregated escalation statistics. RBAC-scoped: superadmins see all; others see o
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `period` | `string` | Time period filter (e.g., `24h`, `7d`) |
+| `period` | `string` | Counting window for created/resolved. One of `1h`, `24h`, `7d`, `30d` (default `24h`; other values fall back to `24h`). Station metrics additionally support `15m` |
 
 **Response 200:**
 
@@ -828,7 +904,7 @@ See [Data Model](../data.md) for the full SQL schema and index strategy.
 
 ## Metadata Candidate Key Operations
 
-These endpoints find, claim, and resolve escalations using a business-domain key stored in the `metadata` JSONB column (e.g., `orderId`). No raw SQL needed — the GIN index makes lookups fast.
+These endpoints find, claim, and resolve escalations using a business-domain key stored in the `metadata` JSONB column (e.g., `orderId`). Lookups go straight through the GIN index on `metadata`, so they stay fast at any scale.
 
 All three endpoints accept an optional `assignee` field — an `external_id` from your auth system. Long Tail resolves it to an internal userId. When omitted, the authenticated caller is used.
 

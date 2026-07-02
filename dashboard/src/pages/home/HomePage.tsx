@@ -160,7 +160,7 @@ export function HomePage() {
   const { user } = useAuth();
   const { isBuilder } = useAccess();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: cpData } = useControlPlaneApps();
+  const { data: cpData } = useControlPlaneApps({ enabled: isBuilder });
   const allAppIds = useMemo(() => (cpData?.apps ?? []).map((a: any) => a.appId).sort(), [cpData]);
   const firstAppId = allAppIds[0] ?? '';
   const pipelineNs = searchParams.get('pipelinenamespace') || firstAppId;
@@ -176,11 +176,14 @@ export function HomePage() {
   useWorkflowListEvents();
   useProcessListEvents();
 
-  const procQ = useProcesses({ limit: 5 });
-  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs });
+  // Row 2 (processes, durable executions, pipeline runs) is builder-only — see JSX
+  // gate below. Disable the queries too, so non-builders don't fire requests that
+  // their role can't access (403 on control-plane apps → empty namespace → 400 on jobs).
+  const procQ = useProcesses({ limit: 5 }, { enabled: isBuilder });
+  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: isBuilder });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
-  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' });
+  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: isBuilder });
   const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc' });
   const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc' });
 

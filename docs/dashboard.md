@@ -28,6 +28,7 @@ The sidebar organizes pages into five groups.
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Recent Activity** | `/` | Live event stream and business process overview. |
+| **Operations** | `/operations` | COO shop-floor view — pace chart of actual-vs-target flow across all ops-visible roles, station table with live metrics, and the station detail panel. Visible to any user with ops or builder access. |
 | **Capabilities** | `/capabilities` | Browse MCP servers grouped by capability category. |
 | **Agent Automations** | `/agents` | Autonomous event-driven automations. Configure subscriptions, schedules, and knowledge domains. |
 | **Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
@@ -197,12 +198,13 @@ User Accounts and Service Accounts live on the same page, separated by a tab tog
 
 Define roles and configure escalation chains that control how work flows between teams.
 
-- **Role list** — all roles in the system with their type (admin, operator, custom). Click to view assigned users.
+- **Role list** — all roles in the system. Each row shows the role key, title, description, user count, chain count, workflow count, and an OPS badge if `ops_visible` is set.
+- **Role detail** — click a role to open its detail panel: identity fields (title, description), escalation chains, and the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`). Edit these inline and save via `PATCH /api/roles/:role`.
 - **Create Role** — add a new role. Roles referenced in workflow configs are auto-created, but you can also create them here for organizational clarity.
 - **Scope picker** — when granting a role at `member` type, a Scope picker offers the five named work-surface profiles: full worker (`all`/`all`, default), see-all-act-own (`all`/`self`), own-items-only (`self`/`self`), read-only auditor (`all`/`none`), and read-only own (`self`/`none`). `admin` and `superadmin` grants show no Scope picker — they always work the whole queue. The picker enforces **write ⊆ read**, so a write breadth wider than the read breadth cannot be selected.
 - **Escalation chains** — define source → target role mappings. When a reviewer escalates, the chain determines which roles receive the escalation next. Chains are directional (reviewer → engineer → admin) and support multiple targets per source.
 
-**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
+**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `PATCH /api/roles/:role` updates metadata and capacity fields. `GET /api/roles/details` returns full `RoleDetail` shapes. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
 
 ### DB Maintenance
 
@@ -259,6 +261,19 @@ Accessible at `/escalations`. A statistics dashboard for escalation health acros
 - **Time window selector** — toggle between 1h, 24h, 7d, and 30d views.
 - **Summary cards** — open (pending), claimed (in progress), created (new), and resolved counts for the selected window.
 - **Role breakdown table** — groups escalations by role so you can see which teams have the most pending work. Useful for identifying bottlenecks and rebalancing workload.
+
+### Operations
+
+Accessible at `/operations`. The COO shop-floor view — shows actual-vs-target flow across every ops-visible role as a pace chart, with a station table and detail panel below.
+
+- **Period selector** — `15m`, `1h`, `24h`, `7d`, `30d`. Controls the lookback window for resolved counts, percentile metrics, and the throughput metrics.
+- **Pace chart** — connects all ops-visible stations in process dependency order and plots absolute counts for the selected window: a straight red target polyline (`target_per_hour × window hours`) against a smooth actual (resolved) curve with a light area fill. Station circles are colored by pace ratio (green ≥ 100%, amber ≥ 60%, red below), with a three-number strip per station: pending, active, resolved.
+- **Station table** — one row per ops-visible role with PENDING, ACTIVE, RESOLVED, P99 WAIT, P99 WORK, and a PRESSURE mini-bar. Stations with in-arrears items show a sub-row with a link to oldest-first queue view.
+- **Station detail panel** — opens on row or circle click. Shows the role's identity, an independent period toggle, and full metric breakdown (wait/work percentiles, SLA target, worker count, links to queue).
+
+Roles appear on this view when `ops_visible = true` is set. The capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`) drive the computed metrics. Set these via `PATCH /api/roles/:role` or the Roles admin page. See [Operations](operations.md) for the full concept doc.
+
+**API:** `GET /api/escalations/station-metrics?period=24h`
 
 ### Processes Overview
 

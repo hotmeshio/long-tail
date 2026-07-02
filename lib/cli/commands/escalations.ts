@@ -12,7 +12,7 @@ const COLUMNS = [
 ];
 
 interface ListOptions {
-  status?: string; role?: string; limit?: string; json?: boolean; quiet?: boolean;
+  status?: string; role?: string; search?: string; limit?: string; json?: boolean; quiet?: boolean;
   facets?: string; block?: string; range?: string; exists?: string; roles?: string;
   available?: string; orderBy?: string;
 }
@@ -21,6 +21,7 @@ export async function listEscalations(opts: ListOptions): Promise<void> {
   const params = new URLSearchParams();
   if (opts.status) params.set('status', opts.status);
   if (opts.role) params.set('role', opts.role);
+  if (opts.search) params.set('search', opts.search);
   if (opts.limit) params.set('limit', opts.limit);
   // Faceted query elements travel as JSON-encoded query params (the route JSON-parses
   // them). parseJsonOption validates the input and throws a friendly error on bad JSON.

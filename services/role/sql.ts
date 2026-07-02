@@ -58,6 +58,36 @@ export const LIST_ROLES = `
 export const DELETE_ROLE = `
   DELETE FROM lt_roles WHERE role = $1`;
 
+/**
+ * PATCH semantics in ONE atomic statement: each column has a boolean
+ * "provided" sentinel — when false the column keeps its current value, when
+ * true the paired value is written (null clears; properties resets to '{}').
+ * This is what lets the dashboard's per-tab saves and single-field MCP calls
+ * coexist on the same row without read-modify-write.
+ */
+export const UPDATE_ROLE_METADATA = `
+  UPDATE lt_roles SET
+    title           = CASE WHEN $2::boolean  THEN $3                                ELSE title           END,
+    description     = CASE WHEN $4::boolean  THEN $5                                ELSE description     END,
+    form_schema     = CASE WHEN $6::boolean  THEN $7::jsonb                         ELSE form_schema     END,
+    metadata_schema = CASE WHEN $8::boolean  THEN $9::jsonb                         ELSE metadata_schema END,
+    properties      = CASE WHEN $10::boolean THEN COALESCE($11::jsonb, '{}'::jsonb) ELSE properties      END,
+    ops_visible     = CASE WHEN $12::boolean THEN $13::boolean                      ELSE ops_visible     END,
+    parent_role     = CASE WHEN $14::boolean THEN $15                               ELSE parent_role     END,
+    sla_minutes     = CASE WHEN $16::boolean THEN $17::numeric                      ELSE sla_minutes     END,
+    target_per_hour = CASE WHEN $18::boolean THEN $19::numeric                      ELSE target_per_hour END,
+    worker_count    = CASE WHEN $20::boolean THEN $21::int                          ELSE worker_count    END
+  WHERE role = $1
+  RETURNING
+    role, title, description, form_schema, metadata_schema, properties,
+    ops_visible, parent_role, sla_minutes, target_per_hour, worker_count`;
+
+export const GET_ROLE_FORM_SCHEMA = `
+  SELECT form_schema FROM lt_roles WHERE role = $1`;
+
+export const GET_ROLE_METADATA_SCHEMA = `
+  SELECT metadata_schema FROM lt_roles WHERE role = $1`;
+
 // ─── Role detail aggregation ────────────────────────────────────────────────
 
 export const LIST_ROLES_WITH_DETAILS = `
@@ -83,6 +113,16 @@ export const LIST_ROLES_WITH_DETAILS = `
   )
   SELECT
     r.role,
+    r.title,
+    r.description,
+    r.form_schema,
+    r.metadata_schema,
+    r.properties,
+    r.ops_visible,
+    r.parent_role,
+    r.sla_minutes,
+    r.target_per_hour,
+    r.worker_count,
     COALESCE(uc.cnt, 0) AS user_count,
     COALESCE(cc.cnt, 0) AS chain_count,
     COALESCE(wc.cnt, 0) AS workflow_count

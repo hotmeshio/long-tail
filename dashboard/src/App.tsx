@@ -116,8 +116,14 @@ const UsersPage = lazy(() =>
 const RolesPage = lazy(() =>
   import('./pages/admin/roles/RolesPage').then((m) => ({ default: m.RolesPage })),
 );
+const RoleDetailPage = lazy(() =>
+  import('./pages/admin/roles/RoleDetailPage').then((m) => ({ default: m.RoleDetailPage })),
+);
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
+);
+const OperationsPage = lazy(() =>
+  import('./pages/operations/OperationsPage').then((m) => ({ default: m.OperationsPage })),
 );
 const ControlPlanePage = lazy(() =>
   import('./pages/admin/controlplane').then((m) => ({ default: m.ControlPlanePage })),
@@ -316,22 +322,33 @@ const router = createBrowserRouter([
         ],
       },
 
+      // Operations: overview of active work across stations. Engineer is
+      // included because the sidebar shows Operations to every builder —
+      // the route gate and the nav entry must admit the same audience.
+      {
+        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
+        children: [
+          { path: 'operations', element: <Lazy><OperationsPage /></Lazy> },
+        ],
+      },
+
       // Admin: Accounts (admin type, superadmin, or engineer — scoped view for non-builders)
       {
         element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'admin', element: <Lazy><AdminDashboard /></Lazy> },
           { path: 'admin/users', element: <Lazy><UsersPage /></Lazy> },
+          { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
+          { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
+          { path: 'admin/roles/:role', element: <Lazy><RoleDetailPage /></Lazy> },
         ],
       },
 
-      // Admin: Builder-only (roles, bots, infrastructure)
+      // Admin: Builder-only (bots, infrastructure)
       {
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
-          { path: 'admin/escalation-chains', element: <Navigate to="/admin/roles" replace /> },
-          { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           {
             element: <RequireFeature flag="dbMaintenance" />,
             children: [
