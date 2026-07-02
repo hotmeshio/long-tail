@@ -866,7 +866,7 @@ const result = await lt.escalations.claimByFacets({
 
 ## getStationMetrics
 
-Retrieve per-role throughput and latency metrics for all stations visible to the caller. Used by the Operations view to power the membrane chart and station table.
+Retrieve per-role throughput and latency metrics for all stations visible to the caller. Used by the Operations view to power the pace chart and station table.
 
 ```typescript
 const result = await lt.escalations.getStationMetrics({ period: '24h' });

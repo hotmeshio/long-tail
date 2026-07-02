@@ -45,7 +45,7 @@ interface RoleDetail {
 | `metadata_schema` | JSON Schema for `lt_escalations.metadata`; used for validation and UI hints |
 | `properties` | Free user-owned bag — arbitrary config stored on the role |
 | `ops_visible` | When `true`, the role appears as a station on the Operations view |
-| `parent_role` | Parent role in the process dependency graph; drives the membrane chart dependency lines |
+| `parent_role` | Parent role in the process dependency graph; drives the pace chart dependency ordering |
 | `sla_minutes` | SLA target in minutes — items older than this appear in `in_arrears` in station metrics |
 | `target_per_hour` | Throughput target used to compute `throughput_pct` in station metrics |
 | `worker_count` | Station capacity — number of workers expected to be active |
@@ -53,7 +53,7 @@ interface RoleDetail {
 | `chain_count` | Number of escalation chain links originating from this role |
 | `workflow_count` | Number of registered workflows that target this role |
 
-The three ops-triangle fields (`sla_minutes`, `target_per_hour`, `worker_count`) power the Operations station detail panel. `ops_visible` controls which roles appear on the `/operations` view. `parent_role` enables the process dependency graph in the membrane chart — set it to describe which upstream role feeds this one.
+The three capacity fields (`sla_minutes`, `target_per_hour`, `worker_count`) power the Operations station detail panel. `ops_visible` controls which roles appear on the `/operations` view. `parent_role` enables the process dependency graph in the pace chart — set it to describe which upstream role feeds this one.
 
 ---
 
@@ -272,4 +272,4 @@ const result = await lt.roles.update({
 
 **Returns:** `LTApiResult<RoleDetail>` — the updated role.
 
-**Auth:** Builder required
+**Auth:** Role manager (admin type, superadmin, or engineer)

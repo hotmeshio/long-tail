@@ -267,9 +267,9 @@ Returns all roles with metadata and usage counts.
 | `properties` | `object` | Free user-owned bag — icons, colors, tags, etc. No reserved keys |
 | `ops_visible` | `boolean` | When `true`, the role appears as a station on the `/operations` view |
 | `parent_role` | `string \| null` | Parent role in the process dependency graph; `null` for root stations |
-| `sla_minutes` | `number \| null` | Target resolution time in minutes (ops triangle) |
-| `target_per_hour` | `number \| null` | Intended throughput — items resolved per hour (ops triangle) |
-| `worker_count` | `number \| null` | Capacity at this station — staff or machine count (ops triangle) |
+| `sla_minutes` | `number \| null` | Target resolution time in minutes (capacity setting) |
+| `target_per_hour` | `number \| null` | Intended throughput — items resolved per hour (capacity setting) |
+| `worker_count` | `number \| null` | Capacity at this station — staff or machine count (capacity setting) |
 | `user_count` | `number` | Number of users assigned this role |
 | `chain_count` | `number` | Number of escalation chain entries referencing this role |
 | `workflow_count` | `number` | Number of workflow configs that reference this role |
@@ -342,7 +342,7 @@ Delete a role if it has no references. Requires admin.
 PATCH /api/roles/:role
 ```
 
-Update role metadata. Only provided fields are changed; omitted fields remain unchanged. `form_schema`, `metadata_schema`, and `parent_role` can be explicitly set to `null` to clear them. Requires builder.
+Update role metadata. Only provided fields are changed; omitted fields remain unchanged. `form_schema`, `metadata_schema`, and `parent_role` can be explicitly set to `null` to clear them. Requires role manager (admin type, superadmin, or engineer).
 
 **Path parameters:**
 

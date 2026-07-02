@@ -425,7 +425,7 @@ Returns distinct escalation type values across all escalations.
 GET /api/escalations/station-metrics
 ```
 
-Per-role operational metrics for all visible stations. Returns queue depth, throughput efficiency, wait time (creation → claim) and work time (claim → resolution) at multiple percentiles. This drives the Operations membrane chart and station detail panel.
+Per-role operational metrics for all visible stations. Returns queue depth, throughput efficiency, wait time (creation → claim) and work time (claim → resolution) at multiple percentiles. This drives the Operations pace chart and station detail panel.
 
 RBAC: `superadmin` sees all stations; other roles see only stations for their assigned roles.
 
@@ -507,7 +507,7 @@ Aggregated escalation statistics. RBAC-scoped: superadmins see all; others see o
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `period` | `string` | Time period filter. One of `15m`, `1h`, `24h`, `7d`, `30d` |
+| `period` | `string` | Counting window for created/resolved. One of `1h`, `24h`, `7d`, `30d` (default `24h`; other values fall back to `24h`). Station metrics additionally support `15m` |
 
 **Response 200:**
 
@@ -904,7 +904,7 @@ See [Data Model](../data.md) for the full SQL schema and index strategy.
 
 ## Metadata Candidate Key Operations
 
-These endpoints find, claim, and resolve escalations using a business-domain key stored in the `metadata` JSONB column (e.g., `orderId`). No raw SQL needed — the GIN index makes lookups fast.
+These endpoints find, claim, and resolve escalations using a business-domain key stored in the `metadata` JSONB column (e.g., `orderId`). Lookups go straight through the GIN index on `metadata`, so they stay fast at any scale.
 
 All three endpoints accept an optional `assignee` field — an `external_id` from your auth system. Long Tail resolves it to an internal userId. When omitted, the authenticated caller is used.
 

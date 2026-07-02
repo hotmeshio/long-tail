@@ -724,7 +724,7 @@ Create a new role. Lowercase alphanumeric with hyphens/underscores.
 
 ### update_role
 
-Update a role's metadata: display name, description, form schema, metadata schema, free properties bag, operations visibility, process parent, and the ops triangle (SLA target, throughput goal, worker count). Only provided fields are changed.
+Update a role's metadata: display name, description, form schema, metadata schema, free properties bag, operations visibility, process parent, and the typed operational targets (SLA minutes, throughput goal, worker count). Only provided fields are changed.
 
 | | |
 |---|---|
