@@ -1,4 +1,4 @@
-import { createRole, updateRoleMetadata, addEscalationChain } from '../services/role';
+import { createRole, updateRoleMetadata, listRolesWithDetails } from '../services/role';
 import { loggerRegistry } from '../lib/logger';
 
 const ORTHO_ROLE_DATA = [
@@ -136,31 +136,42 @@ const ORTHO_ROLE_DATA = [
 ];
 
 export async function seedOrthoRoles(): Promise<void> {
+  // Earlier boot steps (worker-config registration, escalation-chain ensures)
+  // create bare role rows before this seeder runs, so "did createRole insert"
+  // alone under-detects a fresh install. A role is seedable when this call
+  // created it OR when it exists untitled and schema-less; a role the admin
+  // has configured keeps its titles, SLAs, and schemas across restarts.
+  const existing = new Map((await listRolesWithDetails()).map((r) => [r.role, r]));
   for (const data of ORTHO_ROLE_DATA) {
+    let created = false;
     try {
-      await createRole(data.role);
+      created = await createRole(data.role);
     } catch { /* ON CONFLICT DO NOTHING */ }
-    try {
-      await updateRoleMetadata(data.role, {
-        title: data.title,
-        description: data.description,
-        ops_visible: true,
-        parent_role: data.parent_role ?? null,
-        sla_minutes: data.sla_minutes,
-        target_per_hour: data.target_per_hour,
-        form_schema: data.form_schema,
-      });
-    } catch (err: any) {
-      loggerRegistry.warn(`[examples] failed to update ortho role ${data.role}: ${err.message}`);
+    const row = existing.get(data.role);
+    const unconfigured = row != null && row.title == null && row.form_schema == null;
+    if (created || unconfigured) {
+      try {
+        await updateRoleMetadata(data.role, {
+          title: data.title,
+          description: data.description,
+          ops_visible: true,
+          parent_role: data.parent_role ?? null,
+          sla_minutes: data.sla_minutes,
+          target_per_hour: data.target_per_hour,
+          form_schema: data.form_schema,
+        });
+      } catch (err: any) {
+        loggerRegistry.warn(`[examples] failed to update ortho role ${data.role}: ${err.message}`);
+      }
     }
   }
 
+  // The process sequence lives entirely in parent_role + ops_visible — that
+  // pair is what the Operations view renders as the station graph. Escalation
+  // chains are a separate runtime RBAC construct (which roles an operator may
+  // escalate an item TO, e.g. associate → manager) and stay admin-owned;
+  // seeding stage→stage chains here would encode the pipeline into the
+  // permission system.
   const stages = ORTHO_ROLE_DATA.map((d) => d.role);
-  for (let i = 0; i < stages.length - 1; i++) {
-    try {
-      await addEscalationChain(stages[i], stages[i + 1]);
-    } catch { /* ON CONFLICT DO NOTHING */ }
-  }
-
   loggerRegistry.info(`[examples] ortho roles verified (${stages.join(' → ')})`);
 }

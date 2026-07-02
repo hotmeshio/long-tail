@@ -190,6 +190,21 @@ export async function updateRole(input: {
     if (!input.role) {
       return { status: 400, error: 'role is required' };
     }
+    for (const field of ['sla_minutes', 'target_per_hour', 'worker_count'] as const) {
+      const value = input[field];
+      if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+        return { status: 400, error: `${field} must be a non-negative number or null` };
+      }
+    }
+    if (input.worker_count != null && !Number.isInteger(input.worker_count)) {
+      return { status: 400, error: 'worker_count must be a whole number' };
+    }
+    if (input.ops_visible !== undefined && typeof input.ops_visible !== 'boolean') {
+      return { status: 400, error: 'ops_visible must be a boolean' };
+    }
+    if (input.parent_role != null && input.parent_role === input.role) {
+      return { status: 400, error: 'parent_role must reference a different role' };
+    }
     const updated = await roleService.updateRoleMetadata(input.role, {
       title: input.title,
       description: input.description,

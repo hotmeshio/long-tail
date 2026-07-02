@@ -73,7 +73,9 @@ router.delete('/escalation-chains', requireRoleManager, async (req, res) => {
  * Body: { title?, description?, form_schema?, metadata_schema?, properties?, ops_visible?, parent_role?, sla_minutes?, target_per_hour?, worker_count? }
  */
 router.patch('/:role', requireRoleManager, async (req, res) => {
-  const result = await api.updateRole({ role: req.params.role as string, ...req.body });
+  // URL is the resource identity — a `role` key in the body must not redirect
+  // the write to a different row.
+  const result = await api.updateRole({ ...req.body, role: req.params.role as string });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

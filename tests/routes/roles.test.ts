@@ -165,4 +165,82 @@ describe('Roles routes', () => {
       await roleService.replaceEscalationTargets('test_src', ['test_tgt_1', 'test_tgt_2']);
     });
   });
+
+  describe('PATCH /api/roles/:role', () => {
+    const patchRole = `patch_role_${Date.now()}`;
+    const bystander = `bystander_role_${Date.now()}`;
+
+    it('setup: create roles with baseline metadata', async () => {
+      await roleService.createRole(patchRole);
+      await roleService.createRole(bystander);
+      await roleService.updateRoleMetadata(patchRole, {
+        title: 'Original Title',
+        sla_minutes: 45,
+        ops_visible: true,
+      });
+      await roleService.updateRoleMetadata(bystander, { title: 'Bystander' });
+    });
+
+    it('requires role-manager auth', async () => {
+      const res = await fetch(`${ctx.BASE}/roles/${patchRole}`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.memberToken),
+        body: JSON.stringify({ title: 'Nope' }),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it('partial update changes only the provided field', async () => {
+      const res = await fetch(`${ctx.BASE}/roles/${patchRole}`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ description: 'Added later' }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.description).toBe('Added later');
+      expect(body.title).toBe('Original Title');
+      expect(Number(body.sla_minutes)).toBe(45);
+      expect(body.ops_visible).toBe(true);
+    });
+
+    it('a role key in the body cannot redirect the write to another role', async () => {
+      const res = await fetch(`${ctx.BASE}/roles/${patchRole}`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ role: bystander, title: 'Hijacked' }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.role).toBe(patchRole);
+      expect(body.title).toBe('Hijacked');
+
+      const details = await roleService.listRolesWithDetails();
+      const untouched = details.find((r) => r.role === bystander);
+      expect(untouched?.title).toBe('Bystander');
+    });
+
+    it('rejects non-numeric ops fields with 400', async () => {
+      const res = await fetch(`${ctx.BASE}/roles/${patchRole}`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ sla_minutes: 'thirty' }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a self-referencing parent_role with 400', async () => {
+      const res = await fetch(`${ctx.BASE}/roles/${patchRole}`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.adminToken),
+        body: JSON.stringify({ parent_role: patchRole }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('cleanup: remove test roles', async () => {
+      await roleService.deleteRole(patchRole);
+      await roleService.deleteRole(bystander);
+    });
+  });
 });

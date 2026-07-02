@@ -131,35 +131,39 @@ export async function listRolesWithDetails(): Promise<RoleDetail[]> {
 }
 
 /**
- * Create a standalone role entry.
+ * Create a standalone role entry. Returns true when the role was created by
+ * this call, false when it already existed — seeders use this to write
+ * default metadata exactly once and leave later admin edits alone.
  */
-export async function createRole(role: string): Promise<void> {
+export async function createRole(role: string): Promise<boolean> {
   const pool = getPool();
-  await pool.query(ENSURE_ROLE_EXISTS, [role]);
+  const { rowCount } = await pool.query(ENSURE_ROLE_EXISTS, [role]);
+  return (rowCount ?? 0) > 0;
 }
 
 /**
- * Update role metadata (title, description, form_schema, properties, ops_visible, parent_role).
- * Only fields present in the input are updated; omitted fields are left unchanged.
- * form_schema and parent_role are always set (null clears them).
+ * Update role metadata with PATCH semantics: a field omitted from the input
+ * (undefined) keeps its current value; explicit null clears it (properties
+ * resets to {}). One atomic UPDATE — see UPDATE_ROLE_METADATA.
  */
 export async function updateRoleMetadata(
   role: string,
   input: UpdateRoleInput,
 ): Promise<RoleDetail | null> {
   const pool = getPool();
+  const provided = (key: keyof UpdateRoleInput) => input[key] !== undefined;
   const { rows } = await pool.query(UPDATE_ROLE_METADATA, [
     role,
-    input.title ?? null,
-    input.description ?? null,
-    input.form_schema != null ? JSON.stringify(input.form_schema) : null,
-    input.metadata_schema != null ? JSON.stringify(input.metadata_schema) : null,
-    JSON.stringify(input.properties ?? {}),
-    input.ops_visible ?? false,
-    input.parent_role ?? null,
-    input.sla_minutes ?? null,
-    input.target_per_hour ?? null,
-    input.worker_count ?? null,
+    provided('title'), input.title ?? null,
+    provided('description'), input.description ?? null,
+    provided('form_schema'), input.form_schema != null ? JSON.stringify(input.form_schema) : null,
+    provided('metadata_schema'), input.metadata_schema != null ? JSON.stringify(input.metadata_schema) : null,
+    provided('properties'), input.properties != null ? JSON.stringify(input.properties) : null,
+    provided('ops_visible'), input.ops_visible ?? null,
+    provided('parent_role'), input.parent_role ?? null,
+    provided('sla_minutes'), input.sla_minutes ?? null,
+    provided('target_per_hour'), input.target_per_hour ?? null,
+    provided('worker_count'), input.worker_count ?? null,
   ]);
   return rows[0] ?? null;
 }
