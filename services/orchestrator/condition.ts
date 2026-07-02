@@ -31,6 +31,26 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  * });
  * ```
  *
+ * **With an SLA (hotmesh 0.25.1+) — add `timeout` to the config.** The same
+ * single wait arms a resume timer alongside the escalation row: when the timer
+ * fires first, this helper returns `false`, the row transitions to
+ * `status='expired'` (engine-side, atomically), and a late resolve fails as
+ * `already-expired`. A signal that arrives first resolves normally and the
+ * timer is inert.
+ *
+ * ```typescript
+ * const decision = await conditionLT<{ approved: boolean }>(signalId, {
+ *   role: 'reviewer',
+ *   description: instructions,
+ *   metadata: { orderId },
+ *   timeout: '24h',                       // SLA deadline for this worklist row
+ * });
+ * if (decision === false) {
+ *   // deadline passed — the row is already status='expired'; branch to the
+ *   // fallback path (auto-reject, escalate the order, notify, …)
+ * }
+ * ```
+ *
  * **Legacy (two-step) — no config.** Create the escalation first (e.g. via
  * `ltCreateEscalation`) with `signal_id`/`signal_routing` metadata, then wait.
  * On resume the signal payload carries an injected `$escalation_id`; this helper

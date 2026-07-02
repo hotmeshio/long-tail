@@ -68,4 +68,31 @@ describe('conditionLT', () => {
     await conditionLT('sig-1');
     expect(mockResolve).not.toHaveBeenCalled();
   });
+
+  // ── SLA timeout passthrough (hotmesh 0.25.1) ────────────────────────────────
+
+  it('forwards the full config — including timeout — to Durable.workflow.condition verbatim', async () => {
+    mockCondition.mockResolvedValue({ approved: true });
+    // `timeout` typechecks here because conditionLT's param IS the SDK's
+    // ConditionQueueConfig — the passthrough is structural, not a copy.
+    const config = {
+      role: 'reviewer',
+      description: 'SLA-gated review',
+      metadata: { orderId: 'ORD-1' },
+      timeout: '24h',
+    };
+    await conditionLT<{ approved: boolean }>('sig-sla', config);
+    expect(mockCondition).toHaveBeenCalledWith('sig-sla', config);
+  });
+
+  it('propagates false when the SLA timer wins an escalation-bearing wait', async () => {
+    const mockResolve = vi.fn();
+    (Durable.workflow.proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });
+    mockCondition.mockResolvedValue(false);
+    const result = await conditionLT('sig-sla', { role: 'reviewer', timeout: '30m' });
+    expect(result).toBe(false);
+    // The engine already expired the row in its timeout path — the wrapper
+    // must never issue its own resolve against an expired escalation.
+    expect(mockResolve).not.toHaveBeenCalled();
+  });
 });

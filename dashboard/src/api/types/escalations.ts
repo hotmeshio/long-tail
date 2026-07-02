@@ -1,4 +1,4 @@
-export type LTEscalationStatus = 'pending' | 'resolved' | 'cancelled';
+export type LTEscalationStatus = 'pending' | 'resolved' | 'cancelled' | 'expired';
 export type LTEscalationPriority = 1 | 2 | 3 | 4;
 
 export interface LTEscalationRecord {

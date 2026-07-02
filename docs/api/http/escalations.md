@@ -36,7 +36,7 @@ GET /api/escalations
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `status` | `string` | `pending`, `resolved`, or `cancelled` |
+| `status` | `string` | `pending`, `resolved`, `cancelled`, or `expired` |
 | `role` | `string` | Filter by target role |
 | `type` | `string` | Filter by escalation type |
 | `subtype` | `string` | Filter by subtype |
@@ -880,7 +880,7 @@ Release a claimed escalation back to the available pool. Only the user who holds
 | `subtype` | `string` | Subcategory for finer routing |
 | `modality` | `string` | Modality from workflow config |
 | `description` | `string` | Human-readable reason |
-| `status` | `string` | `pending`, `resolved`, or `cancelled` |
+| `status` | `string` | `pending`, `resolved`, `cancelled`, or `expired` |
 | `priority` | `integer` | Numeric priority |
 | `task_id` | `UUID` | FK to the task that triggered this escalation |
 | `origin_id` | `string` | Correlation ID from the parent orchestrator |
@@ -920,7 +920,7 @@ Scoped to the caller's read access. A `member` with `read_scope=self` matches on
 |-----------|------|-------------|
 | `key` | `string` | **Required.** Metadata field name |
 | `value` | `string` | **Required.** Metadata field value |
-| `status` | `string` | Filter by status (`pending`, `resolved`, `cancelled`) |
+| `status` | `string` | Filter by status (`pending`, `resolved`, `cancelled`, `expired`) |
 | `limit` | `integer` | Max results (default 50) |
 | `offset` | `integer` | Pagination offset (default 0) |
 
