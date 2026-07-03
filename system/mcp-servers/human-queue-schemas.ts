@@ -10,6 +10,8 @@ export const escalateSchema = z.object({
   subtype: z.string().optional().default('tool_call').describe('Escalation subtype'),
   priority: z.number().min(1).max(4).optional().default(2)
     .describe('Priority: 1 (highest) to 4 (lowest)'),
+  schema_version: z.number().int().min(1).optional()
+    .describe('Pin the role schema version the resolver form renders (defaults to latest)'),
 });
 
 export const checkResolutionSchema = z.object({
@@ -43,4 +45,6 @@ export const escalateAndWaitSchema = z.object({
   subtype: z.string().optional().default('wait_for_human').describe('Escalation subtype'),
   priority: z.number().min(1).max(4).optional().default(1)
     .describe('Priority: 1 (highest) to 4 (lowest)'),
+  schema_version: z.number().int().min(1).optional()
+    .describe('Pin the role schema version the resolver form renders (defaults to latest; ignored when form_schema is embedded)'),
 }).passthrough();

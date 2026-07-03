@@ -33,6 +33,7 @@ Create a new escalation for human review. Returns the escalation ID.
 | type | string | No | Escalation type classification (default: "mcp") |
 | subtype | string | No | Escalation subtype (default: "tool_call") |
 | priority | number | No | Priority: 1 (highest) to 4 (lowest) (default: 2) |
+| schema_version | number | No | Pin the role schema version the resolver form renders (defaults to latest) |
 
 ### check_resolution
 
@@ -116,6 +117,7 @@ Create an escalation and pause the workflow until a human responds. Returns a si
 | type | string | No | Escalation type classification (default: "mcp") |
 | subtype | string | No | Escalation subtype (default: "wait_for_human") |
 | priority | number | No | Priority: 1 (highest) to 4 (lowest) (default: 1) |
+| schema_version | number | No | Pin the role schema version the resolver form renders (defaults to latest; an embedded `form_schema` takes precedence) |
 
 ## Scope and One-Time Users
 

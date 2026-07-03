@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
 import * as escalationService from '../../services/escalation';
+import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import {
   escalateSchema,
   checkResolutionSchema,
@@ -46,6 +47,10 @@ export async function createHumanQueueServer(options?: {
       inputSchema: escalateSchema,
     },
     async (args: z.infer<typeof escalateSchema>) => {
+      const metadata: Record<string, any> = { source: 'mcp_server' };
+      if (args.schema_version != null) {
+        metadata[ESCALATION_METADATA_KEYS.SCHEMA_VERSION] = args.schema_version;
+      }
       const escalation = await escalationService.createEscalation({
         type: args.type || 'mcp',
         subtype: args.subtype || 'tool_call',
@@ -53,7 +58,7 @@ export async function createHumanQueueServer(options?: {
         priority: args.priority,
         role: args.role,
         envelope: JSON.stringify(args.data || {}),
-        metadata: { source: 'mcp_server' },
+        metadata,
       });
       return {
         content: [{
@@ -246,7 +251,10 @@ export async function createHumanQueueServer(options?: {
         signal_routing: signalRouting,
       };
       if (args.form_schema) {
-        metadata.form_schema = args.form_schema;
+        metadata[ESCALATION_METADATA_KEYS.FORM_SCHEMA] = args.form_schema;
+      }
+      if (args.schema_version != null) {
+        metadata[ESCALATION_METADATA_KEYS.SCHEMA_VERSION] = args.schema_version;
       }
 
       const escalation = await escalationService.createEscalation({

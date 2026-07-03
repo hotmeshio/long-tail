@@ -19,6 +19,7 @@ import * as pip from '../lib/cli/commands/pipelines';
 import * as kb from '../lib/cli/commands/knowledge';
 import * as mcp from '../lib/cli/commands/mcp';
 import * as usr from '../lib/cli/commands/users';
+import * as roles from '../lib/cli/commands/roles';
 import * as streams from '../lib/cli/commands/streams';
 
 const pkg = require('../package.json');
@@ -296,6 +297,27 @@ usrCmd.command('list')
 usrCmd.command('get <id>')
   .option('--json', 'JSON output')
   .action(wrap(usr.getUser));
+
+// ── Roles ────────────────────────────────────────────────────────────────
+
+const rolesCmd = program.command('roles').description('Roles — the queue-backed work surfaces where workflows hand off to people');
+
+rolesCmd.command('list')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'Names only')
+  .action(wrap(roles.listRoles));
+
+rolesCmd.command('schema <role>')
+  .description('Show a role\'s form/metadata schema (latest, or a pinned version)')
+  .option('--version <n>', 'Read an immutable snapshot from the version history')
+  .option('--json', 'JSON output')
+  .action(wrap(roles.getRoleSchema));
+
+rolesCmd.command('schema-versions <role>')
+  .description('List a role\'s schema version history (newest first)')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'Versions only')
+  .action(wrap(roles.listRoleSchemaVersions));
 
 // ── Streams ─────────────────────────────────────────────────────────────
 

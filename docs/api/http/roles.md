@@ -344,6 +344,8 @@ PATCH /api/roles/:role
 
 Update role metadata. Only provided fields are changed; omitted fields remain unchanged. `form_schema`, `metadata_schema`, and `parent_role` can be explicitly set to `null` to clear them. Requires role manager (admin type, superadmin, or engineer).
 
+When the update changes `form_schema` or `metadata_schema`, the new pair is snapshotted into the role's schema version history and `current_schema_version` advances (a save with identical schema values leaves the version alone). Pass `change_summary` to label the snapshot.
+
 **Path parameters:**
 
 | Parameter | Description |
@@ -364,6 +366,7 @@ Update role metadata. Only provided fields are changed; omitted fields remain un
 | `sla_minutes` | `number \| null` | SLA target in minutes |
 | `target_per_hour` | `number \| null` | Throughput target (items per hour) |
 | `worker_count` | `number \| null` | Station capacity |
+| `change_summary` | `string` | Label recorded on the schema version snapshot when this update changes a schema field |
 
 **Example request** — configure a role as a station in the ops view:
 
@@ -383,6 +386,64 @@ Update role metadata. Only provided fields are changed; omitted fields remain un
 
 ```json
 { "error": "Role 'unknown-role' not found" }
+```
+
+### Get a role's schema
+
+```
+GET /api/roles/:role/schema
+GET /api/roles/:role/schema?version=3
+```
+
+Fetch the role's `form_schema` + `metadata_schema` pair. Without `version`, returns the live (latest) schema along with the role's current version number. With `version`, returns that immutable snapshot from the version history — the snapshot an escalation pinned via `metadata.schema_version` (`conditionLT`'s `schemaVersion` field).
+
+**Response 200:**
+
+```json
+{
+  "role": "reviewer",
+  "version": 3,
+  "form_schema": { "type": "object", "properties": { "approved": { "type": "boolean" } } },
+  "metadata_schema": { "type": "object", "properties": { "order_id": { "type": "string" } } },
+  "change_summary": "Added lotNumber field",
+  "created_at": "2026-07-01T12:00:00.000Z",
+  "latest_version": 4
+}
+```
+
+**Response 404:** the role does not exist, or the requested version does not exist for it. A missing version is an error — it never falls back to a different version.
+
+### List a role's schema versions
+
+```
+GET /api/roles/:role/schema/versions
+```
+
+List the role's schema version history, newest first. Schemas are elided; each entry carries presence flags. Fetch a full snapshot via `GET /api/roles/:role/schema?version=N`.
+
+**Response 200:**
+
+```json
+{
+  "versions": [
+    {
+      "version": 4,
+      "has_form_schema": true,
+      "has_metadata_schema": true,
+      "change_summary": null,
+      "created_at": "2026-07-02T09:30:00.000Z",
+      "is_current": true
+    },
+    {
+      "version": 3,
+      "has_form_schema": true,
+      "has_metadata_schema": true,
+      "change_summary": "Added lotNumber field",
+      "created_at": "2026-07-01T12:00:00.000Z",
+      "is_current": false
+    }
+  ]
+}
 ```
 
 ---

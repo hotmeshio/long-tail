@@ -15,13 +15,22 @@ import {
   UPDATE_ROLE_METADATA,
   GET_ROLE_FORM_SCHEMA,
   GET_ROLE_METADATA_SCHEMA,
+  LIST_ROLE_SCHEMA_VERSIONS,
+  GET_ROLE_SCHEMA_VERSION,
+  GET_ROLE_SCHEMA_CURRENT,
   COUNT_USER_ROLE_REFS,
   COUNT_CHAIN_REFS,
   COUNT_WORKFLOW_REFS,
   COUNT_ACTIVE_ESCALATION_REFS,
 } from './sql';
 
-import type { EscalationChain, RoleDetail, UpdateRoleInput } from './types';
+import type {
+  EscalationChain,
+  RoleDetail,
+  RoleSchemaVersion,
+  RoleSchemaVersionSummary,
+  UpdateRoleInput,
+} from './types';
 
 /**
  * Get the roles a given source role can escalate to.
@@ -164,8 +173,37 @@ export async function updateRoleMetadata(
     provided('sla_minutes'), input.sla_minutes ?? null,
     provided('target_per_hour'), input.target_per_hour ?? null,
     provided('worker_count'), input.worker_count ?? null,
+    input.change_summary ?? null,
   ]);
   return rows[0] ?? null;
+}
+
+/**
+ * List the schema version history for a role (newest first). Schemas are
+ * elided — presence flags only; fetch a full snapshot via getRoleSchema.
+ */
+export async function listRoleSchemaVersions(role: string): Promise<RoleSchemaVersionSummary[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(LIST_ROLE_SCHEMA_VERSIONS, [role]);
+  return rows;
+}
+
+/**
+ * Fetch a role's schema pair. With a version, reads the immutable snapshot
+ * from lt_role_schemas; without one, reads the live (latest) columns — a role
+ * that has never versioned its schema still answers with version null.
+ * Returns null when the role (or the requested version) does not exist.
+ */
+export async function getRoleSchema(
+  role: string,
+  version?: number,
+): Promise<RoleSchemaVersion | null> {
+  const pool = getPool();
+  const { rows } = version != null
+    ? await pool.query(GET_ROLE_SCHEMA_VERSION, [role, version])
+    : await pool.query(GET_ROLE_SCHEMA_CURRENT, [role]);
+  if (!rows[0]) return null;
+  return { ...rows[0], role };
 }
 
 /**

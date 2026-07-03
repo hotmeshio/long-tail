@@ -1,11 +1,38 @@
 import { Durable } from '@hotmeshio/hotmesh';
 import type { Types } from '@hotmeshio/hotmesh';
 
+import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import * as interceptorActivities from '../interceptor/activities';
 
 type ActivitiesType = typeof interceptorActivities;
 
 const LT_ACTIVITY_QUEUE = 'lt-interceptor';
+
+/**
+ * HotMesh's escalation config plus long-tail sugar. `schemaVersion` pins the
+ * role-schema version (lt_role_schemas) the resolver form should render; it is
+ * folded into `metadata.schema_version` before the config reaches the engine,
+ * so the pin rides the row's GIN-indexed metadata like any other facet. Omit
+ * it and the resolver UI simply uses the role's latest schema.
+ */
+export type ConditionEscalationConfig = Types.ConditionQueueConfig & {
+  schemaVersion?: number;
+};
+
+/** Fold the schemaVersion sugar into metadata; pass everything else through. */
+function toEngineConfig(
+  escalation?: ConditionEscalationConfig,
+): Types.ConditionQueueConfig | undefined {
+  if (!escalation || escalation.schemaVersion == null) return escalation;
+  const { schemaVersion, ...config } = escalation;
+  return {
+    ...config,
+    metadata: {
+      ...config.metadata,
+      [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: schemaVersion,
+    },
+  };
+}
 
 /**
  * Wait for a signal and resolve the associated escalation automatically.
@@ -28,6 +55,20 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  *   description: instructions,
  *   metadata: { orderId, station: stationName },
  *   envelope: { instructions },
+ * });
+ * ```
+ *
+ * **Pin the role schema version (optional).** Role form/metadata schemas are
+ * versioned (lt_role_schemas). Set `schemaVersion` when this wait depends on a
+ * specific shape — e.g. a review form that gained a field the workflow expects
+ * back. The resolver UI renders exactly that version for this escalation;
+ * without it, the role's latest schema always applies.
+ *
+ * ```typescript
+ * const decision = await conditionLT<{ approved: boolean; lotNumber: string }>(signalId, {
+ *   role: 'reviewer',
+ *   description: instructions,
+ *   schemaVersion: 3,                     // render role schema v3 for this row
  * });
  * ```
  *
@@ -66,11 +107,11 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  */
 export async function conditionLT<T = Record<string, any>>(
   signalId: string,
-  escalation?: Types.ConditionQueueConfig,
+  escalation?: ConditionEscalationConfig,
 ): Promise<T | false | null> {
   const raw = await Durable.workflow.condition<T & { $escalation_id?: string }>(
     signalId,
-    escalation,
+    toEngineConfig(escalation),
   ) as (T & { $escalation_id?: string }) | false | null;
 
   // false = timeout, null = escalation was cancelled — propagate both as-is

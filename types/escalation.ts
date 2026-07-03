@@ -1,3 +1,20 @@
+/**
+ * Reserved keys inside `lt_escalations.metadata`. Everything else in the bag
+ * is caller-owned. These ride the GIN-indexed surface so they survive the
+ * engine's atomic Leg1 write untouched and are queryable like any facet.
+ */
+export const ESCALATION_METADATA_KEYS = {
+  /**
+   * Pins the lt_role_schemas version this escalation was created against.
+   * The resolver UI renders that exact snapshot even after the role's schema
+   * moves on; absent, the latest role schema applies. Set ergonomically via
+   * `conditionLT`'s `schemaVersion` config field.
+   */
+  SCHEMA_VERSION: 'schema_version',
+  /** Per-escalation resolver form override — a full JSON Schema embedded on the row. */
+  FORM_SCHEMA: 'form_schema',
+} as const;
+
 export type LTEscalationStatus =
   | 'pending'
   | 'resolved'

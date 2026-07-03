@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Tag, GitBranch, Eye, Network, Trash2, Check, Braces, Triangle, Settings2,
+  Tag, GitBranch, Eye, Network, Trash2, Check, Braces, Triangle, Settings2, History, Users,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -14,6 +14,8 @@ import {
 } from '../../../api/roles';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
+import { RoleSchemaVersionsSection } from './RoleSchemaVersionsSection';
+import { RoleMembersSection } from './RoleMembersSection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -513,6 +515,21 @@ export function RoleDetailPage() {
             />
             <EscalationSection role={role} allRoles={roles} />
           </div>
+
+          {/* Members — who can see through this window, and how far */}
+          <div className="pt-3 pb-4 border-t border-surface-border/40">
+            <SectionHead
+              icon={Users}
+              color="text-text-quaternary"
+              label="Members"
+              aside={
+                <span className="text-[9px] font-normal normal-case text-text-quaternary">
+                  read = what appears · write = what they can act on
+                </span>
+              }
+            />
+            <RoleMembersSection role={role.role} />
+          </div>
         </div>
 
         {/* ── Col 3: Schemas ── */}
@@ -524,9 +541,14 @@ export function RoleDetailPage() {
               color="text-cyan-400"
               label="Form Schema"
               aside={
-                !editingJson.has('form_schema') && role.form_schema ? (
-                  <button onClick={() => startEditingJson('form_schema')} className="text-[9px] text-accent hover:underline">Edit</button>
-                ) : undefined
+                <div className="flex items-center gap-2">
+                  {role.current_schema_version != null && (
+                    <span className="text-[9px] font-mono text-text-quaternary">v{role.current_schema_version}</span>
+                  )}
+                  {!editingJson.has('form_schema') && role.form_schema ? (
+                    <button onClick={() => startEditingJson('form_schema')} className="text-[9px] text-accent hover:underline">Edit</button>
+                  ) : null}
+                </div>
               }
             />
             <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
@@ -587,6 +609,26 @@ export function RoleDetailPage() {
                 {errors.metadata_schema && <p className="text-[10px] text-status-error mt-1">{errors.metadata_schema}</p>}
               </>
             )}
+          </div>
+
+          {/* Schema version history */}
+          <div>
+            <SectionHead
+              icon={History}
+              color="text-text-quaternary"
+              label="Schema Versions"
+              aside={
+                <span className="text-[9px] font-normal normal-case text-text-quaternary">
+                  each schema save adds one
+                </span>
+              }
+            />
+            <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
+              Escalations pin a version via <code className="font-mono">schemaVersion</code> in
+              the workflow's wait config; pinned forms keep that exact shape. Everything else
+              follows the latest.
+            </p>
+            <RoleSchemaVersionsSection role={role.role} />
           </div>
         </div>
       </div>

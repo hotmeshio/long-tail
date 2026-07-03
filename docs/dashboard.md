@@ -196,15 +196,17 @@ User Accounts and Service Accounts live on the same page, separated by a tab tog
 
 ### Roles
 
-Define roles and configure escalation chains that control how work flows between teams.
+A role is where a running workflow hands work to a person. Work waits in the role's queue, the role's schema shapes the form the person completes, membership decides who can see and resolve which items, and submitting the form resumes the workflow exactly where it paused. Roles are also where escalation chains are configured — the paths work takes between teams when it needs another set of hands.
 
 - **Role list** — all roles in the system. Each row shows the role key, title, description, user count, chain count, workflow count, and an OPS badge if `ops_visible` is set.
-- **Role detail** — click a role to open its detail panel: identity fields (title, description), escalation chains, and the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`). Edit these inline and save via `PATCH /api/roles/:role`.
+- **Role detail** — click a role to open its detail panel: identity fields (title, description), escalation chains, members, schemas with version history, and the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`). Edit these inline and save via `PATCH /api/roles/:role`.
+- **Members** — who holds the role: admins manage it; members work its queue according to their read/write scope (read = which items appear; write = which they can claim and resolve).
+- **Schema versions** — every save that changes the role's form or metadata schema appends an immutable snapshot and advances the current version. Workflows pin a version via `schemaVersion` in the `conditionLT` config so their resolver form keeps that exact shape; escalations without a pin render the latest. The history section shows every version with its snapshot.
 - **Create Role** — add a new role. Roles referenced in workflow configs are auto-created, but you can also create them here for organizational clarity.
 - **Scope picker** — when granting a role at `member` type, a Scope picker offers the five named work-surface profiles: full worker (`all`/`all`, default), see-all-act-own (`all`/`self`), own-items-only (`self`/`self`), read-only auditor (`all`/`none`), and read-only own (`self`/`none`). `admin` and `superadmin` grants show no Scope picker — they always work the whole queue. The picker enforces **write ⊆ read**, so a write breadth wider than the read breadth cannot be selected.
 - **Escalation chains** — define source → target role mappings. When a reviewer escalates, the chain determines which roles receive the escalation next. Chains are directional (reviewer → engineer → admin) and support multiple targets per source.
 
-**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `PATCH /api/roles/:role` updates metadata and capacity fields. `GET /api/roles/details` returns full `RoleDetail` shapes. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
+**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `PATCH /api/roles/:role` updates metadata and capacity fields. `GET /api/roles/details` returns full `RoleDetail` shapes. `GET /api/roles/:role/schema` fetches the latest or a pinned schema version; `GET /api/roles/:role/schema/versions` lists the history. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
 
 ### DB Maintenance
 

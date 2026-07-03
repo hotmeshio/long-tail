@@ -212,7 +212,7 @@ function StationRow({
         <div className="flex items-center gap-1.5 pb-2 pl-1">
           <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
           <Link
-            to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}&sort_by=created_at&order=asc`}
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}&sort_by=created_at&order=asc`}
             className="text-[10px] text-red-400 hover:text-red-500 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >

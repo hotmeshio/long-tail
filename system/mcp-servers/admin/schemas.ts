@@ -285,6 +285,16 @@ export const updateRoleSchema = z.object({
   sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. One of the capacity settings: target_per_hour = worker_count / (sla_minutes / 60)'),
   target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the station pace baseline on the Operations view.'),
   worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
+  change_summary: z.string().optional().describe('Recorded on the schema version snapshot when this update changes form_schema or metadata_schema'),
+});
+
+export const getRoleSchemaSchema = z.object({
+  role: z.string().describe('Role whose schema to fetch'),
+  version: z.number().int().min(1).optional().describe('Version pin — returns that immutable snapshot. Omit for the live (latest) schema.'),
+});
+
+export const listRoleSchemaVersionsSchema = z.object({
+  role: z.string().describe('Role whose schema version history to list'),
 });
 
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────

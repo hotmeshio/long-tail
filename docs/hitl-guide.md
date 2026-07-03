@@ -160,10 +160,32 @@ export async function reviewWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-### Per-Escalation vs Workflow-Level Schema
+### Which Schema Renders the Form
 
-- **Workflow config `resolver_schema`**: Default form for all escalations of this workflow type. Set in the workflow registry.
-- **`metadata.form_schema`**: Per-escalation override. Takes precedence over workflow config. Use when different escalation points in the same workflow need different forms.
+The resolver form resolves in order, most specific first:
+
+1. **`metadata.form_schema`** — a full JSON Schema embedded on the escalation row. Use when different escalation points in the same workflow need different forms.
+2. **`metadata.schema_version`** — a pin to a specific version of the role's schema (set via `schemaVersion` in the `conditionLT` config). The form renders exactly that snapshot, even after the role's schema changes.
+3. **Workflow config `resolver_schema`** — default form for all escalations of this workflow type. Set in the workflow registry.
+4. **The role's latest `form_schema`** — the fallback every role provides.
+
+### Versioned Role Schemas
+
+Every save that changes a role's `form_schema` or `metadata_schema` appends an immutable snapshot to the version history (`lt_role_schemas`) and advances the role's current version. Escalations that need a guaranteed shape pin one:
+
+```typescript
+const decision = await conditionLT<{ approved: boolean; lotNumber: string }>(signalId, {
+  role: 'reviewer',
+  description: instructions,
+  schemaVersion: 3,   // this row renders role schema v3, always
+});
+```
+
+The pin travels as `metadata.schema_version` on the row (GIN-indexed, queryable like any facet). A pin that names a missing version fails at creation with a 400 — it never falls through to a different version. Without a pin, the role's latest schema always applies: workflow authors who don't care get the current form automatically; authors who depend on a specific field (say, a form that gained `lotNumber` in v3 and the workflow reads it back) pin the version and the round trip stays aligned.
+
+`metadata.schema_version` also selects which `metadata_schema` validates the creation-time metadata bag on `POST /api/escalations`.
+
+Inspect versions via `GET /api/roles/:role/schema?version=N`, `GET /api/roles/:role/schema/versions`, `lt.roles.getSchema` / `lt.roles.listSchemaVersions`, `ltc roles schema <role> --version N`, or the `get_role_schema` / `list_role_schema_versions` admin MCP tools. The role detail page shows the full history with a snapshot viewer.
 
 ---
 

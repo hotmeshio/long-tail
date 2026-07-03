@@ -18,9 +18,32 @@ export interface RoleDetail {
   sla_minutes: number | null;
   target_per_hour: number | null;
   worker_count: number | null;
+  /** Version of the live schema pair; each schema edit advances it. Null until the role first carries a schema. */
+  current_schema_version: number | null;
   user_count: number;
   chain_count: number;
   workflow_count: number;
+}
+
+/** One immutable snapshot of a role's schema pair. */
+export interface RoleSchemaVersion {
+  role: string;
+  version: number | null;
+  form_schema: Record<string, unknown> | null;
+  metadata_schema: Record<string, unknown> | null;
+  change_summary: string | null;
+  created_at: string | null;
+  latest_version: number | null;
+}
+
+/** Version-history row (schemas elided; presence flags only). */
+export interface RoleSchemaVersionSummary {
+  version: number;
+  has_form_schema: boolean;
+  has_metadata_schema: boolean;
+  change_summary: string | null;
+  created_at: string;
+  is_current: boolean;
 }
 
 export interface UpdateRoleInput {
@@ -34,6 +57,8 @@ export interface UpdateRoleInput {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /** Recorded on the schema version snapshot when the update changes a schema field. */
+  change_summary?: string;
 }
 
 export function useRoles() {
@@ -104,6 +129,28 @@ export function useRoleDetails() {
   return useQuery<{ roles: RoleDetail[] }>({
     queryKey: ['roles', 'details'],
     queryFn: () => apiFetch('/roles/details'),
+  });
+}
+
+/**
+ * Fetch a role's schema pair. A version pins the immutable snapshot an
+ * escalation was created against (metadata.schema_version); omitted, the live
+ * (latest) schema is returned with its current version number.
+ */
+export function useRoleSchema(role: string, version?: number, enabled = true) {
+  return useQuery<RoleSchemaVersion>({
+    queryKey: ['roles', role, 'schema', version ?? 'latest'],
+    queryFn: () =>
+      apiFetch(`/roles/${encodeURIComponent(role)}/schema${version != null ? `?version=${version}` : ''}`),
+    enabled: enabled && !!role,
+  });
+}
+
+export function useRoleSchemaVersions(role: string) {
+  return useQuery<{ versions: RoleSchemaVersionSummary[] }>({
+    queryKey: ['roles', role, 'schema-versions'],
+    queryFn: () => apiFetch(`/roles/${encodeURIComponent(role)}/schema/versions`),
+    enabled: !!role,
   });
 }
 

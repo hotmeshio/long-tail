@@ -269,7 +269,45 @@ const result = await lt.roles.update({
 | `sla_minutes` | `number \| null` | No | SLA target in minutes |
 | `target_per_hour` | `number \| null` | No | Throughput target (items per hour) |
 | `worker_count` | `number \| null` | No | Station capacity |
+| `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
+
+When the update changes `form_schema` or `metadata_schema`, the new pair is snapshotted into the role's version history and `current_schema_version` advances.
 
 **Returns:** `LTApiResult<RoleDetail>` — the updated role.
 
 **Auth:** Role manager (admin type, superadmin, or engineer)
+
+## getSchema
+
+Fetch a role's `form_schema` + `metadata_schema` pair. With `version`, reads that immutable snapshot from the version history (the one an escalation pins via `conditionLT`'s `schemaVersion`); without it, reads the live (latest) schema and its current version number. A missing version is a 404 — it never falls back to a different version.
+
+```typescript
+const latest = await lt.roles.getSchema({ role: 'reviewer' });
+const pinned = await lt.roles.getSchema({ role: 'reviewer', version: 3 });
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | `string` | Yes | Role whose schema to fetch |
+| `version` | `number` | No | Version pin (positive integer) |
+
+**Returns:** `LTApiResult<RoleSchemaVersion>` — `{ role, version, form_schema, metadata_schema, change_summary, created_at, latest_version }`.
+
+## listSchemaVersions
+
+List a role's schema version history, newest first. Each entry carries the version number, presence flags for the two schemas, the change summary, and whether it is the role's current version.
+
+```typescript
+const result = await lt.roles.listSchemaVersions({ role: 'reviewer' });
+// result.data.versions → [{ version, has_form_schema, has_metadata_schema, change_summary, created_at, is_current }, …]
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | `string` | Yes | Role whose history to list |
+
+**Returns:** `LTApiResult<{ versions: RoleSchemaVersionSummary[] }>`

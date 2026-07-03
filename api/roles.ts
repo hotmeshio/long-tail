@@ -185,6 +185,8 @@ export async function updateRole(input: {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /** Recorded on the schema snapshot when this update changes a schema field. */
+  change_summary?: string;
 }): Promise<LTApiResult> {
   try {
     if (!input.role) {
@@ -216,11 +218,73 @@ export async function updateRole(input: {
       sla_minutes: input.sla_minutes,
       target_per_hour: input.target_per_hour,
       worker_count: input.worker_count,
+      change_summary: input.change_summary,
     });
     if (!updated) {
       return { status: 404, error: `Role '${input.role}' not found` };
     }
     return { status: 200, data: updated };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Fetch a role's schema pair (form_schema + metadata_schema).
+ *
+ * With `version`, returns that immutable snapshot from the version history —
+ * a missing version is a 404, never a silent fall-through to latest. Without
+ * `version`, returns the live (latest) schema along with the current version
+ * number so callers can tell what they got.
+ *
+ * @param input.role — the role whose schema to fetch
+ * @param input.version — optional version pin (positive integer)
+ * @returns `{ status: 200, data: RoleSchemaVersion }` on success
+ */
+export async function getRoleSchema(input: {
+  role: string;
+  version?: number;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.role) {
+      return { status: 400, error: 'role is required' };
+    }
+    if (input.version !== undefined && (!Number.isInteger(input.version) || input.version < 1)) {
+      return { status: 400, error: 'version must be a positive integer' };
+    }
+    const schema = await roleService.getRoleSchema(input.role, input.version);
+    if (!schema) {
+      return {
+        status: 404,
+        error: input.version !== undefined
+          ? `Schema version ${input.version} not found for role '${input.role}'`
+          : `Role '${input.role}' not found`,
+      };
+    }
+    return { status: 200, data: schema };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * List a role's schema version history, newest first. Each entry carries the
+ * version number, presence flags for the two schemas, the change summary, and
+ * whether it is the role's current version. Full snapshots come from
+ * `getRoleSchema({ role, version })`.
+ *
+ * @param input.role — the role whose history to list
+ * @returns `{ status: 200, data: { versions: RoleSchemaVersionSummary[] } }` on success
+ */
+export async function listRoleSchemaVersions(input: {
+  role: string;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.role) {
+      return { status: 400, error: 'role is required' };
+    }
+    const versions = await roleService.listRoleSchemaVersions(input.role);
+    return { status: 200, data: { versions } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

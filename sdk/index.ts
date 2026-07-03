@@ -186,6 +186,8 @@ export function createClient(options: LTClientOptions = {}) {
       create: rolesApi.createRole,
       update: rolesApi.updateRole,
       delete: rolesApi.deleteRole,
+      getSchema: rolesApi.getRoleSchema,
+      listSchemaVersions: rolesApi.listRoleSchemaVersions,
       getEscalationChains: rolesApi.getEscalationChains,
       addEscalationChain: rolesApi.addEscalationChain,
       removeEscalationChain: rolesApi.removeEscalationChain,

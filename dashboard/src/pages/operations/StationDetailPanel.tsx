@@ -152,7 +152,7 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         )}
         {metric && metric.in_arrears > 0 && (
           <Link
-            to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([metric.role]))}&sort_by=created_at&order=asc`}
+            to={`/escalations/available?role=${encodeURIComponent(metric.role)}&sort_by=created_at&order=asc`}
             className="flex items-center justify-between group"
           >
             <span className="text-[10px] text-red-500">{metric.in_arrears} past SLA</span>
@@ -161,11 +161,12 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         )}
       </div>
 
-      {/* View queue — the facet URL parser reads `roles` as a JSON array; a
-          bare `role=` param is ignored and would show every role's queue. */}
+      {/* View queue — `role=` drives the visible filter bar on the escalations
+          page (the JSON `roles=` facet param filters silently and leaves the
+          bar reading "all roles"). */}
       <div className="mt-4 border-t border-surface-border/40 pt-3">
         <Link
-          to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}`}
+          to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
           className="flex items-center gap-1.5 text-[10px] text-accent hover:underline"
         >
           View full queue
