@@ -136,6 +136,8 @@ ltc roles list                            # Roles with schema version, member an
 ltc roles schema reviewer                 # Latest form/metadata schema (with current version)
 ltc roles schema reviewer --version 3     # Immutable v3 snapshot
 ltc roles schema-versions reviewer        # Version history, newest first
+ltc roles save-schema reviewer --file schema.json --summary "Added lotNumber"
+                                          # Save the escalation form schema (a change creates the next version)
 ```
 
 ### Compiler

@@ -319,6 +319,13 @@ rolesCmd.command('schema-versions <role>')
   .option('-q, --quiet', 'Versions only')
   .action(wrap(roles.listRoleSchemaVersions));
 
+rolesCmd.command('save-schema <role>')
+  .description('Save the role\'s escalation form schema (a change creates the next version)')
+  .option('--file <path>', 'JSON Schema file (reads stdin when omitted)')
+  .option('--summary <text>', 'Change summary recorded on the new version')
+  .option('--json', 'JSON output')
+  .action(wrap(roles.saveRoleSchema));
+
 // ── Streams ─────────────────────────────────────────────────────────────
 
 const streamsCmd = program.command('streams').description('Browse stream messages (admin)');

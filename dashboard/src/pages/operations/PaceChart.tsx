@@ -109,14 +109,22 @@ export const RESOLVED_COLOR = '#4e6a5e'; // done — grey with a breath of green
 // ── End-label stacking — spread close labels so text doesn't collide ────────────
 
 const MIN_GAP = 13;
-function spreadLabels<T extends { y: number }>(labels: T[]): (T & { labelY: number })[] {
+function spreadLabels<T extends { y: number }>(labels: T[], maxY: number): (T & { labelY: number })[] {
   const sorted = [...labels].sort((a, b) => a.y - b.y);
   let prev = -Infinity;
-  return sorted.map((l) => {
+  const placed = sorted.map((l) => {
     const labelY = Math.max(l.y + 3, prev + MIN_GAP);
     prev = labelY;
     return { ...l, labelY };
   });
+  // On a quiet window every curve sits at zero and the stack would descend
+  // past the floor into the station titles — lift the whole stack back above
+  // maxY instead.
+  const overflow = placed.length > 0 ? placed[placed.length - 1].labelY - maxY : 0;
+  if (overflow > 0) {
+    for (const l of placed) l.labelY -= overflow;
+  }
+  return placed;
 }
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
@@ -192,16 +200,22 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
       : '';
   const queuedBandPath = hasQueue ? bandPath(pendingPts, activePts) : '';
 
+  // Quiet lines keep their curves (flat at zero) but skip their end labels —
+  // a stack of names pointing at nothing is noise.
+  const showActiveLabel = withTarget.some((r) => r.active > 0);
   const showQueuedLabel = withTarget.some((r) => r.pending > r.active);
   const endLabels = spreadLabels(
     [
       lastTarget ? { key: 'target', text: 'target', color: '#ef4444', y: lastTarget.y } : null,
       lastActual ? { key: 'actual', text: 'actual', color: RESOLVED_COLOR, y: lastActual.y } : null,
-      lastActive ? { key: 'active', text: 'active', color: ACTIVE_COLOR, y: lastActive.y } : null,
+      showActiveLabel && lastActive
+        ? { key: 'active', text: 'active', color: ACTIVE_COLOR, y: lastActive.y }
+        : null,
       showQueuedLabel && lastPending
         ? { key: 'queued', text: 'queued', color: QUEUED_COLOR, y: lastPending.y }
         : null,
     ].filter(Boolean) as { key: string; text: string; color: string; y: number }[],
+    bottom + 4,
   );
 
   return (

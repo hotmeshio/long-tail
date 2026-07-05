@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import pc from 'picocolors';
 import { apiFetch } from '../client';
 import { output, formatTime } from '../format';
@@ -46,4 +47,21 @@ export async function listRoleSchemaVersions(
 ): Promise<void> {
   const data = await apiFetch<any>(`/roles/${encodeURIComponent(role)}/schema/versions`);
   output(data, data.versions || [], VERSION_COLUMNS, opts, 'version');
+}
+
+export async function saveRoleSchema(
+  role: string,
+  opts: { file?: string; summary?: string; json?: boolean },
+): Promise<void> {
+  // One PATCH carrying only the schema (and its summary) — a schema change
+  // appends the next immutable version; an identical save leaves it alone.
+  const raw = opts.file ? fs.readFileSync(opts.file, 'utf8') : fs.readFileSync(0, 'utf8');
+  const schema = JSON.parse(raw);
+  const data = await apiFetch<any>(`/roles/${encodeURIComponent(role)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ form_schema: schema, change_summary: opts.summary }),
+  });
+  if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
+  const version = data.current_schema_version != null ? ` — v${data.current_schema_version} in use` : '';
+  console.log(`\n  ${pc.green('✓')} Saved ${role} escalation schema${version}\n`);
 }

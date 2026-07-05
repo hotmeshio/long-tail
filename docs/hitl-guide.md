@@ -185,7 +185,7 @@ The pin travels as `metadata.schema_version` on the row (GIN-indexed, queryable 
 
 `metadata.schema_version` also selects which `metadata_schema` validates the creation-time metadata bag on `POST /api/escalations`.
 
-Inspect versions via `GET /api/roles/:role/schema?version=N`, `GET /api/roles/:role/schema/versions`, `lt.roles.getSchema` / `lt.roles.listSchemaVersions`, `ltc roles schema <role> --version N`, or the `get_role_schema` / `list_role_schema_versions` admin MCP tools. The role detail page shows the full history with a snapshot viewer.
+Inspect versions via `GET /api/roles/:role/schema?version=N`, `GET /api/roles/:role/schema/versions`, `lt.roles.getSchema` / `lt.roles.listSchemaVersions`, `ltc roles schema <role> --version N`, or the `get_role_schema` / `list_role_schema_versions` admin MCP tools. Save a new version by writing only the schema — `PATCH /api/roles/:role` with `form_schema` (+ optional `change_summary`), `lt.roles.update`, `ltc roles save-schema <role> --file schema.json`, or the `update_role` MCP tool. The dashboard edits it on the role's Escalation Schema page (`/admin/roles/:role/schema`), with the version history and snapshot viewer alongside.
 
 ---
 
