@@ -9,13 +9,29 @@
  * Usage:
  *   npx ts-node scripts/ortho-populate.ts
  *   ORDERS=50 HOLD_S=3 npx ts-node scripts/ortho-populate.ts
- *   ORDERS=5  HOLD_S=0 POLL_MS=500 npx ts-node scripts/ortho-populate.ts
+ *   ORDERS=10 HOLD_S=25 npx ts-node scripts/ortho-populate.ts
+ *   ORDERS=5  HOLD_S=0 QUEUE_S=0 POLL_MS=500 npx ts-node scripts/ortho-populate.ts
  *
  * Env vars:
  *   ORDERS    — number of orders to run (default 20)
- *   HOLD_S    — seconds to hold each escalation before resolving (default 2)
+ *   HOLD_S    — average seconds to hold each claimed escalation before
+ *               resolving (default 2)
+ *   QUEUE_S   — average seconds an escalation waits in the queue before being
+ *               claimed (default: HOLD_S). This is what builds a visible
+ *               backlog: on the Operations chart, queued-but-unclaimed and
+ *               claimed-and-worked are two different bands — with QUEUE_S=0
+ *               everything is claimed the moment it lands and pending always
+ *               equals active.
  *   POLL_MS   — poll interval ms (default 1000)
  *   BASE_URL  — server URL (default http://localhost:3000)
+ *
+ * Both durations are per-item averages, not fixed delays: each escalation gets
+ * its own wait and hold spread across 0.4×–1.6× of the configured value (a
+ * stable hash of its id — no state to track between polls). That staggering is
+ * what makes the Operations chart read like a real floor: at any moment a
+ * station holds a mix of waiting and active items, claims burn the backlog
+ * down gradually, and resolves feed the next station a trickle instead of a
+ * wave.
  */
 
 try { require('dotenv/config'); } catch {}
@@ -23,6 +39,7 @@ try { require('dotenv/config'); } catch {}
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const ORDERS   = parseInt(process.env.ORDERS  || '20',   10);
 const HOLD_S   = parseFloat(process.env.HOLD_S || '2');
+const QUEUE_S  = parseFloat(process.env.QUEUE_S ?? String(HOLD_S));
 const POLL_MS  = parseInt(process.env.POLL_MS  || '1000', 10);
 
 const ORTHO_ROLES = ['design', 'review', 'print', 'grind', 'glue', 'finish', 'qa', 'ship'];
@@ -35,6 +52,18 @@ let totalResolved = 0;
 function ts(): string { return new Date().toISOString().slice(11, 19); }
 function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 function ageSeconds(iso: string): number { return (Date.now() - new Date(iso).getTime()) / 1000; }
+
+// Deterministic per-item jitter — FNV-1a hash of the escalation id into [0, 1).
+// Stable across polls, so each item has one fixed wait and one fixed hold
+// without any bookkeeping.
+function jitter(id: string, salt: string): number {
+  let h = 2166136261;
+  for (const c of salt + id) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 1000) / 1000;
+}
+
+/** Spread a base duration across 0.4×–1.6× so a stage's items trickle instead of toggling together. */
+function spread(base: number, r: number): number { return base * (0.4 + 1.2 * r); }
 
 // ── HTTP helper (mirrors boilerplate 07-shared) ───────────────────────────────
 
@@ -73,6 +102,10 @@ async function claimBatch(batchTag: string): Promise<number> {
     for (const esc of escalations) {
       if (!ORTHO_ROLES.includes(esc.role)) continue;
       if (!String(esc.workflow_id ?? '').includes(batchTag)) continue;
+      // Let the item sit in the queue first — this is the unclaimed backlog the
+      // Operations chart renders as the "waiting" band above the active band.
+      // Each item gets its own wait so the backlog burns down gradually.
+      if (esc.created_at && ageSeconds(esc.created_at) < spread(QUEUE_S, jitter(esc.id, 'queue'))) continue;
 
       try {
         await api('POST', `/api/escalations/${esc.id}/claim`, { durationMinutes: 600 });
@@ -105,8 +138,10 @@ async function resolveBatch(batchTag: string): Promise<number> {
       if (!ORTHO_ROLES.includes(esc.role)) continue;
       if (!String(esc.workflow_id ?? '').includes(batchTag)) continue;
 
+      // Per-item hold: some resolvers are quick, some slow — resolves trickle
+      // out and feed the next station a steady stream instead of a wave.
       const heldS = esc.claimed_at ? ageSeconds(esc.claimed_at) : 0;
-      if (heldS < HOLD_S) continue;
+      if (heldS < spread(HOLD_S, jitter(esc.id, 'hold'))) continue;
 
       try {
         await api('POST', `/api/escalations/${esc.id}/resolve`, {
@@ -147,8 +182,10 @@ async function runOrders(batchTag: string, target: number): Promise<void> {
     }
   };
 
-  // Watchdog — stops when target hit or stalled too long.
-  const STALL_S = Math.max(30, HOLD_S * 6);
+  // Watchdog — stops when target hit or stalled too long. Each stage now
+  // spends QUEUE_S unclaimed + HOLD_S claimed, so the quiet window scales
+  // with both.
+  const STALL_S = Math.max(30, (HOLD_S + QUEUE_S) * 6);
   const watchdog = async () => {
     let lastResolved = totalResolved;
     let stalledFor = 0;
@@ -177,7 +214,7 @@ async function runOrders(batchTag: string, target: number): Promise<void> {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`\n  Ortho Populate  ──  ${ORDERS} orders × 8 stages  (hold=${HOLD_S}s, poll=${POLL_MS}ms)`);
+  console.log(`\n  Ortho Populate  ──  ${ORDERS} orders × 8 stages  (queue=${QUEUE_S}s, hold=${HOLD_S}s, poll=${POLL_MS}ms)`);
   console.log(`  Server: ${BASE_URL}\n`);
 
   await login();
