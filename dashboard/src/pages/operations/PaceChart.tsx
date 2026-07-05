@@ -96,8 +96,11 @@ function paceColor(ratio: number | null): { stroke: string; fill: string } {
   return { stroke: '#ef4444', fill: '#fef2f2' };                    // well behind
 }
 
-const ACTIVE_COLOR = '#6366f1'; // claimed, being worked right now — indigo
-const QUEUED_COLOR = '#0ea5e9'; // pending and unclaimed, waiting in the queue — sky
+// Shared queue-state palette — the chart bands and the station table columns
+// use the same hues so the two views read as one.
+export const ACTIVE_COLOR = '#6366f1';   // claimed, being worked right now — indigo
+export const QUEUED_COLOR = '#0ea5e9';   // pending and unclaimed, waiting in the queue — sky
+export const RESOLVED_COLOR = '#4e6a5e'; // done — grey with a breath of green
 
 // ── End-label stacking — spread close labels so text doesn't collide ────────────
 
@@ -189,7 +192,7 @@ export function PaceChart({ stations, selectedRole, onSelect, periodHours }: Pac
   const endLabels = spreadLabels(
     [
       lastTarget ? { key: 'target', text: 'target', color: '#ef4444', y: lastTarget.y } : null,
-      lastActual ? { key: 'actual', text: 'actual', color: '#475569', y: lastActual.y } : null,
+      lastActual ? { key: 'actual', text: 'actual', color: RESOLVED_COLOR, y: lastActual.y } : null,
       lastActive ? { key: 'active', text: 'active', color: ACTIVE_COLOR, y: lastActive.y } : null,
       showQueuedLabel && lastPending
         ? { key: 'queued', text: 'queued', color: QUEUED_COLOR, y: lastPending.y }
@@ -209,7 +212,7 @@ export function PaceChart({ stations, selectedRole, onSelect, periodHours }: Pac
       })}
 
       {/* Area under the actual curve */}
-      {areaPath && <path d={areaPath} fill="rgb(71 85 105 / 0.05)" style={{ transition: `d ${EASE}` }} />}
+      {areaPath && <path d={areaPath} fill={RESOLVED_COLOR} opacity={0.05} style={{ transition: `d ${EASE}` }} />}
 
       {/* Queue composition bands — the band heights split each station's
           pending total into claimed-and-worked (indigo, floor→active) and
@@ -256,7 +259,7 @@ export function PaceChart({ stations, selectedRole, onSelect, periodHours }: Pac
 
       {/* Actual — thin solid, primary line */}
       {actualSplinePath && (
-        <path d={actualSplinePath} fill="none" stroke="#475569" strokeWidth={1} strokeLinejoin="round" strokeLinecap="round" opacity={0.7} style={{ transition: `d ${EASE}` }} />
+        <path d={actualSplinePath} fill="none" stroke={RESOLVED_COLOR} strokeWidth={1} strokeLinejoin="round" strokeLinecap="round" opacity={0.75} style={{ transition: `d ${EASE}` }} />
       )}
 
       {/* Queue markers — a dot on the active line per station.
@@ -338,7 +341,7 @@ export function PaceChart({ stations, selectedRole, onSelect, periodHours }: Pac
               )}
               <circle r={r} fill={stroke} opacity={0.9} style={{ transition: `r ${EASE}` }} />
               {row.expected != null && (
-                <text y={-r - 5} textAnchor="middle" fontSize={9.5} fill="#334155" fontFamily="ui-monospace, monospace" fontWeight="500">
+                <text y={-r - 5} textAnchor="middle" fontSize={9.5} fill={RESOLVED_COLOR} fontFamily="ui-monospace, monospace" fontWeight="500">
                   {compact(row.actual)}
                 </text>
               )}
