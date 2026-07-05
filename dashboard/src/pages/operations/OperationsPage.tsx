@@ -1,13 +1,26 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, GitMerge, RefreshCw } from 'lucide-react';
 import { useRoleDetails, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
 import { useStationMetricsEvents } from '../../hooks/useEventHooks';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { PaceChart, type ChartStation } from './PaceChart';
+import {
+  PaceChart,
+  ACTIVE_COLOR,
+  QUEUED_COLOR,
+  RESOLVED_COLOR,
+  type ChartStation,
+} from './PaceChart';
 import { StationDetailPanel } from './StationDetailPanel';
+
+// Column band tints — the same hues as the chart's queue-composition bands
+// (~8% alpha), so PENDING/ACTIVE/RESOLVED in the table visually continue the
+// sky/indigo/sage story told above.
+const PENDING_BAND = `${QUEUED_COLOR}14`;
+const ACTIVE_BAND = `${ACTIVE_COLOR}14`;
+const RESOLVED_BAND = `${RESOLVED_COLOR}14`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,36 +42,51 @@ interface OrderedStation {
   depth: number;
 }
 
-// ── Topological sort — BFS, tracking actual depth ─────────────────────────────
+/**
+ * One sequence of stations, named by its origin role. Execution is a graph;
+ * each fragment is the human-readable line the user composed via parent_role.
+ * Cross-fragment edges live in upstream_roles and render as a merge affordance
+ * on the chart, never as a bend in the line.
+ */
+interface SequenceFragment {
+  origin: RoleDetail;
+  stations: OrderedStation[];
+}
 
-function topoSort(roles: RoleDetail[]): OrderedStation[] {
+// ── Fragment builder — BFS per parent_role root, tracking actual depth ────────
+
+function buildFragments(roles: RoleDetail[]): SequenceFragment[] {
   const opsRoles = roles.filter((r) => r.ops_visible);
   const roleMap = new Map(opsRoles.map((r) => [r.role, r]));
-  const result: OrderedStation[] = [];
   const visited = new Set<string>();
 
-  // Roots: no parent, or parent not in ops set
-  const queue: OrderedStation[] = opsRoles
-    .filter((r) => !r.parent_role || !roleMap.has(r.parent_role))
-    .map((r) => ({ role: r, depth: 0 }));
+  // Roots: no parent, or parent not in ops set — each roots its own fragment.
+  const roots = opsRoles.filter((r) => !r.parent_role || !roleMap.has(r.parent_role));
 
-  while (queue.length > 0) {
-    const item = queue.shift()!;
-    if (visited.has(item.role.role)) continue;
-    visited.add(item.role.role);
-    result.push(item);
-    // Children get depth + 1
-    opsRoles
-      .filter((c) => c.parent_role === item.role.role && !visited.has(c.role))
-      .forEach((c) => queue.push({ role: c, depth: item.depth + 1 }));
-  }
+  const fragments: SequenceFragment[] = roots.map((root) => {
+    const stations: OrderedStation[] = [];
+    const queue: OrderedStation[] = [{ role: root, depth: 0 }];
+    while (queue.length > 0) {
+      const item = queue.shift()!;
+      if (visited.has(item.role.role)) continue;
+      visited.add(item.role.role);
+      stations.push(item);
+      opsRoles
+        .filter((c) => c.parent_role === item.role.role && !visited.has(c.role))
+        .forEach((c) => queue.push({ role: c, depth: item.depth + 1 }));
+    }
+    return { origin: root, stations };
+  });
 
-  // Any unreachable (cycles / dangling)
+  // Unreachable (cycles / dangling) — each stands alone rather than vanishing.
   opsRoles
     .filter((r) => !visited.has(r.role))
-    .forEach((r) => result.push({ role: r, depth: 0 }));
+    .forEach((r) => fragments.push({ origin: r, stations: [{ role: r, depth: 0 }] }));
 
-  return result;
+  // Longest line first — the primary sequence leads; side-quests follow.
+  return fragments.sort(
+    (a, b) => b.stations.length - a.stations.length || a.origin.role.localeCompare(b.origin.role),
+  );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -130,13 +158,13 @@ function StationRow({
         tabIndex={0}
         onClick={onClick}
         onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
-        className={`grid items-center gap-4 py-3.5 cursor-pointer transition-colors ${
+        className={`grid items-center gap-4 cursor-pointer transition-colors ${
           selected ? 'border-l-2 border-accent' : 'pl-0.5'
         }`}
         style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
       >
         {/* Role name */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 py-3.5">
           <span
             className="font-mono font-bold text-text-primary truncate text-[11px]"
           >
@@ -145,52 +173,72 @@ function StationRow({
           {role.title && (
             <span className="text-[10px] text-text-tertiary truncate">{role.title}</span>
           )}
+          {(role.upstream_roles?.length ?? 0) > 0 && (
+            <span title={`Fed by ${role.upstream_roles.join(', ')}`} className="shrink-0 leading-none">
+              <GitMerge className="w-3 h-3 text-text-quaternary" />
+            </span>
+          )}
         </div>
 
         {/* Target / hour */}
         <span
-          className={`text-xs font-mono tabular-nums text-right ${
+          className={`text-xs font-mono tabular-nums text-right py-3.5 ${
             target != null ? 'text-text-secondary' : 'text-text-quaternary'
           }`}
         >
           {target != null ? target : '—'}
         </span>
 
-        {/* Pending */}
-        <span
-          className={`text-xs font-mono tabular-nums text-right ${
-            pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
-          }`}
+        {/* Pending — sky band, same hue as the chart's waiting band */}
+        <div
+          className="self-stretch flex items-center justify-end px-1.5"
+          style={{ backgroundColor: PENDING_BAND }}
         >
-          {pending}
-        </span>
+          <span
+            className={`text-xs font-mono tabular-nums ${
+              pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
+            }`}
+          >
+            {pending}
+          </span>
+        </div>
 
-        {/* Active */}
-        <span
-          className={`text-xs font-mono tabular-nums text-right ${
-            claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'
-          }`}
+        {/* Active — indigo band, same hue as the chart's worked band */}
+        <div
+          className="self-stretch flex items-center justify-end px-1.5"
+          style={{ backgroundColor: ACTIVE_BAND }}
         >
-          {claimed}
-        </span>
+          <span
+            className={`text-xs font-mono tabular-nums ${
+              claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'
+            }`}
+          >
+            {claimed}
+          </span>
+        </div>
 
-        {/* Resolved */}
-        <span className="text-xs font-mono tabular-nums text-right text-text-quaternary">
-          {resolved}
-        </span>
+        {/* Resolved — sage band, same hue as the chart's actual curve */}
+        <div
+          className="self-stretch flex items-center justify-end px-1.5"
+          style={{ backgroundColor: RESOLVED_BAND }}
+        >
+          <span className="text-xs font-mono tabular-nums text-text-quaternary">
+            {resolved}
+          </span>
+        </div>
 
         {/* P99 wait */}
-        <span className="text-xs font-mono tabular-nums text-right text-text-secondary">
+        <span className="text-xs font-mono tabular-nums text-right py-3.5 text-text-secondary">
           {fmtMin(metric?.wait.p99 ?? null)}
         </span>
 
         {/* P99 work */}
-        <span className="text-xs font-mono tabular-nums text-right text-text-secondary">
+        <span className="text-xs font-mono tabular-nums text-right py-3.5 text-text-secondary">
           {fmtMin(metric?.work.p99 ?? null)}
         </span>
 
         {/* Load mini-bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 py-3.5">
           <div className="w-12 h-1.5 bg-surface-sunken rounded-full overflow-hidden shrink-0">
             <div className={`h-full rounded-full ${color}`} style={{ width: `${barWidth}%` }} />
           </div>
@@ -212,7 +260,7 @@ function StationRow({
         <div className="flex items-center gap-1.5 pb-2 pl-1">
           <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
           <Link
-            to={`/escalations/available?roles=${encodeURIComponent(JSON.stringify([role.role]))}&sort_by=created_at&order=asc`}
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}&sort_by=created_at&order=asc`}
             className="text-[10px] text-red-400 hover:text-red-500 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
@@ -227,22 +275,47 @@ function StationRow({
 // ── Table header ──────────────────────────────────────────────────────────────
 
 function TableHead() {
-  const cols = ['ROLE', 'TARGET/H', 'PENDING', 'ACTIVE', 'RESOLVED', 'P99 WAIT', 'P99 WORK', 'TREND'];
+  // Queue-state columns carry the chart's band hue into the table.
+  const cols: { label: string; band?: string; hue?: string }[] = [
+    { label: 'ROLE' },
+    { label: 'TARGET/H' },
+    { label: 'PENDING', band: PENDING_BAND, hue: QUEUED_COLOR },
+    { label: 'ACTIVE', band: ACTIVE_BAND, hue: ACTIVE_COLOR },
+    { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR },
+    { label: 'P99 WAIT' },
+    { label: 'P99 WORK' },
+    { label: 'TREND' },
+  ];
   return (
     <div
-      className="grid items-center gap-4 py-1.5 border-b border-surface-border mb-0.5"
+      className="grid items-center gap-4 border-b border-surface-border mb-0.5"
       style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
     >
-      {cols.map((col, i) => (
-        <span
-          key={col}
-          className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary ${
-            i > 0 && i < 7 ? 'text-right' : ''
-          }`}
-        >
-          {col}
-        </span>
-      ))}
+      {cols.map((col, i) =>
+        col.band ? (
+          <div
+            key={col.label}
+            className="self-stretch flex items-center justify-end px-1.5"
+            style={{ backgroundColor: col.band }}
+          >
+            <span
+              className="text-[9px] font-semibold uppercase tracking-wider"
+              style={{ color: col.hue }}
+            >
+              {col.label}
+            </span>
+          </div>
+        ) : (
+          <span
+            key={col.label}
+            className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 ${
+              i > 0 && i < 7 ? 'text-right' : ''
+            }`}
+          >
+            {col.label}
+          </span>
+        ),
+      )}
     </div>
   );
 }
@@ -270,8 +343,35 @@ export function OperationsPage() {
   const roles = roleData?.roles ?? [];
   const metrics = metricsData?.stations ?? [];
 
-  // BFS-ordered stations with exact depth tracked
-  const ordered = useMemo((): OrderedStation[] => topoSort(roles), [roles]);
+  // Sequence fragments, one per parent_role root. The active one is
+  // DEEP-LINKED (?fragment=<origin role>) and each switch is a history entry,
+  // so a shared link opens the same sequence and back/forward walks them.
+  const fragments = useMemo((): SequenceFragment[] => buildFragments(roles), [roles]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const fragmentParam = searchParams.get('fragment');
+  const activeFragment =
+    fragments.find((f) => f.origin.role === fragmentParam) ?? fragments[0] ?? null;
+  const selectFragment = useCallback(
+    (origin: string) => {
+      setSelectedRole(null);
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev);
+        p.set('fragment', origin);
+        return p;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const ordered = activeFragment?.stations ?? [];
+  const fragmentRoleSet = useMemo(
+    () => new Set(ordered.map(({ role }) => role.role)),
+    [ordered],
+  );
+  const fragmentMetrics = useMemo(
+    () => metrics.filter((m) => fragmentRoleSet.has(m.role)),
+    [metrics, fragmentRoleSet],
+  );
 
   const chartStations = useMemo(
     (): ChartStation[] =>
@@ -280,9 +380,21 @@ export function OperationsPage() {
         title: r.title,
         parent_role: r.parent_role,
         target_per_hour: r.target_per_hour ?? null,
+        upstream_roles: r.upstream_roles ?? [],
         metric: metrics.find((m) => m.role === r.role),
       })),
     [ordered, metrics],
+  );
+
+  // Jump to the sequence that feeds this station — the merge glyph's click.
+  const handleUpstreamSelect = useCallback(
+    (upstreamRole: string) => {
+      const target = fragments.find((f) =>
+        f.stations.some(({ role }) => role.role === upstreamRole),
+      );
+      if (target) selectFragment(target.origin.role);
+    },
+    [fragments, selectFragment],
   );
 
   const selectedRoleDetail =
@@ -320,7 +432,7 @@ export function OperationsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Operations"
+        title="Pace Board"
         docsHash="#docs:dashboard.md:operations"
         center={periodSelector}
         actions={
@@ -349,7 +461,7 @@ export function OperationsPage() {
             ))}
           </div>
         </div>
-      ) : ordered.length === 0 ? (
+      ) : fragments.length === 0 ? (
         <div className="mt-8">
           <p className="text-sm text-text-secondary mb-2">Stations appear here once roles are marked visible in Operations.</p>
           <p className="text-xs text-text-tertiary">
@@ -365,6 +477,32 @@ export function OperationsPage() {
         /* Console layout: fixed header (above) → flexible middle → fixed table (30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
+          {/* Sequence picker — one tab per fragment, named by its origin role.
+              Only rendered when there is more than one story to tell. */}
+          {fragments.length > 1 && (
+            <div className="flex items-center gap-0.5 px-4 pt-2">
+              {fragments.map((f) => {
+                const isActive = f.origin.role === activeFragment?.origin.role;
+                return (
+                  <button
+                    key={f.origin.role}
+                    onClick={() => selectFragment(f.origin.role)}
+                    className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors ${
+                      isActive
+                        ? 'bg-accent/10 text-accent font-semibold'
+                        : 'text-text-quaternary hover:text-text-secondary'
+                    }`}
+                  >
+                    {f.origin.title ?? f.origin.role}
+                    <span className={`ml-1.5 tabular-nums ${isActive ? 'text-accent/60' : 'text-text-quaternary/60'}`}>
+                      {f.stations.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Middle row: flexible height — SVG fills left, sidebar fixed-width right */}
           <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
             {/* SVG chart — scales to fill available space */}
@@ -373,6 +511,7 @@ export function OperationsPage() {
                 stations={chartStations}
                 selectedRole={selectedRole}
                 onSelect={handleSelect}
+                onUpstreamSelect={handleUpstreamSelect}
                 periodHours={PERIOD_HOURS[period]}
               />
             </div>
@@ -381,7 +520,7 @@ export function OperationsPage() {
             {/* Right sidebar — fixed width, scrolls its own content */}
             <StationDetailPanel
               role={selectedRoleDetail}
-              allMetrics={metrics}
+              allMetrics={fragmentMetrics}
               orderedRoles={ordered.map((o) => o.role)}
               globalPeriod={period}
               onClose={() => setSelectedRole(null)}

@@ -20,9 +20,9 @@ describe('ChoreographySidebar — operators (no builder, no ops)', () => {
     expect(screen.getByText('Available')).toBeInTheDocument();
   });
 
-  it('does NOT show Operations or React entries for plain operators', () => {
+  it('does NOT show Pace Board or React entries for plain operators', () => {
     render(<ChoreographySidebar />, { wrapper });
-    expect(screen.queryByText('Operations')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pace Board')).not.toBeInTheDocument();
     expect(screen.queryByText('Event Topics')).not.toBeInTheDocument();
   });
 });
@@ -36,11 +36,11 @@ describe('ChoreographySidebar — builders', () => {
     expect(screen.getByText('Capabilities')).toBeInTheDocument();
   });
 
-  it('shows Operations as the first item for builders', () => {
+  it('shows Pace Board as the first item for builders', () => {
     render(<ChoreographySidebar isBuilder />, { wrapper });
     const items = screen.getAllByRole('link');
     const labels = items.map((el) => el.textContent?.trim());
-    expect(labels[0]).toContain('Operations');
+    expect(labels[0]).toContain('Pace Board');
   });
 
   it('shows Agents label when aiEnabled is true', () => {
@@ -51,9 +51,9 @@ describe('ChoreographySidebar — builders', () => {
 });
 
 describe('ChoreographySidebar — ops role (admin, not builder)', () => {
-  it('shows Operations for isOps users', () => {
+  it('shows Pace Board for isOps users', () => {
     render(<ChoreographySidebar isOps />, { wrapper });
-    expect(screen.getByText('Operations')).toBeInTheDocument();
+    expect(screen.getByText('Pace Board')).toBeInTheDocument();
   });
 
   it('does NOT show Event Topics or Capabilities for isOps-only users', () => {

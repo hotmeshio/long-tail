@@ -26,11 +26,11 @@ export function ChoreographySidebar({
 
   if (!isBuilder) {
     // isOps but not builder — only show Operations
-    return <SidebarNav heading="React" entries={[{ to: '/operations', label: 'Operations', icon: LayoutDashboard }]} />;
+    return <SidebarNav heading="React" entries={[{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard }]} />;
   }
 
   const entries: NavEntry[] = [
-    ...(isOps || isBuilder ? [{ to: '/operations', label: 'Operations', icon: LayoutDashboard } as NavEntry] : []),
+    ...(isOps || isBuilder ? [{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard } as NavEntry] : []),
     { to: '/topics', label: 'Event Topics', icon: Radio },
     { to: '/agents', label: aiEnabled ? 'Agents' : 'Automations', icon: Bot },
     { to: '/capabilities', label: 'Capabilities', icon: Zap },

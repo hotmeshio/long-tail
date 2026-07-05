@@ -1,6 +1,7 @@
 import Ajv, { type ValidateFunction } from 'ajv';
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
+import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
@@ -10,16 +11,20 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 // metadata-bearing create for that role into a 500.
 const ajv = new Ajv({ allErrors: true, strict: false });
 
-// Compiled validators cached per role, keyed by the schema's serialized form
-// so an admin's schema edit invalidates the stale validator on the next create.
+// Compiled validators cached per role+version, keyed by the schema's serialized
+// form so an admin's schema edit invalidates the stale validator on the next
+// create. Pinned versions are immutable, but the same key logic covers both.
 const validatorCache = new Map<string, { key: string; validate: ValidateFunction }>();
 
-function compileRoleValidator(role: string, schema: Record<string, any>): ValidateFunction {
+function compileRoleValidator(
+  cacheId: string,
+  schema: Record<string, any>,
+): ValidateFunction {
   const key = JSON.stringify(schema);
-  const cached = validatorCache.get(role);
+  const cached = validatorCache.get(cacheId);
   if (cached && cached.key === key) return cached.validate;
   const validate = ajv.compile(schema);
-  validatorCache.set(role, { key, validate });
+  validatorCache.set(cacheId, { key, validate });
   return validate;
 }
 
@@ -80,13 +85,28 @@ export async function createEscalation(
       return { status: 403, error: `You must have write access to the "${role}" role or be a superadmin to create escalations for it` };
     }
 
-    // Validate metadata against the role's declared schema (if any).
+    // Validate metadata against the role's declared schema (if any). A
+    // metadata.schema_version pin selects that immutable snapshot; a pin that
+    // names a missing version is a 400, never a silent fall-through to latest.
     if (input.metadata) {
-      const schema = await roleService.getRoleMetadataSchema(role);
+      const pinned = input.metadata[ESCALATION_METADATA_KEYS.SCHEMA_VERSION];
+      if (pinned !== undefined && (!Number.isInteger(pinned) || pinned < 1)) {
+        return { status: 400, error: `metadata.${ESCALATION_METADATA_KEYS.SCHEMA_VERSION} must be a positive integer` };
+      }
+      let schema: Record<string, any> | null;
+      if (pinned !== undefined) {
+        const snapshot = await roleService.getRoleSchema(role, pinned);
+        if (!snapshot) {
+          return { status: 400, error: `Schema version ${pinned} does not exist for role "${role}"` };
+        }
+        schema = snapshot.metadata_schema;
+      } else {
+        schema = await roleService.getRoleMetadataSchema(role);
+      }
       if (schema) {
         let validate: ValidateFunction;
         try {
-          validate = compileRoleValidator(role, schema);
+          validate = compileRoleValidator(`${role}@${pinned ?? 'live'}`, schema);
         } catch (compileErr: any) {
           // A broken stored schema is the role admin's bug, not the creator's —
           // name it explicitly instead of surfacing an opaque 500.
@@ -95,7 +115,10 @@ export async function createEscalation(
             error: `metadata_schema for role "${role}" is not a valid JSON Schema: ${compileErr.message}`,
           };
         }
-        const valid = validate(input.metadata);
+        // The pin is a system key, not caller data — strip it so schemas with
+        // additionalProperties: false still validate the caller's bag.
+        const { [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: _pin, ...callerMetadata } = input.metadata;
+        const valid = validate(callerMetadata);
         if (!valid) {
           const msgs = (validate.errors ?? []).map((e) => `${e.instancePath || '(root)'} ${e.message}`).join('; ');
           return { status: 400, error: `metadata does not match the role schema: ${msgs}` };

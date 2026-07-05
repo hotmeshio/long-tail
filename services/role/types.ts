@@ -27,9 +27,45 @@ export interface RoleDetail {
   target_per_hour: number | null;
   /** Capacity at this station (people or machines). Part of the ops triangle. */
   worker_count: number | null;
+  /**
+   * Version of the live form_schema/metadata_schema pair. Advances whenever a
+   * schema field changes; each version is snapshotted in lt_role_schemas so
+   * escalations can pin the exact schema they were created against. Null until
+   * the role first carries a schema.
+   */
+  current_schema_version: number | null;
+  /**
+   * Roles this station draws input from that live in OTHER sequences.
+   * parent_role is the single "prior step" placing the role in one sequence;
+   * upstream inputs are the remaining graph edges (mixin-like, many allowed),
+   * rendered on the Operations chart as a merge affordance.
+   */
+  upstream_roles: string[];
   user_count: number;
   chain_count: number;
   workflow_count: number;
+}
+
+/** One immutable snapshot of a role's schema pair. */
+export interface RoleSchemaVersion {
+  role: string;
+  version: number | null;
+  form_schema: Record<string, any> | null;
+  metadata_schema: Record<string, any> | null;
+  change_summary: string | null;
+  created_at: string | null;
+  /** The role's current version, so callers can tell a pinned read from the latest. */
+  latest_version: number | null;
+}
+
+/** Listing row for the version history (schemas elided; presence flags only). */
+export interface RoleSchemaVersionSummary {
+  version: number;
+  has_form_schema: boolean;
+  has_metadata_schema: boolean;
+  change_summary: string | null;
+  created_at: string;
+  is_current: boolean;
 }
 
 export interface UpdateRoleInput {
@@ -43,4 +79,11 @@ export interface UpdateRoleInput {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /**
+   * Replace the upstream-input set (omitted = preserve; null or [] = clear).
+   * Every entry must name an existing role other than this one.
+   */
+  upstream_roles?: string[] | null;
+  /** Recorded on the schema snapshot when this update changes a schema field. */
+  change_summary?: string;
 }

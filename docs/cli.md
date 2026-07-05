@@ -127,6 +127,19 @@ ltc users list
 ltc users get USER_ID
 ```
 
+### Roles
+
+Roles are the queue-backed work surfaces where paused workflows hand off to people. Role schemas are versioned — every schema save adds an immutable snapshot, and escalations can pin one via `schemaVersion`.
+
+```bash
+ltc roles list                            # Roles with schema version, member and workflow counts
+ltc roles schema reviewer                 # Latest form/metadata schema (with current version)
+ltc roles schema reviewer --version 3     # Immutable v3 snapshot
+ltc roles schema-versions reviewer        # Version history, newest first
+ltc roles save-schema reviewer --file schema.json --summary "Added lotNumber"
+                                          # Save the escalation form schema (a change creates the next version)
+```
+
 ### Compiler
 
 ```bash

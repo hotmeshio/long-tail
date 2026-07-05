@@ -724,7 +724,7 @@ Create a new role. Lowercase alphanumeric with hyphens/underscores.
 
 ### update_role
 
-Update a role's metadata: display name, description, form schema, metadata schema, free properties bag, operations visibility, process parent, and the typed operational targets (SLA minutes, throughput goal, worker count). Only provided fields are changed.
+Update a role's metadata: display name, description, form schema, metadata schema, free properties bag, operations visibility, process parent, and the typed operational targets (SLA minutes, throughput goal, worker count). Only provided fields are changed. A change to `form_schema` or `metadata_schema` snapshots the new pair into the role's schema version history and advances its current version.
 
 | | |
 |---|---|
@@ -745,6 +745,37 @@ Update a role's metadata: display name, description, form schema, metadata schem
 | `sla_minutes` | `number \| null` | No | Target resolution time in minutes |
 | `target_per_hour` | `number \| null` | No | Throughput goal (items resolved per hour) |
 | `worker_count` | `number \| null` | No | Station capacity (staff or machines) |
+| `upstream_roles` | `string[] \| null` | No | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear) |
+| `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
+
+### get_role_schema
+
+Fetch a role's `form_schema` + `metadata_schema` pair. With `version`, reads that immutable snapshot from the version history (the one an escalation pinned via `metadata.schema_version`); without it, reads the live (latest) schema and its current version number.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| role | string | Yes | Role whose schema to fetch |
+| version | number | No | Version pin (positive integer) |
+
+### list_role_schema_versions
+
+List a role's schema version history, newest first. Each entry carries the version, presence flags for the two schemas, the change summary, and whether it is the current version.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| role | string | Yes | Role whose history to list |
 
 ### add_escalation_chain
 

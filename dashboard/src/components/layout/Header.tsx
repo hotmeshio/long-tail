@@ -10,7 +10,7 @@ import { AppLogo } from '../common/display/AppLogo';
 
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
-  const { isBuilder } = useAccess();
+  const { isBuilder, isOps } = useAccess();
   const { available, mine } = useEscalationCounts();
   const { connected } = useEventStatus();
   const { toggleAIOverride } = useAIOverride();
@@ -70,11 +70,11 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           mine{mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
         </Link>
 
-        {isBuilder && (
+        {(isBuilder || isOps) && (
           <>
             <div className="w-px h-4 bg-surface-border" />
 
-            {/* Events */}
+            {/* Events — admins run the floor from live events, same as builders */}
             <button
               type="button"
               onClick={() => {
@@ -92,7 +92,11 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
               <Radio className="w-3.5 h-3.5" strokeWidth={1.5} />
               events
             </button>
+          </>
+        )}
 
+        {isBuilder && (
+          <>
             {/* Docs */}
             <button
               onClick={onToggleDocs}

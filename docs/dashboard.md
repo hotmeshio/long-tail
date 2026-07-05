@@ -196,15 +196,18 @@ User Accounts and Service Accounts live on the same page, separated by a tab tog
 
 ### Roles
 
-Define roles and configure escalation chains that control how work flows between teams.
+A role is where a running workflow hands work to a person. Work waits in the role's queue, the role's schema shapes the form the person completes, membership decides who can see and resolve which items, and submitting the form resumes the workflow exactly where it paused. Roles are also where escalation chains are configured — the paths work takes between teams when it needs another set of hands.
 
 - **Role list** — all roles in the system. Each row shows the role key, title, description, user count, chain count, workflow count, and an OPS badge if `ops_visible` is set.
-- **Role detail** — click a role to open its detail panel: identity fields (title, description), escalation chains, and the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`). Edit these inline and save via `PATCH /api/roles/:role`.
+- **Role detail** — click a role to open its detail panel: identity fields (title, description), escalation chains, members, schemas with version history, and the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`). Edit these inline and save via `PATCH /api/roles/:role`.
+- **Members** — who holds the role: admins manage it; members work its queue according to their read/write scope (read = which items appear; write = which they can claim and resolve).
+- **Prior Step and Upstream Inputs** — Prior Step (`parent_role`) places the role in one Operations sequence; a role with no prior step starts its own. Upstream Inputs declare the roles it also draws from in other sequences — mixin-like, many allowed — rendered on the Operations chart as a merge glyph on the station rather than a bend in the line.
+- **Escalation Schema editor** (`/admin/roles/:role/schema`) — the versioned escalation form has its own page. Enter form fields as JSON Schema in a full-width editor with an optional change summary; every save that changes the schema appends an immutable snapshot and advances the current version. The version rail shows the history — expand any version to view its snapshot or load it into the editor as the base for the next save. Workflows pin a version via `schemaVersion` in the `conditionLT` config so their resolver form keeps that exact shape; escalations without a pin render the latest. The role detail page shows which version is in use and links here.
 - **Create Role** — add a new role. Roles referenced in workflow configs are auto-created, but you can also create them here for organizational clarity.
 - **Scope picker** — when granting a role at `member` type, a Scope picker offers the five named work-surface profiles: full worker (`all`/`all`, default), see-all-act-own (`all`/`self`), own-items-only (`self`/`self`), read-only auditor (`all`/`none`), and read-only own (`self`/`none`). `admin` and `superadmin` grants show no Scope picker — they always work the whole queue. The picker enforces **write ⊆ read**, so a write breadth wider than the read breadth cannot be selected.
 - **Escalation chains** — define source → target role mappings. When a reviewer escalates, the chain determines which roles receive the escalation next. Chains are directional (reviewer → engineer → admin) and support multiple targets per source.
 
-**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `PATCH /api/roles/:role` updates metadata and capacity fields. `GET /api/roles/details` returns full `RoleDetail` shapes. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
+**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `PATCH /api/roles/:role` updates metadata and capacity fields. `GET /api/roles/details` returns full `RoleDetail` shapes. `GET /api/roles/:role/schema` fetches the latest or a pinned schema version; `GET /api/roles/:role/schema/versions` lists the history. `GET /api/roles/escalation-chains` lists chains. `POST /api/roles/escalation-chains` adds a chain.
 
 ### DB Maintenance
 
@@ -264,11 +267,15 @@ Accessible at `/escalations`. A statistics dashboard for escalation health acros
 
 ### Operations
 
-Accessible at `/operations`. The COO shop-floor view — shows actual-vs-target flow across every ops-visible role as a pace chart, with a station table and detail panel below.
+Accessible at `/operations` (sidebar: Operations; page header: **Pace Board**). The COO shop-floor view — shows actual-vs-target flow across ops-visible roles as a pace chart, with a station table and detail panel below.
 
+Execution is a graph; this page tells its story as **sequences**. Each ops-visible role with no prior step (or whose prior step is outside the ops set) starts a sequence, followed by its `parent_role` descendants in dependency order. The table is always the ground truth of the queues; the SVG is the narrative line drawn through them.
+
+- **Sequence picker** — when more than one sequence exists, tabs appear above the chart, one per sequence, named by its origin role (station count alongside). The active sequence is deep-linked (`?fragment=<origin role>`) and each switch is a browser-history entry, so a shared URL opens the same sequence and back/forward walks between them.
 - **Period selector** — `15m`, `1h`, `24h`, `7d`, `30d`. Controls the lookback window for resolved counts, percentile metrics, and the throughput metrics.
-- **Pace chart** — connects all ops-visible stations in process dependency order and plots absolute counts for the selected window: a straight red target polyline (`target_per_hour × window hours`) against a smooth actual (resolved) curve with a light area fill. Station circles are colored by pace ratio (green ≥ 100%, amber ≥ 60%, red below), with a three-number strip per station: pending, active, resolved.
-- **Station table** — one row per ops-visible role with PENDING, ACTIVE, RESOLVED, P99 WAIT, P99 WORK, and a PRESSURE mini-bar. Stations with in-arrears items show a sub-row with a link to oldest-first queue view.
+- **Pace chart** — connects the active sequence's stations in process dependency order and plots absolute counts for the selected window: a straight red target polyline (`target_per_hour × window hours`) against a smooth actual (resolved) curve with a light area fill. The queue splits into two stacked bands — claimed-and-worked (indigo) and waiting-unclaimed (sky). Station circles are colored by pace ratio (green ≥ 100%, amber ≥ 60%, red below).
+- **Merge affordance** — a station that declares upstream inputs (roles feeding it from other sequences) shows a small dashed merge glyph at its floor position. It is deliberately a symbol, never a bend in the line: the upstream is an input, not a descendant. Hover names the feeding roles; click jumps to their sequence.
+- **Station table** — one row per station with PENDING, ACTIVE, RESOLVED (column bands in the chart's hues), P99 WAIT, P99 WORK, and a TREND mini-bar. A merge icon next to the role name marks cross-sequence inputs. Stations with in-arrears items show a sub-row with a link to the oldest-first queue view.
 - **Station detail panel** — opens on row or circle click. Shows the role's identity, an independent period toggle, and full metric breakdown (wait/work percentiles, SLA target, worker count, links to queue).
 
 Roles appear on this view when `ops_visible = true` is set. The capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`) drive the computed metrics. Set these via `PATCH /api/roles/:role` or the Roles admin page. See [Operations](operations.md) for the full concept doc.

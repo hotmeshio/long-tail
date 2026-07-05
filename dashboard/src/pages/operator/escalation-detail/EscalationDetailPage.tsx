@@ -19,7 +19,7 @@ import { EscalationTimeline } from '../../../components/common/display/Escalatio
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { useWorkflowConfigs } from '../../../api/workflows';
-import { useRoleDetails } from '../../../api/roles';
+import { useRoleDetails, useRoleSchema } from '../../../api/roles';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { EscalationActionBar } from './EscalationActionBar';
@@ -84,9 +84,19 @@ export function EscalationDetailPage() {
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  // Workflow-level resolver_schema overrides the role-level form_schema
-  const resolverSchema = wfConfig?.resolver_schema ?? roleDetail?.form_schema ?? null;
+  // Schema resolution, most specific first:
+  //   1. metadata.form_schema — a full schema embedded on the row
+  //   2. metadata.schema_version — the role schema snapshot the workflow
+  //      pinned at creation (conditionLT schemaVersion); renders that exact
+  //      version even after the role's schema moves on
+  //   3. workflow-level resolver_schema
+  //   4. the role's latest form_schema
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
+  const pinnedVersion: number | null = (esc?.metadata as any)?.schema_version ?? null;
+  const pinnedQuery = useRoleSchema(esc?.role ?? '', pinnedVersion ?? undefined, pinnedVersion != null);
+  const pinnedFormSchema = pinnedVersion != null ? (pinnedQuery.data?.form_schema ?? null) : null;
+  const resolverSchema =
+    (pinnedFormSchema ?? wfConfig?.resolver_schema ?? roleDetail?.form_schema ?? null) as Record<string, any> | null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
 
   // Initialize json from schema exactly once. Subsequent esc refetches
@@ -94,6 +104,9 @@ export function EscalationDetailPage() {
   const jsonInitialized = useRef(false);
   useEffect(() => {
     if (jsonInitialized.current) return;
+    // A pinned version is still in flight — wait so the form never
+    // initializes from the latest schema and then swaps under the user.
+    if (pinnedVersion != null && !metadataFormSchema && pinnedQuery.data === undefined && !pinnedQuery.isError) return;
     const formSchema = metadataFormSchema ?? (resolverSchema?.properties ? resolverSchema : null);
     if (formSchema?.properties) {
       jsonInitialized.current = true;
@@ -107,7 +120,7 @@ export function EscalationDetailPage() {
       jsonInitialized.current = true;
       setJson(JSON.stringify(effectiveSchema, null, 2));
     }
-  }, [effectiveSchema, metadataFormSchema, resolverSchema]);
+  }, [effectiveSchema, metadataFormSchema, resolverSchema, pinnedVersion, pinnedQuery.data, pinnedQuery.isError]);
 
   const hasTriage = hasTriageData(esc?.escalation_payload);
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, Eye, Network, Trash2, Check, Braces, Triangle, Settings2,
+  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -14,6 +14,7 @@ import {
 } from '../../../api/roles';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
+import { RoleMembersSection } from './RoleMembersSection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,82 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
   );
 }
 
+// ── Upstream inputs section (live-save) ───────────────────────────────────────
+
+/**
+ * The graph edges that don't fit the line. Prior Step (parent_role) places
+ * this role in ONE sequence on the Operations page; upstream inputs declare
+ * the roles it also draws from in OTHER sequences — mixin-like, many allowed.
+ * The chart shows them as a merge glyph on the station, never as a bend in
+ * the sequence.
+ */
+function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleDetail[] }) {
+  const updateRole = useUpdateRole();
+  const [newUpstream, setNewUpstream] = useState('');
+
+  const upstreams = role.upstream_roles ?? [];
+  const available = useMemo(
+    () => allRoles
+      .map((r) => r.role)
+      .filter((r) => r !== role.role && r !== 'superadmin' && !upstreams.includes(r)),
+    [allRoles, role.role, upstreams],
+  );
+
+  const save = (next: string[]) =>
+    updateRole.mutate({ role: role.role, upstream_roles: next }, { onSuccess: () => setNewUpstream('') });
+
+  return (
+    <div className="space-y-3">
+      {upstreams.length === 0 ? (
+        <p className="text-[11px] text-text-tertiary">
+          Add a role from another sequence that this station draws input from.
+          Prior Step sets where this role sits in its own sequence; upstream
+          inputs mark the side-quests that land here.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {upstreams.map((u) => (
+            <span
+              key={u}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-surface-sunken rounded font-mono text-text-secondary"
+            >
+              {u}
+              <button
+                onClick={() => save(upstreams.filter((x) => x !== u))}
+                className="text-text-quaternary hover:text-red-400 transition-colors leading-none ml-0.5"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {available.length > 0 && (
+        <div className="flex items-center gap-2">
+          <select
+            value={newUpstream}
+            onChange={(e) => setNewUpstream(e.target.value)}
+            className="select text-xs font-mono flex-1"
+          >
+            <option value="">Add upstream input…</option>
+            {available.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <button
+            onClick={() => { if (newUpstream) save([...upstreams, newUpstream]); }}
+            disabled={!newUpstream || updateRole.isPending}
+            className="px-2.5 py-1 text-xs rounded bg-accent text-text-inverse hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          >
+            {updateRole.isPending ? '…' : 'Add'}
+          </button>
+        </div>
+      )}
+      {updateRole.error && (
+        <p className="text-[10px] text-status-error">{(updateRole.error as Error).message}</p>
+      )}
+    </div>
+  );
+}
+
 // ── Draft state ───────────────────────────────────────────────────────────────
 
 interface Draft {
@@ -137,7 +214,6 @@ interface Draft {
   description: string;
   ops_visible: boolean;
   parent_role: string;
-  form_schema: string;
   metadata_schema: string;
   properties: string;
   sla_minutes: string;
@@ -151,7 +227,6 @@ function draftFrom(role: RoleDetail): Draft {
     description: role.description ?? '',
     ops_visible: role.ops_visible,
     parent_role: role.parent_role ?? '',
-    form_schema: safePrettyPrint(role.form_schema),
     metadata_schema: safePrettyPrint(role.metadata_schema),
     properties: safePrettyPrint(role.properties) || '{}',
     sla_minutes: role.sla_minutes != null ? String(role.sla_minutes) : '',
@@ -174,12 +249,12 @@ export function RoleDetailPage() {
 
   const [draft, setDraft] = useState<Draft>({
     title: '', description: '', ops_visible: false, parent_role: '',
-    form_schema: '', metadata_schema: '', properties: '{}',
+    metadata_schema: '', properties: '{}',
     sla_minutes: '', target_per_hour: '', worker_count: '',
   });
   const [dirty, setDirty] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
-  const [errors, setErrors] = useState<{ form_schema?: string; metadata_schema?: string; properties?: string }>({});
+  const [errors, setErrors] = useState<{ metadata_schema?: string; properties?: string }>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editingJson, setEditingJson] = useState(new Set<string>());
 
@@ -217,11 +292,9 @@ export function RoleDetailPage() {
   );
 
   const handleSave = () => {
-    const formResult = safeParseJson(draft.form_schema);
     const metaResult = safeParseJson(draft.metadata_schema);
     const propsResult = safeParseJson(draft.properties);
     const newErrors: typeof errors = {};
-    if (!formResult.ok) newErrors.form_schema = 'Invalid JSON';
     if (!metaResult.ok) newErrors.metadata_schema = 'Invalid JSON';
     if (!propsResult.ok) newErrors.properties = 'Invalid JSON';
     setErrors(newErrors);
@@ -238,7 +311,6 @@ export function RoleDetailPage() {
         description: draft.description.trim() || null,
         ops_visible: draft.ops_visible,
         parent_role: draft.parent_role || null,
-        form_schema: formResult.value ?? null,
         metadata_schema: metaResult.value ?? null,
         properties: propsResult.value ?? {},
         sla_minutes: parseNum(draft.sla_minutes),
@@ -299,17 +371,12 @@ export function RoleDetailPage() {
 
   return (
     <div>
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-10">
-        <div>
+      {/* ── Header: identity · capacity set · ops toggle + actions ── */}
+      <div className="flex items-start justify-between gap-8 mb-12">
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <Tag className="w-5 h-5 text-accent" strokeWidth={1.5} />
             <h1 className="text-lg font-mono font-medium text-text-primary">{role.role}</h1>
-            {role.ops_visible && (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider text-accent">
-                <Eye className="w-2.5 h-2.5" /> ops
-              </span>
-            )}
             {role.parent_role && (
               <span className="flex items-center gap-1 text-[10px] text-text-quaternary font-mono">
                 <GitBranch className="w-3 h-3" /> {role.parent_role}
@@ -319,7 +386,56 @@ export function RoleDetailPage() {
           {role.title && <p className="text-sm text-text-secondary pl-8">{role.title}</p>}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Capacity — one grouped set, centered. Any two settings derive the third. */}
+        <div
+          className="flex items-end gap-4 bg-surface-sunken rounded-lg px-4 py-2.5 shrink-0 mx-auto"
+          title="throughput = workers / (sla / 60)"
+        >
+          {[
+            { key: 'sla_minutes' as const,      label: 'SLA',     unit: 'min', placeholder: '30' },
+            { key: 'target_per_hour' as const,  label: 'Target',  unit: '/h',  placeholder: '20' },
+            { key: 'worker_count' as const,     label: 'Workers', unit: '',    placeholder: '4' },
+          ].map(({ key, label, unit, placeholder }) => (
+            <div key={key}>
+              <label className="block text-[9px] font-semibold uppercase tracking-widest text-text-quaternary mb-1">
+                {label}
+                {unit && <span className="normal-case font-normal ml-1">{unit}</span>}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={draft[key]}
+                onChange={(e) => update({ [key]: e.target.value })}
+                placeholder={placeholder}
+                className="input text-xs w-16 font-mono"
+              />
+            </div>
+          ))}
+          {derivedCapacityHint && (
+            <span className="text-[10px] text-accent font-mono whitespace-nowrap pb-2">
+              {derivedCapacityHint}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Ops — on the same line as Save: this role is (or isn't) a station */}
+          <div className="flex items-center gap-2" title="Show as a station on the Pace Board">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Ops</span>
+            <button
+              onClick={() => update({ ops_visible: !draft.ops_visible })}
+              className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
+                draft.ops_visible ? 'bg-accent' : 'bg-surface-border'
+              }`}
+            >
+              <span
+                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
+                  draft.ops_visible ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
           {savedOk && (
             <span className="flex items-center gap-1 text-xs text-status-success animate-page-enter">
               <Check className="w-3 h-3" /> Saved
@@ -385,121 +501,59 @@ export function RoleDetailPage() {
             </div>
           </div>
 
-          {/* Prior Step */}
-          <div className="space-y-5">
-            <SectionHead icon={GitBranch} color="text-text-tertiary" label="Prior Step" />
-            <select
-              value={draft.parent_role}
-              onChange={(e) => update({ parent_role: e.target.value })}
-              className="select text-sm w-full font-mono"
-            >
-              <option value="">None — root process</option>
-              {availableParents.map((r) => (
-                <option key={r.role} value={r.role}>
-                  {r.title ? `${r.role} — ${r.title}` : r.role}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Ops View */}
-          <div>
-            <SectionHead icon={Settings2} color="text-text-tertiary" label="Ops View" />
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] text-text-tertiary">Show as station on /operations</p>
-              <button
-                onClick={() => update({ ops_visible: !draft.ops_visible })}
-                className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
-                  draft.ops_visible ? 'bg-accent' : 'bg-surface-border'
-                }`}
+          {/* Sequence placement — only meaningful for stations, so these two
+              sections follow the Ops toggle, easing in and out with it. */}
+          <div
+            className={`space-y-14 overflow-hidden transition-all duration-300 ease-out ${
+              draft.ops_visible ? 'opacity-100 max-h-[900px]' : 'opacity-0 max-h-0 pointer-events-none'
+            }`}
+            aria-hidden={!draft.ops_visible}
+          >
+            {/* Prior Step */}
+            <div className="space-y-5">
+              <SectionHead icon={GitBranch} color="text-text-tertiary" label="Prior Step" />
+              <select
+                value={draft.parent_role}
+                onChange={(e) => update({ parent_role: e.target.value })}
+                className="select text-sm w-full font-mono"
               >
-                <span
-                  className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
-                    draft.ops_visible ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`}
-                />
-              </button>
+                <option value="">None — root process</option>
+                {availableParents.map((r) => (
+                  <option key={r.role} value={r.role}>
+                    {r.title ? `${r.role} — ${r.title}` : r.role}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-text-tertiary leading-relaxed">
+                Places this role in one Pace Board sequence. A role with no prior
+                step starts its own sequence.
+              </p>
+            </div>
+
+            {/* Upstream inputs — cross-sequence graph edges, live-save */}
+            <div className="space-y-5">
+              <SectionHead
+                icon={GitMerge}
+                color="text-text-tertiary"
+                label="Upstream Inputs"
+                aside={
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-600">Live</span>
+                  </div>
+                }
+              />
+              <UpstreamSection role={role} allRoles={roles} />
             </div>
           </div>
 
-          {/* Properties (free bag) */}
-          <div>
-            <SectionHead
-              icon={Braces}
-              color="text-text-quaternary"
-              label="Properties"
-              aside={
-                !editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
-                  <button onClick={() => startEditingJson('properties')} className="text-[9px] text-accent hover:underline">Edit</button>
-                ) : (
-                  <span className="text-[9px] font-normal normal-case text-text-quaternary">custom JSON</span>
-                )
-              }
-            />
-            {!editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
-              <JsonViewer data={role.properties} defaultCollapsed />
-            ) : (
-              <>
-                <textarea
-                  value={draft.properties}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    update({ properties: val });
-                    setErrors((prev) => ({ ...prev, properties: safeParseJson(val).ok ? undefined : 'Invalid JSON' }));
-                  }}
-                  rows={5}
-                  spellCheck={false}
-                  className="input text-xs font-mono w-full resize-none"
-                  placeholder={'{\n  "icon": "wrench",\n  "color": "#6366f1"\n}'}
-                />
-                {errors.properties && <p className="text-[10px] text-status-error mt-1">{errors.properties}</p>}
-              </>
-            )}
-          </div>
         </div>
 
-        {/* ── Col 2: Operations Config ── */}
+        {/* ── Col 2: Routing & People ── */}
         <div className="space-y-14">
-          <SectionHead
-            icon={Triangle}
-            color="text-amber-400"
-            label="Capacity"
-            aside={
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-text-quaternary">
-                throughput = workers / (sla / 60)
-              </span>
-            }
-          />
-
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { key: 'sla_minutes' as const,    label: 'SLA',    unit: 'min', placeholder: '30' },
-              { key: 'target_per_hour' as const, label: 'Target', unit: '/h',  placeholder: '20' },
-              { key: 'worker_count' as const,    label: 'Workers', unit: '',   placeholder: '4' },
-            ].map(({ key, label, unit, placeholder }) => (
-              <div key={key}>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-                  {label}
-                  {unit && <span className="normal-case font-normal ml-1 text-text-quaternary">{unit}</span>}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={draft[key]}
-                  onChange={(e) => update({ [key]: e.target.value })}
-                  placeholder={placeholder}
-                  className="input text-sm w-full font-mono"
-                />
-              </div>
-            ))}
-          </div>
-          {derivedCapacityHint && (
-            <p className="text-[10px] text-accent font-mono">{derivedCapacityHint}</p>
-          )}
 
           {/* Escalation targets — live */}
-          <div className="pt-3 pb-4 border-t border-surface-border/40">
+          <div>
             <SectionHead
               icon={Network}
               color="text-text-quaternary"
@@ -513,44 +567,50 @@ export function RoleDetailPage() {
             />
             <EscalationSection role={role} allRoles={roles} />
           </div>
+
+          {/* Members — who can see through this window, and how far */}
+          <div className="pt-3 pb-4 border-t border-surface-border/40">
+            <SectionHead
+              icon={Users}
+              color="text-text-quaternary"
+              label="Members"
+              aside={
+                <span className="text-[9px] font-normal normal-case text-text-quaternary">
+                  read = what appears · write = what they can act on
+                </span>
+              }
+            />
+            <RoleMembersSection role={role.role} />
+          </div>
         </div>
 
-        {/* ── Col 3: Schemas ── */}
+        {/* ── Col 3: Schemas & Properties ── */}
         <div className="space-y-14">
-          {/* Form Schema */}
+          {/* Escalation Schema — versioned, edited on its own page */}
           <div>
             <SectionHead
               icon={Braces}
               color="text-cyan-400"
-              label="Form Schema"
+              label="Escalation Schema"
               aside={
-                !editingJson.has('form_schema') && role.form_schema ? (
-                  <button onClick={() => startEditingJson('form_schema')} className="text-[9px] text-accent hover:underline">Edit</button>
+                role.current_schema_version != null ? (
+                  <span className="text-[9px] font-mono text-text-quaternary">v{role.current_schema_version} in use</span>
                 ) : undefined
               }
             />
             <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
-              Resolver form JSON Schema. Overrideable per workflow via <code className="font-mono">resolver_schema</code>.
+              The form a person completes to resolve this role's escalations.
+              Versioned — each save adds one; workflows pin any version via{' '}
+              <code className="font-mono">schemaVersion</code>.
             </p>
-            {!editingJson.has('form_schema') && role.form_schema ? (
-              <JsonViewer data={role.form_schema} />
-            ) : (
-              <>
-                <textarea
-                  value={draft.form_schema}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    update({ form_schema: val });
-                    setErrors((prev) => ({ ...prev, form_schema: safeParseJson(val).ok ? undefined : 'Invalid JSON' }));
-                  }}
-                  rows={10}
-                  spellCheck={false}
-                  className="input text-xs font-mono w-full resize-y"
-                  placeholder={'{\n  "type": "object",\n  "properties": {\n    "notes": { "type": "string" }\n  }\n}'}
-                />
-                {errors.form_schema && <p className="text-[10px] text-status-error mt-1">{errors.form_schema}</p>}
-              </>
-            )}
+            <Link
+              to={`/admin/roles/${encodeURIComponent(role.role)}/schema`}
+              className="text-xs text-accent hover:underline"
+            >
+              {role.form_schema
+                ? `Open schema editor — v${role.current_schema_version ?? 1} in use →`
+                : 'Define the escalation form →'}
+            </Link>
           </div>
 
           {/* Metadata Schema */}
@@ -585,6 +645,41 @@ export function RoleDetailPage() {
                   placeholder={'{\n  "type": "object",\n  "properties": {\n    "order_id": { "type": "string" }\n  },\n  "required": ["order_id"]\n}'}
                 />
                 {errors.metadata_schema && <p className="text-[10px] text-status-error mt-1">{errors.metadata_schema}</p>}
+              </>
+            )}
+          </div>
+
+          {/* Properties (free bag) */}
+          <div>
+            <SectionHead
+              icon={Braces}
+              color="text-text-quaternary"
+              label="Properties"
+              aside={
+                !editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
+                  <button onClick={() => startEditingJson('properties')} className="text-[9px] text-accent hover:underline">Edit</button>
+                ) : (
+                  <span className="text-[9px] font-normal normal-case text-text-quaternary">custom JSON</span>
+                )
+              }
+            />
+            {!editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
+              <JsonViewer data={role.properties} defaultCollapsed />
+            ) : (
+              <>
+                <textarea
+                  value={draft.properties}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    update({ properties: val });
+                    setErrors((prev) => ({ ...prev, properties: safeParseJson(val).ok ? undefined : 'Invalid JSON' }));
+                  }}
+                  rows={5}
+                  spellCheck={false}
+                  className="input text-xs font-mono w-full resize-none"
+                  placeholder={'{\n  "icon": "wrench",\n  "color": "#6366f1"\n}'}
+                />
+                {errors.properties && <p className="text-[10px] text-status-error mt-1">{errors.properties}</p>}
               </>
             )}
           </div>

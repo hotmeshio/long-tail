@@ -80,6 +80,28 @@ router.patch('/:role', requireRoleManager, async (req, res) => {
 });
 
 /**
+ * GET /api/roles/:role/schema
+ * Fetch the role's schema pair. `?version=N` pins an immutable snapshot from
+ * the version history; omitted, the live (latest) schema is returned with its
+ * current version number.
+ */
+router.get('/:role/schema', async (req, res) => {
+  const versionParam = req.query.version as string | undefined;
+  const version = versionParam !== undefined ? Number(versionParam) : undefined;
+  const result = await api.getRoleSchema({ role: req.params.role as string, version });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * GET /api/roles/:role/schema/versions
+ * List the role's schema version history (newest first).
+ */
+router.get('/:role/schema/versions', async (req, res) => {
+  const result = await api.listRoleSchemaVersions({ role: req.params.role as string });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/roles/:role/escalation-targets
  * Get allowed escalation targets for a specific role.
  */

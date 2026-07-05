@@ -15,6 +15,8 @@ import {
   createRoleSchema,
   addEscalationChainSchema,
   updateRoleSchema,
+  getRoleSchemaSchema,
+  listRoleSchemaVersionsSchema,
 } from './schemas';
 
 export function registerUserTools(server: McpServer): void {
@@ -234,6 +236,8 @@ export function registerUserTools(server: McpServer): void {
         sla_minutes: args.sla_minutes,
         target_per_hour: args.target_per_hour,
         worker_count: args.worker_count,
+        upstream_roles: args.upstream_roles,
+        change_summary: args.change_summary,
       });
       if (!updated) {
         return {
@@ -243,6 +247,58 @@ export function registerUserTools(server: McpServer): void {
       }
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(updated) }],
+      };
+    },
+  );
+
+  // mirrors GET /api/roles/:role/schema
+  (server as any).registerTool(
+    'get_role_schema',
+    {
+      title: 'Get Role Schema',
+      description:
+        'Fetch a role\'s form_schema + metadata_schema pair. Pass version to ' +
+        'read that immutable snapshot from the version history (the version an ' +
+        'escalation pinned via metadata.schema_version); omit it for the live ' +
+        '(latest) schema and its current version number.',
+      inputSchema: getRoleSchemaSchema,
+    },
+    async (args: z.infer<typeof getRoleSchemaSchema>) => {
+      const schema = await roleService.getRoleSchema(args.role, args.version);
+      if (!schema) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: args.version !== undefined
+                ? `Schema version ${args.version} not found for role '${args.role}'`
+                : `Role '${args.role}' not found`,
+            }),
+          }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(schema) }],
+      };
+    },
+  );
+
+  // mirrors GET /api/roles/:role/schema/versions
+  (server as any).registerTool(
+    'list_role_schema_versions',
+    {
+      title: 'List Role Schema Versions',
+      description:
+        'List a role\'s schema version history, newest first. Each schema edit ' +
+        'creates a new version; escalations may pin one via metadata.schema_version. ' +
+        'Use get_role_schema with a version for the full snapshot.',
+      inputSchema: listRoleSchemaVersionsSchema,
+    },
+    async (args: z.infer<typeof listRoleSchemaVersionsSchema>) => {
+      const versions = await roleService.listRoleSchemaVersions(args.role);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ versions }) }],
       };
     },
   );
