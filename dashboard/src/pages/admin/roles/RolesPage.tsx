@@ -173,7 +173,7 @@ export function RolesPage() {
     <div>
       <PageHeader
         title="Roles"
-        docsHash="#docs:dashboard.md:roles-and-permissions"
+        docsHash="#docs:dashboard.md:roles"
         actions={
           <button
             onClick={() => setShowCreate(true)}
@@ -183,14 +183,6 @@ export function RolesPage() {
           </button>
         }
       />
-
-      {/* Roles are the product's center of gravity — say what one is, plainly. */}
-      <p className="text-xs text-text-tertiary leading-relaxed max-w-3xl mb-6">
-        A role is where a running workflow hands work to a person. Work waits in the
-        role's queue, the role's schema shapes the form the person completes, membership
-        decides who can see and resolve which items — and submitting the form resumes
-        the workflow exactly where it paused.
-      </p>
 
       {/* Filter bar */}
       {!isLoading && roles.length > 0 && (
