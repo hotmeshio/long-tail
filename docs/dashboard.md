@@ -267,7 +267,7 @@ Accessible at `/escalations`. A statistics dashboard for escalation health acros
 
 ### Operations
 
-Accessible at `/operations`. The COO shop-floor view — shows actual-vs-target flow across ops-visible roles as a pace chart, with a station table and detail panel below.
+Accessible at `/operations` (sidebar: Operations; page header: **Pace Board**). The COO shop-floor view — shows actual-vs-target flow across ops-visible roles as a pace chart, with a station table and detail panel below.
 
 Execution is a graph; this page tells its story as **sequences**. Each ops-visible role with no prior step (or whose prior step is outside the ops set) starts a sequence, followed by its `parent_role` descendants in dependency order. The table is always the ground truth of the queues; the SVG is the narrative line drawn through them.
 
