@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Braces, Check, History } from 'lucide-react';
+import { Braces, Check, History, BookOpen } from 'lucide-react';
 import {
   useRoleDetails,
   useRoleSchema,
@@ -122,6 +122,13 @@ export function EscalationSchemaPage() {
           <div className="flex items-center gap-3 mb-1">
             <Braces className="w-5 h-5 text-cyan-400" strokeWidth={1.5} />
             <h1 className="text-lg font-medium text-text-primary">Escalation Schema</h1>
+            <button
+              onClick={() => { window.location.hash = '#docs:dashboard.md:escalation-schema'; }}
+              className="text-text-quaternary hover:text-accent transition-colors"
+              title="Open docs for this page"
+            >
+              <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+            </button>
             <span className="font-mono text-sm text-text-tertiary">{role.role}</span>
             {role.current_schema_version != null && (
               <span className="text-[10px] font-mono text-text-quaternary">
@@ -129,12 +136,6 @@ export function EscalationSchemaPage() {
               </span>
             )}
           </div>
-          <p className="text-xs text-text-tertiary pl-8 max-w-2xl leading-relaxed">
-            Enter form fields as JSON Schema — this is the form a person completes to
-            resolve this role's escalations. Saving a change creates the next version;
-            workflows pin any version with <code className="font-mono">schemaVersion</code>,
-            and unpinned escalations always use the latest.
-          </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users,
+  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users, BookOpen,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -377,6 +377,13 @@ export function RoleDetailPage() {
           <div className="flex items-center gap-3 mb-1">
             <Tag className="w-5 h-5 text-accent" strokeWidth={1.5} />
             <h1 className="text-lg font-mono font-medium text-text-primary">{role.role}</h1>
+            <button
+              onClick={() => { window.location.hash = '#docs:dashboard.md:role-detail'; }}
+              className="text-text-quaternary hover:text-accent transition-colors"
+              title="Open docs for this page"
+            >
+              <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+            </button>
             {role.parent_role && (
               <span className="flex items-center gap-1 text-[10px] text-text-quaternary font-mono">
                 <GitBranch className="w-3 h-3" /> {role.parent_role}

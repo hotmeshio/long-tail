@@ -433,7 +433,7 @@ export function OperationsPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Pace Board"
-        docsHash="#docs:dashboard.md:operations"
+        docsHash="#docs:dashboard.md:pace-board"
         center={periodSelector}
         actions={
           <div className="flex items-center gap-3">
