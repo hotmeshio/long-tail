@@ -18,13 +18,23 @@ Canonical role registry. Roles referenced by other tables are seeded here.
 | `current_schema_version` | `INTEGER` | — | Version of the live schema pair; advances on every schema change (null until the role first carries a schema) |
 | `properties` | `JSONB` | `'{}'` | Free user-owned bag (icons, colors, tags) |
 | `ops_visible` | `BOOLEAN` | `false` | Show as a station on the Operations view |
-| `parent_role` | `TEXT` | — | FK to `lt_roles(role)` — process dependency graph |
+| `parent_role` | `TEXT` | — | FK to `lt_roles(role)` — the single prior step placing this role in one Operations sequence (cross-sequence inputs live in `lt_role_upstreams`) |
 | `sla_minutes` | `NUMERIC` | — | Target resolution time |
 | `target_per_hour` | `NUMERIC` | — | Throughput target |
 | `worker_count` | `NUMERIC` | — | Station capacity |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 
 **Seeds:** `reviewer`, `engineer`, `admin`, `superadmin`.
+
+### lt_role_upstreams
+
+The graph edges that don't fit the line. `lt_roles.parent_role` places a role in one Operations sequence (its single "prior step"); this table carries the remaining edges — the roles a station draws input from that live in other sequences (mixin-like, many allowed). The Operations chart renders them as a merge affordance on the station rather than bending the sequence. Replaced as a set through the same atomic `PATCH /api/roles/:role` statement (`upstream_roles`).
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `role` | `TEXT NOT NULL` | — | FK to `lt_roles(role)` `ON DELETE CASCADE`; part of the primary key |
+| `upstream_role` | `TEXT NOT NULL` | — | FK to `lt_roles(role)` `ON DELETE CASCADE`; part of the primary key. `CHECK (role <> upstream_role)` |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | When the edge was declared |
 
 ### lt_role_schemas
 

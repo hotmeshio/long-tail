@@ -34,6 +34,13 @@ export interface RoleDetail {
    * the role first carries a schema.
    */
   current_schema_version: number | null;
+  /**
+   * Roles this station draws input from that live in OTHER sequences.
+   * parent_role is the single "prior step" placing the role in one sequence;
+   * upstream inputs are the remaining graph edges (mixin-like, many allowed),
+   * rendered on the Operations chart as a merge affordance.
+   */
+  upstream_roles: string[];
   user_count: number;
   chain_count: number;
   workflow_count: number;
@@ -72,6 +79,11 @@ export interface UpdateRoleInput {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /**
+   * Replace the upstream-input set (omitted = preserve; null or [] = clear).
+   * Every entry must name an existing role other than this one.
+   */
+  upstream_roles?: string[] | null;
   /** Recorded on the schema snapshot when this update changes a schema field. */
   change_summary?: string;
 }

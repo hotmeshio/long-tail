@@ -185,6 +185,8 @@ export async function updateRole(input: {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /** Replace the upstream-input set (omitted = preserve; null or [] = clear). */
+  upstream_roles?: string[] | null;
   /** Recorded on the schema snapshot when this update changes a schema field. */
   change_summary?: string;
 }): Promise<LTApiResult> {
@@ -207,6 +209,19 @@ export async function updateRole(input: {
     if (input.parent_role != null && input.parent_role === input.role) {
       return { status: 400, error: 'parent_role must reference a different role' };
     }
+    if (input.upstream_roles != null) {
+      if (!Array.isArray(input.upstream_roles) || input.upstream_roles.some((u) => typeof u !== 'string' || !u.trim())) {
+        return { status: 400, error: 'upstream_roles must be an array of role names' };
+      }
+      if (input.upstream_roles.includes(input.role)) {
+        return { status: 400, error: 'upstream_roles must not include the role itself' };
+      }
+      const known = new Set(await roleService.listDistinctRoles());
+      const unknown = input.upstream_roles.filter((u) => !known.has(u));
+      if (unknown.length > 0) {
+        return { status: 400, error: `upstream_roles reference unknown role(s): ${unknown.join(', ')}` };
+      }
+    }
     const updated = await roleService.updateRoleMetadata(input.role, {
       title: input.title,
       description: input.description,
@@ -218,6 +233,7 @@ export async function updateRole(input: {
       sla_minutes: input.sla_minutes,
       target_per_hour: input.target_per_hour,
       worker_count: input.worker_count,
+      upstream_roles: input.upstream_roles,
       change_summary: input.change_summary,
     });
     if (!updated) {

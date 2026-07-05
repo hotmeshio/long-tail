@@ -236,6 +236,7 @@ export function registerUserTools(server: McpServer): void {
         sla_minutes: args.sla_minutes,
         target_per_hour: args.target_per_hour,
         worker_count: args.worker_count,
+        upstream_roles: args.upstream_roles,
         change_summary: args.change_summary,
       });
       if (!updated) {

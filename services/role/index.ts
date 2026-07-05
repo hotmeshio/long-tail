@@ -15,6 +15,7 @@ import {
   UPDATE_ROLE_METADATA,
   GET_ROLE_FORM_SCHEMA,
   GET_ROLE_METADATA_SCHEMA,
+  GET_ROLE_UPSTREAMS,
   LIST_ROLE_SCHEMA_VERSIONS,
   GET_ROLE_SCHEMA_VERSION,
   GET_ROLE_SCHEMA_CURRENT,
@@ -161,6 +162,7 @@ export async function updateRoleMetadata(
 ): Promise<RoleDetail | null> {
   const pool = getPool();
   const provided = (key: keyof UpdateRoleInput) => input[key] !== undefined;
+  const upstreams = [...new Set(input.upstream_roles ?? [])].sort();
   const { rows } = await pool.query(UPDATE_ROLE_METADATA, [
     role,
     provided('title'), input.title ?? null,
@@ -174,8 +176,23 @@ export async function updateRoleMetadata(
     provided('target_per_hour'), input.target_per_hour ?? null,
     provided('worker_count'), input.worker_count ?? null,
     input.change_summary ?? null,
+    provided('upstream_roles'), upstreams,
   ]);
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  // The statement's CTEs share one snapshot, so the returned row cannot see
+  // the upstream sync it just performed — echo the write, or read when the
+  // field wasn't touched.
+  const upstream_roles = provided('upstream_roles')
+    ? upstreams
+    : await getRoleUpstreams(role);
+  return { ...rows[0], upstream_roles };
+}
+
+/** Roles this station draws input from across other sequences. */
+export async function getRoleUpstreams(role: string): Promise<string[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_UPSTREAMS, [role]);
+  return rows.map((r: any) => r.upstream_role);
 }
 
 /**

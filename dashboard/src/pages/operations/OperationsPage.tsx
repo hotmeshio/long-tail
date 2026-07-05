@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, GitMerge, RefreshCw } from 'lucide-react';
 import { useRoleDetails, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
@@ -42,36 +42,51 @@ interface OrderedStation {
   depth: number;
 }
 
-// ── Topological sort — BFS, tracking actual depth ─────────────────────────────
+/**
+ * One sequence of stations, named by its origin role. Execution is a graph;
+ * each fragment is the human-readable line the user composed via parent_role.
+ * Cross-fragment edges live in upstream_roles and render as a merge affordance
+ * on the chart, never as a bend in the line.
+ */
+interface SequenceFragment {
+  origin: RoleDetail;
+  stations: OrderedStation[];
+}
 
-function topoSort(roles: RoleDetail[]): OrderedStation[] {
+// ── Fragment builder — BFS per parent_role root, tracking actual depth ────────
+
+function buildFragments(roles: RoleDetail[]): SequenceFragment[] {
   const opsRoles = roles.filter((r) => r.ops_visible);
   const roleMap = new Map(opsRoles.map((r) => [r.role, r]));
-  const result: OrderedStation[] = [];
   const visited = new Set<string>();
 
-  // Roots: no parent, or parent not in ops set
-  const queue: OrderedStation[] = opsRoles
-    .filter((r) => !r.parent_role || !roleMap.has(r.parent_role))
-    .map((r) => ({ role: r, depth: 0 }));
+  // Roots: no parent, or parent not in ops set — each roots its own fragment.
+  const roots = opsRoles.filter((r) => !r.parent_role || !roleMap.has(r.parent_role));
 
-  while (queue.length > 0) {
-    const item = queue.shift()!;
-    if (visited.has(item.role.role)) continue;
-    visited.add(item.role.role);
-    result.push(item);
-    // Children get depth + 1
-    opsRoles
-      .filter((c) => c.parent_role === item.role.role && !visited.has(c.role))
-      .forEach((c) => queue.push({ role: c, depth: item.depth + 1 }));
-  }
+  const fragments: SequenceFragment[] = roots.map((root) => {
+    const stations: OrderedStation[] = [];
+    const queue: OrderedStation[] = [{ role: root, depth: 0 }];
+    while (queue.length > 0) {
+      const item = queue.shift()!;
+      if (visited.has(item.role.role)) continue;
+      visited.add(item.role.role);
+      stations.push(item);
+      opsRoles
+        .filter((c) => c.parent_role === item.role.role && !visited.has(c.role))
+        .forEach((c) => queue.push({ role: c, depth: item.depth + 1 }));
+    }
+    return { origin: root, stations };
+  });
 
-  // Any unreachable (cycles / dangling)
+  // Unreachable (cycles / dangling) — each stands alone rather than vanishing.
   opsRoles
     .filter((r) => !visited.has(r.role))
-    .forEach((r) => result.push({ role: r, depth: 0 }));
+    .forEach((r) => fragments.push({ origin: r, stations: [{ role: r, depth: 0 }] }));
 
-  return result;
+  // Longest line first — the primary sequence leads; side-quests follow.
+  return fragments.sort(
+    (a, b) => b.stations.length - a.stations.length || a.origin.role.localeCompare(b.origin.role),
+  );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -157,6 +172,11 @@ function StationRow({
           </span>
           {role.title && (
             <span className="text-[10px] text-text-tertiary truncate">{role.title}</span>
+          )}
+          {(role.upstream_roles?.length ?? 0) > 0 && (
+            <span title={`Fed by ${role.upstream_roles.join(', ')}`} className="shrink-0 leading-none">
+              <GitMerge className="w-3 h-3 text-text-quaternary" />
+            </span>
           )}
         </div>
 
@@ -323,8 +343,35 @@ export function OperationsPage() {
   const roles = roleData?.roles ?? [];
   const metrics = metricsData?.stations ?? [];
 
-  // BFS-ordered stations with exact depth tracked
-  const ordered = useMemo((): OrderedStation[] => topoSort(roles), [roles]);
+  // Sequence fragments, one per parent_role root. The active one is
+  // DEEP-LINKED (?fragment=<origin role>) and each switch is a history entry,
+  // so a shared link opens the same sequence and back/forward walks them.
+  const fragments = useMemo((): SequenceFragment[] => buildFragments(roles), [roles]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const fragmentParam = searchParams.get('fragment');
+  const activeFragment =
+    fragments.find((f) => f.origin.role === fragmentParam) ?? fragments[0] ?? null;
+  const selectFragment = useCallback(
+    (origin: string) => {
+      setSelectedRole(null);
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev);
+        p.set('fragment', origin);
+        return p;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const ordered = activeFragment?.stations ?? [];
+  const fragmentRoleSet = useMemo(
+    () => new Set(ordered.map(({ role }) => role.role)),
+    [ordered],
+  );
+  const fragmentMetrics = useMemo(
+    () => metrics.filter((m) => fragmentRoleSet.has(m.role)),
+    [metrics, fragmentRoleSet],
+  );
 
   const chartStations = useMemo(
     (): ChartStation[] =>
@@ -333,9 +380,21 @@ export function OperationsPage() {
         title: r.title,
         parent_role: r.parent_role,
         target_per_hour: r.target_per_hour ?? null,
+        upstream_roles: r.upstream_roles ?? [],
         metric: metrics.find((m) => m.role === r.role),
       })),
     [ordered, metrics],
+  );
+
+  // Jump to the sequence that feeds this station — the merge glyph's click.
+  const handleUpstreamSelect = useCallback(
+    (upstreamRole: string) => {
+      const target = fragments.find((f) =>
+        f.stations.some(({ role }) => role.role === upstreamRole),
+      );
+      if (target) selectFragment(target.origin.role);
+    },
+    [fragments, selectFragment],
   );
 
   const selectedRoleDetail =
@@ -402,7 +461,7 @@ export function OperationsPage() {
             ))}
           </div>
         </div>
-      ) : ordered.length === 0 ? (
+      ) : fragments.length === 0 ? (
         <div className="mt-8">
           <p className="text-sm text-text-secondary mb-2">Stations appear here once roles are marked visible in Operations.</p>
           <p className="text-xs text-text-tertiary">
@@ -418,6 +477,32 @@ export function OperationsPage() {
         /* Console layout: fixed header (above) → flexible middle → fixed table (30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
+          {/* Sequence picker — one tab per fragment, named by its origin role.
+              Only rendered when there is more than one story to tell. */}
+          {fragments.length > 1 && (
+            <div className="flex items-center gap-0.5 px-4 pt-2">
+              {fragments.map((f) => {
+                const isActive = f.origin.role === activeFragment?.origin.role;
+                return (
+                  <button
+                    key={f.origin.role}
+                    onClick={() => selectFragment(f.origin.role)}
+                    className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors ${
+                      isActive
+                        ? 'bg-accent/10 text-accent font-semibold'
+                        : 'text-text-quaternary hover:text-text-secondary'
+                    }`}
+                  >
+                    {f.origin.title ?? f.origin.role}
+                    <span className={`ml-1.5 tabular-nums ${isActive ? 'text-accent/60' : 'text-text-quaternary/60'}`}>
+                      {f.stations.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Middle row: flexible height — SVG fills left, sidebar fixed-width right */}
           <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
             {/* SVG chart — scales to fill available space */}
@@ -426,6 +511,7 @@ export function OperationsPage() {
                 stations={chartStations}
                 selectedRole={selectedRole}
                 onSelect={handleSelect}
+                onUpstreamSelect={handleUpstreamSelect}
                 periodHours={PERIOD_HOURS[period]}
               />
             </div>
@@ -434,7 +520,7 @@ export function OperationsPage() {
             {/* Right sidebar — fixed width, scrolls its own content */}
             <StationDetailPanel
               role={selectedRoleDetail}
-              allMetrics={metrics}
+              allMetrics={fragmentMetrics}
               orderedRoles={ordered.map((o) => o.role)}
               globalPeriod={period}
               onClose={() => setSelectedRole(null)}

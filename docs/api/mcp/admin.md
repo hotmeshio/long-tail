@@ -745,6 +745,7 @@ Update a role's metadata: display name, description, form schema, metadata schem
 | `sla_minutes` | `number \| null` | No | Target resolution time in minutes |
 | `target_per_hour` | `number \| null` | No | Throughput goal (items resolved per hour) |
 | `worker_count` | `number \| null` | No | Station capacity (staff or machines) |
+| `upstream_roles` | `string[] \| null` | No | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear) |
 | `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
 
 ### get_role_schema

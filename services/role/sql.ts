@@ -71,6 +71,12 @@ export const DELETE_ROLE = `
  * the post-update schema pair is snapshotted into lt_role_schemas. A no-change
  * save leaves the version alone and the snapshot INSERT conflicts away.
  * $22 = optional change summary recorded on the snapshot.
+ *
+ * Upstream inputs ($23 = provided sentinel, $24 = replacement set) sync in the
+ * same statement with replace semantics. The two CTEs deliberately avoid
+ * touching the same row: the DELETE only removes rows leaving the set, and the
+ * INSERT's ON CONFLICT DO NOTHING skips rows that stay (delete+insert of the
+ * SAME key in one statement would silently drop it — CTEs share a snapshot).
  */
 export const UPDATE_ROLE_METADATA = `
   WITH updated AS (
@@ -101,6 +107,14 @@ export const UPDATE_ROLE_METADATA = `
     FROM updated
     WHERE ($6::boolean OR $8::boolean) AND current_schema_version IS NOT NULL
     ON CONFLICT (role, version) DO NOTHING
+  ), upstream_prune AS (
+    DELETE FROM lt_role_upstreams
+    WHERE $23::boolean AND role = $1 AND upstream_role <> ALL($24::text[])
+  ), upstream_add AS (
+    INSERT INTO lt_role_upstreams (role, upstream_role)
+    SELECT $1, u FROM unnest($24::text[]) AS u
+    WHERE $23::boolean
+    ON CONFLICT DO NOTHING
   )
   SELECT * FROM updated`;
 
@@ -109,6 +123,9 @@ export const GET_ROLE_FORM_SCHEMA = `
 
 export const GET_ROLE_METADATA_SCHEMA = `
   SELECT metadata_schema FROM lt_roles WHERE role = $1`;
+
+export const GET_ROLE_UPSTREAMS = `
+  SELECT upstream_role FROM lt_role_upstreams WHERE role = $1 ORDER BY upstream_role`;
 
 // ─── Versioned role schemas ─────────────────────────────────────────────────
 
@@ -167,6 +184,11 @@ export const LIST_ROLES_WITH_DETAILS = `
     SELECT role, COUNT(*)::int AS cnt
     FROM lt_config_roles
     GROUP BY role
+  ),
+  upstreams AS (
+    SELECT role, array_agg(upstream_role ORDER BY upstream_role) AS ups
+    FROM lt_role_upstreams
+    GROUP BY role
   )
   SELECT
     r.role,
@@ -181,6 +203,7 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.target_per_hour,
     r.worker_count,
     r.current_schema_version,
+    COALESCE(up.ups, '{}') AS upstream_roles,
     COALESCE(uc.cnt, 0) AS user_count,
     COALESCE(cc.cnt, 0) AS chain_count,
     COALESCE(wc.cnt, 0) AS workflow_count
@@ -188,6 +211,7 @@ export const LIST_ROLES_WITH_DETAILS = `
   LEFT JOIN user_counts uc ON uc.role = r.role
   LEFT JOIN chain_counts cc ON cc.role = r.role
   LEFT JOIN workflow_counts wc ON wc.role = r.role
+  LEFT JOIN upstreams up ON up.role = r.role
   ORDER BY r.role`;
 
 // ─── Reference checks (used before role deletion) ──────────────────────────

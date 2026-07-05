@@ -269,6 +269,7 @@ const result = await lt.roles.update({
 | `sla_minutes` | `number \| null` | No | SLA target in minutes |
 | `target_per_hour` | `number \| null` | No | Throughput target (items per hour) |
 | `worker_count` | `number \| null` | No | Station capacity |
+| `upstream_roles` | `string[] \| null` | No | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Distinct from `parent_role`, which places the role in its own sequence |
 | `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
 
 When the update changes `form_schema` or `metadata_schema`, the new pair is snapshotted into the role's version history and `current_schema_version` advances.

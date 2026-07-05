@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Tag, GitBranch, Eye, Network, Trash2, Check, Braces, Triangle, Settings2, History, Users,
+  Tag, GitBranch, GitMerge, Eye, Network, Trash2, Check, Braces, Triangle, Settings2, History, Users,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -127,6 +127,82 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
             {addChain.isPending ? '…' : 'Add'}
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Upstream inputs section (live-save) ───────────────────────────────────────
+
+/**
+ * The graph edges that don't fit the line. Prior Step (parent_role) places
+ * this role in ONE sequence on the Operations page; upstream inputs declare
+ * the roles it also draws from in OTHER sequences — mixin-like, many allowed.
+ * The chart shows them as a merge glyph on the station, never as a bend in
+ * the sequence.
+ */
+function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleDetail[] }) {
+  const updateRole = useUpdateRole();
+  const [newUpstream, setNewUpstream] = useState('');
+
+  const upstreams = role.upstream_roles ?? [];
+  const available = useMemo(
+    () => allRoles
+      .map((r) => r.role)
+      .filter((r) => r !== role.role && r !== 'superadmin' && !upstreams.includes(r)),
+    [allRoles, role.role, upstreams],
+  );
+
+  const save = (next: string[]) =>
+    updateRole.mutate({ role: role.role, upstream_roles: next }, { onSuccess: () => setNewUpstream('') });
+
+  return (
+    <div className="space-y-3">
+      {upstreams.length === 0 ? (
+        <p className="text-[11px] text-text-tertiary">
+          Add a role from another sequence that this station draws input from.
+          Prior Step sets where this role sits in its own sequence; upstream
+          inputs mark the side-quests that land here.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {upstreams.map((u) => (
+            <span
+              key={u}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-surface-sunken rounded font-mono text-text-secondary"
+            >
+              {u}
+              <button
+                onClick={() => save(upstreams.filter((x) => x !== u))}
+                className="text-text-quaternary hover:text-red-400 transition-colors leading-none ml-0.5"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {available.length > 0 && (
+        <div className="flex items-center gap-2">
+          <select
+            value={newUpstream}
+            onChange={(e) => setNewUpstream(e.target.value)}
+            className="select text-xs font-mono flex-1"
+          >
+            <option value="">Add upstream input…</option>
+            {available.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <button
+            onClick={() => { if (newUpstream) save([...upstreams, newUpstream]); }}
+            disabled={!newUpstream || updateRole.isPending}
+            className="px-2.5 py-1 text-xs rounded bg-accent text-text-inverse hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          >
+            {updateRole.isPending ? '…' : 'Add'}
+          </button>
+        </div>
+      )}
+      {updateRole.error && (
+        <p className="text-[10px] text-status-error">{(updateRole.error as Error).message}</p>
       )}
     </div>
   );
@@ -402,6 +478,26 @@ export function RoleDetailPage() {
                 </option>
               ))}
             </select>
+            <p className="text-[10px] text-text-tertiary leading-relaxed">
+              Places this role in one Operations sequence. A role with no prior
+              step starts its own sequence.
+            </p>
+          </div>
+
+          {/* Upstream inputs — cross-sequence graph edges, live-save */}
+          <div className="space-y-5">
+            <SectionHead
+              icon={GitMerge}
+              color="text-text-tertiary"
+              label="Upstream Inputs"
+              aside={
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-600">Live</span>
+                </div>
+              }
+            />
+            <UpstreamSection role={role} allRoles={roles} />
           </div>
 
           {/* Ops View */}

@@ -285,6 +285,7 @@ export const updateRoleSchema = z.object({
   sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. One of the capacity settings: target_per_hour = worker_count / (sla_minutes / 60)'),
   target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the station pace baseline on the Operations view.'),
   worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
+  upstream_roles: z.array(z.string()).nullable().optional().describe('Replace the set of roles this station draws input from across other sequences (parent_role stays the single prior step in its own sequence). Omitted = preserve; null or [] = clear.'),
   change_summary: z.string().optional().describe('Recorded on the schema version snapshot when this update changes form_schema or metadata_schema'),
 });
 

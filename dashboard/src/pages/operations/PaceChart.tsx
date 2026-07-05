@@ -6,6 +6,8 @@ export interface ChartStation {
   title: string | null;
   target_per_hour: number | null;
   parent_role: string | null;
+  /** Roles feeding this station from other sequences — drawn as a merge glyph, not a bend in the line. */
+  upstream_roles?: string[];
   metric: StationMetric | undefined;
 }
 
@@ -13,6 +15,8 @@ interface PaceChartProps {
   stations: ChartStation[];
   selectedRole: string | null;
   onSelect: (role: string) => void;
+  /** Merge-glyph click — jump to the sequence that feeds this station. */
+  onUpstreamSelect?: (upstreamRole: string) => void;
   /** Selected window length in hours — target count = target_per_hour × this. */
   periodHours: number;
 }
@@ -117,7 +121,7 @@ function spreadLabels<T extends { y: number }>(labels: T[]): (T & { labelY: numb
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
-export function PaceChart({ stations, selectedRole, onSelect, periodHours }: PaceChartProps) {
+export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, periodHours }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const n = stations.length;
@@ -348,6 +352,27 @@ export function PaceChart({ stations, selectedRole, onSelect, periodHours }: Pac
               {isHovered && !isSelected && <circle r={r + 3} fill="none" stroke={stroke} strokeWidth={1} opacity={0.4} />}
               {isSelected && <circle r={r + 4} fill="none" stroke="#6366f1" strokeWidth={2} />}
             </g>
+
+            {/* Merge affordance — this station also receives input from another
+                sequence. The dashed drop into the floor says "a side-quest
+                lands here"; clicking it opens that sequence. It is a symbol,
+                deliberately not a line — the upstream is NOT a descendant. */}
+            {(s.upstream_roles?.length ?? 0) > 0 && (
+              <g
+                transform={`translate(${x - 20} ${bottom})`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpstreamSelect?.(s.upstream_roles![0]);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                <title>{`Fed by ${s.upstream_roles!.join(', ')} — click to view that sequence`}</title>
+                <circle r={9} cy={-6} fill="transparent" />
+                <path d="M -7 -14 C -3 -14 -1 -9 0 -2" fill="none" stroke="#94a3b8" strokeWidth={1} strokeDasharray="2 2" strokeLinecap="round" />
+                <path d="M 0 -2 L 8 -2" stroke="#94a3b8" strokeWidth={1} strokeLinecap="round" />
+                <path d="M 8 -2 l -3.5 -2 v 4 z" fill="#94a3b8" />
+              </g>
+            )}
 
             {/* Station labels (fixed at the floor) */}
             <text x={x} y={bottom + 14} textAnchor="middle" fontSize={9.5} fill="#475569" fontFamily="ui-sans-serif, sans-serif" fontWeight="500">

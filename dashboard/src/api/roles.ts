@@ -20,6 +20,13 @@ export interface RoleDetail {
   worker_count: number | null;
   /** Version of the live schema pair; each schema edit advances it. Null until the role first carries a schema. */
   current_schema_version: number | null;
+  /**
+   * Roles this station draws input from that live in other sequences.
+   * parent_role is the single prior step placing the role in one sequence;
+   * these are the remaining graph edges, shown as a merge affordance on the
+   * Operations chart.
+   */
+  upstream_roles: string[];
   user_count: number;
   chain_count: number;
   workflow_count: number;
@@ -57,6 +64,8 @@ export interface UpdateRoleInput {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /** Replace the upstream-input set (omitted = preserve; [] = clear). */
+  upstream_roles?: string[];
   /** Recorded on the schema version snapshot when the update changes a schema field. */
   change_summary?: string;
 }

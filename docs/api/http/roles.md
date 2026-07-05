@@ -366,6 +366,7 @@ When the update changes `form_schema` or `metadata_schema`, the new pair is snap
 | `sla_minutes` | `number \| null` | SLA target in minutes |
 | `target_per_hour` | `number \| null` | Throughput target (items per hour) |
 | `worker_count` | `number \| null` | Station capacity |
+| `upstream_roles` | `string[] \| null` | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Every entry must name an existing role other than this one. Distinct from `parent_role`, which places the role in its own sequence. |
 | `change_summary` | `string` | Label recorded on the schema version snapshot when this update changes a schema field |
 
 **Example request** — configure a role as a station in the ops view:
