@@ -110,6 +110,7 @@ export function useUpsertWorkflowConfig() {
       description?: string | null;
 
       invocable?: boolean;
+      certified?: boolean;
       task_queue?: string | null;
       default_role?: string;
       roles?: string[];

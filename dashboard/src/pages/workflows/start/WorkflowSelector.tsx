@@ -60,7 +60,7 @@ export function WorkflowSelector({
             const isSelected = selectedType === config.workflow_type;
             const tier = tierMap.get(config.workflow_type) ?? 'durable';
             const variant =
-              tier === 'certified' ? 'certified' : tier === 'configured' ? 'configured' : 'durable';
+              tier === 'certified' ? 'certified' : tier === 'registered' ? 'registered' : 'durable';
             return (
               <button
                 key={config.workflow_type}

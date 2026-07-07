@@ -120,6 +120,8 @@ export const listWorkflowConfigsSchema = z.object({});
 export const upsertWorkflowConfigSchema = z.object({
   workflow_type: z.string().describe('Workflow function name'),
   invocable: z.boolean().optional().default(false),
+  certified: z.boolean().optional()
+    .describe('Explicit HITL certification (interceptor treatment). Omitted → derived from roles/consumes presence.'),
   task_queue: z.string().nullable().optional().default(null),
   default_role: z.string().optional().default('reviewer'),
   description: z.string().nullable().optional().default(null),
@@ -135,7 +137,7 @@ export const upsertWorkflowConfigSchema = z.object({
 });
 
 export const deleteWorkflowConfigSchema = z.object({
-  workflow_type: z.string().describe('Workflow type to de-certify'),
+  workflow_type: z.string().describe('Workflow type to unregister (deletes the registration row)'),
 });
 
 // ── workflows (routes/workflows/invocation.ts + discovery.ts) ───────────────

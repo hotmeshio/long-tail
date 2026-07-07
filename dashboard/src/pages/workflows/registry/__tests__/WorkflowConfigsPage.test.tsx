@@ -47,7 +47,7 @@ const WORKFLOWS: DiscoveredWorkflow[] = [
   }),
   makeWorkflow({
     workflow_type: 'basic-echo',
-    tier: 'configured',
+    tier: 'registered',
     registered: true,
     invocable: true,
     task_queue: 'default',
@@ -135,7 +135,7 @@ describe('WorkflowConfigsPage', () => {
     // review-content + kitchen-sink are certified
     expect(screen.getAllByText('Certified').length).toBe(2);
     // basic-echo is configured
-    expect(screen.getAllByText('Configured').length).toBe(1);
+    expect(screen.getAllByText('Registered').length).toBe(1);
     // unregistered-flow is durable
     expect(screen.getAllByText('Durable').length).toBe(1);
   });
@@ -244,8 +244,8 @@ describe('WorkflowConfigsPage', () => {
 
   it('shows remove config icon for registered workflows', () => {
     renderPage();
-    const removeButtons = screen.getAllByTitle('Remove configuration');
-    // 2 certified + 1 configured = 3 registered
+    const removeButtons = screen.getAllByTitle('Unregister workflow');
+    // 2 certified + 1 registered = 3 with a registration row
     expect(removeButtons.length).toBe(3);
   });
 

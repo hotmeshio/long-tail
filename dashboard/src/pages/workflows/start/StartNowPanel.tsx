@@ -23,7 +23,9 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
   const [formFields, setFormFields] = useState<Record<string, unknown>>({});
   const [isJsonMode, setIsJsonMode] = useState(false);
   const [overrideBot, setOverrideBot] = useState('');
-  const isCertifiable = (selected.roles?.length ?? 0) > 0 || (selected.consumes?.length ?? 0) > 0;
+  // Per-run interceptor opt-out: offered when the workflow's registration is
+  // certified. metadata.certified=false bypasses config lookup for this run.
+  const isCertifiable = selected.certified;
   const [certified, setCertified] = useState(isCertifiable);
 
   const dataFields = useMemo(

@@ -31,6 +31,7 @@ export async function getWorkflowConfig(
 
 
     invocable: wf.invocable,
+    certified: wf.certified ?? false,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
     description: wf.description,
@@ -73,6 +74,7 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
 
 
     invocable: wf.invocable,
+    certified: wf.certified ?? false,
     task_queue: wf.task_queue,
     default_role: wf.default_role,
     description: wf.description,

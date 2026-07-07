@@ -130,10 +130,11 @@ PUT /api/workflows/:type/config
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `invocable` | `boolean` | `false` | Allow this workflow to be started via `POST /api/workflows/:type/invoke` |
+| `certified` | `boolean` | derived | Explicit HITL certification (interceptor treatment). Omitted → derived from roles/consumes presence. |
 | `task_queue` | `string \| null` | `null` | Task queue name (required for invocable workflows) |
 | `default_role` | `string` | `"reviewer"` | Role assigned to escalations when the workflow doesn't specify one |
 | `description` | `string \| null` | `null` | Human-readable description |
-| `roles` | `string[]` | `[]` | Roles allowed to claim escalations for this workflow |
+| `roles` | `string[]` | `[]` | Interceptor default for who can claim interceptor-raised escalations. Escalations raised in workflow code choose their own role, whose versioned schema takes precedence. |
 | `invocation_roles` | `string[]` | `[]` | Roles allowed to invoke via API. Empty = any authenticated user. |
 | `consumes` | `string[]` | `[]` | Workflow types whose completed data this workflow receives via `envelope.lt.providers` |
 | `execute_as` | `string \| null` | `null` | Service account `external_id` to run as (overrides invoker identity) |

@@ -18,7 +18,7 @@ A durable workflow is a plain async function. No config entry, no interceptor in
 
 ### Certified
 
-A certified workflow is durable plus the full Long Tail control plane. It has an entry in the `lt_config_workflows` table, which activates:
+A certified workflow is durable plus the full Long Tail control plane. It has an entry in the `lt_config_workflows` table with `certified: true`, which activates:
 
 - **Interceptor wrapping** — every execution is tracked as a task in `lt_tasks` with full audit trail.
 - **Escalation chains** — returning `{ type: 'escalation' }` creates a reviewable record, routes to the correct role, and triggers re-runs on resolution.
@@ -28,14 +28,16 @@ A certified workflow is durable plus the full Long Tail control plane. It has an
 
 In the dashboard, certified workflows display a ShieldCheck icon with a "Certified" label in accent blue. Durable workflows display a muted "Durable" badge. Both are invocable from the same **Invoke Workflow** page; the distinction is how much operational infrastructure backs them.
 
-To certify a workflow, create a config entry:
+To certify a workflow, create a config entry with the `certified` flag:
 
 ```
 PUT /api/workflows/myWorkflow/config
-{ "default_role": "reviewer", "roles": ["reviewer"], "invocable": true }
+{ "certified": true, "default_role": "reviewer", "roles": ["reviewer"], "invocable": true }
 ```
 
-To de-certify, delete the config. The workflow remains durable — it just loses interceptor tracking.
+A registration with `certified: false` is the "Registered" tier — invocation controls and schema-driven forms, without interceptor tracking. To de-certify, save the config with `certified: false` (roles and consumes stay on the row for re-certification). To unregister entirely, delete the config; the workflow remains durable.
+
+The `roles` list is the interceptor default for who can claim and resolve interceptor-raised escalations. Escalations raised in workflow code choose their own role at the escalation boundary, and that role's versioned escalation schema takes precedence over anything on the workflow config.
 
 ### Pipeline
 

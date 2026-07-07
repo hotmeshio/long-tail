@@ -65,6 +65,7 @@ export function registerWorkflowConfigTools(server: McpServer): void {
       const config = await configService.upsertWorkflowConfig({
         workflow_type: args.workflow_type,
         invocable: args.invocable,
+        certified: args.certified,
         task_queue: args.task_queue,
         default_role: args.default_role,
         description: args.description,

@@ -15,7 +15,7 @@ Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read`
 
 ## Compile Hints
 
-Admin tools modify system configuration. certify_workflow and decertify_workflow change interceptor behavior.
+Admin tools modify system configuration. upsert_workflow_config's `certified` flag and delete_workflow_config change interceptor behavior.
 
 ## Tasks
 
@@ -403,11 +403,12 @@ Create or replace a workflow configuration (certify). Activates the interceptor 
 |-------|------|----------|-------------|
 | workflow_type | string | Yes | Workflow type identifier |
 | invocable | boolean | No | Whether the workflow can be invoked externally |
+| certified | boolean | No | Explicit HITL certification (interceptor treatment). Omitted → derived from roles/consumes presence. |
 | task_queue | string | No | HotMesh task queue |
 | default_role | string | No | Default escalation role |
 | description | string | No | Workflow description |
 | execute_as | string | No | Execution identity |
-| roles | string[] | No | Allowed roles |
+| roles | string[] | No | Interceptor default for who resolves interceptor-raised escalations |
 | invocation_roles | string[] | No | Roles allowed to invoke |
 | consumes | string[] | No | Event topics consumed |
 | tool_tags | string[] | No | Tool tags for routing |
@@ -415,7 +416,7 @@ Create or replace a workflow configuration (certify). Activates the interceptor 
 
 ### delete_workflow_config
 
-De-certify a workflow by removing its config entry.
+Unregister a workflow by deleting its config entry. To demote certified → registered while keeping the registration, use `upsert_workflow_config` with `certified: false`.
 
 | | |
 |---|---|

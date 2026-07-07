@@ -13,7 +13,10 @@ export interface ConfigFormState {
   resolver_schema: string;
   cron_schedule: string;
   execute_as: string;
-  /** UI-only — gates escalation fields in the wizard. Not sent to backend. */
+  /**
+   * Explicit HITL certification, persisted on the registration. Unchecking
+   * demotes certified → registered on save and keeps roles/consumes intact.
+   */
   certified: boolean;
 }
 
@@ -49,7 +52,7 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     resolver_schema: c.resolver_schema ? JSON.stringify(c.resolver_schema, null, 2) : '',
     cron_schedule: c.cron_schedule ?? '',
     execute_as: c.execute_as ?? '',
-    certified: !!(roles || consumes),
+    certified: c.certified,
   };
 }
 

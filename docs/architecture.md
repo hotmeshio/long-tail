@@ -112,7 +112,7 @@ A durable workflow has no entry in `lt_config_workflows`. It runs, but without i
 
 ### Certified
 
-A certified workflow is durable plus the full Long Tail control plane. It has an entry in `lt_config_workflows`, which activates:
+A certified workflow is durable plus the full Long Tail control plane. It has an entry in `lt_config_workflows` with `certified: true`, which activates:
 
 - **Interceptor wrapping** — every execution is tracked as a task in `lt_tasks` with full audit trail.
 - **Escalation chains** — returning `{ type: 'escalation' }` creates a reviewable record, routes to the correct role, and triggers re-runs on resolution.
@@ -120,7 +120,7 @@ A certified workflow is durable plus the full Long Tail control plane. It has an
 - **Invocation controls** — `invocable: true` exposes the workflow for external invocation via the API and dashboard.
 - **Execution identity** — roles, default assignees, and `execute_as` overrides are defined in the config.
 
-In the dashboard, certified workflows display a **ShieldCheck** icon with a "Certified" label in accent blue. Promote a durable workflow to certified by creating a config entry; de-certify by removing it. The workflow code does not change.
+In the dashboard, certified workflows display a **ShieldCheck** icon with a "Certified" label in accent blue. A registration without certification ("Registered" tier) keeps invocation controls and schema-driven forms while skipping the interceptor. Certification is the `certified` flag on the registration: promote by checking Certify (or `certified: true` in the config), demote by unchecking it — escalation roles and dependencies stay on the row. Unregistering deletes the entry entirely. The workflow code does not change.
 
 ### Pipeline
 

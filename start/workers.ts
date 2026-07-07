@@ -175,6 +175,7 @@ export async function startWorkers(
             workflow_type: workflowType,
             task_queue: w.taskQueue,
             invocable: c.invocable ?? false,
+            certified: c.certified,
             default_role: c.defaultRole ?? 'reviewer',
             description: c.description ?? null,
             roles: c.roles ?? [],

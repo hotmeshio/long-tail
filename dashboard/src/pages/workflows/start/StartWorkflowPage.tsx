@@ -26,7 +26,7 @@ export function StartWorkflowPage() {
   }, [discoveredData]);
 
   const invocableConfigs = useMemo(() => {
-    const certified = configs.filter((c) => c.invocable);
+    const invocable = configs.filter((c) => c.invocable);
     const registeredTypes = new Set(configs.map((c) => c.workflow_type));
     const discovered = discoveredData ?? [];
     const durable = discovered
@@ -35,6 +35,7 @@ export function StartWorkflowPage() {
         workflow_type: dw.workflow_type,
         task_queue: dw.task_queue ?? '',
         invocable: true,
+        certified: false,
         description: null,
         default_role: 'reviewer',
         roles: [],
@@ -45,7 +46,7 @@ export function StartWorkflowPage() {
         cron_schedule: null,
         execute_as: null,
       } satisfies LTWorkflowConfig));
-    return [...certified, ...durable];
+    return [...invocable, ...durable];
   }, [configs, discoveredData]);
 
   const selectedConfig = invocableConfigs.find((c) => c.workflow_type === selectedType);

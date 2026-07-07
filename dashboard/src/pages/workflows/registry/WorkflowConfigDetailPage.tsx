@@ -3,7 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Code2, Play, ShieldCheck, ShieldOff,
 } from 'lucide-react';
-import { useWorkflowConfigs, useUpsertWorkflowConfig, useJobs } from '../../../api/workflows';
+import { useWorkflowConfigs, useUpsertWorkflowConfig, useDeleteWorkflowConfig, useJobs } from '../../../api/workflows';
+import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RolePicker } from '../../../components/common/form/RolePicker';
 import { BotPicker } from '../../../components/common/form/BotPicker';
 import { WorkflowPicker } from '../../../components/common/form/WorkflowPicker';
@@ -52,6 +53,8 @@ export function WorkflowConfigDetailPage() {
   const [searchParams] = useSearchParams();
   const { data: configs, isLoading } = useWorkflowConfigs();
   const upsert = useUpsertWorkflowConfig();
+  const deleteConfig = useDeleteWorkflowConfig();
+  const [confirmUnregister, setConfirmUnregister] = useState(false);
 
   const editing = configs?.find((c) => c.workflow_type === workflowType) ?? null;
 
@@ -109,6 +112,7 @@ export function WorkflowConfigDetailPage() {
         task_queue: form.task_queue.trim() || null,
         default_role: form.default_role.trim() || 'reviewer',
         invocable: form.invocable,
+        certified: form.certified,
         roles: splitCsv(form.roles),
         invocation_roles: splitCsv(form.invocation_roles),
         consumes: splitCsv(form.consumes),
@@ -329,12 +333,14 @@ export function WorkflowConfigDetailPage() {
               </label>
               <p className="hint">
                 Certified workflows use the interceptor — failures escalate to human reviewers.
+                Unchecking demotes this workflow to registered on save; escalation roles and
+                dependencies below are kept.
               </p>
             </div>
 
             {form.certified ? (
               <>
-                <Field label="Default Escalation Role" hint="Users assigned escalations by default.">
+                <Field label="Default Escalation Role" hint="The role surface interceptor-raised escalations target.">
                   <RolePicker
                     selected={csvToArray(form.default_role)}
                     onChange={(roles) => set('default_role', roles[0] ?? '')}
@@ -343,7 +349,10 @@ export function WorkflowConfigDetailPage() {
                   />
                 </Field>
 
-                <Field label="Escalation Roles" hint="Users who can claim and resolve escalations.">
+                <Field
+                  label="Escalation Roles"
+                  hint="Interceptor default for who can claim and resolve. Escalations raised in workflow code choose their own role, whose versioned schema takes precedence."
+                >
                   <RolePicker
                     selected={csvToArray(form.roles)}
                     onChange={(roles) => set('roles', arrayToCsv(roles))}
@@ -371,11 +380,11 @@ export function WorkflowConfigDetailPage() {
             {editing && (
               <div className="pt-4 border-t border-surface-border/50">
                 <button
-                  onClick={() => navigate('/workflows/registry')}
+                  onClick={() => setConfirmUnregister(true)}
                   className="flex items-center gap-1.5 text-[11px] text-status-warning hover:underline"
-                  title="Remove configuration"
+                  title="Delete this registration — the workflow returns to plain durable"
                 >
-                  <ShieldOff className="w-3 h-3" /> Remove configuration
+                  <ShieldOff className="w-3 h-3" /> Unregister workflow
                 </button>
               </div>
             )}
@@ -388,6 +397,28 @@ export function WorkflowConfigDetailPage() {
           {schemaError || (upsert.error as Error).message}
         </p>
       )}
+
+      <ConfirmDeleteModal
+        open={confirmUnregister}
+        onClose={() => setConfirmUnregister(false)}
+        onConfirm={() =>
+          deleteConfig.mutate(editing!.workflow_type, {
+            onSuccess: () => navigate('/workflows/registry'),
+          })
+        }
+        title="Unregister Workflow"
+        description={
+          <>
+            Delete the registration for{' '}
+            <span className="font-mono font-medium text-text-primary">{editing?.workflow_type}</span>?
+            This removes its invocation settings, certification, and interceptor treatment; the
+            workflow keeps running as a plain durable workflow. Escalation schemas versioned on
+            roles are untouched.
+          </>
+        }
+        isPending={deleteConfig.isPending}
+        error={deleteConfig.error as Error | null}
+      />
     </div>
   );
 }

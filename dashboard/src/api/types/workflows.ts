@@ -2,6 +2,8 @@ export interface LTWorkflowConfig {
   workflow_type: string;
   description: string | null;
   invocable: boolean;
+  /** Explicit HITL certification — demoting flips this flag and keeps every other field. */
+  certified: boolean;
   task_queue: string;
   default_role: string;
   roles: string[];
@@ -117,7 +119,7 @@ export interface WorkflowExecution {
   activities?: ActivityDetail[];
 }
 
-export type WorkflowTier = 'durable' | 'configured' | 'certified';
+export type WorkflowTier = 'durable' | 'registered' | 'certified';
 
 export interface DiscoveredWorkflow {
   workflow_type: string;

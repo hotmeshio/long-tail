@@ -190,7 +190,10 @@ function PageLoader() {
 function Lazy({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={<PageLoader />}>
-      <div className="animate-page-enter">{children}</div>
+      {/* flex-1 + min-h-0 forward the shell's height constraint to the page —
+          console-style pages (Pace Board) bound their rows against it and
+          scroll internally; document-style pages still grow and scroll main. */}
+      <div className="animate-page-enter flex flex-col flex-1 min-h-0">{children}</div>
     </Suspense>
   );
 }

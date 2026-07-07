@@ -64,15 +64,15 @@ The top navigation bar contains:
 
 ### Workflow Registry
 
-Shows every workflow the system has discovered across all registered workers. Each workflow displays one of three tiers:
+Shows every workflow the system has discovered across all registered workers. Each workflow displays one of three tiers — direct states of the registration:
 
-- **Certified** (ShieldCheck icon) — has an `lt_config_workflows` entry with roles or consumes. Full interceptor tracking, escalation chains, and invocation controls.
-- **Configured** (Settings icon) — has a config entry but no roles. Invocation controls and schema-driven forms, but no automatic escalation routing.
-- **Durable** (Wrench icon) — registered as a HotMesh worker but not configured. Checkpointed execution and retries, but no interceptor wrapping.
+- **Certified** (ShieldCheck icon) — has an `lt_config_workflows` entry with `certified: true`. Full interceptor tracking, escalation defaults, and invocation controls.
+- **Registered** (Settings icon) — has a registration with `certified: false`. Invocation controls and schema-driven forms, without interceptor wrapping.
+- **Durable** (Wrench icon) — runs as a HotMesh worker with no registration. Checkpointed execution and retries only.
 
 **Columns:** Workflow (pill + description), Queue (bordered pill), Tier (icon + label), Access (escalation roles with shield icon, invocation roles with user-check icon).
 
-**Row actions** (on hover): Play (invoke), Wrench (configure durable), ShieldPlus (certify configured), ShieldOff (de-certify).
+**Row actions** (on hover): Play (invoke), Wrench (register durable), ShieldPlus (certify registered), ShieldOff (unregister — deletes the registration). To demote certified → registered, open the workflow and uncheck **Certify for HITL Escalation**; escalation roles, dependencies, and schemas stay on the registration.
 
 **Inline config via `start()`:** Developers can declare workflow profiles directly in the `start()` config by adding a `config` block to any worker entry. This auto-seeds the workflow into `lt_config_workflows` at startup — no manual API calls or dashboard wizard needed. Roles referenced in the config are auto-created.
 
@@ -84,6 +84,7 @@ workers: [
     config: {
       description: 'My workflow description',
       invocable: true,
+      certified: true,
       roles: ['reviewer', 'admin'],
       envelopeSchema: { data: { field1: '', field2: 0 } },
       resolverSchema: { approved: true, notes: '' },

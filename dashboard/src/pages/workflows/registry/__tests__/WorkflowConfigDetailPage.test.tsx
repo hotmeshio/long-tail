@@ -10,6 +10,7 @@ vi.mock('../../../../api/workflows', () => ({
     isPending: false,
     error: null,
   })),
+  useDeleteWorkflowConfig: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useJobs: vi.fn(() => ({ data: { jobs: [] } })),
 }));
 

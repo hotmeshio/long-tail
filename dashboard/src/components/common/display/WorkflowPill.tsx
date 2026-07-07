@@ -1,7 +1,7 @@
 import { Workflow, ShieldCheck, SlidersHorizontal, Wand2, Zap } from 'lucide-react';
 import { typeColor } from '../../../lib/type-color';
 
-type WorkflowVariant = 'durable' | 'configured' | 'certified' | 'pipeline' | 'capability';
+type WorkflowVariant = 'durable' | 'registered' | 'certified' | 'pipeline' | 'capability';
 
 interface WorkflowPillProps {
   type: string;
@@ -13,7 +13,7 @@ interface WorkflowPillProps {
 
 const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
   certified:  ShieldCheck,
-  configured: SlidersHorizontal,
+  registered: SlidersHorizontal,
   pipeline:   Wand2,
   capability: Zap,
   durable:    Workflow,
@@ -21,7 +21,7 @@ const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
 
 const VARIANT_FIXED_COLOR: Record<string, { text: string; bg: string }> = {
   certified:  { text: 'text-status-success', bg: 'bg-status-success/10' },
-  configured: { text: 'text-amber-500/70', bg: 'bg-amber-200/[0.12]' },
+  registered: { text: 'text-amber-500/70', bg: 'bg-amber-200/[0.12]' },
 };
 
 const SIZE_CONFIG = {
@@ -32,7 +32,9 @@ const SIZE_CONFIG = {
 
 export function WorkflowPill({ type, size = 'sm', certified, variant }: WorkflowPillProps) {
   const resolved = variant ?? (certified ? 'certified' : 'durable');
-  const Icon = VARIANT_ICON[resolved];
+  // Callers pass server-provided tier strings here — fall back to the durable
+  // icon on an unrecognized value so version skew degrades instead of crashing.
+  const Icon = VARIANT_ICON[resolved] ?? Workflow;
   const s = SIZE_CONFIG[size];
 
   const fixed = VARIANT_FIXED_COLOR[resolved];

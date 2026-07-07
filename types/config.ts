@@ -5,9 +5,23 @@
 export interface LTWorkflowConfig {
   workflow_type: string;
   invocable: boolean;
+  /**
+   * Explicit certification. Certified workflows get the interceptor: task
+   * tracking, escalation handling, re-run detection. Stored on the row —
+   * demoting to plain registered flips this flag and keeps every other
+   * field intact. Always present on reads; optional on writes, where an
+   * omitted value derives from roles/consumes presence (the pre-flag rule).
+   */
+  certified?: boolean;
   task_queue: string | null;
   default_role: string;
   description: string | null;
+  /**
+   * @deprecated Escalation formalization belongs to the escalation and its
+   * role — roles carry the versioned escalation schema and take precedence.
+   * This list remains only as the interceptor default for who can claim and
+   * resolve interceptor-raised escalations.
+   */
   roles: string[];
   invocation_roles: string[];
   consumes: string[];
@@ -25,6 +39,8 @@ export interface LTWorkflowConfig {
  */
 export interface LTResolvedConfig {
   invocable: boolean;
+  /** Explicit certification — gates the interceptor treatment. */
+  certified: boolean;
   taskQueue: string | null;
   role: string;
   roles: string[];

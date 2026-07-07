@@ -61,7 +61,7 @@ export function EnvelopeEditor({
       {!selectedConfig.envelope_schema && (
         <div className="bg-surface-sunken border border-surface-border rounded px-4 py-3 mb-3">
           <p className="text-xs text-text-secondary leading-relaxed">
-            This workflow has no input template. Edit the JSON directly below, or register it as a <Link to="/workflows/registry/new" className="text-status-success hover:underline">certified workflow</Link> in the Workflow Registry for pre-filled fields and form-based input.
+            This workflow has no input template. Edit the JSON directly below, or <Link to="/workflows/registry/new" className="text-status-success hover:underline">register it</Link> in the Workflow Registry with an envelope schema for pre-filled fields and form-based input.
           </p>
         </div>
       )}
