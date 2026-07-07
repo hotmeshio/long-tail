@@ -15,7 +15,7 @@ Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read`
 
 ## Compile Hints
 
-Admin tools modify system configuration. certify_workflow and decertify_workflow change interceptor behavior.
+Admin tools modify system configuration. upsert_workflow_config's `certified` flag and delete_workflow_config change interceptor behavior.
 
 ## Tasks
 
@@ -231,7 +231,10 @@ Release all escalation claims that exceeded their lock duration.
 
 ### bulk_triage
 
-Resolve escalations for triage and start mcpTriage workflows.
+Resolve escalations for triage and start mcpTriage workflows. Rows backing a
+live `condition()` waiter (`signal_key` set) stay `pending` and are excluded
+from the result — settle those with the targeted resolve, which carries the
+workflow's wake.
 
 | | |
 |---|---|
@@ -400,11 +403,12 @@ Create or replace a workflow configuration (certify). Activates the interceptor 
 |-------|------|----------|-------------|
 | workflow_type | string | Yes | Workflow type identifier |
 | invocable | boolean | No | Whether the workflow can be invoked externally |
+| certified | boolean | No | Explicit HITL certification (interceptor treatment). Omitted → derived from roles/consumes presence. |
 | task_queue | string | No | HotMesh task queue |
 | default_role | string | No | Default escalation role |
 | description | string | No | Workflow description |
 | execute_as | string | No | Execution identity |
-| roles | string[] | No | Allowed roles |
+| roles | string[] | No | Interceptor default for who resolves interceptor-raised escalations |
 | invocation_roles | string[] | No | Roles allowed to invoke |
 | consumes | string[] | No | Event topics consumed |
 | tool_tags | string[] | No | Tool tags for routing |
@@ -412,7 +416,7 @@ Create or replace a workflow configuration (certify). Activates the interceptor 
 
 ### delete_workflow_config
 
-De-certify a workflow by removing its config entry.
+Unregister a workflow by deleting its config entry. To demote certified → registered while keeping the registration, use `upsert_workflow_config` with `certified: false`.
 
 | | |
 |---|---|
@@ -1160,10 +1164,12 @@ happened and where to look, not how to "fix" a job.
 **Read this first — what is and isn't a problem.** A workflow suspended at a
 `condition()` / `waitFor()` / `sleepFor()` can sit idle for days legitimately,
 and HotMesh only bumps `updated_at` when a job's status changes. A frozen
-`updated_at` is therefore the *normal* signature of a wait, **not** a fault. The
+`updated_at` is therefore the *normal* signature of a wait, **not** a fault. A
+reservation whose holder died self-heals: the message redelivers once the
+reclaim window lapses (~90s worst case) and the activity re-executes. The
 genuinely broken signals are: a dead-lettered message (retries exhausted), a
-reservation leak (claimed but never ACK'd past the reclaim window), and a
-suspended waiter with **no** escalation row.
+reservation still held past several reclaim windows, and a suspended waiter
+with **no** escalation row.
 
 **Recommended flow:** start fleet-wide with `find_orphaned_signals` (the
 genuinely-broken case) or `find_stalled_jobs` (candidates worth a look), then run

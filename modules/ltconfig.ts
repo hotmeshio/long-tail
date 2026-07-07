@@ -87,14 +87,14 @@ class LTConfigCache {
    *
    * The interceptor uses this to decide whether to wrap the workflow
    * with task tracking, escalation handling, and re-run detection.
-   * Configured-but-not-certified workflows (no roles, no consumes)
-   * return null so the interceptor skips them.
+   * Certification is the explicit `certified` flag on the registration —
+   * registered-but-not-certified workflows return null so the interceptor
+   * skips them.
    */
   async getResolvedConfig(name: string): Promise<LTResolvedConfig | null> {
     const config = await this.get(name);
     if (!config) return null;
-    const isCertified = (config.roles?.length ?? 0) > 0 || (config.consumes?.length ?? 0) > 0;
-    return isCertified ? config : null;
+    return config.certified ? config : null;
   }
 
   /**

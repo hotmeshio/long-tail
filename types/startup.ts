@@ -21,11 +21,21 @@ export interface LTWorkerConfig {
   description?: string;
   /** Allow invocation from the dashboard / API. Default: false. */
   invocable?: boolean;
+  /**
+   * Certify for HITL escalation — the interceptor wraps the workflow with
+   * task tracking, escalation handling, and re-run detection. Omitted →
+   * derived from roles/consumes presence (the pre-flag behavior).
+   */
+  certified?: boolean;
   /** Roles allowed to invoke this workflow. */
   invocationRoles?: string[];
   /** Default role for escalations. Default: 'reviewer'. */
   defaultRole?: string;
-  /** Roles that can claim and resolve escalations (certifies the workflow for HITL). */
+  /**
+   * Interceptor default for who can claim and resolve interceptor-raised
+   * escalations. Escalation formalization lives with the escalation's role
+   * (versioned schema) and takes precedence over this list.
+   */
   roles?: string[];
   /** JSON template that pre-fills the dashboard invocation form. */
   envelopeSchema?: Record<string, any>;

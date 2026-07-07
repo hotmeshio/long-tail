@@ -42,16 +42,26 @@ const EASE = '0.5s cubic-bezier(0.4, 0, 0.2, 1)';
 
 // ── Path builders ─────────────────────────────────────────────────────────────
 
+// A one-point curve still needs a stroke: a short segment — slightly longer
+// than an em dash — centered through the point. It anchors the dot and its
+// end label in vertical space when a sequence has a single station (or a
+// single station carries a target).
+const SOLO_HALF = 9;
+function soloSegment(p: { x: number; y: number }): string {
+  return `M ${(p.x - SOLO_HALF).toFixed(1)} ${p.y.toFixed(1)} L ${(p.x + SOLO_HALF).toFixed(1)} ${p.y.toFixed(1)}`;
+}
+
 /** Straight polyline — the target line is a discrete count per station. */
 function linePath(pts: { x: number; y: number }[]): string {
   if (pts.length === 0) return '';
+  if (pts.length === 1) return soloSegment(pts[0]);
   return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
 }
 
 /** Catmull-Rom → cubic bezier — smooth curves for the actual and active lines. */
 function catmullPath(pts: { x: number; y: number }[]): string {
   if (pts.length === 0) return '';
-  if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+  if (pts.length === 1) return soloSegment(pts[0]);
   const segs: string[] = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[Math.max(0, i - 1)];

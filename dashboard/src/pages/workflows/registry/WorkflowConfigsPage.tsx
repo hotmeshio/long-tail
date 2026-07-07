@@ -19,8 +19,8 @@ import type { DiscoveredWorkflow } from '../../../api/types';
 function TierBadge({ tier }: { tier: string }) {
   if (tier === 'certified')
     return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-status-success"><ShieldCheck className="w-3 h-3" />Certified</span>;
-  if (tier === 'configured')
-    return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><Settings className="w-3 h-3" />Configured</span>;
+  if (tier === 'registered')
+    return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><Settings className="w-3 h-3" />Registered</span>;
   return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-quaternary"><Wrench className="w-3 h-3" />Durable</span>;
 }
 
@@ -199,13 +199,14 @@ export function WorkflowConfigsPage() {
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
-        title="De-certify Workflow"
+        title="Unregister Workflow"
         description={
           <>
-            Remove certification from{' '}
+            Delete the registration for{' '}
             <span className="font-mono font-medium text-text-primary">{confirmDelete}</span>? This
-            removes interceptor guarantees, escalation chains, and invocation role constraints. The
-            workflow will continue running as a standard durable workflow.
+            removes its invocation settings, certification, and interceptor treatment; the workflow
+            keeps running as a plain durable workflow. To demote certified → registered instead,
+            open the workflow and uncheck Certify — that keeps every setting.
           </>
         }
         isPending={deleteConfig.isPending}
@@ -259,7 +260,7 @@ function WorkflowRow({
         <WorkflowPill
           type={wf.workflow_type}
           size="md"
-          variant={wf.tier === 'certified' ? 'certified' : wf.tier === 'configured' ? 'configured' : 'durable'}
+          variant={wf.tier === 'certified' ? 'certified' : wf.tier === 'registered' ? 'registered' : 'durable'}
         />
         {wf.description && (
           <p className="mt-0.5 text-[10px] text-text-tertiary group-hover:text-text-secondary leading-snug line-clamp-2 transition-colors">
@@ -312,7 +313,7 @@ function WorkflowRow({
             <Wrench className="w-3.5 h-3.5" />
           </button>
         )}
-        {wf.tier === 'configured' && (
+        {wf.tier === 'registered' && (
           <button
             title="Certify workflow"
             onClick={(e) => { e.stopPropagation(); onNavigate(`/workflows/registry/${encodeURIComponent(wf.workflow_type)}`); }}
@@ -323,7 +324,7 @@ function WorkflowRow({
         )}
         {wf.registered && (
           <button
-            title="Remove configuration"
+            title="Unregister workflow"
             onClick={(e) => { e.stopPropagation(); onDelete(wf.workflow_type); }}
             className="text-text-quaternary hover:text-status-warning transition-colors"
           >

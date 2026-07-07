@@ -15,6 +15,18 @@ import {
   DELETE_WORKFLOW,
 } from './sql';
 
+/**
+ * Certification fallback for writers that omit the explicit flag (older SDKs,
+ * seed blocks without `certified`): derived from roles/consumes presence —
+ * the rule that governed the tier before the flag existed.
+ */
+function resolveCertified(config: LTWorkflowConfig): boolean {
+  return (
+    config.certified ??
+    ((config.roles?.length ?? 0) > 0 || (config.consumes?.length ?? 0) > 0)
+  );
+}
+
 export async function upsertWorkflowConfig(
   config: LTWorkflowConfig & { lifecycle?: any },
 ): Promise<LTWorkflowConfig> {
@@ -47,6 +59,7 @@ export async function upsertWorkflowConfig(
         config.cron_schedule ?? null,
         config.tool_tags || [],
         config.execute_as ?? null,
+        resolveCertified(config),
       ],
     );
 
@@ -114,6 +127,7 @@ export async function seedWorkflowConfig(
     config.cron_schedule ?? null,
     config.tool_tags || [],
     config.execute_as ?? null,
+    resolveCertified(config),
   ]);
 
   const inserted = (rowCount ?? 0) > 0;
@@ -133,6 +147,7 @@ export async function seedWorkflowConfig(
       const drifts: string[] = [];
       if (config.description && existing.description !== config.description) drifts.push('description');
       if (config.invocable !== existing.invocable) drifts.push('invocable');
+      if (resolveCertified(config) !== existing.certified) drifts.push('certified');
       if (config.default_role !== existing.default_role) drifts.push('default_role');
       if (JSON.stringify(config.envelope_schema) !== JSON.stringify(existing.envelope_schema)) drifts.push('envelope_schema');
       if (JSON.stringify(config.resolver_schema) !== JSON.stringify(existing.resolver_schema)) drifts.push('resolver_schema');

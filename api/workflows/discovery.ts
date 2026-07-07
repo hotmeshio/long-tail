@@ -76,12 +76,7 @@ export async function listDiscoveredWorkflows(input: {
       .map((workflowType) => {
         const config = configMap.get(workflowType);
         const worker = activeWorkers.get(workflowType);
-        const hasCertification = !!(
-          config &&
-          ((config.roles?.length ?? 0) > 0 ||
-           (config.consumes?.length ?? 0) > 0)
-        );
-        const tier = !config ? 'durable' : hasCertification ? 'certified' : 'configured';
+        const tier = !config ? 'durable' : config.certified ? 'certified' : 'registered';
         return {
           workflow_type: workflowType,
           task_queue: config?.task_queue ?? worker?.taskQueue ?? null,

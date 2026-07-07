@@ -124,6 +124,10 @@ const ORTHO_ROLE_DATA = [
     parent_role: 'qa',
     sla_minutes: 2,
     target_per_hour: 22,
+    // Ship draws finished inserts from the shoe side-quest — a cross-sequence
+    // merge, rendered as the merge glyph on the Pace Board, not a bend in
+    // the main line.
+    upstream_roles: ['inserting'],
     form_schema: {
       properties: {
         carrier:          { type: 'string', title: 'Carrier', enum: ['fedex', 'ups', 'usps', 'dhl', 'local'] },
@@ -131,6 +135,37 @@ const ORTHO_ROLE_DATA = [
         notes:            { type: 'string', title: 'Notes', 'x-lt-widget': 'textarea' },
       },
       required: ['carrier', 'tracking_number'],
+    },
+  },
+  // ── Shoe side-quest (its own sequence: ordering → inserting ⇒ ship) ──────
+  {
+    role: 'ordering',
+    title: 'Ordering',
+    description: 'Order the patient’s shoes from the vendor.',
+    parent_role: null,
+    sla_minutes: 3,
+    target_per_hour: 22,
+    form_schema: {
+      properties: {
+        po_number: { type: 'string', title: 'PO Number' },
+        notes:     { type: 'string', title: 'Notes', 'x-lt-widget': 'textarea' },
+      },
+      required: ['po_number'],
+    },
+  },
+  {
+    role: 'inserting',
+    title: 'Inserting',
+    description: 'Fit the finished inserts into the delivered shoes.',
+    parent_role: 'ordering',
+    sla_minutes: 5,
+    target_per_hour: 22,
+    form_schema: {
+      properties: {
+        inserted: { type: 'boolean', title: 'Inserts Fitted' },
+        notes:    { type: 'string',  title: 'Notes', 'x-lt-widget': 'textarea' },
+      },
+      required: ['inserted'],
     },
   },
 ];
@@ -142,11 +177,20 @@ export async function seedOrthoRoles(): Promise<void> {
   // created it OR when it exists untitled and schema-less; a role the admin
   // has configured keeps its titles, SLAs, and schemas across restarts.
   const existing = new Map((await listRolesWithDetails()).map((r) => [r.role, r]));
+
+  // 1. Ensure every bare role row exists before any metadata is applied —
+  //    parent_role and upstream_roles reference lt_roles, and ship points at
+  //    the side-quest's `inserting` across the array order.
+  const createdRoles = new Set<string>();
   for (const data of ORTHO_ROLE_DATA) {
-    let created = false;
     try {
-      created = await createRole(data.role);
+      if (await createRole(data.role)) createdRoles.add(data.role);
     } catch { /* ON CONFLICT DO NOTHING */ }
+  }
+
+  // 2. Apply titles, dials, sequence edges, and form schemas.
+  for (const data of ORTHO_ROLE_DATA) {
+    const created = createdRoles.has(data.role);
     const row = existing.get(data.role);
     const unconfigured = row != null && row.title == null && row.form_schema == null;
     if (created || unconfigured) {
@@ -159,6 +203,9 @@ export async function seedOrthoRoles(): Promise<void> {
           sla_minutes: data.sla_minutes,
           target_per_hour: data.target_per_hour,
           form_schema: data.form_schema,
+          ...('upstream_roles' in data
+            ? { upstream_roles: (data as { upstream_roles: string[] }).upstream_roles }
+            : {}),
         });
       } catch (err: any) {
         loggerRegistry.warn(`[examples] failed to update ortho role ${data.role}: ${err.message}`);

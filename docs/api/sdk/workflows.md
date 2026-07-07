@@ -152,7 +152,7 @@ const result = await lt.workflows.listDiscovered({ include_system: false });
 |-------|------|----------|-------------|
 | `include_system` | `boolean` | No | Include system workflows (default: false) |
 
-**Returns:** `LTApiResult<{ workflows: [{ workflow_type, task_queue, registered, active, invocable, system, description, roles, invocation_roles, execute_as }] }>`
+**Returns:** `LTApiResult<{ workflows: [{ workflow_type, task_queue, tier, registered, active, invocable, system, description, roles, invocation_roles, execute_as }] }>` — `tier` is `certified`, `registered`, or `durable`.
 
 **Auth:** Not required
 
@@ -232,11 +232,12 @@ const result = await lt.workflows.upsertConfig({
 |-------|------|----------|-------------|
 | `type` | `string` | Yes | Workflow type name |
 | `invocable` | `boolean` | No | Whether the workflow can be started via the API |
+| `certified` | `boolean` | No | Explicit HITL certification (interceptor treatment). Omitted → derived from roles/consumes presence. |
 | `task_queue` | `string \| null` | No | HotMesh task queue |
 | `default_role` | `string` | No | Default escalation role |
 | `description` | `string \| null` | No | Human-readable description |
 | `execute_as` | `string \| null` | No | Service account for proxy invocation |
-| `roles` | `string[]` | No | Roles that can resolve escalations |
+| `roles` | `string[]` | No | Interceptor default for who resolves interceptor-raised escalations |
 | `invocation_roles` | `string[]` | No | Roles that can invoke this workflow |
 | `consumes` | `string[]` | No | Workflow types whose data this workflow consumes |
 | `tool_tags` | `string[]` | No | MCP tool tags for discovery |

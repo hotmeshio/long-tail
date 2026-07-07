@@ -147,9 +147,10 @@ export async function resolveEscalation(
  * Use this over a per-row `resolveEscalation` loop when every row takes the SAME
  * resolverPayload and the rows are woken collectively (or are bookkeeping rows with
  * no signal_key). NOTE: unlike the single `resolve`, this does NOT deliver per-row
- * signals — `resolveMany` is UPDATE-only. Do not use it for signal_key adverts whose
- * resolution must wake a parked workflow; those require the per-row `resolveEscalation`
- * (which delivers the signal).
+ * signals — `resolveMany` is UPDATE-only, and the store enforces it: rows with
+ * `signal_key` set (live `condition()` waiters) are skipped, stay `pending`, and
+ * drop out of the return set. Waking a parked workflow requires the per-row
+ * `resolveEscalation` (which delivers the signal).
  */
 export async function resolveEscalationsByIds(
   ids: string[],

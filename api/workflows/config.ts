@@ -45,11 +45,16 @@ export async function getWorkflowConfig(input: {
  *
  * @param input.type — workflow type name
  * @param input.invocable — whether the workflow can be started via the API
+ * @param input.certified — explicit HITL certification (interceptor treatment).
+ *   Omitted → derived from roles/consumes presence, preserving the behavior of
+ *   callers that predate the explicit flag.
  * @param input.task_queue — HotMesh task queue
  * @param input.default_role — default escalation role
  * @param input.description — human-readable description
  * @param input.execute_as — service account for proxy invocation
- * @param input.roles — roles that can resolve escalations
+ * @param input.roles — interceptor default for who resolves interceptor-raised
+ *   escalations (deprecated as formalization — the escalation's role carries
+ *   the versioned schema and takes precedence)
  * @param input.invocation_roles — roles that can invoke this workflow
  * @param input.consumes — workflow types whose data this workflow consumes
  * @param input.tool_tags — MCP tool tags for discovery
@@ -61,6 +66,7 @@ export async function getWorkflowConfig(input: {
 export async function upsertWorkflowConfig(input: {
   type: string;
   invocable?: boolean;
+  certified?: boolean;
   task_queue?: string | null;
   default_role?: string;
   description?: string | null;
@@ -83,6 +89,7 @@ export async function upsertWorkflowConfig(input: {
     const config = await configService.upsertWorkflowConfig({
       workflow_type: input.type,
       invocable: input.invocable ?? false,
+      certified: input.certified,
       task_queue: input.task_queue ?? null,
       default_role: input.default_role ?? 'reviewer',
       description: input.description ?? null,

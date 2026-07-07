@@ -34,6 +34,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
   const result = await api.upsertWorkflowConfig({
     type: req.params.type as string,
     invocable: req.body.invocable,
+    certified: req.body.certified,
     task_queue: req.body.task_queue,
     default_role: req.body.default_role,
     description: req.body.description,
