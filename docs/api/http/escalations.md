@@ -667,7 +667,7 @@ Reassign multiple escalations to a different role. Requires admin or superadmin 
 POST /api/escalations/bulk-triage
 ```
 
-Resolve multiple escalations and start AI triage workflows (mcpTriage) for each. Requires admin or superadmin permission for the escalation roles.
+Resolve multiple escalations and start AI triage workflows (mcpTriage) for each. Rows backing a live `condition()` waiter (`signal_key` set) stay `pending` and are excluded from `triaged` — settle those individually via `POST /:id/resolve`, which carries the workflow's wake. Requires admin or superadmin permission for the escalation roles.
 
 **Request body:**
 
@@ -1044,7 +1044,7 @@ Single atomic query finds the pending escalation by metadata, auto-claims if unc
 POST /api/escalations/resolve-by-ids
 ```
 
-Resolve many escalations in one guarded statement — the set-based sibling of `POST /:id/resolve`. Used for bookkeeping rows that are woken collectively (it does not deliver a per-row signal). RBAC: a scoped caller may only resolve rows whose role they hold (global principals are unrestricted).
+Resolve many escalations in one guarded statement — the set-based sibling of `POST /:id/resolve`. Used for bookkeeping rows that are woken collectively (it does not deliver a per-row signal). The store enforces this: rows backing a live `condition()` waiter (`signal_key` set) stay `pending` and are excluded from the response — settle those via `POST /:id/resolve`, which carries the wake. RBAC: a scoped caller may only resolve rows whose role they hold (global principals are unrestricted).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -1052,7 +1052,7 @@ Resolve many escalations in one guarded statement — the set-based sibling of `
 | `resolverPayload` | `object` | yes | Payload applied to every row |
 | `metadata` | `object` | no | Outcome patch merged into each row's GIN-indexed metadata |
 
-**Response 200:** `{ "resolved": <count>, "escalationIds": [...] }` — only the rows that were still `pending` are resolved and returned.
+**Response 200:** `{ "resolved": <count>, "escalationIds": [...] }` — only still-`pending` rows without a `signal_key` are resolved and returned.
 
 ## Faceted search
 

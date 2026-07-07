@@ -163,7 +163,7 @@ When an activity completes, its result is checkpointed in PostgreSQL. If the pro
 
 - Activities that already completed are **not re-executed** — their cached results are replayed
 - The workflow resumes from the **last checkpoint**, not the beginning
-- External services (OpenAI, databases) are not called twice
+- An activity that was **mid-flight** at the crash is redelivered once its stream reservation lapses (`HMSH_RESERVATION_TIMEOUT_S`, ~90s worst case) and **re-executes** — delivery is at-least-once, so activity side effects (HTTP calls, bookings, emails) should be idempotent
 
 This is what `proxyActivities()` provides. The raw function becomes a durable checkpoint:
 

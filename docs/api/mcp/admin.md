@@ -231,7 +231,10 @@ Release all escalation claims that exceeded their lock duration.
 
 ### bulk_triage
 
-Resolve escalations for triage and start mcpTriage workflows.
+Resolve escalations for triage and start mcpTriage workflows. Rows backing a
+live `condition()` waiter (`signal_key` set) stay `pending` and are excluded
+from the result — settle those with the targeted resolve, which carries the
+workflow's wake.
 
 | | |
 |---|---|
@@ -1160,10 +1163,12 @@ happened and where to look, not how to "fix" a job.
 **Read this first — what is and isn't a problem.** A workflow suspended at a
 `condition()` / `waitFor()` / `sleepFor()` can sit idle for days legitimately,
 and HotMesh only bumps `updated_at` when a job's status changes. A frozen
-`updated_at` is therefore the *normal* signature of a wait, **not** a fault. The
+`updated_at` is therefore the *normal* signature of a wait, **not** a fault. A
+reservation whose holder died self-heals: the message redelivers once the
+reclaim window lapses (~90s worst case) and the activity re-executes. The
 genuinely broken signals are: a dead-lettered message (retries exhausted), a
-reservation leak (claimed but never ACK'd past the reclaim window), and a
-suspended waiter with **no** escalation row.
+reservation still held past several reclaim windows, and a suspended waiter
+with **no** escalation row.
 
 **Recommended flow:** start fleet-wide with `find_orphaned_signals` (the
 genuinely-broken case) or `find_stalled_jobs` (candidates worth a look), then run

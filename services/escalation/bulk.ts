@@ -74,7 +74,9 @@ export async function bulkCancelEscalations(
 /**
  * Bulk resolve escalations for AI triage.
  * Returns full records so the caller can start triage workflows. No signal is
- * delivered — the triage workflow takes over handling.
+ * delivered — the triage workflow takes over handling. Rows backing a live
+ * `condition()` waiter (`signal_key` set) are skipped by the store and stay
+ * `pending`; only the returned rows enter triage.
  */
 export async function bulkResolveForTriage(
   ids: string[],

@@ -635,6 +635,8 @@ Trigger AI triage for multiple escalations.
 
 Resolves each escalation and starts a triage workflow that uses MCP tools to analyze and potentially auto-resolve the issue.
 
+Rows backing a live `condition()` waiter (`signal_key` set) stay `pending` and are excluded from `triaged` — their resolution must carry the workflow's wake, which only the targeted `resolve` delivers. Settle those individually with `resolve` or `cancel`.
+
 ```typescript
 const result = await lt.escalations.bulkTriage({
   ids: ['esc_1', 'esc_2'],
@@ -803,7 +805,7 @@ const result = await lt.escalations.resolveByMetadata({
 
 ## resolveByIds
 
-Resolve a set of escalations by id in one guarded statement (the set-based sibling of `resolve`). For bookkeeping rows woken collectively — it does not deliver a per-row signal. RBAC: a scoped caller may only resolve rows whose role they hold.
+Resolve a set of escalations by id in one guarded statement (the set-based sibling of `resolve`). For bookkeeping rows woken collectively — it does not deliver a per-row signal, and the store enforces that: rows backing a live `condition()` waiter (`signal_key` set) stay `pending` and are excluded from the result. Settle waiter rows individually with `resolve`, which carries the wake. RBAC: a scoped caller may only resolve rows whose role they hold.
 
 ```typescript
 const result = await lt.escalations.resolveByIds({
