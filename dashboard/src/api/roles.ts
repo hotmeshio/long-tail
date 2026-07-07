@@ -18,6 +18,10 @@ export interface RoleDetail {
   sla_minutes: number | null;
   target_per_hour: number | null;
   worker_count: number | null;
+  /** Max age (minutes) before a pending unclaimed item counts as priority on the Pace Board. Falls back to sla_minutes. */
+  priority_threshold_minutes: number | null;
+  /** Escalation metadata key holding the age origin (ISO 8601 UTC timestamp). Falls back to created_at. */
+  priority_facet: string | null;
   /** Version of the live schema pair; each schema edit advances it. Null until the role first carries a schema. */
   current_schema_version: number | null;
   /**
@@ -64,6 +68,8 @@ export interface UpdateRoleInput {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  priority_threshold_minutes?: number | null;
+  priority_facet?: string | null;
   /** Replace the upstream-input set (omitted = preserve; [] = clear). */
   upstream_roles?: string[];
   /** Recorded on the schema version snapshot when the update changes a schema field. */

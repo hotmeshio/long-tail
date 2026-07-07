@@ -14,11 +14,24 @@ Each station has three settings that define what "healthy" looks like — knowin
 
 | Field | Description |
 |-------|-------------|
-| `sla_minutes` | Target resolution time in minutes. Items older than this are counted as `in_arrears`. |
+| `sla_minutes` | Target resolution time in minutes. The default age threshold for the priority count. |
 | `target_per_hour` | Intended throughput — how many items should resolve per hour. Used to compute `throughput_pct` and the station's expected count on the pace chart. |
 | `worker_count` | Capacity at this station — number of staff or machines expected to be active. |
 
 These are set via `PATCH /api/roles/:role` or the Roles admin page.
+
+## Priority count
+
+Every station carries one age signal: `priority_count`, the number of **pending, unclaimed** items older than the station's threshold. It is deliberately a count, not a re-sorted queue — the floor rebalances coarsely, pulling the counted items to the front of the rack, rather than continuously re-ordering everything.
+
+Two per-role dials shape it, each with a fallback so the count works from `sla_minutes` alone:
+
+| Dial | Description |
+|------|-------------|
+| `priority_facet` | `lt_escalations.metadata` key holding each item's age origin as an ISO 8601 UTC timestamp (e.g. `authorized_at`, the date the order was authorized). Blank = age from `created_at`. When set, items missing the key or holding an unparseable value are not counted. |
+| `priority_threshold_minutes` | Max age before an item counts as priority. Blank = the station's `sla_minutes`. |
+
+Claimed items are excluded — they are already in someone's hands; the count is what still needs pulling forward. On the pace chart the count renders as a powder-blue circle at the station; clicking it (or the sub-row link in the station table) opens the station's queue ordered oldest-first by the same facet, so the counted items sit at the top.
 
 ## Pace chart
 
@@ -63,7 +76,7 @@ Below the chart, a flat table lists every station with its live numbers:
 | P99 WORK | 99th-percentile processing time (claimed → resolved) in minutes |
 | TREND | Mini fill bar + percentage — live backlog ratio while items queue, period throughput efficiency when idle |
 
-If a station has `in_arrears > 0`, a sub-row appears: `⚠ N items past SLA — view oldest first →`. The link opens the escalation queue sorted by `created_at` ascending, filtered to that role.
+If a station has `priority_count > 0`, a powder-blue sub-row appears: `N priority — pull oldest first →`. The link opens the escalation queue filtered to that role and ordered oldest-first by the station's priority facet (`created_at` when no facet is configured), so the counted items sit at the top.
 
 Clicking any row opens the station detail panel.
 
@@ -79,7 +92,7 @@ Close the panel with × or by clicking another row.
 
 ## Data source
 
-All station metrics come from `GET /api/escalations/station-metrics?period=<period>`. The endpoint runs two queries against `public.hmsh_escalations` joined to `lt_roles` (for `sla_minutes` and `target_per_hour`): a live-counts pass over the pending backlog, and a window-bounded percentile pass over resolved rows (`PERCENTILE_CONT` in Postgres, served by the `idx_hmsh_esc_resolved_cover` index). Updates reach the page as push events — every escalation write invalidates the metrics through the Socket.IO event system.
+All station metrics come from `GET /api/escalations/station-metrics?period=<period>`. The endpoint runs two queries against `public.hmsh_escalations` joined to `lt_roles` (for the priority dials and `target_per_hour`): a live-counts pass over the pending backlog, and a window-bounded percentile pass over resolved rows (`PERCENTILE_CONT` in Postgres, served by the `idx_hmsh_esc_resolved_cover` index). Updates reach the page as push events — every escalation write invalidates the metrics through the Socket.IO event system.
 
 `pending` is always the live count regardless of period. `resolved`, percentiles, and `throughput_pct` are scoped to the lookback window. See [`lt.escalations.getStationMetrics`](api/sdk/escalations.md#getstationmetrics) for the full response shape.
 

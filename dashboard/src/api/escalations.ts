@@ -70,7 +70,13 @@ export interface StationMetric {
   pending: number;
   claimed: number;
   resolved: number;
-  in_arrears: number;
+  /**
+   * Pending, unclaimed items past the role's threshold — the Pace Board
+   * rebalance signal. Age is measured from the role's priority_facet metadata
+   * timestamp (created_at when unset) against priority_threshold_minutes
+   * (sla_minutes when unset).
+   */
+  priority_count: number;
   throughput_pct: number | null;
   wait: StationMetricPeriod;
   work: StationMetricPeriod;

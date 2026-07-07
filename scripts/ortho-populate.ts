@@ -39,6 +39,12 @@
  * down gradually, and resolves feed the next station a trickle instead of a
  * wave.
  *
+ * Every escalation this run creates carries `metadata.authorized_at` — an ISO
+ * 8601 UTC timestamp stamped when the order arrives, identical across all of
+ * that order's stages (main line and shoe side-quest). Point a role's
+ * `priority_facet` at `authorized_at` with a threshold (e.g. 1 minute) and the
+ * Pace Board priority count lights up as orders age through the run.
+ *
  * ── The shoe side-quest ──────────────────────────────────────────────────────
  * A shoe order exercises the cross-sequence model (ordering → inserting feeds
  * ship via upstream_roles — its own Operations sequence, not a bend in the
@@ -172,6 +178,7 @@ async function createSideEscalation(
   orderId: string,
   runId: string,
   description: string,
+  authorizedAt: string,
 ): Promise<boolean> {
   try {
     await api('POST', '/api/escalations', {
@@ -181,7 +188,7 @@ async function createSideEscalation(
       description,
       workflow_id: workflowId,
       envelope: JSON.stringify({ order_id: orderId }),
-      metadata: { order_id: orderId, source: 'populate', run_id: runId },
+      metadata: { order_id: orderId, source: 'populate', run_id: runId, authorized_at: authorizedAt },
     });
     return true;
   } catch (err: any) {
@@ -252,12 +259,14 @@ async function resolveBatch(batchTag: string, runId: string): Promise<number> {
         console.log(`[${ts()}]   [resolve] ${esc.role.padEnd(9)} ${esc.id.slice(0, 8)}… held ${heldS.toFixed(1)}s [${totalResolved} total]`);
 
         // Shoes arrived — the side quest advances to inserting, which sits
-        // available until the manufactured inserts catch up with it.
+        // available until the manufactured inserts catch up with it. The
+        // order's authorized_at rides along from the ordering escalation.
         if (esc.role === 'ordering') {
           const orderId = esc.metadata?.order_id ?? '';
           await createSideEscalation(
             'inserting', esc.workflow_id, orderId, runId,
             `Stuff inserts into shoes for ${orderId}`,
+            esc.metadata?.authorized_at ?? new Date().toISOString(),
           );
         }
       } catch (err: any) {
@@ -290,10 +299,18 @@ async function runOrders(
   const enqueueLoop = async () => {
     for (const order of plan) {
       if (done) break;
+      // The order's authorization moment — stamped once at arrival and carried
+      // on every stage escalation via the workflow's metadata passthrough, so
+      // an `authorized_at` priority facet measures journey age.
+      const authorizedAt = new Date().toISOString();
       try {
         await api('POST', '/api/workflows/orthoPipeline/invoke', {
           workflowId: order.wfId,
-          data:     { order_id: order.orderId, item_type: 'insole-standard' },
+          data: {
+            order_id: order.orderId,
+            item_type: 'insole-standard',
+            metadata: { source: 'populate', run_id: runId, authorized_at: authorizedAt },
+          },
           metadata: { source: 'populate', run_id: runId, shoes: order.shoes },
         });
         workflowIds.push(order.wfId);
@@ -307,6 +324,7 @@ async function runOrders(
         const ok = await createSideEscalation(
           'ordering', `${order.wfId}-shoes`, order.orderId, runId,
           `Order shoes for ${order.orderId}`,
+          authorizedAt,
         );
         if (!ok) target.value -= 2;
       }

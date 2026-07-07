@@ -1,4 +1,5 @@
 import * as roleService from '../services/role';
+import { FACET_KEY } from '../services/escalation/facet-sql';
 import type { LTApiResult } from '../types/sdk';
 
 /**
@@ -185,6 +186,10 @@ export async function updateRole(input: {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  /** Max age (minutes) before a pending unclaimed item counts as priority on the Pace Board. Falls back to sla_minutes. */
+  priority_threshold_minutes?: number | null;
+  /** Escalation metadata key holding the age origin (ISO 8601 UTC timestamp). Falls back to created_at. */
+  priority_facet?: string | null;
   /** Replace the upstream-input set (omitted = preserve; null or [] = clear). */
   upstream_roles?: string[] | null;
   /** Recorded on the schema snapshot when this update changes a schema field. */
@@ -194,7 +199,7 @@ export async function updateRole(input: {
     if (!input.role) {
       return { status: 400, error: 'role is required' };
     }
-    for (const field of ['sla_minutes', 'target_per_hour', 'worker_count'] as const) {
+    for (const field of ['sla_minutes', 'target_per_hour', 'worker_count', 'priority_threshold_minutes'] as const) {
       const value = input[field];
       if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
         return { status: 400, error: `${field} must be a non-negative number or null` };
@@ -202,6 +207,9 @@ export async function updateRole(input: {
     }
     if (input.worker_count != null && !Number.isInteger(input.worker_count)) {
       return { status: 400, error: 'worker_count must be a whole number' };
+    }
+    if (input.priority_facet != null && (typeof input.priority_facet !== 'string' || !FACET_KEY.test(input.priority_facet))) {
+      return { status: 400, error: 'priority_facet must be a metadata key (letters, numbers, underscores) or null' };
     }
     if (input.ops_visible !== undefined && typeof input.ops_visible !== 'boolean') {
       return { status: 400, error: 'ops_visible must be a boolean' };
@@ -233,6 +241,8 @@ export async function updateRole(input: {
       sla_minutes: input.sla_minutes,
       target_per_hour: input.target_per_hour,
       worker_count: input.worker_count,
+      priority_threshold_minutes: input.priority_threshold_minutes,
+      priority_facet: input.priority_facet,
       upstream_roles: input.upstream_roles,
       change_summary: input.change_summary,
     });

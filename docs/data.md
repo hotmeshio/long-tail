@@ -22,6 +22,8 @@ Canonical role registry. Roles referenced by other tables are seeded here.
 | `sla_minutes` | `NUMERIC` | — | Target resolution time |
 | `target_per_hour` | `NUMERIC` | — | Throughput target |
 | `worker_count` | `NUMERIC` | — | Station capacity |
+| `priority_threshold_minutes` | `NUMERIC` | — | Priority age threshold; falls back to `sla_minutes` |
+| `priority_facet` | `TEXT` | — | Escalation metadata key holding the priority age origin (ISO 8601 UTC); falls back to `created_at` |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 
 **Seeds:** `reviewer`, `engineer`, `admin`, `superadmin`.

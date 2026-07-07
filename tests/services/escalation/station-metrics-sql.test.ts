@@ -20,7 +20,9 @@ const { Connection } = Durable;
 // backdated timestamps so the aggregates themselves are pinned:
 //
 //   wait = claimed_at - created_at, work = resolved_at - claimed_at,
-//   in_arrears = pending rows older than the role's sla_minutes,
+//   priority_count = pending UNCLAIMED rows older than the role's threshold
+//     (age from priority_facet metadata, created_at fallback; threshold from
+//     priority_threshold_minutes, sla_minutes fallback),
 //   resolved = closed within the window ONLY (window bounding),
 //   throughput_pct = resolved / (target_per_hour × window_hours) × 100.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,11 +54,12 @@ describe('station metrics SQL (integration)', () => {
     // Row 1 — fresh pending: counts toward pending only.
     await seedEscalation();
 
-    // Row 2 — pending, 10 minutes old with a 5-minute SLA: in_arrears.
-    const arrearsId = await seedEscalation();
+    // Row 2 — pending unclaimed, 10 minutes old with a 5-minute SLA: priority
+    // via the created_at fallback (no facet configured on this role).
+    const overdueId = await seedEscalation();
     await pool.query(
       `UPDATE public.hmsh_escalations SET created_at = NOW() - INTERVAL '10 minutes' WHERE id = $1`,
-      [arrearsId],
+      [overdueId],
     );
 
     // Row 3 — actively claimed (still status='pending' in the implicit model).
@@ -106,10 +109,10 @@ describe('station metrics SQL (integration)', () => {
     const s = stations[0];
 
     expect(s.role).toBe(ROLE);
-    // Rows 1 (fresh), 2 (in arrears), 3 (claimed) are the live backlog.
+    // Rows 1 (fresh), 2 (overdue), 3 (claimed) are the live backlog.
     expect(s.pending).toBe(3);
     expect(s.claimed).toBe(1);
-    expect(s.in_arrears).toBe(1);
+    expect(s.priority_count).toBe(1);
 
     // Only row 4 resolved inside the window — row 5 (2h old) is excluded.
     expect(s.resolved).toBe(1);
@@ -152,7 +155,7 @@ describe('station metrics SQL (integration)', () => {
       expect(s.pending).toBe(0);
       expect(s.claimed).toBe(0);
       expect(s.resolved).toBe(0);
-      expect(s.in_arrears).toBe(0);
+      expect(s.priority_count).toBe(0);
       expect(s.wait.p99).toBeNull();
       expect(s.work.p99).toBeNull();
       // Target configured but zero resolved → 0%, never null.

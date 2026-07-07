@@ -745,6 +745,8 @@ Update a role's metadata: display name, description, form schema, metadata schem
 | `sla_minutes` | `number \| null` | No | Target resolution time in minutes |
 | `target_per_hour` | `number \| null` | No | Throughput goal (items resolved per hour) |
 | `worker_count` | `number \| null` | No | Station capacity (staff or machines) |
+| `priority_threshold_minutes` | `number \| null` | No | Priority age threshold in minutes; falls back to `sla_minutes` |
+| `priority_facet` | `string \| null` | No | Metadata key for the priority age origin (ISO 8601 UTC); falls back to `created_at` |
 | `upstream_roles` | `string[] \| null` | No | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear) |
 | `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
 

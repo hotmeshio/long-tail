@@ -478,7 +478,7 @@ export async function getStationMetrics(
       pending: Number(c.pending ?? 0),
       claimed: Number(c.claimed ?? 0),
       resolved: Number(p?.resolved ?? 0),
-      in_arrears: Number(c.in_arrears ?? 0),
+      priority_count: Number(c.priority_count ?? 0),
       throughput_pct: p?.throughput_pct != null ? Number(p.throughput_pct) : null,
       wait: {
         p99: toNum(p?.p99_wait_min),

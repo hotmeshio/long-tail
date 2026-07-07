@@ -911,13 +911,13 @@ interface StationMetric {
   pending: number;        // currently queued (status = pending and not claimed)
   claimed: number;        // active — claimed and assignment not expired
   resolved: number;       // resolved within the lookback period
-  in_arrears: number;     // pending items older than sla_minutes
+  priority_count: number; // pending unclaimed items past the role's age threshold
   throughput_pct: number | null;  // resolved / (target_per_hour × hours) × 100
   wait: StationMetricPeriod;      // queue time: created_at → claimed_at
   work: StationMetricPeriod;      // processing time: claimed_at → resolved_at
 }
 ```
 
-`pending` reflects the live queue depth regardless of period. `claimed`, `resolved`, and both percentile objects use the lookback window. `in_arrears` is computed from `sla_minutes` on the role — stations without `sla_minutes` always return `0`. `throughput_pct` is `null` when `target_per_hour` is not set.
+`pending` reflects the live queue depth regardless of period. `claimed`, `resolved`, and both percentile objects use the lookback window. `priority_count` covers pending, unclaimed items whose age exceeds the role's threshold — age from the `priority_facet` metadata timestamp (`created_at` when unset) against `priority_threshold_minutes` (`sla_minutes` when unset); stations with neither threshold always return `0`. `throughput_pct` is `null` when `target_per_hour` is not set.
 
 **Auth:** Same RBAC as `getStats` — callers see only the stations for roles they hold.

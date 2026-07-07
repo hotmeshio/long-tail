@@ -28,6 +28,18 @@ export interface RoleDetail {
   /** Capacity at this station (people or machines). Part of the ops triangle. */
   worker_count: number | null;
   /**
+   * Max age (minutes) before a pending, unclaimed escalation counts toward the
+   * Pace Board priority count. Falls back to sla_minutes when null.
+   */
+  priority_threshold_minutes: number | null;
+  /**
+   * lt_escalations.metadata key holding the age origin for the priority count
+   * as an ISO 8601 UTC timestamp (e.g. the order's authorized date). Falls
+   * back to created_at when null. When set, items missing the key or holding
+   * an unparseable value are not counted.
+   */
+  priority_facet: string | null;
+  /**
    * Version of the live form_schema/metadata_schema pair. Advances whenever a
    * schema field changes; each version is snapshotted in lt_role_schemas so
    * escalations can pin the exact schema they were created against. Null until
@@ -79,6 +91,8 @@ export interface UpdateRoleInput {
   sla_minutes?: number | null;
   target_per_hour?: number | null;
   worker_count?: number | null;
+  priority_threshold_minutes?: number | null;
+  priority_facet?: string | null;
   /**
    * Replace the upstream-input set (omitted = preserve; null or [] = clear).
    * Every entry must name an existing role other than this one.
