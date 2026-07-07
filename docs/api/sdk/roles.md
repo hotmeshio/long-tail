@@ -30,6 +30,8 @@ interface RoleDetail {
   sla_minutes: number | null;
   target_per_hour: number | null;
   worker_count: number | null;
+  priority_threshold_minutes: number | null;
+  priority_facet: string | null;
   user_count: number;
   chain_count: number;
   workflow_count: number;
@@ -46,9 +48,11 @@ interface RoleDetail {
 | `properties` | Free user-owned bag — arbitrary config stored on the role |
 | `ops_visible` | When `true`, the role appears as a station on the Operations view |
 | `parent_role` | Parent role in the process dependency graph; drives the pace chart dependency ordering |
-| `sla_minutes` | SLA target in minutes — items older than this appear in `in_arrears` in station metrics |
+| `sla_minutes` | SLA target in minutes — the default age threshold for `priority_count` in station metrics |
 | `target_per_hour` | Throughput target used to compute `throughput_pct` in station metrics |
 | `worker_count` | Station capacity — number of workers expected to be active |
+| `priority_threshold_minutes` | Max age before a pending unclaimed item counts toward `priority_count`; falls back to `sla_minutes` |
+| `priority_facet` | Escalation metadata key holding the age origin as an ISO 8601 UTC timestamp (e.g. `authorized_at`); falls back to `created_at` |
 | `user_count` | Number of users currently assigned to this role |
 | `chain_count` | Number of escalation chain links originating from this role |
 | `workflow_count` | Number of registered workflows that target this role |
@@ -269,6 +273,8 @@ const result = await lt.roles.update({
 | `sla_minutes` | `number \| null` | No | SLA target in minutes |
 | `target_per_hour` | `number \| null` | No | Throughput target (items per hour) |
 | `worker_count` | `number \| null` | No | Station capacity |
+| `priority_threshold_minutes` | `number \| null` | No | Priority age threshold in minutes; falls back to `sla_minutes` |
+| `priority_facet` | `string \| null` | No | Metadata key for the priority age origin; falls back to `created_at` |
 | `upstream_roles` | `string[] \| null` | No | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Distinct from `parent_role`, which places the role in its own sequence |
 | `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
 

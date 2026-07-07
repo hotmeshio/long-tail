@@ -70,9 +70,9 @@ export const DELETE_ROLE = `
  * evaluated against the pre-update row), current_schema_version advances and
  * the post-update schema pair is snapshotted into lt_role_schemas. A no-change
  * save leaves the version alone and the snapshot INSERT conflicts away.
- * $22 = optional change summary recorded on the snapshot.
+ * $26 = optional change summary recorded on the snapshot.
  *
- * Upstream inputs ($23 = provided sentinel, $24 = replacement set) sync in the
+ * Upstream inputs ($27 = provided sentinel, $28 = replacement set) sync in the
  * same statement with replace semantics. The two CTEs deliberately avoid
  * touching the same row: the DELETE only removes rows leaving the set, and the
  * INSERT's ON CONFLICT DO NOTHING skips rows that stay (delete+insert of the
@@ -91,6 +91,9 @@ export const UPDATE_ROLE_METADATA = `
       sla_minutes     = CASE WHEN $16::boolean THEN $17::numeric                      ELSE sla_minutes     END,
       target_per_hour = CASE WHEN $18::boolean THEN $19::numeric                      ELSE target_per_hour END,
       worker_count    = CASE WHEN $20::boolean THEN $21::int                          ELSE worker_count    END,
+      priority_threshold_minutes
+                      = CASE WHEN $22::boolean THEN $23::numeric                      ELSE priority_threshold_minutes END,
+      priority_facet  = CASE WHEN $24::boolean THEN $25                               ELSE priority_facet  END,
       current_schema_version = CASE
         WHEN ($6::boolean AND $7::jsonb IS DISTINCT FROM form_schema)
           OR ($8::boolean AND $9::jsonb IS DISTINCT FROM metadata_schema)
@@ -100,20 +103,21 @@ export const UPDATE_ROLE_METADATA = `
     RETURNING
       role, title, description, form_schema, metadata_schema, properties,
       ops_visible, parent_role, sla_minutes, target_per_hour, worker_count,
+      priority_threshold_minutes, priority_facet,
       current_schema_version
   ), snapshot AS (
     INSERT INTO lt_role_schemas (role, version, form_schema, metadata_schema, change_summary)
-    SELECT role, current_schema_version, form_schema, metadata_schema, $22
+    SELECT role, current_schema_version, form_schema, metadata_schema, $26
     FROM updated
     WHERE ($6::boolean OR $8::boolean) AND current_schema_version IS NOT NULL
     ON CONFLICT (role, version) DO NOTHING
   ), upstream_prune AS (
     DELETE FROM lt_role_upstreams
-    WHERE $23::boolean AND role = $1 AND upstream_role <> ALL($24::text[])
+    WHERE $27::boolean AND role = $1 AND upstream_role <> ALL($28::text[])
   ), upstream_add AS (
     INSERT INTO lt_role_upstreams (role, upstream_role)
-    SELECT $1, u FROM unnest($24::text[]) AS u
-    WHERE $23::boolean
+    SELECT $1, u FROM unnest($28::text[]) AS u
+    WHERE $27::boolean
     ON CONFLICT DO NOTHING
   )
   SELECT * FROM updated`;
@@ -202,6 +206,8 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.sla_minutes,
     r.target_per_hour,
     r.worker_count,
+    r.priority_threshold_minutes,
+    r.priority_facet,
     r.current_schema_version,
     COALESCE(up.ups, '{}') AS upstream_roles,
     COALESCE(uc.cnt, 0) AS user_count,

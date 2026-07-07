@@ -194,7 +194,7 @@ LEFT JOIN resolved ON resolved.id = target.id`;
 // path is wasteful: percentile aggregates sort every qualifying resolved row,
 // while the live counts are cheap and bounded. So the two halves are separated:
 //
-//   STATION_LIVE_COUNTS_SQL    — pending / claimed / in_arrears. Cheap, always
+//   STATION_LIVE_COUNTS_SQL    — pending / claimed / priority_count. Cheap, always
 //                                run fresh. Scans only pending rows (backlog is
 //                                bounded no matter how much history accrues).
 //   STATION_PERIOD_METRICS_SQL — resolved / throughput / latency percentiles.
@@ -207,17 +207,34 @@ LEFT JOIN resolved ON resolved.id = target.id`;
 // ---------------------------------------------------------------------------
 
 /**
- * Live counts — pending, active claims, and past-SLA (in_arrears) per role.
+ * Live counts — pending, active claims, and priority (past-threshold) per role.
  *
  * $1 TEXT[] — role filter (NULL = all roles / superadmin).
  *
  * Hits idx_hmsh_esc_pending_role_created (role, created_at DESC) WHERE
  * status='pending'. The pending working set is bounded by real backlog depth,
  * so this stays cheap as historical volume grows — safe on the hot refresh path.
+ *
+ * priority_count is the Pace Board rebalance signal: pending AND unclaimed
+ * items older than the role's threshold. One signal, two per-role dials with
+ * fallbacks so it works from sla_minutes alone:
+ *
+ *   age origin — priority_facet metadata key (an ISO 8601 UTC timestamp, e.g.
+ *                the order's authorized date) when set, else created_at.
+ *   threshold  — priority_threshold_minutes when set, else sla_minutes.
+ *
+ * Claimed items are excluded — they are already in someone's hands; the count
+ * is what the floor must still pull forward. The GIN metadata index only
+ * serves containment, not age comparisons, so the facet read rides the same
+ * bounded pending scan as the other counts. The cast is guarded by
+ * pg_input_is_valid inside a CASE (Postgres does not promise AND evaluation
+ * order) so one malformed metadata value can never break the stats query;
+ * with a facet configured, items missing the key or holding an unparseable
+ * value do not count (NULL age never passes the comparison).
  */
 export const STATION_LIVE_COUNTS_SQL = `
 WITH role_targets AS (
-  SELECT role, sla_minutes
+  SELECT role, sla_minutes, priority_threshold_minutes, priority_facet
   FROM lt_roles
   WHERE ($1::text[] IS NULL OR role = ANY($1::text[]))
 ),
@@ -227,9 +244,15 @@ live_counts AS (
     COUNT(*)                                                                         AS pending,
     COUNT(*) FILTER (WHERE e.assigned_to IS NOT NULL AND e.assigned_until > NOW())  AS claimed,
     COUNT(*) FILTER (
-      WHERE rt.sla_minutes IS NOT NULL
-        AND e.created_at < NOW() - (rt.sla_minutes * INTERVAL '1 minute')
-    )                                                                                AS in_arrears
+      WHERE COALESCE(rt.priority_threshold_minutes, rt.sla_minutes) IS NOT NULL
+        AND (e.assigned_to IS NULL OR e.assigned_until IS NULL OR e.assigned_until <= NOW())
+        AND CASE
+          WHEN rt.priority_facet IS NULL THEN e.created_at
+          WHEN pg_input_is_valid(e.metadata->>rt.priority_facet, 'timestamptz')
+            THEN (e.metadata->>rt.priority_facet)::timestamptz
+          ELSE NULL
+        END < NOW() - (COALESCE(rt.priority_threshold_minutes, rt.sla_minutes) * INTERVAL '1 minute')
+    )                                                                                AS priority_count
   FROM hmsh_escalations e
   JOIN role_targets rt ON rt.role = e.role
   WHERE e.status = 'pending'
@@ -237,9 +260,9 @@ live_counts AS (
 )
 SELECT
   rt.role,
-  COALESCE(lc.pending,    0) AS pending,
-  COALESCE(lc.claimed,    0) AS claimed,
-  COALESCE(lc.in_arrears, 0) AS in_arrears
+  COALESCE(lc.pending,        0) AS pending,
+  COALESCE(lc.claimed,        0) AS claimed,
+  COALESCE(lc.priority_count, 0) AS priority_count
 FROM role_targets rt
 LEFT JOIN live_counts lc ON lc.role = rt.role
 ORDER BY rt.role

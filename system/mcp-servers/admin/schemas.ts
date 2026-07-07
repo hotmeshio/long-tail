@@ -11,6 +11,8 @@
  */
 import { z } from 'zod';
 
+import { FACET_KEY } from '../../../services/escalation/facet-sql';
+
 // ── tasks (routes/tasks.ts) ─────────────────────────────────────────────────
 
 export const findTasksSchema = z.object({
@@ -285,6 +287,8 @@ export const updateRoleSchema = z.object({
   sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. One of the capacity settings: target_per_hour = worker_count / (sla_minutes / 60)'),
   target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the station pace baseline on the Operations view.'),
   worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
+  priority_threshold_minutes: z.number().min(0).nullable().optional().describe('Max age in minutes before a pending unclaimed escalation counts toward the Pace Board priority count. Falls back to sla_minutes when null.'),
+  priority_facet: z.string().regex(FACET_KEY).nullable().optional().describe('lt_escalations.metadata key holding the age origin for the priority count as an ISO 8601 UTC timestamp (e.g. authorized_at). Falls back to created_at when null. When set, items missing the key or holding an unparseable value are not counted.'),
   upstream_roles: z.array(z.string()).nullable().optional().describe('Replace the set of roles this station draws input from across other sequences (parent_role stays the single prior step in its own sequence). Omitted = preserve; null or [] = clear.'),
   change_summary: z.string().optional().describe('Recorded on the schema version snapshot when this update changes form_schema or metadata_schema'),
 });

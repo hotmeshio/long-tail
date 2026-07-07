@@ -219,6 +219,8 @@ interface Draft {
   sla_minutes: string;
   target_per_hour: string;
   worker_count: string;
+  priority_threshold_minutes: string;
+  priority_facet: string;
 }
 
 function draftFrom(role: RoleDetail): Draft {
@@ -232,8 +234,14 @@ function draftFrom(role: RoleDetail): Draft {
     sla_minutes: role.sla_minutes != null ? String(role.sla_minutes) : '',
     target_per_hour: role.target_per_hour != null ? String(role.target_per_hour) : '',
     worker_count: role.worker_count != null ? String(role.worker_count) : '',
+    priority_threshold_minutes: role.priority_threshold_minutes != null ? String(role.priority_threshold_minutes) : '',
+    priority_facet: role.priority_facet ?? '',
   };
 }
+
+// Mirrors the server-side facet key rule (metadata keys are interpolated as a
+// JSON path, so they are strictly validated).
+const FACET_KEY = /^[a-zA-Z0-9_]+$/;
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -251,10 +259,11 @@ export function RoleDetailPage() {
     title: '', description: '', ops_visible: false, parent_role: '',
     metadata_schema: '', properties: '{}',
     sla_minutes: '', target_per_hour: '', worker_count: '',
+    priority_threshold_minutes: '', priority_facet: '',
   });
   const [dirty, setDirty] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
-  const [errors, setErrors] = useState<{ metadata_schema?: string; properties?: string }>({});
+  const [errors, setErrors] = useState<{ metadata_schema?: string; properties?: string; priority_facet?: string }>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editingJson, setEditingJson] = useState(new Set<string>());
 
@@ -294,9 +303,11 @@ export function RoleDetailPage() {
   const handleSave = () => {
     const metaResult = safeParseJson(draft.metadata_schema);
     const propsResult = safeParseJson(draft.properties);
+    const facet = draft.priority_facet.trim();
     const newErrors: typeof errors = {};
     if (!metaResult.ok) newErrors.metadata_schema = 'Invalid JSON';
     if (!propsResult.ok) newErrors.properties = 'Invalid JSON';
+    if (facet && !FACET_KEY.test(facet)) newErrors.priority_facet = 'Letters, numbers, underscores only';
     setErrors(newErrors);
     if (Object.keys(newErrors).length || !role) return;
 
@@ -316,6 +327,8 @@ export function RoleDetailPage() {
         sla_minutes: parseNum(draft.sla_minutes),
         target_per_hour: parseNum(draft.target_per_hour),
         worker_count: parseCount(draft.worker_count),
+        priority_threshold_minutes: parseNum(draft.priority_threshold_minutes),
+        priority_facet: facet || null,
       },
       {
         onSuccess: () => {
@@ -371,31 +384,53 @@ export function RoleDetailPage() {
 
   return (
     <div>
-      {/* ── Header: identity · capacity set · ops toggle + actions ── */}
-      <div className="flex items-start justify-between gap-8 mb-12">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <Tag className="w-5 h-5 text-accent" strokeWidth={1.5} />
-            <h1 className="text-lg font-mono font-medium text-text-primary">{role.role}</h1>
-            <button
-              onClick={() => { window.location.hash = '#docs:dashboard.md:role-detail'; }}
-              className="text-text-quaternary hover:text-accent transition-colors"
-              title="Open docs for this page"
-            >
-              <BookOpen className="w-4 h-4" strokeWidth={1.5} />
-            </button>
-            {role.parent_role && (
-              <span className="flex items-center gap-1 text-[10px] text-text-quaternary font-mono">
-                <GitBranch className="w-3 h-3" /> {role.parent_role}
-              </span>
-            )}
+      {/* ── Header: mirrors the three-column body grid so each section sits
+          exactly atop its column — identity + ops · capacity · priority + actions ── */}
+      <div className="grid grid-cols-3 gap-16 items-center mb-12">
+        {/* Col 1: identity, with the Ops toggle at the column's right edge */}
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 mb-1">
+              <Tag className="w-5 h-5 text-accent" strokeWidth={1.5} />
+              <h1 className="text-lg font-mono font-medium text-text-primary">{role.role}</h1>
+              <button
+                onClick={() => { window.location.hash = '#docs:dashboard.md:role-detail'; }}
+                className="text-text-quaternary hover:text-accent transition-colors"
+                title="Open docs for this page"
+              >
+                <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              {role.parent_role && (
+                <span className="flex items-center gap-1 text-[10px] text-text-quaternary font-mono">
+                  <GitBranch className="w-3 h-3" /> {role.parent_role}
+                </span>
+              )}
+            </div>
+            {role.title && <p className="text-sm text-text-secondary pl-8">{role.title}</p>}
           </div>
-          {role.title && <p className="text-sm text-text-secondary pl-8">{role.title}</p>}
+
+          {/* Ops — this role is (or isn't) a station on the Pace Board */}
+          <div className="flex items-center gap-2 shrink-0" title="Show as a station on the Pace Board">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Ops</span>
+            <button
+              onClick={() => update({ ops_visible: !draft.ops_visible })}
+              className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
+                draft.ops_visible ? 'bg-accent' : 'bg-surface-border'
+              }`}
+            >
+              <span
+                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
+                  draft.ops_visible ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
-        {/* Capacity — one grouped set, centered. Any two settings derive the third. */}
+        {/* Col 2: capacity — full column width, settings centered atop the
+            column below. Any two settings derive the third. */}
         <div
-          className="flex items-end gap-4 bg-surface-sunken rounded-lg px-4 py-2.5 shrink-0 mx-auto"
+          className="flex items-end justify-center gap-4 bg-surface-sunken rounded-lg px-4 py-2.5 w-full"
           title="throughput = workers / (sla / 60)"
         >
           {[
@@ -426,48 +461,73 @@ export function RoleDetailPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Ops — on the same line as Save: this role is (or isn't) a station */}
-          <div className="flex items-center gap-2" title="Show as a station on the Pace Board">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Ops</span>
-            <button
-              onClick={() => update({ ops_visible: !draft.ops_visible })}
-              className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
-                draft.ops_visible ? 'bg-accent' : 'bg-surface-border'
-              }`}
-            >
-              <span
-                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
-                  draft.ops_visible ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                }`}
-              />
-            </button>
-          </div>
-          {savedOk && (
-            <span className="flex items-center gap-1 text-xs text-status-success animate-page-enter">
-              <Check className="w-3 h-3" /> Saved
-            </span>
-          )}
-          {updateRole.error && (
-            <span className="text-xs text-status-error max-w-[180px] truncate">
-              {(updateRole.error as Error).message}
-            </span>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={!canSave || updateRole.isPending}
-            className="px-3 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        {/* Col 3: priority left-aligned to the column edge, actions at the right.
+            Pending unclaimed items older than the threshold appear as the Pace
+            Board priority count, ordered by the facet for the pull. */}
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <div
+            className="flex items-end gap-4 bg-surface-sunken rounded-lg px-4 py-2.5 shrink-0"
+            title="Pending unclaimed items older than the threshold count as priority on the Pace Board. Age is measured from the metadata facet (an ISO 8601 UTC timestamp, e.g. authorized_at) or from created_at when the facet is blank; the threshold falls back to SLA when blank."
           >
-            {updateRole.isPending ? 'Saving…' : 'Save Role'}
-          </button>
-          {!inUse && (
+            <div>
+              <label className="block text-[9px] font-semibold uppercase tracking-widest text-text-quaternary mb-1">
+                Priority
+                <span className="normal-case font-normal ml-1">min</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={draft.priority_threshold_minutes}
+                onChange={(e) => update({ priority_threshold_minutes: e.target.value })}
+                placeholder={draft.sla_minutes || '60'}
+                className="input text-xs w-16 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[9px] font-semibold uppercase tracking-widest text-text-quaternary mb-1">
+                Facet
+              </label>
+              <input
+                type="text"
+                value={draft.priority_facet}
+                onChange={(e) => update({ priority_facet: e.target.value })}
+                placeholder="created_at"
+                className="input text-xs w-28 font-mono"
+              />
+              {errors.priority_facet && (
+                <p className="text-[9px] text-status-error mt-0.5">{errors.priority_facet}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {savedOk && (
+              <span className="flex items-center gap-1 text-xs text-status-success animate-page-enter">
+                <Check className="w-3 h-3" /> Saved
+              </span>
+            )}
+            {updateRole.error && (
+              <span className="text-xs text-status-error max-w-[180px] truncate">
+                {(updateRole.error as Error).message}
+              </span>
+            )}
             <button
-              onClick={() => setConfirmDelete(true)}
-              className="px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors flex items-center gap-1"
+              onClick={handleSave}
+              disabled={!canSave || updateRole.isPending}
+              className="px-3 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Trash2 className="w-3 h-3" /> Delete
+              {updateRole.isPending ? 'Saving…' : 'Save'}
             </button>
-          )}
+            {!inUse && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

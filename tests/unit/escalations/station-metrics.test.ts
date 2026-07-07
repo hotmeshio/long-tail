@@ -50,7 +50,7 @@ describe('getStationMetrics', () => {
       pending: 5,
       claimed: 1,
       resolved: 42,
-      in_arrears: 0,
+      priority_count: 0,
       throughput_pct: '87.5',
       p99_wait_min: '0.017',
       p50_wait_min: '0.012',
@@ -146,6 +146,18 @@ describe('getStationMetrics', () => {
     expect(station.resolved).toBe(42);
     expect(station.throughput_pct).toBe(87.5);
     expect(station.work.p99).toBeCloseTo(0.667);
+  });
+
+  it('maps priority_count from the live row to a number', async () => {
+    mockQuery.mockResolvedValue({ rows: [mockRow({ priority_count: '3' })] });
+    const [station] = await getStationMetrics(undefined, '24h');
+    expect(station.priority_count).toBe(3);
+  });
+
+  it('defaults priority_count to 0 when the SQL column is absent', async () => {
+    mockQuery.mockResolvedValue({ rows: [mockRow({ priority_count: undefined })] });
+    const [station] = await getStationMetrics(undefined, '24h');
+    expect(station.priority_count).toBe(0);
   });
 
   it('serves period metrics from cache on a repeat call but re-queries live counts', async () => {

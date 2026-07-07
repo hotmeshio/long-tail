@@ -445,7 +445,7 @@ RBAC: `superadmin` sees all stations; other roles see only stations for their as
       "pending": 12,
       "claimed": 3,
       "resolved": 45,
-      "in_arrears": 2,
+      "priority_count": 2,
       "throughput_pct": 112.5,
       "wait": {
         "p99": 18.3,
@@ -472,7 +472,7 @@ RBAC: `superadmin` sees all stations; other roles see only stations for their as
 | `pending` | `number` | Escalations currently pending (real-time) |
 | `claimed` | `number` | Escalations actively claimed (real-time) |
 | `resolved` | `number` | Escalations resolved within the selected period |
-| `in_arrears` | `number` | Pending escalations that have exceeded the role's `sla_minutes` target |
+| `priority_count` | `number` | Pending, unclaimed escalations past the role's age threshold — the Pace Board rebalance signal |
 | `throughput_pct` | `number \| null` | `resolved / (target_per_hour × period_hours) × 100`. `null` when the role has no `target_per_hour` set |
 | `wait.p99` | `number \| null` | 99th-percentile wait time in minutes (creation → first claim) within the period. `null` when no resolved items |
 | `wait.p50` | `number \| null` | Median wait time in minutes |
@@ -486,7 +486,7 @@ RBAC: `superadmin` sees all stations; other roles see only stations for their as
 **Notes:**
 - `pending` and `claimed` reflect the live queue state, not the selected period.
 - `throughput_pct` above 100 means the station resolved more than its target — ahead of schedule. Below 100 means behind.
-- `in_arrears` counts items whose age exceeds the role's `sla_minutes`; it is 0 when `sla_minutes` is not configured for the role.
+- `priority_count` measures age from the role's `priority_facet` metadata timestamp (`created_at` when unset) against `priority_threshold_minutes` (`sla_minutes` when unset); it is 0 when neither threshold is configured. Claimed items are excluded. With a facet configured, items missing the key or holding an unparseable value are not counted.
 - Time values are in decimal minutes.
 
 **Example:** Fetch station metrics for the last hour:

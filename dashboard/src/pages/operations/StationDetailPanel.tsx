@@ -4,6 +4,8 @@ import { X, ExternalLink } from 'lucide-react';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
 import type { RoleDetail } from '../../api/roles';
+import { PRIORITY_TEXT_COLOR } from './PaceChart';
+import { priorityQueueLink } from './priority-link';
 
 interface StationDetailPanelProps {
   role: RoleDetail | null;
@@ -142,7 +144,7 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         </div>
       </div>
 
-      {/* SLA + arrears */}
+      {/* SLA + priority */}
       <div className="border-t border-surface-border/40 pt-2 mt-3 space-y-1.5">
         {slaMinutes && (
           <div className="flex items-center justify-between">
@@ -150,13 +152,15 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
             <span className="text-xs font-mono text-text-secondary">{slaMinutes}m</span>
           </div>
         )}
-        {metric && metric.in_arrears > 0 && (
+        {metric && metric.priority_count > 0 && (
           <Link
-            to={`/escalations/available?role=${encodeURIComponent(metric.role)}&sort_by=created_at&order=asc`}
+            to={priorityQueueLink(role)}
             className="flex items-center justify-between group"
           >
-            <span className="text-[10px] text-red-500">{metric.in_arrears} past SLA</span>
-            <ExternalLink className="w-3 h-3 text-red-400 group-hover:text-red-500 transition-colors" />
+            <span className="text-[10px]" style={{ color: PRIORITY_TEXT_COLOR }}>
+              {metric.priority_count} priority — pull oldest first
+            </span>
+            <ExternalLink className="w-3 h-3 transition-colors" style={{ color: PRIORITY_TEXT_COLOR }} />
           </Link>
         )}
       </div>
@@ -186,12 +190,12 @@ function OverviewPanel({
   orderedRoles: RoleDetail[];
   period: string;
 }) {
-  const totalPending  = allMetrics.reduce((s, m) => s + m.pending,    0);
-  const totalResolved = allMetrics.reduce((s, m) => s + m.resolved,   0);
-  const totalArrears  = allMetrics.reduce((s, m) => s + m.in_arrears, 0);
+  const totalPending  = allMetrics.reduce((s, m) => s + m.pending,        0);
+  const totalResolved = allMetrics.reduce((s, m) => s + m.resolved,       0);
+  const totalPriority = allMetrics.reduce((s, m) => s + m.priority_count, 0);
 
   const metricByRole    = new Map(allMetrics.map((m) => [m.role, m]));
-  const stationsAtRisk  = allMetrics.filter((m) => m.in_arrears > 0).length;
+  const stationsAtRisk  = allMetrics.filter((m) => m.priority_count > 0).length;
   const stationsWithLoad = allMetrics.filter((m) => m.pending > 0).length;
 
   return (
@@ -203,8 +207,8 @@ function OverviewPanel({
       {/* Health headline */}
       <div className="mb-4">
         {stationsAtRisk > 0 ? (
-          <p className="text-[11px] text-red-400">
-            {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} past SLA
+          <p className="text-[11px]" style={{ color: PRIORITY_TEXT_COLOR }}>
+            {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} with priority items
           </p>
         ) : stationsWithLoad > 0 ? (
           <p className="text-[11px] text-amber-400">
@@ -229,10 +233,12 @@ function OverviewPanel({
           <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Resolved · {period}</span>
           <span className="text-xs font-mono tabular-nums text-text-secondary">{totalResolved}</span>
         </div>
-        {totalArrears > 0 && (
+        {totalPriority > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Past SLA</span>
-            <span className="text-xs font-mono tabular-nums text-red-500 font-semibold">{totalArrears}</span>
+            <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Priority</span>
+            <span className="text-xs font-mono tabular-nums font-semibold" style={{ color: PRIORITY_TEXT_COLOR }}>
+              {totalPriority}
+            </span>
           </div>
         )}
       </div>
@@ -250,30 +256,32 @@ function OverviewPanel({
       {/* Station list in pipeline order */}
       <div className="space-y-0.5">
         {orderedRoles.map((r) => {
-          const m         = metricByRole.get(r.role);
-          const pending   = m?.pending    ?? 0;
-          const claimed   = m?.claimed    ?? 0;
-          const resolved  = m?.resolved   ?? 0;
-          const inArrears = m?.in_arrears ?? 0;
-          const label     = r.title || r.role;
-          const hasAlert  = inArrears > 0;
-          const hasLoad   = pending > 0;
+          const m             = metricByRole.get(r.role);
+          const pending       = m?.pending        ?? 0;
+          const claimed       = m?.claimed        ?? 0;
+          const resolved      = m?.resolved       ?? 0;
+          const priorityCount = m?.priority_count ?? 0;
+          const label         = r.title || r.role;
+          const hasAlert      = priorityCount > 0;
+          const hasLoad       = pending > 0;
 
           return (
             <div key={r.role} className="flex items-center gap-2 py-0.5">
               <span
                 className={`text-[10px] font-mono flex-1 truncate ${
-                  hasAlert ? 'text-red-400' : hasLoad ? 'text-text-primary' : 'text-text-quaternary'
+                  hasLoad ? 'text-text-primary' : 'text-text-quaternary'
                 }`}
               >
                 {label}
                 {hasAlert && (
-                  <span className="ml-1 text-[8px] text-red-400 font-semibold">SLA</span>
+                  <span className="ml-1 text-[8px] font-semibold" style={{ color: PRIORITY_TEXT_COLOR }}>
+                    {priorityCount} PRIORITY
+                  </span>
                 )}
               </span>
               <span
                 className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${
-                  hasAlert ? 'text-red-400' : hasLoad ? 'text-text-primary font-semibold' : 'text-text-quaternary'
+                  hasLoad ? 'text-text-primary font-semibold' : 'text-text-quaternary'
                 }`}
               >
                 {pending > 0 ? pending : '—'}

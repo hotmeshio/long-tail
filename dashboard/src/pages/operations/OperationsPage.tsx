@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, GitMerge, RefreshCw } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { GitMerge, RefreshCw } from 'lucide-react';
 import { useRoleDetails, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
@@ -11,9 +11,12 @@ import {
   ACTIVE_COLOR,
   QUEUED_COLOR,
   RESOLVED_COLOR,
+  PRIORITY_COLOR,
+  PRIORITY_TEXT_COLOR,
   type ChartStation,
 } from './PaceChart';
 import { StationDetailPanel } from './StationDetailPanel';
+import { priorityQueueLink } from './priority-link';
 
 // Column band tints — the same hues as the chart's queue-composition bands
 // (~8% alpha), so PENDING/ACTIVE/RESOLVED in the table visually continue the
@@ -146,7 +149,7 @@ function StationRow({
   const pending = metric?.pending ?? 0;
   const claimed = metric?.claimed ?? 0;
   const resolved = metric?.resolved ?? 0;
-  const inArrears = metric?.in_arrears ?? 0;
+  const priorityCount = metric?.priority_count ?? 0;
   const target = role.target_per_hour ?? null;
   const { pct, color, historical } = loadBar(pending, target, metric?.throughput_pct ?? null, resolved);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
@@ -255,16 +258,20 @@ function StationRow({
         </div>
       </div>
 
-      {/* In-arrears sub-row */}
-      {inArrears > 0 && (
+      {/* Priority sub-row — unclaimed items past the role's age threshold */}
+      {priorityCount > 0 && (
         <div className="flex items-center gap-1.5 pb-2 pl-1">
-          <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: PRIORITY_COLOR }}
+          />
           <Link
-            to={`/escalations/available?role=${encodeURIComponent(role.role)}&sort_by=created_at&order=asc`}
-            className="text-[10px] text-red-400 hover:text-red-500 hover:underline"
+            to={priorityQueueLink(role)}
+            className="text-[10px] hover:underline"
+            style={{ color: PRIORITY_TEXT_COLOR }}
             onClick={(e) => e.stopPropagation()}
           >
-            {inArrears} past SLA — view oldest first →
+            {priorityCount} priority — pull oldest first →
           </Link>
         </div>
       )}
@@ -397,6 +404,16 @@ export function OperationsPage() {
     [fragments, selectFragment],
   );
 
+  // Priority-badge click — open the station's queue oldest-first by its facet.
+  const navigate = useNavigate();
+  const handlePrioritySelect = useCallback(
+    (roleName: string) => {
+      const detail = roles.find((r) => r.role === roleName);
+      if (detail) navigate(priorityQueueLink(detail));
+    },
+    [roles, navigate],
+  );
+
   const selectedRoleDetail =
     ordered.find(({ role }) => role.role === selectedRole)?.role ?? null;
 
@@ -512,6 +529,7 @@ export function OperationsPage() {
                 selectedRole={selectedRole}
                 onSelect={handleSelect}
                 onUpstreamSelect={handleUpstreamSelect}
+                onPrioritySelect={handlePrioritySelect}
                 periodHours={PERIOD_HOURS[period]}
               />
             </div>

@@ -250,6 +250,8 @@ Returns all roles with metadata and usage counts.
       "sla_minutes": 30,
       "target_per_hour": 20,
       "worker_count": 4,
+      "priority_threshold_minutes": null,
+      "priority_facet": null,
       "user_count": 5,
       "chain_count": 2,
       "workflow_count": 3
@@ -270,6 +272,8 @@ Returns all roles with metadata and usage counts.
 | `sla_minutes` | `number \| null` | Target resolution time in minutes (capacity setting) |
 | `target_per_hour` | `number \| null` | Intended throughput — items resolved per hour (capacity setting) |
 | `worker_count` | `number \| null` | Capacity at this station — staff or machine count (capacity setting) |
+| `priority_threshold_minutes` | `number \| null` | Max age (minutes) before a pending unclaimed item counts toward `priority_count` in station metrics; falls back to `sla_minutes` |
+| `priority_facet` | `string \| null` | Escalation metadata key holding the age origin as an ISO 8601 UTC timestamp (e.g. `authorized_at`); falls back to `created_at` |
 | `user_count` | `number` | Number of users assigned this role |
 | `chain_count` | `number` | Number of escalation chain entries referencing this role |
 | `workflow_count` | `number` | Number of workflow configs that reference this role |
@@ -366,6 +370,8 @@ When the update changes `form_schema` or `metadata_schema`, the new pair is snap
 | `sla_minutes` | `number \| null` | SLA target in minutes |
 | `target_per_hour` | `number \| null` | Throughput target (items per hour) |
 | `worker_count` | `number \| null` | Station capacity |
+| `priority_threshold_minutes` | `number \| null` | Priority age threshold in minutes; falls back to `sla_minutes` |
+| `priority_facet` | `string \| null` | Metadata key for the priority age origin (letters, numbers, underscores); falls back to `created_at` |
 | `upstream_roles` | `string[] \| null` | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Every entry must name an existing role other than this one. Distinct from `parent_role`, which places the role in its own sequence. |
 | `change_summary` | `string` | Label recorded on the schema version snapshot when this update changes a schema field |
 

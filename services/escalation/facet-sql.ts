@@ -13,7 +13,8 @@ import type { FacetOrder, FacetQuery, FacetRange } from '../../types';
 const ORDER_COLUMNS = new Set(['priority', 'created_at', 'updated_at', 'status', 'role']);
 const RANGE_OPS = new Set(['<', '<=', '>', '>=', '=']);
 // Metadata keys are interpolated (as a JSON path), so they are strictly validated.
-const FACET_KEY = /^[a-zA-Z0-9_]+$/;
+// Exported so role config (priority_facet) validates keys against the same rule.
+export const FACET_KEY = /^[a-zA-Z0-9_]+$/;
 
 /** A metadata extraction expression for a validated key (text or numeric). */
 function metaExpr(key: string, numeric = false): string {

@@ -175,6 +175,8 @@ export async function updateRoleMetadata(
     provided('sla_minutes'), input.sla_minutes ?? null,
     provided('target_per_hour'), input.target_per_hour ?? null,
     provided('worker_count'), input.worker_count ?? null,
+    provided('priority_threshold_minutes'), input.priority_threshold_minutes ?? null,
+    provided('priority_facet'), input.priority_facet ?? null,
     input.change_summary ?? null,
     provided('upstream_roles'), upstreams,
   ]);

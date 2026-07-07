@@ -119,6 +119,26 @@ describe('role service — updateRoleMetadata PATCH semantics', () => {
     });
     expect(detail).toBeNull();
   });
+
+  it('priority dials: set, preserved on unrelated saves, cleared by explicit null', async () => {
+    let detail = await roleService.updateRoleMetadata(ROLE, {
+      priority_threshold_minutes: 240,
+      priority_facet: 'authorized_at',
+    });
+    expect(Number(detail!.priority_threshold_minutes)).toBe(240);
+    expect(detail!.priority_facet).toBe('authorized_at');
+
+    detail = await roleService.updateRoleMetadata(ROLE, { title: 'Unrelated Save' });
+    expect(Number(detail!.priority_threshold_minutes)).toBe(240);
+    expect(detail!.priority_facet).toBe('authorized_at');
+
+    detail = await roleService.updateRoleMetadata(ROLE, {
+      priority_threshold_minutes: null,
+      priority_facet: null,
+    });
+    expect(detail!.priority_threshold_minutes).toBeNull();
+    expect(detail!.priority_facet).toBeNull();
+  });
 });
 
 describe('role service — createRole reports creation', () => {

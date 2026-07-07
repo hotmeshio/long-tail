@@ -193,7 +193,7 @@ describe('getEscalationStats', () => {
 
 describe('getStationMetrics', () => {
   const stationRow = {
-    role: 'reviewer', pending: 3, claimed: 1, resolved: 12, in_arrears: 0,
+    role: 'reviewer', pending: 3, claimed: 1, resolved: 12, priority_count: 0,
     throughput_pct: 96.5,
     wait: { p99: 0.5, p50: 0.3, avg: 0.4, max: 1.2 },
     work: { p99: 0.67, p50: 0.5, avg: 0.55, max: 0.9 },

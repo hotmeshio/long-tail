@@ -70,7 +70,7 @@ router.delete('/escalation-chains', requireRoleManager, async (req, res) => {
 /**
  * PATCH /api/roles/:role
  * Update role metadata. Requires admin.
- * Body: { title?, description?, form_schema?, metadata_schema?, properties?, ops_visible?, parent_role?, sla_minutes?, target_per_hour?, worker_count? }
+ * Body: { title?, description?, form_schema?, metadata_schema?, properties?, ops_visible?, parent_role?, sla_minutes?, target_per_hour?, worker_count?, priority_threshold_minutes?, priority_facet? }
  */
 router.patch('/:role', requireRoleManager, async (req, res) => {
   // URL is the resource identity — a `role` key in the body must not redirect
