@@ -279,6 +279,24 @@ export async function listDistinctTypes(): Promise<string[]> {
   return client.listDistinctTypes();
 }
 
+/**
+ * Narrow the caller's explicit role filter WITHIN their read scope. The SDK
+ * store gives `roles[]` precedence over `role` when both are set, so passing
+ * both would silently DROP the explicit filter for scoped (non-global)
+ * callers — a role-filtered list would return the scope's rows instead.
+ * Intersecting first keeps the plain path's semantics identical to the
+ * faceted path's: a role filter can only narrow scope, never widen past it,
+ * and an out-of-scope role yields an empty result, not someone else's rows.
+ */
+function narrowRoleWithinScope(
+  role: string | undefined,
+  visibleRoles: string[] | undefined,
+): { role?: string; roles?: string[]; empty: boolean } {
+  if (!role || !visibleRoles) return { role, roles: visibleRoles, empty: false };
+  if (!visibleRoles.includes(role)) return { empty: true };
+  return { role, roles: undefined, empty: false };
+}
+
 export async function listEscalations(filters: {
   status?: LTEscalationStatus;
   role?: string;
@@ -326,16 +344,19 @@ export async function listEscalations(filters: {
     });
   }
 
+  const scoped = narrowRoleWithinScope(filters.role, filters.visibleRoles);
+  if (scoped.empty) return { escalations: [], total: 0 };
+
   const client = await escalations();
 
   // Shared filter — passed to both list() and count() so totals stay in sync.
   const where: SdkListParams = {
     status: filters.status,
-    role: filters.role,
+    role: scoped.role,
     type: filters.type,
     subtype: filters.subtype,
     priority: filters.priority,
-    roles: filters.visibleRoles,
+    roles: scoped.roles,
   };
   if (filters.assigned_to) where.assignedTo = filters.assigned_to;
   if (heldNow) where.available = false;
@@ -394,16 +415,19 @@ export async function listAvailableEscalations(filters: {
     });
   }
 
+  const scoped = narrowRoleWithinScope(filters.role, filters.visibleRoles);
+  if (scoped.empty) return { escalations: [], total: 0 };
+
   const client = await escalations();
 
   const where: SdkListParams = {
     status: 'pending',
     available: true,
-    role: filters.role,
+    role: scoped.role,
     type: filters.type,
     subtype: filters.subtype,
     priority: filters.priority,
-    roles: filters.visibleRoles,
+    roles: scoped.roles,
   };
 
   const [rows, total] = await Promise.all([
