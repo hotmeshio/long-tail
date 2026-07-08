@@ -8,7 +8,7 @@ interface FilterBarProps {
 export function FilterBar({ children, actions }: FilterBarProps) {
   return (
     <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-      <div className="bg-[#F7F7F7] rounded-lg px-5 py-2">
+      <div className="bg-surface-sunken rounded-lg px-5 py-2">
         <div className="flex items-center gap-5 flex-wrap">
           {children}
           {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}

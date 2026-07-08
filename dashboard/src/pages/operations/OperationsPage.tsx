@@ -11,6 +11,7 @@ import {
   ACTIVE_COLOR,
   QUEUED_COLOR,
   RESOLVED_COLOR,
+  TARGET_COLOR,
   PRIORITY_COLOR,
   PRIORITY_TEXT_COLOR,
   type ChartStation,
@@ -21,6 +22,7 @@ import { priorityQueueLink } from './priority-link';
 // Column band tints — the same hues as the chart's queue-composition bands
 // (~8% alpha), so PENDING/ACTIVE/RESOLVED in the table visually continue the
 // sky/indigo/sage story told above.
+const TARGET_BAND = `${TARGET_COLOR}14`;
 const PENDING_BAND = `${QUEUED_COLOR}14`;
 const ACTIVE_BAND = `${ACTIVE_COLOR}14`;
 const RESOLVED_BAND = `${RESOLVED_COLOR}14`;
@@ -104,33 +106,16 @@ function fmtMin(v: number | null): string {
   return `${(v / 60).toFixed(1)}h`;
 }
 
-function loadBar(
-  pending: number,
-  target: number | null,
-  throughputPct: number | null,
-  resolved: number,
-) {
-  if (!target) return { pct: null, color: 'bg-surface-border', historical: false };
+function loadBar(pending: number, target: number | null) {
+  // No target, or nothing pending — there is no live load to trend. Show the
+  // empty state rather than inventing a rate from historical throughput.
+  if (!target || pending === 0) return { pct: null, color: 'bg-surface-border' };
 
-  if (pending > 0) {
-    const ratio = pending / target;
-    const pct = Math.round(ratio * 100);
-    // Amber: backlog. Orange: some work but well under pace. Green: healthy.
-    const color = ratio > 1.0 ? 'bg-amber-400' : ratio < 0.2 ? 'bg-orange-400' : 'bg-emerald-400';
-    return { pct, color, historical: false };
-  }
-
-  // Idle: use period throughput efficiency rather than the live backlog ratio.
-  // resolved=0 means nothing happened in this window → no data, not failing.
-  if (resolved === 0 || throughputPct == null) {
-    return { pct: null, color: 'bg-surface-border', historical: true };
-  }
-  const ratio = throughputPct / 100;
-  const pct = Math.round(throughputPct);
-  // Amber: above baseline (produced more than target). Neutral otherwise —
-  // below-target throughput isn't a positive green signal, just normal data.
-  const color = ratio > 1.0 ? 'bg-amber-400' : 'bg-surface-border';
-  return { pct, color, historical: true };
+  const ratio = pending / target;
+  const pct = Math.round(ratio * 100);
+  // Amber: backlog. Orange: some work but well under pace. Green: healthy.
+  const color = ratio > 1.0 ? 'bg-status-warning' : ratio < 0.2 ? 'bg-status-draft' : 'bg-status-success';
+  return { pct, color };
 }
 
 // ── Station table row ─────────────────────────────────────────────────────────
@@ -151,7 +136,7 @@ function StationRow({
   const resolved = metric?.resolved ?? 0;
   const priorityCount = metric?.priority_count ?? 0;
   const target = role.target_per_hour ?? null;
-  const { pct, color, historical } = loadBar(pending, target, metric?.throughput_pct ?? null, resolved);
+  const { pct, color } = loadBar(pending, target);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
 
   return (
@@ -161,13 +146,13 @@ function StationRow({
         tabIndex={0}
         onClick={onClick}
         onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
-        className={`grid items-center gap-4 cursor-pointer transition-colors ${
-          selected ? 'border-l-2 border-accent' : 'pl-0.5'
+        className={`grid items-center gap-4 pr-3 cursor-pointer transition-colors ${
+          selected ? 'border-l-2 !border-l-accent pl-2.5' : 'pl-3'
         }`}
         style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
       >
         {/* Role name */}
-        <div className="flex items-center gap-1.5 min-w-0 py-3.5">
+        <div className="flex items-center gap-1.5 min-w-0 py-1.5">
           <span
             className="font-mono font-bold text-text-primary truncate text-[11px]"
           >
@@ -183,14 +168,19 @@ function StationRow({
           )}
         </div>
 
-        {/* Target / hour */}
-        <span
-          className={`text-xs font-mono tabular-nums text-right py-3.5 ${
-            target != null ? 'text-text-secondary' : 'text-text-quaternary'
-          }`}
+        {/* Target / hour — emerald band, same hue as the chart's target line */}
+        <div
+          className="self-stretch flex items-center justify-end px-1.5"
+          style={{ backgroundColor: TARGET_BAND }}
         >
-          {target != null ? target : '—'}
-        </span>
+          <span
+            className={`text-xs font-mono tabular-nums ${
+              target != null ? 'text-text-secondary' : 'text-text-quaternary'
+            }`}
+          >
+            {target != null ? target : '—'}
+          </span>
+        </div>
 
         {/* Pending — sky band, same hue as the chart's waiting band */}
         <div
@@ -231,38 +221,37 @@ function StationRow({
         </div>
 
         {/* P99 wait */}
-        <span className="text-xs font-mono tabular-nums text-right py-3.5 text-text-secondary">
+        <span className="text-xs font-mono tabular-nums text-right py-1.5 text-text-secondary">
           {fmtMin(metric?.wait.p99 ?? null)}
         </span>
 
         {/* P99 work */}
-        <span className="text-xs font-mono tabular-nums text-right py-3.5 text-text-secondary">
+        <span className="text-xs font-mono tabular-nums text-right py-1.5 text-text-secondary">
           {fmtMin(metric?.work.p99 ?? null)}
         </span>
 
         {/* Load mini-bar */}
-        <div className="flex items-center gap-2 py-3.5">
+        <div className="flex items-center gap-2 py-1.5">
           <div className="w-12 h-1.5 bg-surface-sunken rounded-full overflow-hidden shrink-0">
             <div className={`h-full rounded-full ${color}`} style={{ width: `${barWidth}%` }} />
           </div>
           <span
             className={`text-[10px] font-mono tabular-nums ${
               pct != null && pct > 100
-                ? 'text-amber-500 font-semibold'
+                ? 'text-status-warning font-semibold'
                 : 'text-text-quaternary'
             }`}
-            title={historical ? 'Throughput efficiency for the selected period' : undefined}
           >
-            {pct != null ? `${pct}%${historical ? '↩' : ''}` : '—'}
+            {pct != null ? `${pct}%` : '—'}
           </span>
         </div>
       </div>
 
       {/* Priority sub-row — unclaimed items past the role's age threshold */}
       {priorityCount > 0 && (
-        <div className="flex items-center gap-1.5 pb-2 pl-1">
+        <div className="flex items-center gap-1.5 pb-2 pl-3.5">
           <span
-            className="w-2.5 h-2.5 rounded-full shrink-0"
+            className="w-2.5 h-2.5 rounded-full dot-ring shrink-0"
             style={{ backgroundColor: PRIORITY_COLOR }}
           />
           <Link
@@ -285,9 +274,9 @@ function TableHead() {
   // Queue-state columns carry the chart's band hue into the table.
   const cols: { label: string; band?: string; hue?: string }[] = [
     { label: 'ROLE' },
-    { label: 'TARGET/H' },
+    { label: 'TARGET/H', band: TARGET_BAND, hue: TARGET_COLOR },
     { label: 'PENDING', band: PENDING_BAND, hue: QUEUED_COLOR },
-    { label: 'ACTIVE', band: ACTIVE_BAND, hue: ACTIVE_COLOR },
+    { label: 'CLAIMED', band: ACTIVE_BAND, hue: ACTIVE_COLOR },
     { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR },
     { label: 'P99 WAIT' },
     { label: 'P99 WORK' },
@@ -295,7 +284,7 @@ function TableHead() {
   ];
   return (
     <div
-      className="grid items-center gap-4 border-b border-surface-border mb-0.5"
+      className="grid items-center gap-4 px-3 border-b border-surface-border mb-0.5"
       style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
     >
       {cols.map((col, i) =>
@@ -331,7 +320,9 @@ function TableHead() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function OperationsPage() {
-  const [period, setPeriod] = useState<Period>('24h');
+  // 1h default: long enough to show a whole simulation shift's shape,
+  // short enough that stale history doesn't drown the current run.
+  const [period, setPeriod] = useState<Period>('1h');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -453,18 +444,13 @@ export function OperationsPage() {
         docsHash="#docs:dashboard.md:pace-board"
         center={periodSelector}
         actions={
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="text-text-quaternary hover:text-text-secondary transition-colors disabled:opacity-40"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <Link to="/admin/roles" className="btn-secondary text-xs">
-              Configure
-            </Link>
-          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-text-quaternary hover:text-text-secondary transition-colors disabled:opacity-40"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         }
       />
 
@@ -545,8 +531,8 @@ export function OperationsPage() {
             />
           </div>
 
-          {/* Bottom row: fixed 30vh — table header sticky, rows scroll */}
-          <div className="h-[30vh] flex-none flex flex-col border-t border-surface-border overflow-hidden">
+          {/* Bottom row: sized to its rows up to 45vh — header sticky, rows scroll */}
+          <div className="max-h-[45vh] flex-none flex flex-col border-t border-surface-border overflow-hidden">
             <TableHead />
             <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-surface-border/30">
               {ordered.map(({ role }) => (

@@ -78,7 +78,7 @@ export function StreamMessageDetail({ message, filters }: {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[message.status]}`} />
+          <span className={`w-2 h-2 rounded-full dot-ring shrink-0 ${STATUS_DOT[message.status]}`} />
           <FilterableField
             label=""
             value={STATUS_LABEL[message.status]}

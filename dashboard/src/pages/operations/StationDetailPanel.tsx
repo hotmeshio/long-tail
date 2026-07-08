@@ -211,11 +211,11 @@ function OverviewPanel({
             {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} with priority items
           </p>
         ) : stationsWithLoad > 0 ? (
-          <p className="text-[11px] text-amber-400">
+          <p className="text-[11px] text-status-warning">
             {stationsWithLoad} station{stationsWithLoad > 1 ? 's' : ''} with backlog
           </p>
         ) : totalResolved > 0 ? (
-          <p className="text-[11px] text-emerald-500">Flowing — queue clear</p>
+          <p className="text-[11px] text-status-success">Flowing — queue clear</p>
         ) : (
           <p className="text-[11px] text-text-quaternary">Quiet — awaiting work</p>
         )}
@@ -248,7 +248,7 @@ function OverviewPanel({
         <div className="flex items-center gap-2">
           <span className="text-[8px] text-text-quaternary uppercase tracking-wider flex-1">Station</span>
           <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">pend</span>
-          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">actv</span>
+          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">clmd</span>
           <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">res</span>
         </div>
       </div>

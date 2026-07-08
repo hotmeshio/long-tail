@@ -25,7 +25,7 @@ function TargetPill({ target }: { target: ThrottleTarget }) {
   const color = isMesh
     ? 'bg-status-error/10 text-status-error'
     : isEngine
-      ? 'bg-blue-500/10 text-blue-500'
+      ? 'bg-status-active/10 text-status-active'
       : 'bg-accent/[0.06] text-text-secondary';
   const scopeLabel = target.scope === 'engines' ? 'engine only'
     : target.scope === 'workers' ? 'worker only'

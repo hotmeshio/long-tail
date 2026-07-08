@@ -1,4 +1,12 @@
 /** @type {import('tailwindcss').Config} */
+
+/*
+ * Themed tokens resolve through CSS variables declared in src/styles/globals.css.
+ * The active theme is selected by `data-theme` on <html> (violet | red | orange | blue).
+ * Variables hold space-separated RGB channels so Tailwind opacity modifiers keep working.
+ */
+const themed = (channels) => `rgb(var(${channels}) / <alpha-value>)`;
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -8,21 +16,23 @@ export default {
           DEFAULT: '#FFFFFF',
           raised: '#FFFFFF',
           sunken: '#F5F5F7',
-          hover: '#F7F4FF',
-          border: '#E0DAF0',
+          hover: themed('--lt-surface-hover'),
+          border: themed('--lt-surface-border'),
         },
         text: {
-          primary: '#1E1535',
-          secondary: '#5B5173',
-          tertiary: '#918AAB',
+          primary: themed('--lt-text-primary'),
+          secondary: themed('--lt-text-secondary'),
+          tertiary: themed('--lt-text-tertiary'),
+          quaternary: themed('--lt-text-quaternary'),
           inverse: '#FFFFFF',
         },
         accent: {
-          DEFAULT: '#6C47FF',
-          hover: '#5835DB',
-          muted: '#C8BEF0',
-          faint: '#E8E2F8',
+          DEFAULT: themed('--lt-accent'),
+          hover: themed('--lt-accent-hover'),
+          muted: themed('--lt-accent-muted'),
+          faint: themed('--lt-accent-faint'),
         },
+        heading: themed('--lt-heading'),
         status: {
           active: '#2563EB',
           pending: '#F59E0B',
@@ -45,7 +55,7 @@ export default {
           '100%': { opacity: '1' },
         },
         'border-breathe': {
-          '0%, 100%': { borderColor: '#6C47FF' },
+          '0%, 100%': { borderColor: 'rgb(var(--lt-accent))' },
           '50%': { borderColor: 'transparent' },
         },
       },

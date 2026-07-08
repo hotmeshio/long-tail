@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { LT_BASE } from '../../../lib/base-path';
 
 interface AppLogoProps {
@@ -11,8 +12,10 @@ interface AppLogoProps {
 /**
  * Shared branding mark used in the header toolbar and login page.
  *
- * The logo image is rendered large + rotated behind the wordmark,
- * creating a watermark effect. The `size` prop scales the pair:
+ * The pineapple is rendered large + rotated behind the wordmark, creating a
+ * watermark effect. It takes the theme accent color (the PNG's alpha channel
+ * used as a CSS mask) at reduced opacity so the ink wordmark stays legible.
+ * The `size` prop scales the pair:
  * - `sm` (default) — toolbar height
  * - `lg` — login page hero
  */
@@ -29,10 +32,11 @@ export function AppLogo({ size = 'sm', hideLabel = false, className = '' }: AppL
 
   return (
     <div className={`flex items-center ${className}`} style={{ height: '50px' }}>
-      <img
-        src={`${LT_BASE}/logo512.png`}
-        alt="LongTail"
-        className={`shrink-0 z-0 ${imgClass}`}
+      <span
+        role="img"
+        aria-label="LongTail"
+        className={`logo-mark shrink-0 z-0 ${imgClass}`}
+        style={{ '--logo-url': `url(${LT_BASE}/logo512.png)` } as CSSProperties}
       />
       <span className={`z-[1] transition-opacity duration-300 ${textClass} ${hideLabel ? 'opacity-0' : ''}`}>
         LongTail

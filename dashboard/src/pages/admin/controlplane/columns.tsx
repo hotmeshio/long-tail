@@ -129,7 +129,7 @@ export function getEngineColumns(opts: ColumnOptions): Column<QuorumProfile>[] {
           <div className="flex items-center gap-2">
             <div className="w-20 h-2 bg-surface-sunken rounded overflow-hidden" title={`${c.total.toLocaleString()} messages (${pct.toFixed(0)}%)`}>
               <div
-                className={`h-full rounded transition-all duration-500 ${c.errors > 0 ? 'bg-status-error/70' : 'bg-blue-500/60'}`}
+                className={`h-full rounded transition-all duration-500 ${c.errors > 0 ? 'bg-status-error/70' : 'bg-status-active/60'}`}
                 style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%` }}
               />
             </div>

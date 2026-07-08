@@ -8,14 +8,14 @@ import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { useSettings } from '../../api/settings';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  task:       'bg-blue-400/15 text-blue-400',
+  task:       'bg-status-active/10 text-status-active',
   workflow:   'bg-accent/15 text-accent',
-  escalation: 'bg-amber-400/15 text-amber-400',
-  activity:   'bg-cyan-400/15 text-cyan-400',
-  knowledge:  'bg-violet-400/15 text-violet-400',
-  agent:      'bg-emerald-400/15 text-emerald-400',
-  app:        'bg-rose-400/15 text-rose-400',
-  milestone:  'bg-violet-400/15 text-violet-400',
+  escalation: 'bg-status-warning/10 text-status-warning',
+  activity:   'bg-status-active/10 text-status-active',
+  knowledge:  'bg-accent/10 text-accent',
+  agent:      'bg-status-success/10 text-status-success',
+  app:        'bg-status-error/10 text-status-error',
+  milestone:  'bg-accent/10 text-accent',
 };
 
 function SectionHeader({ icon: Icon, color, children }: { icon: React.ElementType; color: string; children: React.ReactNode }) {
@@ -72,7 +72,7 @@ export function TopicDetailPage() {
   const isSystem = topic.source === 'system';
   const isManaged = topic.managed;
   const editable = !isManaged;
-  const categoryPillCls = CATEGORY_COLORS[topic.category] ?? 'bg-zinc-400/15 text-zinc-400';
+  const categoryPillCls = CATEGORY_COLORS[topic.category] ?? 'bg-surface-sunken text-text-tertiary';
 
   const defaultPayload = topic.example_payload
     ? JSON.stringify(topic.example_payload, null, 2)
@@ -181,7 +181,7 @@ export function TopicDetailPage() {
             </button>
           )}
           {!editing && !isSystem && editable && (
-            <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors">
+            <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-status-error/60 hover:text-status-error hover:bg-status-error/10 transition-colors">
               <Trash2 className="w-3 h-3" /> Delete
             </button>
           )}
@@ -253,7 +253,7 @@ export function TopicDetailPage() {
 
           {/* Col 2 — Example Payload */}
           <div className="min-w-0">
-            <SectionHeader icon={Braces} color="text-cyan-400">Example Payload</SectionHeader>
+            <SectionHeader icon={Braces} color="text-accent">Example Payload</SectionHeader>
             {topic.example_payload ? (
               <JsonViewer data={topic.example_payload} />
             ) : (
@@ -263,11 +263,11 @@ export function TopicDetailPage() {
 
           {/* Col 3 — Test */}
           <div className="min-w-0 space-y-4 animate-page-enter">
-            <SectionHeader icon={FlaskConical} color="text-violet-400">Test</SectionHeader>
+            <SectionHeader icon={FlaskConical} color="text-accent">Test</SectionHeader>
             {/* Target Subscribers */}
             <div className="bg-surface-sunken/30 rounded-md px-4 py-3">
               <div className="flex items-center gap-2 mb-2">
-                <Bot className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.5} />
+                <Bot className="w-3.5 h-3.5 text-status-success" strokeWidth={1.5} />
                 <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                   Target Subscribers
                 </h2>
@@ -286,7 +286,7 @@ export function TopicDetailPage() {
                       onClick={() => navigate(`/agents/${sub.agent_id}`)}
                       className="flex items-center gap-2 w-full text-left py-1 rounded hover:bg-surface-hover/50 transition-colors"
                     >
-                      <Bot className="w-2.5 h-2.5 text-emerald-400 shrink-0" strokeWidth={1.5} />
+                      <Bot className="w-2.5 h-2.5 text-status-success shrink-0" strokeWidth={1.5} />
                       <span className="text-[11px] text-text-primary hover:text-accent transition-colors truncate">{sub.agent_name}</span>
                       <span className="text-[9px] font-mono text-text-quaternary ml-auto shrink-0">{sub.reaction_type}</span>
                     </button>
@@ -461,7 +461,7 @@ export function TopicDetailPage() {
               className="input-json w-full"
               placeholder={'{\n  "type": "object",\n  "properties": {\n    "orderId": { "type": "string" }\n  }\n}'}
             />
-            {schemaError && <p className="text-[10px] text-red-400 mt-1">{schemaError}</p>}
+            {schemaError && <p className="text-[10px] text-status-error mt-1">{schemaError}</p>}
             <p className="hint">JSON Schema describing the event.data shape.</p>
           </div>
         </div>

@@ -48,7 +48,7 @@ function buildColumns(
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${dotClass}${pulseClass}`} title={row.status} />
+            <span className={`w-1.5 h-1.5 shrink-0 rounded-full dot-ring ${dotClass}${pulseClass}`} title={row.status} />
             <span className="font-mono text-xs text-text-primary truncate">{row.workflow_id}</span>
           </div>
         );
@@ -103,7 +103,7 @@ function buildColumns(
             className="opacity-0 group-hover/row:opacity-100 transition-opacity"
             title={`Filter by ${row.status}`}
           >
-            <svg className={`w-[18px] h-[18px] ${STATUS_COLORS[row.status] ?? 'text-text-tertiary'} hover:opacity-70`} viewBox="0 0 24 24" fill="currentColor">
+            <svg className={`w-[18px] h-[18px] ${STATUS_COLORS[row.status] ?? 'text-text-tertiary'} hover:opacity-70`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
               <circle cx="12" cy="12" r="6" />
             </svg>
           </button>

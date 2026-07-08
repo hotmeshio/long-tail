@@ -63,7 +63,7 @@ function EngineRow({ engine, isFirst, onThrottle }: {
       {source && <span className="text-[10px] text-text-tertiary/50">{source}</span>}
 
       {engine.is_scout && (
-        <span className="text-[9px] text-amber-500 uppercase tracking-widest">scout</span>
+        <span className="text-[9px] text-status-warning uppercase tracking-widest">scout</span>
       )}
 
       <span className="flex-1" />

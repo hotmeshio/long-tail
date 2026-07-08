@@ -41,7 +41,7 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): Column<LTJob>[]
         const pulseClass = s === 'in_progress' ? ' animate-pulse' : '';
         return (
           <div className="flex items-start gap-2 min-w-0">
-            <span className={`w-[9px] h-[9px] shrink-0 rounded-full mt-1 ${dotClass}${pulseClass}`} title={s} />
+            <span className={`w-[9px] h-[9px] shrink-0 rounded-full dot-ring mt-1 ${dotClass}${pulseClass}`} title={s} />
             <div className="min-w-0">
               <span className="font-mono text-xs text-text-primary truncate block">
                 {row.workflow_id}

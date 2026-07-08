@@ -120,7 +120,7 @@ export function ScheduleSection() {
             </div>
             <div>
               <div className="flex items-center gap-1.5 h-8">
-                <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-status-success' : 'bg-text-tertiary'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full dot-ring ${active ? 'bg-status-success' : 'bg-text-tertiary'}`} />
                 <span className={`text-xs ${active ? 'text-status-success' : 'text-text-tertiary'}`}>
                   {active ? 'Active' : 'Inactive'}
                 </span>

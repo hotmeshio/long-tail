@@ -283,7 +283,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
 
       {jsonHint && (
         <div className="flex items-center justify-end gap-2 mb-2 px-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-status-warning animate-pulse" />
+          <span className="inline-block w-1.5 h-1.5 rounded-full dot-ring bg-status-warning animate-pulse" />
           <span className="text-xs text-status-warning">{jsonHint}</span>
         </div>
       )}

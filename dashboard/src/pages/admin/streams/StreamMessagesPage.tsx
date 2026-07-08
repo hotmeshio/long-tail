@@ -66,7 +66,7 @@ export function StreamMessagesPage() {
       label: 'Status',
       render: (row) => (
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[row.status]}`} />
+          <span className={`w-2 h-2 rounded-full dot-ring shrink-0 ${STATUS_DOT[row.status]}`} />
           <span className="text-xs">{STATUS_LABEL[row.status]}</span>
         </div>
       ),

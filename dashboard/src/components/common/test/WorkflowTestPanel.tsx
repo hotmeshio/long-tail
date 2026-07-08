@@ -8,10 +8,10 @@ import type { LTYamlWorkflowRecord, ActivityManifestEntry } from '../../../api/t
 import { buildSkeleton } from '../../../pages/mcp/mcp-query-detail/helpers';
 
 const TOOL_SOURCE_COLORS: Record<string, { border: string; text: string; icon: string }> = {
-  mcp:       { border: 'border-blue-500', text: 'text-blue-500', icon: 'MCP' },
-  db:        { border: 'border-blue-500', text: 'text-blue-500', icon: 'DB' },
-  llm:       { border: 'border-violet-500', text: 'text-violet-500', icon: 'LLM' },
-  transform: { border: 'border-emerald-500', text: 'text-emerald-500', icon: 'Map' },
+  mcp:       { border: 'border-status-active', text: 'text-status-active', icon: 'MCP' },
+  db:        { border: 'border-status-active', text: 'text-status-active', icon: 'DB' },
+  llm:       { border: 'border-accent', text: 'text-accent', icon: 'LLM' },
+  transform: { border: 'border-status-success', text: 'text-status-success', icon: 'Map' },
 };
 
 function LiveTimeline({ steps, manifest, isComplete }: {

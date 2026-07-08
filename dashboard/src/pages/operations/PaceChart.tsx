@@ -103,20 +103,12 @@ function last<T>(a: T[]): T | undefined {
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-/** Circle color from actual vs the window target. Meeting or beating the target
- *  is good (green); short is the concern (amber → red). */
-function paceColor(ratio: number | null): { stroke: string; fill: string } {
-  if (ratio == null) return { stroke: '#cbd5e1', fill: '#f8fafc' };
-  if (ratio >= 1.0) return { stroke: '#10b981', fill: '#ecfdf5' };  // met/beat target
-  if (ratio >= 0.6) return { stroke: '#f59e0b', fill: '#fffbeb' };  // behind
-  return { stroke: '#ef4444', fill: '#fef2f2' };                    // well behind
-}
-
 // Shared queue-state palette — the chart bands and the station table columns
 // use the same hues so the two views read as one.
 export const ACTIVE_COLOR = '#6366f1';   // claimed, being worked right now — indigo
 export const QUEUED_COLOR = '#0ea5e9';   // pending and unclaimed, waiting in the queue — sky
-export const RESOLVED_COLOR = '#4e6a5e'; // done — grey with a breath of green
+export const RESOLVED_COLOR = '#1E3A8A'; // done — navy, matches the default theme accent
+export const TARGET_COLOR = '#059669';   // target pace line — emerald
 
 // Priority — unclaimed items past the role's age threshold, the count the
 // floor pulls to the front of the rack. Powder blue for the badge circle;
@@ -224,13 +216,13 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
   const showQueuedLabel = withTarget.some((r) => r.pending > r.active);
   const endLabels = spreadLabels(
     [
-      lastTarget ? { key: 'target', text: 'target', color: '#ef4444', y: lastTarget.y } : null,
-      lastActual ? { key: 'actual', text: 'actual', color: RESOLVED_COLOR, y: lastActual.y } : null,
+      lastTarget ? { key: 'target', text: 'Target', color: TARGET_COLOR, y: lastTarget.y } : null,
+      lastActual ? { key: 'actual', text: 'Resolved', color: RESOLVED_COLOR, y: lastActual.y } : null,
       showActiveLabel && lastActive
-        ? { key: 'active', text: 'active', color: ACTIVE_COLOR, y: lastActive.y }
+        ? { key: 'active', text: 'Claimed', color: ACTIVE_COLOR, y: lastActive.y }
         : null,
       showQueuedLabel && lastPending
-        ? { key: 'queued', text: 'queued', color: QUEUED_COLOR, y: lastPending.y }
+        ? { key: 'queued', text: 'Pending', color: QUEUED_COLOR, y: lastPending.y }
         : null,
     ].filter(Boolean) as { key: string; text: string; color: string; y: number }[],
     bottom + 4,
@@ -262,7 +254,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
 
       {/* Target — thin red solid reference at the window's expected count */}
       {targetLinePath && (
-        <path d={targetLinePath} fill="none" stroke="#ef4444" strokeWidth={0.5} strokeLinejoin="round" opacity={0.9} style={{ transition: `d ${EASE}` }} />
+        <path d={targetLinePath} fill="none" stroke={TARGET_COLOR} strokeWidth={0.5} strokeLinejoin="round" opacity={0.9} style={{ transition: `d ${EASE}` }} />
       )}
 
       {/* Per-role target for the window (target_per_hour × duration), just above the red line */}
@@ -273,7 +265,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
           y={tp.y - 3.5}
           textAnchor="middle"
           fontSize={6.5}
-          fill="#ef4444"
+          fill={TARGET_COLOR}
           fontFamily="ui-monospace, monospace"
           fontWeight="500"
           opacity={0.7}
@@ -295,7 +287,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
 
       {/* Actual — thin solid, primary line */}
       {actualSplinePath && (
-        <path d={actualSplinePath} fill="none" stroke={RESOLVED_COLOR} strokeWidth={1} strokeLinejoin="round" strokeLinecap="round" opacity={0.75} style={{ transition: `d ${EASE}` }} />
+        <path d={actualSplinePath} fill="none" stroke={RESOLVED_COLOR} strokeWidth={0.6} strokeLinejoin="round" strokeLinecap="round" opacity={0.65} style={{ transition: `d ${EASE}` }} />
       )}
 
       {/* Queue markers — a dot on the active line per station.
@@ -344,19 +336,17 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         const s = stations[row.idx];
         const x = row.x;
         const cy = row.expected != null ? yScale(row.actual) : bottom;
-        const ratio = row.expected && row.expected > 0 ? row.actual / row.expected : null;
-        const { stroke } = paceColor(row.expected != null ? ratio : null);
         // Same small scale as the active dot — a hair larger.
-        const r = Math.max(3, Math.min(5.5, 3 + row.actual / 120));
+        const r = Math.max(2.25, Math.min(4, 2.25 + row.actual / 160));
         const isSelected = s.role === selectedRole;
         const isHovered = hoveredIdx === row.idx;
 
         const tooltip =
           row.expected == null
             ? 'idle · set a target rate to plot pace'
-            : `${row.actual} done · target ${Math.round(row.expected)}`
-              + (row.pending > row.active ? ` · ${row.pending - row.active} waiting` : '')
-              + (row.active > 0 ? ` · ${row.active} active` : '')
+            : `${row.actual} resolved · target ${Math.round(row.expected)}`
+              + (row.pending > row.active ? ` · ${row.pending - row.active} pending` : '')
+              + (row.active > 0 ? ` · ${row.active} claimed` : '')
               + (row.priorityCount > 0 ? ` · ${row.priorityCount} priority` : '');
         const tipW = tooltip.length * 5.5 + 20;
         const tipX = Math.max(ML + tipW / 2 + 4, Math.min(right - tipW / 2 - 4, x));
@@ -373,13 +363,13 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
             {/* Animated marker group — slides vertically as the window rescales */}
             <g transform={`translate(${x} ${cy})`} style={{ transition: `transform ${EASE}` }}>
               <circle r={22} fill="transparent" />
-              <circle r={r} fill={stroke} opacity={0.9} style={{ transition: `r ${EASE}` }} />
+              <circle r={r} fill={RESOLVED_COLOR} opacity={0.9} style={{ transition: `r ${EASE}` }} />
               {row.expected != null && (
                 <text y={-r - 5} textAnchor="middle" fontSize={9.5} fill={RESOLVED_COLOR} fontFamily="ui-monospace, monospace" fontWeight="500">
                   {compact(row.actual)}
                 </text>
               )}
-              {isHovered && !isSelected && <circle r={r + 3} fill="none" stroke={stroke} strokeWidth={1} opacity={0.4} />}
+              {isHovered && !isSelected && <circle r={r + 3} fill="none" stroke={RESOLVED_COLOR} strokeWidth={1} opacity={0.4} />}
               {isSelected && <circle r={r + 4} fill="none" stroke="#6366f1" strokeWidth={2} />}
             </g>
 

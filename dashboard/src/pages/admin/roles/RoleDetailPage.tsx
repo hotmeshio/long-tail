@@ -97,7 +97,7 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
               {t}
               <button
                 onClick={() => removeChain.mutate({ source_role: role.role, target_role: t })}
-                className="text-text-quaternary hover:text-red-400 transition-colors leading-none ml-0.5"
+                className="text-text-quaternary hover:text-status-error transition-colors leading-none ml-0.5"
               >
                 ×
               </button>
@@ -173,7 +173,7 @@ function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleD
               {u}
               <button
                 onClick={() => save(upstreams.filter((x) => x !== u))}
-                className="text-text-quaternary hover:text-red-400 transition-colors leading-none ml-0.5"
+                className="text-text-quaternary hover:text-status-error transition-colors leading-none ml-0.5"
               >
                 ×
               </button>
@@ -522,7 +522,7 @@ export function RoleDetailPage() {
             {!inUse && (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors flex items-center gap-1"
+                className="px-3 py-1.5 text-xs rounded-md text-status-error/60 hover:text-status-error hover:bg-status-error/10 transition-colors flex items-center gap-1"
               >
                 <Trash2 className="w-3 h-3" /> Delete
               </button>
@@ -605,8 +605,8 @@ export function RoleDetailPage() {
                 label="Upstream Inputs"
                 aside={
                   <div className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-600">Live</span>
+                    <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-status-success">Live</span>
                   </div>
                 }
               />
@@ -627,8 +627,8 @@ export function RoleDetailPage() {
               label="Escalation Targets"
               aside={
                 <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-600">Live</span>
+                  <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
+                  <span className="text-[9px] font-semibold uppercase tracking-widest text-status-success">Live</span>
                 </div>
               }
             />
@@ -657,7 +657,7 @@ export function RoleDetailPage() {
           <div>
             <SectionHead
               icon={Braces}
-              color="text-cyan-400"
+              color="text-accent"
               label="Escalation Schema"
               aside={
                 role.current_schema_version != null ? (
@@ -684,7 +684,7 @@ export function RoleDetailPage() {
           <div>
             <SectionHead
               icon={Braces}
-              color="text-violet-400"
+              color="text-accent"
               label="Metadata Schema"
               aside={
                 !editingJson.has('metadata_schema') && role.metadata_schema ? (

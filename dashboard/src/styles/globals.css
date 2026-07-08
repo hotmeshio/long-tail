@@ -2,7 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme palettes. Each theme supplies the accent family plus the tinted
+ * neutrals (text, hover, border) so the whole page shifts hue together.
+ * Values are space-separated RGB channels — see tailwind.config.js.
+ * Select with data-theme on <html>: blue (navy, default) | violet | red |
+ * green | rose. The :root default block MUST come first: :root ties the
+ * data-theme selectors on specificity, so source order decides the winner.
+ */
 @layer base {
+  :root,
+  [data-theme='blue'] {
+    --lt-accent: 30 58 138;           /* navy #1E3A8A */
+    --lt-accent-hover: 22 42 102;     /* #162A66 */
+    --lt-accent-muted: 148 163 216;   /* #94A3D8 */
+    --lt-accent-faint: 213 220 240;   /* #D5DCF0 */
+    --lt-surface-hover: 240 243 250;  /* #F0F3FA */
+    --lt-surface-border: 188 198 228; /* #BCC6E4 */
+    --lt-text-primary: 10 16 38;      /* #0A1026 */
+    --lt-text-secondary: 47 58 94;    /* #2F3A5E */
+    --lt-text-tertiary: 100 111 150;  /* #646F96 */
+    --lt-text-quaternary: 141 150 184;/* #8D96B8 */
+    --lt-heading: 23 42 110;          /* #172A6E */
+  }
+
+  [data-theme='violet'] {
+    --lt-accent: 123 59 224;          /* violet at Redis-logo intensity #7B3BE0 */
+    --lt-accent-hover: 98 41 190;     /* #6229BE */
+    --lt-accent-muted: 187 156 239;   /* #BB9CEF */
+    --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
+    --lt-surface-hover: 246 241 253;  /* #F6F1FD */
+    --lt-surface-border: 210 191 240; /* #D2BFF0 */
+    --lt-text-primary: 18 6 41;       /* #120629 */
+    --lt-text-secondary: 62 44 99;    /* #3E2C63 */
+    --lt-text-tertiary: 117 101 158;  /* #75659E */
+    --lt-text-quaternary: 157 143 192;/* #9D8FC0 */
+    --lt-heading: 98 36 184;          /* #6224B8 */
+  }
+
+  [data-theme='red'] {
+    --lt-accent: 220 56 45;           /* Redis logo red #DC382D */
+    --lt-accent-hover: 179 42 34;     /* #B32A22 */
+    --lt-accent-muted: 236 154 147;   /* #EC9A93 */
+    --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
+    --lt-surface-hover: 252 241 239;  /* #FCF1EF */
+    --lt-surface-border: 233 194 188; /* #E9C2BC */
+    --lt-text-primary: 41 10 7;       /* #290A07 */
+    --lt-text-secondary: 102 59 52;   /* #663B34 */
+    --lt-text-tertiary: 150 110 102;  /* #966E66 */
+    --lt-text-quaternary: 188 154 147;/* #BC9A93 */
+    --lt-heading: 173 33 25;          /* #AD2119 */
+  }
+
+  [data-theme='green'] {
+    --lt-accent: 5 150 105;           /* emerald #059669 */
+    --lt-accent-hover: 4 120 87;      /* #047857 */
+    --lt-accent-muted: 134 209 184;   /* #86D1B8 */
+    --lt-accent-faint: 205 237 226;   /* #CDEDE2 */
+    --lt-surface-hover: 238 249 245;  /* #EEF9F5 */
+    --lt-surface-border: 175 219 203; /* #AFDBCB */
+    --lt-text-primary: 3 28 21;       /* #031C15 */
+    --lt-text-secondary: 34 89 72;    /* #225948 */
+    --lt-text-tertiary: 91 140 125;   /* #5B8C7D */
+    --lt-text-quaternary: 136 176 163;/* #88B0A3 */
+    --lt-heading: 4 110 79;           /* #046E4F */
+  }
+
+  [data-theme='rose'] {
+    --lt-accent: 214 36 110;          /* raspberry #D6246E */
+    --lt-accent-hover: 173 25 87;     /* #AD1957 */
+    --lt-accent-muted: 235 148 185;   /* #EB94B9 */
+    --lt-accent-faint: 248 213 228;   /* #F8D5E4 */
+    --lt-surface-hover: 253 240 246;  /* #FDF0F6 */
+    --lt-surface-border: 233 188 207; /* #E9BCCF */
+    --lt-text-primary: 40 8 22;       /* #280816 */
+    --lt-text-secondary: 99 53 72;    /* #633548 */
+    --lt-text-tertiary: 148 104 122;  /* #94687A */
+    --lt-text-quaternary: 186 150 165;/* #BA96A5 */
+    --lt-heading: 168 20 84;          /* #A81454 */
+  }
+
   body {
     @apply bg-surface text-text-primary antialiased;
   }
@@ -68,7 +147,7 @@
     font-weight: 300;
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
-    color: #5C2069;
+    color: rgb(var(--lt-heading));
   }
 
   .section-h2 {
@@ -76,7 +155,28 @@
     font-weight: 300;
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
-    color: #5C2069;
+    color: rgb(var(--lt-heading));
+  }
+
+  /* Status dots render as thin outlined rings: a radial mask hollows the
+     filled circle so the element's bg-* class becomes the ring color. */
+  .dot-ring {
+    mask-image: radial-gradient(circle closest-side, transparent calc(100% - 1.5px), #000 calc(100% - 0.75px));
+    -webkit-mask-image: radial-gradient(circle closest-side, transparent calc(100% - 1.5px), #000 calc(100% - 0.75px));
+  }
+
+  /* The pineapple mark, silhouette tinted to the active theme accent.
+     The logo asset is a flat single-color PNG used as an alpha mask. */
+  .logo-mark {
+    background-color: rgb(var(--lt-accent));
+    mask-image: var(--logo-url);
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    -webkit-mask-image: var(--logo-url);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
   }
 }
 
@@ -86,9 +186,9 @@
 }
 
 @keyframes triage-glow {
-  0%              { box-shadow: 0 0 3px 0 rgba(108, 71, 255, 0.15); }
-  8.3%            { box-shadow: 0 0 10px 2px rgba(108, 71, 255, 0.4); }
-  16.7%, 100%     { box-shadow: 0 0 3px 0 rgba(108, 71, 255, 0.15); }
+  0%              { box-shadow: 0 0 3px 0 rgb(var(--lt-accent) / 0.15); }
+  8.3%            { box-shadow: 0 0 10px 2px rgb(var(--lt-accent) / 0.4); }
+  16.7%, 100%     { box-shadow: 0 0 3px 0 rgb(var(--lt-accent) / 0.15); }
 }
 
 .animate-page-enter {

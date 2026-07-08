@@ -128,7 +128,7 @@ export function SwimlaneRow({
                 }
               >
                 {/* Claim dot */}
-                <div className="absolute -top-1 -left-[3px] w-[7px] h-[7px] rounded-full bg-white border border-amber-600" />
+                <div className="absolute -top-1 -left-[3px] w-[7px] h-[7px] rounded-full bg-white border border-status-warning" />
               </div>
             )}
           </div>

@@ -61,7 +61,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <span
-            className={`w-2 h-2 rounded-full shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
+            className={`w-2 h-2 rounded-full dot-ring shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
             title={row.status}
           />
           <div>
@@ -147,7 +147,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
         <div className="overflow-x-clip">
           {/* Sticky search bar */}
           <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-            <div className="bg-[#F7F7F7] rounded-lg px-5 py-2">
+            <div className="bg-surface-sunken rounded-lg px-5 py-2">
               <div className="relative w-1/2">
                 <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
                 <input

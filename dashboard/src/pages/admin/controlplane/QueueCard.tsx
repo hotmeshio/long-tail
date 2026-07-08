@@ -127,7 +127,7 @@ export function QueueCard({
         onClick={() => onToggle(queue)}
         className="group/row relative flex items-center gap-3 w-full py-2 hover:bg-surface-hover transition-colors text-left rounded"
       >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${healthDot}`} title={health} />
+        <span className={`w-2 h-2 rounded-full dot-ring shrink-0 ${healthDot}`} title={health} />
         <ChevronRight
           className={`w-3.5 h-3.5 text-text-tertiary/50 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
           strokeWidth={2}

@@ -23,7 +23,7 @@ export function NatsStatus({ className = '', onClick }: NatsStatusProps) {
     >
       <Radio className="w-4 h-4" strokeWidth={1.5} />
       <span
-        className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-text-tertiary'}`}
+        className={`absolute -top-1 -right-1 w-2 h-2 rounded-full dot-ring ${connected ? 'bg-emerald-500' : 'bg-text-tertiary'}`}
         data-testid="nats-status-dot"
       />
     </button>

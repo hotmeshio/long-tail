@@ -38,19 +38,19 @@ export function ReviewStep({ form }: Props) {
       </Section>
 
       {(form.goals || form.rules) && (
-        <Section icon={Compass} color="text-rose-400" title="Motivation">
+        <Section icon={Compass} color="text-accent" title="Motivation">
           {form.goals && <Field label="Goals">{form.goals}</Field>}
           {form.rules && <Field label="Rules">{form.rules}</Field>}
         </Section>
       )}
 
-      <Section icon={Brain} color="text-emerald-400" title="Knowledge">
+      <Section icon={Brain} color="text-accent" title="Knowledge">
         <Field label="Domain">{form.knowledge_domain || 'None'}</Field>
       </Section>
 
       {/* Subscriptions + Schedule side by side */}
       <div className="grid grid-cols-2 gap-x-10">
-        <Section icon={Radio} color="text-cyan-400" title={`Subscriptions (${form.subscriptions.length})`}>
+        <Section icon={Radio} color="text-accent" title={`Subscriptions (${form.subscriptions.length})`}>
           {form.subscriptions.length === 0 ? (
             <span className="text-[11px] text-text-quaternary">None configured</span>
           ) : (
@@ -65,7 +65,7 @@ export function ReviewStep({ form }: Props) {
           )}
         </Section>
 
-        <Section icon={Clock} color="text-amber-400" title={`Schedules (${form.schedules.length})`}>
+        <Section icon={Clock} color="text-accent" title={`Schedules (${form.schedules.length})`}>
           {form.schedules.length === 0 ? (
             <span className="text-[11px] text-text-quaternary">None configured</span>
           ) : (
@@ -81,7 +81,7 @@ export function ReviewStep({ form }: Props) {
         </Section>
       </div>
 
-      <div className="border-l-2 border-emerald-400/30 pl-3 py-2 mt-6">
+      <div className="border-l-2 border-status-success/30 pl-3 py-2 mt-6">
         <p className="text-[11px] text-text-tertiary leading-relaxed">
           After saving, subscriptions and schedules activate immediately. You can pause the automation anytime.
         </p>

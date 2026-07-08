@@ -76,13 +76,13 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
   const categoryDot = (category: string) => {
     switch (category) {
       case 'activity':
-        return 'bg-blue-500';
+        return 'bg-status-active';
       case 'signal':
-        return 'bg-emerald-500';
+        return 'bg-status-success';
       case 'timer':
         return 'bg-status-warning';
       case 'child_workflow':
-        return 'bg-violet-500';
+        return 'bg-accent';
       default:
         return 'bg-text-tertiary';
     }
@@ -198,7 +198,7 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
                     {evt.event_id}
                   </span>
                   <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${categoryDot(evt.category)}`}
+                    className={`w-2 h-2 rounded-full dot-ring shrink-0 ${categoryDot(evt.category)}`}
                   />
                   <span className="text-sm text-text-primary flex-1 truncate">
                     {eventLabel(evt)}
@@ -206,7 +206,7 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
                   <span className="text-xs font-mono text-text-tertiary shrink-0">
                     {pending ? (
                       <span className="inline-flex items-center gap-1 text-status-warning">
-                        <span className="w-1.5 h-1.5 rounded-full bg-status-warning animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-warning animate-pulse" />
                         Pending
                       </span>
                     ) : evt.duration_ms !== null ? (

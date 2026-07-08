@@ -98,7 +98,7 @@ export function ScheduleStep({ form, set }: Props) {
                 <span className="text-[11px] font-mono block">{s.cron || 'new schedule'}</span>
                 <span className="text-[9px] text-text-quaternary">{(s.reaction_type === 'pipeline' ? s.pipeline_id : s.workflow_type) || 'no target'} · {describeCron(s.cron)}</span>
               </button>
-              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove schedule "${s.cron || 'new'}"?\n\nThis takes effect when you save.`)) removeSched(i); }} className="opacity-0 group-hover/sched:opacity-100 px-2 text-text-quaternary hover:text-red-400 transition-all" title="Remove">
+              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove schedule "${s.cron || 'new'}"?\n\nThis takes effect when you save.`)) removeSched(i); }} className="opacity-0 group-hover/sched:opacity-100 px-2 text-text-quaternary hover:text-status-error transition-all" title="Remove">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
