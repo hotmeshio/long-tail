@@ -80,7 +80,7 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
   return (
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+        <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${dot}`} />
         <span className="text-[12px] text-text-primary font-mono truncate max-w-[60%]">{midEllipsis(id)}</span>
         <span className="text-[10px] text-text-quaternary shrink-0 ml-auto whitespace-nowrap"><DateValue date={date} /></span>
       </div>
@@ -217,7 +217,7 @@ export function HomePage() {
 
         {/* Col 1: Available Escalations */}
         <div>
-          <SectionHeader icon={Inbox} color="text-blue-400" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
+          <SectionHeader icon={Inbox} color="text-accent" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
               <NavIcon to="/escalations/available" icon={ExternalLink} title="All available escalations" />
@@ -253,7 +253,7 @@ export function HomePage() {
 
         {/* Col 2: My Escalations */}
         <div>
-          <SectionHeader icon={Inbox} color="text-orange-400" count={myEscTotal} docsHash="#docs:dashboard.md:escalations-overview" actions={
+          <SectionHeader icon={Inbox} color="text-accent" count={myEscTotal} docsHash="#docs:dashboard.md:escalations-overview" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => myEscQ.refetch()} isFetching={myEscQ.isFetching} apiPath={`/escalations?assigned_to=${user?.userId ?? ''}&status=pending&limit=5&sort_by=created_at&order=desc`} />
               <NavIcon to="/escalations/queue" icon={ExternalLink} title="My escalation queue" />
@@ -293,7 +293,7 @@ export function HomePage() {
 
         {/* Col 1: Processes */}
         <div>
-          <SectionHeader icon={Layers} color="text-emerald-400" count={processTotal} docsHash="#docs:dashboard.md:processes-overview" actions={
+          <SectionHeader icon={Layers} color="text-accent" count={processTotal} docsHash="#docs:dashboard.md:processes-overview" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => procQ.refetch()} isFetching={procQ.isFetching} apiPath="/tasks/processes?limit=5" />
               <NavIcon to="/processes/all" icon={ExternalLink} title="All processes" />
@@ -324,7 +324,7 @@ export function HomePage() {
 
         {/* Col 2: Workflow Executions */}
         <div>
-          <SectionHeader icon={ScrollText} color="text-blue-400" count={jobsTotal} docsHash="#docs:dashboard.md:durable-executions" actions={
+          <SectionHeader icon={ScrollText} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:durable-executions" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
               <NavIcon to="/workflows/executions" icon={ExternalLink} title="All durable executions" />
@@ -353,7 +353,7 @@ export function HomePage() {
 
         {/* Col 3: Pipeline Executions */}
         <div>
-          <SectionHeader icon={GitBranch} color="text-violet-400" count={mcpTotal} docsHash="#docs:dashboard.md:mcp-pipeline-tools" actions={
+          <SectionHeader icon={GitBranch} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:mcp-pipeline-tools" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
               <NavIcon to="/mcp/executions" icon={ExternalLink} title="All pipeline executions" />

@@ -31,11 +31,11 @@ export function SwimlaneHeader({ allExpanded, onToggleAll }: SwimlaneHeaderProps
           <span className="text-[9px] text-text-tertiary">Notification</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-status-success" />
+          <span className="w-2 h-2 rounded-full dot-ring bg-status-success" />
           <span className="text-[9px] text-text-tertiary">Done</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-status-warning" />
+          <span className="w-2 h-2 rounded-full dot-ring bg-status-warning" />
           <span className="text-[9px] text-text-tertiary">Active</span>
         </div>
       </div>

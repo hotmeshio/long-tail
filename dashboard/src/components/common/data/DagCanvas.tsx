@@ -67,7 +67,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
           const s = styleFor(src);
           return (
             <div key={src} className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+              <span className={`w-2 h-2 rounded-full dot-ring ${s.dot}`} />
               <span className="text-[9px] text-text-tertiary">{s.label}</span>
             </div>
           );
@@ -109,7 +109,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
             >
               {/* Lane label */}
               <div className="w-56 shrink-0 pr-4 flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.dot}`} />
+                <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${s.dot}`} />
                 <p
                   className="text-xs font-mono text-text-secondary truncate"
                   title={entry.title}

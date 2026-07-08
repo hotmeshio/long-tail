@@ -7,14 +7,14 @@ import { Radio } from 'lucide-react';
  */
 
 const CATEGORY_COLORS: Record<string, string> = {
-  task:       'text-blue-400',
+  task:       'text-status-active',
   workflow:   'text-accent',
-  escalation: 'text-amber-400',
-  activity:   'text-cyan-400',
-  knowledge:  'text-violet-400',
-  agent:      'text-emerald-400',
-  app:        'text-rose-400',
-  milestone:  'text-violet-400',
+  escalation: 'text-status-warning',
+  activity:   'text-status-active',
+  knowledge:  'text-accent',
+  agent:      'text-status-success',
+  app:        'text-status-error',
+  milestone:  'text-accent',
 };
 
 interface EventTopicPillProps {

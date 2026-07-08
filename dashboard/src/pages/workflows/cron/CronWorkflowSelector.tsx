@@ -38,7 +38,7 @@ export function CronWorkflowSelector({
                   {config.workflow_type}
                 </p>
                 {hasCron && (
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${
                     isActive ? 'bg-status-success' : 'bg-status-warning'
                   }`} />
                 )}

@@ -120,7 +120,7 @@ export function EscalationSchemaPage() {
       <div className="flex items-start justify-between mb-10">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <Braces className="w-5 h-5 text-cyan-400" strokeWidth={1.5} />
+            <Braces className="w-5 h-5 text-accent" strokeWidth={1.5} />
             <h1 className="text-lg font-medium text-text-primary">Escalation Schema</h1>
             <button
               onClick={() => { window.location.hash = '#docs:dashboard.md:escalation-schema'; }}

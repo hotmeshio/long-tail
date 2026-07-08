@@ -8,15 +8,15 @@ import type { AgentFormState, SubscriptionFormState } from './agent-form-types';
 import { EMPTY_SUBSCRIPTION, updateMappingField, sectionCls, hintCls, inputCls, jsonCls } from './agent-form-types';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  task:       'bg-blue-400/15 text-blue-400',
+  task:       'bg-status-active/10 text-status-active',
   workflow:   'bg-accent/15 text-accent',
-  escalation: 'bg-amber-400/15 text-amber-400',
-  activity:   'bg-cyan-400/15 text-cyan-400',
-  knowledge:  'bg-violet-400/15 text-violet-400',
-  file:       'bg-orange-400/15 text-orange-400',
-  agent:      'bg-emerald-400/15 text-emerald-400',
-  app:        'bg-rose-400/15 text-rose-400',
-  milestone:  'bg-violet-400/15 text-violet-400',
+  escalation: 'bg-status-warning/10 text-status-warning',
+  activity:   'bg-status-active/10 text-status-active',
+  knowledge:  'bg-accent/10 text-accent',
+  file:       'bg-status-draft/10 text-status-draft',
+  agent:      'bg-status-success/10 text-status-success',
+  app:        'bg-status-error/10 text-status-error',
+  milestone:  'bg-accent/10 text-accent',
 };
 
 interface Props {
@@ -102,12 +102,12 @@ export function SubscriptionsStep({ form, set }: Props) {
             }`}>
               <button onClick={() => setSelected(i)} className="flex-1 text-left px-3 py-2 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isComplete(s) ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${isComplete(s) ? 'bg-status-success' : 'bg-surface-border'}`} />
                   <span className="text-[11px] font-mono truncate">{s.topic || 'new subscription'}</span>
                 </div>
                 <span className="text-[9px] text-text-quaternary ml-3">→ {s.workflow_type || s.tool_name || s.reaction_type}</span>
               </button>
-              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove subscription "${s.topic || 'new'}"?\n\nThis takes effect when you save.`)) removeSub(i); }} className="opacity-0 group-hover/sub:opacity-100 px-2 text-text-quaternary hover:text-red-400 transition-all" title="Remove">
+              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove subscription "${s.topic || 'new'}"?\n\nThis takes effect when you save.`)) removeSub(i); }} className="opacity-0 group-hover/sub:opacity-100 px-2 text-text-quaternary hover:text-status-error transition-all" title="Remove">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
@@ -510,7 +510,7 @@ function TopicCombobox({ value, onChange, topics }: {
       {open && filtered.length > 0 && (
         <div className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
           {filtered.map((t) => {
-            const catCls = CATEGORY_COLORS[t.category] ?? 'bg-zinc-400/15 text-zinc-400';
+            const catCls = CATEGORY_COLORS[t.category] ?? 'bg-surface-sunken text-text-tertiary';
             return (
               <button
                 key={t.topic}

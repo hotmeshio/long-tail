@@ -249,7 +249,7 @@ export function WorkflowConfigDetailPage() {
 
         {/* ── Invocation ───────────────────────────────────────────────── */}
         <div>
-          <SectionHeader icon={Play} color="text-emerald-400">Invocation</SectionHeader>
+          <SectionHeader icon={Play} color="text-accent">Invocation</SectionHeader>
           <div className="space-y-5">
             <div className="space-y-1">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -302,7 +302,7 @@ export function WorkflowConfigDetailPage() {
 
         {/* ── Certification ────────────────────────────────────────────── */}
         <div>
-          <SectionHeader icon={ShieldCheck} color="text-violet-400">Certification</SectionHeader>
+          <SectionHeader icon={ShieldCheck} color="text-accent">Certification</SectionHeader>
           <div className="space-y-5">
             <Field
               label="Resolver Schema"

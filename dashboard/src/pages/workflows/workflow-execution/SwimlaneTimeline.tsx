@@ -146,7 +146,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
         <div className="flex items-center gap-3 ml-auto">
           {activeCategories.map((cat) => (
             <div key={cat} className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${outline ? `border ${CATEGORY_COLORS[cat]?.outline ?? 'border-text-tertiary'}` : CATEGORY_COLORS[cat]?.bar ?? 'bg-text-tertiary'}`} />
+              <span className={`w-2 h-2 rounded-full dot-ring ${outline ? `border ${CATEGORY_COLORS[cat]?.outline ?? 'border-text-tertiary'}` : CATEGORY_COLORS[cat]?.bar ?? 'bg-text-tertiary'}`} />
               <span className="text-[9px] text-text-tertiary">
                 {CATEGORY_COLORS[cat]?.label ?? cat}
               </span>
@@ -154,7 +154,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
           ))}
           {spans.some((s) => s.pending) && (
             <div className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-status-warning animate-pulse" />
+              <span className="w-2 h-2 rounded-full dot-ring bg-status-warning animate-pulse" />
               <span className="text-[9px] text-text-tertiary">Pending</span>
             </div>
           )}
@@ -186,7 +186,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
             {/* Lane row */}
             <div className="flex items-center border-b border-surface-border">
               <div className="w-56 shrink-0 py-3 pr-4 flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${catColor?.bar ?? 'bg-text-tertiary'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${catColor?.bar ?? 'bg-text-tertiary'}`} />
                 <p
                   className="text-xs font-mono text-text-secondary whitespace-nowrap overflow-hidden"
                   title={lane.name}

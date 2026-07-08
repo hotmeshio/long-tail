@@ -75,7 +75,7 @@ export function CredentialsPage() {
 
       {/* Add credential dropdown */}
       {addOpen && (
-        <div className="mb-6 p-4 bg-surface-raised border border-surface-border rounded-md space-y-3">
+        <div className="mb-6 pb-5 border-b border-surface-border/60 space-y-3">
           <div className="flex items-center gap-3">
             <label className="text-xs text-text-secondary font-medium">Provider</label>
             <div className="relative">
@@ -118,11 +118,11 @@ export function CredentialsPage() {
           <p className="text-xs mt-1">Add a credential to enable tool authentication.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-surface-border/30">
           {connections.map((conn) => (
             <div
               key={`${conn.provider}-${conn.label}`}
-              className="group/row flex items-center gap-4 px-4 py-3 bg-surface-raised border border-surface-border rounded-md"
+              className="group/row flex items-center gap-4 px-3 py-2.5 -mx-3"
             >
               <OAuthIcon provider={conn.provider} className="w-6 h-6 shrink-0" />
 

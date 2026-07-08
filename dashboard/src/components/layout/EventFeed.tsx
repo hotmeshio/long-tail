@@ -20,7 +20,7 @@ interface FeedEvent {
 // Color by {category}.{action} — extracted from structured subjects like
 // system.workflow.abc123.completed → workflow.completed
 const TYPE_COLORS: Record<string, string> = {
-  'escalation.created': 'text-blue-400',
+  'escalation.created': 'text-status-active',
   'escalation.claimed': 'text-status-warning',
   'escalation.released': 'text-text-tertiary',
   'escalation.resolved': 'text-status-success',
@@ -31,16 +31,16 @@ const TYPE_COLORS: Record<string, string> = {
   'workflow.started': 'text-accent',
   'workflow.completed': 'text-status-success',
   'workflow.failed': 'text-status-error',
-  'activity.started': 'text-blue-400',
+  'activity.started': 'text-status-active',
   'activity.completed': 'text-status-success',
   'activity.failed': 'text-status-error',
-  'knowledge.stored': 'text-violet-400',
+  'knowledge.stored': 'text-accent',
   'knowledge.deleted': 'text-text-tertiary',
   'agent.started': 'text-accent',
   'agent.completed': 'text-status-success',
   'agent.failed': 'text-status-error',
-  'agent.status_changed': 'text-blue-400',
-  milestone: 'text-violet-400',
+  'agent.status_changed': 'text-status-active',
+  milestone: 'text-accent',
 };
 
 /** Extract {category}.{action} from a structured event type for color lookup. */

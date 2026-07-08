@@ -102,7 +102,7 @@ export function AgentDetailPage() {
     );
   }
 
-  const statusDot = agent.status === 'active' ? 'bg-emerald-400' : agent.status === 'paused' ? 'bg-amber-400' : agent.status === 'error' ? 'bg-red-400' : 'bg-zinc-500';
+  const statusDot = agent.status === 'active' ? 'bg-status-success' : agent.status === 'paused' ? 'bg-status-warning' : agent.status === 'error' ? 'bg-status-error' : 'bg-surface-border';
   const subs = subsData?.subscriptions ?? [];
   const statusLabel = agent.status === 'active' ? 'Active' : agent.status === 'paused' ? 'Paused' : agent.status === 'error' ? 'Error' : 'Inactive';
   const schedules = (agent.behaviors as any)?.schedules as any[] | undefined;
@@ -148,14 +148,14 @@ export function AgentDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 mr-2">
-            <span className={`w-2 h-2 rounded-full ${statusDot}`} />
+            <span className={`w-2 h-2 rounded-full dot-ring ${statusDot}`} />
             <span className="text-xs text-text-secondary capitalize">{statusLabel}</span>
           </div>
           <button onClick={() => navigate(`/agents/${agent.id}/edit`)} className="flex items-center gap-1.5 px-4 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors">
             <Pencil className="w-3 h-3" /> Edit
           </button>
           {agent.status !== 'active' && (
-            <button onClick={() => updateMutation.mutate({ id: agent.id, status: 'active' as any })} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-emerald-400 hover:bg-emerald-600/10 transition-colors">
+            <button onClick={() => updateMutation.mutate({ id: agent.id, status: 'active' as any })} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-status-success hover:bg-status-success/10 transition-colors">
               <Play className="w-3 h-3" /> Activate
             </button>
           )}
@@ -164,7 +164,7 @@ export function AgentDetailPage() {
               <Pause className="w-3 h-3" /> Pause
             </button>
           )}
-          <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-600/10 transition-colors">
+          <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md text-status-error/60 hover:text-status-error hover:bg-status-error/10 transition-colors">
             <Trash2 className="w-3 h-3" /> Delete
           </button>
         </div>
@@ -182,7 +182,7 @@ export function AgentDetailPage() {
         <div className="mb-10">
           <SectionHeader
             icon={Compass}
-            color="text-rose-400"
+            color="text-accent"
             actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=2`} label="Motivation" />}
           >Motivation</SectionHeader>
           <div className="grid grid-cols-2 gap-x-14 bg-surface-sunken/20 rounded-lg px-5 py-4">
@@ -209,7 +209,7 @@ export function AgentDetailPage() {
         <div>
           <SectionHeader
             icon={Radio}
-            color="text-cyan-400"
+            color="text-accent"
             actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=4`} label="Subscriptions" />}
           >
             Subscriptions ({subs.length})
@@ -238,7 +238,7 @@ export function AgentDetailPage() {
         <div>
           <SectionHeader
             icon={Clock}
-            color="text-amber-400"
+            color="text-accent"
             actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=5`} label="Schedules" />}
           >Schedules ({schedCount})</SectionHeader>
           {schedules?.length ? (
@@ -265,7 +265,7 @@ export function AgentDetailPage() {
           <div>
             <SectionHeader
               icon={Brain}
-              color="text-emerald-400"
+              color="text-accent"
               actions={
                 <SectionViewLink
                   to={agent.knowledge_domain ? `/knowledge?domain=${agent.knowledge_domain}` : `/agents/${agent.id}/edit?step=3`}
@@ -285,10 +285,10 @@ export function AgentDetailPage() {
           </div>
 
           <div>
-            <SectionHeader icon={Radio} color="text-cyan-400"
+            <SectionHeader icon={Radio} color="text-accent"
               actions={
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-500 ${pulse ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full dot-ring transition-colors duration-500 ${pulse ? 'bg-status-success' : 'bg-surface-border'}`} />
                   <span className="text-[10px] text-text-quaternary">live</span>
                 </div>
               }

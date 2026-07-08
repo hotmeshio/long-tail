@@ -75,6 +75,21 @@ function renderPage(initialPath = '/workflows/registry') {
   );
 }
 
+// The filter bar search input debounces 300ms before propagating
+function typeSearch(value: string) {
+  vi.useFakeTimers();
+  const input = screen.getByPlaceholderText(/\d+ workflows/);
+  fireEvent.change(input, { target: { value } });
+  act(() => {
+    vi.advanceTimersByTime(350);
+  });
+  vi.useRealTimers();
+}
+
+function selectQueue(value: string) {
+  fireEvent.change(screen.getByRole('combobox'), { target: { value } });
+}
+
 describe('WorkflowConfigsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,14 +115,15 @@ describe('WorkflowConfigsPage', () => {
     expect(screen.getByText('unregistered-flow')).toBeInTheDocument();
   });
 
-  it('renders filter bar with search and queue tab controls', () => {
+  it('renders filter bar with search and queue select controls', () => {
     renderPage();
-    expect(screen.getByPlaceholderText(/Search \d+ workflows/)).toBeInTheDocument();
-    // "All" tab is always shown in the queue filter bar
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
-    // Queue-specific tabs derived from data
-    expect(screen.getByRole('button', { name: 'default' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'examples' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/\d+ workflows/)).toBeInTheDocument();
+    // Queue select with an "All" default plus one option per queue
+    const select = screen.getByRole('combobox');
+    expect(select).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'All' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'examples' })).toBeInTheDocument();
   });
 
   it('renders loading skeleton when loading', () => {
@@ -144,8 +160,7 @@ describe('WorkflowConfigsPage', () => {
 
   it('filters by queue', () => {
     renderPage();
-    // Click the 'examples' queue tab button
-    fireEvent.click(screen.getByRole('button', { name: 'examples' }));
+    selectQueue('examples');
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
     expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
@@ -161,13 +176,13 @@ describe('WorkflowConfigsPage', () => {
     expect(screen.getByRole('heading', { name: 'user-queue' })).toBeInTheDocument();
   });
 
-  it('shows all queue tabs in the filter bar', () => {
+  it('shows all queues in the filter select', () => {
     renderPage();
-    // All queues derived from data appear as tab buttons
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'default' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'examples' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'user-queue' })).toBeInTheDocument();
+    // All queues derived from data appear as select options
+    expect(screen.getByRole('option', { name: 'All' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'examples' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'user-queue' })).toBeInTheDocument();
   });
 
   // ── Filter: access column ──
@@ -182,29 +197,24 @@ describe('WorkflowConfigsPage', () => {
 
   it('filters by search text (workflow_type)', () => {
     renderPage();
-    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
-    fireEvent.change(input, { target: { value: 'kitchen' } });
+    typeSearch('kitchen');
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
   });
 
   it('filters by search text (description)', () => {
     renderPage();
-    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
-    fireEvent.change(input, { target: { value: 'demo' } });
+    typeSearch('demo');
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
   });
 
   // ── Combined filters ──
 
-  it('combines queue tab + search filters', () => {
+  it('combines queue select + search filters', () => {
     renderPage();
-    // Activate the 'default' queue tab
-    fireEvent.click(screen.getByRole('button', { name: 'default' }));
-    // Then narrow by search
-    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
-    fireEvent.change(input, { target: { value: 'review' } });
+    selectQueue('default');
+    typeSearch('review');
     expect(screen.getByText('review-content')).toBeInTheDocument();
     expect(screen.queryByText('basic-echo')).not.toBeInTheDocument();
     expect(screen.queryByText('kitchen-sink')).not.toBeInTheDocument();
@@ -212,14 +222,14 @@ describe('WorkflowConfigsPage', () => {
 
   // ── Facet options ──
 
-  it('derives queue tabs from data', () => {
+  it('derives queue options from data', () => {
     renderPage();
-    // All button always present
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
-    // One tab per unique task_queue value
-    expect(screen.getByRole('button', { name: 'default' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'examples' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'user-queue' })).toBeInTheDocument();
+    // All option always present
+    expect(screen.getByRole('option', { name: 'All' })).toBeInTheDocument();
+    // One option per unique task_queue value
+    expect(screen.getByRole('option', { name: 'default' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'examples' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'user-queue' })).toBeInTheDocument();
   });
 
   it('derives role pills from workflow access data', () => {
@@ -303,8 +313,7 @@ describe('filter helpers (via rendering)', () => {
       isLoading: false,
     } as any);
     renderPage();
-    const input = screen.getByPlaceholderText(/Search \d+ workflows/);
-    fireEvent.change(input, { target: { value: 'REVIEW' } });
+    typeSearch('REVIEW');
     expect(screen.getByText('review-content')).toBeInTheDocument();
   });
 
@@ -315,10 +324,10 @@ describe('filter helpers (via rendering)', () => {
     } as any);
     renderPage();
     // Filter to examples queue
-    fireEvent.click(screen.getByRole('button', { name: 'examples' }));
+    selectQueue('examples');
     expect(screen.queryByText('review-content')).not.toBeInTheDocument();
-    // Click 'All' to restore all results
-    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    // Select the 'All' default to restore all results
+    selectQueue('');
     expect(screen.getByText('review-content')).toBeInTheDocument();
     expect(screen.getByText('kitchen-sink')).toBeInTheDocument();
   });

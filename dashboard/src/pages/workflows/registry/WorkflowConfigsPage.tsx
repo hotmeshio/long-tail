@@ -5,9 +5,10 @@ import {
   useDeleteWorkflowConfig,
 } from '../../../api/workflows';
 import {
-  Search, Server, LayoutGrid,
+  Server,
   ShieldCheck, ShieldPlus, ShieldOff, Settings, Wrench, Play, UserCheck,
 } from 'lucide-react';
+import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
@@ -95,49 +96,22 @@ export function WorkflowConfigsPage() {
         }
       />
 
-      {/* Sticky filter bar: queue tabs + search */}
+      {/* Sticky filter bar: queue select + search */}
       {!isLoading && queues.length > 0 && (
-        <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-        <div className="bg-[#F7F7F7] rounded-lg px-5 pt-3 pb-3 flex items-center gap-5">
-          <button
-            onClick={() => setActiveQueue(null)}
-            className={`flex flex-col items-center gap-1 transition-colors ${
-              activeQueue === null ? 'text-accent' : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-          >
-            <LayoutGrid className="w-3 h-3" strokeWidth={1.5} />
-            <span className="text-[9px] font-medium">All</span>
-          </button>
-          {queues.map((queue) => {
-            const isActive = activeQueue === queue;
-            const label = queue.length > 16 ? queue.slice(0, 14) + '…' : queue;
-            return (
-              <button
-                key={queue}
-                onClick={() => setActiveQueue(isActive ? null : queue)}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  isActive ? 'text-accent' : 'text-text-quaternary hover:text-text-secondary'
-                }`}
-                title={queue}
-              >
-                <Server className="w-3 h-3" strokeWidth={1.5} />
-                <span className="text-[9px] font-medium">{label}</span>
-              </button>
-            );
-          })}
-          <span className="flex-1" />
-          <div className="relative">
-            <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${allWorkflows.length} workflows…`}
-              className="pl-5 py-1 text-sm bg-transparent border-b border-surface-border/60 text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors w-52"
-            />
-          </div>
-        </div>
-        </div>
+        <FilterBar>
+          <FilterSelect
+            label="Queue"
+            value={activeQueue ?? ''}
+            onChange={(v) => setActiveQueue(v || null)}
+            options={queues.map((q) => ({ value: q, label: q }))}
+          />
+          <FilterInput
+            label="Search"
+            value={search}
+            onChange={setSearch}
+            placeholder={`${allWorkflows.length} workflows…`}
+          />
+        </FilterBar>
       )}
 
       {/* Content */}
@@ -151,7 +125,7 @@ export function WorkflowConfigsPage() {
         <div className="space-y-10">
           {grouped.map(({ queue, workflows }) => (
             <div key={queue}>
-              <div className="sticky top-[78px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
+              <div className="sticky top-[60px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
                 <Server className="w-3 h-3 text-accent" strokeWidth={1.5} />
                 <h2 className="section-h2">{queue}</h2>
                 <span className="text-xs text-text-quaternary">{workflows.length}</span>
@@ -173,7 +147,7 @@ export function WorkflowConfigsPage() {
 
           {ungrouped.length > 0 && (
             <div>
-              <div className="sticky top-[78px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
+              <div className="sticky top-[60px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
                 <Wrench className="w-3 h-3 text-text-quaternary" strokeWidth={1.5} />
                 <h2 className="section-h2">No Queue</h2>
                 <span className="text-xs text-text-quaternary">{ungrouped.length}</span>
@@ -218,7 +192,7 @@ export function WorkflowConfigsPage() {
 
 // ── Column layout ─────────────────────────────────────────────────────────────
 // [Workflow 1fr] [Tier 7rem] [Access 13rem] [Actions 4.5rem]
-const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_7rem_13rem_4.5rem] gap-x-6 items-start';
+const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_7rem_13rem_4.5rem] gap-x-6';
 
 function WorkflowTableHeader() {
   return (
@@ -253,40 +227,40 @@ function WorkflowRow({
       tabIndex={0}
       onClick={() => onRowClick(wf)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onRowClick(wf); }}
-      className={`group ${ROW_GRID} py-2.5 px-3 -mx-3 rounded-md cursor-pointer transition-colors`}
+      className={`group ${ROW_GRID} py-2 px-3 -mx-3 rounded-md cursor-pointer transition-colors items-center`}
     >
-      {/* Col 1: Workflow name + description */}
-      <div className="min-w-0">
+      {/* Col 1: Workflow name + description, single line */}
+      <div className="flex items-center gap-3 min-w-0">
         <WorkflowPill
           type={wf.workflow_type}
           size="md"
           variant={wf.tier === 'certified' ? 'certified' : wf.tier === 'registered' ? 'registered' : 'durable'}
         />
         {wf.description && (
-          <p className="mt-0.5 text-[10px] text-text-tertiary group-hover:text-text-secondary leading-snug line-clamp-2 transition-colors">
+          <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary group-hover:text-text-secondary transition-colors">
             {wf.description}
           </p>
         )}
       </div>
 
       {/* Col 2: Tier */}
-      <div className="pt-0.5">
+      <div>
         <TierBadge tier={wf.tier ?? 'durable'} />
       </div>
 
-      {/* Col 3: Access — escalation roles then invocation roles */}
-      <div className="min-w-0 space-y-1 pt-0.5">
+      {/* Col 3: Access — escalation + invocation roles, single line */}
+      <div className="flex items-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap">
         {escRoles.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <>
             <span title="Escalation roles"><ShieldCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
             {escRoles.map((r) => <RolePill key={`e-${r}`} role={r} />)}
-          </div>
+          </>
         )}
         {invokeRoles.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <>
             <span title="Invocation roles"><UserCheck className="w-3 h-3 text-text-quaternary shrink-0" /></span>
             {invokeRoles.map((r) => <RolePill key={`i-${r}`} role={r} />)}
-          </div>
+          </>
         )}
         {escRoles.length === 0 && invokeRoles.length === 0 && (
           <span className="text-xs text-text-quaternary">—</span>
@@ -294,7 +268,7 @@ function WorkflowRow({
       </div>
 
       {/* Col 4: Actions — revealed on hover */}
-      <div className="flex items-center justify-end gap-2.5 pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center justify-end gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {wf.invocable && (
           <button
             title="Invoke workflow"

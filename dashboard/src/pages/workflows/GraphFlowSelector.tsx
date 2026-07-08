@@ -30,7 +30,7 @@ export function GraphFlowSelector({
     <div>
       {/* Sticky header: search pill + section label — single block, no gap */}
       <div className="sticky top-0 z-20 bg-surface pt-4">
-        <div className="bg-[#F7F7F7] rounded-lg px-4 py-2 mb-3">
+        <div className="bg-surface-sunken rounded-lg px-4 py-2 mb-3">
           <div className="relative w-1/2">
             <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
             <input
@@ -60,20 +60,22 @@ export function GraphFlowSelector({
               <button
                 key={flow.id}
                 onClick={() => onSelect(flow)}
-                className="group relative w-full text-left py-3 px-3 -mx-3 rounded-md transition-colors duration-150"
+                className="group relative w-full text-left py-2 px-3 -mx-3 rounded-md transition-colors duration-150"
               >
                 {isSelected && (
                   <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full" />
                 )}
-                <div className="flex items-center gap-2 mb-0.5">
+                <div className="flex items-center gap-3">
                   <ToolPill name={flow.graph_topic} size="md" />
-                  <NamespacePill namespace={flow.app_id} />
+                  {flow.description && (
+                    <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+                      {flow.description}
+                    </p>
+                  )}
+                  <span className="ml-auto shrink-0">
+                    <NamespacePill namespace={flow.app_id} />
+                  </span>
                 </div>
-                {flow.description && (
-                  <p className="text-[10px] text-text-tertiary group-hover:text-text-secondary leading-snug transition-colors pl-0.5">
-                    {flow.description}
-                  </p>
-                )}
               </button>
             );
           })}

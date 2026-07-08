@@ -23,16 +23,16 @@ function StatusDot({ row }: { row: LTEscalationRecord }) {
     return <Bell className={`w-3 h-3 shrink-0 ${color}`} />;
   }
   if (row.status === 'resolved') {
-    return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-success text-status-success" />;
+    return <Circle className="w-2.5 h-2.5 shrink-0 text-status-success" strokeWidth={2.5} />;
   }
   if (row.status === 'cancelled') {
-    return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-error text-status-error" />;
+    return <Circle className="w-2.5 h-2.5 shrink-0 text-status-error" strokeWidth={2.5} />;
   }
   if (isEffectivelyClaimed(row)) {
-    return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-warning text-status-warning" />;
+    return <Circle className="w-2.5 h-2.5 shrink-0 text-status-warning" strokeWidth={2.5} />;
   }
   // pending (unclaimed)
-  return <Circle className="w-2.5 h-2.5 shrink-0 fill-status-active text-status-active" />;
+  return <Circle className="w-2.5 h-2.5 shrink-0 text-status-active" strokeWidth={2.5} />;
 }
 
 /**
@@ -170,13 +170,13 @@ export const STATUS_COLUMN: Column<LTEscalationRecord> = {
       return <Bell className={`w-3 h-3 ${color}`} />;
     }
     if (row.status === 'resolved') {
-      return <Circle className="w-2.5 h-2.5 fill-status-success text-status-success" />;
+      return <Circle className="w-2.5 h-2.5 text-status-success" strokeWidth={2.5} />;
     }
     if (isEffectivelyClaimed(row)) {
-      return <Circle className="w-2.5 h-2.5 fill-status-warning text-status-warning" />;
+      return <Circle className="w-2.5 h-2.5 text-status-warning" strokeWidth={2.5} />;
     }
     // pending (unclaimed)
-    return <Circle className="w-2.5 h-2.5 fill-text-tertiary text-text-tertiary" />;
+    return <Circle className="w-2.5 h-2.5 text-text-tertiary" strokeWidth={2.5} />;
   },
   className: 'w-8',
 };
@@ -188,7 +188,7 @@ export const CLAIMED_STATUS_COLUMN: Column<LTEscalationRecord> = {
   render: (row) =>
     isAckEscalation(row)
       ? <Bell className="w-3 h-3 text-status-warning" />
-      : <Circle className="w-2.5 h-2.5 fill-status-warning text-status-warning" />,
+      : <Circle className="w-2.5 h-2.5 text-status-warning" strokeWidth={2.5} />,
   className: 'w-8',
 };
 

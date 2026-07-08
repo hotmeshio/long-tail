@@ -24,12 +24,12 @@ const columns: Column<Agent>[] = [
     key: 'name',
     label: 'Agent',
     render: (row) => (
-      <div className="flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.status === 'active' ? 'bg-emerald-400' : row.status === 'paused' ? 'bg-amber-400' : row.status === 'error' ? 'bg-red-400' : 'bg-zinc-500'}`} />
-        <div className="min-w-0">
-          <span className="text-xs font-medium text-text-primary block">{row.id}</span>
-          {row.description && <p className="text-[10px] text-text-tertiary truncate">{row.description}</p>}
-        </div>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${row.status === 'active' ? 'bg-status-success' : row.status === 'paused' ? 'bg-status-warning' : row.status === 'error' ? 'bg-status-error' : 'bg-surface-border'}`} />
+        <span className="text-xs font-medium text-text-primary whitespace-nowrap">{row.id}</span>
+        {row.description && (
+          <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary">{row.description}</p>
+        )}
       </div>
     ),
   },

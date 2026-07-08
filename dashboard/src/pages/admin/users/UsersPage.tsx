@@ -7,7 +7,7 @@ import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
-import { TimestampCell } from '../../../components/common/display/TimestampCell';
+import { DateValue } from '../../../components/common/display/DateValue';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import type { LTUserRecord } from '../../../api/types';
@@ -90,27 +90,32 @@ function UserAccountsPanel() {
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <span
-            className={`w-2 h-2 rounded-full shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
+            className={`w-2 h-2 rounded-full dot-ring shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
             title={row.status}
           />
-          <div>
-            <p className="text-sm text-text-primary">
-              {row.display_name || row.external_id}
-            </p>
-            {row.email && (
-              <p className="text-xs text-text-tertiary">{row.email}</p>
-            )}
-          </div>
+          <span className="text-xs text-text-primary whitespace-nowrap">
+            {row.display_name || row.external_id}
+          </span>
         </div>
       ),
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      render: (row) =>
+        row.email ? (
+          <span className="text-xs text-text-secondary whitespace-nowrap">{row.email}</span>
+        ) : (
+          <span className="text-xs text-text-quaternary">—</span>
+        ),
     },
     {
       key: 'roles',
       label: 'Roles',
       render: (row) => (
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {(row.roles ?? []).map((r) => (
-            <RolePill key={r.role} role={r.role} />
+            <RolePill key={r.role} role={r.role} size="md" />
           ))}
         </div>
       ),
@@ -118,8 +123,8 @@ function UserAccountsPanel() {
     {
       key: 'created_at',
       label: 'Created',
-      render: (row) => <TimestampCell date={row.created_at} />,
-      className: 'w-44',
+      render: (row) => <DateValue date={row.created_at} />,
+      className: 'w-36 whitespace-nowrap',
     },
     ...(isBuilder ? [{
       key: 'actions' as const,

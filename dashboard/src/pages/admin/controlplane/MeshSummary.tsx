@@ -15,28 +15,24 @@ const HEALTH_CONFIG = {
     icon: Shield,
     label: 'Healthy',
     color: 'text-status-success',
-    bg: 'bg-status-success/5 border-status-success/20',
     desc: 'All engines and workers are processing normally.',
   },
   degraded: {
     icon: ShieldAlert,
     label: 'Degraded',
     color: 'text-status-warning',
-    bg: 'bg-status-warning/5 border-status-warning/20',
     desc: 'Some nodes are throttled or reporting errors.',
   },
   paused: {
     icon: ShieldOff,
     label: 'Paused',
     color: 'text-status-error',
-    bg: 'bg-status-error/5 border-status-error/20',
     desc: 'One or more queues are paused. Messages are accumulating.',
   },
   unknown: {
     icon: Shield,
     label: 'Discovering...',
     color: 'text-text-tertiary',
-    bg: 'bg-surface-sunken border-surface-border',
     desc: 'Waiting for roll call responses.',
   },
 };
@@ -73,7 +69,7 @@ export function MeshSummary({
   const HealthIcon = cfg.icon;
 
   return (
-    <div className={`rounded-lg border p-4 ${cfg.bg}`}>
+    <div className="py-4 border-b border-surface-border/60">
       <div className="flex items-start gap-4">
         {/* Health status */}
         <div className="flex items-center gap-2 min-w-[140px]">

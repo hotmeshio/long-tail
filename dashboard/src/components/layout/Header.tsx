@@ -7,6 +7,7 @@ import { useEscalationCounts } from '../../hooks/useEscalationCounts';
 import { useEventStatus } from '../../hooks/useEventContext';
 import { useAIOverride } from '../../api/settings';
 import { AppLogo } from '../common/display/AppLogo';
+import { THEMES, THEME_LABELS, THEME_SWATCHES, getTheme, setTheme, type Theme } from '../../lib/theme';
 
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
@@ -15,7 +16,13 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   const { connected } = useEventStatus();
   const { toggleAIOverride } = useAIOverride();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setActiveTheme] = useState<Theme>(getTheme);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const selectTheme = (next: Theme) => {
+    setTheme(next);
+    setActiveTheme(next);
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -50,7 +57,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         <Link
           to="/escalations/available"
           className={`flex items-center gap-1.5 text-[11px] transition-colors ${
-            available > 0 ? 'text-blue-400 hover:text-blue-300' : 'text-text-quaternary hover:text-text-secondary'
+            available > 0 ? 'text-status-active hover:text-status-active/80' : 'text-text-quaternary hover:text-text-secondary'
           }`}
           title="Available escalations"
         >
@@ -62,7 +69,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
         <Link
           to="/escalations/queue"
           className={`flex items-center gap-1.5 text-[11px] transition-colors ${
-            mine > 0 ? 'text-status-warning hover:text-amber-300' : 'text-text-quaternary hover:text-text-secondary'
+            mine > 0 ? 'text-status-warning hover:text-status-warning/80' : 'text-text-quaternary hover:text-text-secondary'
           }`}
           title="My escalation queue"
         >
@@ -85,7 +92,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                 }
               }}
               className={`flex items-center gap-1.5 text-[11px] transition-colors ${
-                connected ? 'text-emerald-400 hover:text-emerald-300' : 'text-text-quaternary hover:text-text-secondary'
+                connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
               }`}
               title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
             >
@@ -133,6 +140,24 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                 >
                   Credentials
                 </Link>
+                <div className="px-3 py-2 border-t border-surface-border/60">
+                  <p className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Theme</p>
+                  <div className="flex items-center gap-2">
+                    {THEMES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => selectTheme(t)}
+                        title={THEME_LABELS[t]}
+                        aria-label={`${THEME_LABELS[t]} theme`}
+                        className={`w-4 h-4 rounded-full transition-transform hover:scale-110 ${
+                          theme === t ? 'ring-2 ring-offset-1 ring-surface-border' : ''
+                        }`}
+                        style={{ backgroundColor: THEME_SWATCHES[t] }}
+                      />
+                    ))}
+                  </div>
+                </div>
                 <button
                   onClick={() => { setMenuOpen(false); logout(); }}
                   className="block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"

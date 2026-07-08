@@ -3,7 +3,7 @@ import type { ActivityManifestEntry } from '../../../api/types';
 // ── Colors ──────────────────────────────────────────────────────────────────
 
 const SOURCE_STYLES: Record<string, { bar: string; dot: string; hex: string; label: string }> = {
-  trigger:   { bar: 'bg-[#6C47FF]',  dot: 'bg-[#6C47FF]',  hex: '#6C47FF', label: 'Trigger' },
+  trigger:   { bar: 'bg-accent',      dot: 'bg-accent',      hex: 'rgb(var(--lt-accent))', label: 'Trigger' },
   mcp:       { bar: 'bg-blue-500',    dot: 'bg-blue-500',    hex: '#3B82F6', label: 'MCP' },
   db:        { bar: 'bg-blue-500',    dot: 'bg-blue-500',    hex: '#3B82F6', label: 'Database' },
   llm:       { bar: 'bg-violet-500',  dot: 'bg-violet-500',  hex: '#8B5CF6', label: 'LLM' },

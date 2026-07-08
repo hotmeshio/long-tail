@@ -34,8 +34,8 @@ export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartP
     const pct = maxCount > 0 ? (s.count / maxCount) * 100 : 0;
     const isEngine = s.stream_type === 'engine';
     const label = isEngine ? '(all engines)' : stripStreamPrefix(s.stream_name);
-    const barColor = isEngine ? 'bg-blue-500/70' : 'bg-accent/60';
-    const labelColor = isEngine ? 'text-blue-500' : 'text-text-tertiary';
+    const barColor = isEngine ? 'bg-status-active/70' : 'bg-accent/60';
+    const labelColor = isEngine ? 'text-status-active' : 'text-text-tertiary';
     return (
       <div key={`${s.stream_type}-${s.stream_name}`} className="flex items-center gap-3">
         <span
@@ -64,7 +64,7 @@ export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartP
       {engineStreams.length > 0 && (
         <>
           <p
-            className={`${labelCls} text-blue-500/70 hover:text-blue-500`}
+            className={`${labelCls} text-status-active/70 hover:text-status-active`}
             onClick={() => onNodeFilter?.('engines')}
           >
             Engine Stream

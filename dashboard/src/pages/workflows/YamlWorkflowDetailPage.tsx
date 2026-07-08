@@ -157,18 +157,18 @@ export function YamlWorkflowDetailPage() {
         {/* Input / Output */}
         <div className="space-y-10">
           <div>
-            <SectionHeader icon={Braces} color="text-emerald-400">Input</SectionHeader>
+            <SectionHeader icon={Braces} color="text-accent">Input</SectionHeader>
             <FieldList schema={flow.input_schema} empty="No declared input fields" />
           </div>
           <div>
-            <SectionHeader icon={Braces} color="text-amber-400">Output</SectionHeader>
+            <SectionHeader icon={Braces} color="text-accent">Output</SectionHeader>
             <FieldList schema={outputSchema} empty="No declared output fields" />
           </div>
         </div>
 
         {/* Graph structure */}
         <div>
-          <SectionHeader icon={Workflow} color="text-violet-400">Graph</SectionHeader>
+          <SectionHeader icon={Workflow} color="text-accent">Graph</SectionHeader>
           {manifest.length === 0 ? (
             <EmptyHint text="A single trigger maps the input straight to the output — see the graph definition below." />
           ) : (
@@ -189,7 +189,7 @@ export function YamlWorkflowDetailPage() {
 
       {/* Graph definition source */}
       <div className="mb-12">
-        <SectionHeader icon={FileCode2} color="text-cyan-400">Definition</SectionHeader>
+        <SectionHeader icon={FileCode2} color="text-accent">Definition</SectionHeader>
         <pre className="text-[11px] font-mono text-text-secondary bg-surface-sunken/50 rounded-md p-4 overflow-x-auto leading-relaxed">
           {flow.yaml_content}
         </pre>
@@ -197,7 +197,7 @@ export function YamlWorkflowDetailPage() {
 
       {/* Versions */}
       <div>
-        <SectionHeader icon={History} color="text-rose-400">Versions ({versions.length})</SectionHeader>
+        <SectionHeader icon={History} color="text-accent">Versions ({versions.length})</SectionHeader>
         {versions.length === 0 ? (
           <EmptyHint text="No prior versions" />
         ) : (

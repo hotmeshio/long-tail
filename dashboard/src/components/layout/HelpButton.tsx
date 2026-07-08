@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { X } from 'lucide-react';
 import { useHelpAssistant } from '../../hooks/useHelpAssistant';
 import { LT_BASE } from '../../lib/base-path';
@@ -15,7 +16,12 @@ export function HelpButton() {
       {helpOpen ? (
         <X className="w-5 h-5 text-text-tertiary" strokeWidth={1.5} />
       ) : (
-        <img src={`${LT_BASE}/logo512.png`} alt="Help" className="w-8 h-8 -rotate-[120deg]" />
+        <span
+          role="img"
+          aria-label="Help"
+          className="logo-mark w-8 h-8 -rotate-[120deg]"
+          style={{ '--logo-url': `url(${LT_BASE}/logo512.png)` } as CSSProperties}
+        />
       )}
     </button>
   );

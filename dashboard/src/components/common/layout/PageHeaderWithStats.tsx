@@ -44,7 +44,7 @@ export function PageHeaderWithStats({
       <div className="flex items-center gap-5">
         {stats?.map((s) => (
           <div key={s.label} className="flex items-center gap-1.5 text-xs text-text-tertiary">
-            {s.dotClass && <span className={`w-1.5 h-1.5 rounded-full ${s.dotClass}`} />}
+            {s.dotClass && <span className={`w-1.5 h-1.5 rounded-full dot-ring ${s.dotClass}`} />}
             <span>{s.label}</span>
             <span className="font-medium text-text-secondary">{s.value}</span>
           </div>

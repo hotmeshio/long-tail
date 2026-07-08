@@ -107,7 +107,8 @@ describe('StartWorkflowPage', () => {
 
   it('renders workflow selector with all invocable workflows', () => {
     renderPage();
-    expect(screen.getByText('Workflows')).toBeInTheDocument();
+    // Workflows are grouped by task queue with a section header per queue
+    expect(screen.getByRole('heading', { name: 'long-tail-examples-reviewContent' })).toBeInTheDocument();
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
     expect(screen.getByText('processClaim')).toBeInTheDocument();
     // every procedural workflow carries the 'durable' namespace pill

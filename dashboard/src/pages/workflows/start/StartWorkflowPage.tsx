@@ -122,14 +122,14 @@ export function StartWorkflowPage() {
             }`}
           >
             {selectedType && selectedConfig ? (
-              <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
+              <div className="border-l border-surface-border pl-6">
+                <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="w-12 h-12 rounded-full bg-accent/[0.06] flex items-center justify-center mb-4">
-                  <Play className="w-5 h-5 text-accent/50" />
-                </div>
-                <p className="text-sm text-text-secondary mb-1">Select a workflow</p>
-                <p className="text-xs text-text-quaternary">Choose one from the list to configure and invoke it.</p>
+                <Play className="w-6 h-6 text-text-quaternary mb-3" strokeWidth={1} />
+                <p className="text-sm text-text-tertiary">Select a workflow</p>
+                <p className="text-xs text-text-quaternary mt-1">Choose one from the list to configure and invoke it.</p>
               </div>
             )}
           </div>

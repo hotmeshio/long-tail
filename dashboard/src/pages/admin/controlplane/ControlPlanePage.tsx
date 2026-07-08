@@ -128,7 +128,7 @@ export function ControlPlanePage() {
   // ── Header stats ──────────────────────────────────────────────
   const headerStats = useMemo((): InlineStat[] => {
     const stats: InlineStat[] = [
-      { label: 'Engines', value: engines.length, dotClass: 'bg-blue-500' },
+      { label: 'Engines', value: engines.length, dotClass: 'bg-status-active' },
       { label: 'Workers', value: workers.length, dotClass: 'bg-text-secondary' },
       { label: 'Topics', value: queueMap.size },
     ];

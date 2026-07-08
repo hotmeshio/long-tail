@@ -131,7 +131,7 @@ export function ProcessDetailPage() {
               <div>
                 <SectionLabel>Output</SectionLabel>
                 <div className="flex items-center gap-2 font-mono text-xs bg-surface-sunken rounded-md p-4 text-text-secondary mt-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-status-pending animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-pending animate-pulse" />
                   Processing...
                 </div>
               </div>

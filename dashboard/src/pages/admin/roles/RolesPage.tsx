@@ -6,9 +6,9 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { CreateRoleModal } from './CreateRoleModal';
 
 // ── Grid columns ──────────────────────────────────────────────────────────────
-// OPS(28px) | ROLE(160px) | LABEL(160px) | DESCRIPTION(1fr) | PRECEDED BY(130px) | ESCALATES TO(160px) | MEMBERS(88px) | CAPACITY(204px)
+// ROLE(dot+name, 176px) | LABEL(160px) | DESCRIPTION(1fr) | PRECEDED BY(130px) | ESCALATES TO(160px) | MEMBERS(88px) | CAPACITY(204px)
 // The capacity block is a single combined cell that internally renders SLA/m · Target/h · Staff flush to row edges
-const GRID = '28px 160px 160px 1fr 130px 160px 88px 204px';
+const GRID = '176px 160px 1fr 130px 160px 88px 204px';
 
 const CELL_TEXT = 'text-text-secondary transition-colors group-hover/row:text-text-primary';
 const HDR = 'text-[9px] font-semibold uppercase tracking-widest text-text-quaternary';
@@ -24,11 +24,10 @@ const ROW_PY = 'py-2.5';
 function TableHead() {
   return (
     <div
-      className="grid gap-4 border-b border-surface-border sticky top-[78px] z-10 bg-surface"
+      className="grid gap-4 px-3 border-b border-surface-border bg-surface"
       style={{ gridTemplateColumns: GRID }}
     >
-      <span className={CELL_PY} />
-      <span className={`${HDR} ${CELL_PY} flex items-center pl-1`}>Role</span>
+      <span className={`${HDR} ${CELL_PY} flex items-center pl-[18px]`}>Role</span>
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Label</span>
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Description</span>
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Preceded By</span>
@@ -64,21 +63,19 @@ function RoleRow({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
-      className="grid gap-4 cursor-pointer group/row"
+      className="grid gap-4 px-3 cursor-pointer group/row"
       style={{ gridTemplateColumns: GRID }}
     >
-      {/* Ops status circle */}
-      <div className={`flex items-center justify-center ${ROW_PY}`}>
+      {/* ROLE — ops status circle inline with the name */}
+      <div className={`flex items-center gap-2.5 min-w-0 ${ROW_PY}`}>
         <span
-          className={`w-2 h-2 rounded-full shrink-0 ${role.ops_visible ? 'bg-emerald-500' : 'bg-surface-border'}`}
+          className={`w-2 h-2 rounded-full dot-ring shrink-0 ${role.ops_visible ? 'bg-status-success' : 'bg-surface-border'}`}
           title={role.ops_visible ? 'Visible in Operations' : 'Enable in role settings to show in Operations'}
         />
+        <span className={`text-[11px] truncate ${CELL_TEXT}`}>
+          {role.role}
+        </span>
       </div>
-
-      {/* ROLE */}
-      <span className={`flex items-center text-[11px] truncate pl-1 ${ROW_PY} ${CELL_TEXT}`}>
-        {role.role}
-      </span>
 
       {/* LABEL */}
       <span className={`flex items-center text-[11px] truncate ${ROW_PY} ${CELL_TEXT}`}>
@@ -184,10 +181,10 @@ export function RolesPage() {
         }
       />
 
-      {/* Filter bar */}
+      {/* Filter bar + table header — one sticky block, no seam for rows to bleed through */}
       {!isLoading && roles.length > 0 && (
-        <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-          <div className="bg-surface-sunken rounded-lg px-5 py-3 flex items-center gap-3">
+        <div className="sticky top-0 z-20 bg-surface pt-3">
+          <div className="bg-surface-sunken rounded-lg px-5 py-3 mb-3 flex items-center gap-3">
             <Search className="w-3 h-3 text-text-quaternary shrink-0" />
             <input
               type="text"
@@ -202,6 +199,7 @@ export function RolesPage() {
               </span>
             )}
           </div>
+          {filtered.length > 0 && <TableHead />}
         </div>
       )}
 
@@ -218,7 +216,6 @@ export function RolesPage() {
         </p>
       ) : (
         <>
-          <TableHead />
           <div className="divide-y divide-surface-border/30">
             {filtered.map((role) => (
               <RoleRow
