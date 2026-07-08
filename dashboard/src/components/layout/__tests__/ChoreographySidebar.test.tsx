@@ -17,7 +17,7 @@ describe('ChoreographySidebar — operators (no builder, no ops)', () => {
     render(<ChoreographySidebar />, { wrapper });
     expect(screen.getByText('Work')).toBeInTheDocument();
     expect(screen.getByText('My Queue')).toBeInTheDocument();
-    expect(screen.getByText('Available')).toBeInTheDocument();
+    expect(screen.getByText('All')).toBeInTheDocument();
   });
 
   it('does NOT show Pace Board or React entries for plain operators', () => {

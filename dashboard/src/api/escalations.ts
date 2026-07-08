@@ -82,12 +82,13 @@ export interface StationMetric {
   work: StationMetricPeriod;
 }
 
-export function useStationMetrics(period?: string) {
+export function useStationMetrics(period?: string, opts?: { enabled?: boolean }) {
   const p = period ?? '24h';
   return useQuery<{ stations: StationMetric[] }>({
     queryKey: ['stationMetrics', p],
     queryFn: () => apiFetch(`/escalations/station-metrics?period=${p}`),
     staleTime: 5_000,
+    enabled: opts?.enabled ?? true,
   });
 }
 

@@ -4,7 +4,7 @@ import { SidebarNav, type NavEntry } from './SidebarNav';
 /**
  * "Orchestrate" — top-down durable orchestration, authorable two ways.
  * Both flavors are durable and transactional; they differ in form:
- *   Procedural — temporal-like TypeScript, readable, emulated atop the graph.
+ *   Procedural — imperative TypeScript, readable, emulated atop the graph.
  *   Graph      — the compiled DAG, roughly 3x the speed.
  * Each flavor exposes the same shape: Configure, Invoke, Executions.
  */

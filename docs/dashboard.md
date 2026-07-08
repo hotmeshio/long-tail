@@ -1,37 +1,48 @@
 # Dashboard Guide
 
-The Long Tail dashboard is a React single-page application for managing durable workflows, MCP pipelines, escalations, and system administration. It connects to the Long Tail backend over REST and receives real-time updates via NATS subscriptions.
+The Long Tail dashboard is a React single-page application for managing procedural and graph workflows, escalations, automations, and system administration. It connects to the Long Tail backend over REST and receives real-time updates via socket subscriptions.
 
 ## Sidebar Navigation
 
-The sidebar organizes pages into five groups.
+The sidebar organizes pages into six groups.
 
-### Workflows
+### React
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| **Workflow Registry** | `/workflows/registry` | All discovered workflows with tier, queue, and access columns. Configure, certify, or invoke from here. |
-| **Invoke Workflow** | `/workflows/start` | Start a workflow immediately or schedule it on a cron. Two-panel layout with workflow selector and envelope editor. |
-| **Durable Executions** | `/workflows/executions` | All workflow runs with status, duration, and tier. Click through to task records and escalation history. |
-
-### MCP Workflows
+The reactive, event-driven surface — where operations watch the floor and builders configure choreography.
 
 | Page | Route | Purpose |
 |------|-------|---------|
-| **MCP Tool Designer** | `/mcp/queries` | Design and compile MCP tools. Three modes: Plan (multi-workflow sets), Builder (single tool from execution), and Composer (manual tool design). |
-| **MCP Server Tools** | `/mcp/servers` | Browse registered MCP servers and their tools. Register new servers via guided wizard. |
-| **MCP Pipeline Tools** | `/mcp/workflows` | YAML pipeline tools available to the orchestrator. Shows compiled deterministic workflows. |
-| **Pipeline Executions** | `/mcp/executions` | Execution history for MCP pipelines — both dynamic (agentic) and compiled (deterministic) runs. |
-
-### Work
-
-| Page | Route | Purpose |
-|------|-------|---------|
-| **Recent Activity** | `/` | Live event stream and business process overview. |
 | **Pace Board** | `/operations` | COO shop-floor view — pace chart of actual-vs-target flow across every station role, station table with live metrics, and the station detail panel. Visible to any user with ops or builder access. |
-| **Capabilities** | `/capabilities` | Browse MCP servers grouped by capability category. |
-| **Agent Automations** | `/agents` | Autonomous event-driven automations. Configure subscriptions, schedules, and knowledge domains. |
-| **Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
+| **Event Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
+| **Agents** | `/agents` | Autonomous event-driven automations (labeled **Automations** when AI is not configured). Configure subscriptions, schedules, and knowledge domains. |
+| **Capabilities** | `/capabilities` | Browse MCP tools grouped by capability category, with a live run panel. |
+
+### Orchestrate
+
+Top-down durable orchestration, authorable two ways. Both flavors are durable and transactional; they differ in form:
+
+- **Procedural** — imperative TypeScript. Readable, familiar, and the fastest way to author a resilient workflow — no DAG authoring required. It is emulated atop the graph engine, so an equivalent flow costs roughly 6× the activity count of its compiled form. Modern hardware makes that an easy trade in most cases: buy the vCPU, save the engineering time.
+- **Graph** — the compiled YAML DAG, the substrate everything ultimately runs on. Roughly 3× the speed; the right choice when performance genuinely matters. Procedural workflows can be compiled down to graphs, so the Graph executions list shows a mix of hand-authored flows and compiled procedural ones.
+
+Each flavor exposes the same shape: configure, invoke, executions.
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Procedural → Registry** | `/workflows/registry` | All discovered workflows with tier, queue, and access columns. Configure, certify, or invoke from here. |
+| **Procedural → Invoke** | `/workflows/durable/invoke` | Start any invocable procedural workflow. Two-panel layout with workflow selector and envelope editor. |
+| **Procedural → Executions** | `/workflows/executions` | All procedural runs with status, duration, and tier. Click through to task records and escalation history. |
+| **Graph → Configure** | `/mcp/workflows` | Graph workflows available to the orchestrator — compiled deterministic YAML DAGs, grouped by namespace. |
+| **Graph → Invoke** | `/mcp/workflows/invoke` | Start any active graph flow. Same two-panel layout as procedural invoke. |
+| **Graph → Executions** | `/mcp/executions` | Execution history for graph runs — both dynamic (agentic) and compiled (deterministic). |
+
+### Design
+
+The LLM authoring add-on. Appears when an Anthropic key is configured.
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Designer** | `/mcp/queries` | Design and compile MCP tools. Three modes: Plan (multi-workflow sets), Builder (single tool from execution), and Composer (manual tool design). |
+| **Servers & Tools** | `/mcp/servers` | Browse registered MCP servers and their tools. Register new servers via guided wizard. |
 
 ### Storage
 
@@ -40,25 +51,37 @@ The sidebar organizes pages into five groups.
 | **Files** | `/files` | Browse and manage files in connected storage (MinIO/S3/GCS). |
 | **Knowledge** | `/knowledge` | Knowledge base entries for workflow context and retrieval. |
 
-### Admin
+### Identity & Access
 
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Accounts** | `/admin/users` | User accounts and service accounts (bots). Create, edit, assign roles, manage API keys. |
 | **Roles** | `/admin/roles` | Define roles — the queues, forms, and membership that connect workflows to people. Escalation chains, capacity settings, and versioned schemas live here. |
+
+### Infrastructure
+
+Builder-only.
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| **Routers** | `/admin/controlplane` | Active task queues, connected engines and workers, queue depth, and worker health. |
+| **Messages** | `/admin/streams` | Stream message browser for queue debugging. |
 | **DB Maintenance** | `/admin/maintenance` | Database housekeeping — vacuum, reindex, table statistics. |
-| **Task Queues** | `/admin/controlplane` | Active task queues, connected workers, queue depth, and worker health. |
 
 ### Header
 
 The top navigation bar contains:
 
-- **Home logo** — links to the home page (`/`), which shows all business processes.
-- **Quick Query** — a search/prompt field for launching MCP queries directly from the header.
-- **Documentation** (BookOpen icon) — toggles an in-app documentation drawer. Each page also has a contextual docs link next to its title that opens the drawer to the relevant section.
-- **Inbox** (Inbox icon) — links to `/escalations/queue` (My Escalations). Shows a badge count of pending escalations for the current user's roles.
-- **NATS status indicator** — shows connection health.
-- **User menu** (User icon) — dropdown with Credentials and Sign Out options.
+- **Home logo** — links to the home page (`/`), Recent Activity.
+- **all** — links to `/escalations/available` with a live count of unclaimed escalations.
+- **mine** — links to `/escalations/queue` with a live count of escalations assigned to you.
+- **events** — toggles the live event feed (builders and ops; doubles as the connection indicator).
+- **docs** (BookOpen icon) — toggles the in-app documentation drawer. Each page also has a contextual docs link next to its title that opens the drawer to the relevant section.
+- **User menu** — Credentials, theme picker (five accent themes), and Sign Out.
+
+## Home — Recent Activity
+
+The home page mirrors the navigation. Row 1 reflects the two header escalation links: **All Escalations** and **My Escalations**, each showing the five most recent items. Row 2 reflects the Orchestrate story and is tiered by role: superadmins and engineers see the **Pace Board** chart at a glance (click through to `/operations`) beside the five most recent **Procedural** and **Graph** executions; admins — who don't see workflows — get the Pace Board spanning the full row; operators see row 1 only.
 
 ## Key Pages
 
@@ -97,22 +120,15 @@ workers: [
 
 ### Invoke Workflow
 
-A two-panel page for starting any invocable workflow. The left sidebar lists invocable workflows using the same pill styling as the registry. Workflows with active cron schedules show a clock icon. The right panel changes based on the selected mode.
+A two-panel page for starting any invocable procedural workflow. The left panel lists invocable workflows grouped by task queue, with a queue select and search in the filter bar. Workflows with active cron schedules show a clock icon. Selecting a workflow opens the invocation form on the right:
 
-**Mode toggle** (top right): Switch between **Start Now** and **Schedule**.
-
-**Start Now** — immediate invocation:
 - **Identity summary** — shows who will execute (current user, configured bot, or admin override).
 - **Envelope editor** — dual-mode input: a structured form view (when `envelope_schema.data` has scalar fields) or a raw JSON editor. The form auto-generates fields from the schema with inferred types.
 - **Start Workflow** button — invokes the workflow and navigates to the executions page.
 
-**Schedule** — recurring cron execution:
-- **Cron expression** — enter a standard cron expression (e.g., `0 9 * * 1-5`). A human-readable description appears below the input. Expressions firing more often than once per minute are rejected.
-- **Common patterns** — clickable presets for frequent schedules.
-- **Cron envelope** — template payload sent on each scheduled invocation.
-- **Recent executions** — table showing the last 10 runs of the selected workflow.
+Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page.
 
-**API:** `POST /api/workflows/:type/invoke` starts a workflow. `PUT /api/workflows/:type/config` with `cron_schedule` sets up recurring execution.
+**API:** `POST /api/workflows/:type/invoke` starts a workflow.
 
 ### MCP Tool Designer
 
@@ -132,7 +148,7 @@ The MCP Tool Designer page lists previous tool design sessions and provides entr
 
 **Composer mode** — manual tool design for building tools from scratch using the visual DAG editor.
 
-Steps unlock sequentially in each wizard. Compiled tools appear in **MCP Pipeline Tools** and **Pipeline Executions**. See the [Compilation Pipeline](compilation.md) guide for details.
+Steps unlock sequentially in each wizard. Compiled tools appear in **Graph Workflows** and **Graph Executions**. See the [Compilation Pipeline](compilation.md) guide for details.
 
 ### MCP Server Tools
 
@@ -144,9 +160,9 @@ Browse all registered MCP servers and their exposed tools.
 
 **API:** `GET /api/mcp-servers` lists servers. `POST /api/mcp-servers` registers a new one. `GET /api/mcp-servers/:id/tools` lists tools for a server.
 
-### MCP Pipeline Tools
+### Graph Workflows
 
-Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DAG that the `mcpQueryRouter` discovers and invokes automatically — faster and cheaper than re-running the original agentic loop.
+The Graph → Configure page. Deterministic workflows compiled from dynamic MCP executions or authored directly. Each is a YAML DAG that the `mcpQueryRouter` discovers and invokes automatically — faster and cheaper than re-running the original agentic loop.
 
 **Page layout:** Tools are grouped by namespace (app_id). Expand a namespace to see its individual tools. Each tool row shows name, status, and action buttons.
 
@@ -164,9 +180,9 @@ Deterministic tools compiled from dynamic MCP executions. Each tool is a YAML DA
 
 **API:** `GET /api/yaml-workflows` lists pipeline tools. `POST /api/yaml-workflows/:id/deploy` deploys. `POST /api/yaml-workflows/:id/activate` activates. `POST /api/yaml-workflows/:id/invoke` invokes.
 
-### Pipeline Executions
+### Graph Executions
 
-Execution history for all MCP pipeline runs — both dynamic (agentic LLM loops) and compiled (deterministic YAML DAGs).
+Execution history for all graph runs — both dynamic (agentic LLM loops) and compiled (deterministic YAML DAGs). Because procedural workflows compile down to graphs, this list mixes hand-authored flows with compiled procedural ones.
 
 - **Columns:** Workflow ID, type (dynamic/deterministic), status, duration, and start time.
 - **Duration comparison** — deterministic runs are typically faster and cheaper than their dynamic counterparts. Use this page to verify that compiled tools match or exceed the quality of dynamic executions.
@@ -174,9 +190,9 @@ Execution history for all MCP pipeline runs — both dynamic (agentic LLM loops)
 
 **API:** `GET /api/pipelines` lists executions with status, type, and pagination filters.
 
-### Durable Executions
+### Procedural Executions
 
-Lists all durable workflow runs across the system.
+Lists all procedural workflow runs across the system.
 
 - **Tier filter** (top) — switch between All, Certified, and Durable to focus on specific workflow types.
 - **Columns:** Workflow name, workflow ID, status (running/completed/failed), start time, and duration.

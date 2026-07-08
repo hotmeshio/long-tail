@@ -104,7 +104,7 @@ export function YamlWorkflowDetailPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-light text-text-primary font-mono">{flow.graph_topic}</h1>
           <button
-            onClick={() => { window.location.hash = '#docs:dashboard.md:mcp-pipeline-tools'; }}
+            onClick={() => { window.location.hash = '#docs:dashboard.md:graph-workflows'; }}
             className="text-text-quaternary hover:text-accent transition-colors mt-1"
             title="Docs"
           >

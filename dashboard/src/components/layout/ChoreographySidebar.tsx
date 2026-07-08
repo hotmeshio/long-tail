@@ -19,7 +19,7 @@ export function ChoreographySidebar({
   if (!isBuilder && !isOps) {
     const operatorEntries: NavEntry[] = [
       { to: '/escalations/queue', label: 'My Queue', icon: Inbox },
-      { to: '/escalations/available', label: 'Available', icon: ListChecks },
+      { to: '/escalations/available', label: 'All', icon: ListChecks },
     ];
     return <SidebarNav heading="Work" entries={operatorEntries} />;
   }

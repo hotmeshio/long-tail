@@ -60,7 +60,7 @@ interface SequenceFragment {
 
 // ── Fragment builder — BFS per parent_role root, tracking actual depth ────────
 
-function buildFragments(roles: RoleDetail[]): SequenceFragment[] {
+export function buildFragments(roles: RoleDetail[]): SequenceFragment[] {
   const opsRoles = roles.filter((r) => r.ops_visible);
   const roleMap = new Map(opsRoles.map((r) => [r.role, r]));
   const visited = new Set<string>();
