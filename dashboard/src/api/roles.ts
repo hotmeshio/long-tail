@@ -140,10 +140,11 @@ export function useRemoveEscalationChain() {
   });
 }
 
-export function useRoleDetails() {
+export function useRoleDetails(opts?: { enabled?: boolean }) {
   return useQuery<{ roles: RoleDetail[] }>({
     queryKey: ['roles', 'details'],
     queryFn: () => apiFetch('/roles/details'),
+    enabled: opts?.enabled ?? true,
   });
 }
 

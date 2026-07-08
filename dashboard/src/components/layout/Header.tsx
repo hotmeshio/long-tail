@@ -59,10 +59,10 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           className={`flex items-center gap-1.5 text-[11px] transition-colors ${
             available > 0 ? 'text-status-active hover:text-status-active/80' : 'text-text-quaternary hover:text-text-secondary'
           }`}
-          title="Available escalations"
+          title="All escalations"
         >
           <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
-          available{available > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{available}</sup>}
+          all{available > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{available}</sup>}
         </Link>
 
         {/* Escalations: mine */}

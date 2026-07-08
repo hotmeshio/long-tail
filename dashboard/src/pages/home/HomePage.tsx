@@ -1,21 +1,24 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Inbox, ScrollText, GitBranch, Layers, ExternalLink, BookOpen,
+  Inbox, Code2, Workflow, LayoutDashboard, ExternalLink, BookOpen,
 } from 'lucide-react';
 import { formatCountCompact } from '../../lib/format';
-import { useAvailableEscalations, useEscalations } from '../../api/escalations';
+import { useAvailableEscalations, useEscalations, useStationMetrics } from '../../api/escalations';
+import { useRoleDetails } from '../../api/roles';
 import { useJobs } from '../../api/workflows';
 import { useMcpRuns } from '../../api/pipelines';
 import { useControlPlaneApps } from '../../api/controlplane';
-import { useProcesses } from '../../api/tasks';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
-import { useEscalationStatsEvents, useWorkflowListEvents, useProcessListEvents } from '../../hooks/useEventHooks';
+import { useEscalationStatsEvents, useWorkflowListEvents, useStationMetricsEvents } from '../../hooks/useEventHooks';
 import { DateValue } from '../../components/common/display/DateValue';
 import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { PaceChart, type ChartStation } from '../operations/PaceChart';
+import { buildFragments } from '../operations/OperationsPage';
+import { priorityQueueLink } from '../operations/priority-link';
 
 const STATUS_DOT: Record<string, string> = {
   completed: 'bg-status-success',
@@ -38,7 +41,9 @@ function SectionHeader({ icon: Icon, color, docsHash, count, children, actions }
         <Icon className={`w-4.5 h-4.5 ${color || 'text-accent/60'}`} strokeWidth={1.5} />
         <h2 className="section-h2">{children}</h2>
         {count !== undefined && count > 0 && (
-          <span className="text-[10px] text-text-quaternary tabular-nums">{formatCountCompact(count)}</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-semibold tabular-nums">
+            {formatCountCompact(count)}
+          </span>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -158,7 +163,7 @@ function AppPicker({ appIds, selected, onSelect }: {
 export function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isBuilder } = useAccess();
+  const { isBuilder, isOps } = useAccess();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: cpData } = useControlPlaneApps({ enabled: isBuilder });
   const allAppIds = useMemo(() => (cpData?.apps ?? []).map((a: any) => a.appId).sort(), [cpData]);
@@ -174,12 +179,16 @@ export function HomePage() {
   }, [setSearchParams]);
   useEscalationStatsEvents();
   useWorkflowListEvents();
-  useProcessListEvents();
+  useStationMetricsEvents();
 
-  // Row 2 (processes, durable executions, pipeline runs) is builder-only — see JSX
-  // gate below. Disable the queries too, so non-builders don't fire requests that
-  // their role can't access (403 on control-plane apps → empty namespace → 400 on jobs).
-  const procQ = useProcesses({ limit: 5 }, { enabled: isBuilder });
+  // Row 2: the Pace Board shows for builders (superadmin/engineer) AND ops (admin);
+  // the execution columns are builder-only — admins historically cannot see
+  // workflows, so their Pace Board spans the full row. Disable queries per tier
+  // so roles don't fire requests they can't access (403 on control-plane apps →
+  // empty namespace → 400 on jobs).
+  const showPace = isBuilder || isOps;
+  const rolesQ = useRoleDetails({ enabled: showPace });
+  const stationQ = useStationMetrics('1h', { enabled: showPace });
   const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: isBuilder });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
@@ -197,8 +206,25 @@ export function HomePage() {
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const processes = procQ.data?.processes ?? [];
-  const processTotal = (procQ.data as any)?.total as number | undefined;
+  // Pace Board mini — the primary sequence (longest line) at the 1h window.
+  const paceStations = useMemo((): ChartStation[] => {
+    const fragments = buildFragments(rolesQ.data?.roles ?? []);
+    const primary = fragments[0]?.stations ?? [];
+    const metrics = stationQ.data?.stations ?? [];
+    return primary.map(({ role: r }) => ({
+      role: r.role,
+      title: r.title,
+      parent_role: r.parent_role,
+      target_per_hour: r.target_per_hour ?? null,
+      upstream_roles: r.upstream_roles ?? [],
+      metric: metrics.find((m) => m.role === r.role),
+    }));
+  }, [rolesQ.data, stationQ.data]);
+  const paceRoleByName = useMemo(
+    () => new Map((rolesQ.data?.roles ?? []).map((r) => [r.role, r])),
+    [rolesQ.data],
+  );
+
   const jobs = jobsQ.data?.jobs ?? [];
   const jobsTotal = jobsQ.data?.total;
   const mcpRuns = (mcpQ.data as any)?.jobs ?? [];
@@ -212,18 +238,18 @@ export function HomePage() {
     <div>
       <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
 
-      {/* ── Row 1: Available Escalations | My Escalations ────────────────── */}
+      {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 min-h-[35vh]">
 
-        {/* Col 1: Available Escalations */}
+        {/* Col 1: All Escalations */}
         <div>
           <SectionHeader icon={Inbox} color="text-accent" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
-              <NavIcon to="/escalations/available" icon={ExternalLink} title="All available escalations" />
+              <NavIcon to="/escalations/available" icon={ExternalLink} title="All escalations" />
             </div>
           }>
-            Available Escalations
+            All Escalations
           </SectionHeader>
           {allEscalations.length === 0 ? (
             <EmptyPanel icon={Inbox} text="No pending escalations" />
@@ -288,53 +314,50 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* ── Row 2: Processes | Workflow Executions | Pipeline Executions (builders only) */}
-      {isBuilder && <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 mt-14">
+      {/* ── Row 2: Pace Board | Procedural | Graph — mirrors the left nav.
+          Builders see all three; ops (admin) can't see workflows, so their
+          Pace Board spans the full row. Operators see neither. */}
+      {showPace && <div className={`grid grid-cols-1 ${isBuilder ? 'lg:grid-cols-3' : ''} gap-x-14 mt-14`}>
 
-        {/* Col 1: Processes */}
+        {/* Col 1: Pace Board — the story being told, at a glance */}
         <div>
-          <SectionHeader icon={Layers} color="text-accent" count={processTotal} docsHash="#docs:dashboard.md:processes-overview" actions={
-            <div className="flex items-center gap-2">
-              <ListToolbar onRefresh={() => procQ.refetch()} isFetching={procQ.isFetching} apiPath="/tasks/processes?limit=5" />
-              <NavIcon to="/processes/all" icon={ExternalLink} title="All processes" />
-            </div>
+          <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
+            <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
           }>
-            Certified Processes
+            Pace Board
           </SectionHeader>
-          <div className="mb-3 -mt-2">
-            <span className="px-2 py-0.5 text-[10px] rounded text-text-quaternary uppercase tracking-widest">all namespaces</span>
-          </div>
-          {processes.length === 0 ? (
-            <EmptyPanel icon={Layers} text="No recent processes" />
+          {paceStations.length === 0 ? (
+            <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
           ) : (
-            <div className="space-y-1">
-              {processes.map((p: any) => (
-                <ExecutionRow
-                  key={p.origin_id}
-                  dot={(p.task_count ?? 0) > 0 && (p.completed ?? 0) >= (p.task_count ?? 0) ? 'bg-status-success' : (p.escalated ?? 0) > 0 ? 'border border-status-error' : 'bg-status-active'}
-                  pill={<>{(p.workflow_types ?? [p.workflow_type]).filter(Boolean).map((wt: string) => <WorkflowPill key={wt} type={wt} size="xs" />)}</>}
-                  id={p.origin_id}
-                  date={p.last_activity ?? p.started_at}
-                  onClick={() => navigate(`/processes/detail/${p.origin_id}`)}
-                />
-              ))}
+            <div className={`${isBuilder ? 'h-64' : 'h-80'} cursor-pointer`} onClick={() => navigate('/operations')}>
+              <PaceChart
+                stations={paceStations}
+                selectedRole={null}
+                onSelect={() => navigate('/operations')}
+                onUpstreamSelect={() => navigate('/operations')}
+                onPrioritySelect={(role) => {
+                  const detail = paceRoleByName.get(role);
+                  if (detail) navigate(priorityQueueLink(detail));
+                }}
+                periodHours={1}
+              />
             </div>
           )}
         </div>
 
-        {/* Col 2: Workflow Executions */}
-        <div>
-          <SectionHeader icon={ScrollText} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:durable-executions" actions={
+        {/* Col 2: Procedural executions (builders only) */}
+        {isBuilder && <div>
+          <SectionHeader icon={Code2} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:procedural-executions" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
-              <NavIcon to="/workflows/executions" icon={ExternalLink} title="All durable executions" />
+              <NavIcon to="/workflows/executions" icon={ExternalLink} title="All procedural executions" />
             </div>
           }>
-            Workflow Executions
+            Procedural
           </SectionHeader>
           <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
           {jobs.length === 0 ? (
-            <EmptyPanel icon={ScrollText} text="No recent executions" />
+            <EmptyPanel icon={Code2} text="No recent procedural runs" />
           ) : (
             <div className="space-y-1">
               {jobs.map((job: any) => (
@@ -349,21 +372,21 @@ export function HomePage() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
 
-        {/* Col 3: Pipeline Executions */}
-        <div>
-          <SectionHeader icon={GitBranch} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:mcp-pipeline-tools" actions={
+        {/* Col 3: Graph executions (builders only) */}
+        {isBuilder && <div>
+          <SectionHeader icon={Workflow} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:graph-executions" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
-              <NavIcon to="/mcp/executions" icon={ExternalLink} title="All pipeline executions" />
+              <NavIcon to="/mcp/executions" icon={ExternalLink} title="All graph executions" />
             </div>
           }>
-            Pipeline Executions
+            Graph
           </SectionHeader>
           <AppPicker appIds={pipelineAppIds} selected={pipelineNs} onSelect={(ns) => setNs('pipelinenamespace', ns)} />
           {mcpRuns.length === 0 ? (
-            <EmptyPanel icon={GitBranch} text="No recent pipeline runs" />
+            <EmptyPanel icon={Workflow} text="No recent graph runs" />
           ) : (
             <div className="space-y-1">
               {mcpRuns.map((run: any) => (
@@ -378,7 +401,7 @@ export function HomePage() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>}
     </div>
   );

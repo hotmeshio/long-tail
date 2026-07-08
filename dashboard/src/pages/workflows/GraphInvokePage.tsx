@@ -32,7 +32,7 @@ export function GraphInvokePage() {
 
   return (
     <div>
-      <PageHeader title="Invoke" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
+      <PageHeader title="Invoke" docsHash="#docs:dashboard.md:graph-workflows" />
 
       {flows.length === 0 ? (
         <div className="py-16 text-center">

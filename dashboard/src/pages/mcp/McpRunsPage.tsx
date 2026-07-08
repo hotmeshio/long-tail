@@ -176,7 +176,7 @@ export function McpRunsPage() {
 
   return (
     <div>
-      <PageHeader title="Pipeline Executions" docsHash="#docs:dashboard.md:pipeline-executions" />
+      <PageHeader title="Pipeline Executions" docsHash="#docs:dashboard.md:graph-executions" />
 
       <FilterBar actions={
         <ListToolbar

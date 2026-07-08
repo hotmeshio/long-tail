@@ -33,7 +33,7 @@ export function YamlWorkflowsPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Configure" docsHash="#docs:dashboard.md:mcp-pipeline-tools" />
+        <PageHeader title="Configure" docsHash="#docs:dashboard.md:graph-workflows" />
         <div className="animate-pulse space-y-0">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 border-b last:border-b-0 px-6 flex items-center">
@@ -49,7 +49,7 @@ export function YamlWorkflowsPage() {
     <div>
       <PageHeader
         title="Configure"
-        docsHash="#docs:dashboard.md:mcp-pipeline-tools"
+        docsHash="#docs:dashboard.md:graph-workflows"
         actions={
           aiEnabled ? (
             <button onClick={() => navigate('/mcp/queries/new')} className="btn-primary text-xs">

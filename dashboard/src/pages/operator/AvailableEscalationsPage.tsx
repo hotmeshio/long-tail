@@ -271,7 +271,7 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="Available Escalations" docsHash="#docs:dashboard.md:all-escalations" />
+      <PageHeader title="All Escalations" docsHash="#docs:dashboard.md:all-escalations" />
 
       <EscalationFilterBar
         filters={filters}
@@ -383,7 +383,7 @@ export function AvailableEscalationsPage() {
         keyFn={(row) => row.id}
         onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
         isLoading={isLoading}
-        emptyMessage={queryError ? 'Unable to load data' : 'No available escalations'}
+        emptyMessage={queryError ? 'Unable to load data' : 'No escalations'}
         sort={sort}
         onSort={setSort}
       />
