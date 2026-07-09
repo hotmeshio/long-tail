@@ -12,6 +12,7 @@ import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
+import * as printerTwinWorkflow from './workflows/printer-twin';
 import {
   PRINT_FARM_DIABETIC,
   PRINT_FARM_STANDARD,
@@ -20,6 +21,11 @@ import {
   PRINT_FARMER_DIABETIC,
   PRINT_FARMER_STANDARD,
 } from './workflows/print-routing/types';
+import {
+  PRINT_SERVICER,
+  PRINTER_FLEET,
+  PRINT_JOBS,
+} from './workflows/printer-twin/types';
 
 // ── Role constants ──────────────────────────────────────────────────────────
 
@@ -292,6 +298,50 @@ const orthoPipelineConfig: LTWorkerConfig = {
   // For ortho, role form_schema is the source of truth, picked up automatically.
 };
 
+const printerTwinConfig: LTWorkerConfig = {
+  description:
+    'Printer twin — the digital twin of one REAL machine behind a print-farm-manager host. Its life is a loop of escalations: a print-servicer registers the unboxed machine (serial, model, filament, xl/pdac/soft), the twin advertises availability, the broker hands it a job, and the farm manager\'s callback resolves the in-flight printing row. Cancelling any of its rows (power outage, machine dark mid-print) detours it through a service escalation before it re-enters the pool.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINT_SERVICER,
+  roles: [PRINT_SERVICER, PRINTER_FLEET],
+  envelopeSchema: {
+    data: { printerId: 'printer-01', operatorId: '' },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const twinOrderConfig: LTWorkerConfig = {
+  description:
+    'Twin order — demand for the twin fleet. Writes one print-job escalation per unit as one origin group (filament + required capabilities as facets, a signed gcode URL per unit), then parks until the broker settles the whole set and reports every unit\'s outcome.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINT_JOBS,
+  roles: [PRINT_JOBS],
+  envelopeSchema: {
+    data: {
+      filament: 'pla',
+      require: { xl: false, pdac: false, soft: false },
+      units: [{ gcodeUrl: 'https://example.com/unit-0.gcode' }, { gcodeUrl: 'https://example.com/unit-1.gcode' }],
+      operatorId: '',
+    },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const twinBrokerConfig: LTWorkerConfig = {
+  description:
+    'Twin broker — the market maker at the physical boundary, one singleton. Claims demand sized to ready supply, locks each order\'s printer SET all-or-nothing, tells the farm manager to print (FARM_MANAGER_BACKEND: mock today, http against a real farm-manager host), harvests every twin\'s report, and settles the order. Throttles when idle and continueAsNew\'s to run durably.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: PRINTER_FLEET,
+  roles: [PRINTER_FLEET, PRINT_JOBS],
+  envelopeSchema: {
+    data: { brokerId: '', tickSeconds: 1, idleTickSeconds: 5, maxIdleRuns: 60 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 // ── Worker exports ──────────────────────────────────────────────────────────
 
 /**
@@ -317,4 +367,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.farmInspector, config: farmInspectorConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printShift, config: printShiftConfig },
   { taskQueue: 'long-tail-examples', workflow: orthoPipelineWorkflow.orthoPipeline, config: orthoPipelineConfig },
+  { taskQueue: 'long-tail-examples', workflow: printerTwinWorkflow.printerTwin, config: printerTwinConfig },
+  { taskQueue: 'long-tail-examples', workflow: printerTwinWorkflow.twinOrder, config: twinOrderConfig },
+  { taskQueue: 'long-tail-examples', workflow: printerTwinWorkflow.twinBroker, config: twinBrokerConfig },
 ];
