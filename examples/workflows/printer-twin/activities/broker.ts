@@ -126,6 +126,7 @@ export async function lockTwinsAndHandoff(input: {
       callbackKey: pairing.callbackKey,
       printDoneKey: pairing.printDoneKey,
       brokerWorkflowId: input.brokerWorkflowId,
+      simOutcome: memberMeta[JOB_FACETS.SIM_OUTCOME] as TwinJobPayload['simOutcome'],
     };
     // Resolve as the broker operator — an efficient (signal_key) row, so this
     // marks the advert resolved AND delivers the job to the parked twin atomically.

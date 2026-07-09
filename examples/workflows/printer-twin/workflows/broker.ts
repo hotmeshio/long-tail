@@ -12,7 +12,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import type { LTEnvelope } from '../../../../types';
 import type { ClaimedGroup } from '../../../../types';
 
-import { claimJobGroups, lockTwinsAndHandoff, releaseGroup, notifyFarmManager, settleJob, LOOP_DEFAULTS } from './proxy';
+import { claimJobGroups, lockTwinsAndHandoff, releaseGroup, settleJob, LOOP_DEFAULTS } from './proxy';
 import { PRINTER_FLEET, TWIN_WORKFLOWS, TWIN_STATE, TWIN_FACETS } from '../types';
 import type { TwinBrokerData, TwinBrokerTotals, TwinPairing, TwinCallbackPayload } from '../types';
 
@@ -52,25 +52,11 @@ export async function twinBroker(envelope: LTEnvelope): Promise<any> {
   }
   const pairings = placed.flatMap((p) => p.pairings);
 
-  // 3. Tell the physical side to print — THE placeholder boundary. Today the
-  //    mock backend plays the machine; set FARM_MANAGER_BACKEND=http and
-  //    FARM_MANAGER_BASE_URL to dispatch to a real farm-manager host instead.
-  for (const p of pairings) {
-    await notifyFarmManager({
-      job: {
-        serialNumber: p.serialNumber,
-        model: p.model,
-        jobId: p.jobId,
-        orderId: p.orderId,
-        unitIndex: p.unitIndex,
-        gcodeUrl: p.gcodeUrl,
-        printDoneKey: p.printDoneKey,
-      },
-      operatorId: d.brokerId,
-    });
-  }
+  // The physical print is driven by the TWIN itself: it polls its advert, sees
+  // the job we handed off, uploads + prints on the real machine, and reconciles
+  // the print to a poll-confirmed terminal. The broker just hands off and waits.
 
-  // 4. Harvest — one `dispatched` row per pairing (the broker's side of the
+  // 3. Harvest — one `dispatched` row per pairing (the broker's side of the
   //    in-flight job). The twin resolves it with the print outcome, which
   //    resumes this collated wait. Keep concurrent waits ≤ 20 (the platform's
   //    condition-collation cap); an office fleet is well under it.
@@ -94,7 +80,7 @@ export async function twinBroker(envelope: LTEnvelope): Promise<any> {
       ),
     );
 
-    // 5. Settle each order with its units' outcomes and wake the order workflow.
+    // 4. Settle each order with its units' outcomes and wake the order workflow.
     for (const { group, pairings: groupPairings } of placed) {
       const outcomes = groupPairings
         .map((p) => dones[pairings.indexOf(p)])

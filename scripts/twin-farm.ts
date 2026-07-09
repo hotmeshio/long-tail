@@ -3,16 +3,19 @@
  *
  * Spins up the whole DIGITAL side of the physical/digital twin farm from one
  * command and plays every human part automatically, so a single run exercises
- * the full lifecycle: register → advertise → dispatch → print → settle, plus the
- * failure detour (cancel → service → back in the pool). The PHYSICAL side is the
- * app's farm-manager backend — `mock` by default (self-contained), or `http`
- * against a real print-farm-manager host once you wire the office up.
+ * the full lifecycle: onboard (register + bind) → advertise → dispatch → print →
+ * reconcile → settle, plus the failure detours (autonomous fail → inspect, and
+ * filament runout → change → resume). The PHYSICAL side is the app's Bambu
+ * backend — `BAMBU_BACKEND=mock` by default (a deterministic in-repo simulation),
+ * or `http` against a real Farm Manager Server once the office link is wired.
+ *
+ * Faults are injected deterministically via each order unit's `simOutcome` (the
+ * mock honors it), so the service escalations fire on demand — no racing.
  *
  * Usage:
  *   npm run twin:farm
  *   FLEET=6 ORDERS=10 UNITS=2 npm run twin:farm
- *   FAIL_PCT=25 npm run twin:farm                 # rehearse dead-machine → service
- *   FARM_MANAGER_URL=http://192.168.1.50:4000 npm run twin:farm   # preflight the office link
+ *   FAIL_PCT=30 FAIL_MODE=filament_runout npm run twin:farm   # fault → service → recover
  *   FLEET=4 ORDERS=4 KEEP=1 npm run twin:farm     # leave twins running to poke in the UI
  *
  * Env vars:
@@ -24,17 +27,13 @@
  *   FILAMENTS         comma-separated filament pool the fleet + orders draw from
  *                     (default "pla,petg")
  *   ARRIVAL_S         average seconds between order arrivals (default 2)
- *   FAIL_PCT          percent of print jobs to cancel mid-print, exercising the
- *                     service path (default 0). Best-effort: it races the
- *                     physical side, so raise MOCK_PRINT_SECONDS on the app for
- *                     a wider window (see README).
- *   POLL_MS           poll interval ms (default 750)
+ *   FAIL_PCT          percent of orders with one faulted unit (default 0)
+ *   FAIL_MODE         the injected fault: filament_runout | failed (default filament_runout)
+ *   POLL_MS           servicer/registrar poll interval ms (default 750)
  *   BROKER_IDLE       idle broker ticks before it self-terminates (default 40)
  *   RUN_BROKER        launch a broker (default 1; set 0 if one already runs)
  *   KEEP              1 = leave twins advertising at the end (default 0 = retire
  *                     them with a power-down so nothing lingers between runs)
- *   FARM_MANAGER_URL  optional: GET this before running and report reachability,
- *                     a preflight for the office laptop → farm-manager-host link
  *
  * Capabilities: each twin is registered with a capability profile (xl/pdac/soft).
  * By default the fleet is fully capable and only filament routes; set FLEET_CAPS
@@ -52,11 +51,11 @@ const UNITS        = parseInt(process.env.UNITS  || '2', 10);
 const FILAMENTS    = (process.env.FILAMENTS || 'pla,petg').split(',').map((f) => f.trim()).filter(Boolean);
 const ARRIVAL_S    = parseFloat(process.env.ARRIVAL_S || '2');
 const FAIL_PCT     = parseInt(process.env.FAIL_PCT || '0', 10);
+const FAIL_MODE    = (process.env.FAIL_MODE || 'filament_runout') as 'filament_runout' | 'failed';
 const POLL_MS      = parseInt(process.env.POLL_MS || '750', 10);
 const BROKER_IDLE  = parseInt(process.env.BROKER_IDLE || '40', 10);
 const RUN_BROKER   = process.env.RUN_BROKER !== '0';
 const KEEP         = process.env.KEEP === '1';
-const FARM_MANAGER_URL = process.env.FARM_MANAGER_URL || '';
 
 const CAPABILITY_KEYS = ['xl', 'pdac', 'soft'] as const;
 type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
@@ -68,7 +67,7 @@ let token = '';
 let userId = '';
 let done = false;
 
-const stats = { registered: 0, dispatched: 0, printed: 0, cancelled: 0, serviced: 0, settled: 0 };
+const stats = { registered: 0, dispatched: 0, printed: 0, faulted: 0, serviced: 0, settled: 0 };
 
 function ts(): string { return new Date().toISOString().slice(11, 19); }
 function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
@@ -117,9 +116,10 @@ async function login(): Promise<void> {
  * a side-quest root merging into the fleet.
  */
 const TWIN_ROLE_CONFIG = [
-  { role: 'print-jobs',     title: 'Print Jobs',     parent_role: null,          sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Order demand — one print-job escalation per unit, claimed as a set.' },
-  { role: 'printer-fleet',  title: 'Printer Fleet',  parent_role: 'print-jobs',  sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Twin availability adverts and in-flight print rows — the machines at work.', upstream_roles: ['print-servicer'] },
-  { role: 'print-servicer', title: 'Print Servicer', parent_role: null,          sla_minutes: 10, target_per_hour: 10, priority_threshold_minutes: 10, description: 'Register unboxed machines and restore ones that fell offline.' },
+  { role: 'print-jobs',      title: 'Print Jobs',      parent_role: null,          sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Order demand — one print-job escalation per unit, claimed as a set.' },
+  { role: 'printer-fleet',   title: 'Printer Fleet',   parent_role: 'print-jobs',  sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Twin availability adverts and in-flight print rows — the machines at work.', upstream_roles: ['print-onboarder', 'print-servicer'] },
+  { role: 'print-onboarder', title: 'Print Onboarder', parent_role: null,          sla_minutes: 15, target_per_hour: 5,  priority_threshold_minutes: 15, description: 'Register + bind a newly unboxed machine.' },
+  { role: 'print-servicer',  title: 'Print Servicer',  parent_role: null,          sla_minutes: 10, target_per_hour: 10, priority_threshold_minutes: 10, description: 'Reload filament, inspect failures, restore offline machines.' },
 ] as const;
 
 async function ensureTwinRoles(): Promise<void> {
@@ -180,6 +180,13 @@ interface OrderSpec {
   filament: string;
   require: Partial<CapabilitySet>;
   units: number;
+  /** A deterministically-injected fault on one unit — drives the service path. */
+  fault?: { unit: number; mode: 'filament_runout' | 'failed' };
+}
+
+/** Evenly distribute FAIL_PCT across the order sequence (deterministic). */
+function hasFault(i: number): boolean {
+  return Math.floor(((i + 1) * FAIL_PCT) / 100) > Math.floor((i * FAIL_PCT) / 100);
 }
 
 function planOrders(batchTag: string, fleet: TwinSpec[]): OrderSpec[] {
@@ -193,7 +200,8 @@ function planOrders(batchTag: string, fleet: TwinSpec[]): OrderSpec[] {
     const cap = CAPABILITY_KEYS[i % CAPABILITY_KEYS.length];
     const capable = pool.filter((t) => t.caps[cap]).length;
     const require: Partial<CapabilitySet> = (i % 2 === 0 && capable >= units) ? { [cap]: true } : {};
-    return { index: i, wfId: `${batchTag}-o${i}`, orderId: `TWIN-${batchTag.slice(-6)}-${i}`, filament, require, units };
+    const fault = hasFault(i) ? { unit: 0, mode: FAIL_MODE } : undefined;
+    return { index: i, wfId: `${batchTag}-o${i}`, orderId: `TWIN-${batchTag.slice(-6)}-${i}`, filament, require, units, fault };
   });
 }
 
@@ -224,7 +232,10 @@ async function placeOrder(spec: OrderSpec): Promise<void> {
       orderId: spec.orderId,
       filament: spec.filament,
       require: spec.require,
-      units: Array.from({ length: spec.units }, (_, u) => ({ gcodeUrl: `https://example.com/${spec.orderId}-u${u}.gcode` })),
+      units: Array.from({ length: spec.units }, (_, u) => ({
+        gcodeUrl: `https://example.com/${spec.orderId}-u${u}.gcode`,
+        ...(spec.fault && spec.fault.unit === u ? { simOutcome: spec.fault.mode } : {}),
+      })),
       operatorId: userId,
     },
     metadata: { source: 'twin-farm' },
@@ -237,7 +248,7 @@ async function placeOrder(spec: OrderSpec): Promise<void> {
 async function registerLoop(fleet: Map<string, TwinSpec>): Promise<void> {
   while (!done) {
     try {
-      const resp = await api('GET', '/api/escalations/available?role=print-servicer&subtype=registering&limit=100');
+      const resp = await api('GET', '/api/escalations/available?role=print-onboarder&subtype=registering&limit=100');
       for (const esc of resp?.escalations ?? []) {
         const spec = fleet.get(String(esc.metadata?.printerId ?? ''));
         if (!spec) continue;
@@ -262,44 +273,33 @@ async function registerLoop(fleet: Map<string, TwinSpec>): Promise<void> {
   }
 }
 
-/** Resolve service escalations — the servicer realigning a downed machine. */
+/** The servicer's resolution for each escalation subtype the twin raises. Reloads
+ *  the SAME filament the machine had (from the escalation metadata) so a service
+ *  visit restores the machine rather than repurposing it. */
+function servicePayload(esc: any): Record<string, unknown> {
+  const subtype = esc.subtype;
+  if (subtype === 'filament_change') return { filamentLoaded: esc.metadata?.filament || 'pla', notes: 'Reloaded by twin-farm' };
+  if (subtype === 'failure_inspect') return { action: 'reset', notes: 'Inspected by twin-farm' };
+  if (subtype === 'offline_investigate') return { action: 'checked', notes: 'Reconnected by twin-farm' };
+  return { action: 'restored', notes: 'Auto-serviced by twin-farm' };
+}
+
+/** Resolve every servicer escalation (except registration) — filament changes,
+ *  failure inspections, offline investigations — the way a technician would. */
 async function serviceLoop(): Promise<void> {
   while (!done) {
     try {
-      const resp = await api('GET', '/api/escalations/available?role=print-servicer&subtype=service&limit=100');
+      const resp = await api('GET', '/api/escalations/available?role=print-servicer&limit=100');
       for (const esc of resp?.escalations ?? []) {
         await api('POST', `/api/escalations/${esc.id}/resolve`, {
-          resolverPayload: { action: 'restored', notes: 'Auto-serviced by twin-farm' },
+          resolverPayload: servicePayload(esc),
         }).then(() => {
           stats.serviced++;
-          console.log(`[${ts()}]   [service]  ${esc.metadata?.printerId ?? esc.id.slice(0, 8)} restored [${stats.serviced}]`);
+          console.log(`[${ts()}]   [service]  ${esc.subtype.padEnd(18)} ${esc.metadata?.printerId ?? esc.id.slice(0, 8)} [${stats.serviced}]`);
         }).catch(() => { /* raced */ });
       }
     } catch (err: any) { logPollErr('service', err); }
     if (!done) await sleep(POLL_MS);
-  }
-}
-
-/** Cancel a deterministic fraction of in-flight prints — the power-outage /
- *  dead-machine drill. Best-effort: it races the physical side's resolve. */
-async function failLoop(): Promise<void> {
-  if (FAIL_PCT <= 0) return;
-  const acted = new Set<string>();
-  while (!done) {
-    try {
-      const resp = await api('GET', '/api/escalations/available?role=printer-fleet&subtype=printing&limit=100');
-      for (const esc of resp?.escalations ?? []) {
-        const jobId = String(esc.metadata?.jobId ?? esc.id);
-        if (acted.has(jobId)) continue;
-        if (jitter(jobId, 'fail') * 100 >= FAIL_PCT) continue;
-        acted.add(jobId);
-        await api('POST', `/api/escalations/${esc.id}/cancel`).then(() => {
-          stats.cancelled++;
-          console.log(`[${ts()}]   [FAIL]     cancelled print ${jobId} — machine went dark [${stats.cancelled}]`);
-        }).catch(() => { /* physical side won the race — already resolved */ });
-      }
-    } catch (err: any) { logPollErr('fail', err); }
-    if (!done) await sleep(Math.min(POLL_MS, 300));
   }
 }
 
@@ -329,7 +329,11 @@ async function orderLoop(orders: OrderSpec[]): Promise<void> {
 async function settlementWatch(orders: OrderSpec[]): Promise<void> {
   const settled = new Set<string>();
   let stalled = 0;
-  const STALL_S = Math.max(40, ORDERS * (ARRIVAL_S + 8));
+  // Poll-driven twins add latency per order (poll pickup + print + report), and
+  // a fault adds a service round-trip, so the broker needs generous time to
+  // converge (it retries placement every tick via release-on-skip). This is a
+  // no-progress watchdog, not a deadline — steady settling keeps resetting it.
+  const STALL_S = Math.max(60, ORDERS * (ARRIVAL_S + 14));
   while (!done) {
     await sleep(1000);
     let progressed = false;
@@ -345,8 +349,8 @@ async function settlementWatch(orders: OrderSpec[]): Promise<void> {
           const outcomes: any[] = data.outcomes ?? [];
           const ok = outcomes.filter((o) => o.outcome === 'success').length;
           const bad = outcomes.length - ok;
-          stats.printed += ok; stats.dispatched += outcomes.length;
-          console.log(`[${ts()}]   [settle]   ${order.orderId} — ${ok} printed${bad ? `, ${bad} cancelled` : ''} [${stats.settled}/${ORDERS}]`);
+          stats.printed += ok; stats.faulted += bad; stats.dispatched += outcomes.length;
+          console.log(`[${ts()}]   [settle]   ${order.orderId} — ${ok} printed${bad ? `, ${bad} faulted` : ''} [${stats.settled}/${ORDERS}]`);
         }
       } catch { /* 202 still running */ }
     }
@@ -361,6 +365,10 @@ async function settlementWatch(orders: OrderSpec[]): Promise<void> {
 
 async function retireTwins(fleet: TwinSpec[]): Promise<void> {
   if (KEEP) { console.log(`[${ts()}] KEEP=1 — leaving ${fleet.length} twins advertising`); return; }
+  if (stats.settled < ORDERS) {
+    console.log(`[${ts()}] ${stats.settled}/${ORDERS} settled — leaving twins up so the broker can finish (rerun with KEEP=1 to keep them)`);
+    return;
+  }
   await sleep(2000); // let any last twin re-advertise after a service visit
   let retired = 0;
   for (let sweep = 0; sweep < 4 && retired < fleet.length; sweep++) {
@@ -378,21 +386,6 @@ async function retireTwins(fleet: TwinSpec[]): Promise<void> {
   console.log(`[${ts()}] Retired ${retired} idle twin${retired === 1 ? '' : 's'}`);
 }
 
-// ── Optional office-link preflight ────────────────────────────────────────────
-
-async function preflightFarmManager(): Promise<void> {
-  if (!FARM_MANAGER_URL) return;
-  process.stdout.write(`[${ts()}] Preflight → ${FARM_MANAGER_URL} … `);
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch(FARM_MANAGER_URL, { signal: ctrl.signal }).finally(() => clearTimeout(t));
-    console.log(`reachable (HTTP ${res.status}). Set FARM_MANAGER_BACKEND=http + FARM_MANAGER_BASE_URL on the app to dispatch for real.`);
-  } catch (err: any) {
-    console.log(`UNREACHABLE (${String(err?.message).slice(0, 60)}). Check the office wifi link — see the README connectivity walkthrough.`);
-  }
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -402,19 +395,18 @@ async function main(): Promise<void> {
   const fleetById = new Map(fleet.map((t) => [t.printerId, t]));
 
   console.log(`\n  Twin Farm  ──  ${FLEET} printers, ${ORDERS} orders (≤${UNITS} units), filaments [${FILAMENTS.join(', ')}]`);
-  console.log(`  arrival=${ARRIVAL_S}s poll=${POLL_MS}ms fail=${FAIL_PCT}% broker=${RUN_BROKER ? `on (idle≤${BROKER_IDLE})` : 'external'} keep=${KEEP}`);
+  console.log(`  arrival=${ARRIVAL_S}s fail=${FAIL_PCT}% (${FAIL_MODE}) broker=${RUN_BROKER ? `on (idle≤${BROKER_IDLE})` : 'external'} keep=${KEEP}`);
   console.log(`  Server: ${BASE_URL}\n`);
 
   await login();
   await ensureTwinRoles();
-  await preflightFarmManager();
 
-  // 1. Launch the fleet — each twin raises a registration escalation and parks.
+  // 1. Launch the fleet — each twin onboards (register → bind) then advertises.
   console.log(`\n[${ts()}] Launching ${FLEET} twins …`);
   for (const spec of fleet) await startTwin(spec);
 
   // 2. Register + service loops start now so twins come online as they appear.
-  const humanLoops = [registerLoop(fleetById), serviceLoop(), failLoop()];
+  const humanLoops = [registerLoop(fleetById), serviceLoop()];
 
   // 3. Broker (once the humans are watching).
   if (RUN_BROKER) { await startBroker(batchTag); console.log(`[${ts()}] Broker running`); }
@@ -436,7 +428,7 @@ async function main(): Promise<void> {
   console.log(`\n[${ts()}] Done in ${elapsed}s`);
   console.log(`  Registered:  ${stats.registered}/${FLEET}`);
   console.log(`  Orders:      ${stats.settled}/${ORDERS} settled`);
-  console.log(`  Units:       ${stats.printed} printed${stats.cancelled ? `, ${stats.cancelled} cancelled` : ''} (${stats.dispatched} dispatched)`);
+  console.log(`  Units:       ${stats.printed} printed${stats.faulted ? `, ${stats.faulted} faulted` : ''} (${stats.dispatched} dispatched)`);
   console.log(`  Serviced:    ${stats.serviced}`);
   console.log(`\n  Dashboard: ${BASE_URL}/escalations\n`);
   process.exit(0);

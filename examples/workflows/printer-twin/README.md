@@ -1,192 +1,150 @@
 # Printer Twin — the physical/digital boundary
 
 [print-routing](../print-routing/) proves the marketplace at throughput with simulated
-machines — see its [ARCHITECTURE.md](../print-routing/ARCHITECTURE.md) for the market
-design (supply adverts, demand groups, the broker, claim TTLs, signal budgets). This
-example takes the next step: each durable workflow is the **digital twin of one real
-machine** sitting behind a print-farm-manager host (e.g. a Windows machine running a
-vendor's print farm manager, with the printers joined to it over the farm network).
+machines. This example takes the next step: each durable workflow is the **digital twin
+of one real machine** behind a Bambu Farm Manager Server. The twin keeps a canonical
+mirror continuously in sync with the physical printer by **polling ground truth** — and
+every divergence that needs a decision becomes a durable escalation. The escalation
+surface is the adaptive layer; that is where resilience comes from.
 
-The twin's escalation surface is its JIT UI. At any moment, the one pending escalation a
-twin holds tells the world what the machine needs next — and resolving (or cancelling)
-that row is how the world answers.
+## Why poll, not callbacks
+
+The real Farm Manager API has **no event for the states that matter most**: printer
+offline/online, stop-confirmation, and bed_clean/reset-confirmation never webhook, and
+`job_failed` fires only for autonomous failures (not a client stop). A callback-driven
+twin drifts out of sync exactly when the real world gets messy. So the twin treats
+**poll as the source of truth, poll wins every conflict**, and self-heals within one poll
+interval. Webhooks, when present, are only an optional accelerant — never required for
+correctness. (See `bambu_config/DIGITAL_TWIN_SPEC.md` for the full event surface.)
 
 ## Actors
 
 | Workflow | Side | What it does |
 |----------|------|--------------|
-| `printerTwin` | supply | One per physical machine. Registration → availability → printing → service, all as escalations. |
+| `printerTwin` | supply | One per physical machine. A poll → reconcile → act loop over a canonical `mirror`. |
 | `twinOrder` | demand | One row per unit, one origin group; parks until the set settles. |
-| `twinBroker` | market maker | Claims demand sized to supply, locks the printer **set** all-or-nothing, dispatches to the farm manager, harvests, settles. |
+| `twinBroker` | market maker | Claims demand sized to supply, locks the printer **set** all-or-nothing, hands off, harvests, settles. |
 
 ## Roles
 
-| Role | Who holds it |
-|------|--------------|
-| `print-servicer` | Humans who unbox, register, refill, and repair machines |
-| `printer-fleet` | Twin adverts + in-flight rows; the twin, broker, and farm-manager callback operate here |
-| `print-jobs` | Demand rows; the order and broker operate here |
+Each **human** role owns the versioned `form_schema` for its escalation surface —
+declared on the role in [`seed-twin.ts`](../../seed-twin.ts), never on the workflow and
+never inline on the escalation (see [`forms.ts`](forms.ts)). The twin raises an escalation
+to a role; the dashboard renders that role's schema.
 
-## The twin's lifecycle (each state is an escalation)
+| Role | Escalation surface (its `form_schema`) |
+|------|----------------------------------------|
+| `print-onboarder` | Registration form — a human registers + binds a newly unboxed machine |
+| `print-servicer` | Service form — reload filament, inspect a failure (reset/decommission), restore an offline machine |
+| `printer-fleet` | Twin availability adverts + in-flight rows (no human form); the twin and broker operate here |
+| `print-jobs` | Demand rows (no human form); the order and broker operate here |
+
+The workflow is registered plain (`certified: false`) — no workflow-level resolver schema
+and no "certify for HITL" tier. RBAC and the escalation schema live entirely on the roles.
+
+## The mirror + reconciliation
+
+Each twin persists a `mirror` — identity, membership (`bound`), liveness (`online`), the
+print state machine (`gcodeState`, progress, `hms`), the current job, and its own
+bookkeeping (see [`mirror.ts`](mirror.ts)). Every tick, the twin polls the machine,
+folds the snapshot into the mirror (**poll wins**), and runs the pure
+[`reconcile()`](reconcile.ts) function, which returns the next mirror plus a typed list
+of actions — Bambu commands and escalation I/O — that the batch activity executes.
+
+`reconcile()` is pure and exhaustively unit-tested (`tests/examples/printer-twin-reconcile-*`).
+It owns the whole state machine and its idempotency: a broker-dispatched job is reported
+terminal exactly once; each escalation kind is opened at most once (the open-row ledger).
+
+## Lifecycle (each state is derived from the mirror; each decision is an escalation)
 
 ```
-created (unboxed)
-   │
+onboarding ─ servicer registers + the twin binds the machine (register escalation)
    ▼
-registering ──► print-servicer plugs the machine in, joins it to the farm
-   │            manager, fills the registration form (serial, model, date,
-   │            filament, certifications, xl/pdac/soft), submits
+ready ───── advertises availability; the broker resolves the advert with a job
    ▼
-ready ────────► availability advert carrying the capability facets; the broker
-   │            claims printer SETS against these (allOrNone) and resolves each
-   │            advert with its job {gcodeUrl, callbackKey, printDoneKey}
+printing ── uploads + prints on the real machine; reconciles to a poll-confirmed terminal
+   ├─ FINISH  → report success → bed_clean → needs_reset → ready
+   ├─ FAILED (autonomous) → report fail → failure_inspect (servicer) → reset → ready
+   ├─ PAUSE + filament HMS → paused_filament → filament_change (servicer) → resume
+   └─ offline (poll only, debounced) → offline_investigate (servicer); hold or give up
    ▼
-printing ─────► the physical rendezvous. The broker has told the farm manager
-   │            to print; the farm-manager callback resolves this row when the
-   │            machine reports. created_at → resolved_at IS the print duration.
-   │
-   ├─ resolved (success/fail) ──► twin reports to the broker, back to ready
-   └─ CANCELLED (machine went dark; a farm worker cancels from the dashboard)
-                │
-                ▼
-service ──────► print-servicer physically restores the machine, submits the
-                service form (action, filament changes, notes) — the twin is
-                realigned with its machine and re-enters the pool
+retiring ── drain in-flight, bed_clean, unbind → retired (workflow completes)
 ```
 
-Cancellation is first-class: cancelling any pending twin escalation wakes the parked
-`condition()` with `{ __escalation_cancelled: true }`, and the twin detours through a
-`service` escalation before advertising again. A power outage is just a batch of
-cancellations followed by a batch of service visits.
+`PAUSED_FILAMENT` vs an operator pause is distinguished from the HMS signature **by poll
+alone** — the twin never trusts a `job_paused{auto_pause}` webhook. `NEEDS_RESET` is
+first-class because the machine rejects a new print until `bed_clean` returns it to IDLE.
 
-## The farm-manager boundary (the placeholder)
+## Continuation & the hot loop (memory-efficient by design)
 
-`twinBroker` calls one proxyActivity per dispatched job:
+- **No `Durable.sleep` between polls.** The poll/reconcile/act loop runs inside a single
+  ~60s [`pollReconcileBatch`](activities/twin-batch.ts) proxyActivity (plain-JS internal
+  pacing) — one durable checkpoint per batch, not one per poll. This is the two-cost-layers
+  pattern from [../print-routing/ARCHITECTURE.md](../print-routing/ARCHITECTURE.md).
+- **No `continueAsNew`.** The twin continues via `startChild` with an incrementing link
+  counter (`${printerId}-l${n}`), carrying the mirror forward — the proven fleet idiom.
+  A duplicate spawn collides and the sitting link keeps its seat (leader safety).
 
-```typescript
-await notifyFarmManager({ job: { serialNumber, model, jobId, gcodeUrl, printDoneKey, ... } });
-```
+## The Bambu backend (env-selected)
 
-Backend is env-selected — no code changes between mock and real:
+The twin codes against a single [`bambu-client`](activities/bambu-client.ts) interface, so
+the workflow never changes between simulation and the real server:
 
 | Env var | Default | Meaning |
 |---------|---------|---------|
-| `FARM_MANAGER_BACKEND` | `mock` | `mock` = simulate the physical side; `http` = dispatch to a real host |
-| `FARM_MANAGER_BASE_URL` | — | Required for `http` (e.g. `http://192.168.1.50:4000`) |
-| `MOCK_PRINT_SECONDS` | `1` | Simulated print time for the mock backend |
+| `BAMBU_BACKEND` | `mock` | `mock` = deterministic in-repo simulation; `http` = real Farm Manager over mTLS |
+| `MOCK_PRINT_SECONDS` | `3` | Simulated print duration (mock) |
+| `TWIN_POLL_MS` / `TWIN_BATCH_MS` | `2000` / `8000` | Baseline poll cadence + batch window (raise to 20s/60s for production) |
 
-**mock** — the activity plays the machine: it waits `MOCK_PRINT_SECONDS`, then resolves
-the twin's `printing` row through the public API — *exactly the call the real callback
-makes*, so promoting to `http` changes only who makes it.
+The **mock** ([`bambu-mock.ts`](activities/bambu-mock.ts)) faithfully replicates
+`bambu_config/mock_server_reference/server.py` — the same state machine, command guards,
+and deliberate no-event gaps — with a deterministic outcome control (`success | failed |
+filament_runout`) armed per printer (tests) or carried on a job's `simOutcome` (the
+driver), so every reconcile branch is reachable with no network.
 
-**http** — the activity POSTs the job to `${FARM_MANAGER_BASE_URL}/print-jobs` with the
-gcode URL (a signed URL the host downloads) and the callback contract.
-
-### The callback contract
-
-When a print finishes (or fails), the farm-manager host reports by resolving the twin's
-`printing` row — one authenticated POST to the long-tail API:
-
-```bash
-curl -X POST http://<long-tail-host>:3010/api/escalations/resolve-by-signal-key \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer <operator-token>' \
-  -d '{
-    "signalKey": "print-done-<jobId>",
-    "resolverPayload": { "outcome": "success", "reportedBy": "farm-manager" }
-  }'
-```
-
-The `signalKey` (`printDoneKey`) arrives in the dispatch request, so the host only
-echoes it back. `outcome` is `success` or `fail`. That single call wakes the twin,
-records the outcome on the row, and cascades: twin → broker → order.
-
-## Office connectivity walkthrough (the staging farm)
-
-Goal: laptop (long-tail + twins) ↔ Windows machine (print farm manager) ↔ printers, all
-on the office wifi.
-
-1. **Same-LAN first — no tunnel needed.** Give the Windows machine a static DHCP lease,
-   allow the farm manager's port through Windows Defender Firewall (private network
-   profile), and verify from the laptop: `curl http://<windows-ip>:<port>/`. Then start
-   long-tail with `FARM_MANAGER_BACKEND=http FARM_MANAGER_BASE_URL=http://<windows-ip>:<port>`.
-2. **Callback direction.** The Windows host must reach the laptop's long-tail API
-   (`http://<laptop-ip>:3010`). Same LAN, same story — just the macOS firewall to allow.
-   When long-tail runs in docker compose the port is already published.
-3. **Tunnels (ngrok etc.) are for crossing networks**, not for this office loop. They
-   become useful when the digital side moves to AWS and must reach the factory host —
-   or prefer no inbound exposure at all: the callback POST is outbound-only from the
-   factory, so only the dispatch direction needs a tunnel or VPN.
-
-Client-isolation on some office wifi blocks peer-to-peer traffic — if both directions
-fail while the internet works, wire both machines to the same switch/SSID without
-isolation.
+The **http** backend (next pass) will present the mTLS client cert/key + custom CA with a
+forced SNI via Node's `node:https`, reading everything from env (`BAMBU_BASE_URL`,
+`BAMBU_CLIENT_CERT/KEY`, `BAMBU_CA_CERT`, `BAMBU_SERVERNAME`, `BAMBU_ADMIN_USER/PASS`).
+Cutover is config-only — no twin code changes. The local mock, certs, and API references
+live only under the gitignored `bambu_config/`.
 
 ## Pace Board — throughput of the farm
 
-The three roles are operationalized on the Operations **Pace Board** via static
-config in [`examples/seed-twin.ts`](../../seed-twin.ts) (seeded at startup) — the
-same mechanism `ortho:populate` uses. Two segments render:
+The three roles are operationalized on the Operations Pace Board via static config in
+[`examples/seed-twin.ts`](../../seed-twin.ts): `Print Jobs → Printer Fleet` (production
+line) with `Print Servicer` as a side-quest merging in. `ops_visible` marks a role
+tracked; `parent_role` chains a segment; `upstream_roles` draws the merge glyph. Dials
+(`target_per_hour`, `sla_minutes`, `priority_threshold_minutes`) tune the bands.
 
-```
-Print Jobs ─▶ Printer Fleet        production line (demand → print)   [2]
-                  ▲
-                  └── Print Servicer   maintenance side-quest          [1]
-```
+## Running it — the driver (effortless path)
 
-`ops_visible` marks a role tracked; `parent_role` chains a segment (a root with no
-parent starts one); `upstream_roles` draws the merge glyph (a serviced machine
-re-enters the fleet). Each role carries dials — `target_per_hour` (the Target band),
-`sla_minutes`, and `priority_threshold_minutes` (the age/priority count). Tune them
-in the admin Roles UI or `PATCH /api/roles/:role`; the seeder only configures
-unconfigured roles, so your tuning survives restarts. The `twin:farm` driver also
-ensures this config at run-start, so the board populates even without a full seed.
-
-Note: `printer-fleet` blends `ready` adverts (idle supply), `printing`, and
-`dispatched` under one role — its *pending* reads as available-plus-in-flight and
-its *resolved* is completed prints (the real throughput signal).
-
-## Running it — the driver script (effortless path)
-
-`npm run twin:farm` drives the whole thing from one command. It launches the fleet,
-**plays the print-servicer automatically** (registration and service visits), starts the
-broker, places orders, and reports what happened — so a single run exercises the full
-lifecycle including the failure detour.
+`npm run twin:farm` drives the whole thing from one command: it launches the fleet, plays
+the print-servicer automatically (registration, filament changes, failure inspections),
+starts the broker, places orders, and reports what happened.
 
 ```bash
-npm run twin:farm                                   # 4 printers, 6 orders, mock backend
-FLEET=6 ORDERS=10 UNITS=2 npm run twin:farm         # bigger fleet
-FAIL_PCT=30 npm run twin:farm                        # inject dead-machine → service
-FLEET_CAPS="xl|pdac|full|full" npm run twin:farm     # vary capabilities per printer
-FARM_MANAGER_URL=http://192.168.1.50:4000 npm run twin:farm   # preflight the office link
-KEEP=1 npm run twin:farm                             # leave twins running to poke in the UI
+npm run twin:farm                                        # 4 printers, 6 orders, mock backend
+FLEET=6 ORDERS=10 UNITS=2 npm run twin:farm              # bigger fleet
+FAIL_PCT=30 FAIL_MODE=filament_runout npm run twin:farm  # fault → service → recover
+FLEET=4 ORDERS=4 KEEP=1 npm run twin:farm                # leave twins running to poke in the UI
 ```
 
-All knobs (`FLEET`, `ORDERS`, `UNITS`, `FILAMENTS`, `ARRIVAL_S`, `FAIL_PCT`, `POLL_MS`,
-`BROKER_IDLE`, `RUN_BROKER`, `KEEP`, `FARM_MANAGER_URL`, `FLEET_CAPS`, `BASE_URL`) are
-documented in the header of [`scripts/twin-farm.ts`](../../../scripts/twin-farm.ts). It
-logs in as `superadmin` (which bypasses the pond role gates, so no operator seeding is
-needed) and every order it plans is sized to be satisfiable by the fleet.
-
-**Failure injection** (`FAIL_PCT`) cancels a fraction of in-flight prints, racing the
-physical side — so it's best-effort. For a wider, more reliable window, raise the app's
-`MOCK_PRINT_SECONDS` (e.g. `MOCK_PRINT_SECONDS=4` in the app environment) so the cancel
-lands mid-print. You can also just cancel a `printing` row by hand from the dashboard.
+Faults are injected deterministically via an order unit's `simOutcome` (the mock honors
+it), so the service escalations fire on demand — no racing the physical side. All knobs
+(`FLEET`, `ORDERS`, `UNITS`, `FILAMENTS`, `ARRIVAL_S`, `FAIL_PCT`, `FAIL_MODE`, `KEEP`,
+`FLEET_CAPS`, `BASE_URL`) are documented in the header of
+[`scripts/twin-farm.ts`](../../../scripts/twin-farm.ts). It logs in as `superadmin`
+(which bypasses the pond role gates), and every order it plans is fleet-satisfiable.
 
 ### By hand (dashboard or SDK)
 
 ```bash
-# 1. Start a twin (one per machine):
-#    printerTwin  { printerId: 'printer-01', operatorId: '<fleet operator user id>' }
-# 2. Register: claim the 'registering' escalation under print-servicer, fill the form, submit.
-# 3. Start the broker (singleton):
-#    twinBroker   { brokerId: '<fleet+jobs operator user id>' }
-# 4. Place an order:
-#    twinOrder    { filament: 'pla', require: { xl: true }, units: [{ gcodeUrl: 'https://...' }, ...], operatorId: '<jobs operator user id>' }
+# 1. Start a twin:  printerTwin { printerId: 'printer-01', operatorId: '<fleet operator>' }
+# 2. Register: resolve the 'registering' escalation under print-servicer (serial, model, filament, xl/pdac/soft).
+# 3. Start the broker: twinBroker { brokerId: '<fleet+jobs operator>' }
+# 4. Place an order: twinOrder { filament: 'pla', require: { xl: true }, units: [{ gcodeUrl: '…' }, …], operatorId: '<jobs operator>' }
 ```
 
-Watch the escalations dashboard: the order's demand rows appear, the broker locks the
-printer set, `dispatched` + `printing` rows open, the mock (or the real farm manager)
-resolves them, and everything settles. To rehearse a failure, cancel a `printing` row
-mid-flight — the service escalation appears for the print-servicer, and the unit comes
-back as `outcome: 'cancel'` in the order result.
+Watch `/escalations` and `/operations`: the twin registers and binds, advertises, prints
+via poll-confirmed FINISH, and — when a unit faults — opens a filament-change or
+failure-inspect escalation that a servicer resolves before the machine re-enters the pool.

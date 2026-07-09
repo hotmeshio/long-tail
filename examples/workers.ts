@@ -22,6 +22,7 @@ import {
   PRINT_FARMER_STANDARD,
 } from './workflows/print-routing/types';
 import {
+  PRINT_ONBOARDER,
   PRINT_SERVICER,
   PRINTER_FLEET,
   PRINT_JOBS,
@@ -300,11 +301,13 @@ const orthoPipelineConfig: LTWorkerConfig = {
 
 const printerTwinConfig: LTWorkerConfig = {
   description:
-    'Printer twin — the digital twin of one REAL machine behind a print-farm-manager host. Its life is a loop of escalations: a print-servicer registers the unboxed machine (serial, model, filament, xl/pdac/soft), the twin advertises availability, the broker hands it a job, and the farm manager\'s callback resolves the in-flight printing row. Cancelling any of its rows (power outage, machine dark mid-print) detours it through a service escalation before it re-enters the pool.',
+    'Printer twin — the digital twin of one REAL machine (Bambu Farm Manager), a poll-driven reconciliation loop that keeps a canonical mirror in sync with the physical printer. A print-servicer registers + binds the unboxed machine, then the twin advertises availability, prints jobs the broker hands off, and reconciles each print to a poll-confirmed terminal (poll is ground truth — offline/stop/reset have no webhook). Every divergence that needs a decision — change filament, inspect a failure, investigate an offline machine, retire — surfaces as an escalation the twin waits on. The hot loop runs inside a proxyActivity (no durable sleep) and the twin continues via startChild links.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: PRINT_SERVICER,
-  roles: [PRINT_SERVICER, PRINTER_FLEET],
+  roles: [PRINT_ONBOARDER, PRINT_SERVICER, PRINTER_FLEET],
+  // Registered, never certified — configs with roles derive certified=true otherwise.
+  certified: false,
   envelopeSchema: {
     data: { printerId: 'printer-01', operatorId: '' },
     metadata: { source: 'dashboard' },
@@ -318,6 +321,7 @@ const twinOrderConfig: LTWorkerConfig = {
   invocationRoles: INVOCATION_ROLES,
   defaultRole: PRINT_JOBS,
   roles: [PRINT_JOBS],
+  certified: false,
   envelopeSchema: {
     data: {
       filament: 'pla',
@@ -331,11 +335,12 @@ const twinOrderConfig: LTWorkerConfig = {
 
 const twinBrokerConfig: LTWorkerConfig = {
   description:
-    'Twin broker — the market maker at the physical boundary, one singleton. Claims demand sized to ready supply, locks each order\'s printer SET all-or-nothing, tells the farm manager to print (FARM_MANAGER_BACKEND: mock today, http against a real farm-manager host), harvests every twin\'s report, and settles the order. Throttles when idle and continueAsNew\'s to run durably.',
+    'Twin broker — the market maker at the physical boundary, one singleton. Claims demand sized to ready supply, locks each order\'s printer SET all-or-nothing, and hands each twin its job by resolving its advert. The twin itself drives the physical print (poll-reconciled to a terminal) and reports back; the broker harvests those reports and settles the order. Throttles when idle and continueAsNew\'s to run durably.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: PRINTER_FLEET,
   roles: [PRINTER_FLEET, PRINT_JOBS],
+  certified: false,
   envelopeSchema: {
     data: { brokerId: '', tickSeconds: 1, idleTickSeconds: 5, maxIdleRuns: 60 },
     metadata: { source: 'dashboard' },
