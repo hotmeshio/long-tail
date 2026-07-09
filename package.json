@@ -1,6 +1,6 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -44,6 +44,7 @@
     "process": "tsx scripts/process.ts",
     "demo": "bash scripts/demo.sh",
     "ortho:populate": "ts-node scripts/ortho-populate.ts",
+    "twin:farm": "ts-node scripts/twin-farm.ts",
     "dashboard:install": "cd dashboard && npm install",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",

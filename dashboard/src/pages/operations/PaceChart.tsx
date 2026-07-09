@@ -51,14 +51,7 @@ function soloSegment(p: { x: number; y: number }): string {
   return `M ${(p.x - SOLO_HALF).toFixed(1)} ${p.y.toFixed(1)} L ${(p.x + SOLO_HALF).toFixed(1)} ${p.y.toFixed(1)}`;
 }
 
-/** Straight polyline — the target line is a discrete count per station. */
-function linePath(pts: { x: number; y: number }[]): string {
-  if (pts.length === 0) return '';
-  if (pts.length === 1) return soloSegment(pts[0]);
-  return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-}
-
-/** Catmull-Rom → cubic bezier — smooth curves for the actual and active lines. */
+/** Catmull-Rom → cubic bezier — smooth curves for the target, actual, and active lines. */
 function catmullPath(pts: { x: number; y: number }[]): string {
   if (pts.length === 0) return '';
   if (pts.length === 1) return soloSegment(pts[0]);
@@ -183,7 +176,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
   const activePts = withTarget.map((r) => ({ ...r, y: yScale(r.active) }));
   const pendingPts = withTarget.map((r) => ({ ...r, y: yScale(r.pending) }));
 
-  const targetLinePath = linePath(targetPts);
+  const targetLinePath = catmullPath(targetPts);
   const actualSplinePath = catmullPath(actualPts);
   const activeSplinePath = catmullPath(activePts);
   const pendingSplinePath = catmullPath(pendingPts);
@@ -252,7 +245,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         <path d={queuedBandPath} fill={QUEUED_COLOR} opacity={0.12} style={{ transition: `d ${EASE}` }} />
       )}
 
-      {/* Target — thin red solid reference at the window's expected count */}
+      {/* Target — thin emerald reference curve at the window's expected count */}
       {targetLinePath && (
         <path d={targetLinePath} fill="none" stroke={TARGET_COLOR} strokeWidth={0.5} strokeLinejoin="round" opacity={0.9} style={{ transition: `d ${EASE}` }} />
       )}
