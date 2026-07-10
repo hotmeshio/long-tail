@@ -19,15 +19,19 @@ export async function getEscalation(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const escalation = await escalationService.getEscalation(input.id);
-    if (!escalation) {
+    // One query: the escalation plus its role's form, resolved to the version the
+    // row pinned (or the role's latest) and embedded as `form_schema`. The resolve
+    // UI renders from this without a second schema call, and the form is never
+    // stored on the row — it is JOINed in from the roles tables.
+    const detail = await escalationService.getEscalationWithFormSchema(input.id);
+    if (!detail) {
       return { status: 404, error: 'Escalation not found' };
     }
 
-    const denied = await assertReadAccess(auth.userId, escalation);
+    const denied = await assertReadAccess(auth.userId, detail.escalation);
     if (denied) return denied;
 
-    return { status: 200, data: escalation };
+    return { status: 200, data: { ...detail.escalation, form_schema: detail.form_schema } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

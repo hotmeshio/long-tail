@@ -242,7 +242,7 @@ const result = await lt.workflows.upsertConfig({
 | `consumes` | `string[]` | No | Workflow types whose data this workflow consumes |
 | `tool_tags` | `string[]` | No | MCP tool tags for discovery |
 | `envelope_schema` | `any` | No | JSON Schema for envelope.data validation |
-| `resolver_schema` | `any` | No | JSON Schema for resolver payload validation |
+| `resolver_schema` | `any` | No | **Deprecated** legacy fallback only. There is no resolver-payload validation; the escalation form is owned by the target role as a versioned `form_schema`. |
 | `cron_schedule` | `string \| null` | No | Cron expression for scheduled execution |
 
 **Returns:** `LTApiResult<LTWorkflowConfig>`

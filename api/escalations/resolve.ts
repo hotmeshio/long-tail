@@ -28,7 +28,7 @@ export async function resolveEscalation(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { id, resolverPayload, metadata } = input;
+    const { id, metadata, resolverPayload } = input;
     if (!resolverPayload) {
       return { status: 400, error: 'resolverPayload is required' };
     }
@@ -49,6 +49,10 @@ export async function resolveEscalation(
     }
     const denied = await assertWriteAccess(auth.userId, escalation);
     if (denied) return denied;
+
+    // The resolver payload is stored exactly as submitted — its shape is the
+    // workflow's contract, formed by the caller (the React app maps the form to
+    // the payload via x-lt-bind before submitting). No server-side transform.
 
     // `metadata` (the outcome patch) is never written separately — it rides WITH the
     // resolverPayload to whichever path performs the resolve, so it merges inside the
@@ -110,7 +114,7 @@ export async function resolveBySignalKey(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { signalKey, resolverPayload, metadata } = input;
+    const { signalKey, metadata, resolverPayload } = input;
     if (!signalKey) return { status: 400, error: 'signalKey is required' };
     if (!resolverPayload) return { status: 400, error: 'resolverPayload is required' };
 
@@ -122,6 +126,8 @@ export async function resolveBySignalKey(
     const denied = await assertWriteAccess(auth.userId, escalation);
     if (denied) return { status: 404, error: 'Escalation not found' };
 
+    // The payload is delivered as the signal the parked workflow's condition()
+    // receives — stored exactly as submitted (the caller formed its shape).
     return resolveViaSignalKey(escalation, resolverPayload, metadata);
   } catch (err: any) {
     return { status: 500, error: err.message };
@@ -144,11 +150,14 @@ export async function resolveByIds(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { ids, resolverPayload, metadata } = input;
+    const { ids, metadata } = input;
     if (!Array.isArray(ids) || ids.length === 0) {
       return { status: 400, error: 'ids must be a non-empty array' };
     }
-    if (!resolverPayload) return { status: 400, error: 'resolverPayload is required' };
+    if (!input.resolverPayload) return { status: 400, error: 'resolverPayload is required' };
+    // One pre-shaped payload for a homogeneous group of bookkeeping rows, stored
+    // as submitted — the caller forms the payload's shape.
+    const resolverPayload = input.resolverPayload;
 
     // Bulk resolve ("ack") is a write verb, gated PER ITEM: write_all roles may
     // resolve any item in the role; write_self roles may resolve only items assigned

@@ -18,8 +18,8 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { EscalationTimeline } from '../../../components/common/display/EscalationTimeline';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
+import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import { useWorkflowConfigs } from '../../../api/workflows';
-import { useRoleDetails, useRoleSchema } from '../../../api/roles';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { EscalationActionBar } from './EscalationActionBar';
@@ -66,14 +66,12 @@ export function EscalationDetailPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const { data: escalationTargets } = useEscalationTargets(esc?.role ?? '');
   const { data: workflowConfigs } = useWorkflowConfigs();
-  const { data: roleDetailsData } = useRoleDetails();
   const { data: settings } = useSettings();
 
   const { isBuilder } = useAccess();
   const { isDevMode, toggleMode } = useViewMode(false);
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
-  const roleDetail = roleDetailsData?.roles.find((r) => r.role === esc?.role);
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
   const [activeView, setActiveView] = useState<ActiveView>('resolve');
   const [json, setJson] = useState('{}');
@@ -85,42 +83,44 @@ export function EscalationDetailPage() {
   const [triageNotes, setTriageNotes] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   // Schema resolution, most specific first:
-  //   1. metadata.form_schema — a full schema embedded on the row
-  //   2. metadata.schema_version — the role schema snapshot the workflow
-  //      pinned at creation (conditionLT schemaVersion); renders that exact
-  //      version even after the role's schema moves on
-  //   3. workflow-level resolver_schema
-  //   4. the role's latest form_schema
+  //   1. metadata.form_schema — a full form embedded on the row (legacy records)
+  //   2. esc.form_schema — the role's form the single-escalation GET already
+  //      JOINed in, resolved to the row's pinned version (metadata.schema_version)
+  //      or the role's latest when unpinned. No second call.
+  //   3. workflow-level resolver_schema (legacy fallback)
   const metadataFormSchema = (esc?.metadata as any)?.form_schema ?? null;
-  const pinnedVersion: number | null = (esc?.metadata as any)?.schema_version ?? null;
-  const pinnedQuery = useRoleSchema(esc?.role ?? '', pinnedVersion ?? undefined, pinnedVersion != null);
-  const pinnedFormSchema = pinnedVersion != null ? (pinnedQuery.data?.form_schema ?? null) : null;
   const resolverSchema =
-    (pinnedFormSchema ?? wfConfig?.resolver_schema ?? roleDetail?.form_schema ?? null) as Record<string, any> | null;
+    (esc?.form_schema ?? wfConfig?.resolver_schema ?? null) as Record<string, any> | null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
 
-  // Initialize json from schema exactly once. Subsequent esc refetches
-  // (claim events, real-time updates) must NOT reset user edits.
+  // Initialize json from the form exactly once. Each field is seeded from the
+  // workflow's `envelope.formDefaults` (a resolver-shaped payload, reverse-mapped
+  // through x-lt-bind to the flat form) and falls back to the field's schema
+  // default. So workflow-sent defaults prefill; schema defaults fill the rest.
+  // Subsequent esc refetches (claim events, real-time updates) must NOT reset
+  // user edits. The form arrives embedded on esc, so nothing else to await.
   const jsonInitialized = useRef(false);
   useEffect(() => {
     if (jsonInitialized.current) return;
-    // A pinned version is still in flight — wait so the form never
-    // initializes from the latest schema and then swaps under the user.
-    if (pinnedVersion != null && !metadataFormSchema && pinnedQuery.data === undefined && !pinnedQuery.isError) return;
     const formSchema = metadataFormSchema ?? (resolverSchema?.properties ? resolverSchema : null);
     if (formSchema?.properties) {
       jsonInitialized.current = true;
+      const seeded = safeParse(esc?.envelope) as Record<string, any> | null;
+      const seededDefaults = seeded?.formDefaults;
+      const prefill = seededDefaults && typeof seededDefaults === 'object'
+        ? mapPayloadToForm(seededDefaults as Record<string, any>, formSchema)
+        : {};
       const initial: Record<string, any> = { _form_schema: formSchema };
       for (const [key, def] of Object.entries(formSchema.properties)) {
         const fieldDef = def as Record<string, any>;
-        initial[key] = fieldDef.default ?? '';
+        initial[key] = prefill[key] ?? fieldDef.default ?? '';
       }
       setJson(JSON.stringify(initial, null, 2));
     } else if (effectiveSchema) {
       jsonInitialized.current = true;
       setJson(JSON.stringify(effectiveSchema, null, 2));
     }
-  }, [effectiveSchema, metadataFormSchema, resolverSchema, pinnedVersion, pinnedQuery.data, pinnedQuery.isError]);
+  }, [effectiveSchema, metadataFormSchema, resolverSchema, esc?.envelope]);
 
   const hasTriage = hasTriageData(esc?.escalation_payload);
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';

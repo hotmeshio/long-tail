@@ -263,7 +263,7 @@ Workflow registration. Every workflow that uses the LT interceptor must have a r
 | `consumes` | `TEXT[] NOT NULL` | `'{}'` | Array of workflow types whose completed data this workflow receives via `envelope.lt.providers` |
 | `tool_tags` | `TEXT[]` | `'{}'` | Tags for MCP tool discovery |
 | `envelope_schema` | `JSONB` | — | JSON Schema for the workflow input envelope |
-| `resolver_schema` | `JSONB` | — | JSON Schema for the escalation resolver payload |
+| `resolver_schema` | `JSONB` | — | **Deprecated** legacy fallback only. The escalation form is owned by the target role as a versioned `form_schema`. |
 | `cron_schedule` | `TEXT` | — | Cron expression for scheduled execution |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |

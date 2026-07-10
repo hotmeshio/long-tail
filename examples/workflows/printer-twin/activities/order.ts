@@ -49,6 +49,7 @@ export async function enqueueJobUnits(input: {
         [TWIN_FACETS.FILAMENT]: order.filament,
         [JOB_FACETS.ORDER_SIGNAL]: orderSignal,
         [JOB_FACETS.GCODE_URL]: order.units[idx].gcodeUrl,
+        ...(order.units[idx].simOutcome ? { [JOB_FACETS.SIM_OUTCOME]: order.units[idx].simOutcome } : {}),
         ...require,
         source: TWIN_SOURCE,
       },

@@ -226,8 +226,7 @@ export async function getRoleSchema(
 }
 
 /**
- * Fetch form_schema for a role (used as default escalation form when workflow
- * config does not specify a resolver_schema).
+ * Fetch a role's live form_schema — the escalation form the dashboard renders.
  */
 export async function getRoleFormSchema(role: string): Promise<Record<string, any> | null> {
   const pool = getPool();

@@ -11,16 +11,22 @@
  * See ../print-routing/ARCHITECTURE.md for the marketplace design this builds on.
  */
 
+import type { Mirror, SimOutcome } from './mirror';
+
 // ── Roles (hard capability walls) ────────────────────────────────────────────
 
-/** Humans who unbox, register, refill, and repair machines. */
+// Each human role owns the versioned form_schema for its escalation surface
+// (declared on the role in seed-twin.ts — never inline on the workflow).
+/** Onboarding surface — a human registers + binds a newly unboxed machine. */
+export const PRINT_ONBOARDER = 'print-onboarder';
+/** Servicing surface — a human reloads filament, inspects failures, clears offline. */
 export const PRINT_SERVICER = 'print-servicer';
 /** Supply pond — twin availability adverts and in-flight print rows. */
 export const PRINTER_FLEET = 'printer-fleet';
 /** Demand pond — order print-job escalations, grouped by origin. */
 export const PRINT_JOBS = 'print-jobs';
 
-export const ALL_TWIN_ROLES = [PRINT_SERVICER, PRINTER_FLEET, PRINT_JOBS] as const;
+export const ALL_TWIN_ROLES = [PRINT_ONBOARDER, PRINT_SERVICER, PRINTER_FLEET, PRINT_JOBS] as const;
 
 export const TWIN_QUEUE = 'long-tail-examples';
 
@@ -75,6 +81,8 @@ export const JOB_FACETS = {
   FILAMENT: 'filament',
   ORDER_SIGNAL: 'orderSignal',
   GCODE_URL: 'gcodeUrl',
+  /** Deterministic mock outcome for this unit (test/driver control). */
+  SIM_OUTCOME: 'simOutcome',
 } as const;
 
 /** Outcome facets merged into in-flight rows in the same atomic resolve. */
@@ -138,6 +146,9 @@ export interface TwinJobPayload {
   /** Signal key of the twin's `printing` row — the farm manager resolves it. */
   printDoneKey: string;
   brokerWorkflowId: string;
+  /** Deterministic outcome the mock backend should produce for this print
+   *  (threaded from the order's unit metadata). Ignored by the real backend. */
+  simOutcome?: SimOutcome;
   /** A `ready` advert resolved with this (and no job) retires the twin. */
   powerdown?: boolean;
   /** Set by the platform when the advert was cancelled rather than resolved. */
@@ -171,11 +182,16 @@ export interface TwinData {
   /** Twin operator — a principal holding the fleet pond role (reports outcomes
    *  through the gated public API). Threaded at start; asserted before use. */
   operatorId: string;
-  /** Carried across continueAsNew once the servicer registers the machine. */
+  /** The canonical reconciled mirror — carried across startChild links. Absent
+   *  on the first link (a fresh twin bootstraps its mirror). */
+  mirror?: Mirror;
+  /** The startChild continuation counter (workflowId = `${printerId}-l${link}`). */
+  link?: number;
+  /** Carried across links once the servicer registers the machine. */
   registration?: TwinRegistration;
   jobsCompleted?: number;
   services?: number;
-  /** Monotonic wait counter — keeps signal keys unique across generations. */
+  /** Monotonic wait counter — keeps escalation/signal keys unique across links. */
   seq?: number;
 }
 
@@ -192,7 +208,7 @@ export interface TwinOrderData {
   /** Capabilities every printer in the claimed set must have (true = required). */
   require?: Partial<CapabilitySet>;
   /** One gcode reference per unit — a signed URL the farm manager downloads. */
-  units: { gcodeUrl: string }[];
+  units: { gcodeUrl: string; simOutcome?: SimOutcome }[];
   priority?: number;
   /** Order operator — a principal holding the jobs pond role (create is gated). */
   operatorId: string;

@@ -10,10 +10,13 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 
 /**
  * HotMesh's escalation config plus long-tail sugar. `schemaVersion` pins the
- * role-schema version (lt_role_schemas) the resolver form should render; it is
- * folded into `metadata.schema_version` before the config reaches the engine,
- * so the pin rides the row's GIN-indexed metadata like any other facet. Omit
- * it and the resolver UI simply uses the role's latest schema.
+ * role form version (lt_role_schemas) the resolve UI renders; it is a
+ * compile-time LITERAL the workflow author sets, folded into
+ * `metadata.schema_version` before the config reaches the engine, so the pin
+ * rides the row's GIN-indexed metadata like any other facet. Folding is a pure
+ * transform — no query, no activity — so a pinned `conditionLT` costs exactly
+ * what an unpinned one does. Omit it and the resolve UI renders the role's latest
+ * form when the escalation is fetched.
  */
 export type ConditionEscalationConfig = Types.ConditionQueueConfig & {
   schemaVersion?: number;
@@ -58,17 +61,20 @@ function toEngineConfig(
  * });
  * ```
  *
- * **Pin the role schema version (optional).** Role form/metadata schemas are
- * versioned (lt_role_schemas). Set `schemaVersion` when this wait depends on a
- * specific shape — e.g. a review form that gained a field the workflow expects
- * back. The resolver UI renders exactly that version for this escalation;
- * without it, the role's latest schema always applies.
+ * **Pin the role form version — a compile-time literal.** A role's escalation
+ * form is versioned (lt_role_schemas); its first form is version 1. Pass the
+ * version as a literal, paired with the generic `<T>` payload type, both bumped
+ * together when the form evolves. The literal folds into metadata for the same
+ * cost as an unpinned wait. Omit it and the resolve UI renders the role's latest
+ * form when the escalation is fetched.
  *
  * ```typescript
- * const decision = await conditionLT<{ approved: boolean; lotNumber: string }>(signalId, {
- *   role: 'reviewer',
+ * import { INTAKE_SCHEMA_VERSION, type IntakeResolverV1 } from './forms';
+ *
+ * const decision = await conditionLT<IntakeResolverV1>(signalId, {
+ *   role: INTAKE_ROLE,
  *   description: instructions,
- *   schemaVersion: 3,                     // render role schema v3 for this row
+ *   schemaVersion: INTAKE_SCHEMA_VERSION, // the form version this code is written for
  * });
  * ```
  *

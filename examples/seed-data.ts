@@ -36,7 +36,12 @@ export const SEED_USERS = [
     display_name: 'Reviewer User',
     email: 'reviewer@longtail.local',
     password: 'l0ngt@1l',
-    roles: [{ role: 'reviewer', type: 'member' as const }],
+    roles: [
+      { role: 'reviewer', type: 'member' as const },
+      // Also holds the rich-form escalation surface so the intake demo is
+      // claimable by a normal (non-superadmin) user.
+      { role: 'intake-reviewer', type: 'member' as const },
+    ],
   },
   {
     external_id: 'mock:test-user-1',
@@ -204,7 +209,7 @@ export const SEED_ENVELOPES: Array<{
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
-        role: 'reviewer',
+        role: 'intake-reviewer',
       } satisfies RichFormEnvelopeData,
       metadata: {
         source: 'seed',

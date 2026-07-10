@@ -186,6 +186,37 @@ export async function searchEscalationsFaceted(opts: {
 }
 
 /**
+ * Single-query escalation read for the resolve UI: the escalation row PLUS the
+ * role's escalation form, resolved to the version the escalation pinned
+ * (`metadata.schema_version`) or the role's latest when unpinned, JOINed from the
+ * roles tables and returned as `form_schema`. The form is NOT stored on the
+ * escalation — it rides in from lt_role_schemas/lt_roles on this one query, so a
+ * versioned JIT UI costs no per-row space and one SQL call to render. The version
+ * cast is guarded, so a non-numeric pin simply falls through to the latest form.
+ */
+export async function getEscalationWithFormSchema(
+  id: string,
+): Promise<{ escalation: LTEscalationRecord; form_schema: Record<string, any> | null } | null> {
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT e.*, COALESCE(ps.form_schema, r.form_schema) AS resolved_form_schema
+       FROM public.lt_escalations e
+       LEFT JOIN public.lt_roles r ON r.role = e.role
+       LEFT JOIN public.lt_role_schemas ps
+         ON ps.role = e.role
+        AND ps.version = CASE WHEN e.metadata->>'schema_version' ~ '^[0-9]+$'
+                              THEN (e.metadata->>'schema_version')::int END
+      WHERE e.id = $1`,
+    [id],
+  );
+  if (!rows[0]) return null;
+  const { resolved_form_schema, ...row } = rows[0];
+  const [escalation] = toEscalationRecords([row as any]);
+  return { escalation, form_schema: (resolved_form_schema as Record<string, any> | null) ?? null };
+}
+
+/**
  * Distinct top-level metadata facet KEYS visible to the caller — feeds the faceted
  * UI's key autocomplete so it only ever offers facets that ACTUALLY exist in the
  * caller's rows (a key in metadata, not description text). Role-scoped with the same

@@ -1,36 +1,37 @@
 /**
- * Rich Form Workflow
+ * Rich Form Workflow — the reference example for the role-owned, versioned
+ * escalation interface.
  *
- * Showcases every HITL form feature:
- * - format: date, email, textarea, password
- * - x-lt-widget: file-upload, code-editor
- * - x-lt-layout: two-column
- * - x-lt-order for field sequencing
- * - required validation
- * - readOnly display fields
- * - Schema title + description (user mode context panel)
+ * The escalation surface is NOT declared here. The `intake-reviewer` role owns
+ * two versioned schemas (seed-rich-form.ts): a `form_schema` (the flat VIEW that
+ * showcases every HITL form feature — date, email, textarea, file-upload,
+ * two-column layout, ordering, required) and a `resolver_schema` (the nested
+ * MODEL this workflow consumes), bound by `x-lt-bind`.
+ *
+ * Versioning is an AUTHOR decision, made at compile time — never a runtime
+ * lookup. The workflow declares the exact interface it is written against with
+ * two co-located literals: the type it expects back (`IntakeResolverV1`) and the
+ * version number that produced it (`INTAKE_SCHEMA_VERSION`). Both are passed to a
+ * single `conditionLT` call. `schemaVersion` folds into the escalation metadata
+ * inside the same atomic Leg1 write the engine already performs — the cost of
+ * this line is exactly the cost of `condition()`: one commit, no create activity,
+ * no version query. When the human resolves, the pipeline validates the flat
+ * submission against form_schema, maps it via x-lt-bind, validates the tree
+ * against resolver_schema, and delivers it as the signal — so `conditionLT`
+ * returns resolver-shaped, contract-checked `IntakeResolverV1`.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
 import { conditionLT } from '../../../services/orchestrator/condition';
-import * as interceptorActivities from '../../../services/interceptor/activities';
 import * as activities from './activities';
+import { INTAKE_ROLE, INTAKE_SCHEMA_VERSION, type IntakeResolverV1 } from './forms';
 
-type InterceptorType = typeof interceptorActivities;
 type ActivitiesType = typeof activities;
 
-const LT_ACTIVITY_QUEUE = 'lt-interceptor';
-
 export async function richForm(envelope: LTEnvelope): Promise<any> {
-  const { role = 'reviewer' } = envelope.data;
-
-  const { ltCreateEscalation } = Durable.workflow.proxyActivities<InterceptorType>({
-    activities: interceptorActivities,
-    taskQueue: LT_ACTIVITY_QUEUE,
-    retry: { maximumAttempts: 3 },
-  });
+  const { role = INTAKE_ROLE } = envelope.data;
 
   const { processIntake } = Durable.workflow.proxyActivities<ActivitiesType>({
     activities,
@@ -39,84 +40,30 @@ export async function richForm(envelope: LTEnvelope): Promise<any> {
   const ctx = Durable.workflow.workflowInfo();
   const signalId = `rich-form-${ctx.workflowId}`;
 
-  await ltCreateEscalation({
+  // Seed the resolve form with default values: a resolver-shaped payload the
+  // dashboard reverse-maps through x-lt-bind to prefill the flat form. The user
+  // sees these values on load and can change, clear, or keep them. Fields the
+  // seed omits fall back to the form_schema's own defaults.
+  const formDefaults: IntakeResolverV1 = {
+    customer: { name: 'Acme Widgets LLC', email: 'ops@acme.example', phone: '+1-555-0100' },
+    contract: { tier: 'professional', startDate: '2026-08-01', budget: 50000, approved: false },
+    notes: 'Seeded defaults — edit before submitting.',
+  };
+
+  // One atomic expression: write the escalation in Leg1 AND suspend. The version
+  // the workflow is coded against is a literal — the returned shape is typed to
+  // match it. No create activity, no version fetch; same cost as condition().
+  const response = await conditionLT<IntakeResolverV1>(signalId, {
+    role,
     type: 'intake',
     subtype: 'rich-form',
-    description: 'Complete the customer intake form. Review all fields carefully before submitting.',
-    role,
     priority: 2,
-    envelope: JSON.stringify(envelope),
-    workflowId: ctx.workflowId,
+    description: 'Complete the customer intake form. Review all fields carefully before submitting.',
     workflowType: 'richForm',
-    taskQueue: ctx.taskQueue,
-    metadata: {
-      signal_id: signalId,
-      form_schema: {
-        title: 'Customer Intake',
-        description: 'Fill out all required fields for the new customer. Verify the contact email is correct and select the appropriate service tier.',
-        'x-lt-layout': 'two-column',
-        'x-lt-order': ['customer_name', 'contact_email', 'phone', 'tier', 'start_date', 'budget', 'approved', 'notes', 'attachment'],
-        required: ['customer_name', 'contact_email', 'tier', 'start_date', 'approved'],
-        properties: {
-          customer_name: {
-            type: 'string',
-            default: '',
-            description: 'Full legal business name',
-          },
-          contact_email: {
-            type: 'string',
-            format: 'email',
-            default: '',
-            description: 'Primary contact email address',
-          },
-          phone: {
-            type: 'string',
-            default: '',
-            description: 'Phone number with country code',
-          },
-          tier: {
-            type: 'string',
-            enum: ['free', 'starter', 'professional', 'enterprise'],
-            default: 'starter',
-            description: 'Service tier determines SLA and feature set',
-          },
-          start_date: {
-            type: 'string',
-            format: 'date',
-            default: '',
-            description: 'Effective start date of the contract',
-          },
-          budget: {
-            type: 'number',
-            default: 0,
-            description: 'Annual budget in USD',
-          },
-          approved: {
-            type: 'boolean',
-            default: false,
-            description: 'I confirm all information is accurate',
-          },
-          notes: {
-            type: 'string',
-            format: 'textarea',
-            default: '',
-            description: 'Additional context or special requirements',
-            'x-lt-span': 2,
-          },
-          attachment: {
-            type: 'string',
-            default: '',
-            'x-lt-widget': 'file-upload',
-            accept: '.pdf,.doc,.docx,.png,.jpg',
-            description: 'Upload signed agreement or supporting documents',
-            'x-lt-span': 2,
-          },
-        },
-      },
-    },
+    envelope: { source: 'rich-form', formDefaults },
+    schemaVersion: INTAKE_SCHEMA_VERSION,
   });
 
-  const response = await conditionLT<Record<string, unknown>>(signalId);
   if (!response) {
     return { type: 'return' as const, data: { cancelled: true } };
   }

@@ -69,13 +69,17 @@ describe('WorkflowConfigDetailPage — edit', () => {
     expect(screen.getByText('assemblyLine')).toBeInTheDocument();
   });
 
-  it('renders three section headers', () => {
+  it('renders section headers (escalation/resolution config is role-owned, not shown here)', () => {
     render(<WorkflowConfigDetailPage />, {
       wrapper: wrapper({ path: '/workflows/registry/:workflowType', initialPath: '/workflows/registry/assemblyLine' }),
     });
     expect(screen.getByText('Identity')).toBeInTheDocument();
     expect(screen.getByText('Invocation')).toBeInTheDocument();
-    expect(screen.getByText('Certification')).toBeInTheDocument();
+    // The old "Certification" section (resolver schema + certify) is gone — the
+    // escalation surface belongs to the role now. Only the registration lifecycle remains.
+    expect(screen.getByText('Registration')).toBeInTheDocument();
+    expect(screen.queryByText('Certify for HITL Escalation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Resolver Schema')).not.toBeInTheDocument();
   });
 
   it('renders Save button (not Next)', () => {

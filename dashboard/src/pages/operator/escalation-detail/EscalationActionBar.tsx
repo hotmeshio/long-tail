@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { mapFormToPayload } from '../../../lib/x-lt-bind';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
@@ -130,7 +131,11 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
       }
     }
 
-    onResolve(payload);
+    // Submit the resolver payload in its final shape: drop the UI-only schema and
+    // map the flat form fields into the nested payload via x-lt-bind. The server
+    // stores this exactly as sent — the payload IS the payload.
+    const { _form_schema, ...formValues } = payload;
+    onResolve(mapFormToPayload(formValues, schema as Record<string, any> | undefined));
   };
 
   const tabClass = (active: boolean) =>

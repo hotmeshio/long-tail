@@ -27,6 +27,7 @@ export interface LTWorkflowConfig {
   consumes: string[];
   tool_tags?: string[];
   envelope_schema?: Record<string, any> | null;
+  /** @deprecated The escalation form is a versioned, role-owned schema. Legacy fallback only. */
   resolver_schema?: Record<string, any> | null;
   cron_schedule?: string | null;
   /** Bot external_id to run as. When set, workflows use this bot's identity. */
@@ -48,6 +49,7 @@ export interface LTResolvedConfig {
   consumes: string[];
   toolTags: string[];
   envelopeSchema: Record<string, any> | null;
+  /** @deprecated Role-owned versioned schema supersedes this. Legacy fallback only. */
   resolverSchema: Record<string, any> | null;
   cronSchedule: string | null;
   executeAs: string | null;
