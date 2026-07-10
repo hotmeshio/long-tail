@@ -9,7 +9,9 @@ export interface RoleDetail {
   role: string;
   title: string | null;
   description: string | null;
-  /** JSON Schema for the escalation resolve form. Overridden per-workflow by resolver_schema. */
+  /** JSON Schema for the escalation resolve FORM (the JIT UI). Versioned so the
+   *  UI can evolve; fields may carry `x-lt-bind` to map form values to a path in
+   *  the resolver payload the workflow consumes. */
   form_schema: Record<string, any> | null;
   /**
    * JSON Schema declaring the expected shape of lt_escalations.metadata for
@@ -40,10 +42,10 @@ export interface RoleDetail {
    */
   priority_facet: string | null;
   /**
-   * Version of the live form_schema/metadata_schema pair. Advances whenever a
-   * schema field changes; each version is snapshotted in lt_role_schemas so
-   * escalations can pin the exact schema they were created against. Null until
-   * the role first carries a schema.
+   * Version of the live form_schema. Advances whenever the form (or
+   * metadata_schema) changes; each version is snapshotted in lt_role_schemas so
+   * an escalation can pin the exact form it was created against. Null until the
+   * role first carries a schema.
    */
   current_schema_version: number | null;
   /**
@@ -58,7 +60,7 @@ export interface RoleDetail {
   workflow_count: number;
 }
 
-/** One immutable snapshot of a role's schema pair. */
+/** One immutable snapshot of a role's schema set (form + metadata). */
 export interface RoleSchemaVersion {
   role: string;
   version: number | null;

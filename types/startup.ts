@@ -39,7 +39,11 @@ export interface LTWorkerConfig {
   roles?: string[];
   /** JSON template that pre-fills the dashboard invocation form. */
   envelopeSchema?: Record<string, any>;
-  /** JSON template that pre-fills the escalation resolution form. */
+  /**
+   * @deprecated The escalation form is a versioned schema owned by the target
+   * role, not the workflow. Declare the form on the role; retained only as a
+   * legacy fallback.
+   */
   resolverSchema?: Record<string, any>;
   /** Upstream workflow types whose output is injected into this workflow's envelope. */
   consumes?: string[];

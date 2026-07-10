@@ -36,6 +36,7 @@ const ADMIN = 'admin';
 const SUPERADMIN = 'superadmin';
 const GRINDER = 'grinder';
 const GLUER = 'gluer';
+const INTAKE_REVIEWER = 'intake-reviewer';
 
 const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
 const INVOCATION_ROLES = [SUPERADMIN, ENGINEER];
@@ -116,12 +117,12 @@ const efficientSignalConfig: LTWorkerConfig = {
 };
 
 const richFormConfig: LTWorkerConfig = {
-  description: 'Rich form showcase — exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, read-only, ordering',
+  description: 'Rich form showcase — exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, read-only, ordering. Reference example for the role-owned, versioned escalation interface (form_schema + resolver_schema, x-lt-bind).',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
+  defaultRole: INTAKE_REVIEWER,
   envelopeSchema: {
-    data: { role: REVIEWER },
+    data: { role: INTAKE_REVIEWER },
     metadata: { source: 'dashboard' },
   },
 };

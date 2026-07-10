@@ -145,7 +145,7 @@ GET /api/escalations/:id
 
 **Scope:** Enforces read scope. A `member` with `read_scope=self` sees only escalations assigned to them; an item outside their read surface returns 404.
 
-**Response 200:** A single escalation object.
+**Response 200:** A single escalation object. The response embeds a `form_schema` field — the target role's versioned `form_schema` resolved to the escalation's pinned `metadata.schema_version` (or the role's latest when unpinned), JOINed from the roles tables in the same query and never stored on the escalation row. The dashboard renders the resolve form from this field; an MCP agent sees the same schema via `check_resolution`.
 
 **Response 404:**
 
@@ -203,6 +203,8 @@ Resolving an escalation starts a new workflow execution with the resolver's payl
 |-------|------|----------|-------------|
 | `resolverPayload` | `object` | yes | The reviewer's decision — injected into `envelope.resolver` |
 | `metadata` | `object` | no | Outcome facets merged into the escalation's GIN-indexed metadata. Records *what happened* (disposition, timing) next to *what was asked*; `@>`-queryable. Distinct from `resolverPayload`, which resumes the workflow and is not indexed |
+
+The `resolverPayload` is stored exactly as submitted — the resolver payload is the payload. There is no server-side validation and no server-side mapping of its shape. The client forms the final payload: the React dashboard maps the flat form to the nested payload via each field's `x-lt-bind` before submitting.
 
 **Example request:**
 
@@ -304,9 +306,11 @@ Returns `404` when the key is unknown, `409` when the escalation is already term
 
 When a reviewer claims an escalation, the dashboard renders a typed form instead of a raw JSON editor — if a schema is available. There are two ways to attach a schema:
 
-### Option 1: Workflow config (static)
+### Option 1: Role `form_schema` (versioned)
 
-Register a `resolver_schema` in the workflow registry wizard (Step 3, Certification). Every escalation from that workflow type inherits the schema automatically.
+The escalation form is owned by the target **role** as a versioned `form_schema`, declared on the role (e.g. via `PATCH /api/roles/:role`). Every escalation targeting that role resolves against it. A workflow pins a specific version through `conditionLT`'s `schemaVersion`, which stamps `metadata.schema_version` on the escalation; unpinned escalations resolve against the role's latest `form_schema`. Fields may carry `x-lt-bind` to map a form value to a path in the resolver payload.
+
+The deprecated workflow-config `resolver_schema` remains only as a legacy fallback when no role `form_schema` is available.
 
 ### Option 2: Escalation metadata (dynamic)
 
@@ -383,7 +387,7 @@ Keys prefixed with `_` (e.g., `_internal_id`) are stored in the payload but hidd
 
 ### Schema priority
 
-When both exist, `metadata.form_schema` takes precedence over `resolver_schema` from the workflow config. This lets workflows define a default form while allowing individual escalations to override it.
+The form that renders is resolved by precedence: `metadata.form_schema` (a legacy inline schema on the escalation row) > the role's `form_schema` (resolved to the escalation's pinned `metadata.schema_version`, or the role's latest when unpinned, and embedded in the `GET /api/escalations/:id` response) > the deprecated workflow-config `resolver_schema` legacy fallback.
 
 ## Release expired claims
 

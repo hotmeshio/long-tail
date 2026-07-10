@@ -23,15 +23,21 @@ export const getAvailableWorkSchema = z.object({
   limit: z.number().optional().default(10).describe('Max results to return'),
 });
 
+// The payload is stored exactly as submitted — the resolver payload IS the
+// payload. Shape it to match the role form's x-lt-bind paths (see the form_schema
+// check_resolution returns for a pending escalation); no server-side transform.
+const RESOLVER_PAYLOAD_DESC =
+  'Resolution payload, stored as-is. Match the shape the workflow consumes (the form_schema\'s x-lt-bind paths).';
+
 export const claimAndResolveSchema = z.object({
   escalation_id: z.string().describe('The escalation ID to claim and resolve'),
   resolver_id: z.string().describe('Identifier for who/what is resolving'),
-  payload: z.record(z.any()).describe('Resolution payload data'),
+  payload: z.record(z.any()).describe(RESOLVER_PAYLOAD_DESC),
 });
 
 export const resolveEscalationSchema = z.object({
   escalation_id: z.string().describe('The escalation ID to resolve'),
-  payload: z.record(z.any()).describe('Resolution payload data'),
+  payload: z.record(z.any()).describe(RESOLVER_PAYLOAD_DESC),
 });
 
 export const escalateAndWaitSchema = z.object({

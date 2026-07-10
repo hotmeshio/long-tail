@@ -472,9 +472,9 @@ If you use raw `Durable.workflow.condition()` instead, the `$escalation_id` fiel
 
 When a reviewer claims an escalation in the dashboard, a typed form is rendered instead of a raw JSON editor — if a schema is available. There are two ways to provide one:
 
-**Option 1 — Workflow config (static):** Set `resolver_schema` in the workflow registry wizard (Step 3, Certification). Every escalation from that workflow inherits the schema.
+**Option 1 — Role `form_schema` (versioned):** The escalation form is owned by the target role as a versioned `form_schema`. A workflow pins a version through `conditionLT`'s `schemaVersion`; unpinned escalations resolve against the role's latest. Fields may carry `x-lt-bind` to map a form value to a path in the resolver payload. The deprecated workflow-config `resolver_schema` remains only as a legacy fallback.
 
-**Option 2 — Escalation metadata (dynamic):** Pass `form_schema` inside `metadata` when creating an escalation. This overrides any workflow-level schema.
+**Option 2 — Escalation metadata (dynamic):** Pass `form_schema` inside `metadata` when creating an escalation. This overrides any role-level schema.
 
 ### Schema shape
 
@@ -511,7 +511,7 @@ Keys prefixed with `_` are stored in the payload but hidden from the form. `_for
 
 ### Priority
 
-`metadata.form_schema` takes precedence over `resolver_schema` from the workflow config.
+The form is resolved by precedence: `metadata.form_schema` (legacy inline on the row) > the role's `form_schema` (resolved to the escalation's pinned `metadata.schema_version`, or the role's latest when unpinned) > the deprecated workflow-config `resolver_schema` legacy fallback.
 
 ---
 

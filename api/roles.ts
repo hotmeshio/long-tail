@@ -178,6 +178,7 @@ export async function updateRole(input: {
   role: string;
   title?: string | null;
   description?: string | null;
+  /** The escalation resolve FORM schema (the JIT UI). Fields may carry x-lt-bind. */
   form_schema?: Record<string, any> | null;
   metadata_schema?: Record<string, any> | null;
   properties?: Record<string, any> | null;

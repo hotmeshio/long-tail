@@ -1,32 +1,10 @@
-import Ajv, { type ValidateFunction } from 'ajv';
+import { type ValidateFunction } from 'ajv';
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
+import { compileSchemaValidator, formatValidationErrors } from '../../services/role/schema-validator';
 import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
-
-// strict: false — role metadata_schemas use the project's house extension
-// keywords (x-lt-widget etc., the same style as seeded form_schemas); Ajv 8's
-// strict mode throws at compile on any unknown keyword, which would turn every
-// metadata-bearing create for that role into a 500.
-const ajv = new Ajv({ allErrors: true, strict: false });
-
-// Compiled validators cached per role+version, keyed by the schema's serialized
-// form so an admin's schema edit invalidates the stale validator on the next
-// create. Pinned versions are immutable, but the same key logic covers both.
-const validatorCache = new Map<string, { key: string; validate: ValidateFunction }>();
-
-function compileRoleValidator(
-  cacheId: string,
-  schema: Record<string, any>,
-): ValidateFunction {
-  const key = JSON.stringify(schema);
-  const cached = validatorCache.get(cacheId);
-  if (cached && cached.key === key) return cached.validate;
-  const validate = ajv.compile(schema);
-  validatorCache.set(cacheId, { key, validate });
-  return validate;
-}
 
 // ── Create ────────────────────────────────────────────────────────────────
 
@@ -85,44 +63,25 @@ export async function createEscalation(
       return { status: 403, error: `You must have write access to the "${role}" role or be a superadmin to create escalations for it` };
     }
 
-    // Validate metadata against the role's declared schema (if any). A
-    // metadata.schema_version pin selects that immutable snapshot; a pin that
-    // names a missing version is a 400, never a silent fall-through to latest.
-    if (input.metadata) {
-      const pinned = input.metadata[ESCALATION_METADATA_KEYS.SCHEMA_VERSION];
-      if (pinned !== undefined && (!Number.isInteger(pinned) || pinned < 1)) {
-        return { status: 400, error: `metadata.${ESCALATION_METADATA_KEYS.SCHEMA_VERSION} must be a positive integer` };
+    // Validate the caller-supplied metadata against the role's metadata_schema
+    // (the queryable-facet contract). An escalation may carry a form-version pin
+    // (metadata.schema_version) chosen by the workflow author; that is a system
+    // key, not caller data, so it is excluded from validation. No version is
+    // stamped here — omitting it means the resolve UI renders the role's latest
+    // form at fetch time.
+    const metadata = input.metadata ?? {};
+    const metadataSchema = await roleService.getRoleMetadataSchema(role);
+    if (metadataSchema) {
+      let validate: ValidateFunction;
+      try {
+        validate = compileSchemaValidator(`${role}:meta`, metadataSchema);
+      } catch (compileErr: any) {
+        // A broken stored schema is the role admin's bug, not the creator's.
+        return { status: 422, error: `metadata_schema for role "${role}" is not a valid JSON Schema: ${compileErr.message}` };
       }
-      let schema: Record<string, any> | null;
-      if (pinned !== undefined) {
-        const snapshot = await roleService.getRoleSchema(role, pinned);
-        if (!snapshot) {
-          return { status: 400, error: `Schema version ${pinned} does not exist for role "${role}"` };
-        }
-        schema = snapshot.metadata_schema;
-      } else {
-        schema = await roleService.getRoleMetadataSchema(role);
-      }
-      if (schema) {
-        let validate: ValidateFunction;
-        try {
-          validate = compileRoleValidator(`${role}@${pinned ?? 'live'}`, schema);
-        } catch (compileErr: any) {
-          // A broken stored schema is the role admin's bug, not the creator's —
-          // name it explicitly instead of surfacing an opaque 500.
-          return {
-            status: 422,
-            error: `metadata_schema for role "${role}" is not a valid JSON Schema: ${compileErr.message}`,
-          };
-        }
-        // The pin is a system key, not caller data — strip it so schemas with
-        // additionalProperties: false still validate the caller's bag.
-        const { [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: _pin, ...callerMetadata } = input.metadata;
-        const valid = validate(callerMetadata);
-        if (!valid) {
-          const msgs = (validate.errors ?? []).map((e) => `${e.instancePath || '(root)'} ${e.message}`).join('; ');
-          return { status: 400, error: `metadata does not match the role schema: ${msgs}` };
-        }
+      const { [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: _pin, ...callerMetadata } = metadata;
+      if (!validate(callerMetadata)) {
+        return { status: 400, error: `metadata does not match the role schema: ${formatValidationErrors(validate)}` };
       }
     }
 

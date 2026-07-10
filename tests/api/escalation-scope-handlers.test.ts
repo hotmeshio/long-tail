@@ -17,7 +17,10 @@ vi.mock('../../services/user', async (importActual) => {
   };
 });
 vi.mock('../../services/escalation');
-vi.mock('../../services/role', () => ({ canEscalateTo: vi.fn() }));
+vi.mock('../../services/role', () => ({
+  canEscalateTo: vi.fn(),
+  getRoleMetadataSchema: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('../../services/task', () => ({ createTask: vi.fn(), getTask: vi.fn() }));
 vi.mock('../../services/escalation-strategy', () => ({ escalationStrategyRegistry: { current: null } }));
 vi.mock('../../services/iam/ephemeral', () => ({ storeEphemeral: vi.fn(), formatEphemeralToken: vi.fn() }));
@@ -160,12 +163,17 @@ describe('create — queue-manage gate (write_all only)', () => {
 });
 
 describe('view single — read gate', () => {
+  // The single-escalation GET reads through getEscalationWithFormSchema (the row
+  // plus the JOINed, resolved form). The read gate still runs on the record.
+  const detail = (assigned_to: string | null) => ({ escalation: esc(assigned_to), form_schema: null });
+
   it('read_self sees own, not others; read_all sees any', async () => {
     scope('self', 'self');
+    svc.getEscalationWithFormSchema.mockResolvedValue(detail('me') as any);
     expect((await getEscalation({ id: 'esc-1' }, AUTH)).status).toBe(200);
 
     scope('self', 'self');
-    svc.getEscalation.mockResolvedValue(esc('someone-else') as any);
+    svc.getEscalationWithFormSchema.mockResolvedValue(detail('someone-else') as any);
     expect((await getEscalation({ id: 'esc-1' }, AUTH)).status).toBe(403);
 
     scope('all', 'none');

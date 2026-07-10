@@ -147,8 +147,8 @@ export const LIST_ROLE_SCHEMA_VERSIONS = `
   ORDER BY s.version DESC`;
 
 export const GET_ROLE_SCHEMA_VERSION = `
-  SELECT s.role, s.version, s.form_schema, s.metadata_schema, s.change_summary,
-         s.created_at, r.current_schema_version AS latest_version
+  SELECT s.role, s.version, s.form_schema, s.metadata_schema,
+         s.change_summary, s.created_at, r.current_schema_version AS latest_version
   FROM lt_role_schemas s
   JOIN lt_roles r ON r.role = s.role
   WHERE s.role = $1 AND s.version = $2`;

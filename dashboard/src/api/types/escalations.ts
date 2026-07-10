@@ -27,4 +27,11 @@ export interface LTEscalationRecord {
   updated_at: string;
   trace_id: string | null;
   span_id: string | null;
+  /**
+   * The role's escalation form, resolved to this escalation's pinned version (or
+   * the role's latest when unpinned) and JOINed in by the single-escalation GET.
+   * Not a stored column — it rides in from the roles tables so the resolve UI
+   * renders the versioned form without a second call. Absent on list rows.
+   */
+  form_schema?: Record<string, any> | null;
 }

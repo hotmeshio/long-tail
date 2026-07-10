@@ -264,7 +264,7 @@ Returns all roles with metadata and usage counts.
 |-------|------|-------------|
 | `title` | `string \| null` | Display name separate from the technical role key |
 | `description` | `string \| null` | Human-readable summary |
-| `form_schema` | `object \| null` | JSON Schema for the escalation resolve form (overridden per-workflow by `resolver_schema`) |
+| `form_schema` | `object \| null` | JSON Schema for the escalation resolve form (the JIT UI). Versioned per role; fields may carry `x-lt-bind` to map values into the payload. Takes precedence over the deprecated workflow-level `resolver_schema` |
 | `metadata_schema` | `object \| null` | JSON Schema declaring the expected shape of `lt_escalations.metadata` for this role. Drives faceted-query key autocomplete and creation-time validation |
 | `properties` | `object` | Free user-owned bag — icons, colors, tags, etc. No reserved keys |
 | `ops_visible` | `boolean` | When `true`, the role appears as a station on the `/operations` view |

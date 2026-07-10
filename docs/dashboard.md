@@ -110,7 +110,7 @@ workers: [
       certified: true,
       roles: ['reviewer', 'admin'],
       envelopeSchema: { data: { field1: '', field2: 0 } },
-      resolverSchema: { approved: true, notes: '' },
+      resolverSchema: { approved: true, notes: '' }, // deprecated legacy fallback — the escalation form is owned by the target role as a versioned form_schema
     },
   },
 ]
@@ -308,7 +308,7 @@ The central queue for all escalation activity across every workflow.
 - **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
 - **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
 - **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations. The queue list and aggregate stats reflect `read_all` memberships — a member scoped to `read_self` lands directly on their own assigned item in user mode rather than browsing the full queue.
-- **Resolve** — after claiming, submit a resolver payload (pre-filled from the workflow's `resolver_schema` if configured). Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
+- **Resolve** — after claiming, submit a resolver payload. The form is pre-filled from the role's versioned `form_schema` field defaults and from the workflow's seeded `envelope.formDefaults` (reverse-mapped through each field's `x-lt-bind`). The dashboard maps the flat form to the nested payload via `x-lt-bind` and the submitted payload is stored as-is. Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
 - **Escalate** — forward a claimed escalation to a higher-tier role via the escalation chain.
 
 **API:** `GET /api/escalations` lists with filters. `POST /api/escalations/:id/claim` claims. `POST /api/escalations/:id/resolve` resolves.

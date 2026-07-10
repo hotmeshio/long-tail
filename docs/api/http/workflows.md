@@ -140,7 +140,7 @@ PUT /api/workflows/:type/config
 | `execute_as` | `string \| null` | `null` | Service account `external_id` to run as (overrides invoker identity) |
 | `tool_tags` | `string[]` | `[]` | MCP tool tags for scoped tool discovery |
 | `envelope_schema` | `object \| null` | `null` | JSON Schema for the workflow input envelope |
-| `resolver_schema` | `object \| null` | `null` | JSON Schema for the escalation resolver payload |
+| `resolver_schema` | `object \| null` | `null` | **Deprecated** legacy fallback only. The escalation form is owned by the target role as a versioned `form_schema`. |
 | `cron_schedule` | `string \| null` | `null` | Cron expression for scheduled execution (e.g., `"0 9 * * *"`) |
 
 **Example request:**

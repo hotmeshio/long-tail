@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Code2, Play, ShieldCheck, ShieldOff,
+  Code2, Play, ShieldOff,
 } from 'lucide-react';
 import { useWorkflowConfigs, useUpsertWorkflowConfig, useDeleteWorkflowConfig, useJobs } from '../../../api/workflows';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RolePicker } from '../../../components/common/form/RolePicker';
 import { BotPicker } from '../../../components/common/form/BotPicker';
-import { WorkflowPicker } from '../../../components/common/form/WorkflowPicker';
 import { NamespacePill } from '../../../components/common/display/NamespacePill';
 import { splitCsv } from '../../../lib/parse';
 import { EMPTY_FORM, configToForm, jsonValid } from './config-form-types';
@@ -300,96 +299,22 @@ export function WorkflowConfigDetailPage() {
           </div>
         </div>
 
-        {/* ── Certification ────────────────────────────────────────────── */}
-        <div>
-          <SectionHeader icon={ShieldCheck} color="text-accent">Certification</SectionHeader>
-          <div className="space-y-5">
-            <Field
-              label="Resolver Schema"
-              hint={<>Default form for resolving escalations. Use <code className="font-mono">properties</code> with <code className="font-mono">type</code>, <code className="font-mono">default</code>, <code className="font-mono">description</code>.</>}
+        {/* Escalation & resolution config is ROLE-owned now — a workflow no longer
+            declares a resolver schema or a certification tier here. The escalation
+            surface (form_schema + resolver_schema, versioned) lives on the target
+            role. This section is intentionally hidden from the workflow view. */}
+        {editing && (
+          <div>
+            <SectionHeader icon={ShieldOff} color="text-text-tertiary">Registration</SectionHeader>
+            <button
+              onClick={() => setConfirmUnregister(true)}
+              className="flex items-center gap-1.5 text-[11px] text-status-warning hover:underline"
+              title="Delete this registration — the workflow returns to plain durable"
             >
-              <textarea
-                value={form.resolver_schema}
-                onChange={(e) => set('resolver_schema', e.target.value)}
-                placeholder={'{\n  "properties": {\n    "approved": { "type": "boolean", "default": false }\n  }\n}'}
-                className={jsonCls}
-                rows={6}
-                spellCheck={false}
-              />
-              {form.resolver_schema.trim() && !jsonValid(form.resolver_schema) && (
-                <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
-              )}
-            </Field>
-
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.certified}
-                  onChange={(e) => set('certified', e.target.checked)}
-                  className="w-4 h-4 rounded border-border accent-accent"
-                />
-                <span className="text-xs text-text-primary font-medium">Certify for HITL Escalation</span>
-              </label>
-              <p className="hint">
-                Certified workflows use the interceptor — failures escalate to human reviewers.
-                Unchecking demotes this workflow to registered on save; escalation roles and
-                dependencies below are kept.
-              </p>
-            </div>
-
-            {form.certified ? (
-              <>
-                <Field label="Default Escalation Role" hint="The role surface interceptor-raised escalations target.">
-                  <RolePicker
-                    selected={csvToArray(form.default_role)}
-                    onChange={(roles) => set('default_role', roles[0] ?? '')}
-                    single
-                    placeholder="Select role…"
-                  />
-                </Field>
-
-                <Field
-                  label="Escalation Roles"
-                  hint="Interceptor default for who can claim and resolve. Escalations raised in workflow code choose their own role, whose versioned schema takes precedence."
-                >
-                  <RolePicker
-                    selected={csvToArray(form.roles)}
-                    onChange={(roles) => set('roles', arrayToCsv(roles))}
-                    placeholder="Select roles…"
-                  />
-                </Field>
-
-                <Field label="Consumes" hint="Upstream workflows whose output is injected into this workflow's envelope.">
-                  <WorkflowPicker
-                    options={(configs ?? [])
-                      .map((c) => c.workflow_type)
-                      .filter((t) => t !== form.workflow_type)}
-                    selected={csvToArray(form.consumes)}
-                    onChange={(workflows) => set('consumes', arrayToCsv(workflows))}
-                    placeholder="Select dependencies…"
-                  />
-                </Field>
-              </>
-            ) : (
-              <p className="text-[11px] text-text-tertiary py-2">
-                Enable <span className="font-medium text-text-secondary">Certify</span> to add automatic escalation routing and role-based resolution.
-              </p>
-            )}
-
-            {editing && (
-              <div className="pt-4 border-t border-surface-border/50">
-                <button
-                  onClick={() => setConfirmUnregister(true)}
-                  className="flex items-center gap-1.5 text-[11px] text-status-warning hover:underline"
-                  title="Delete this registration — the workflow returns to plain durable"
-                >
-                  <ShieldOff className="w-3 h-3" /> Unregister workflow
-                </button>
-              </div>
-            )}
+              <ShieldOff className="w-3 h-3" /> Unregister workflow
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {(schemaError || upsert.error) && (

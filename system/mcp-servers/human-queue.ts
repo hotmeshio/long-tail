@@ -79,12 +79,15 @@ export async function createHumanQueueServer(options?: {
     'check_resolution',
     {
       title: 'Check Escalation Resolution',
-      description: 'Check the status of an escalation. Returns status and resolver payload if resolved.',
+      description: 'Check an escalation. When resolved, returns the resolver payload. When pending, returns the role\'s form_schema — the fields (and their x-lt-bind payload paths) to submit when resolving.',
       inputSchema: checkResolutionSchema,
     },
     async (args: z.infer<typeof checkResolutionSchema>) => {
-      const escalation = await escalationService.getEscalation(args.escalation_id);
-      if (!escalation) {
+      // Single query: the escalation plus its role's form, resolved to the pinned
+      // version (or latest) — the same JOIN the HTTP GET uses, so an agent sees
+      // the same form the dashboard renders.
+      const detail = await escalationService.getEscalationWithFormSchema(args.escalation_id);
+      if (!detail) {
         return {
           content: [{
             type: 'text' as const,
@@ -93,6 +96,7 @@ export async function createHumanQueueServer(options?: {
           isError: true,
         };
       }
+      const escalation = detail.escalation;
       const result: Record<string, any> = {
         escalation_id: escalation.id,
         status: escalation.status,
@@ -104,6 +108,9 @@ export async function createHumanQueueServer(options?: {
           result.resolver_payload = escalation.resolver_payload;
         }
         result.resolved_at = escalation.resolved_at;
+      } else if (escalation.status === 'pending' && detail.form_schema) {
+        // The shape the resolver payload should take (fields + x-lt-bind paths).
+        result.form_schema = detail.form_schema;
       }
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],

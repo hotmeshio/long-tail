@@ -132,7 +132,9 @@ export const upsertWorkflowConfigSchema = z.object({
   consumes: z.array(z.string()).optional().default([]),
   tool_tags: z.array(z.string()).optional().default([]),
   envelope_schema: z.record(z.any()).nullable().optional().default(null),
-  resolver_schema: z.record(z.any()).nullable().optional().default(null),
+  resolver_schema: z.record(z.any()).nullable().optional()
+    .describe('DEPRECATED: the escalation form is a versioned schema owned by the target role. Legacy fallback only.')
+    .default(null),
   cron_schedule: z.string().nullable().optional().default(null),
 });
 
@@ -281,7 +283,7 @@ export const updateRoleSchema = z.object({
   role: z.string().describe('Role key to update'),
   title: z.string().nullable().optional().describe('Display name shown on role cards and station views'),
   description: z.string().nullable().optional().describe('Short description of this role\'s purpose'),
-  form_schema: z.record(z.any()).nullable().optional().describe('JSON Schema for the escalation resolve form (overridden by workflow-level resolver_schema)'),
+  form_schema: z.record(z.any()).nullable().optional().describe('JSON Schema for the escalation resolve form (the JIT UI). Versioned per role; fields may carry x-lt-bind to map to the payload. Takes precedence over the deprecated workflow-level resolver_schema.'),
   metadata_schema: z.record(z.any()).nullable().optional().describe('JSON Schema declaring the expected shape of lt_escalations.metadata for this role. Drives creation-time validation and faceted-query key autocomplete.'),
   properties: z.record(z.any()).nullable().optional().describe('Free user-owned bag (icon, color, tags, etc.). No reserved keys — use the typed columns below for operational values.'),
   ops_visible: z.boolean().optional().describe('When true, role appears as a station on the /operations view'),

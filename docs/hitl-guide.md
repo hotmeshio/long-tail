@@ -165,9 +165,8 @@ export async function reviewWorkflow(envelope: LTEnvelope) {
 The resolver form resolves in order, most specific first:
 
 1. **`metadata.form_schema`** — a full JSON Schema embedded on the escalation row. Use when different escalation points in the same workflow need different forms.
-2. **`metadata.schema_version`** — a pin to a specific version of the role's schema (set via `schemaVersion` in the `conditionLT` config). The form renders exactly that snapshot, even after the role's schema changes.
-3. **Workflow config `resolver_schema`** — default form for all escalations of this workflow type. Set in the workflow registry.
-4. **The role's latest `form_schema`** — the fallback every role provides.
+2. **The role's `form_schema`** — the versioned form every role provides. When the row carries a `metadata.schema_version` pin (set via `schemaVersion` in the `conditionLT` config), the form renders exactly that snapshot even after the role's schema changes; without a pin, the role's latest applies.
+3. **Workflow config `resolver_schema`** — **deprecated** legacy fallback only, used when no role `form_schema` is available.
 
 ### Versioned Role Schemas
 
