@@ -127,6 +127,17 @@
            leading-relaxed tabular-nums resize-y transition-colors duration-150;
   }
 
+  /* Quiet multiline field — a whisper of background marks the writable
+     region (borderless prose fields disappear otherwise); the underline is
+     the only stroke, deepening to accent on focus. Pairs with
+     AutoGrowTextarea, which grows the height with the content. */
+  .textarea-quiet {
+    @apply w-full bg-surface-sunken/50 rounded-t-md border-b border-surface-border/60 px-3 py-2 text-sm
+           text-text-primary placeholder:text-text-tertiary leading-relaxed
+           focus:outline-none focus:border-accent/50 focus:bg-surface-sunken/80
+           transition-colors duration-150 resize-none overflow-hidden;
+  }
+
   .select {
     @apply bg-transparent border-b border-surface-border/60 px-1 py-1.5 text-sm
            text-text-primary focus:outline-none focus:border-accent/50

@@ -177,6 +177,66 @@ export async function resolveEscalationsByIds(
 }
 
 /**
+ * Resolve a SET of escalations atomically — every listed row resolves, each
+ * with its OWN resolverPayload, or none do. One SQL statement locks the rows
+ * in deterministic id order, applies per-row payloads, and commits each
+ * waiter's wake WITH its resolve. Unlike {@link resolveEscalationsByIds},
+ * rows backing a live `condition()` waiter are first-class here: each is
+ * woken with its own payload as the condition's return value.
+ *
+ * On failure NOTHING is written and `failed` names exactly the rows that
+ * blocked the batch (`not-found`, `already-resolved`, `already-cancelled`,
+ * `already-expired`, `assignee-mismatch`) — rows that were themselves
+ * resolvable stay pending and are not listed.
+ *
+ * `assertAssignee` (optional) additionally requires every row to be assigned
+ * to that principal, asserted inside the same guarded statement — closing the
+ * claim-race window for claim-then-resolve flows.
+ */
+export async function resolveEscalationsAllOrNone(
+  items: Array<{ id: string; resolverPayload: Record<string, any> }>,
+  metadata?: Record<string, any>,
+  assertAssignee?: string,
+): Promise<
+  | { ok: true; escalations: LTEscalationRecord[] }
+  | { ok: false; failed: Array<{ id: string; reason: string }> }
+> {
+  if (items.length === 0) return { ok: true, escalations: [] };
+  const client = await escalations();
+  const result = await client.resolveAllOrNone({ items, metadata, assertAssignee });
+  if (!result.ok) return { ok: false, failed: result.failed };
+
+  const records = toEscalationRecords(result.entries);
+  for (const escalation of records) {
+    publishEscalationChange({
+      type: 'escalation.resolved',
+      source: 'service',
+      workflowId: escalation.workflow_id || '',
+      workflowName: escalation.workflow_type || '',
+      taskQueue: escalation.task_queue || '',
+      escalationId: escalation.id,
+      status: 'resolved',
+      data: {},
+    });
+  }
+  return { ok: true, escalations: records };
+}
+
+/**
+ * Fetch full records for a set of escalation IDs in one indexed query.
+ * Used by bulk orchestrators that need per-row context beyond the scope
+ * fields — signal routing shape, `metadata.form_schema` for redaction.
+ */
+export async function getEscalationsByIds(
+  ids: string[],
+): Promise<LTEscalationRecord[]> {
+  if (ids.length === 0) return [];
+  const client = await escalations();
+  const rows = await client.list({ ids, limit: LOOKUP_LIMIT });
+  return toEscalationRecords(rows);
+}
+
+/**
  * Look up an efficient (atomic) escalation by its `signal_key` — the signal id
  * passed to `conditionLT(signalId, config)` / `condition(signalId, config)`.
  * Returns null when no row carries that key.

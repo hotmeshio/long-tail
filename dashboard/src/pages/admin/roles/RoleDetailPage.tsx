@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users, BookOpen,
+  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -14,6 +14,7 @@ import {
 } from '../../../api/roles';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
+import { AutoGrowTextarea } from '../../../components/common/form/AutoGrowTextarea';
 import { RoleMembersSection } from './RoleMembersSection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -55,6 +56,55 @@ function SectionHead({
         <h2 className="section-h2">{label}</h2>
       </div>
       {aside}
+    </div>
+  );
+}
+
+// ── Section group — eyebrow (icon + tiny title + annotation) over a left-ruled
+//    body. The page's top-level grouping treatment; sub-sections inside a group
+//    keep SectionHead. ──────────────────────────────────────────────────────────
+
+function SectionGroup({
+  icon: Icon,
+  label,
+  annotation,
+  aside,
+  accent = false,
+  children,
+}: {
+  icon: React.ElementType;
+  label: string;
+  annotation?: string;
+  aside?: React.ReactNode;
+  accent?: boolean;
+  children: React.ReactNode;
+}) {
+  const hue = accent ? 'text-accent' : 'text-text-tertiary';
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Icon className={`w-3 h-3 ${hue} shrink-0`} strokeWidth={1.5} />
+          <span className={`text-[9px] font-semibold uppercase tracking-widest ${hue}`}>{label}</span>
+          {annotation && (
+            <span className="text-[9px] text-text-quaternary truncate">— {annotation}</span>
+          )}
+        </div>
+        {aside}
+      </div>
+      <div className={`border-l-2 pl-5 ${accent ? 'border-accent/15' : 'border-surface-border/60'}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Live-save indicator shown in a group's eyebrow. */
+function LiveBadge() {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-status-success">Live</span>
     </div>
   );
 }
@@ -409,9 +459,9 @@ export function RoleDetailPage() {
             {role.title && <p className="text-sm text-text-secondary pl-8">{role.title}</p>}
           </div>
 
-          {/* Ops — this role is (or isn't) a station on the Pace Board */}
+          {/* Pace Board — this role is (or isn't) a station on the Pace Board */}
           <div className="flex items-center gap-2 shrink-0" title="Show as a station on the Pace Board">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Ops</span>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Pace Board</span>
             <button
               onClick={() => update({ ops_visible: !draft.ops_visible })}
               className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
@@ -538,80 +588,83 @@ export function RoleDetailPage() {
         <div className="space-y-14">
 
           {/* Identity */}
-          <div className="space-y-8">
-            <SectionHead icon={Tag} color="text-accent" label="Identity" />
+          <SectionGroup icon={Tag} label="Identity" annotation="name and description" accent>
+            <div className="space-y-8">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={draft.title}
+                  onChange={(e) => update({ title: e.target.value })}
+                  placeholder={`e.g., ${role.role.charAt(0).toUpperCase() + role.role.slice(1)}`}
+                  className="input text-sm w-full"
+                />
+              </div>
 
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-                Display Name
-              </label>
-              <input
-                type="text"
-                value={draft.title}
-                onChange={(e) => update({ title: e.target.value })}
-                placeholder={`e.g., ${role.role.charAt(0).toUpperCase() + role.role.slice(1)}`}
-                className="input text-sm w-full"
-              />
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+                  Description
+                </label>
+                <AutoGrowTextarea
+                  value={draft.description}
+                  onChange={(v) => update({ description: v })}
+                  placeholder="A short description shown on role cards and in the operations view."
+                  rows={2}
+                />
+              </div>
             </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-                Description
-              </label>
-              <textarea
-                value={draft.description}
-                onChange={(e) => update({ description: e.target.value })}
-                placeholder="A short description shown on role cards and in the operations view."
-                rows={4}
-                className="input text-sm w-full resize-none"
-              />
-            </div>
-          </div>
+          </SectionGroup>
 
           {/* Sequence placement — only meaningful for stations, so these two
-              sections follow the Ops toggle, easing in and out with it. */}
+              sections follow the Pace Board toggle, easing in and out with it. */}
           <div
-            className={`space-y-14 overflow-hidden transition-all duration-300 ease-out ${
+            className={`overflow-hidden transition-all duration-300 ease-out ${
               draft.ops_visible ? 'opacity-100 max-h-[900px]' : 'opacity-0 max-h-0 pointer-events-none'
             }`}
             aria-hidden={!draft.ops_visible}
           >
-            {/* Prior Step */}
-            <div className="space-y-5">
-              <SectionHead icon={GitBranch} color="text-text-tertiary" label="Prior Step" />
-              <select
-                value={draft.parent_role}
-                onChange={(e) => update({ parent_role: e.target.value })}
-                className="select text-sm w-full font-mono"
-              >
-                <option value="">None — root process</option>
-                {availableParents.map((r) => (
-                  <option key={r.role} value={r.role}>
-                    {r.title ? `${r.role} — ${r.title}` : r.role}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[10px] text-text-tertiary leading-relaxed">
-                Places this role in one Pace Board sequence. A role with no prior
-                step starts its own sequence.
-              </p>
-            </div>
+            <SectionGroup
+              icon={LayoutDashboard}
+              label="Pace Board"
+              annotation="where this station sits on the floor"
+              accent
+            >
+              <div className="space-y-14">
+                {/* Prior Step */}
+                <div className="space-y-5">
+                  <SectionHead icon={GitBranch} color="text-text-tertiary" label="Prior Step" />
+                  <select
+                    value={draft.parent_role}
+                    onChange={(e) => update({ parent_role: e.target.value })}
+                    className="select text-sm w-full font-mono"
+                  >
+                    <option value="">None — root process</option>
+                    {availableParents.map((r) => (
+                      <option key={r.role} value={r.role}>
+                        {r.title ? `${r.role} — ${r.title}` : r.role}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-text-tertiary leading-relaxed">
+                    Places this role in one Pace Board sequence. A role with no prior
+                    step starts its own sequence.
+                  </p>
+                </div>
 
-            {/* Upstream inputs — cross-sequence graph edges, live-save */}
-            <div className="space-y-5">
-              <SectionHead
-                icon={GitMerge}
-                color="text-text-tertiary"
-                label="Upstream Inputs"
-                aside={
-                  <div className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-status-success">Live</span>
-                  </div>
-                }
-              />
-              <UpstreamSection role={role} allRoles={roles} />
-            </div>
+                {/* Upstream inputs — cross-sequence graph edges, live-save */}
+                <div className="space-y-5">
+                  <SectionHead
+                    icon={GitMerge}
+                    color="text-text-tertiary"
+                    label="Upstream Inputs"
+                    aside={<LiveBadge />}
+                  />
+                  <UpstreamSection role={role} allRoles={roles} />
+                </div>
+              </div>
+            </SectionGroup>
           </div>
 
         </div>
@@ -620,51 +673,39 @@ export function RoleDetailPage() {
         <div className="space-y-14">
 
           {/* Escalation targets — live */}
-          <div>
-            <SectionHead
-              icon={Network}
-              color="text-text-quaternary"
-              label="Escalation Targets"
-              aside={
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
-                  <span className="text-[9px] font-semibold uppercase tracking-widest text-status-success">Live</span>
-                </div>
-              }
-            />
+          <SectionGroup
+            icon={Network}
+            label="Escalation Targets"
+            annotation="hand-off routing"
+            aside={<LiveBadge />}
+          >
             <EscalationSection role={role} allRoles={roles} />
-          </div>
+          </SectionGroup>
 
           {/* Members — who can see through this window, and how far */}
-          <div className="pt-3 pb-4 border-t border-surface-border/40">
-            <SectionHead
-              icon={Users}
-              color="text-text-quaternary"
-              label="Members"
-              aside={
-                <span className="text-[9px] font-normal normal-case text-text-quaternary">
-                  read = what appears · write = what they can act on
-                </span>
-              }
-            />
+          <SectionGroup
+            icon={Users}
+            label="Members"
+            annotation="read = what appears · write = what they can act on"
+          >
             <RoleMembersSection role={role.role} />
-          </div>
+          </SectionGroup>
         </div>
 
         {/* ── Col 3: Schemas & Properties ── */}
         <div className="space-y-14">
           {/* Escalation Schema — versioned, edited on its own page */}
-          <div>
-            <SectionHead
-              icon={Braces}
-              color="text-accent"
-              label="Escalation Schema"
-              aside={
-                role.current_schema_version != null ? (
-                  <span className="text-[9px] font-mono text-text-quaternary">v{role.current_schema_version} in use</span>
-                ) : undefined
-              }
-            />
+          <SectionGroup
+            icon={Braces}
+            label="Escalation Schema"
+            annotation="the resolve form"
+            accent
+            aside={
+              role.current_schema_version != null ? (
+                <span className="text-[9px] font-mono text-text-quaternary">v{role.current_schema_version} in use</span>
+              ) : undefined
+            }
+          >
             <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
               The form a person completes to resolve this role's escalations.
               Versioned — each save adds one; workflows pin any version via{' '}
@@ -678,20 +719,19 @@ export function RoleDetailPage() {
                 ? `Open schema editor — v${role.current_schema_version ?? 1} in use →`
                 : 'Define the escalation form →'}
             </Link>
-          </div>
+          </SectionGroup>
 
           {/* Metadata Schema */}
-          <div>
-            <SectionHead
-              icon={Braces}
-              color="text-accent"
-              label="Metadata Schema"
-              aside={
-                !editingJson.has('metadata_schema') && role.metadata_schema ? (
-                  <button onClick={() => startEditingJson('metadata_schema')} className="text-[9px] text-accent hover:underline">Edit</button>
-                ) : undefined
-              }
-            />
+          <SectionGroup
+            icon={Braces}
+            label="Metadata Schema"
+            annotation="validates metadata at creation"
+            aside={
+              !editingJson.has('metadata_schema') && role.metadata_schema ? (
+                <button onClick={() => startEditingJson('metadata_schema')} className="text-[9px] text-accent hover:underline">Edit</button>
+              ) : undefined
+            }
+          >
             <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
               Validates <code className="font-mono">metadata</code> at creation time. Keys appear in faceted search autocomplete.
             </p>
@@ -714,42 +754,11 @@ export function RoleDetailPage() {
                 {errors.metadata_schema && <p className="text-[10px] text-status-error mt-1">{errors.metadata_schema}</p>}
               </>
             )}
-          </div>
+          </SectionGroup>
 
-          {/* Properties (free bag) */}
-          <div>
-            <SectionHead
-              icon={Braces}
-              color="text-text-quaternary"
-              label="Properties"
-              aside={
-                !editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
-                  <button onClick={() => startEditingJson('properties')} className="text-[9px] text-accent hover:underline">Edit</button>
-                ) : (
-                  <span className="text-[9px] font-normal normal-case text-text-quaternary">custom JSON</span>
-                )
-              }
-            />
-            {!editingJson.has('properties') && role.properties && Object.keys(role.properties).length > 0 ? (
-              <JsonViewer data={role.properties} defaultCollapsed />
-            ) : (
-              <>
-                <textarea
-                  value={draft.properties}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    update({ properties: val });
-                    setErrors((prev) => ({ ...prev, properties: safeParseJson(val).ok ? undefined : 'Invalid JSON' }));
-                  }}
-                  rows={5}
-                  spellCheck={false}
-                  className="input text-xs font-mono w-full resize-none"
-                  placeholder={'{\n  "icon": "wrench",\n  "color": "#6366f1"\n}'}
-                />
-                {errors.properties && <p className="text-[10px] text-status-error mt-1">{errors.properties}</p>}
-              </>
-            )}
-          </div>
+          {/* Properties (free custom-JSON bag) is intentionally not rendered:
+              nothing consumes it yet and it crowded the column. The draft still
+              round-trips the stored value on save, so existing data is kept. */}
         </div>
       </div>
 

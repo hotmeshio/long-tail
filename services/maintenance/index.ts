@@ -3,6 +3,7 @@ import { Virtual } from '@hotmeshio/hotmesh';
 import { getConnection } from '../../lib/db';
 import { loggerRegistry } from '../../lib/logger';
 import * as dbaService from '../dba';
+import { escalations } from '../escalation/client';
 import type { LTMaintenanceConfig, LTMaintenanceRule } from '../../types/maintenance';
 
 const CRON_TOPIC = 'lt.maintenance.prune';
@@ -55,6 +56,28 @@ async function executeRule(appId: string, rule: LTMaintenanceRule): Promise<void
         streams: false,
       });
       break;
+
+    // Age out terminal escalation rows (resolved/cancelled/expired). The
+    // engine-owned prune deletes at most one batch per call in one atomic
+    // statement; loop until the horizon is drained. Pending rows and live
+    // condition() waiters are never touched — every engine state transition
+    // guards on status='pending', so terminal rows are inert audit records.
+    case rule.target === 'escalations' && rule.action === 'delete': {
+      const client = await escalations();
+      let deleted = 0;
+      let batch: number;
+      do {
+        ({ deleted: batch } = await client.prune({
+          olderThan: rule.olderThan,
+          statuses: rule.statuses,
+        }));
+        deleted += batch;
+      } while (batch > 0);
+      if (deleted > 0) {
+        loggerRegistry.info(`[lt-maintenance] escalations pruned: ${deleted} (olderThan: ${rule.olderThan})`);
+      }
+      break;
+    }
 
     default:
       loggerRegistry.warn(`[lt-maintenance] unknown rule, skipping: ${JSON.stringify(rule)}`);

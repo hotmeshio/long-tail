@@ -92,6 +92,9 @@ export const YAML_VERSION_LIMIT = envInt('LT_YAML_VERSION_LIMIT', 20);
 
 // ── Escalation ──────────────────────────────────────────────────────
 
+/** Maximum items per atomic bulk resolve (POST /escalations/resolve-all-or-none). */
+export const ESCALATION_BULK_RESOLVE_MAX = envInt('LT_ESCALATION_BULK_RESOLVE_MAX', 100);
+
 /**
  * Claim duration presets shown in the dashboard (minutes).
  * Override via JSON array, e.g. LT_CLAIM_DURATION_OPTIONS='[15,30,60,480]'

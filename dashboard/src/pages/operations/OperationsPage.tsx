@@ -18,6 +18,7 @@ import {
 } from './PaceChart';
 import { StationDetailPanel } from './StationDetailPanel';
 import { priorityQueueLink } from './priority-link';
+import { displayRoleTitle } from '../../lib/role-display';
 
 // Column band tints — the same hues as the chart's queue-composition bands
 // (~8% alpha), so PENDING/ACTIVE/RESOLVED in the table visually continue the
@@ -26,6 +27,10 @@ const TARGET_BAND = `${TARGET_COLOR}14`;
 const PENDING_BAND = `${QUEUED_COLOR}14`;
 const ACTIVE_BAND = `${ACTIVE_COLOR}14`;
 const RESOLVED_BAND = `${RESOLVED_COLOR}14`;
+
+// Station table grid — shared by the header and every row. The display name
+// leads (user-set title or derived from the id); the exact role id follows.
+const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) 64px 56px 56px 60px 72px 72px 104px';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -149,24 +154,24 @@ function StationRow({
         className={`grid items-center gap-4 pr-3 cursor-pointer transition-colors ${
           selected ? 'border-l-2 !border-l-accent pl-2.5' : 'pl-3'
         }`}
-        style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
+        style={{ gridTemplateColumns: STATION_GRID_COLS }}
       >
-        {/* Role name */}
+        {/* Name — user-set title, or derived from the role id */}
         <div className="flex items-center gap-1.5 min-w-0 py-1.5">
-          <span
-            className="font-mono font-bold text-text-primary truncate text-[11px]"
-          >
-            {role.role}
+          <span className="font-bold text-text-primary truncate text-xs">
+            {displayRoleTitle(role)}
           </span>
-          {role.title && (
-            <span className="text-[10px] text-text-tertiary truncate">{role.title}</span>
-          )}
           {(role.upstream_roles?.length ?? 0) > 0 && (
             <span title={`Fed by ${role.upstream_roles.join(', ')}`} className="shrink-0 leading-none">
               <GitMerge className="w-3 h-3 text-text-quaternary" />
             </span>
           )}
         </div>
+
+        {/* Role id — the exact format */}
+        <span className="font-mono text-[11px] text-text-tertiary truncate py-1.5">
+          {role.role}
+        </span>
 
         {/* Target / hour — emerald band, same hue as the chart's target line */}
         <div
@@ -273,6 +278,7 @@ function StationRow({
 function TableHead() {
   // Queue-state columns carry the chart's band hue into the table.
   const cols: { label: string; band?: string; hue?: string }[] = [
+    { label: 'NAME' },
     { label: 'ROLE' },
     { label: 'TARGET/H', band: TARGET_BAND, hue: TARGET_COLOR },
     { label: 'PENDING', band: PENDING_BAND, hue: QUEUED_COLOR },
@@ -285,7 +291,7 @@ function TableHead() {
   return (
     <div
       className="grid items-center gap-4 px-3 border-b border-surface-border mb-0.5"
-      style={{ gridTemplateColumns: '1fr 64px 56px 56px 60px 72px 72px 104px' }}
+      style={{ gridTemplateColumns: STATION_GRID_COLS }}
     >
       {cols.map((col, i) =>
         col.band ? (
@@ -305,7 +311,7 @@ function TableHead() {
           <span
             key={col.label}
             className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 ${
-              i > 0 && i < 7 ? 'text-right' : ''
+              i > 1 && i < 8 ? 'text-right' : ''
             }`}
           >
             {col.label}
@@ -477,7 +483,7 @@ export function OperationsPage() {
           </p>
         </div>
       ) : (
-        /* Console layout: fixed header (above) → flexible middle → fixed table (30vh) */
+        /* Console layout: fixed header (above) → chart row (min 40vh) → table row (max 30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
           {/* Sequence picker — one tab per fragment, named by its origin role.
@@ -496,7 +502,7 @@ export function OperationsPage() {
                         : 'text-text-quaternary hover:text-text-secondary'
                     }`}
                   >
-                    {f.origin.title ?? f.origin.role}
+                    {displayRoleTitle(f.origin)}
                     <span className={`ml-1.5 tabular-nums ${isActive ? 'text-accent/60' : 'text-text-quaternary/60'}`}>
                       {f.stations.length}
                     </span>
@@ -506,8 +512,8 @@ export function OperationsPage() {
             </div>
           )}
 
-          {/* Middle row: flexible height — SVG fills left, sidebar fixed-width right */}
-          <div className="flex-1 min-h-0 flex items-stretch overflow-hidden">
+          {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
+          <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
             {/* SVG chart — scales to fill available space */}
             <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden p-4">
               <PaceChart
@@ -531,8 +537,8 @@ export function OperationsPage() {
             />
           </div>
 
-          {/* Bottom row: sized to its rows up to 45vh — header sticky, rows scroll */}
-          <div className="max-h-[45vh] flex-none flex flex-col border-t border-surface-border overflow-hidden">
+          {/* Bottom row: sized to its rows up to 30vh — header sticky, rows scroll */}
+          <div className="max-h-[30vh] flex-none flex flex-col border-t border-surface-border overflow-hidden">
             <TableHead />
             <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-surface-border/30">
               {ordered.map(({ role }) => (

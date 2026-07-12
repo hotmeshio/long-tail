@@ -28,6 +28,7 @@ await start({
       { target: 'jobs',    olderThan: '14 days',  action: 'delete', hasEntity: false },
       { target: 'jobs',    olderThan: '14 days',  action: 'prune',  hasEntity: true },
       { target: 'jobs',    olderThan: '180 days', action: 'delete', pruned: true },
+      { target: 'escalations', olderThan: '180 days', action: 'delete' },
     ],
   },
 });
@@ -42,14 +43,15 @@ await start({
 
 ## What gets cleaned
 
-Four categories of data are subject to maintenance:
+Five categories of data are subject to maintenance:
 
 | Category | Description |
 |---|---|
-| **Streams** | Redis-style stream messages used internally by HotMesh to coordinate activities. These are pure infrastructure; no user-facing data resides here. |
+| **Streams** | Stream messages used internally by HotMesh to coordinate activities. These are pure infrastructure; no user-facing data resides here. |
 | **Transient jobs** | Job rows where the `entity` column is `NULL`. These represent activity executions, signal deliveries, and other bookkeeping that is not tied to a named workflow entity. They serve no purpose after execution completes. |
 | **Entity jobs** | Job rows where `entity` is set. These represent actual workflow instances -- the rows that back `Durable.Client.workflow.search()` calls and execution exports. Deleting them removes the workflow record entirely. |
 | **Pruned jobs** | Entity jobs that have already had their execution artifacts stripped (the `pruned_at` column is not `NULL`). These retain core data but no longer carry execution scaffolding. They can be hard-deleted after a longer retention window. |
+| **Terminal escalations** | Escalation rows in a terminal status (`resolved`, `cancelled`, `expired`). Terminal rows are inert audit records -- every engine state transition guards on `status = 'pending'`, so aging them out is safe for live waiters, claims, and signal delivery. The engine-owned prune deletes in atomic batches until the retention horizon is drained. Pending rows are never touched. |
 
 ## Prune vs. delete
 
@@ -93,11 +95,12 @@ Defined in `types/maintenance.ts`. Each rule describes a single cleanup operatio
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `target` | `'streams' \| 'jobs'` | Yes | The resource type to act on. |
+| `target` | `'streams' \| 'jobs' \| 'escalations'` | Yes | The resource type to act on. |
 | `action` | `'delete' \| 'prune'` | Yes | Whether to remove entirely or strip execution artifacts. |
 | `olderThan` | `string` | Yes | A PostgreSQL interval expression: `'7 days'`, `'24 hours'`, `'90 days'`. |
 | `hasEntity` | `boolean` | No | When `target` is `'jobs'`: `true` selects entity jobs, `false` selects transient jobs (where `entity IS NULL`). |
 | `pruned` | `boolean` | No | When `true`, only targets jobs where `pruned_at IS NOT NULL` -- jobs that have already been pruned. |
+| `statuses` | `Array<'resolved' \| 'cancelled' \| 'expired'>` | No | When `target` is `'escalations'`: which terminal statuses to age out. Defaults to all three. |
 
 ### `LTMaintenanceConfig`
 

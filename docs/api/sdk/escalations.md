@@ -387,7 +387,7 @@ export async function stationWorker(envelope: LTEnvelope) {
     workflowType: 'stationWorker',
     metadata: { orderId: envelope.data.orderId, station: 'qc' },
     envelope: { instructions: 'Review and approve or reject' },
-    timeout: '24h',   // SLA for this worklist row (hotmesh 0.25.1+)
+    timeout: '24h',   // SLA for this worklist row
   });
 
   if (decision === false) {
@@ -405,7 +405,7 @@ export async function stationWorker(envelope: LTEnvelope) {
 
 ### SLA-gated waits (`timeout`)
 
-`ConditionQueueConfig.timeout` (hotmesh 0.25.1+) arms the same resume timer as
+`ConditionQueueConfig.timeout` arms the same resume timer as
 `condition(signalId, '24h')` **in the same single Leg1 write** that creates the
 escalation row. The race is resolved atomically on both sides: a signal that
 arrives first resolves the row normally and the timer is inert; a timer that
@@ -822,6 +822,41 @@ const result = await lt.escalations.resolveByIds({
 | `metadata` | `Record<string, any>` | No | Outcome patch merged into each row |
 
 **Returns:** `LTApiResult<{ resolved: number; escalationIds: string[] }>` — only still-`pending` rows are resolved.
+
+## resolveAllOrNone
+
+Atomic bulk resolve with per-row payloads: every listed escalation resolves with its own `resolverPayload` in one SQL statement, or nothing resolves. Rows backing a live `condition()` waiter are first-class — each waiter's wake commits with its resolve, delivering that row's payload as the condition's return value (the same wake contract as `resolve`). Use it for gang handoffs where each member must receive a distinct mandate and a partial batch is unacceptable.
+
+RBAC matches `resolveByIds`: per-item write scope, and any missing or out-of-scope id returns 404 with nothing resolved. `requireClaimed` additionally asserts — inside the same guarded statement — that every row is currently assigned to the caller, closing the window where another principal re-claims a member between the caller's claim and the resolve.
+
+```typescript
+const result = await lt.escalations.resolveAllOrNone({
+  items: [
+    { id: 'esc_left', resolverPayload: { gcodeRef: 'gcode-left', unit: 'left' } },
+    { id: 'esc_right', resolverPayload: { gcodeRef: 'gcode-right', unit: 'right' } },
+  ],
+  metadata: { outcome: 'gang-dispatched' },
+  requireClaimed: true,
+});
+
+if (result.status === 409) {
+  // nothing resolved — result.data.failed names exactly the blocking rows
+  // (not-found | already-resolved | already-cancelled | already-expired |
+  //  assignee-mismatch | unsupported-resolution-path); re-gang around them
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `items` | `Array<{ id, resolverPayload }>` | Yes | The batch — each row resolves with its own payload. Ids must be unique; max 100 items (`LT_ESCALATION_BULK_RESOLVE_MAX`) |
+| `metadata` | `Record<string, any>` | No | Shared outcome patch merged into every row's GIN-indexed metadata |
+| `requireClaimed` | `boolean` | No | Assert every row is currently assigned to the caller, inside the atomic statement |
+
+**Returns:** `LTApiResult<{ resolved: number; escalationIds: string[] }>` on success. On 409 the data carries `{ error, failedIds, failed: [{ id, reason }] }` — only the rows that blocked the batch are listed; resolvable members stay pending, untouched.
+
+Rows that resolve through legacy signal routing (`metadata.signal_id` / `metadata.signal_routing`) require the single `resolve` path, which delivers their workflow signal; including one blocks the batch with reason `unsupported-resolution-path`. Password-format fields are redacted per row against that row's own `form_schema` before the payload enters the signal store.
+
+**Auth:** Required
 
 ## resolveBySignalKey
 

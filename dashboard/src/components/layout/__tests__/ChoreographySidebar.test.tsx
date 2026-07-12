@@ -20,7 +20,7 @@ describe('ChoreographySidebar — operators (no builder, no ops)', () => {
     expect(screen.getByText('All')).toBeInTheDocument();
   });
 
-  it('does NOT show Pace Board or React entries for plain operators', () => {
+  it('does NOT show Pace Board or Monitor entries for plain operators', () => {
     render(<ChoreographySidebar />, { wrapper });
     expect(screen.queryByText('Pace Board')).not.toBeInTheDocument();
     expect(screen.queryByText('Event Topics')).not.toBeInTheDocument();
@@ -28,9 +28,9 @@ describe('ChoreographySidebar — operators (no builder, no ops)', () => {
 });
 
 describe('ChoreographySidebar — builders', () => {
-  it('shows React heading with Event Topics, Automations, Capabilities for builders', () => {
+  it('shows Monitor heading with Event Topics, Automations, Capabilities for builders', () => {
     render(<ChoreographySidebar isBuilder />, { wrapper });
-    expect(screen.getByText('React')).toBeInTheDocument();
+    expect(screen.getByText('Monitor')).toBeInTheDocument();
     expect(screen.getByText('Event Topics')).toBeInTheDocument();
     expect(screen.getByText('Automations')).toBeInTheDocument();
     expect(screen.getByText('Capabilities')).toBeInTheDocument();

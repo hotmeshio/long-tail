@@ -188,9 +188,15 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
 }) {
   const label = fieldKey.replace(/[_-]/g, ' ');
   const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
+  const widgetName = fieldSchema?.['x-lt-widget'] as string | undefined;
+
+  // Markdown dispatches ahead of the read-only branch: a readOnly markdown
+  // field is a CONTENT BLOCK — the widget renders its source as HTML (the
+  // versioned schema carries the page source), not as static text.
+  const isMarkdown = widgetName === 'markdown' && typeof value === 'string';
 
   // Read-only fields display as static text
-  if (isReadOnly) {
+  if (isReadOnly && !isMarkdown) {
     const displayValue = value === null ? 'null'
       : typeof value === 'object' ? JSON.stringify(value, null, 2)
       : String(value);
@@ -203,7 +209,6 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   }
 
   // Custom widget via x-lt-widget (string fields only)
-  const widgetName = fieldSchema?.['x-lt-widget'] as string | undefined;
   if (widgetName && widgetName in WIDGET_MAP && typeof value === 'string') {
     const Widget = WIDGET_MAP[widgetName];
     return <Widget fieldKey={fieldKey} value={value} onChange={(v) => onChange(v)} schema={fieldSchema} />;

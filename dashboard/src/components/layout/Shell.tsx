@@ -98,7 +98,8 @@ function ShellLayout() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div ref={contentRef} className="max-w-dashboard mx-auto px-10 py-10 pb-16 animate-page-in h-full flex flex-col">
+          {/* Full width — pages get all the room the window offers */}
+          <div ref={contentRef} className="w-full px-10 py-10 pb-16 animate-page-in h-full flex flex-col">
             <Outlet />
           </div>
         </main>

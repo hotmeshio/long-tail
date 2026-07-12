@@ -6,7 +6,7 @@ The Long Tail dashboard is a React single-page application for managing procedur
 
 The sidebar organizes pages into six groups.
 
-### React
+### Monitor
 
 The reactive, event-driven surface — where operations watch the floor and builders configure choreography.
 

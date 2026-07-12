@@ -4,7 +4,7 @@ import { escalationStrategyRegistry } from '../../services/escalation-strategy';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
-import { JOB_EXPIRE_SECS } from '../../modules/defaults';
+import { JOB_EXPIRE_SECS, ESCALATION_BULK_RESOLVE_MAX } from '../../modules/defaults';
 import { assertReadAccess, assertWriteAccess, getEscalationWriteScope } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
@@ -178,6 +178,125 @@ export async function resolveByIds(
 
     const resolved = await escalationService.resolveEscalationsByIds(ids, resolverPayload, metadata);
     return { status: 200, data: { resolved: resolved.length, escalationIds: resolved.map((e) => e.id) } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Atomic all-or-none bulk resolve with PER-ROW payloads — the gang-handoff
+ * sibling of {@link resolveByIds}. Every listed escalation must be pending and
+ * writable by the caller, or NOTHING resolves. Unlike resolveByIds, rows
+ * backing a live `condition()` waiter are first-class: each is woken with its
+ * own payload inside the single atomic statement (same wake contract as
+ * single resolve).
+ *
+ * RBAC matches resolveByIds: per-item write scope, 404 non-disclosure when any
+ * id is missing or out of scope, nothing resolved. `requireClaimed` adds a
+ * SQL-level assertion that every row is currently assigned to the caller —
+ * for claim-then-resolve flows (a broker resolving its claimed gang), this
+ * closes the window where another principal re-claims a member mid-flight.
+ *
+ * Rows whose resolution requires a non-atomic path (legacy signal routing via
+ * `metadata.signal_id` / `metadata.signal_routing`, which need a separate
+ * workflow signal) block the batch with 409 — bulk-resolving them would strand
+ * their workflows. Re-run/triage rows (workflow_type without any signal shape)
+ * resolve as bookkeeping acknowledgements, matching resolveByIds semantics.
+ */
+export async function resolveAllOrNone(
+  input: {
+    items: Array<{ id: string; resolverPayload: Record<string, any> }>;
+    metadata?: Record<string, any>;
+    requireClaimed?: boolean;
+  },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    const { items, metadata, requireClaimed } = input;
+    if (!Array.isArray(items) || items.length === 0) {
+      return { status: 400, error: 'items must be a non-empty array' };
+    }
+    if (items.length > ESCALATION_BULK_RESOLVE_MAX) {
+      return { status: 400, error: `items exceeds the maximum of ${ESCALATION_BULK_RESOLVE_MAX}` };
+    }
+    const wellFormed = items.every(
+      (i) => i && typeof i.id === 'string' && i.id.length > 0
+        && i.resolverPayload && typeof i.resolverPayload === 'object',
+    );
+    if (!wellFormed) {
+      return { status: 400, error: 'every item requires an id and a resolverPayload object' };
+    }
+    const ids = items.map((i) => i.id);
+    if (new Set(ids).size !== ids.length) {
+      return { status: 400, error: 'items must not repeat ids' };
+    }
+
+    // One indexed read serves every pre-flight gate below (scope, path shape,
+    // redaction schema). Role and signal routing are immutable per escalation,
+    // so none of these checks race the guarded statement that follows — and
+    // row STATE (pending, assignee) is re-asserted inside that statement.
+    const rows = await escalationService.getEscalationsByIds(ids);
+    const rowById = new Map(rows.map((r) => [r.id, r]));
+
+    // Per-item write scope, same rule as resolveByIds: write_all roles may
+    // resolve any item in the role; write_self only items assigned to the
+    // caller. A missing id or any out-of-scope item → 404 (non-disclosure),
+    // nothing resolved. Global bypasses; the store then reports precise
+    // per-row blockers (including not-found) via the 409 below.
+    const writeScope = await getEscalationWriteScope(auth.userId);
+    if (!writeScope.global) {
+      const allSet = new Set(writeScope.allRoles);
+      const selfSet = new Set(writeScope.selfRoles);
+      const writable = (r: { role: string | null; assigned_to: string | null }): boolean =>
+        (!!r.role && allSet.has(r.role)) ||
+        (!!r.role && selfSet.has(r.role) && r.assigned_to === auth.userId);
+      if (rows.length !== ids.length || !rows.every(writable)) {
+        return { status: 404, error: 'One or more escalations not found' };
+      }
+    }
+
+    // Fail loud on rows the atomic statement cannot wake: legacy signal shapes
+    // resume their workflow via a separate handle.signal, so bulk-resolving the
+    // row would mark it settled while the workflow stays parked forever.
+    const unsupported = rows.filter((r) => {
+      const meta = (r.metadata ?? {}) as Record<string, any>;
+      return !r.signal_key && (meta.signal_id || meta.signal_routing?.signalId);
+    });
+    if (unsupported.length > 0) {
+      const failed = unsupported.map((r) => ({ id: r.id, reason: 'unsupported-resolution-path' }));
+      // error rides inside data too: routes serialize `data ?? { error }`, and
+      // the 409 body must carry BOTH the message and the blocking ids
+      const error = 'One or more escalations require the single-resolve path (legacy signal routing)';
+      return { status: 409, error, data: { error, failedIds: failed.map((f) => f.id), failed } };
+    }
+
+    // Per-row password redaction against each row's own form schema — the
+    // payload enters the signal store and the audit record; plaintext never.
+    const serviceItems = await Promise.all(items.map(async (item) => ({
+      id: item.id,
+      resolverPayload: await redactPasswords(
+        item.resolverPayload,
+        (rowById.get(item.id)?.metadata as any)?.form_schema,
+      ),
+    })));
+
+    const result = await escalationService.resolveEscalationsAllOrNone(
+      serviceItems,
+      metadata,
+      requireClaimed ? auth.userId : undefined,
+    );
+    if (!result.ok) {
+      const error = 'One or more escalations blocked the batch; nothing was resolved';
+      return {
+        status: 409,
+        error,
+        data: { error, failedIds: result.failed.map((f) => f.id), failed: result.failed },
+      };
+    }
+    return {
+      status: 200,
+      data: { resolved: result.escalations.length, escalationIds: result.escalations.map((e) => e.id) },
+    };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

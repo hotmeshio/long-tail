@@ -179,7 +179,10 @@ describe('escalation service', () => {
 
       expect(types).toContain('document');
       expect(types).toContain('content');
-      expect(types).toEqual([...types].sort());
+      // ordering comes from the database's linguistic collation (ORDER BY
+      // type), so assert with a locale-aware comparator — code-unit sort()
+      // disagrees when case mixes mid-word (e.g. printOrder vs printer)
+      expect(types).toEqual([...types].sort((a, b) => a.localeCompare(b)));
     });
   });
 

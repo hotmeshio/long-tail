@@ -104,7 +104,7 @@ Records human intervention requests. Created when a workflow returns
 workflow calls `condition(signalId, config)` / `conditionLT(signalId, config)`.
 Updated when claimed or resolved.
 
-Since v0.5.3 the storage is the **shared HotMesh table `public.hmsh_escalations`**
+The storage is the **shared HotMesh table `public.hmsh_escalations`**
 (written by both long-tail and the HotMesh SDK). `lt_escalations` remains as a
 backward-compatible **view** over it — `SELECT *` plus a computed `available`
 column — so existing read queries and the public API are unchanged. Indexes are

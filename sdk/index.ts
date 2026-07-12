@@ -114,6 +114,7 @@ export function createClient(options: LTClientOptions = {}) {
       resolve: bindAuth(escalationsApi.resolveEscalation, auth),
       resolveBySignalKey: bindAuth(escalationsApi.resolveBySignalKey, auth),
       resolveByIds: bindAuth(escalationsApi.resolveByIds, auth),
+      resolveAllOrNone: bindAuth(escalationsApi.resolveAllOrNone, auth),
       releaseExpired: escalationsApi.releaseExpiredClaims,
       updatePriority: bindAuth(escalationsApi.updatePriority, auth),
       bulkClaim: bindAuth(escalationsApi.bulkClaim, auth),

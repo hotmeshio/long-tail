@@ -136,6 +136,12 @@ export function EscalationSchemaPage() {
               </span>
             )}
           </div>
+          <button
+            onClick={() => { window.location.hash = '#docs:hitl-guide.md:json-schema-form-authoring'; }}
+            className="text-[11px] text-accent hover:underline pl-8"
+          >
+            Form authoring reference — field types, widgets, and every x-lt-* keyword →
+          </button>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

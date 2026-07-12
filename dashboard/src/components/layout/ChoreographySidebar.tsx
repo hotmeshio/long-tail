@@ -2,7 +2,7 @@ import { Zap, Bot, Radio, Inbox, ListChecks, LayoutDashboard } from 'lucide-reac
 import { SidebarNav, type NavEntry } from './SidebarNav';
 
 /**
- * "React" — the reactive, event-driven surface (choreography).
+ * "Monitor" — the reactive, event-driven surface (choreography).
  * Builders configure automations, topics, and capabilities here. Operators,
  * who don't build, get their escalation queue (home is also one logo click away).
  * Operations (COO view) is the first entry for admins and builders.
@@ -26,7 +26,7 @@ export function ChoreographySidebar({
 
   if (!isBuilder) {
     // isOps but not builder — only show Operations
-    return <SidebarNav heading="React" entries={[{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard }]} />;
+    return <SidebarNav heading="Monitor" entries={[{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard }]} />;
   }
 
   const entries: NavEntry[] = [
@@ -36,5 +36,5 @@ export function ChoreographySidebar({
     { to: '/capabilities', label: 'Capabilities', icon: Zap },
   ];
 
-  return <SidebarNav heading="React" entries={entries} />;
+  return <SidebarNav heading="Monitor" entries={entries} />;
 }
