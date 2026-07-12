@@ -87,6 +87,21 @@ The `timeout` field (hotmesh 0.25.1+) makes the wait SLA-gated in the same
 single Leg1 write: one `conditionLT` call yields the worklist row AND the
 resume timer. Omit it for an open-ended wait.
 
+Two engine contracts (hotmesh 0.26.0) worth building on:
+
+- **The row is complete from its first visible moment.** Every field of the
+  config — including `metadata` facets — commits inside the Leg1 checkpoint.
+  A claim-by-metadata router or a version-pinned facet (e.g. a
+  `schema_version` the resolver UI renders) can trust every row it reads;
+  there is no window where a row is visible but its metadata is still en route.
+- **Early signals are buffered.** A resolve that races ahead of the
+  `condition()` registration (a fast webhook, a payload deposited before the
+  workflow starts) is held as a pending signal and delivered when the wait
+  registers — 10 minutes by default; pass `expire` to `signal()` (e.g. `'1h'`)
+  when signaling early on purpose. Fan-out (`Promise.all` over many waits)
+  scales the same way: buffering covers every signal that outruns its
+  registration.
+
 #### Two-step form
 
 When you need to create the escalation separately — for example to enrich routing metadata before pausing — create it first, then wait:
@@ -208,6 +223,17 @@ await lt.escalations.resolve({
 ```
 
 The patch is distinct from the resolver payload: the payload resumes the paused workflow and is not indexed; the metadata patch is the durable, queryable record on the row. Use it for the audit trail and analytics — disposition, reviewer, time-to-resolve — so the escalation table answers *what was asked, what was decided, and how long it took* without a parallel log.
+
+### Resolving a set atomically
+
+When one decision settles a SET of waits — each with its own payload — use
+`lt.escalations.resolveAllOrNone({ items })` (`POST /api/escalations/resolve-all-or-none`).
+Every listed row resolves with its own `resolverPayload` in one SQL statement,
+waking each parked workflow with its own value, or nothing resolves and the
+409 body names exactly the rows that blocked (`failedIds` + reasons). Pass
+`requireClaimed: true` in claim-then-resolve flows to assert, inside the same
+statement, that every row is still assigned to the caller. See the
+[SDK reference](./api/sdk/escalations.md#resolveallornone) for the full contract.
 
 ---
 

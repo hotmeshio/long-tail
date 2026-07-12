@@ -1058,6 +1058,26 @@ Resolve many escalations in one guarded statement — the set-based sibling of `
 
 **Response 200:** `{ "resolved": <count>, "escalationIds": [...] }` — only still-`pending` rows without a `signal_key` are resolved and returned.
 
+## Resolve a set atomically (all-or-none)
+
+```
+POST /api/escalations/resolve-all-or-none
+```
+
+Atomic bulk resolve with per-row payloads: every listed escalation resolves with its own `resolverPayload` in one SQL statement, or nothing resolves. Rows backing a live `condition()` waiter are first-class — each waiter's wake commits with its resolve, delivering that row's payload as the condition's return value (the same wake contract as `POST /:id/resolve`). For gang handoffs where each member needs a distinct mandate and a partial batch is unacceptable: the caller gets a clean binary — all mandates delivered, or the set intact for a retry.
+
+RBAC matches `resolve-by-ids`: per-item write scope; any missing or out-of-scope id returns 404 with nothing resolved. Rows that resolve through legacy signal routing (`metadata.signal_id` / `metadata.signal_routing`) require `POST /:id/resolve` and block the batch with reason `unsupported-resolution-path`. Password-format fields are redacted per row against that row's own `form_schema`.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `items` | `Array<{ id, resolverPayload }>` | yes | The batch — each row resolves with its own payload. Ids must be unique; max 100 items (`LT_ESCALATION_BULK_RESOLVE_MAX`) |
+| `metadata` | `object` | no | Shared outcome patch merged into every row's GIN-indexed metadata |
+| `requireClaimed` | `boolean` | no | Assert every row is currently assigned to the caller, inside the atomic statement — closes the re-claim race for claim-then-resolve flows |
+
+**Response 200:** `{ "resolved": <count>, "escalationIds": [...] }` — every listed row resolved.
+
+**Response 409:** `{ "error": ..., "failedIds": [...], "failed": [{ "id": ..., "reason": ... }] }` — nothing resolved. Only the rows that blocked the batch are listed (`not-found`, `already-resolved`, `already-cancelled`, `already-expired`, `assignee-mismatch`, `unsupported-resolution-path`); resolvable members stay pending, untouched.
+
 ## Faceted search
 
 ```

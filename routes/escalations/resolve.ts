@@ -42,6 +42,28 @@ export function registerResolveRoutes(router: Router): void {
   });
 
   /**
+   * POST /api/escalations/resolve-all-or-none
+   * Atomic bulk resolve with per-row payloads: every listed escalation resolves
+   * with its own resolverPayload in one statement, or nothing resolves. Rows
+   * backing a live condition() waiter are woken with their own payload (same
+   * wake contract as /:id/resolve). 409 returns { error, failedIds, failed }
+   * naming exactly the rows that blocked the batch. Max 100 items per call.
+   * Body: { items: Array<{ id: string, resolverPayload: Record<string, any> }>,
+   *         metadata?: Record<string, any>, requireClaimed?: boolean }
+   */
+  router.post('/resolve-all-or-none', async (req, res) => {
+    const result = await api.resolveAllOrNone(
+      {
+        items: req.body?.items,
+        metadata: req.body?.metadata,
+        requireClaimed: req.body?.requireClaimed,
+      },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * POST /api/escalations/:id/resolve
    * Resolve a pending escalation with a human-provided payload. Routes by
    * escalation shape: efficient (signal_key) resumes the job in place; legacy

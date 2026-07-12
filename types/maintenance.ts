@@ -3,7 +3,7 @@
  */
 export interface LTMaintenanceRule {
   /** Which resource to target */
-  target: 'streams' | 'jobs';
+  target: 'streams' | 'jobs' | 'escalations';
   /** delete = hard-delete rows; prune = strip execution artifacts */
   action: 'delete' | 'prune';
   /** Postgres interval for the retention window, e.g. '7 days', '90 days' */
@@ -12,6 +12,11 @@ export interface LTMaintenanceRule {
   hasEntity?: boolean;
   /** When true, only target jobs that have already been pruned (pruned_at IS NOT NULL) */
   pruned?: boolean;
+  /**
+   * When target is 'escalations': which terminal statuses to age out.
+   * Defaults to all three. Pending rows and live waiters are never touched.
+   */
+  statuses?: Array<'resolved' | 'cancelled' | 'expired'>;
 }
 
 /**
