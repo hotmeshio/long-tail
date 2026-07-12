@@ -62,6 +62,18 @@ services:
       - MOCK_OAUTH_BROWSER_AUTH_URL=http://localhost:9080/authorize
       - MOCK_OAUTH_TOKEN_URL=http://mock-oauth:9080/token
       - MOCK_OAUTH_USERINFO_URL=http://mock-oauth:9080/userinfo
+      # Printer-twin Bambu backend. Default `mock` (in-repo simulation) keeps
+      # existing behavior; set `http` in .env to drive a real Farm Manager
+      # Server (or the Python mock) over mTLS. Cert paths are in-container (the
+      # repo is bind-mounted at /app), so no extra volume is needed.
+      - BAMBU_BACKEND=${BAMBU_BACKEND:-mock}
+      - BAMBU_BASE_URL=${BAMBU_BASE_URL:-}
+      - BAMBU_CLIENT_CERT=${BAMBU_CLIENT_CERT:-}
+      - BAMBU_CLIENT_KEY=${BAMBU_CLIENT_KEY:-}
+      - BAMBU_CA_CERT=${BAMBU_CA_CERT:-}
+      - BAMBU_SERVERNAME=${BAMBU_SERVERNAME:-farm_server.bambulab.com}
+      - BAMBU_ADMIN_USER=${BAMBU_ADMIN_USER:-admin}
+      - BAMBU_ADMIN_PASS=${BAMBU_ADMIN_PASS:-qwer1234}
     depends_on:
       postgres:
         condition: service_healthy

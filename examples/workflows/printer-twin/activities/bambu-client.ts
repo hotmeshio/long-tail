@@ -1,15 +1,16 @@
 /**
  * Bambu client — the physical boundary, env-selected. `BAMBU_BACKEND=mock`
  * (default) drives the in-repo deterministic simulation; `BAMBU_BACKEND=http`
- * talks to a real Farm Manager Server over mTLS (built next pass, config-only
- * cutover). The batch executor codes against this interface only, so the twin
- * workflow never changes between mock and real.
+ * talks to a real Farm Manager Server over mTLS (see `bambu-http.ts`), a
+ * config-only cutover. The batch executor codes against this interface only, so
+ * the twin workflow never changes between mock and real.
  *
  * All real-server specifics come from env — no host, IP, cert path, or
  * credential is ever hardcoded.
  */
 
 import { mockBackend } from './bambu-mock';
+import { httpBackend } from './bambu-http';
 import type { BambuPollResult } from '../mirror';
 import type { TwinJobPayload } from '../types';
 
@@ -37,29 +38,9 @@ export function resolveBambuBackend(env: { BAMBU_BACKEND?: string }): BambuBacke
   return backend;
 }
 
-const HTTP_ENV = ['BAMBU_BASE_URL', 'BAMBU_CLIENT_CERT', 'BAMBU_CLIENT_KEY', 'BAMBU_CA_CERT', 'BAMBU_SERVERNAME', 'BAMBU_ADMIN_USER', 'BAMBU_ADMIN_PASS'];
-
-/**
- * The http backend arrives next pass — a `node:https` Agent presenting the
- * client cert/key + custom CA with a forced SNI, wrapping the Farm Manager API.
- * Until then it fails loud, naming exactly what it will need, so a premature
- * `BAMBU_BACKEND=http` never silently no-ops.
- */
-function httpBackendStub(): never {
-  throw new Error(
-    `BAMBU_BACKEND=http is not wired yet (next pass). It will read: ${HTTP_ENV.join(', ')}. ` +
-      'Use BAMBU_BACKEND=mock for now.',
-  );
-}
-
-const httpBackend: BambuClient = {
-  bind: httpBackendStub,
-  unbind: httpBackendStub,
-  pollDevice: httpBackendStub,
-  opt: httpBackendStub,
-  uploadAndPrint: httpBackendStub,
-};
-
 export function getBambuClient(): BambuClient {
+  // Importing bambu-http is side-effect-free — cert files and env are read
+  // lazily on the first request (via resolveHttpConfig), so a `mock` run never
+  // touches them and a missing-env failure surfaces only when `http` is used.
   return resolveBambuBackend(process.env) === 'http' ? httpBackend : mockBackend;
 }

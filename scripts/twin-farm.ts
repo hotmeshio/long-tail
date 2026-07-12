@@ -20,7 +20,10 @@
  *
  * Env vars:
  *   BASE_URL          long-tail API (default http://localhost:3000)
- *   FLEET             printer twins to launch (default 4)
+ *   SERIALS           comma-separated real machine serials to register (for the
+ *                     http backend — the twin binds these on the Farm Manager;
+ *                     the fleet is capped to how many are given). Omit for mock.
+ *   FLEET             printer twins to launch (default 4; capped to SERIALS len)
  *   ORDERS            orders to place (default 6)
  *   UNITS             max units per order (default 2; capped to the fleet that
  *                     shares an order's filament, so every order is satisfiable)
@@ -45,7 +48,13 @@
 try { require('dotenv/config'); } catch { /* dotenv optional */ }
 
 const BASE_URL     = process.env.BASE_URL || 'http://localhost:3000';
-const FLEET        = parseInt(process.env.FLEET  || '4', 10);
+// SERIALS: real machine serials to register (the `http` backend binds these on
+// the Farm Manager; the mock backend synthesizes its own). When set, the fleet
+// uses them in order and is capped to how many are available — a synthetic
+// serial would fail `bind` against a real server that only knows its own.
+const SERIALS      = (process.env.SERIALS || '').split(',').map((s) => s.trim()).filter(Boolean);
+const FLEET_REQ    = parseInt(process.env.FLEET  || '4', 10);
+const FLEET        = SERIALS.length ? Math.min(FLEET_REQ, SERIALS.length) : FLEET_REQ;
 const ORDERS       = parseInt(process.env.ORDERS || '6', 10);
 const UNITS        = parseInt(process.env.UNITS  || '2', 10);
 const FILAMENTS    = (process.env.FILAMENTS || 'pla,petg').split(',').map((f) => f.trim()).filter(Boolean);
@@ -163,13 +172,22 @@ function parseCapSpec(spec: string): CapabilitySet {
   return set;
 }
 
+/** Best-effort model label from a real serial (e.g. MOCKP1S… → Bambu-P1S). */
+function serialModel(sn: string): string {
+  const m = sn.match(/(P1S|H2S|X1C|A1|P1P)/i);
+  return m ? `Bambu-${m[1].toUpperCase()}` : MODELS[0];
+}
+
 function planFleet(batchTag: string): TwinSpec[] {
   const capSpecs = (process.env.FLEET_CAPS || '').split('|').map((s) => s.trim()).filter(Boolean);
   return Array.from({ length: FLEET }, (_, i) => {
     const filament = FILAMENTS[i % FILAMENTS.length];
     const caps = capSpecs.length ? parseCapSpec(capSpecs[i % capSpecs.length]) : { xl: true, pdac: true, soft: true };
     const printerId = `${batchTag}-p${i}`;
-    return { printerId, wfId: printerId, filament, caps, model: MODELS[i % MODELS.length], serialNumber: `SN-${batchTag.slice(-6)}-${i}` };
+    // Real serial when provided (http backend), else a synthetic one (mock).
+    const serialNumber = SERIALS[i] ?? `SN-${batchTag.slice(-6)}-${i}`;
+    const model = SERIALS[i] ? serialModel(serialNumber) : MODELS[i % MODELS.length];
+    return { printerId, wfId: printerId, filament, caps, model, serialNumber };
   });
 }
 
