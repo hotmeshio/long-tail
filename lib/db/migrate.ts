@@ -15,7 +15,38 @@ export async function migrate(): Promise<void> {
   // Uses a dedicated client so the lock is held for the entire sequence.
   const client = await pool.connect();
   try {
+    // Migrations define the shared public tables, so resolution is pinned on
+    // this client even if a future caller wires a pool without the pool-level
+    // search_path option. Without this, a schema named after the DB role
+    // (default search_path `"$user", public`) captures every unqualified
+    // CREATE TABLE below.
+    await client.query('SET search_path TO public');
+
     await client.query('SELECT pg_advisory_lock(8675309)');
+
+    // Fail loudly on a pre-existing split: an lt_migrations table in any other
+    // schema means a prior boot ran with `"$user"` shadowing public and forked
+    // the tables. Booting through it would either fork the data further or
+    // re-run every migration against empty public tables while the live rows
+    // sit in the shadow schema. An operator must consolidate first (move the
+    // live lt_* tables to public, archive the stale copies).
+    const drift = await client.query(`
+      SELECT n.nspname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = 'lt_migrations' AND c.relkind = 'r' AND n.nspname <> 'public'
+    `);
+    if (drift.rows.length > 0) {
+      const schemas = drift.rows.map((r) => r.nspname).join(', ');
+      throw new Error(
+        `[migrate] lt_migrations exists in non-public schema(s): ${schemas}. ` +
+        'Long-tail tables must live in the public schema. This usually means the ' +
+        'database user shares a name with another schema, so the default ' +
+        'search_path ("$user", public) captured earlier migrations. Consolidate ' +
+        'the schemas (ALTER TABLE ... SET SCHEMA public for the live lt_* tables, ' +
+        'archive stale public copies) before starting the app.',
+      );
+    }
 
     // ensure migration tracking table
     await client.query(`
