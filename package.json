@@ -45,6 +45,7 @@
     "demo": "bash scripts/demo.sh",
     "ortho:populate": "ts-node scripts/ortho-populate.ts",
     "twin:farm": "ts-node scripts/twin-farm.ts",
+    "twin:bambu-check": "ts-node scripts/twin-bambu-check.ts",
     "dashboard:install": "cd dashboard && npm install",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
