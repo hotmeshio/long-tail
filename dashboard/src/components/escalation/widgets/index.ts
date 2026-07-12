@@ -3,6 +3,7 @@ import { FileUploadWidget } from './FileUploadWidget';
 import { CodeEditorWidget } from './CodeEditorWidget';
 import { SignatureWidget } from './SignatureWidget';
 import { RichTextWidget } from './RichTextWidget';
+import { MarkdownWidget } from './MarkdownWidget';
 
 export interface WidgetProps {
   fieldKey: string;
@@ -20,4 +21,5 @@ export const WIDGET_MAP: Record<string, ComponentType<WidgetProps>> = {
   'code-editor': CodeEditorWidget,
   'signature': SignatureWidget,
   'rich-text': RichTextWidget,
+  'markdown': MarkdownWidget,
 };

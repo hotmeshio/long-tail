@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { StationMetric } from '../../api/escalations';
+import { displayRoleTitle } from '../../lib/role-display';
 
 export interface ChartStation {
   role: string;
@@ -250,22 +251,24 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         <path d={targetLinePath} fill="none" stroke={TARGET_COLOR} strokeWidth={0.5} strokeLinejoin="round" opacity={0.9} style={{ transition: `d ${EASE}` }} />
       )}
 
-      {/* Per-role target for the window (target_per_hour × duration), just above the red line */}
+      {/* Per-station target markers — a small emerald dot on the target line
+          (mirroring the Resolved line's dots) with the window's expected count
+          (target_per_hour × duration) just above it */}
       {targetPts.map((tp) => (
-        <text
-          key={`tval-${tp.idx}`}
-          x={tp.x}
-          y={tp.y - 3.5}
-          textAnchor="middle"
-          fontSize={6.5}
-          fill={TARGET_COLOR}
-          fontFamily="ui-monospace, monospace"
-          fontWeight="500"
-          opacity={0.7}
-          style={{ transition: `y ${EASE}` }}
-        >
-          {Math.round(tp.expected as number)}
-        </text>
+        <g key={`tval-${tp.idx}`} transform={`translate(${tp.x} ${tp.y})`} style={{ transition: `transform ${EASE}` }}>
+          <circle r={2} fill={TARGET_COLOR} opacity={0.8} />
+          <text
+            y={-5}
+            textAnchor="middle"
+            fontSize={6.5}
+            fill={TARGET_COLOR}
+            fontFamily="ui-monospace, monospace"
+            fontWeight="500"
+            opacity={0.7}
+          >
+            {Math.round(tp.expected as number)}
+          </text>
+        </g>
       ))}
 
       {/* Pending — thin dotted sky edge along the queue total (top of the bands) */}
@@ -419,12 +422,20 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
               </g>
             )}
 
-            {/* Station labels (fixed at the floor) */}
-            <text x={x} y={bottom + 14} textAnchor="middle" fontSize={9.5} fill="#475569" fontFamily="ui-sans-serif, sans-serif" fontWeight="500">
-              {s.title ?? s.role}
-            </text>
-            <text x={x} y={bottom + 26} textAnchor="middle" fontSize={8} fill="#94a3b8" fontFamily="ui-monospace, monospace">
-              {s.role}
+            {/* Station label — the display name (user-set title, or derived
+                from the role id). The exact id lives in the table below.
+                Adjacent labels alternate depth from the baseline so dense
+                sequences don't collide. */}
+            <text
+              x={x}
+              y={bottom + (row.idx % 2 === 0 ? 14 : 27)}
+              textAnchor="middle"
+              fontSize={9.5}
+              fill="#475569"
+              fontFamily="ui-sans-serif, sans-serif"
+              fontWeight="500"
+            >
+              {displayRoleTitle(s)}
             </text>
 
             {/* Tooltip */}

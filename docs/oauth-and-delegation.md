@@ -143,7 +143,7 @@ if (ctx) {
 }
 ```
 
-The MCP client (`callServerTool`) also reads `ToolContext` automatically. When no explicit `authContext` is passed, it derives `_auth` from the ambient context. This closes the identity gap for YAML workflow workers, which previously had no auth propagation.
+The MCP client (`callServerTool`) also reads `ToolContext` automatically. When no explicit `authContext` is passed, it derives `_auth` from the ambient context — YAML workflow workers get auth propagation this way without any explicit wiring.
 
 ## Delegation Tokens
 

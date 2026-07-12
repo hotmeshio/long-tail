@@ -6,6 +6,7 @@ import type { StationMetric } from '../../api/escalations';
 import type { RoleDetail } from '../../api/roles';
 import { PRIORITY_TEXT_COLOR } from './PaceChart';
 import { priorityQueueLink } from './priority-link';
+import { displayRoleTitle } from '../../lib/role-display';
 
 interface StationDetailPanelProps {
   role: RoleDetail | null;
@@ -77,10 +78,8 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
       <div className="flex items-start justify-between mb-1">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-1.5 flex-wrap">
-            <span className="text-sm font-mono font-bold text-text-primary">{role.role}</span>
-            {role.title && (
-              <span className="text-[10px] text-text-secondary">{role.title}</span>
-            )}
+            <span className="text-sm font-bold text-text-primary">{displayRoleTitle(role)}</span>
+            <span className="text-[10px] font-mono text-text-secondary">{role.role}</span>
           </div>
           {role.description && (
             <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-2 leading-relaxed">

@@ -387,7 +387,7 @@ export async function stationWorker(envelope: LTEnvelope) {
     workflowType: 'stationWorker',
     metadata: { orderId: envelope.data.orderId, station: 'qc' },
     envelope: { instructions: 'Review and approve or reject' },
-    timeout: '24h',   // SLA for this worklist row (hotmesh 0.25.1+)
+    timeout: '24h',   // SLA for this worklist row
   });
 
   if (decision === false) {
@@ -405,7 +405,7 @@ export async function stationWorker(envelope: LTEnvelope) {
 
 ### SLA-gated waits (`timeout`)
 
-`ConditionQueueConfig.timeout` (hotmesh 0.25.1+) arms the same resume timer as
+`ConditionQueueConfig.timeout` arms the same resume timer as
 `condition(signalId, '24h')` **in the same single Leg1 write** that creates the
 escalation row. The race is resolved atomically on both sides: a signal that
 arrives first resolves the row normally and the timer is inert; a timer that

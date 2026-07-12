@@ -46,9 +46,6 @@ export default {
         sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'monospace'],
       },
-      maxWidth: {
-        dashboard: '1440px',
-      },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },

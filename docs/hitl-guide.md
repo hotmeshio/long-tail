@@ -83,11 +83,11 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-The `timeout` field (hotmesh 0.25.1+) makes the wait SLA-gated in the same
-single Leg1 write: one `conditionLT` call yields the worklist row AND the
-resume timer. Omit it for an open-ended wait.
+The `timeout` field makes the wait SLA-gated in the same single Leg1 write:
+one `conditionLT` call yields the worklist row AND the resume timer. Omit it
+for an open-ended wait.
 
-Two engine contracts (hotmesh 0.26.0) worth building on:
+Two engine contracts worth building on:
 
 - **The row is complete from its first visible moment.** Every field of the
   config — including `metadata` facets — commits inside the Leg1 checkpoint.
@@ -241,6 +241,30 @@ statement, that every row is still assigned to the caller. See the
 
 The dashboard renders forms automatically from JSON Schema. No frontend code needed.
 
+The full custom vocabulary at a glance — every `x-lt-*` keyword and extension key the renderer honors:
+
+| Keyword | Level | Purpose |
+|---------|-------|---------|
+| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown` |
+| `x-lt-language` | field | Syntax hint shown by the `code-editor` widget |
+| `accept` | field | File-type filter for the `file-upload` widget (e.g. `".pdf,.png"`) |
+| `x-lt-bind` | field | Path this field's value occupies in the resolver payload (e.g. `"customer.email"`) |
+| `x-lt-span` | field | Column span in a `two-column` layout (`2` = full width) |
+| `x-lt-order` | schema | Field render sequence |
+| `x-lt-layout` | schema | `"two-column"` grid layout |
+| `x-lt-context` | schema | Context panel text shown alongside the form in user mode |
+| `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI |
+| `format` | field | Input specialization: `password`, `date`, `date-time`, `email`, `uri`, `textarea` |
+| `readOnly` | field | Static display (or a rendered content block with the `markdown` widget) |
+| `required` | schema | Fields that must be filled before submit |
+| `title` / `description` | both | Section header / helper text |
+
+The working reference is `examples/workflows/rich-form/` — the `intake-reviewer` role's
+versioned `form_schema` (seeded by `examples/seed-rich-form.ts`) exercises the whole
+vocabulary in one form: a markdown content block, two-column layout, ordering, date and
+email formats, enum, file upload, spans, required fields, and `x-lt-bind` mapping into a
+nested payload.
+
 ### Supported Field Types
 
 | JSON Type | Renders As |
@@ -286,6 +310,7 @@ For rich inputs beyond standard HTML types:
 | `"code-editor"` | Monospace textarea with tab-key support. Use `x-lt-language` for syntax hint. |
 | `"signature"` | HTML5 Canvas drawing pad. Outputs PNG data URL. |
 | `"rich-text"` | Tall textarea for formatted text input. |
+| `"markdown"` | Markdown source, rendered with the same engine as the docs drawer (headings, tables, lists, code blocks, callouts). Editable fields get a Write/Preview toggle; with `readOnly: true` the field is a pure content block — see below. |
 
 ```json
 {
@@ -310,6 +335,64 @@ For rich inputs beyond standard HTML types:
   }
 }
 ```
+
+#### Markdown content blocks
+
+`readOnly: true` + `x-lt-widget: "markdown"` turns a field into a rendered content
+block: the markdown in its `default` displays as HTML inside the form — headings,
+tables, checklists, callouts. The versioned schema carries the page source itself,
+so review instructions and SOPs version with the form they belong to, and the
+source rides along in the resolver payload like any read-only field.
+
+```json
+{
+  "properties": {
+    "review_guide": {
+      "type": "string",
+      "readOnly": true,
+      "x-lt-widget": "markdown",
+      "x-lt-span": 2,
+      "default": "### Review checklist\n\n1. Confirm the **legal name** matches.\n2. Send a test message before approving.\n\n> Escalate non-standard contract language to legal."
+    }
+  }
+}
+```
+
+Without `readOnly`, the field is a markdown *editor* — the resolver writes source in
+a Write/Preview toggle and the submitted value is the markdown text.
+
+### Payload Binding (`x-lt-bind`)
+
+The form is flat; the payload the workflow consumes rarely is. A field may declare
+`x-lt-bind` — the path its value occupies in the resolver payload (dot keys, optional
+`[n]` indices). The dashboard maps the flat form through the binds on submit, and
+reverse-maps workflow-seeded `envelope.formDefaults` through them to prefill. A field
+with no bind lands at its own name at the payload root (1:1).
+
+```json
+{
+  "properties": {
+    "customer_name": { "type": "string", "x-lt-bind": "customer.name" },
+    "contact_email": { "type": "string", "format": "email", "x-lt-bind": "customer.email" },
+    "tier": { "type": "string", "enum": ["starter", "professional"], "x-lt-bind": "contract.tier" },
+    "notes": { "type": "string", "format": "textarea" }
+  }
+}
+```
+
+Submitting `{ customer_name, contact_email, tier, notes }` stores:
+
+```json
+{
+  "customer": { "name": "…", "email": "…" },
+  "contract": { "tier": "…" },
+  "notes": "…"
+}
+```
+
+Only the FORM is versioned on the role — the payload shape is the workflow's own
+contract, produced by the binds. Evolve the form and its binds together, and the
+workflow's resolver type in the same commit.
 
 ### Layout Options (`x-lt-layout`)
 

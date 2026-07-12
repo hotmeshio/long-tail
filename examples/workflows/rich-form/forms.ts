@@ -40,18 +40,44 @@ export interface IntakeResolverV1 {
 
 /**
  * The versioned FORM: a flat, two-column customer-intake form. Exercises every
- * HITL form feature (date, email, textarea, file-upload, enum, required,
- * ordering) AND carries `x-lt-bind` on the fields that map into a nested payload
- * group (a property with no bind lands at its own name, 1:1).
+ * HITL form feature (markdown content block, date, email, textarea,
+ * file-upload, enum, required, ordering) AND carries `x-lt-bind` on the fields
+ * that map into a nested payload group (a property with no bind lands at its
+ * own name, 1:1).
  */
 export const INTAKE_FORM_SCHEMA = {
   title: 'Customer Intake',
   description:
     'Fill out all required fields for the new customer. Verify the contact email is correct and select the appropriate service tier.',
   'x-lt-layout': 'two-column',
-  'x-lt-order': ['customer_name', 'contact_email', 'phone', 'tier', 'start_date', 'budget', 'approved', 'notes', 'attachment'],
+  'x-lt-order': ['review_guide', 'customer_name', 'contact_email', 'phone', 'tier', 'start_date', 'budget', 'approved', 'notes', 'attachment'],
   required: ['customer_name', 'contact_email', 'tier', 'start_date', 'approved'],
   properties: {
+    // Markdown content block — readOnly + x-lt-widget markdown renders the
+    // default's markdown source as HTML, so the versioned schema carries the
+    // page itself (the review SOP), not just its inputs. The source rides
+    // along in the resolver payload like any readOnly field.
+    review_guide: {
+      type: 'string',
+      readOnly: true,
+      'x-lt-widget': 'markdown',
+      'x-lt-span': 2,
+      default: [
+        '### Review checklist',
+        '',
+        '1. Confirm the **legal business name** matches the signed agreement.',
+        '2. Send a test message to the contact email before approving.',
+        '3. Tier guidance:',
+        '',
+        '| Tier | When |',
+        '|------|------|',
+        '| `starter` | Single team, standard SLA |',
+        '| `professional` | Multi-team, priority SLA |',
+        '| `enterprise` | Custom contract terms |',
+        '',
+        '> Escalate to legal review for any non-standard contract language.',
+      ].join('\n'),
+    },
     customer_name: {
       type: 'string',
       default: '',
