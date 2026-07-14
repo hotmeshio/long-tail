@@ -196,7 +196,9 @@ Lists all procedural workflow runs across the system.
 
 - **Tier filter** (top) — switch between All, Certified, and Durable to focus on specific workflow types.
 - **Columns:** Workflow name, workflow ID, status (running/completed/failed), start time, and duration.
-- **Click any row** to see the full execution detail: task record with milestones, activity checkpoints, resolver payloads, and any associated escalations.
+- **Click any row** to see the full execution detail: the swimlane timeline and events fill the main column, and a full-height side panel carries the record's facts. The main header stays quiet — just the title and a panel toggle; status, the refresh/copy toolbar, and the **Actions** menu (a small caret anchor at the right of the panel's icon row) all live in the panel. The panel and main column share the width as a flex set — the main column narrows as the panel expands.
+  - **Details** — status, workflow identity (type, ID, parent), task queue, start/end times, duration, history size, and activity counts.
+  - **Escalations** — every escalation the workflow raised, each a row with type, role, age, and status badge, so multiple escalations across the run's lifecycle read as a table rather than running on; related child tasks list the same way below.
 - **Duration** is computed from start to completion — useful for identifying slow workflows or comparing performance across versions.
 
 **API:** `GET /api/workflows/executions` lists runs with tier, status, and pagination filters.
@@ -294,7 +296,7 @@ Browse individual stream messages from the Postgres engine and worker stream tab
 
 - **Namespace & Source** — required filters. Engine streams carry internal orchestration messages; worker streams carry task messages with workflow metadata (job ID, activity, message type).
 - **Filters** — narrow by status (pending, claimed, processed, dead-lettered) and stream name (partial match).
-- **Message detail** — click any row to open the inspector panel. Shows timestamps, retry info, worker metadata, and the full JSON payload with expandable tree view.
+- **Message detail** — click any row to slide open the inspector panel: a full-height column beside the table with its own scroll, like the left nav. The table narrows to make room, so no cells are covered. Shows timestamps, retry info, worker metadata, and the full JSON payload with expandable tree view.
 - **Pagination & sorting** — standard controls. Sort by created time, stream name, or priority.
 
 Messages are read-only. Status is derived from timestamps: pending (no timestamps set), claimed (reserved), processed (expired), or dead-lettered.
@@ -310,6 +312,7 @@ The central queue for all escalation activity across every workflow.
 - **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations. The queue list and aggregate stats reflect `read_all` memberships — a member scoped to `read_self` lands directly on their own assigned item in user mode rather than browsing the full queue.
 - **Resolve** — after claiming, submit a resolver payload. The form is pre-filled from the role's versioned `form_schema` field defaults and from the workflow's seeded `envelope.formDefaults` (reverse-mapped through each field's `x-lt-bind`). The dashboard maps the flat form to the nested payload via `x-lt-bind` and the submitted payload is stored as-is. Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
 - **Escalate** — forward a claimed escalation to a higher-tier role via the escalation chain.
+- **Side panel** — a slide-in beside the resolve form with switchable views, selected by the icon set at its top: **Help** (the form's `x-lt-help` markdown, `{{domain.path}}`-interpolated against the live record, or a state-aware hint such as "Claim this escalation to enable the form"), **Details** (status, role, priority, claim provenance, timestamps, and — for builders — identifier links), **AI Analysis** (what triage diagnosed and corrected — shown when AI is enabled and triage data is present), **Metadata** (the row's metadata values), **Context** (input envelope, escalation context, resolver payload), and **Record** (the raw escalation JSON, builders only). The panel and form share the width as a flex set — the form column narrows as the panel expands. It opens expanded on Help when the form carries `x-lt-help`, stays hidden otherwise, and the page-header panel button toggles it either way.
 
 **API:** `GET /api/escalations` lists with filters. `POST /api/escalations/:id/claim` claims. `POST /api/escalations/:id/resolve` resolves.
 

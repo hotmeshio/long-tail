@@ -28,6 +28,13 @@ interface DataTableProps<T> {
   onSort?: (column: string) => void;
   /** Disable the sticky header (useful when nested inside collapsible sections). */
   inline?: boolean;
+  /**
+   * `fixed` locks the table to its container width: columns with width
+   * classes keep them, the rest share the remainder, and long content
+   * truncates instead of widening the table. Use beside a slide panel where
+   * the table must shrink as the panel expands.
+   */
+  layout?: 'auto' | 'fixed';
 }
 
 function SortIcon({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
@@ -58,6 +65,7 @@ export function DataTable<T>({
   sort,
   onSort,
   inline,
+  layout = 'auto',
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
@@ -76,7 +84,7 @@ export function DataTable<T>({
   }
 
   return (
-    <table className="w-full">
+    <table className={`w-full ${layout === 'fixed' ? 'table-fixed' : ''}`}>
       <thead>
         <tr className="border-b">
           {columns.map((col) => {

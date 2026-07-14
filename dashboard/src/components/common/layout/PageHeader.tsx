@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { BookOpen } from 'lucide-react';
 
 interface PageHeaderProps {
-  title: string;
+  title: string | ReactNode;
   actions?: ReactNode;
   /** Optional element centered between the title and the actions (e.g. a sparkline). */
   center?: ReactNode;
@@ -14,7 +14,12 @@ export function PageHeader({ title, actions, center, docsHash }: PageHeaderProps
   return (
     <div className="flex items-center gap-4 mb-10">
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <h1 className="text-3xl font-light text-text-primary">{title}</h1>
+        <h1
+          className="text-3xl font-light text-text-primary min-w-0 truncate"
+          title={typeof title === 'string' ? title : undefined}
+        >
+          {title}
+        </h1>
         {docsHash && (
           <button
             onClick={() => { window.location.hash = docsHash; }}

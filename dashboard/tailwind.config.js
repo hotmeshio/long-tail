@@ -15,7 +15,7 @@ export default {
         surface: {
           DEFAULT: '#FFFFFF',
           raised: '#FFFFFF',
-          sunken: '#F5F5F7',
+          sunken: themed('--lt-surface-sunken'),
           hover: themed('--lt-surface-hover'),
           border: themed('--lt-surface-border'),
         },

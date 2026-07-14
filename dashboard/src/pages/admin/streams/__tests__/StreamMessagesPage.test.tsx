@@ -127,21 +127,15 @@ describe('StreamMessagesPage', () => {
     expect(screen.getByText('hmsh:durable:w:other')).toBeDefined();
   });
 
-  it('renders status labels', async () => {
+  it('renders status as a titled dot on each row', async () => {
     mockApiFetch();
     render(<StreamMessagesPage />, { wrapper: createWrapper() });
     await screen.findByText('hmsh:durable:w:default');
-    // "Processed" appears in both the filter dropdown and the table row
-    expect(screen.getAllByText('Processed').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('Pending').length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('renders message type column', async () => {
-    mockApiFetch();
-    render(<StreamMessagesPage />, { wrapper: createWrapper() });
-    await screen.findByText('hmsh:durable:w:default');
-    expect(screen.getByText('WORKER')).toBeDefined();
-    expect(screen.getByText('RESPONSE')).toBeDefined();
+    // Status renders as a dot in front of the stream name, labeled via title
+    expect(screen.getByTitle('Processed')).toBeDefined();
+    expect(screen.getByTitle('Pending')).toBeDefined();
+    // "Processed" text still appears once — the timestamp column header
+    expect(screen.getAllByText('Processed').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows empty state when no messages', async () => {

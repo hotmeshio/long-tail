@@ -171,8 +171,8 @@ describe('WorkflowExecutionPage', () => {
     } as any);
 
     renderPage();
-    // workflow_id appears in both header h2 and Run ID field
-    expect(screen.getAllByText('mcpQuery-abc123def456').length).toBeGreaterThanOrEqual(1);
+    // workflow_id renders center-ellipsized in the side panel; the full value is the title
+    expect(screen.getAllByTitle('mcpQuery-abc123def456').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Completed')).toBeInTheDocument();
   });
 
@@ -199,7 +199,8 @@ describe('WorkflowExecutionPage', () => {
     } as any);
 
     renderPage();
-    expect(screen.getByText('Details')).toBeInTheDocument();
+    // "Details" appears in both the section header and the side panel view label
+    expect(screen.getAllByText('Details').length).toBeGreaterThanOrEqual(1);
     // "Execution Timeline" may appear in both section header and sub-component
     expect(screen.getAllByText('Execution Timeline').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Events').length).toBeGreaterThanOrEqual(1);

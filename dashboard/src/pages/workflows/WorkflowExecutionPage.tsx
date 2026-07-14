@@ -6,12 +6,12 @@ import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
 
+import { PanelRightClose, PanelRightOpen, ChevronDown } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
-import { StatusBadge } from '../../components/common/display/StatusBadge';
 
-import { ExecutionHeader } from './workflow-execution/ExecutionHeader';
+import { ExecutionSidePanel } from './workflow-execution/ExecutionSidePanel';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
 import { EventTable } from './workflow-execution/EventTable';
@@ -36,11 +36,16 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="btn-primary text-xs">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-0.5 pl-2 pr-1 py-1 rounded-md text-[11px] font-medium text-text-tertiary hover:text-accent hover:bg-surface-hover transition-colors"
+        title="Actions"
+      >
         Actions
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-10">
+        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-20">
           <button
             onClick={() => { onAction('restart'); setOpen(false); }}
             className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
@@ -159,6 +164,15 @@ export function WorkflowExecutionPage() {
   }
 
   const isRunning = execution.status !== 'completed' && execution.status !== 'failed';
+  const sidePanelOpen = !isCollapsed('side-panel');
+
+  // Parent relationship — prefer execution-level pj (from HotMesh raw state),
+  // fall back to lt_tasks record. Self-references filtered (cron-invoked
+  // workflows store themselves as parent).
+  const executionParent = (execution as any).parent_workflow_id as string | undefined;
+  const isLeaf = task && task.workflow_id === execution.workflow_id;
+  const rawParent = executionParent || (isLeaf ? task.parent_workflow_id : null) || null;
+  const parentWorkflowId = rawParent && rawParent !== execution.workflow_id ? rawParent : null;
   const hasToolCalls = execution.status === 'completed' && execution.events.some(
     (e) => {
       if (e.event_type !== 'activity_task_completed') return false;
@@ -168,66 +182,85 @@ export function WorkflowExecutionPage() {
   );
 
   return (
-    <div>
-      <PageHeader
-        title={executionTitle}
-        actions={
-          <div className="flex items-center gap-3">
+    // Master flow beside a full-height panel: the left column page-scrolls
+    // like any detail page; the panel spans the middle row with its own
+    // sticky viewport. Negative margins let the panel bleed to the page edge;
+    // the left column re-adds those gutters.
+    <div className="flex items-stretch min-w-0 -mt-10 -mr-10 -mb-16">
+      <div className="flex-1 min-w-0 pt-10 pr-10 pb-16">
+        {/* The main header stays quiet: title + the panel toggle. Status, the
+            toolbar, and the Actions menu all live in the panel. */}
+        <PageHeader
+          title={executionTitle}
+          actions={
+            <button
+              onClick={() => toggle('side-panel')}
+              className="text-text-tertiary hover:text-accent transition-colors"
+              title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+            >
+              {sidePanelOpen
+                ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
+                : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
+            </button>
+          }
+        />
+
+        {terminateMutation.error && (
+          <div className="py-3 mb-6">
+            <p className="text-xs text-status-error">
+              Terminate failed: {terminateMutation.error.message}
+            </p>
+          </div>
+        )}
+
+
+        <div className="space-y-6">
+          <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle} contentClassName="mt-4 ml-9">
+            <ExecutionInputResult execution={execution} />
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle} contentClassName="mt-4 ml-9">
+            <SwimlaneTimeline
+              events={execution.events}
+              childTasks={childTasksData?.tasks}
+              jid={workflowId}
+              appId="durable"
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle} contentClassName="mt-4 ml-9">
+            <EventTable
+              events={execution.events}
+              childTasks={childTasksData?.tasks}
+              jid={workflowId}
+              appId="durable"
+            />
+          </CollapsibleSection>
+        </div>
+      </div>
+
+      <ExecutionSidePanel
+        execution={execution}
+        parentWorkflowId={parentWorkflowId}
+        childTasks={childTasksData?.tasks ?? []}
+        escalations={escalationsData?.escalations ?? []}
+        headerActions={
+          <>
             <ListToolbar
               onRefresh={() => refetch()}
               isFetching={isFetching}
               apiPath={`/workflow-states/${workflowId}/execution`}
             />
-            <StatusBadge status={execution.status} />
             <ActionsDropdown
               isRunning={isRunning}
               hasToolCalls={hasToolCalls}
               workflowId={workflowId!}
               onAction={handleAction}
             />
-          </div>
+          </>
         }
+        open={sidePanelOpen}
       />
-
-      <ExecutionHeader
-        execution={execution}
-        task={task}
-        childTasks={childTasksData?.tasks}
-        escalations={escalationsData?.escalations}
-      />
-
-      {terminateMutation.error && (
-        <div className="py-3 mb-6">
-          <p className="text-xs text-status-error">
-            Terminate failed: {terminateMutation.error.message}
-          </p>
-        </div>
-      )}
-
-
-      <div className="space-y-6">
-        <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle} contentClassName="mt-4 ml-9">
-          <ExecutionInputResult execution={execution} />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle} contentClassName="mt-4 ml-9">
-          <SwimlaneTimeline
-            events={execution.events}
-            childTasks={childTasksData?.tasks}
-            jid={workflowId}
-            appId="durable"
-          />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle} contentClassName="mt-4 ml-9">
-          <EventTable
-            events={execution.events}
-            childTasks={childTasksData?.tasks}
-            jid={workflowId}
-            appId="durable"
-          />
-        </CollapsibleSection>
-      </div>
     </div>
   );
 }
