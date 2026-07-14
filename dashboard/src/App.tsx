@@ -122,6 +122,9 @@ const RoleDetailPage = lazy(() =>
 const EscalationSchemaPage = lazy(() =>
   import('./pages/admin/roles/EscalationSchemaPage').then((m) => ({ default: m.EscalationSchemaPage })),
 );
+const EscalationListSchemaPage = lazy(() =>
+  import('./pages/admin/roles/EscalationListSchemaPage').then((m) => ({ default: m.EscalationListSchemaPage })),
+);
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
 );
@@ -348,6 +351,7 @@ const router = createBrowserRouter([
           { path: 'admin/roles', element: <Lazy><RolesPage /></Lazy> },
           { path: 'admin/roles/:role', element: <Lazy><RoleDetailPage /></Lazy> },
           { path: 'admin/roles/:role/schema', element: <Lazy><EscalationSchemaPage /></Lazy> },
+          { path: 'admin/roles/:role/list-schema', element: <Lazy><EscalationListSchemaPage /></Lazy> },
         ],
       },
 

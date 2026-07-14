@@ -654,6 +654,68 @@ To create a polished resolve experience:
 
 ---
 
+## Escalations List Schema
+
+The form schema formats one escalation on the detail page. A role can also own a
+`list_schema` that formats its whole **list** page — the list-page analog of the
+resolve form. It is opt-in and applies only when the list is scoped to exactly one
+role (`/escalations/available?role=<role>`). Absent, the list renders the standard
+engineer table; present, a rich role-authored view renders with a "Table view" toggle
+one click away. It is versioned **independently** of the form schema (its own timeline;
+a list edit never bumps the form version) and edited on its own page,
+`/admin/roles/:role/list-schema`. The list always renders the latest version.
+
+This is what turns a queue like a `policy-document` role — where a looped workflow
+keeps exactly one escalation live and each resolved one is a revision — into a document
+with a history, instead of a one-row table.
+
+### Vocabulary
+
+Every string is a markdown/text template run through the same `{{domain.path}}` token
+binding as `x-lt-help` (domains `escalation | metadata | envelope | payload | resolver`,
+evaluated against each row); `body` strings render through the markdown renderer.
+
+| Key | Level | Purpose |
+|-----|-------|---------|
+| `x-lt-layout` | schema | `"active-history"` (two columns), `"active"` (card only), or `"table"` (fallback) |
+| `x-lt-help` | schema | Optional markdown header, interpolated with the active row |
+| `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{label, value}] }` |
+| `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
+
+The **active** item is the first non-terminal escalation. The **history** column is not
+auto-loaded — a "Load full history" link fetches resolved items on demand (`status`
+defaults to `resolved`, `limit` to 25). Unknown/absent `x-lt-layout` is a safe no-op
+that falls back to the table.
+
+### Example — a policy-document role
+
+```json
+{
+  "x-lt-layout": "active-history",
+  "x-lt-help": "# {{metadata.title}}\nThe authoritative policy. One revision is live at a time.",
+  "x-lt-active": {
+    "title": "{{metadata.title}}",
+    "subtitle": "Revision {{metadata.revision}} · effective {{metadata.effective_date}}",
+    "body": "{{metadata.document_markdown}}",
+    "fields": [
+      { "label": "Owner", "value": "{{metadata.owner}}" },
+      { "label": "Claimed by", "value": "{{escalation.assigned_to}}" }
+    ]
+  },
+  "x-lt-history": {
+    "row": { "title": "{{metadata.title}} — revision {{metadata.revision}}" },
+    "limit": 25
+  }
+}
+```
+
+The working reference is `examples/workflows/policy-document/` (role seeded by
+`examples/seed-policy-document.ts`): a looped workflow opens one policy-review
+escalation, parks on it, and folds each resolution into the next revision — so the
+policy facts ride the row's metadata and the list view reads them with `{{metadata.*}}`.
+
+---
+
 ## Role-Based Routing
 
 Escalations are routed by role. Users only see escalations for roles they hold.

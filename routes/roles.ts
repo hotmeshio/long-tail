@@ -102,6 +102,28 @@ router.get('/:role/schema/versions', async (req, res) => {
 });
 
 /**
+ * GET /api/roles/:role/list-schema
+ * Fetch the role's LIST schema (rich list-page formatting). `?version=N` pins a
+ * snapshot; omitted, the live (latest) list schema is returned with its version.
+ * Versions independently from the resolve form schema.
+ */
+router.get('/:role/list-schema', async (req, res) => {
+  const versionParam = req.query.version as string | undefined;
+  const version = versionParam !== undefined ? Number(versionParam) : undefined;
+  const result = await api.getRoleListSchema({ role: req.params.role as string, version });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * GET /api/roles/:role/list-schema/versions
+ * List the role's LIST schema version history (newest first).
+ */
+router.get('/:role/list-schema/versions', async (req, res) => {
+  const result = await api.listRoleListSchemaVersions({ role: req.params.role as string });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/roles/:role/escalation-targets
  * Get allowed escalation targets for a specific role.
  */

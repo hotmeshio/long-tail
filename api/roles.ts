@@ -181,6 +181,8 @@ export async function updateRole(input: {
   /** The escalation resolve FORM schema (the JIT UI). Fields may carry x-lt-bind. */
   form_schema?: Record<string, any> | null;
   metadata_schema?: Record<string, any> | null;
+  /** The escalation LIST schema — rich formatting for this role's list page. */
+  list_schema?: Record<string, any> | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
   parent_role?: string | null;
@@ -236,6 +238,7 @@ export async function updateRole(input: {
       description: input.description,
       form_schema: input.form_schema,
       metadata_schema: input.metadata_schema,
+      list_schema: input.list_schema,
       properties: input.properties,
       ops_visible: input.ops_visible,
       parent_role: input.parent_role,
@@ -311,6 +314,58 @@ export async function listRoleSchemaVersions(input: {
       return { status: 400, error: 'role is required' };
     }
     const versions = await roleService.listRoleSchemaVersions(input.role);
+    return { status: 200, data: { versions } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Fetch a role's LIST schema (independent version lineage from the form schema).
+ * With `version`, returns that immutable snapshot — a missing version is a 404.
+ * Without `version`, returns the live (latest) list schema with its version.
+ *
+ * @returns `{ status: 200, data: RoleListSchemaVersion }` on success
+ */
+export async function getRoleListSchema(input: {
+  role: string;
+  version?: number;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.role) {
+      return { status: 400, error: 'role is required' };
+    }
+    if (input.version !== undefined && (!Number.isInteger(input.version) || input.version < 1)) {
+      return { status: 400, error: 'version must be a positive integer' };
+    }
+    const schema = await roleService.getRoleListSchema(input.role, input.version);
+    if (!schema) {
+      return {
+        status: 404,
+        error: input.version !== undefined
+          ? `List schema version ${input.version} not found for role '${input.role}'`
+          : `Role '${input.role}' not found`,
+      };
+    }
+    return { status: 200, data: schema };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * List a role's LIST schema version history, newest first.
+ *
+ * @returns `{ status: 200, data: { versions: RoleListSchemaVersionSummary[] } }`
+ */
+export async function listRoleListSchemaVersions(input: {
+  role: string;
+}): Promise<LTApiResult> {
+  try {
+    if (!input.role) {
+      return { status: 400, error: 'role is required' };
+    }
+    const versions = await roleService.listRoleListSchemaVersions(input.role);
     return { status: 200, data: { versions } };
   } catch (err: any) {
     return { status: 500, error: err.message };

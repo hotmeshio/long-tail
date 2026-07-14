@@ -77,6 +77,11 @@ export const DELETE_ROLE = `
  * touching the same row: the DELETE only removes rows leaving the set, and the
  * INSERT's ON CONFLICT DO NOTHING skips rows that stay (delete+insert of the
  * SAME key in one statement would silently drop it — CTEs share a snapshot).
+ *
+ * The list_schema ($29 = provided sentinel, $30 = value) versions INDEPENDENTLY
+ * of the form/metadata pair: its own current_list_schema_version and its own
+ * snapshot table (lt_role_list_schemas), so a list-view edit never advances the
+ * resolve form's version. It shares $26 as the change summary.
  */
 export const UPDATE_ROLE_METADATA = `
   WITH updated AS (
@@ -94,22 +99,33 @@ export const UPDATE_ROLE_METADATA = `
       priority_threshold_minutes
                       = CASE WHEN $22::boolean THEN $23::numeric                      ELSE priority_threshold_minutes END,
       priority_facet  = CASE WHEN $24::boolean THEN $25                               ELSE priority_facet  END,
+      list_schema     = CASE WHEN $29::boolean THEN $30::jsonb                        ELSE list_schema     END,
       current_schema_version = CASE
         WHEN ($6::boolean AND $7::jsonb IS DISTINCT FROM form_schema)
           OR ($8::boolean AND $9::jsonb IS DISTINCT FROM metadata_schema)
         THEN COALESCE(current_schema_version, 0) + 1
-        ELSE current_schema_version END
+        ELSE current_schema_version END,
+      current_list_schema_version = CASE
+        WHEN $29::boolean AND $30::jsonb IS DISTINCT FROM list_schema
+        THEN COALESCE(current_list_schema_version, 0) + 1
+        ELSE current_list_schema_version END
     WHERE role = $1
     RETURNING
       role, title, description, form_schema, metadata_schema, properties,
       ops_visible, parent_role, sla_minutes, target_per_hour, worker_count,
       priority_threshold_minutes, priority_facet,
-      current_schema_version
+      current_schema_version, list_schema, current_list_schema_version
   ), snapshot AS (
     INSERT INTO lt_role_schemas (role, version, form_schema, metadata_schema, change_summary)
     SELECT role, current_schema_version, form_schema, metadata_schema, $26
     FROM updated
     WHERE ($6::boolean OR $8::boolean) AND current_schema_version IS NOT NULL
+    ON CONFLICT (role, version) DO NOTHING
+  ), list_snapshot AS (
+    INSERT INTO lt_role_list_schemas (role, version, list_schema, change_summary)
+    SELECT role, current_list_schema_version, list_schema, $26
+    FROM updated
+    WHERE $29::boolean AND current_list_schema_version IS NOT NULL
     ON CONFLICT (role, version) DO NOTHING
   ), upstream_prune AS (
     DELETE FROM lt_role_upstreams
@@ -166,6 +182,40 @@ export const GET_ROLE_SCHEMA_CURRENT = `
     ON s.role = r.role AND s.version = r.current_schema_version
   WHERE r.role = $1`;
 
+// ─── Versioned role LIST schemas (independent version lineage) ──────────────
+
+export const LIST_ROLE_LIST_SCHEMA_VERSIONS = `
+  SELECT
+    s.version,
+    s.list_schema IS NOT NULL AS has_list_schema,
+    s.change_summary,
+    s.created_at,
+    s.version = r.current_list_schema_version AS is_current
+  FROM lt_role_list_schemas s
+  JOIN lt_roles r ON r.role = s.role
+  WHERE s.role = $1
+  ORDER BY s.version DESC`;
+
+export const GET_ROLE_LIST_SCHEMA_VERSION = `
+  SELECT s.role, s.version, s.list_schema,
+         s.change_summary, s.created_at, r.current_list_schema_version AS latest_version
+  FROM lt_role_list_schemas s
+  JOIN lt_roles r ON r.role = s.role
+  WHERE s.role = $1 AND s.version = $2`;
+
+/**
+ * Latest list schema resolves from the live lt_roles column (a role that has
+ * never versioned its list schema still answers, with version NULL).
+ */
+export const GET_ROLE_LIST_SCHEMA_CURRENT = `
+  SELECT r.role, r.current_list_schema_version AS version, r.list_schema,
+         s.change_summary, s.created_at,
+         r.current_list_schema_version AS latest_version
+  FROM lt_roles r
+  LEFT JOIN lt_role_list_schemas s
+    ON s.role = r.role AND s.version = r.current_list_schema_version
+  WHERE r.role = $1`;
+
 // ─── Role detail aggregation ────────────────────────────────────────────────
 
 export const LIST_ROLES_WITH_DETAILS = `
@@ -209,6 +259,8 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.priority_threshold_minutes,
     r.priority_facet,
     r.current_schema_version,
+    r.list_schema,
+    r.current_list_schema_version,
     COALESCE(up.ups, '{}') AS upstream_roles,
     COALESCE(uc.cnt, 0) AS user_count,
     COALESCE(cc.cnt, 0) AS chain_count,

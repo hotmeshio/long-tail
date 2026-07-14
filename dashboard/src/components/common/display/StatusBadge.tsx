@@ -2,7 +2,8 @@ import type { LTTaskStatus, LTEscalationStatus } from '../../../api/types';
 
 type Status = LTTaskStatus | LTEscalationStatus | string;
 
-const statusStyles: Record<string, string> = {
+/** Status → dot background class, for bare outlined-dot status indicators. */
+export const STATUS_DOT_STYLES: Record<string, string> = {
   pending: 'bg-status-pending',
   in_progress: 'bg-status-active animate-pulse',
   completed: 'bg-status-success',
@@ -41,7 +42,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: Status }) {
-  const dotClass = statusStyles[status] ?? 'bg-status-pending';
+  const dotClass = STATUS_DOT_STYLES[status] ?? 'bg-status-pending';
   const label = statusLabels[status] ?? status;
 
   return (

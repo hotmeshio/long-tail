@@ -267,6 +267,15 @@ Accessible at `/admin/roles/:role/schema`. The versioned form behind a role's es
 
 **API:** `GET /api/roles/:role/schema` fetches the latest or a pinned version. `GET /api/roles/:role/schema/versions` lists the history. `PATCH /api/roles/:role` with `form_schema` (+ optional `change_summary`) saves a new version.
 
+### Escalations List Schema
+
+Accessible at `/admin/roles/:role/list-schema`. The versioned rich view for the role's escalation **list** page — the list-page analog of the resolve form. Opt-in: when a role owns a `list_schema`, its list page renders a role-authored view (the live item as a card plus a load-on-demand history) instead of the engineer table, scoped to that one role. See the [HITL guide](hitl-guide.md#escalations-list-schema) for the `x-lt-layout` / `x-lt-active` / `x-lt-history` vocabulary.
+
+- **Editor + version rail** — same shape as the Escalation Schema editor, but on its own **independent** version timeline: editing the list view never advances the resolve form's version.
+- The list always renders the latest version — no pinning (a display template, not a payload contract).
+
+**API:** `GET /api/roles/:role/list-schema` (latest or `?version=`), `GET /api/roles/:role/list-schema/versions`, and `PATCH /api/roles/:role` with `list_schema` (+ optional `change_summary`).
+
 ### DB Maintenance
 
 Database housekeeping tools for keeping PostgreSQL healthy under sustained workflow load.
@@ -309,6 +318,7 @@ The central queue for all escalation activity across every workflow.
 
 - **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
 - **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
+- **Rich list view** — when the list is scoped to exactly one role (`?role=<role>`) and that role owns a [list schema](#escalations-list-schema), a role-authored view renders in place of the table (the live item as a card, plus a load-on-demand history), with a **Table view** toggle back to the columns.
 - **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations. The queue list and aggregate stats reflect `read_all` memberships — a member scoped to `read_self` lands directly on their own assigned item in user mode rather than browsing the full queue.
 - **Resolve** — after claiming, submit a resolver payload. The form is pre-filled from the role's versioned `form_schema` field defaults and from the workflow's seeded `envelope.formDefaults` (reverse-mapped through each field's `x-lt-bind`). The dashboard maps the flat form to the nested payload via `x-lt-bind` and the submitted payload is stored as-is. Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
 - **Escalate** — forward a claimed escalation to a higher-tier role via the escalation chain.

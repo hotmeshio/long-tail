@@ -5,6 +5,7 @@ import type {
   BasicEchoEnvelopeData,
   BasicSignalEnvelopeData,
   RichFormEnvelopeData,
+  PolicyDocumentEnvelopeData,
 } from './types';
 
 // ── Seed users ───────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -215,6 +216,25 @@ export const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'rich-form',
         description: 'Showcases every HITL form feature: date pickers, email, file upload, two-column layout, required fields, and ordering.',
+      },
+    },
+  },
+
+  // -- Process 8: Policy Document
+  {
+    label: 'Process 8 — Policy Document',
+    workflowName: 'policyDocument',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: {
+        role: 'policy-document',
+        title: 'Refund Policy',
+        owner: 'Legal',
+      } satisfies PolicyDocumentEnvelopeData,
+      metadata: {
+        source: 'seed',
+        process: 'policy-document',
+        description: 'One live policy at a time — the role owns a list_schema that renders the live policy as a document with a revision history.',
       },
     },
   },

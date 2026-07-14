@@ -79,3 +79,49 @@ describe('Role schema routes', () => {
     expect(body.versions[0].is_current).toBe(true);
   });
 });
+
+// GET /api/roles/:role/list-schema[/versions] — the role's list-page view schema,
+// versioned independently of the resolve form schema.
+
+const LIST_ROLE = `route-list-schema-role-${Date.now()}`;
+const LIST_SCHEMA = { 'x-lt-layout': 'active-history', 'x-lt-active': { title: 'x' } };
+
+describe('Role list-schema routes', () => {
+  beforeAll(async () => {
+    await roleService.createRole(LIST_ROLE);
+    await roleService.updateRoleMetadata(LIST_ROLE, { list_schema: LIST_SCHEMA });
+  });
+
+  afterAll(async () => {
+    const { getPool } = await import('../../lib/db');
+    await getPool().query('DELETE FROM lt_roles WHERE role = $1', [LIST_ROLE]);
+  });
+
+  it('returns the latest list schema with its current version', async () => {
+    const res = await fetch(`${ctx.BASE}/roles/${LIST_ROLE}/list-schema`, {
+      headers: authHeaders(ctx.memberToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.version).toBe(1);
+    expect(body.list_schema).toEqual(LIST_SCHEMA);
+  });
+
+  it('404s a missing version instead of falling back to latest', async () => {
+    const res = await fetch(`${ctx.BASE}/roles/${LIST_ROLE}/list-schema?version=42`, {
+      headers: authHeaders(ctx.memberToken),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('lists the list-schema version history newest first', async () => {
+    const res = await fetch(`${ctx.BASE}/roles/${LIST_ROLE}/list-schema/versions`, {
+      headers: authHeaders(ctx.memberToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.versions[0].version).toBe(1);
+    expect(body.versions[0].has_list_schema).toBe(true);
+    expect(body.versions[0].is_current).toBe(true);
+  });
+});

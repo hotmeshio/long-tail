@@ -20,7 +20,8 @@ import {
 } from '../../api/escalations';
 import { FacetedFilterPanel } from './FacetedFilterPanel';
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
-import { useRoles } from '../../api/roles';
+import { useRoles, useRoleListSchema } from '../../api/roles';
+import { EscalationListView } from '../../components/escalation/EscalationListView';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { buildApiPath } from '../../lib/api-path';
@@ -31,7 +32,7 @@ import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
-import { Lock, SlidersHorizontal, X } from 'lucide-react';
+import { Lock, SlidersHorizontal, X, LayoutList, Table } from 'lucide-react';
 import { ESCALATION_COLUMNS, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
@@ -158,6 +159,20 @@ export function AvailableEscalationsPage() {
   const escalations = data?.escalations ?? [];
   const total = data?.total ?? 0;
   const { canBulk: canBulkManage } = useAccess();
+
+  // Role-owned rich view: only when the list targets exactly ONE role (the basic
+  // filter, or a single faceted role) and that role owns a list_schema. Absent
+  // or multi-role → the engineer table, unchanged. `forceTable` lets the user
+  // flip back to the columns.
+  const singleRole = filters.role
+    || (facetFilters.roles?.length === 1 ? facetFilters.roles[0] : null);
+  const [forceTable, setForceTable] = useState(false);
+  const listSchemaQuery = useRoleListSchema(singleRole ?? '', undefined, !!singleRole);
+  const listSchema = (listSchemaQuery.data?.list_schema ?? null) as Record<string, any> | null;
+  // A rich view is available for this list; the toggle flips to the table.
+  const hasRichView = !!singleRole && !!listSchema
+    && !!listSchema['x-lt-layout'] && listSchema['x-lt-layout'] !== 'table';
+  const useRichView = hasRichView && !forceTable;
 
   const selectedRoles = useMemo(() => {
     const roles = new Set<string>();
@@ -287,6 +302,17 @@ export function AvailableEscalationsPage() {
               isFetching={isFetching}
               apiPath={apiPath}
             />
+            {hasRichView && (
+              <button
+                onClick={() => setForceTable((v) => !v)}
+                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
+                title={forceTable ? 'Rich view' : 'Table view'}
+              >
+                {forceTable
+                  ? <LayoutList className="w-4 h-4" />
+                  : <Table className="w-4 h-4" />}
+              </button>
+            )}
             <button
               onClick={() => setFacetDrawerOpen((v) => !v)}
               className="relative ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
@@ -377,25 +403,36 @@ export function AvailableEscalationsPage() {
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        data={escalations}
-        keyFn={(row) => row.id}
-        onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
-        isLoading={isLoading}
-        emptyMessage={queryError ? 'Unable to load data' : 'No escalations'}
-        sort={sort}
-        onSort={setSort}
-      />
+      {useRichView ? (
+        <EscalationListView
+          role={singleRole!}
+          listSchema={listSchema!}
+          activeEscalations={escalations}
+          onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
+        />
+      ) : (
+        <>
+          <DataTable
+            columns={columns}
+            data={escalations}
+            keyFn={(row) => row.id}
+            onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
+            isLoading={isLoading}
+            emptyMessage={queryError ? 'Unable to load data' : 'No escalations'}
+            sort={sort}
+            onSort={setSort}
+          />
 
-      <StickyPagination
-        page={pagination.page}
-        totalPages={pagination.totalPages(total)}
-        onPageChange={pagination.setPage}
-        total={total}
-        pageSize={pagination.pageSize}
-        onPageSizeChange={pagination.setPageSize}
-      />
+          <StickyPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages(total)}
+            onPageChange={pagination.setPage}
+            total={total}
+            pageSize={pagination.pageSize}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </>
+      )}
 
       <ClaimModal
         claimTarget={claimTarget}
