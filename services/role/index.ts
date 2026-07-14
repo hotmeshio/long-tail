@@ -19,6 +19,9 @@ import {
   LIST_ROLE_SCHEMA_VERSIONS,
   GET_ROLE_SCHEMA_VERSION,
   GET_ROLE_SCHEMA_CURRENT,
+  LIST_ROLE_LIST_SCHEMA_VERSIONS,
+  GET_ROLE_LIST_SCHEMA_VERSION,
+  GET_ROLE_LIST_SCHEMA_CURRENT,
   COUNT_USER_ROLE_REFS,
   COUNT_CHAIN_REFS,
   COUNT_WORKFLOW_REFS,
@@ -30,6 +33,8 @@ import type {
   RoleDetail,
   RoleSchemaVersion,
   RoleSchemaVersionSummary,
+  RoleListSchemaVersion,
+  RoleListSchemaVersionSummary,
   UpdateRoleInput,
 } from './types';
 
@@ -179,6 +184,7 @@ export async function updateRoleMetadata(
     provided('priority_facet'), input.priority_facet ?? null,
     input.change_summary ?? null,
     provided('upstream_roles'), upstreams,
+    provided('list_schema'), input.list_schema != null ? JSON.stringify(input.list_schema) : null,
   ]);
   if (!rows[0]) return null;
   // The statement's CTEs share one snapshot, so the returned row cannot see
@@ -221,6 +227,34 @@ export async function getRoleSchema(
   const { rows } = version != null
     ? await pool.query(GET_ROLE_SCHEMA_VERSION, [role, version])
     : await pool.query(GET_ROLE_SCHEMA_CURRENT, [role]);
+  if (!rows[0]) return null;
+  return { ...rows[0], role };
+}
+
+/**
+ * List the list-schema version history for a role (newest first). The schema is
+ * elided — presence flag only; fetch a full snapshot via getRoleListSchema.
+ */
+export async function listRoleListSchemaVersions(role: string): Promise<RoleListSchemaVersionSummary[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(LIST_ROLE_LIST_SCHEMA_VERSIONS, [role]);
+  return rows;
+}
+
+/**
+ * Fetch a role's list schema. With a version, reads the immutable snapshot from
+ * lt_role_list_schemas; without one, the live (latest) column — a role that has
+ * never versioned its list schema still answers with version null. Returns null
+ * when the role (or the requested version) does not exist.
+ */
+export async function getRoleListSchema(
+  role: string,
+  version?: number,
+): Promise<RoleListSchemaVersion | null> {
+  const pool = getPool();
+  const { rows } = version != null
+    ? await pool.query(GET_ROLE_LIST_SCHEMA_VERSION, [role, version])
+    : await pool.query(GET_ROLE_LIST_SCHEMA_CURRENT, [role]);
   if (!rows[0]) return null;
   return { ...rows[0], role };
 }

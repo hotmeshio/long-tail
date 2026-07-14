@@ -83,7 +83,7 @@ export function FilterInput({ label, value, onChange, placeholder }: FilterInput
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="input text-[11px] py-1 px-2 w-48 font-mono"
+        className="input text-[11px] py-1 px-2 w-36 font-mono"
       />
     </div>
   );

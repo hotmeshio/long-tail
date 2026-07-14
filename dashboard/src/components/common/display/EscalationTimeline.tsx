@@ -12,7 +12,7 @@ function Marker({ pct, place, label, title, emphasis }: {
   title: string;
   emphasis?: boolean;
 }) {
-  const line = <span className="w-px h-1.5 bg-surface-border" aria-hidden />;
+  const line = <span className="w-px h-1 bg-surface-border" aria-hidden />;
   const text = (
     <span className={`whitespace-nowrap leading-none ${emphasis ? 'text-text-secondary' : 'text-text-tertiary'}`}>
       {label}
@@ -22,7 +22,7 @@ function Marker({ pct, place, label, title, emphasis }: {
     <div
       // title on the whole marker so hovering either the label or its line explains it
       title={title}
-      className={`absolute ${place === 'above' ? 'bottom-0' : 'top-0'} flex flex-col items-center gap-0.5 -translate-x-1/2 cursor-help`}
+      className={`absolute ${place === 'above' ? 'bottom-0' : 'top-0'} flex flex-col items-center gap-0 -translate-x-1/2 cursor-help`}
       style={{ left: `${pct}%` }}
     >
       {place === 'above' ? <>{text}{line}</> : <>{line}{text}</>}
@@ -74,7 +74,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
   return (
     <div className={className} title={legend}>
       {/* claim marker (above) */}
-      <div className="relative h-3.5 text-[9px] font-mono">
+      <div className="relative h-2.5 text-[9px] font-mono">
         {showSecond && (
           <Marker pct={waitPct} place="above" label={split} title={`Time to claim: ${split} (created → claimed)`} />
         )}
@@ -96,7 +96,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
       </div>
 
       {/* total / age marker (below, centered on the right edge) */}
-      <div className="relative h-3.5 text-[9px] font-mono">
+      <div className="relative h-2.5 text-[9px] font-mono">
         <Marker pct={100} place="below" emphasis label={totalStr} title={totalTip} />
       </div>
     </div>

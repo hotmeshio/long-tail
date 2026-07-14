@@ -50,6 +50,16 @@ export interface RichFormEnvelopeData {
   role?: string;
 }
 
+/** Policy document — one live policy escalation at a time; revisions are history. */
+export interface PolicyDocumentEnvelopeData {
+  /** Role that owns the policy surface. */
+  role?: string;
+  /** Policy title. */
+  title?: string;
+  /** Owning team. */
+  owner?: string;
+}
+
 // ── assemblyLine ─────────────────────────────────────────────
 
 /** Assembly line — durable orchestrator with sequential human task queues. */
@@ -92,6 +102,7 @@ export type WorkflowEnvelopeMap = {
   basicEcho: BasicEchoEnvelopeData;
   basicSignal: BasicSignalEnvelopeData;
   richForm: RichFormEnvelopeData;
+  policyDocument: PolicyDocumentEnvelopeData;
   assemblyLine: AssemblyLineEnvelopeData;
   stepIterator: StepIteratorEnvelopeData;
   reverter: ReverterEnvelopeData;

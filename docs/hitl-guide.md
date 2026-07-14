@@ -252,7 +252,8 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 | `x-lt-span` | field | Column span in a `two-column` layout (`2` = full width) |
 | `x-lt-order` | schema | Field render sequence |
 | `x-lt-layout` | schema | `"two-column"` grid layout |
-| `x-lt-context` | schema | Context panel text shown alongside the form in user mode |
+| `x-lt-help` | schema | Markdown guidance for the side panel's Help view; `{{domain.path}}` tokens interpolate live record values |
+| `x-lt-context` | schema | Plain-text fallback for the Help view when `x-lt-help` is absent |
 | `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI |
 | `format` | field | Input specialization: `password`, `date`, `date-time`, `email`, `uri`, `textarea` |
 | `readOnly` | field | Static display (or a rendered content block with the `markdown` widget) |
@@ -261,9 +262,9 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 
 The working reference is `examples/workflows/rich-form/` — the `intake-reviewer` role's
 versioned `form_schema` (seeded by `examples/seed-rich-form.ts`) exercises the whole
-vocabulary in one form: a markdown content block, two-column layout, ordering, date and
-email formats, enum, file upload, spans, required fields, and `x-lt-bind` mapping into a
-nested payload.
+vocabulary in one form: side-panel help (`x-lt-help` with a checklist, table, tokens,
+and a relative link), two-column layout, ordering, date and email formats, enum, file
+upload, spans, required fields, and `x-lt-bind` mapping into a nested payload.
 
 ### Supported Field Types
 
@@ -360,6 +361,43 @@ source rides along in the resolver payload like any read-only field.
 
 Without `readOnly`, the field is a markdown *editor* — the resolver writes source in
 a Write/Preview toggle and the submitted value is the markdown text.
+
+### Help Panel (`x-lt-help`)
+
+Schema-level `x-lt-help` carries the form's guidance — checklists, tier tables,
+callouts, links — as markdown. The dashboard renders it in the side panel beside the
+form, so the form itself stays a clean title and fields while the SOP sits one glance
+to the right. The help versions with the form: it lives in the same `form_schema`
+snapshot in `lt_role_schemas`.
+
+```json
+{
+  "title": "Customer Intake",
+  "x-lt-help": "### Review checklist\n\n1. Confirm the **legal name** matches.\n2. Send a test message before approving.\n\nThis escalation is **{{escalation.status}}** in the **{{escalation.role}}** queue.\n\n[Back to the queue](/escalations/queue?role=intake-reviewer)",
+  "properties": { ... }
+}
+```
+
+`{{domain.path}}` tokens interpolate live values from the escalation surface using the
+`x-lt-bind` path syntax (dot keys, optional `[n]` indices). Five domains are available:
+
+| Domain | Resolves against |
+|--------|------------------|
+| `escalation` | The escalation row (`{{escalation.role}}`, `{{escalation.status}}`) |
+| `metadata` | The row's metadata dict (`{{metadata.schema_version}}`) |
+| `envelope` | The workflow-sent input envelope (`{{envelope.formDefaults.customer.name}}`) |
+| `payload` | The escalation context payload (`{{payload.category}}`) |
+| `resolver` | The submitted resolver payload (`{{resolver.notes}}`) |
+
+A missing value renders as an em dash. Links whose href starts with `/` navigate
+inside the dashboard.
+
+The Help view falls back in order: `x-lt-help` → `x-lt-context` (plain text) → a
+state-aware hint ("Claim this escalation to enable the form", "Fill out the form and
+submit to resolve it", and so on), so the panel always tells the resolver what the
+page expects of them. The panel's other views surface the record itself: **Metadata**
+(the row's metadata values), **Context** (input envelope, escalation context, resolver
+payload), and **Record** (the raw escalation JSON, builders only).
 
 ### Payload Binding (`x-lt-bind`)
 
@@ -458,8 +496,9 @@ Fields with `readOnly: true` display as static text. Useful for showing context 
 ### Schema Title and Description
 
 The `title` and `description` at the schema root are used in the UI:
-- **`title`**: Shown as the section header (replaces "Submit Your Resolution" in user mode)
-- **`description`** or **`x-lt-context`**: In user mode, displayed as a context panel alongside the form in a two-panel layout
+- **`title`**: Shown as the form's section header
+- **`description`**: Shown as helper text beneath the title — keep it to a short phrase; longer guidance belongs in `x-lt-help`
+- **`x-lt-help`**: Rendered as markdown in the side panel beside the form
 
 ```json
 {
@@ -578,31 +617,102 @@ Communication happens via `window.postMessage`.
 
 ---
 
-## Dev Mode vs User Mode
+## The Escalation Detail Page
 
-The escalation detail page has two viewing modes:
+The escalation detail page has one view, built for the person resolving the item: the
+escalation's description is the page title, the form starts directly beneath it, and
+the action bar closes the page. The lifecycle sparkline (waiting / claimed / resolved
+ratios) sits as a short persistent row above the side panel. Everything else lives in
+the side panel, ordered by specificity:
 
-| Aspect | Dev Mode | User Mode |
-|--------|----------|-----------|
-| **Default for** | Admins, superadmins, engineers | All other roles |
-| **Shows** | Everything | Title, description, form, action bar |
-| **Hides** | Nothing | Technical IDs, raw JSON, envelope data, AI triage, raw JSON editor |
-| **Persistence** | sessionStorage (per browser session) | sessionStorage |
+| View | Shows | Available to |
+|------|-------|--------------|
+| **Help** | The form's `x-lt-help` markdown, or a state-aware hint | Everyone |
+| **Details** | Status, role, priority, claim provenance, timestamps; identifier links below a divider | Everyone (identifiers: builders) |
+| **AI Analysis** | What triage diagnosed and corrected | When AI is enabled and triage data is present |
+| **Metadata** | The row's metadata values | Everyone |
+| **Context** | Input envelope, escalation context, resolver payload | Everyone |
+| **Record** | The raw escalation JSON | Builders (admins, superadmins, engineers) |
 
-**Key principle**: User mode only hides technical debugging information. All HITL workflow actions (claim, submit, escalate, release) are always visible in both modes.
+The page is two fixed-height columns beneath the global toolbar — the form column and
+the panel each scroll independently, so the panel stays pinned like the left nav while
+long forms or long panel content scroll. The form column narrows as the panel expands
+(the panel is capped at half the page). When the form carries `x-lt-help`, the panel
+opens expanded on the Help view; otherwise it stays hidden until the page-header panel
+button summons it.
 
-Privileged users can toggle between modes via the switch in the page header.
+### Designing the Form
 
-### Designing for User Mode
-
-To create a polished user mode experience:
+To create a polished resolve experience:
 
 1. Set `title` on your schema — it replaces the section header
-2. Set `description` or `x-lt-context` — it appears as a context panel in a two-panel layout
+2. Set `x-lt-help` — checklists, tables, and links render as markdown in the side panel, with `{{domain.path}}` tokens for live record values; keep `description` to a short subtitle
 3. Use `readOnly` fields for context the human needs to see but shouldn't edit
 4. Use `x-lt-order` to put the most important fields first
 5. Use `required` to guide users on what must be filled
 6. Use descriptive `description` on individual fields for inline help text
+
+---
+
+## Escalations List Schema
+
+The form schema formats one escalation on the detail page. A role can also own a
+`list_schema` that formats its whole **list** page — the list-page analog of the
+resolve form. It is opt-in and applies only when the list is scoped to exactly one
+role (`/escalations/available?role=<role>`). Absent, the list renders the standard
+engineer table; present, a rich role-authored view renders with a "Table view" toggle
+one click away. It is versioned **independently** of the form schema (its own timeline;
+a list edit never bumps the form version) and edited on its own page,
+`/admin/roles/:role/list-schema`. The list always renders the latest version.
+
+This is what turns a queue like a `policy-document` role — where a looped workflow
+keeps exactly one escalation live and each resolved one is a revision — into a document
+with a history, instead of a one-row table.
+
+### Vocabulary
+
+Every string is a markdown/text template run through the same `{{domain.path}}` token
+binding as `x-lt-help` (domains `escalation | metadata | envelope | payload | resolver`,
+evaluated against each row); `body` strings render through the markdown renderer.
+
+| Key | Level | Purpose |
+|-----|-------|---------|
+| `x-lt-layout` | schema | `"active-history"` (two columns), `"active"` (card only), or `"table"` (fallback) |
+| `x-lt-help` | schema | Optional markdown header, interpolated with the active row |
+| `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{label, value}] }` |
+| `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
+
+The **active** item is the first non-terminal escalation. The **history** column is not
+auto-loaded — a "Load full history" link fetches resolved items on demand (`status`
+defaults to `resolved`, `limit` to 25). Unknown/absent `x-lt-layout` is a safe no-op
+that falls back to the table.
+
+### Example — a policy-document role
+
+```json
+{
+  "x-lt-layout": "active-history",
+  "x-lt-help": "# {{metadata.title}}\nThe authoritative policy. One revision is live at a time.",
+  "x-lt-active": {
+    "title": "{{metadata.title}}",
+    "subtitle": "Revision {{metadata.revision}} · effective {{metadata.effective_date}}",
+    "body": "{{metadata.document_markdown}}",
+    "fields": [
+      { "label": "Owner", "value": "{{metadata.owner}}" },
+      { "label": "Claimed by", "value": "{{escalation.assigned_to}}" }
+    ]
+  },
+  "x-lt-history": {
+    "row": { "title": "{{metadata.title}} — revision {{metadata.revision}}" },
+    "limit": 25
+  }
+}
+```
+
+The working reference is `examples/workflows/policy-document/` (role seeded by
+`examples/seed-policy-document.ts`): a looped workflow opens one policy-review
+escalation, parks on it, and folds each resolution into the next revision — so the
+policy facts ride the row's metadata and the list view reads them with `{{metadata.*}}`.
 
 ---
 
@@ -891,10 +1001,10 @@ When you author a HITL-backed workflow, the platform handles:
 - **Claim/release** — soft-lock with TTL, prevents duplicate work
 - **Real-time updates** — NATS/Socket.IO events push changes to the dashboard instantly
 - **Form rendering** — JSON Schema to rich form controls, no frontend code needed
-- **Dev/user mode** — technical vs clean views, per-session preference
+- **Side panel** — help, AI analysis, metadata, context, and raw-record views beside the form
 - **Section state persistence** — collapsed sections remembered across navigation
 - **Escalation chains** — users can re-route work to other roles
-- **AI triage** — optional auto-resolution for common patterns (dev mode)
+- **AI triage** — optional auto-resolution for common patterns
 - **Signal routing** — 5 resolution paths (conditionLT, waitFor, triage, re-run, notification-only)
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces

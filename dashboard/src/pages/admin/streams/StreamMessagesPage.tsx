@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { X, MessageSquare } from 'lucide-react';
+import { SlidePanel, SlidePanelViews } from '../../../components/common/layout/SlidePanel';
 import { useStreamMessages, type StreamMessage } from '../../../api/stream-messages';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { useNamespace } from '../../../hooks/useNamespace';
@@ -8,7 +8,7 @@ import { buildApiPath } from '../../../lib/api-path';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
-import { TimestampCell } from '../../../components/common/display/TimestampCell';
+import { DateValue } from '../../../components/common/display/DateValue';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { StreamMessageDetail } from './StreamMessageDetail';
@@ -60,85 +60,94 @@ export function StreamMessagesPage() {
 
   const panelOpen = !!activeMessage;
 
+  // Hold the last message through the panel's closing animation so the detail
+  // content stays rendered while the panel slides shut.
+  const [lastMessage, setLastMessage] = useState<StreamMessage | null>(null);
+  useEffect(() => {
+    if (activeMessage) setLastMessage(activeMessage);
+  }, [activeMessage]);
+  const displayMessage = activeMessage ?? lastMessage;
+
+  // Status and type live as the dot and the detail panel — the row itself
+  // stays one flexible stream column plus fixed narrow facts, so the table
+  // shrinks with the container (same shape as the executions list).
   const columns: Column<StreamMessage>[] = [
-    {
-      key: 'status',
-      label: 'Status',
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full dot-ring shrink-0 ${STATUS_DOT[row.status]}`} />
-          <span className="text-xs">{STATUS_LABEL[row.status]}</span>
-        </div>
-      ),
-      className: 'w-28',
-    },
-    {
-      key: 'source',
-      label: 'Source',
-      render: (row) => <span className={SOURCE_BADGE}>{row.source}</span>,
-      className: 'w-20',
-    },
     {
       key: 'stream_name',
       label: 'Stream',
       sortable: true,
       render: (row) => (
-        <span className="font-mono text-xs text-text-secondary truncate block max-w-[240px]" title={row.stream_name}>
-          {row.stream_name}
-        </span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`w-1.5 h-1.5 shrink-0 rounded-full dot-ring ${STATUS_DOT[row.status]}`}
+            title={STATUS_LABEL[row.status]}
+          />
+          <span className="font-mono text-xs text-text-secondary truncate" title={row.stream_name}>
+            {row.stream_name}
+          </span>
+        </div>
       ),
     },
     {
-      key: 'msg_type',
-      label: 'Type',
-      render: (row) => (
-        <span className="text-xs text-text-secondary">{row.msg_type || '—'}</span>
-      ),
+      key: 'source',
+      label: 'Source',
+      render: (row) => <span className={SOURCE_BADGE}>{row.source}</span>,
       className: 'w-24',
     },
     {
       key: 'created_at',
       label: 'Created',
       sortable: true,
-      render: (row) => <TimestampCell date={row.created_at} />,
-      className: 'w-44',
+      render: (row) => <DateValue date={row.created_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
+      className: 'w-32',
     },
     {
       key: 'reserved_at',
       label: 'Reserved',
-      render: (row) => row.reserved_at ? <TimestampCell date={row.reserved_at} /> : <span className="text-xs text-text-tertiary">—</span>,
-      className: 'w-44',
+      render: (row) => row.reserved_at
+        ? <DateValue date={row.reserved_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />
+        : <span className="text-xs text-text-tertiary">—</span>,
+      className: 'w-32',
     },
     {
       key: 'expired_at',
       label: 'Processed',
-      render: (row) => row.expired_at ? <TimestampCell date={row.expired_at} /> : <span className="text-xs text-text-tertiary">—</span>,
-      className: 'w-44',
+      render: (row) => row.expired_at
+        ? <DateValue date={row.expired_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />
+        : <span className="text-xs text-text-tertiary">—</span>,
+      className: 'w-32',
     },
     {
       key: 'priority',
       label: 'Pri',
       sortable: true,
       render: (row) => <span className="text-xs text-text-secondary">{row.priority}</span>,
-      className: 'w-12 text-right',
+      className: 'w-14 text-right',
     },
     {
       key: 'retry_attempt',
       label: 'Retries',
       render: (row) => (
-        <span className="text-xs text-text-secondary">
+        <span className="text-xs text-text-secondary whitespace-nowrap">
           {row.retry_attempt}/{row.max_retry_attempts}
         </span>
       ),
-      className: 'w-16',
+      className: 'w-20',
     },
   ];
 
   return (
-    <div>
-      <PageHeader title="Messages" docsHash="#docs:dashboard.md:messages" />
+    // Master-list flow beside a full-height panel: the left column is a plain
+    // page-scrolling list (FilterBar and table headers stick against the main
+    // scroll, exactly like the executions list). The panel column spans the
+    // page height; its sticky viewport stays pinned with its own scroll.
+    // Negative margins let the panel span the full middle row; the left
+    // column re-adds those gutters for its own content.
+    <div className="flex items-stretch min-w-0 -mt-10 -mr-10 -mb-16">
+      <div className="flex-1 min-w-0 pt-10 pr-10">
+        <PageHeader title="Messages" docsHash="#docs:dashboard.md:messages" />
 
-      <FilterBar actions={
+        <FilterBar actions={
         <ListToolbar
           onRefresh={() => refetch()}
           isFetching={isFetching}
@@ -210,57 +219,62 @@ export function StreamMessagesPage() {
         ))}
       </FilterBar>
 
-      <DataTable
-        columns={columns}
-        data={messages}
-        keyFn={(row) => `${row.source}:${row.id}`}
-        isLoading={isLoading}
-        emptyMessage="No stream messages found"
-        onRowClick={(row) => setSelected(row)}
-        activeRowKey={activeMessage ? `${activeMessage.source}:${activeMessage.id}` : null}
-        sort={sort}
-        onSort={setSort}
-      />
+        <DataTable
+          columns={columns}
+          data={messages}
+          keyFn={(row) => `${row.source}:${row.id}`}
+          isLoading={isLoading}
+          emptyMessage="No stream messages found"
+          onRowClick={(row) => setSelected(row)}
+          activeRowKey={activeMessage ? `${activeMessage.source}:${activeMessage.id}` : null}
+          sort={sort}
+          onSort={setSort}
+          layout="fixed"
+        />
 
-      <StickyPagination
-        page={pagination.page}
-        totalPages={pagination.totalPages(total)}
-        onPageChange={pagination.setPage}
-        total={total}
-        pageSize={pagination.pageSize}
-        onPageSizeChange={pagination.setPageSize}
-      />
+        {/* Direct child of the tall column so sticky works; its -mx-10 fills
+            the column's pr-10, ending flush at the panel's edge. */}
+        <StickyPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages(total)}
+          onPageChange={pagination.setPage}
+          total={total}
+          pageSize={pagination.pageSize}
+          onPageSizeChange={pagination.setPageSize}
+        />
+      </div>
 
-      {/* Detail panel — portaled to body so fixed positioning works */}
-      {panelOpen && createPortal(
-        <div className="fixed right-0 bottom-0 w-[400px] z-40 border-l border-surface-border bg-surface overflow-y-auto shadow-lg" style={{ top: '3.5rem' }}>
-          <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-surface border-b border-surface-border/50">
-            <span className="text-xs font-medium text-text-primary">Message Detail</span>
-            <button
-              onClick={() => setSelected(null)}
-              className="p-1 rounded hover:bg-surface-hover text-text-tertiary hover:text-text-primary transition-colors"
-              title="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="px-4 py-4">
-            <StreamMessageDetail
-              message={activeMessage}
-              filters={{
-                onFilterStatus: (v) => setFilter('status', v),
-                onFilterStreamName: (v) => setFilter('stream_name', v),
-                onFilterMsgType: (v) => setFilter('msg_type', v),
-                onFilterTopic: (v) => setFilter('topic', v),
-                onFilterWorkflow: (v) => setFilter('workflow_name', v),
-                onFilterJid: (v) => setFilter('jid', v),
-                onFilterAid: (v) => setFilter('aid', v),
-              }}
-            />
-          </div>
-        </div>,
-        document.body,
-      )}
+      {/* Detail panel — spans the page height; the sticky viewport keeps the
+          chrome pinned to the visible area with its own scroll. */}
+      <SlidePanel open={panelOpen} width={416} className="self-stretch">
+        <div className="h-full pl-4">
+          <SlidePanelViews
+            views={[{
+              id: 'detail',
+              icon: MessageSquare,
+              label: 'Message Detail',
+              content: displayMessage ? (
+                <StreamMessageDetail
+                  message={displayMessage}
+                  filters={{
+                    onFilterStatus: (v) => setFilter('status', v),
+                    onFilterStreamName: (v) => setFilter('stream_name', v),
+                    onFilterMsgType: (v) => setFilter('msg_type', v),
+                    onFilterTopic: (v) => setFilter('topic', v),
+                    onFilterWorkflow: (v) => setFilter('workflow_name', v),
+                    onFilterJid: (v) => setFilter('jid', v),
+                    onFilterAid: (v) => setFilter('aid', v),
+                  }}
+                />
+              ) : null,
+            }]}
+            activeId="detail"
+            onViewChange={() => {}}
+            onClose={() => setSelected(null)}
+            stickyClassName="sticky top-0 z-10 h-[calc(100vh-5.25rem)] pt-9"
+          />
+        </div>
+      </SlidePanel>
     </div>
   );
 }

@@ -24,6 +24,10 @@ export interface RoleDetail {
   priority_facet: string | null;
   /** Version of the live schema pair; each schema edit advances it. Null until the role first carries a schema. */
   current_schema_version: number | null;
+  /** Rich formatting for this role's escalation list page (x-lt-* markup). Opt-in; versioned independently. */
+  list_schema: Record<string, unknown> | null;
+  /** Version of the live list_schema; advances only on list-schema edits. Null until the role first carries one. */
+  current_list_schema_version: number | null;
   /**
    * Roles this station draws input from that live in other sequences.
    * parent_role is the single prior step placing the role in one sequence;
@@ -57,11 +61,31 @@ export interface RoleSchemaVersionSummary {
   is_current: boolean;
 }
 
+/** One immutable snapshot of a role's list schema (independent version lineage). */
+export interface RoleListSchemaVersion {
+  role: string;
+  version: number | null;
+  list_schema: Record<string, unknown> | null;
+  change_summary: string | null;
+  created_at: string | null;
+  latest_version: number | null;
+}
+
+/** List-schema version-history row (schema elided). */
+export interface RoleListSchemaVersionSummary {
+  version: number;
+  has_list_schema: boolean;
+  change_summary: string | null;
+  created_at: string;
+  is_current: boolean;
+}
+
 export interface UpdateRoleInput {
   title?: string | null;
   description?: string | null;
   form_schema?: Record<string, unknown> | null;
   metadata_schema?: Record<string, unknown> | null;
+  list_schema?: Record<string, unknown> | null;
   properties?: Record<string, unknown> | null;
   ops_visible?: boolean;
   parent_role?: string | null;
@@ -166,6 +190,28 @@ export function useRoleSchemaVersions(role: string) {
   return useQuery<{ versions: RoleSchemaVersionSummary[] }>({
     queryKey: ['roles', role, 'schema-versions'],
     queryFn: () => apiFetch(`/roles/${encodeURIComponent(role)}/schema/versions`),
+    enabled: !!role,
+  });
+}
+
+/**
+ * Fetch a role's LIST schema (rich list-page formatting). A version pins the
+ * immutable snapshot; omitted, the live (latest) list schema is returned.
+ * Versions independently of the resolve form schema.
+ */
+export function useRoleListSchema(role: string, version?: number, enabled = true) {
+  return useQuery<RoleListSchemaVersion>({
+    queryKey: ['roles', role, 'list-schema', version ?? 'latest'],
+    queryFn: () =>
+      apiFetch(`/roles/${encodeURIComponent(role)}/list-schema${version != null ? `?version=${version}` : ''}`),
+    enabled: enabled && !!role,
+  });
+}
+
+export function useRoleListSchemaVersions(role: string) {
+  return useQuery<{ versions: RoleListSchemaVersionSummary[] }>({
+    queryKey: ['roles', role, 'list-schema-versions'],
+    queryFn: () => apiFetch(`/roles/${encodeURIComponent(role)}/list-schema/versions`),
     enabled: !!role,
   });
 }

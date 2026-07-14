@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAccess } from '../../../hooks/useAccess';
-import { useViewMode } from '../../../hooks/useViewMode';
-import { useCollapsedSections } from '../../../hooks/useCollapsedSections';
 import {
   useEscalation,
   useClaimEscalation,
@@ -15,17 +13,17 @@ import {
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
 import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
-import { EscalationTimeline } from '../../../components/common/display/EscalationTimeline';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { EscalationSidePanel } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
-import { EscalationHero } from './EscalationHero';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
-import { EscalationContextBlocks, EscalationCollapsibleSections } from './EscalationDetailSections';
+import { EscalationContextBlocks, EscalationFormSection } from './EscalationDetailSections';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,14 +36,6 @@ function safeParse(value: string | null | undefined): unknown {
   } catch {
     return value;
   }
-}
-
-function hasTriageData(payload: string | null | undefined): boolean {
-  if (!payload) return false;
-  try {
-    const p = JSON.parse(payload);
-    return !!(p && typeof p === 'object' && p._triage);
-  } catch { return false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -69,15 +59,15 @@ export function EscalationDetailPage() {
   const { data: settings } = useSettings();
 
   const { isBuilder } = useAccess();
-  const { isDevMode, toggleMode } = useViewMode(false);
 
   const wfConfig = workflowConfigs?.find((c) => c.workflow_type === esc?.workflow_type);
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
   const [activeView, setActiveView] = useState<ActiveView>('resolve');
   const [json, setJson] = useState('{}');
 
-  // Section collapse state — persisted to localStorage
-  const { isCollapsed, toggle: toggleSection, collapse, expand } = useCollapsedSections('escalation-detail');
+  // Side panel: open by default (on Help). An explicit toggle overrides the
+  // default for the visit.
+  const [sidePanelToggled, setSidePanelToggled] = useState<boolean | null>(null);
 
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
@@ -122,18 +112,7 @@ export function EscalationDetailPage() {
     }
   }, [effectiveSchema, metadataFormSchema, resolverSchema, esc?.envelope]);
 
-  const hasTriage = hasTriageData(esc?.escalation_payload);
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
-  const isWaitForHuman = esc?.subtype === 'wait_for_human';
-  useEffect(() => {
-    if (hasTriage || isRoundsExhausted) {
-      collapse('context');
-    }
-    if (isWaitForHuman && metadataFormSchema) {
-      collapse('context');
-      expand('resolver');
-    }
-  }, [hasTriage, isRoundsExhausted, isWaitForHuman, metadataFormSchema, collapse, expand]);
 
   if (isLoading) {
     return (
@@ -163,6 +142,12 @@ export function EscalationDetailPage() {
     ? escalationPayload as Record<string, unknown>
     : null;
   const triageData = payloadObj?._triage as Record<string, unknown> | undefined;
+  const resolverObj = (typeof resolverPayload === 'object' && resolverPayload !== null && !Array.isArray(resolverPayload))
+    ? resolverPayload as Record<string, unknown>
+    : null;
+  // The panel opens by default — the Help view always has something to say
+  // (authored x-lt-help, or a state-aware hint). An explicit toggle overrides.
+  const sidePanelOpen = sidePanelToggled ?? true;
 
   const actionBarMode: ActionBarMode = isTerminal
     ? 'terminal'
@@ -174,9 +159,6 @@ export function EscalationDetailPage() {
 
   const handleClaim = (durationMinutes: number) => {
     claim.mutate({ id: esc.id, durationMinutes });
-    collapse('context');
-    collapse('triage');
-    expand('resolver');
   };
 
   const goBack = () => {
@@ -219,26 +201,6 @@ export function EscalationDetailPage() {
     goBack();
   };
 
-  const viewToggle = isBuilder ? (
-    <button
-      onClick={toggleMode}
-      className="text-text-tertiary hover:text-accent transition-colors"
-      title={isDevMode ? 'Switch to user view' : 'Switch to developer view'}
-    >
-      {isDevMode ? (
-        /* Braces icon — dev/JSON mode */
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-        </svg>
-      ) : (
-        /* Form/document icon — user mode */
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-        </svg>
-      )}
-    </button>
-  ) : undefined;
-
   const headerActions = (
     <div className="flex items-center gap-2">
       <ListToolbar
@@ -246,90 +208,108 @@ export function EscalationDetailPage() {
         isFetching={isFetching}
         apiPath={`/escalations/${esc.id}`}
       />
-      {viewToggle && <div className="ml-4">{viewToggle}</div>}
+      <button
+        onClick={() => setSidePanelToggled(!sidePanelOpen)}
+        className="ml-2 text-text-tertiary hover:text-accent transition-colors"
+        title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+      >
+        {sidePanelOpen
+          ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
+          : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
+      </button>
     </div>
   );
 
   return (
-    <div className="min-h-[calc(100vh-9rem)] flex flex-col">
-      <PageHeader
-        title="Escalation"
-        actions={headerActions}
-        center={<EscalationTimeline esc={esc} className="w-[25%] shrink-0" />}
-      />
+    // Two fixed-height columns, like the left nav: the form column scrolls
+    // independently and the side panel keeps its own scroll. Negative margins
+    // let the panel span the full middle row (header to event feed, flush
+    // right); the left column re-adds those gutters for its own content.
+    <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-10 -mr-10 -mb-16">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        {/* The description IS the title — the page opens with what to do. It
+            shares the row with the toolbar and panel toggle, truncating to
+            make room. */}
+        <div className="shrink-0 pt-10 pr-10">
+          <PageHeader title={esc.description || 'Escalation'} actions={headerActions} />
+        </div>
 
-      <EscalationHero
+        {/* Independently scrolling form column */}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-10">
+          <EscalationContextBlocks
+            isRoundsExhausted={isRoundsExhausted}
+            payloadObj={payloadObj}
+            isTerminal={isTerminal}
+            resolverPayload={resolverPayload as Record<string, unknown> | null}
+            onRetryTriage={handleRetryTriage}
+            isRetrying={claim.isPending || resolve.isPending}
+          />
+
+          <EscalationFormSection
+            esc={esc}
+            resolverPayload={resolverPayload}
+            isTerminal={isTerminal}
+            claimedByMe={claimedByMe}
+            activeView={activeView}
+            metadataFormSchema={metadataFormSchema}
+            effectiveSchema={effectiveSchema as Record<string, unknown> | null}
+            json={json}
+            onJsonChange={setJson}
+            requestTriage={requestTriage}
+            onRequestTriageChange={setRequestTriage}
+            triageNotes={triageNotes}
+            onTriageNotesChange={setTriageNotes}
+            onResolve={handleResolve}
+            onEscalate={handleEscalate}
+            submitAttempted={submitAttempted}
+            isCertified={isCertified}
+            hasAI={hasAI}
+          />
+
+          <div className="h-10" />
+        </div>
+
+        <EscalationActionBar
+          mode={actionBarMode}
+          activeView={activeView}
+          onActiveViewChange={setActiveView}
+          onClaim={handleClaim}
+          claimPending={claim.isPending}
+          workflowType={esc.workflow_type}
+          json={json}
+          onResolve={handleResolve}
+          resolvePending={resolve.isPending}
+          resolveError={resolve.error as Error | null}
+          requestTriage={requestTriage}
+          triageNotes={triageNotes}
+          currentRole={esc.role}
+          escalationTargets={(escalationTargets?.targets ?? []).filter((r) => r !== esc.role)}
+          onEscalate={handleEscalate}
+          escalatePending={escalate.isPending}
+          escalateError={escalate.error as Error | null}
+          onRelease={handleRelease}
+          releasePending={claim.isPending}
+          onCancel={() => setCancelModalOpen(true)}
+          assignedTo={esc.assigned_to}
+          assignedUntil={esc.assigned_until}
+          onSubmitAttempt={() => setSubmitAttempted(true)}
+        />
+      </div>
+
+      <EscalationSidePanel
         esc={esc}
-        claimedByMe={claimedByMe}
-        claimed={claimed}
-        isTerminal={isTerminal}
-        traceUrl={traceUrl}
-        isDevMode={isDevMode}
-        showDetails={!isCollapsed('details')}
-        onToggleDetails={() => toggleSection('details')}
-      />
-
-      <EscalationContextBlocks
-        isRoundsExhausted={isRoundsExhausted}
-        payloadObj={payloadObj}
-        isTerminal={isTerminal}
-        resolverPayload={resolverPayload as Record<string, unknown> | null}
-        onRetryTriage={handleRetryTriage}
-        isRetrying={claim.isPending || resolve.isPending}
-      />
-
-      <EscalationCollapsibleSections
-        isCollapsed={isCollapsed}
-        toggleSection={toggleSection}
-        esc={esc}
-        escalationPayload={escalationPayload}
-        resolverPayload={resolverPayload}
-        triageData={triageData}
-        payloadObj={payloadObj}
-        isTerminal={isTerminal}
-        claimedByMe={claimedByMe}
-        activeView={activeView}
-        metadataFormSchema={metadataFormSchema}
-        json={json}
-        onJsonChange={setJson}
-        requestTriage={requestTriage}
-        onRequestTriageChange={setRequestTriage}
-        triageNotes={triageNotes}
-        onTriageNotesChange={setTriageNotes}
-        isDevMode={isDevMode}
-        onResolve={handleResolve}
-        onEscalate={handleEscalate}
-        submitAttempted={submitAttempted}
-        isCertified={isCertified}
+        schema={effectiveSchema as Record<string, unknown> | null}
+        envelope={envelopeObj}
+        payload={payloadObj}
+        resolver={resolverObj}
+        triage={triageData ?? null}
         hasAI={hasAI}
-      />
-
-      <div className="flex-1" />
-
-      <EscalationActionBar
-        mode={actionBarMode}
-        activeView={activeView}
-        onActiveViewChange={setActiveView}
-        onClaim={handleClaim}
-        claimPending={claim.isPending}
-        workflowType={esc.workflow_type}
-        json={json}
-        onResolve={handleResolve}
-        resolvePending={resolve.isPending}
-        resolveError={resolve.error as Error | null}
-        requestTriage={requestTriage}
-        triageNotes={triageNotes}
-        currentRole={esc.role}
-        escalationTargets={(escalationTargets?.targets ?? []).filter((r) => r !== esc.role)}
-        onEscalate={handleEscalate}
-        escalatePending={escalate.isPending}
-        escalateError={escalate.error as Error | null}
-        onRelease={handleRelease}
-        releasePending={claim.isPending}
-        onCancel={() => setCancelModalOpen(true)}
-        assignedTo={esc.assigned_to}
-        assignedUntil={esc.assigned_until}
-        onSubmitAttempt={() => setSubmitAttempted(true)}
+        claimed={claimed}
+        claimedByMe={claimedByMe}
+        isTerminal={isTerminal}
+        isBuilder={isBuilder}
+        traceUrl={traceUrl}
+        open={sidePanelOpen}
       />
 
       <ConfirmCancelModal

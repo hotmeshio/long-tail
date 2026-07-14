@@ -10,6 +10,7 @@ import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
+import * as policyDocumentWorkflow from './workflows/policy-document';
 import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
 import * as printerTwinWorkflow from './workflows/printer-twin';
@@ -37,6 +38,7 @@ const SUPERADMIN = 'superadmin';
 const GRINDER = 'grinder';
 const GLUER = 'gluer';
 const INTAKE_REVIEWER = 'intake-reviewer';
+const POLICY_DOCUMENT = 'policy-document';
 
 const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
 const INVOCATION_ROLES = [SUPERADMIN, ENGINEER];
@@ -123,6 +125,17 @@ const richFormConfig: LTWorkerConfig = {
   defaultRole: INTAKE_REVIEWER,
   envelopeSchema: {
     data: { role: INTAKE_REVIEWER },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const policyDocumentConfig: LTWorkerConfig = {
+  description: 'Policy document — a looped workflow that keeps ONE live policy escalation at a time; members revise it and each resolved revision is the audit trail. Reference example for the role-owned, versioned LIST view (list_schema).',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: POLICY_DOCUMENT,
+  envelopeSchema: {
+    data: { role: POLICY_DOCUMENT, title: 'Refund Policy', owner: 'Legal' },
     metadata: { source: 'dashboard' },
   },
 };
@@ -366,6 +379,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
+  { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printBroker, config: printBrokerConfig },

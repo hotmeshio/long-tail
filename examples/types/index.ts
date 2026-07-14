@@ -13,6 +13,7 @@ export type {
   BasicEchoEnvelopeData,
   BasicSignalEnvelopeData,
   RichFormEnvelopeData,
+  PolicyDocumentEnvelopeData,
   AssemblyLineEnvelopeData,
   StepIteratorEnvelopeData,
   ReverterEnvelopeData,

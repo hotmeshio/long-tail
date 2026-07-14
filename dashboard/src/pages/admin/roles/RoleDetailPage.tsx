@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard,
+  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -718,6 +718,31 @@ export function RoleDetailPage() {
               {role.form_schema
                 ? `Open schema editor — v${role.current_schema_version ?? 1} in use →`
                 : 'Define the escalation form →'}
+            </Link>
+          </SectionGroup>
+
+          {/* Escalations List Schema — versioned independently, edited on its own page */}
+          <SectionGroup
+            icon={LayoutList}
+            label="Escalations List Schema"
+            annotation="rich list view"
+            aside={
+              role.current_list_schema_version != null ? (
+                <span className="text-[9px] font-mono text-text-quaternary">v{role.current_list_schema_version} in use</span>
+              ) : undefined
+            }
+          >
+            <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
+              Richly formats the escalation list when it's scoped to just this role.
+              Versioned on its own timeline — separate from the resolve form.
+            </p>
+            <Link
+              to={`/admin/roles/${encodeURIComponent(role.role)}/list-schema`}
+              className="text-xs text-accent hover:underline"
+            >
+              {role.list_schema
+                ? `Open list schema editor — v${role.current_list_schema_version ?? 1} in use →`
+                : 'Define the list view →'}
             </Link>
           </SectionGroup>
 
