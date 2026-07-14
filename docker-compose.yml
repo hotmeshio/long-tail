@@ -71,6 +71,7 @@ services:
         condition: service_healthy
       mock-oauth:
         condition: service_healthy
+    command: ["npx", "ts-node-dev", "--respawn", "--poll", "--transpile-only", "index.ts"]
     restart: unless-stopped
 
   postgres:

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, Settings, List } from 'lucide-react';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
 import type { RoleDetail } from '../../api/roles';
@@ -95,13 +95,22 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         </button>
       </div>
 
-      <Link
-        to={`/admin/roles/${encodeURIComponent(role.role)}`}
-        className="flex items-center gap-1 text-[10px] text-accent hover:underline mb-4"
-      >
-        <ExternalLink className="w-2.5 h-2.5" />
-        Edit in Roles
-      </Link>
+      <div className="flex items-center gap-3 mb-4">
+        <Link
+          to={`/admin/roles/${encodeURIComponent(role.role)}`}
+          className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+        >
+          <Settings className="w-2.5 h-2.5" />
+          Edit in Roles
+        </Link>
+        <Link
+          to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
+          className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+        >
+          <List className="w-2.5 h-2.5" />
+          View full queue
+        </Link>
+      </div>
 
       <PeriodSelector period={period} onChange={setPeriod} />
 
@@ -164,18 +173,6 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         )}
       </div>
 
-      {/* View queue — `role=` drives the visible filter bar on the escalations
-          page (the JSON `roles=` facet param filters silently and leaves the
-          bar reading "all roles"). */}
-      <div className="mt-4 border-t border-surface-border/40 pt-3">
-        <Link
-          to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
-          className="flex items-center gap-1.5 text-[10px] text-accent hover:underline"
-        >
-          View full queue
-          <ExternalLink className="w-2.5 h-2.5" />
-        </Link>
-      </div>
     </>
   );
 }

@@ -29,6 +29,21 @@ import { EscalationContextBlocks, EscalationFormSection } from './EscalationDeta
 // Helpers
 // ---------------------------------------------------------------------------
 
+const PANEL_OPEN_KEY = 'lt:escalation:panel:open';
+
+function readPanelOpen(): boolean {
+  try {
+    const v = localStorage.getItem(PANEL_OPEN_KEY);
+    return v === null ? true : v === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function savePanelOpen(open: boolean): void {
+  try { localStorage.setItem(PANEL_OPEN_KEY, String(open)); } catch {}
+}
+
 function safeParse(value: string | null | undefined): unknown {
   if (!value) return null;
   try {
@@ -65,9 +80,7 @@ export function EscalationDetailPage() {
   const [activeView, setActiveView] = useState<ActiveView>('resolve');
   const [json, setJson] = useState('{}');
 
-  // Side panel: open by default (on Help). An explicit toggle overrides the
-  // default for the visit.
-  const [sidePanelToggled, setSidePanelToggled] = useState<boolean | null>(null);
+  const [sidePanelOpen, setSidePanelOpen] = useState<boolean>(readPanelOpen);
 
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
@@ -145,9 +158,6 @@ export function EscalationDetailPage() {
   const resolverObj = (typeof resolverPayload === 'object' && resolverPayload !== null && !Array.isArray(resolverPayload))
     ? resolverPayload as Record<string, unknown>
     : null;
-  // The panel opens by default — the Help view always has something to say
-  // (authored x-lt-help, or a state-aware hint). An explicit toggle overrides.
-  const sidePanelOpen = sidePanelToggled ?? true;
 
   const actionBarMode: ActionBarMode = isTerminal
     ? 'terminal'
@@ -209,7 +219,7 @@ export function EscalationDetailPage() {
         apiPath={`/escalations/${esc.id}`}
       />
       <button
-        onClick={() => setSidePanelToggled(!sidePanelOpen)}
+        onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}
         className="ml-2 text-text-tertiary hover:text-accent transition-colors"
         title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
       >

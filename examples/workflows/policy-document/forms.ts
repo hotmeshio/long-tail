@@ -85,17 +85,16 @@ export const POLICY_FORM_SCHEMA = {
 
 /**
  * The versioned LIST view. `active-history` renders the single live policy as a
- * card (left) and a load-on-demand revision history (right). Every string is a
- * `{{domain.path}}` token interpolated against each escalation row — here the
- * policy facts ride the row's metadata, so the card reads them directly.
+ * card (left) and a load-on-demand revision history (right). Concise facts
+ * (title, owner, revision, effective date) come from metadata; the full document
+ * body comes from the escalation envelope where long text belongs.
  */
 export const POLICY_LIST_SCHEMA = {
   'x-lt-layout': 'active-history',
-  'x-lt-help': '# {{metadata.title}}\nThe authoritative policy. One revision is live at a time; prior revisions are the audit trail.',
   'x-lt-active': {
     title: '{{metadata.title}}',
     subtitle: 'Revision {{metadata.revision}} · effective {{metadata.effective_date}}',
-    body: '{{metadata.document_markdown}}',
+    body: '{{envelope.formDefaults.policy.document}}',
     fields: [
       { label: 'Owner', value: '{{metadata.owner}}' },
       { label: 'Claimed by', value: '{{escalation.assigned_to}}' },

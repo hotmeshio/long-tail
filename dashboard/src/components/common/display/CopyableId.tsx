@@ -75,7 +75,7 @@ export function CopyableId({ label, value, href, external, bare }: CopyableIdPro
     <div className="text-left group relative">
       <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{label}</span>
       <span className="flex items-center gap-1 mt-0.5">
-        <button onClick={handleCopy} title={value} className="text-[12px] font-mono text-text-primary group-hover:text-accent transition-colors">
+        <button onClick={handleCopy} title={value} className="flex-1 text-left text-[12px] font-mono text-text-primary group-hover:text-accent transition-colors">
           {centerEllipsis(value)}
         </button>
         {valueButtons}
