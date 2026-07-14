@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { GitMerge, RefreshCw } from 'lucide-react';
+import { GitMerge, RefreshCw, List } from 'lucide-react';
 import { useRoleDetails, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
@@ -30,7 +30,7 @@ const RESOLVED_BAND = `${RESOLVED_COLOR}14`;
 
 // Station table grid — shared by the header and every row. The display name
 // leads (user-set title or derived from the id); the exact role id follows.
-const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) 64px 56px 56px 60px 72px 72px 104px';
+const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) 64px 56px 56px 60px 72px 72px 104px 36px';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -192,13 +192,15 @@ function StationRow({
           className="self-stretch flex items-center justify-end px-1.5"
           style={{ backgroundColor: PENDING_BAND }}
         >
-          <span
-            className={`text-xs font-mono tabular-nums ${
+          <Link
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
+            className={`text-xs font-mono tabular-nums hover:underline ${
               pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
             }`}
+            onClick={(e) => e.stopPropagation()}
           >
             {pending}
-          </span>
+          </Link>
         </div>
 
         {/* Active — indigo band, same hue as the chart's worked band */}
@@ -206,13 +208,15 @@ function StationRow({
           className="self-stretch flex items-center justify-end px-1.5"
           style={{ backgroundColor: ACTIVE_BAND }}
         >
-          <span
-            className={`text-xs font-mono tabular-nums ${
+          <Link
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
+            className={`text-xs font-mono tabular-nums hover:underline ${
               claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'
             }`}
+            onClick={(e) => e.stopPropagation()}
           >
             {claimed}
-          </span>
+          </Link>
         </div>
 
         {/* Resolved — sage band, same hue as the chart's actual curve */}
@@ -220,9 +224,13 @@ function StationRow({
           className="self-stretch flex items-center justify-end px-1.5"
           style={{ backgroundColor: RESOLVED_BAND }}
         >
-          <span className="text-xs font-mono tabular-nums text-text-quaternary">
+          <Link
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
+            className="text-xs font-mono tabular-nums hover:underline text-text-quaternary"
+            onClick={(e) => e.stopPropagation()}
+          >
             {resolved}
-          </span>
+          </Link>
         </div>
 
         {/* P99 wait */}
@@ -249,6 +257,18 @@ function StationRow({
           >
             {pct != null ? `${pct}%` : '—'}
           </span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-center py-1.5">
+          <Link
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
+            className="text-text-quaternary hover:text-accent transition-colors"
+            title="View full queue"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <List className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
 
@@ -287,6 +307,7 @@ function TableHead() {
     { label: 'P99 WAIT' },
     { label: 'P99 WORK' },
     { label: 'TREND' },
+    { label: 'ACTIONS' },
   ];
   return (
     <div
@@ -311,7 +332,7 @@ function TableHead() {
           <span
             key={col.label}
             className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 ${
-              i > 1 && i < 8 ? 'text-right' : ''
+              i > 1 && i < 8 ? 'text-right' : i === 9 ? 'text-center' : ''
             }`}
           >
             {col.label}

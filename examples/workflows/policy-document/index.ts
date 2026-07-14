@@ -4,23 +4,21 @@
  *
  * The workflow is a loop: it opens ONE policy-review escalation to the
  * `policy-document` role and parks on it (conditionLT). A member claims and
- * publishes a revision; the workflow folds that into the next revision's
- * metadata and opens the next escalation. So at any moment exactly ONE policy is
- * live (pending), and every resolved revision is the audit trail — which is why
- * the list needs a schema: a list of one is a document, not a table row.
+ * publishes a revision; the workflow folds that into the next revision's state
+ * and opens the next escalation. At most 10 revisions run per workflow execution;
+ * the 10th iteration spawns a fresh child workflow (fire-and-forget) carrying the
+ * current state, keeping replay history bounded.
  *
- * The policy facts (title, owner, revision, effective date, and the document
- * markdown itself) ride the escalation's metadata, so the list_schema reads them
- * off the live row with `{{metadata.*}}` tokens with no second lookup. The edit
- * form is pinned to POLICY_SCHEMA_VERSION; the list view always renders latest.
+ * Concise facts (title, owner, revision, effective date) ride the escalation's
+ * metadata so the list view reads them off the row. The full policy document body
+ * travels in the escalation envelope (formDefaults) where long text belongs.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
 import { conditionLT } from '../../../services/orchestrator/condition';
-import * as activities from './activities';
-import type { RevisionMetadata } from './activities';
+import { JOB_EXPIRE_SECS } from '../../../modules/defaults';
 import {
   POLICY_ROLE,
   POLICY_SCHEMA_VERSION,
@@ -28,42 +26,46 @@ import {
   type PolicyResolverV1,
 } from './forms';
 
-type ActivitiesType = typeof activities;
-
-/** Bounded high enough that the queue always shows one live policy in a demo. */
-const MAX_REVISIONS = 50;
+const MAX_ITERATIONS = 10;
+const TASK_QUEUE = 'long-tail-examples';
 
 export async function policyDocument(envelope: LTEnvelope): Promise<any> {
-  const { role = POLICY_ROLE, title = 'Refund Policy', owner = 'Legal' } = envelope.data ?? {};
-
-  const { nextRevisionMetadata } = Durable.workflow.proxyActivities<ActivitiesType>({ activities });
+  const {
+    role = POLICY_ROLE,
+    title = 'Refund Policy',
+    owner = 'Legal',
+    revision: startRevision = 1,
+    effective_date: startDate = '2026-08-01',
+    document: startDocument = INITIAL_POLICY_MARKDOWN,
+  } = envelope.data ?? {};
 
   const ctx = Durable.workflow.workflowInfo();
 
-  let meta: RevisionMetadata = {
-    title,
-    owner,
-    revision: 1,
-    effective_date: '2026-08-01',
-    document_markdown: INITIAL_POLICY_MARKDOWN,
+  let meta = {
+    title:          title as string,
+    owner:          owner as string,
+    revision:       startRevision as number,
+    effective_date: startDate as string,
+    document:       startDocument as string,
   };
 
-  for (let rev = 1; rev <= MAX_REVISIONS; rev++) {
-    const signalId = `policy-${ctx.workflowId}-${rev}`;
+  for (let i = 1; i <= MAX_ITERATIONS; i++) {
+    const signalId = `policy-${ctx.workflowId}-${meta.revision}`;
 
-    // Seed the edit form from the current policy so the member revises in place.
+    // Seed the edit form from the current state so the member revises in place.
     const formDefaults: PolicyResolverV1 = {
       policy: {
-        title: meta.title,
+        title:         meta.title,
         effectiveDate: meta.effective_date,
-        owner: meta.owner,
-        document: meta.document_markdown,
+        owner:         meta.owner,
+        document:      meta.document,
       },
       approved: false,
     };
 
-    // Open the live policy escalation and park. The policy facts ride the
-    // metadata so the list view reads them straight off the row.
+    // Open the live policy escalation and park. Concise facts ride the metadata
+    // so the list view reads them off the row; the document body lives in the
+    // envelope where long text belongs.
     const response = await conditionLT<PolicyResolverV1>(signalId, {
       role,
       type: 'policy-review',
@@ -72,11 +74,10 @@ export async function policyDocument(envelope: LTEnvelope): Promise<any> {
       description: `Review and revise "${meta.title}" (revision ${meta.revision}).`,
       workflowType: 'policyDocument',
       metadata: {
-        title: meta.title,
-        owner: meta.owner,
-        revision: meta.revision,
+        title:          meta.title,
+        owner:          meta.owner,
+        revision:       meta.revision,
         effective_date: meta.effective_date,
-        document_markdown: meta.document_markdown,
       },
       envelope: { source: 'policy-document', formDefaults },
       schemaVersion: POLICY_SCHEMA_VERSION,
@@ -86,9 +87,41 @@ export async function policyDocument(envelope: LTEnvelope): Promise<any> {
       return { type: 'return' as const, data: { cancelled: true, atRevision: meta.revision } };
     }
 
-    // Fold the resolution into the next revision and loop.
-    meta = await nextRevisionMetadata({ resolved: response, prior: meta });
+    // Fold the resolution into the next iteration's state.
+    const p = response.policy ?? ({} as PolicyResolverV1['policy']);
+    meta = {
+      title:          p.title          || meta.title,
+      owner:          p.owner          || meta.owner,
+      revision:       meta.revision + 1,
+      effective_date: p.effectiveDate  || meta.effective_date,
+      document:       p.document       || meta.document,
+    };
+
+    // After MAX_ITERATIONS revisions, continue as a fresh child workflow to
+    // keep replay history bounded, then exit.
+    if (i === MAX_ITERATIONS) {
+      const childId = `${ctx.workflowId}-c${meta.revision}`;
+      await Durable.workflow.startChild({
+        workflowName: 'policyDocument',
+        args: [{
+          data: {
+            role,
+            title:          meta.title,
+            owner:          meta.owner,
+            revision:       meta.revision,
+            effective_date: meta.effective_date,
+            document:       meta.document,
+          },
+        }],
+        taskQueue:  TASK_QUEUE,
+        workflowId: childId,
+        expire:     JOB_EXPIRE_SECS,
+        entity:     'policyDocument',
+        signalIn:   false,
+      });
+      return { type: 'return' as const, data: { continued: true, childId, atRevision: meta.revision } };
+    }
   }
 
-  return { type: 'return' as const, data: { done: true, revisions: meta.revision } };
+  return { type: 'return' as const, data: { done: true, atRevision: meta.revision } };
 }

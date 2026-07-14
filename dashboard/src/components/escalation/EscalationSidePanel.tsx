@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { HelpCircle, Info, Tags, Layers, Braces, Sparkles, User } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { HelpCircle, Info, Tags, Layers, Braces, Sparkles, User, ListFilter, Search } from 'lucide-react';
 import { SlidePanel, SlidePanelViews, PanelField, type SlidePanelView } from '../common/layout/SlidePanel';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { JsonViewer } from '../common/data/JsonViewer';
@@ -24,12 +24,22 @@ export const ESCALATION_PANEL_VIEWS = {
   RECORD: 'record',
 } as const;
 
+const PANEL_VIEW_KEY = 'lt:escalation:panel:view';
+
+function readPanelView(validIds: readonly string[]): PanelViewId {
+  try {
+    const v = localStorage.getItem(PANEL_VIEW_KEY);
+    if (v && validIds.includes(v)) return v as PanelViewId;
+  } catch {}
+  return ESCALATION_PANEL_VIEWS.HELP;
+}
+
 type PanelViewId = (typeof ESCALATION_PANEL_VIEWS)[keyof typeof ESCALATION_PANEL_VIEWS];
 
 /** Metadata keys that are plumbing, not information for the person resolving. */
 const HIDDEN_METADATA_KEYS = new Set(['form_schema']);
 
-function MetadataList({ metadata }: { metadata: Record<string, unknown> | null }) {
+function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | null; role: string }) {
   const entries = Object.entries(metadata ?? {}).filter(
     ([k]) => !k.startsWith('_') && !HIDDEN_METADATA_KEYS.has(k),
   );
@@ -38,13 +48,40 @@ function MetadataList({ metadata }: { metadata: Record<string, unknown> | null }
   }
   return (
     <dl className="space-y-3.5">
-      {entries.map(([key, value]) => (
-        <PanelField key={key} label={key.replace(/[_-]/g, ' ')}>
-          <span className="font-mono break-all">
-            {typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}
-          </span>
-        </PanelField>
-      ))}
+      {entries.map(([key, value]) => {
+        const displayValue = typeof value === 'object' && value !== null
+          ? JSON.stringify(value)
+          : String(value);
+        const facets = encodeURIComponent(JSON.stringify({ [key]: displayValue }));
+        const roleUrl = `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}`;
+        const globalUrl = `/escalations/available?facets=${facets}`;
+        return (
+          <div key={key} className="group relative">
+            <dt className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">
+              {key.replace(/[_-]/g, ' ')}
+            </dt>
+            <dd className="mt-0.5 flex items-center gap-1">
+              <span className="text-[12px] text-text-primary font-mono break-all flex-1">
+                {displayValue}
+              </span>
+              <Link
+                to={roleUrl}
+                title={`Filter this queue: ${key} = ${displayValue}`}
+                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
+              >
+                <ListFilter className="w-3 h-3" />
+              </Link>
+              <Link
+                to={globalUrl}
+                title={`Search all queues: ${key} = ${displayValue}`}
+                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
+              >
+                <Search className="w-3 h-3" />
+              </Link>
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
@@ -165,7 +202,13 @@ export function EscalationSidePanel({
   open: boolean;
 }) {
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState<PanelViewId>(ESCALATION_PANEL_VIEWS.HELP);
+  const ALL_VIEW_IDS = Object.values(ESCALATION_PANEL_VIEWS) as readonly string[];
+  const [activeView, setActiveView] = useState<PanelViewId>(() => readPanelView(ALL_VIEW_IDS));
+
+  const handleViewChange = useCallback((id: string) => {
+    try { localStorage.setItem(PANEL_VIEW_KEY, id); } catch {}
+    setActiveView(id as PanelViewId);
+  }, []);
 
   const helpMarkdown = useMemo(() => {
     const authored = buildHelpMarkdown(schema, {
@@ -192,7 +235,7 @@ export function EscalationSidePanel({
     {
       id: ESCALATION_PANEL_VIEWS.HELP,
       icon: HelpCircle,
-      label: 'Help',
+      label: 'Instructions',
       content: <MarkdownRenderer content={helpMarkdown} onClick={handleHelpClick} />,
     },
     {
@@ -213,7 +256,7 @@ export function EscalationSidePanel({
       id: ESCALATION_PANEL_VIEWS.METADATA,
       icon: Tags,
       label: 'Metadata',
-      content: <MetadataList metadata={esc.metadata} />,
+      content: <MetadataList metadata={esc.metadata} role={esc.role} />,
     },
     {
       id: ESCALATION_PANEL_VIEWS.CONTEXT,
@@ -261,7 +304,7 @@ export function EscalationSidePanel({
             <SlidePanelViews
               views={views}
               activeId={activeView}
-              onViewChange={(id) => setActiveView(id as PanelViewId)}
+              onViewChange={handleViewChange}
               stickyClassName="h-full min-h-0"
             />
           </div>

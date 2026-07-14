@@ -26,7 +26,7 @@ COPY docker/dev-entrypoint.sh /usr/local/bin/dev-entrypoint.sh
 RUN chmod +x /usr/local/bin/dev-entrypoint.sh
 ENTRYPOINT ["dev-entrypoint.sh"]
 # ts-node-dev watches for changes and restarts automatically
-CMD ["npx", "ts-node-dev", "--respawn", "--poll", "index.ts"]
+CMD ["npx", "ts-node-dev", "--respawn", "--poll", "--transpile-only", "index.ts"]
 
 FROM base AS builder
 ENV NODE_ENV=production
