@@ -186,6 +186,7 @@ export function EscalationSidePanel({
   isBuilder,
   traceUrl,
   open,
+  noGutter,
 }: {
   esc: LTEscalationRecord;
   schema: Record<string, unknown> | null;
@@ -200,6 +201,8 @@ export function EscalationSidePanel({
   isBuilder: boolean;
   traceUrl: string | null;
   open: boolean;
+  /** Remove the left gutter so the panel background is flush with the content column (used in full-bleed iframe mode). */
+  noGutter?: boolean;
 }) {
   const navigate = useNavigate();
   const ALL_VIEW_IDS = Object.values(ESCALATION_PANEL_VIEWS) as readonly string[];
@@ -289,7 +292,7 @@ export function EscalationSidePanel({
           animated width, so the closed state reclaims all of it. The column
           is fixed height (like the left nav): the sparkline row persists at
           the top and the active view scrolls independently beneath it. */}
-      <div className="h-full pl-6">
+      <div className={`h-full${noGutter ? '' : ' pl-6'}`}>
         {/* One tinted column, top to bottom — the sparkline lives inside it,
             hovering tight (2px y padding) above the icon row, centered at 80%
             so its edge labels never clip. The slim row drops the icons onto

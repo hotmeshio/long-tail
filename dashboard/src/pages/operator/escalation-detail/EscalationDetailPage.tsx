@@ -245,31 +245,45 @@ export function EscalationDetailPage() {
           // Full-bleed iframe mode: no header, no padding, -ml-10 cancels shell's pl-10.
           // Release, Cancel, and panel toggle float at top-right over the iframe.
           <div className="relative flex-1 min-h-0 -ml-10">
-            <div className="absolute top-3 right-3 z-50 flex items-center gap-1">
-              <button
-                onClick={handleRelease}
-                disabled={claim.isPending}
-                className="text-text-tertiary hover:text-accent transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
-                title="Release claim"
-              >
-                <RotateCcw className="w-4 h-4" strokeWidth={1.5} />
-              </button>
-              <button
-                onClick={() => setCancelModalOpen(true)}
-                className="text-text-tertiary hover:text-status-error transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
-                title="Cancel escalation"
-              >
-                <X className="w-4 h-4" strokeWidth={1.5} />
-              </button>
-              <button
-                onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}
-                className="text-text-tertiary hover:text-accent transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
-                title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
-              >
-                {sidePanelOpen
-                  ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
-                  : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
-              </button>
+            <div className="absolute top-3 right-3 z-50 flex items-center gap-0.5 bg-surface-base/90 backdrop-blur-sm rounded-lg px-1.5 py-1 shadow-sm border border-surface-border/40">
+              {[
+                {
+                  onClick: handleRelease,
+                  disabled: claim.isPending,
+                  label: 'Release',
+                  hoverClass: 'hover:text-accent',
+                  icon: <RotateCcw className="w-4 h-4" strokeWidth={1.5} />,
+                },
+                {
+                  onClick: () => setCancelModalOpen(true),
+                  disabled: false,
+                  label: 'Cancel',
+                  hoverClass: 'hover:text-status-error',
+                  icon: <X className="w-4 h-4" strokeWidth={1.5} />,
+                },
+                {
+                  onClick: () => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; }),
+                  disabled: false,
+                  label: sidePanelOpen ? 'Hide panel' : 'Show panel',
+                  hoverClass: 'hover:text-accent',
+                  icon: sidePanelOpen
+                    ? <PanelRightClose className="w-4 h-4" strokeWidth={1.5} />
+                    : <PanelRightOpen className="w-4 h-4" strokeWidth={1.5} />,
+                },
+              ].map(({ onClick, disabled, label, hoverClass, icon }) => (
+                <div key={label} className="relative group/tip">
+                  <button
+                    onClick={onClick}
+                    disabled={disabled}
+                    className={`text-text-tertiary ${hoverClass} transition-colors disabled:opacity-40 disabled:cursor-default p-1.5 rounded-md`}
+                  >
+                    {icon}
+                  </button>
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 rounded text-[11px] bg-surface-sunken text-text-primary whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity">
+                    {label}
+                  </span>
+                </div>
+              ))}
             </div>
             <IframeViewport
               src={expandViewportSrc(iframeViewport!.src!, esc)}
@@ -369,6 +383,7 @@ export function EscalationDetailPage() {
         isBuilder={isBuilder}
         traceUrl={traceUrl}
         open={sidePanelOpen}
+        noGutter={isIframeMode}
       />
 
       <ConfirmCancelModal
