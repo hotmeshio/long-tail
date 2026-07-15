@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { useSettings } from '../../api/settings';
+import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
 import { ChoreographySidebar } from './ChoreographySidebar';
@@ -18,9 +19,10 @@ import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 
 function ShellLayout() {
-  const { isBuilder, isOps } = useAccess();
+  const { isBuilder, isOps, viewAs } = useAccess();
   const { data: settings } = useSettings();
-  const aiEnabled = !!settings?.ai?.enabled;
+  const aiOverride = getAiOverride();
+  const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
   const [feedConfigOpen, setFeedConfigOpen] = useState(false);
@@ -61,7 +63,7 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} />
+            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} />
             {isBuilder && <OrchestrationSidebar />}
             {isBuilder && aiEnabled && <DesignSidebar />}
             {isBuilder && <StorageSidebar />}

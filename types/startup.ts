@@ -237,6 +237,15 @@ export interface LTStartConfig {
     dbMaintenance?: boolean;
   };
 
+  /**
+   * White-label branding. The `appName` replaces "LongTail" in the dashboard
+   * header. Defaults to "LongTail" when omitted.
+   */
+  branding?: {
+    /** Product name shown in the dashboard header. Default: "LongTail". */
+    appName?: string;
+  };
+
   /** Authentication. Defaults to the built-in JWT adapter using JWT_SECRET. */
   auth?: {
     /** JWT secret for the built-in adapter. */

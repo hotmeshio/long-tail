@@ -29,6 +29,9 @@ GET /api/settings
   },
   "ai": {
     "enabled": true
+  },
+  "branding": {
+    "appName": "LongTail"
   }
 }
 ```
@@ -43,3 +46,4 @@ GET /api/settings
 | `auth.sso` | `boolean` | Whether SSO is configured for embedded deployments. When `true`, the dashboard auto-exchanges host auth for an LT JWT instead of showing the login form. |
 | `auth.ssoLogoutUrl` | `string \| null` | URL to redirect the browser on logout. Set by the host via `sso.logoutUrl` in the startup config. When `null`, the dashboard shows its own login page on logout. |
 | `ai.enabled` | `boolean` | Whether an LLM API key is configured. When `false`, the dashboard hides AI-specific features (pipelines designer, AI assistant, triage). |
+| `branding.appName` | `string` | The product name shown in the dashboard header. Configured via `branding.appName` in the startup config; defaults to `"LongTail"`. |

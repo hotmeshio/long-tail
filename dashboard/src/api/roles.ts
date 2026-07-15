@@ -238,6 +238,23 @@ export function useUpdateRole() {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
+    onMutate: async ({ role, ...input }) => {
+      await queryClient.cancelQueries({ queryKey: ['roles', 'details'] });
+      const previous = queryClient.getQueryData<{ roles: RoleDetail[] }>(['roles', 'details']);
+      if (previous) {
+        queryClient.setQueryData<{ roles: RoleDetail[] }>(['roles', 'details'], {
+          roles: previous.roles.map((r) =>
+            r.role === role ? { ...r, ...(input as Partial<RoleDetail>) } : r,
+          ),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['roles', 'details'], context.previous);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     },

@@ -20,6 +20,8 @@ interface PaceChartProps {
   onUpstreamSelect?: (upstreamRole: string) => void;
   /** Priority-badge click — open the station's queue oldest-first by its age facet. */
   onPrioritySelect?: (role: string) => void;
+  /** Cmd/meta+click on a resolved dot — navigate to the role's full queue. */
+  onCmdClick?: (role: string) => void;
   /** Selected window length in hours — target count = target_per_hour × this. */
   periodHours: number;
 }
@@ -99,10 +101,10 @@ function last<T>(a: T[]): T | undefined {
 
 // Shared queue-state palette — the chart bands and the station table columns
 // use the same hues so the two views read as one.
-export const ACTIVE_COLOR = '#6366f1';   // claimed, being worked right now — indigo
+export const ACTIVE_COLOR = '#f97316';   // claimed, being worked right now — orange
 export const QUEUED_COLOR = '#0ea5e9';   // pending and unclaimed, waiting in the queue — sky
-export const RESOLVED_COLOR = '#1E3A8A'; // done — navy, matches the default theme accent
-export const TARGET_COLOR = '#059669';   // target pace line — emerald
+export const RESOLVED_COLOR = '#16a34a'; // done — green
+export const TARGET_COLOR = '#94a3b8';   // target pace line — slate gray
 
 // Priority — unclaimed items past the role's age threshold, the count the
 // floor pulls to the front of the rack. Powder blue for the badge circle;
@@ -133,7 +135,7 @@ function spreadLabels<T extends { y: number }>(labels: T[], maxY: number): (T & 
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
-export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onPrioritySelect, periodHours }: PaceChartProps) {
+export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onPrioritySelect, onCmdClick, periodHours }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const n = stations.length;
@@ -246,9 +248,9 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         <path d={queuedBandPath} fill={QUEUED_COLOR} opacity={0.12} style={{ transition: `d ${EASE}` }} />
       )}
 
-      {/* Target — thin emerald reference curve at the window's expected count */}
+      {/* Target — dashed reference curve at the window's expected count */}
       {targetLinePath && (
-        <path d={targetLinePath} fill="none" stroke={TARGET_COLOR} strokeWidth={0.5} strokeLinejoin="round" opacity={0.9} style={{ transition: `d ${EASE}` }} />
+        <path d={targetLinePath} fill="none" stroke={TARGET_COLOR} strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.7} style={{ transition: `d ${EASE}` }} />
       )}
 
       {/* Per-station target markers — a small emerald dot on the target line
@@ -351,7 +353,14 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         return (
           <g
             key={s.role}
-            onClick={() => onSelect(s.role)}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) {
+                e.stopPropagation();
+                onCmdClick?.(s.role);
+              } else {
+                onSelect(s.role);
+              }
+            }}
             onMouseEnter={() => setHoveredIdx(row.idx)}
             onMouseLeave={() => setHoveredIdx(null)}
             style={{ cursor: 'pointer' }}

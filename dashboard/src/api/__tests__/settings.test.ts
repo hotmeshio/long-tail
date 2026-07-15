@@ -78,4 +78,19 @@ describe('useSettings AI override integration', () => {
     };
     expect(settings.ai).toBeUndefined();
   });
+
+  it('AppSettings type accepts branding.appName', async () => {
+    const settings: import('../settings').AppSettings = {
+      telemetry: { traceUrl: null },
+      branding: { appName: 'Acme' },
+    };
+    expect(settings.branding?.appName).toBe('Acme');
+  });
+
+  it('AppSettings type allows branding to be undefined', async () => {
+    const settings: import('../settings').AppSettings = {
+      telemetry: { traceUrl: null },
+    };
+    expect(settings.branding).toBeUndefined();
+  });
 });

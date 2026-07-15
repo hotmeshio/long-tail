@@ -2,7 +2,7 @@
  * Pluggable accent theme. One of four hues; the palette itself lives in
  * src/styles/globals.css as CSS variables keyed by data-theme on <html>.
  */
-export const THEMES = ['violet', 'red', 'green', 'blue', 'rose'] as const;
+export const THEMES = ['violet', 'red', 'green', 'blue', 'rose', 'orange'] as const;
 export type Theme = (typeof THEMES)[number];
 
 export const DEFAULT_THEME: Theme = 'blue';
@@ -12,16 +12,18 @@ export const THEME_SWATCHES: Record<Theme, string> = {
   violet: '#7B3BE0',
   red: '#DC382D',
   green: '#059669',
-  blue: '#1E3A8A',
+  blue: '#2563EB',
   rose: '#D6246E',
+  orange: '#E85D04',
 };
 
 export const THEME_LABELS: Record<Theme, string> = {
   violet: 'Violet',
   red: 'Brick',
   green: 'Emerald',
-  blue: 'Navy',
+  blue: 'Electric',
   rose: 'Raspberry',
+  orange: 'Harvest',
 };
 
 const STORAGE_KEY = 'lt.theme';

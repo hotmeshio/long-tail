@@ -14,6 +14,7 @@ import { escalationStrategyRegistry } from '../services/escalation-strategy';
 import { DefaultEscalationStrategy } from '../services/escalation-strategy/default';
 import { McpEscalationStrategy } from '../services/escalation-strategy/mcp';
 import { configureFeatureFlags } from '../modules/features';
+import { configureBranding } from '../modules/branding';
 
 import { createSocketIOAuthenticator } from './socket-auth';
 import type { LTStartConfig } from '../types/startup';
@@ -25,6 +26,7 @@ import type { LTStartConfig } from '../types/startup';
 export function registerAdapters(startConfig: LTStartConfig): void {
   // Dashboard feature flags (default permissive; deployment opts out).
   configureFeatureFlags(startConfig.features);
+  configureBranding(startConfig.branding);
 
   // Logging (register first so subsequent log calls use it)
   if (startConfig.logging?.adapter) {

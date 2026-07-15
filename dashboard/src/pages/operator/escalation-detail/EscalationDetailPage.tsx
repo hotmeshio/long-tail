@@ -245,7 +245,7 @@ export function EscalationDetailPage() {
           // Full-bleed iframe mode: no header, no padding, -ml-10 cancels shell's pl-10.
           // Release, Cancel, and panel toggle float at top-right over the iframe.
           <div className="relative flex-1 min-h-0 -ml-10">
-            <div className="absolute top-3 right-3 z-50 flex items-center gap-0.5 bg-surface-base/90 backdrop-blur-sm rounded-lg px-1.5 py-1 shadow-sm border border-surface-border/40">
+            <div className="absolute top-3 right-3 z-50 flex items-center gap-0.5 bg-surface/90 backdrop-blur-sm rounded-lg px-1.5 py-1 shadow-sm border border-surface-border/40">
               {[
                 {
                   onClick: handleRelease,
