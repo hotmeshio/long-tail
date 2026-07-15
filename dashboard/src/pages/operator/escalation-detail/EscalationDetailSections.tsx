@@ -109,6 +109,7 @@ interface FormSectionProps {
   onTriageNotesChange: (v: string) => void;
   onResolve?: (payload: Record<string, unknown>) => void;
   onEscalate?: (targetRole: string) => void;
+  onClaim?: () => void;
   submitAttempted?: boolean;
   isCertified?: boolean;
   hasAI?: boolean;
@@ -136,6 +137,7 @@ export function EscalationFormSection({
   onTriageNotesChange,
   onResolve,
   onEscalate,
+  onClaim,
   submitAttempted,
   isCertified,
   hasAI,
@@ -173,13 +175,17 @@ export function EscalationFormSection({
 
   if (isIframeViewport && !claimedByMe) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[55vh] gap-3 text-center">
-        <MonitorPlay className="w-10 h-10 text-text-tertiary" strokeWidth={1} />
-        <p className="text-base font-medium text-text-primary">Claim to launch the editor</p>
+      <button
+        onClick={() => onClaim?.()}
+        disabled={!onClaim}
+        className="flex flex-col items-center justify-center min-h-[55vh] w-full gap-3 text-center group disabled:opacity-50 disabled:cursor-default"
+      >
+        <MonitorPlay className="w-10 h-10 text-text-tertiary group-hover:text-accent transition-colors" strokeWidth={1} />
+        <p className="text-base font-medium text-text-primary group-hover:text-accent transition-colors">Claim to launch the editor</p>
         <p className="text-sm text-text-secondary max-w-xs leading-relaxed">
-          This task uses an embedded design tool. Claim it to open the editor here in full screen.
+          Click to claim this task and open the embedded editor.
         </p>
-      </div>
+      </button>
     );
   }
 

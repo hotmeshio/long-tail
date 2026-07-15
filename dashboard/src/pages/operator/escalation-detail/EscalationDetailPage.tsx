@@ -19,7 +19,7 @@ import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
 import { EscalationSidePanel } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
@@ -242,17 +242,35 @@ export function EscalationDetailPage() {
     <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-10 -mr-10 -mb-16">
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         {isIframeMode ? (
-          // Full-bleed iframe mode: no header, no padding, panel toggle floats
-          <div className="relative flex-1 min-h-0">
-            <button
-              onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}
-              className="absolute top-3 right-3 z-50 text-text-tertiary hover:text-accent transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
-              title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
-            >
-              {sidePanelOpen
-                ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
-                : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
-            </button>
+          // Full-bleed iframe mode: no header, no padding, -ml-10 cancels shell's pl-10.
+          // Release, Cancel, and panel toggle float at top-right over the iframe.
+          <div className="relative flex-1 min-h-0 -ml-10">
+            <div className="absolute top-3 right-3 z-50 flex items-center gap-1">
+              <button
+                onClick={handleRelease}
+                disabled={claim.isPending}
+                className="text-text-tertiary hover:text-accent transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
+                title="Release claim"
+              >
+                <RotateCcw className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => setCancelModalOpen(true)}
+                className="text-text-tertiary hover:text-status-error transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
+                title="Cancel escalation"
+              >
+                <X className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}
+                className="text-text-tertiary hover:text-accent transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
+                title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+              >
+                {sidePanelOpen
+                  ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
+                  : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
+              </button>
+            </div>
             <IframeViewport
               src={expandViewportSrc(iframeViewport!.src!, esc)}
               escalation={esc}
@@ -299,6 +317,7 @@ export function EscalationDetailPage() {
                 onTriageNotesChange={setTriageNotes}
                 onResolve={handleResolve}
                 onEscalate={handleEscalate}
+                onClaim={() => handleClaim(30)}
                 submitAttempted={submitAttempted}
                 isCertified={isCertified}
                 hasAI={hasAI}
@@ -309,7 +328,7 @@ export function EscalationDetailPage() {
           </>
         )}
 
-        <EscalationActionBar
+        {!isIframeMode && <EscalationActionBar
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}
@@ -333,7 +352,7 @@ export function EscalationDetailPage() {
           assignedTo={esc.assigned_to}
           assignedUntil={esc.assigned_until}
           onSubmitAttempt={() => setSubmitAttempted(true)}
-        />
+        />}
       </div>
 
       <EscalationSidePanel
