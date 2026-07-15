@@ -60,6 +60,9 @@ services:
       - OAUTH_MOCK_CLIENT_ID=${OAUTH_MOCK_CLIENT_ID:-mock-client}
       - OAUTH_MOCK_CLIENT_SECRET=${OAUTH_MOCK_CLIENT_SECRET:-mock-secret}
       - MOCK_OAUTH_BROWSER_AUTH_URL=http://localhost:9080/authorize
+      - WORKBENCH_BASE_URL=${WORKBENCH_BASE_URL:-http://localhost:3016}
+      - WORKBENCH_ID=${WORKBENCH_ID:-}
+      - COMPANY_ID=${COMPANY_ID:-}
       - MOCK_OAUTH_TOKEN_URL=http://mock-oauth:9080/token
       - MOCK_OAUTH_USERINFO_URL=http://mock-oauth:9080/userinfo
     depends_on:

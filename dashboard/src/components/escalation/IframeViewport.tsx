@@ -18,7 +18,14 @@ type ChildMessage =
   | { type: 'lt:escalate'; target: string }
   | { type: 'lt:resize'; height: number };
 
-/** Safe subset of escalation data exposed to the iframe (no envelope). */
+/**
+ * Escalation context delivered to the iframe via `lt:init`. Includes the
+ * full envelope and metadata so the embedded app has all the context it
+ * needs to load the right session and submit a meaningful payload back.
+ *
+ * The iframe is origin-validated before any message is sent, so secrets in
+ * the envelope only travel to the declared src origin.
+ */
 interface IframeEscalationData {
   id: string;
   type: string;
@@ -28,6 +35,9 @@ interface IframeEscalationData {
   priority: number;
   role: string;
   workflow_type: string | null;
+  envelope: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  escalation_payload: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,17 +53,27 @@ interface IframeViewportProps {
   submitAttempted?: boolean;
 }
 
+function safeParse(s: string | null | undefined): Record<string, unknown> | null {
+  if (!s) return null;
+  try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
+}
+
 /**
  * Renders a sandboxed iframe for fully custom HITL UIs.
  *
- * The iframe communicates with the parent via postMessage:
- * - Parent → iframe: `lt:init` (escalation data + schema), `lt:validate`
- * - Iframe → parent: `lt:submit`, `lt:escalate`, `lt:resize`
+ * Protocol — parent → iframe:
+ *   `lt:init`         escalation context (id, envelope, metadata, payload) + schema
+ *   `lt:requestSubmit` ask the iframe to trigger its own submit flow
+ *   `lt:validate`     ask the iframe to report validation errors
  *
- * Security:
- * - `sandbox` restricts iframe capabilities
- * - Origin validation on incoming messages
- * - Envelope data is NOT sent to the iframe (may contain secrets)
+ * Protocol — iframe → parent:
+ *   `lt:ready`    iframe loaded, ready to receive `lt:init`
+ *   `lt:submit`   work complete; payload becomes the resolver payload
+ *   `lt:escalate` re-route to a different role
+ *   `lt:resize`   resize the iframe height
+ *
+ * The iframe can detect it is embedded via `window !== window.top` and
+ * opt in to postMessage communication instead of its own submit UX.
  */
 export function IframeViewport({ src, escalation, schema, onResolve, onEscalate, submitAttempted }: IframeViewportProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -73,7 +93,7 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow || !iframeOrigin.current) return;
 
-    const safeData: IframeEscalationData = {
+    const data: IframeEscalationData = {
       id: escalation.id,
       type: escalation.type,
       subtype: escalation.subtype,
@@ -82,21 +102,18 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
       priority: escalation.priority,
       role: escalation.role,
       workflow_type: escalation.workflow_type,
+      envelope: safeParse(escalation.envelope),
+      metadata: escalation.metadata ?? null,
+      escalation_payload: safeParse(escalation.escalation_payload),
     };
 
-    const message: ParentMessage = {
-      type: 'lt:init',
-      escalation: safeData,
-      schema,
-    };
-
+    const message: ParentMessage = { type: 'lt:init', escalation: data, schema };
     iframe.contentWindow.postMessage(message, iframeOrigin.current);
   }, [escalation, schema]);
 
   // Listen for messages from the iframe
   useEffect(() => {
     const handler = (event: MessageEvent) => {
-      // Origin validation
       if (event.origin !== iframeOrigin.current) return;
 
       const data = event.data as ChildMessage;
@@ -130,7 +147,7 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
     return () => window.removeEventListener('message', handler);
   }, [sendInit, onResolve, onEscalate]);
 
-  // Send lt:validate to iframe when parent triggers submit validation
+  // Forward lt:validate to iframe when the action bar triggers a submit attempt
   useEffect(() => {
     if (!submitAttempted) return;
     const iframe = iframeRef.current;
@@ -144,9 +161,9 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
       <iframe
         ref={iframeRef}
         src={src}
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-downloads"
         className="w-full border-0"
-        style={{ minHeight: '400px' }}
+        style={{ minHeight: '600px' }}
         title="HITL Viewport"
         onLoad={sendInit}
       />
