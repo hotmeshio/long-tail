@@ -23,7 +23,8 @@ import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { EscalationSidePanel } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
-import { EscalationContextBlocks, EscalationFormSection } from './EscalationDetailSections';
+import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc } from './EscalationDetailSections';
+import { IframeViewport } from '../../../components/escalation/IframeViewport';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -145,6 +146,9 @@ export function EscalationDetailPage() {
   const claimedByOther = claimed && !claimedByMe;
   const isTerminal = esc.status === 'resolved' || esc.status === 'cancelled';
 
+  const iframeViewport = (effectiveSchema as any)?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
+  const isIframeMode = iframeViewport?.type === 'iframe' && !!iframeViewport?.src && claimedByMe && !isTerminal;
+
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
   const envelopeObj = safeParse(esc.envelope) as Record<string, any> | null;
@@ -237,47 +241,73 @@ export function EscalationDetailPage() {
     // right); the left column re-adds those gutters for its own content.
     <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-10 -mr-10 -mb-16">
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        {/* The description IS the title — the page opens with what to do. It
-            shares the row with the toolbar and panel toggle, truncating to
-            make room. */}
-        <div className="shrink-0 pt-10 pr-10">
-          <PageHeader title={esc.description || 'Escalation'} actions={headerActions} />
-        </div>
+        {isIframeMode ? (
+          // Full-bleed iframe mode: no header, no padding, panel toggle floats
+          <div className="relative flex-1 min-h-0">
+            <button
+              onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}
+              className="absolute top-3 right-3 z-50 text-text-tertiary hover:text-accent transition-colors bg-surface-base/80 backdrop-blur-sm rounded p-1.5"
+              title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+            >
+              {sidePanelOpen
+                ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
+                : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
+            </button>
+            <IframeViewport
+              src={expandViewportSrc(iframeViewport!.src!, esc)}
+              escalation={esc}
+              schema={effectiveSchema!}
+              onResolve={handleResolve}
+              onEscalate={handleEscalate}
+              submitAttempted={submitAttempted}
+              fill
+            />
+          </div>
+        ) : (
+          <>
+            {/* The description IS the title — the page opens with what to do. It
+                shares the row with the toolbar and panel toggle, truncating to
+                make room. */}
+            <div className="shrink-0 pt-10 pr-10">
+              <PageHeader title={esc.description || 'Escalation'} actions={headerActions} />
+            </div>
 
-        {/* Independently scrolling form column */}
-        <div className="flex-1 min-h-0 overflow-y-auto pr-10">
-          <EscalationContextBlocks
-            isRoundsExhausted={isRoundsExhausted}
-            payloadObj={payloadObj}
-            isTerminal={isTerminal}
-            resolverPayload={resolverPayload as Record<string, unknown> | null}
-            onRetryTriage={handleRetryTriage}
-            isRetrying={claim.isPending || resolve.isPending}
-          />
+            {/* Independently scrolling form column */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-10">
+              <EscalationContextBlocks
+                isRoundsExhausted={isRoundsExhausted}
+                payloadObj={payloadObj}
+                isTerminal={isTerminal}
+                resolverPayload={resolverPayload as Record<string, unknown> | null}
+                onRetryTriage={handleRetryTriage}
+                isRetrying={claim.isPending || resolve.isPending}
+              />
 
-          <EscalationFormSection
-            esc={esc}
-            resolverPayload={resolverPayload}
-            isTerminal={isTerminal}
-            claimedByMe={claimedByMe}
-            activeView={activeView}
-            metadataFormSchema={metadataFormSchema}
-            effectiveSchema={effectiveSchema as Record<string, unknown> | null}
-            json={json}
-            onJsonChange={setJson}
-            requestTriage={requestTriage}
-            onRequestTriageChange={setRequestTriage}
-            triageNotes={triageNotes}
-            onTriageNotesChange={setTriageNotes}
-            onResolve={handleResolve}
-            onEscalate={handleEscalate}
-            submitAttempted={submitAttempted}
-            isCertified={isCertified}
-            hasAI={hasAI}
-          />
+              <EscalationFormSection
+                esc={esc}
+                resolverPayload={resolverPayload}
+                isTerminal={isTerminal}
+                claimedByMe={claimedByMe}
+                activeView={activeView}
+                metadataFormSchema={metadataFormSchema}
+                effectiveSchema={effectiveSchema as Record<string, unknown> | null}
+                json={json}
+                onJsonChange={setJson}
+                requestTriage={requestTriage}
+                onRequestTriageChange={setRequestTriage}
+                triageNotes={triageNotes}
+                onTriageNotesChange={setTriageNotes}
+                onResolve={handleResolve}
+                onEscalate={handleEscalate}
+                submitAttempted={submitAttempted}
+                isCertified={isCertified}
+                hasAI={hasAI}
+              />
 
-          <div className="h-10" />
-        </div>
+              <div className="h-10" />
+            </div>
+          </>
+        )}
 
         <EscalationActionBar
           mode={actionBarMode}

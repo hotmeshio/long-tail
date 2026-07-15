@@ -51,6 +51,8 @@ interface IframeViewportProps {
   onResolve: (payload: Record<string, unknown>) => void;
   onEscalate: (targetRole: string) => void;
   submitAttempted?: boolean;
+  /** Fill the parent container edge-to-edge (absolute inset-0). Used for full-bleed iframe mode. */
+  fill?: boolean;
 }
 
 function safeParse(s: string | null | undefined): Record<string, unknown> | null {
@@ -75,7 +77,7 @@ function safeParse(s: string | null | undefined): Record<string, unknown> | null
  * The iframe can detect it is embedded via `window !== window.top` and
  * opt in to postMessage communication instead of its own submit UX.
  */
-export function IframeViewport({ src, escalation, schema, onResolve, onEscalate, submitAttempted }: IframeViewportProps) {
+export function IframeViewport({ src, escalation, schema, onResolve, onEscalate, submitAttempted, fill }: IframeViewportProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const iframeOrigin = useRef<string>('');
 
@@ -155,6 +157,21 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
       iframe.contentWindow.postMessage({ type: 'lt:validate' } as ParentMessage, iframeOrigin.current);
     }
   }, [submitAttempted]);
+
+  if (fill) {
+    return (
+      <div className="absolute inset-0 overflow-hidden">
+        <iframe
+          ref={iframeRef}
+          src={src}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-downloads"
+          className="w-full h-full border-0 block"
+          title="HITL Viewport"
+          onLoad={sendInit}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-surface-border overflow-hidden bg-white">

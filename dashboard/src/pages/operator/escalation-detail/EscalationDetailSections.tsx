@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, MonitorPlay } from 'lucide-react';
 import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ResolverForm } from '../../../components/escalation/ResolverForm';
@@ -16,7 +16,7 @@ import type { LTEscalationRecord } from '../../../api/types';
  * This mirrors how the existing form schemas map envelope/metadata values into
  * default field values, but applied to the iframe src URL.
  */
-function expandViewportSrc(src: string, esc: LTEscalationRecord): string {
+export function expandViewportSrc(src: string, esc: LTEscalationRecord): string {
   if (!src.includes('{')) return src;
   try {
     const parse = (s: string | null | undefined): Record<string, unknown> => {
@@ -173,8 +173,12 @@ export function EscalationFormSection({
 
   if (isIframeViewport && !claimedByMe) {
     return (
-      <div className="mt-8 pt-6">
-        <p className="text-sm text-text-secondary">Claim this item to open the embedded editor.</p>
+      <div className="flex flex-col items-center justify-center min-h-[55vh] gap-3 text-center">
+        <MonitorPlay className="w-10 h-10 text-text-tertiary" strokeWidth={1} />
+        <p className="text-base font-medium text-text-primary">Claim to launch the editor</p>
+        <p className="text-sm text-text-secondary max-w-xs leading-relaxed">
+          This task uses an embedded design tool. Claim it to open the editor here in full screen.
+        </p>
       </div>
     );
   }
