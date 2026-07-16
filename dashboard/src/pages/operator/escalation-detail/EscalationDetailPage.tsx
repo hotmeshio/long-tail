@@ -18,6 +18,7 @@ import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
+import { getAiOverride } from '../../../lib/view-as';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
 import { EscalationSidePanel } from '../../../components/escalation/EscalationSidePanel';
@@ -153,7 +154,8 @@ export function EscalationDetailPage() {
   const resolverPayload = safeParse(esc.resolver_payload);
   const envelopeObj = safeParse(esc.envelope) as Record<string, any> | null;
   const isCertified = !!(envelopeObj?.metadata?.certified);
-  const hasAI = !!(settings as any)?.ai?.enabled;
+  const aiOverride = getAiOverride();
+  const hasAI = aiOverride !== null ? aiOverride : !!(settings as any)?.ai?.enabled;
 
   const payloadObj = (typeof escalationPayload === 'object' && escalationPayload !== null && !Array.isArray(escalationPayload))
     ? escalationPayload as Record<string, unknown>

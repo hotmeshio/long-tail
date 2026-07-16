@@ -53,8 +53,8 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
           ? JSON.stringify(value)
           : String(value);
         const facets = encodeURIComponent(JSON.stringify({ [key]: displayValue }));
-        const roleUrl = `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}`;
-        const globalUrl = `/escalations/available?facets=${facets}`;
+        const roleUrl = `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`;
+        const globalUrl = `/escalations/available?facets=${facets}&status=all`;
         return (
           <div key={key} className="group relative">
             <dt className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">

@@ -182,9 +182,6 @@ export function EscalationFormSection({
       >
         <MonitorPlay className="w-10 h-10 text-text-tertiary group-hover:text-accent transition-colors" strokeWidth={1} />
         <p className="text-base font-medium text-text-primary group-hover:text-accent transition-colors">Claim to launch the editor</p>
-        <p className="text-sm text-text-secondary max-w-xs leading-relaxed">
-          Click to claim this task and open the embedded editor.
-        </p>
       </button>
     );
   }
