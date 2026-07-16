@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, MonitorPlay } from 'lucide-react';
 import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ResolverForm } from '../../../components/escalation/ResolverForm';
@@ -7,6 +7,34 @@ import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
 import type { LTEscalationRecord } from '../../../api/types';
+
+/**
+ * Expands `{key}` tokens in a viewport src URL using values from the
+ * escalation's payload, envelope, and metadata — merged in that order so
+ * escalation_payload values win over envelope, and envelope wins over metadata.
+ *
+ * This mirrors how the existing form schemas map envelope/metadata values into
+ * default field values, but applied to the iframe src URL.
+ */
+export function expandViewportSrc(src: string, esc: LTEscalationRecord): string {
+  if (!src.includes('{')) return src;
+  try {
+    const parse = (s: string | null | undefined): Record<string, unknown> => {
+      if (!s) return {};
+      try { return JSON.parse(s) as Record<string, unknown>; } catch { return {}; }
+    };
+    const merged = {
+      ...parse(esc.metadata as any),
+      ...parse(esc.envelope),
+      ...parse(esc.escalation_payload),
+    };
+    return src.replace(/\{([^}]+)\}/g, (_, key) =>
+      Object.prototype.hasOwnProperty.call(merged, key) ? String(merged[key]) : `{${key}}`
+    );
+  } catch {
+    return src;
+  }
+}
 
 interface EscalationContextProps {
   isRoundsExhausted: boolean;
@@ -81,6 +109,7 @@ interface FormSectionProps {
   onTriageNotesChange: (v: string) => void;
   onResolve?: (payload: Record<string, unknown>) => void;
   onEscalate?: (targetRole: string) => void;
+  onClaim?: () => void;
   submitAttempted?: boolean;
   isCertified?: boolean;
   hasAI?: boolean;
@@ -108,11 +137,12 @@ export function EscalationFormSection({
   onTriageNotesChange,
   onResolve,
   onEscalate,
+  onClaim,
   submitAttempted,
   isCertified,
   hasAI,
 }: FormSectionProps) {
-  const schema = metadataFormSchema as Record<string, unknown> | null;
+  const schema = effectiveSchema;
 
   // Terminal: show the submitted resolution read-only. The stored payload is
   // the NESTED shape (mapped through x-lt-bind on submit) — reverse-map it
@@ -123,7 +153,7 @@ export function EscalationFormSection({
     const payload = typeof resolverPayload === 'object' && resolverPayload !== null
       ? resolverPayload as Record<string, unknown>
       : {};
-    const formSchema = (effectiveSchema ?? schema) as Record<string, any> | null;
+    const formSchema = (effectiveSchema ?? (metadataFormSchema as Record<string, any> | null));
     const value = formSchema?.properties
       ? { ...mapPayloadToForm(payload, formSchema), _form_schema: formSchema }
       : payload;
@@ -138,20 +168,36 @@ export function EscalationFormSection({
     );
   }
 
-  if (activeView !== 'resolve' || !(esc.workflow_type || metadataFormSchema)) return null;
+  if (activeView !== 'resolve' || !(esc.workflow_type || effectiveSchema)) return null;
 
   const viewport = schema?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
   const isIframeViewport = viewport?.type === 'iframe' && !!viewport.src && onResolve && onEscalate;
+
+  if (isIframeViewport && !claimedByMe) {
+    return (
+      <button
+        onClick={() => onClaim?.()}
+        disabled={!onClaim}
+        className="flex flex-col items-center justify-center min-h-[55vh] w-full gap-3 text-center group disabled:opacity-50 disabled:cursor-default"
+      >
+        <MonitorPlay className="w-10 h-10 text-text-tertiary group-hover:text-accent transition-colors" strokeWidth={1} />
+        <p className="text-base font-medium text-text-primary group-hover:text-accent transition-colors">Claim to launch the editor</p>
+      </button>
+    );
+  }
+
+  const resolvedSrc = isIframeViewport ? expandViewportSrc(viewport!.src!, esc) : '';
 
   return (
     <div className="mt-8 pt-6">
       {isIframeViewport ? (
         <IframeViewport
-          src={viewport!.src!}
+          src={resolvedSrc}
           escalation={esc}
           schema={schema!}
           onResolve={onResolve!}
           onEscalate={onEscalate!}
+          submitAttempted={submitAttempted}
         />
       ) : (
         <ResolverSection

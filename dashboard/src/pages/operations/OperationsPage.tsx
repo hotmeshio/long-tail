@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { GitMerge, RefreshCw, List } from 'lucide-react';
-import { useRoleDetails, type RoleDetail } from '../../api/roles';
+import { GitMerge, RefreshCw, Eye } from 'lucide-react';
+import { useRoleDetails, useUpdateRole, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
 import { useStationMetricsEvents } from '../../hooks/useEventHooks';
@@ -20,17 +20,18 @@ import { StationDetailPanel } from './StationDetailPanel';
 import { priorityQueueLink } from './priority-link';
 import { displayRoleTitle } from '../../lib/role-display';
 
-// Column band tints — the same hues as the chart's queue-composition bands
-// (~8% alpha), so PENDING/ACTIVE/RESOLVED in the table visually continue the
-// sky/indigo/sage story told above.
-const TARGET_BAND = `${TARGET_COLOR}14`;
-const PENDING_BAND = `${QUEUED_COLOR}14`;
-const ACTIVE_BAND = `${ACTIVE_COLOR}14`;
+// Column band tints — same hues as the chart bands (~8% alpha).
+// Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, sla=amber.
+const SLA_COLOR  = TARGET_COLOR;
+const TARGET_BAND   = `${TARGET_COLOR}18`;
+const SLA_BAND      = `${TARGET_COLOR}18`;
+const PENDING_BAND  = `${QUEUED_COLOR}14`;
+const ACTIVE_BAND   = `${ACTIVE_COLOR}14`;
 const RESOLVED_BAND = `${RESOLVED_COLOR}14`;
 
-// Station table grid — shared by the header and every row. The display name
-// leads (user-set title or derived from the id); the exact role id follows.
-const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) 64px 56px 56px 60px 72px 72px 104px 36px';
+// Station table grid. The 5 colored columns are grouped into a single auto
+// cell rendered as a flex row with no internal gap so they touch each other.
+const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) auto 72px 72px 104px 36px';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -123,6 +124,37 @@ function loadBar(pending: number, target: number | null) {
   return { pct, color };
 }
 
+// ── Editable numeric cell ─────────────────────────────────────────────────────
+
+function EditableNumber({ value, onSave }: { value: number | null; onSave: (n: number | null) => void }) {
+  const [local, setLocal] = useState(value != null ? String(value) : '');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const commit = (val: string) => {
+    const n = parseInt(val, 10);
+    onSave(!val.trim() || isNaN(n) || n < 0 ? null : n);
+  };
+
+  return (
+    <input
+      type="number"
+      min={0}
+      step={1}
+      value={local}
+      onChange={(e) => {
+        const val = e.target.value;
+        setLocal(val);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => commit(val), 400);
+      }}
+      onBlur={(e) => { clearTimeout(timer.current); commit(e.target.value); }}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      className="w-full bg-transparent text-xs font-mono tabular-nums text-right focus:outline-none"
+    />
+  );
+}
+
 // ── Station table row ─────────────────────────────────────────────────────────
 
 function StationRow({
@@ -136,6 +168,7 @@ function StationRow({
   selected: boolean;
   onClick: () => void;
 }) {
+  const updateRole = useUpdateRole();
   const pending = metric?.pending ?? 0;
   const claimed = metric?.claimed ?? 0;
   const resolved = metric?.resolved ?? 0;
@@ -143,6 +176,9 @@ function StationRow({
   const target = role.target_per_hour ?? null;
   const { pct, color } = loadBar(pending, target);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
+
+  const saveTarget = (n: number | null) => updateRole.mutate({ role: role.role, target_per_hour: n });
+  const saveSla    = (n: number | null) => updateRole.mutate({ role: role.role, sla_minutes: n });
 
   return (
     <>
@@ -168,69 +204,59 @@ function StationRow({
           )}
         </div>
 
-        {/* Role id — the exact format */}
+        {/* Role id */}
         <span className="font-mono text-[11px] text-text-tertiary truncate py-1.5">
           {role.role}
         </span>
 
-        {/* Target / hour — emerald band, same hue as the chart's target line */}
-        <div
-          className="self-stretch flex items-center justify-end px-1.5"
-          style={{ backgroundColor: TARGET_BAND }}
-        >
-          <span
-            className={`text-xs font-mono tabular-nums ${
-              target != null ? 'text-text-secondary' : 'text-text-quaternary'
-            }`}
-          >
-            {target != null ? target : '—'}
-          </span>
-        </div>
-
-        {/* Pending — sky band, same hue as the chart's waiting band */}
-        <div
-          className="self-stretch flex items-center justify-end px-1.5"
-          style={{ backgroundColor: PENDING_BAND }}
-        >
-          <Link
-            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
-            className={`text-xs font-mono tabular-nums hover:underline ${
-              pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {pending}
-          </Link>
-        </div>
-
-        {/* Active — indigo band, same hue as the chart's worked band */}
-        <div
-          className="self-stretch flex items-center justify-end px-1.5"
-          style={{ backgroundColor: ACTIVE_BAND }}
-        >
-          <Link
-            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
-            className={`text-xs font-mono tabular-nums hover:underline ${
-              claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {claimed}
-          </Link>
-        </div>
-
-        {/* Resolved — sage band, same hue as the chart's actual curve */}
-        <div
-          className="self-stretch flex items-center justify-end px-1.5"
-          style={{ backgroundColor: RESOLVED_BAND }}
-        >
-          <Link
-            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
-            className="text-xs font-mono tabular-nums hover:underline text-text-quaternary"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {resolved}
-          </Link>
+        {/* ── 5 colored columns in one touching flex group ── */}
+        <div className="self-stretch flex items-stretch">
+          {/* Target/h — editable, slate band */}
+          <div className="w-16 shrink-0 flex items-center justify-end px-1.5" style={{ backgroundColor: TARGET_BAND }}>
+            <EditableNumber value={role.target_per_hour ?? null} onSave={saveTarget} />
+          </div>
+          {/* SLA/m — editable, amber band */}
+          <div className="w-16 shrink-0 flex items-center justify-end px-1.5" style={{ backgroundColor: SLA_BAND }}>
+            <EditableNumber value={role.sla_minutes ?? null} onSave={saveSla} />
+          </div>
+          {/* Pending — sky band */}
+          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: PENDING_BAND }}>
+            <Link
+              to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
+              className={`text-xs font-mono tabular-nums hover:underline ${
+                pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {pending}
+            </Link>
+          </div>
+          {/* Claimed — orange band */}
+          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: ACTIVE_BAND }}>
+            <Link
+              to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
+              className={`text-xs font-mono tabular-nums hover:underline ${
+                claimed > 0 ? 'font-semibold' : 'text-text-quaternary'
+              }`}
+              style={claimed > 0 ? { color: ACTIVE_COLOR } : undefined}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {claimed}
+            </Link>
+          </div>
+          {/* Resolved — green band */}
+          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: RESOLVED_BAND }}>
+            <Link
+              to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
+              className={`text-xs font-mono tabular-nums hover:underline ${
+                resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'
+              }`}
+              style={resolved > 0 ? { color: RESOLVED_COLOR } : undefined}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {resolved}
+            </Link>
+          </div>
         </div>
 
         {/* P99 wait */}
@@ -259,15 +285,15 @@ function StationRow({
           </span>
         </div>
 
-        {/* Actions */}
+        {/* Actions — navigate to full queue (all statuses) */}
         <div className="flex items-center justify-center py-1.5">
           <Link
-            to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
+            to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=all`}
             className="text-text-quaternary hover:text-accent transition-colors"
-            title="View full queue"
+            title="View all items in queue"
             onClick={(e) => e.stopPropagation()}
           >
-            <List className="w-3.5 h-3.5" />
+            <Eye className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
@@ -296,49 +322,40 @@ function StationRow({
 // ── Table header ──────────────────────────────────────────────────────────────
 
 function TableHead() {
-  // Queue-state columns carry the chart's band hue into the table.
-  const cols: { label: string; band?: string; hue?: string }[] = [
-    { label: 'NAME' },
-    { label: 'ROLE' },
-    { label: 'TARGET/H', band: TARGET_BAND, hue: TARGET_COLOR },
-    { label: 'PENDING', band: PENDING_BAND, hue: QUEUED_COLOR },
-    { label: 'CLAIMED', band: ACTIVE_BAND, hue: ACTIVE_COLOR },
-    { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR },
-    { label: 'P99 WAIT' },
-    { label: 'P99 WORK' },
-    { label: 'TREND' },
-    { label: 'ACTIONS' },
+  const coloredCols = [
+    { label: 'TARGET/H', band: TARGET_BAND, hue: TARGET_COLOR, w: 'w-16' },
+    { label: 'SLA/M',    band: SLA_BAND,    hue: SLA_COLOR,    w: 'w-16' },
+    { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-16', px: 'px-3' },
+    { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-16', px: 'px-3' },
+    { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-16', px: 'px-3' },
   ];
   return (
     <div
       className="grid items-center gap-4 px-3 border-b border-surface-border mb-0.5"
       style={{ gridTemplateColumns: STATION_GRID_COLS }}
     >
-      {cols.map((col, i) =>
-        col.band ? (
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5">NAME</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5">ROLE</span>
+
+      {/* Touching colored column group */}
+      <div className="self-stretch flex items-stretch">
+        {coloredCols.map((col) => (
           <div
             key={col.label}
-            className="self-stretch flex items-center justify-end px-1.5"
+            className={`${col.w} shrink-0 flex items-center justify-end ${'px' in col ? col.px : 'px-1.5'}`}
             style={{ backgroundColor: col.band }}
           >
-            <span
-              className="text-[9px] font-semibold uppercase tracking-wider"
-              style={{ color: col.hue }}
-            >
+            <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: col.hue }}>
               {col.label}
             </span>
           </div>
-        ) : (
-          <span
-            key={col.label}
-            className={`text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 ${
-              i > 1 && i < 8 ? 'text-right' : i === 9 ? 'text-center' : ''
-            }`}
-          >
-            {col.label}
-          </span>
-        ),
-      )}
+        ))}
+      </div>
+
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WAIT</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WORK</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5">TREND</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-center">ACTIONS</span>
     </div>
   );
 }
@@ -543,6 +560,7 @@ export function OperationsPage() {
                 onSelect={handleSelect}
                 onUpstreamSelect={handleUpstreamSelect}
                 onPrioritySelect={handlePrioritySelect}
+                onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
                 periodHours={PERIOD_HOURS[period]}
               />
             </div>

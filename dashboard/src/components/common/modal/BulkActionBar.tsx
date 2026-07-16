@@ -1,6 +1,7 @@
 import { PRIORITY_OPTIONS } from '../../../lib/constants';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
 import { useSettings } from '../../../api/settings';
+import { getAiOverride } from '../../../lib/view-as';
 
 interface BulkActionBarProps {
   selectedCount: number;
@@ -39,7 +40,8 @@ export function BulkActionBar(props: BulkActionBarProps) {
   // truth — it merges the server /settings flag with the persisted localStorage
   // override (lt_ai_override). Hide the button entirely when AI is off.
   const { data: settings } = useSettings();
-  const aiEnabled = settings?.ai?.enabled === true;
+  const aiOverride = getAiOverride();
+  const aiEnabled = aiOverride !== null ? aiOverride : settings?.ai?.enabled === true;
   const open = props.selectedCount > 0;
 
   return (

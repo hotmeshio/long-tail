@@ -87,6 +87,7 @@ async function main() {
     escalation: {
       strategy: 'mcp',
     },
+    branding: process.env.WHITE_LABEL ? { appName: process.env.WHITE_LABEL } : undefined,
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
     events: config.EVENT_TRANSPORT === 'nats'
       ? { nats: { url: config.NATS_URL, wsUrl: config.NATS_WS_URL || undefined, token: config.NATS_TOKEN || undefined } }

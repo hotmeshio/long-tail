@@ -82,13 +82,18 @@ describe('ESCALATION_COLUMNS', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  it('previews metadata keys and expands to the JSON viewer on click', () => {
+  it('shows first key/value with inline +N indicator, expands on click', () => {
     renderColumn('metadata', makeEscalation({ metadata: { confidence: 0.65, flags: 'x', extra: 1 } }));
-    expect(screen.getByText('{ confidence, flags +1 }')).toBeInTheDocument();
-    fireEvent.click(screen.getByTitle(/expand metadata/i));
-    // The interactive JSON viewer renders the values (e.g. the number 0.65),
-    // which the collapsed key preview does not.
+    // First entry always shown
+    expect(screen.getByText('confidence')).toBeInTheDocument();
     expect(screen.getByText('0.65')).toBeInTheDocument();
+    // Remaining 2 entries hidden; inline +2 expand button visible
+    expect(screen.queryByText('flags')).not.toBeInTheDocument();
+    const expandBtn = screen.getByTitle(/show 2 more fields/i);
+    fireEvent.click(expandBtn);
+    // After expanding all entries visible
+    expect(screen.getByText('flags')).toBeInTheDocument();
+    expect(screen.getByText('x')).toBeInTheDocument();
   });
 });
 

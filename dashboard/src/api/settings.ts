@@ -16,6 +16,9 @@ export interface AppSettings {
     /** DB Maintenance admin page is shown. Default: true (omitted treated as true). */
     dbMaintenance?: boolean;
   };
+  branding?: {
+    appName?: string;
+  };
   environment?: {
     longTailVersion: string;
     hotmeshVersion: string;

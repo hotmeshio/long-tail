@@ -35,7 +35,7 @@ function fmt(min: number | null): string {
 
 function MetricRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1">
+    <div className="flex items-center justify-between py-1.5">
       <span className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</span>
       <span className="text-xs font-mono font-medium text-text-primary tabular-nums">{value}</span>
     </div>
@@ -75,14 +75,14 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
   return (
     <>
       {/* Header */}
-      <div className="flex items-start justify-between mb-1">
+      <div className="flex items-start justify-between mb-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-sm font-bold text-text-primary">{displayRoleTitle(role)}</span>
             <span className="text-[10px] font-mono text-text-secondary">{role.role}</span>
           </div>
           {role.description && (
-            <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-2 leading-relaxed">
+            <p className="text-[10px] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">
               {role.description}
             </p>
           )}
@@ -95,7 +95,7 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         </button>
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-6">
         <Link
           to={`/admin/roles/${encodeURIComponent(role.role)}`}
           className="flex items-center gap-1 text-[10px] text-accent hover:underline"
@@ -116,44 +116,44 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
 
       {/* Capacity settings */}
       {(targetPerHour || slaMinutes || workerCount) && (
-        <div className="flex items-center gap-4 mb-4 text-[10px]">
+        <div className="flex items-center gap-6 mb-6 text-[10px] border-b border-surface-border/30 pb-5">
           {targetPerHour && (
             <div>
-              <div className="font-mono font-semibold text-text-primary">{targetPerHour}/h</div>
-              <div className="text-text-quaternary uppercase tracking-wider text-[8.5px]">target</div>
+              <div className="font-mono font-semibold text-text-primary text-sm">{targetPerHour}/h</div>
+              <div className="text-text-quaternary uppercase tracking-wider text-[8.5px] mt-0.5">target</div>
             </div>
           )}
           {slaMinutes && (
             <div>
-              <div className="font-mono font-semibold text-text-primary">{slaMinutes}m</div>
-              <div className="text-text-quaternary uppercase tracking-wider text-[8.5px]">SLA</div>
+              <div className="font-mono font-semibold text-text-primary text-sm">{slaMinutes}m</div>
+              <div className="text-text-quaternary uppercase tracking-wider text-[8.5px] mt-0.5">SLA</div>
             </div>
           )}
           {workerCount && (
             <div>
-              <div className="font-mono font-semibold text-text-primary">{workerCount}</div>
-              <div className="text-text-quaternary uppercase tracking-wider text-[8.5px]">workers</div>
+              <div className="font-mono font-semibold text-text-primary text-sm">{workerCount}</div>
+              <div className="text-text-quaternary uppercase tracking-wider text-[8.5px] mt-0.5">workers</div>
             </div>
           )}
         </div>
       )}
 
       {/* Two-column wait / work grid */}
-      <div className="grid grid-cols-2 gap-x-3">
+      <div className="grid grid-cols-2 gap-x-4 mb-2">
         <div>
-          <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-1.5">Wait (queue)</p>
+          <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-2">Wait (queue)</p>
           <MetricRow label="P99" value={fmt(metric?.wait.p99 ?? null)} />
           <MetricRow label="avg" value={fmt(metric?.wait.avg ?? null)} />
         </div>
         <div>
-          <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-1.5">Work (proc.)</p>
+          <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-2">Work (proc.)</p>
           <MetricRow label="P99" value={fmt(metric?.work.p99 ?? null)} />
           <MetricRow label="avg" value={fmt(metric?.work.avg ?? null)} />
         </div>
       </div>
 
       {/* SLA + priority */}
-      <div className="border-t border-surface-border/40 pt-2 mt-3 space-y-1.5">
+      <div className="border-t border-surface-border/40 pt-4 mt-5 space-y-2.5">
         {slaMinutes && (
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-text-tertiary">SLA target</span>
@@ -282,7 +282,7 @@ function OverviewPanel({
               >
                 {pending > 0 ? pending : '—'}
               </span>
-              <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${claimed > 0 ? 'text-accent' : 'text-text-quaternary'}`}>
+              <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'}`}>
                 {claimed > 0 ? claimed : '—'}
               </span>
               <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'}`}>
@@ -308,7 +308,7 @@ export function StationDetailPanel({
   onClose,
 }: StationDetailPanelProps) {
   return (
-    <div className="w-[280px] shrink-0 px-6 py-8 flex flex-col overflow-y-auto min-h-0">
+    <div className="w-[280px] shrink-0 px-7 py-10 flex flex-col overflow-y-auto min-h-0">
       {role ? (
         <RoleView role={role} globalPeriod={globalPeriod} onClose={onClose} />
       ) : (

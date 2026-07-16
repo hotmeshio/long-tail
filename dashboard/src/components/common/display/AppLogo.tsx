@@ -7,6 +7,8 @@ interface AppLogoProps {
   hideLabel?: boolean;
   /** Extra CSS classes on the outer container. */
   className?: string;
+  /** Override the wordmark text. Defaults to "LongTail". */
+  appName?: string;
 }
 
 /**
@@ -19,7 +21,7 @@ interface AppLogoProps {
  * - `sm` (default) — toolbar height
  * - `lg` — login page hero
  */
-export function AppLogo({ size = 'sm', hideLabel = false, className = '' }: AppLogoProps) {
+export function AppLogo({ size = 'sm', hideLabel = false, className = '', appName = 'LongTail' }: AppLogoProps) {
   const isLarge = size === 'lg';
 
   const imgClass = isLarge
@@ -34,12 +36,12 @@ export function AppLogo({ size = 'sm', hideLabel = false, className = '' }: AppL
     <div className={`flex items-center ${className}`} style={{ height: '50px' }}>
       <span
         role="img"
-        aria-label="LongTail"
+        aria-label={appName}
         className={`logo-mark shrink-0 z-0 ${imgClass}`}
         style={{ '--logo-url': `url(${LT_BASE}/logo512.png)` } as CSSProperties}
       />
       <span className={`z-[1] transition-opacity duration-300 ${textClass} ${hideLabel ? 'opacity-0' : ''}`}>
-        LongTail
+        {appName}
       </span>
     </div>
   );

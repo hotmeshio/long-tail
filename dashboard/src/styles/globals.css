@@ -13,18 +13,18 @@
 @layer base {
   :root,
   [data-theme='blue'] {
-    --lt-accent: 30 58 138;           /* navy #1E3A8A */
-    --lt-accent-hover: 22 42 102;     /* #162A66 */
-    --lt-accent-muted: 148 163 216;   /* #94A3D8 */
-    --lt-accent-faint: 213 220 240;   /* #D5DCF0 */
-    --lt-surface-hover: 240 243 250;  /* #F0F3FA */
-    --lt-surface-sunken: 236 239 247; /* #ECEFF7 */
-    --lt-surface-border: 188 198 228; /* #BCC6E4 */
+    --lt-accent: 37 99 235;           /* electric blue #2563EB */
+    --lt-accent-hover: 29 78 216;     /* #1D4ED8 */
+    --lt-accent-muted: 147 197 253;   /* #93C5FD */
+    --lt-accent-faint: 219 234 254;   /* #DBEAFE */
+    --lt-surface-hover: 239 246 255;  /* #EFF6FF */
+    --lt-surface-sunken: 235 243 255; /* #EBF3FF */
+    --lt-surface-border: 191 219 254; /* #BFDBFE */
     --lt-text-primary: 10 16 38;      /* #0A1026 */
-    --lt-text-secondary: 47 58 94;    /* #2F3A5E */
-    --lt-text-tertiary: 100 111 150;  /* #646F96 */
-    --lt-text-quaternary: 141 150 184;/* #8D96B8 */
-    --lt-heading: 23 42 110;          /* #172A6E */
+    --lt-text-secondary: 30 58 138;   /* #1E3A8A */
+    --lt-text-tertiary: 96 125 185;   /* #607DB9 */
+    --lt-text-quaternary: 147 172 220;/* #93ACD8 */
+    --lt-heading: 29 78 216;          /* #1D4ED8 */
   }
 
   [data-theme='violet'] {
@@ -58,33 +58,48 @@
   }
 
   [data-theme='green'] {
-    --lt-accent: 5 150 105;           /* emerald #059669 */
-    --lt-accent-hover: 4 120 87;      /* #047857 */
-    --lt-accent-muted: 134 209 184;   /* #86D1B8 */
-    --lt-accent-faint: 205 237 226;   /* #CDEDE2 */
-    --lt-surface-hover: 238 249 245;  /* #EEF9F5 */
-    --lt-surface-sunken: 233 245 240; /* #E9F5F0 */
-    --lt-surface-border: 175 219 203; /* #AFDBCB */
-    --lt-text-primary: 3 28 21;       /* #031C15 */
-    --lt-text-secondary: 34 89 72;    /* #225948 */
-    --lt-text-tertiary: 91 140 125;   /* #5B8C7D */
-    --lt-text-quaternary: 136 176 163;/* #88B0A3 */
-    --lt-heading: 4 110 79;           /* #046E4F */
+    --lt-accent: 22 163 74;           /* vivid green #16A34A */
+    --lt-accent-hover: 15 118 55;     /* #0F7637 */
+    --lt-accent-muted: 74 222 128;    /* #4ADE80 */
+    --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
+    --lt-surface-hover: 240 253 244;  /* #F0FDF4 */
+    --lt-surface-sunken: 220 252 231; /* #DCFCE7 */
+    --lt-surface-border: 110 206 148; /* #6ECE94 */
+    --lt-text-primary: 2 44 26;       /* #022C1A */
+    --lt-text-secondary: 20 83 45;    /* #14532D */
+    --lt-text-tertiary: 22 163 74;    /* #16A34A */
+    --lt-text-quaternary: 74 173 104; /* #4AAD68 */
+    --lt-heading: 20 83 45;           /* #14532D */
   }
 
   [data-theme='rose'] {
-    --lt-accent: 214 36 110;          /* raspberry #D6246E */
-    --lt-accent-hover: 173 25 87;     /* #AD1957 */
-    --lt-accent-muted: 235 148 185;   /* #EB94B9 */
-    --lt-accent-faint: 248 213 228;   /* #F8D5E4 */
-    --lt-surface-hover: 253 240 246;  /* #FDF0F6 */
-    --lt-surface-sunken: 250 235 242; /* #FAEBF2 */
-    --lt-surface-border: 233 188 207; /* #E9BCCF */
-    --lt-text-primary: 40 8 22;       /* #280816 */
-    --lt-text-secondary: 99 53 72;    /* #633548 */
-    --lt-text-tertiary: 148 104 122;  /* #94687A */
-    --lt-text-quaternary: 186 150 165;/* #BA96A5 */
-    --lt-heading: 168 20 84;          /* #A81454 */
+    --lt-accent: 236 72 153;          /* hot pink #EC4899 */
+    --lt-accent-hover: 219 39 119;    /* #DB2777 */
+    --lt-accent-muted: 249 168 212;   /* #F9A8D4 */
+    --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
+    --lt-surface-hover: 253 242 248;  /* #FDF2F8 */
+    --lt-surface-sunken: 251 228 241; /* #FBE4F1 */
+    --lt-surface-border: 244 173 214; /* #F4ADD6 */
+    --lt-text-primary: 60 8 37;       /* #3C0825 */
+    --lt-text-secondary: 131 24 67;   /* #831843 */
+    --lt-text-tertiary: 190 24 93;    /* #BE185D */
+    --lt-text-quaternary: 216 90 143; /* #D85A8F */
+    --lt-heading: 157 23 77;          /* #9D174D */
+  }
+
+  [data-theme='orange'] {
+    --lt-accent: 249 115 22;          /* vivid orange #F97316 */
+    --lt-accent-hover: 234 88 12;     /* #EA580C */
+    --lt-accent-muted: 254 215 170;   /* #FED7AA */
+    --lt-accent-faint: 255 247 237;   /* #FFF7ED */
+    --lt-surface-hover: 255 251 247;  /* barely warm white */
+    --lt-surface-sunken: 255 248 240; /* #FFF8F0 */
+    --lt-surface-border: 254 215 170; /* #FED7AA */
+    --lt-text-primary: 12 8 3;        /* near-black warm */
+    --lt-text-secondary: 124 45 18;   /* #7C2D12 */
+    --lt-text-tertiary: 154 80 35;    /* warm mid */
+    --lt-text-quaternary: 200 135 85; /* lighter warm */
+    --lt-heading: 234 88 12;          /* #EA580C */
   }
 
   body {

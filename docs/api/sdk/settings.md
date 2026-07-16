@@ -12,7 +12,7 @@ const result = await lt.settings.get();
 
 **Parameters:** None
 
-**Returns:** `LTApiResult<{ telemetry, escalation, events, auth, ai }>`
+**Returns:** `LTApiResult<{ telemetry, escalation, events, auth, ai, branding }>`
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -24,5 +24,6 @@ const result = await lt.settings.get();
 | `auth.sso` | `boolean` | Whether SSO is configured for embedded deployments |
 | `auth.ssoLogoutUrl` | `string \| null` | Host logout URL (redirected to on dashboard sign out) |
 | `ai.enabled` | `boolean` | Whether an LLM API key is configured |
+| `branding.appName` | `string` | Product name shown in the dashboard header (defaults to `"LongTail"`) |
 
 **Auth:** Not required

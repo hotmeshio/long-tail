@@ -18,12 +18,14 @@ import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
+import { getAiOverride } from '../../../lib/view-as';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
 import { EscalationSidePanel } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
-import { EscalationContextBlocks, EscalationFormSection } from './EscalationDetailSections';
+import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc } from './EscalationDetailSections';
+import { IframeViewport } from '../../../components/escalation/IframeViewport';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -145,11 +147,15 @@ export function EscalationDetailPage() {
   const claimedByOther = claimed && !claimedByMe;
   const isTerminal = esc.status === 'resolved' || esc.status === 'cancelled';
 
+  const iframeViewport = (effectiveSchema as any)?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
+  const isIframeMode = iframeViewport?.type === 'iframe' && !!iframeViewport?.src && claimedByMe && !isTerminal;
+
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
   const envelopeObj = safeParse(esc.envelope) as Record<string, any> | null;
   const isCertified = !!(envelopeObj?.metadata?.certified);
-  const hasAI = !!(settings as any)?.ai?.enabled;
+  const aiOverride = getAiOverride();
+  const hasAI = aiOverride !== null ? aiOverride : !!(settings as any)?.ai?.enabled;
 
   const payloadObj = (typeof escalationPayload === 'object' && escalationPayload !== null && !Array.isArray(escalationPayload))
     ? escalationPayload as Record<string, unknown>
@@ -237,49 +243,108 @@ export function EscalationDetailPage() {
     // right); the left column re-adds those gutters for its own content.
     <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-10 -mr-10 -mb-16">
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        {/* The description IS the title — the page opens with what to do. It
-            shares the row with the toolbar and panel toggle, truncating to
-            make room. */}
-        <div className="shrink-0 pt-10 pr-10">
-          <PageHeader title={esc.description || 'Escalation'} actions={headerActions} />
-        </div>
+        {isIframeMode ? (
+          // Full-bleed iframe mode: no header, no padding, -ml-10 cancels shell's pl-10.
+          // Release, Cancel, and panel toggle float at top-right over the iframe.
+          <div className="relative flex-1 min-h-0 -ml-10">
+            <div className="absolute top-3 right-3 z-50 flex items-center gap-0.5 bg-surface/90 backdrop-blur-sm rounded-lg px-1.5 py-1 shadow-sm border border-surface-border/40">
+              {[
+                {
+                  onClick: handleRelease,
+                  disabled: claim.isPending,
+                  label: 'Release',
+                  hoverClass: 'hover:text-accent',
+                  icon: <RotateCcw className="w-4 h-4" strokeWidth={1.5} />,
+                },
+                {
+                  onClick: () => setCancelModalOpen(true),
+                  disabled: false,
+                  label: 'Cancel',
+                  hoverClass: 'hover:text-status-error',
+                  icon: <X className="w-4 h-4" strokeWidth={1.5} />,
+                },
+                {
+                  onClick: () => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; }),
+                  disabled: false,
+                  label: sidePanelOpen ? 'Hide panel' : 'Show panel',
+                  hoverClass: 'hover:text-accent',
+                  icon: sidePanelOpen
+                    ? <PanelRightClose className="w-4 h-4" strokeWidth={1.5} />
+                    : <PanelRightOpen className="w-4 h-4" strokeWidth={1.5} />,
+                },
+              ].map(({ onClick, disabled, label, hoverClass, icon }) => (
+                <div key={label} className="relative group/tip">
+                  <button
+                    onClick={onClick}
+                    disabled={disabled}
+                    className={`text-text-tertiary ${hoverClass} transition-colors disabled:opacity-40 disabled:cursor-default p-1.5 rounded-md`}
+                  >
+                    {icon}
+                  </button>
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 rounded text-[11px] bg-surface-sunken text-text-primary whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity">
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <IframeViewport
+              src={expandViewportSrc(iframeViewport!.src!, esc)}
+              escalation={esc}
+              schema={effectiveSchema!}
+              onResolve={handleResolve}
+              onEscalate={handleEscalate}
+              submitAttempted={submitAttempted}
+              fill
+            />
+          </div>
+        ) : (
+          <>
+            {/* The description IS the title — the page opens with what to do. It
+                shares the row with the toolbar and panel toggle, truncating to
+                make room. */}
+            <div className="shrink-0 pt-10 pr-10">
+              <PageHeader title={esc.description || 'Escalation'} actions={headerActions} />
+            </div>
 
-        {/* Independently scrolling form column */}
-        <div className="flex-1 min-h-0 overflow-y-auto pr-10">
-          <EscalationContextBlocks
-            isRoundsExhausted={isRoundsExhausted}
-            payloadObj={payloadObj}
-            isTerminal={isTerminal}
-            resolverPayload={resolverPayload as Record<string, unknown> | null}
-            onRetryTriage={handleRetryTriage}
-            isRetrying={claim.isPending || resolve.isPending}
-          />
+            {/* Independently scrolling form column */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-10">
+              <EscalationContextBlocks
+                isRoundsExhausted={isRoundsExhausted}
+                payloadObj={payloadObj}
+                isTerminal={isTerminal}
+                resolverPayload={resolverPayload as Record<string, unknown> | null}
+                onRetryTriage={handleRetryTriage}
+                isRetrying={claim.isPending || resolve.isPending}
+              />
 
-          <EscalationFormSection
-            esc={esc}
-            resolverPayload={resolverPayload}
-            isTerminal={isTerminal}
-            claimedByMe={claimedByMe}
-            activeView={activeView}
-            metadataFormSchema={metadataFormSchema}
-            effectiveSchema={effectiveSchema as Record<string, unknown> | null}
-            json={json}
-            onJsonChange={setJson}
-            requestTriage={requestTriage}
-            onRequestTriageChange={setRequestTriage}
-            triageNotes={triageNotes}
-            onTriageNotesChange={setTriageNotes}
-            onResolve={handleResolve}
-            onEscalate={handleEscalate}
-            submitAttempted={submitAttempted}
-            isCertified={isCertified}
-            hasAI={hasAI}
-          />
+              <EscalationFormSection
+                esc={esc}
+                resolverPayload={resolverPayload}
+                isTerminal={isTerminal}
+                claimedByMe={claimedByMe}
+                activeView={activeView}
+                metadataFormSchema={metadataFormSchema}
+                effectiveSchema={effectiveSchema as Record<string, unknown> | null}
+                json={json}
+                onJsonChange={setJson}
+                requestTriage={requestTriage}
+                onRequestTriageChange={setRequestTriage}
+                triageNotes={triageNotes}
+                onTriageNotesChange={setTriageNotes}
+                onResolve={handleResolve}
+                onEscalate={handleEscalate}
+                onClaim={() => handleClaim(30)}
+                submitAttempted={submitAttempted}
+                isCertified={isCertified}
+                hasAI={hasAI}
+              />
 
-          <div className="h-10" />
-        </div>
+              <div className="h-10" />
+            </div>
+          </>
+        )}
 
-        <EscalationActionBar
+        {!isIframeMode && <EscalationActionBar
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}
@@ -303,7 +368,7 @@ export function EscalationDetailPage() {
           assignedTo={esc.assigned_to}
           assignedUntil={esc.assigned_until}
           onSubmitAttempt={() => setSubmitAttempted(true)}
-        />
+        />}
       </div>
 
       <EscalationSidePanel
@@ -320,6 +385,7 @@ export function EscalationDetailPage() {
         isBuilder={isBuilder}
         traceUrl={traceUrl}
         open={sidePanelOpen}
+        noGutter={isIframeMode}
       />
 
       <ConfirmCancelModal
