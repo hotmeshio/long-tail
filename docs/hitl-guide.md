@@ -250,6 +250,7 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 | `accept` | field | File-type filter for the `file-upload` widget (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path this field's value occupies in the resolver payload (e.g. `"customer.email"`) |
 | `x-lt-span` | field | Column span in a `two-column` layout (`2` = full width) |
+| `x-lt-showIf` | field | Show field only when a value exists at `domain.path`; prefix `!` to invert |
 | `x-lt-order` | schema | Field render sequence |
 | `x-lt-layout` | schema | `"two-column"` grid layout |
 | `x-lt-help` | schema | Markdown guidance for the side panel's Help view; `{{domain.path}}` tokens interpolate live record values |
@@ -465,6 +466,59 @@ By default, fields render in JSON key order. Use `x-lt-order` to control sequenc
   }
 }
 ```
+
+### Conditional Visibility (`x-lt-showIf`)
+
+A field can be hidden or shown based on a value present in the escalation record. Use `x-lt-showIf` on any property to make it conditional:
+
+```json
+"x-lt-showIf": "domain.path"
+```
+
+The value at `domain.path` is evaluated for truthiness. If it is present and truthy the field shows; if absent, null, false, or an empty string it is hidden. Prefix `!` to invert: show when the value is absent.
+
+Domains follow the same `domain.path` convention as `x-lt-help` tokens:
+
+| Domain | Resolves against |
+|--------|-----------------|
+| `metadata` | The row's metadata dict |
+| `payload` | The escalation context payload (`escalation_payload`) |
+| `envelope` | The workflow-sent input envelope |
+| `escalation` | Top-level escalation row fields (`role`, `status`, `priority`, …) |
+| `resolver` | The submitted resolver payload |
+
+**Example — item type branching:**
+
+A role where the queue receives both regular work items and crew-pill shutdown signals. The payload carries `item_type` to distinguish them.
+
+```json
+{
+  "title": "Worker Station",
+  "properties": {
+    "action_taken": {
+      "type": "string",
+      "enum": ["completed", "deferred", "escalated"],
+      "description": "Outcome for this work item",
+      "x-lt-showIf": "!payload.crew_pill"
+    },
+    "notes": {
+      "type": "string",
+      "format": "textarea",
+      "x-lt-showIf": "!payload.crew_pill"
+    },
+    "shutdown_ack": {
+      "type": "boolean",
+      "title": "Acknowledge shutdown",
+      "description": "Confirm you are stopping work and clearing the station",
+      "x-lt-showIf": "payload.crew_pill"
+    }
+  }
+}
+```
+
+When `escalation_payload` contains `{ "crew_pill": true }`, only `shutdown_ack` renders. When the payload carries a regular item (no `crew_pill` key), only `action_taken` and `notes` render.
+
+`x-lt-showIf` is evaluated against the escalation record at render time — not against the current form values. Hidden fields are not rendered but their values (if any) remain in the form state and are not submitted to the resolver payload via `x-lt-bind` unless they were filled.
 
 ### Validation (`required`)
 

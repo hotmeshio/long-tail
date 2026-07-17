@@ -1,4 +1,5 @@
 import { ResolverForm } from '../../../components/escalation/ResolverForm';
+import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 
 export function ResolverSection({
   json,
@@ -10,6 +11,7 @@ export function ResolverSection({
   disabled = false,
   submitAttempted = false,
   showTriage = false,
+  escalationContext,
 }: {
   json: string;
   onJsonChange: (v: string) => void;
@@ -20,6 +22,7 @@ export function ResolverSection({
   disabled?: boolean;
   submitAttempted?: boolean;
   showTriage?: boolean;
+  escalationContext?: ShowIfContext;
 }) {
   return (
     <>
@@ -65,7 +68,7 @@ export function ResolverSection({
       <div className="relative min-h-[200px]">
         {/* Form controls */}
         <div className={requestTriage ? 'pointer-events-none select-none' : ''}>
-          <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} />
+          <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} escalationContext={escalationContext} />
         </div>
 
         {/* Triage overlay — occludes the form when AI Triage is checked */}

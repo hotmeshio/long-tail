@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { WIDGET_MAP } from './widgets';
+import { evaluateShowIf, type ShowIfContext } from '../../lib/x-lt-show-if';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -16,11 +17,12 @@ type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string
  *
  * Calls `onChange` with the full JSON string on every edit.
  */
-export function ResolverForm({ value, onChange, disabled, submitAttempted }: {
+export function ResolverForm({ value, onChange, disabled, submitAttempted, escalationContext }: {
   value: string;
   onChange: (json: string) => void;
   disabled?: boolean;
   submitAttempted?: boolean;
+  escalationContext?: ShowIfContext;
 }) {
   const [data, setData] = useState<Record<string, JsonValue>>({});
   const [hidden, setHidden] = useState<Record<string, JsonValue>>({});
@@ -93,13 +95,19 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted }: {
 
   // Field ordering via x-lt-order
   const fieldOrder = formSchema?.['x-lt-order'] as string[] | undefined;
-  const entries = fieldOrder
+  const ordered = fieldOrder
     ? [...allEntries].sort((a, b) => {
         const ai = fieldOrder.indexOf(a[0]);
         const bi = fieldOrder.indexOf(b[0]);
         return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
       })
     : allEntries;
+
+  // Conditional visibility via x-lt-showIf
+  const entries = ordered.filter(([key]) => {
+    const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
+    return evaluateShowIf(fieldSchema?.['x-lt-showIf'], escalationContext);
+  });
 
   const requiredFields = new Set(formSchema?.required as string[] ?? []);
   const layout = formSchema?.['x-lt-layout'] as string | undefined;
