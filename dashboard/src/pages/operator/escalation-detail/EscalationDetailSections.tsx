@@ -24,7 +24,7 @@ export function expandViewportSrc(src: string, esc: LTEscalationRecord): string 
       try { return JSON.parse(s) as Record<string, unknown>; } catch { return {}; }
     };
     const merged = {
-      ...parse(esc.metadata as any),
+      ...(esc.metadata ?? {}),
       ...parse(esc.envelope),
       ...parse(esc.escalation_payload),
     };
