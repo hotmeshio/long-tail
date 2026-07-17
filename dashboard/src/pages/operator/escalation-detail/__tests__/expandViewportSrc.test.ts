@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { expandViewportSrc } from '../EscalationDetailSections';
-import type { LTEscalationRecord } from '../../../api/types';
+import type { LTEscalationRecord } from '../../../../api/types';
 
 function base(overrides: Partial<LTEscalationRecord> = {}): LTEscalationRecord {
   return {
