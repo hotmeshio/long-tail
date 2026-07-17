@@ -10,7 +10,7 @@ import { formatAgoCompact, formatDateTime } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
 import type { LTEscalationRecord } from '../../api/types';
 
-export type MetaFacetFn = (key: string, value: string, shift: boolean, role: string | null) => void;
+export type MetaFacetFn = (key: string, value: string | number | boolean, shift: boolean, role: string | null) => void;
 
 export interface EscalationColumnOpts {
   onMetaFacet?: MetaFacetFn;
@@ -42,7 +42,7 @@ function StatusDot({ row }: { row: LTEscalationRecord }) {
 }
 
 /** Key/value metadata dict with 1 row collapsed by default, expand for the rest. */
-function MetadataCell({
+export function MetadataCell({
   metadata,
   role,
   highlightKeys,
@@ -76,6 +76,10 @@ function MetadataCell({
           const sv = typeof metadata[k] === 'object' && metadata[k] !== null
             ? JSON.stringify(metadata[k])
             : String(metadata[k]);
+          // Native type (boolean/number) preserved for facet queries; objects become JSON strings.
+          const facetValue: string | number | boolean = typeof metadata[k] === 'object' && metadata[k] !== null
+            ? JSON.stringify(metadata[k])
+            : (metadata[k] as string | number | boolean);
           const isHl = hl.includes(k);
           const isLastShown = i === shown.length - 1;
           return (
@@ -97,14 +101,14 @@ function MetadataCell({
                   <button
                     className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
                     title={`Filter ${role}: ${k} = ${sv}`}
-                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet(k, sv, ev.shiftKey, role); }}
+                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet(k, facetValue, ev.shiftKey, role); }}
                   >
                     <ListFilter className="w-3 h-3" />
                   </button>
                   <button
                     className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
                     title={`Search all: ${k} = ${sv}`}
-                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet(k, sv, ev.shiftKey, null); }}
+                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet(k, facetValue, ev.shiftKey, null); }}
                   >
                     <Search className="w-3 h-3" />
                   </button>

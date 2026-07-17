@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
-import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar, STATUS_OPTIONS } from '../escalation-columns';
+import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar, STATUS_OPTIONS, MetadataCell } from '../escalation-columns';
 import type { LTEscalationRecord } from '../../../api/types';
 
 function makeEscalation(overrides: Partial<LTEscalationRecord> = {}): LTEscalationRecord {
@@ -180,5 +180,87 @@ describe('EscalationFilterBar', () => {
     // Priority is the third select
     fireEvent.change(selects[2], { target: { value: '1' } });
     expect(setFilter).toHaveBeenCalledWith('priority', '1');
+  });
+});
+
+describe('MetadataCell — native-type facet values', () => {
+  it('passes boolean true (not string "true") to onMetaFacet when filter is clicked', () => {
+    const onMetaFacet = vi.fn();
+    render(
+      <MetadataCell
+        metadata={{ crew_pill: true }}
+        role="crew-worker"
+        onMetaFacet={onMetaFacet}
+      />,
+    );
+    // Filter button title includes the display string but the callback gets native type.
+    const filterBtn = screen.getByTitle(/Filter crew-worker: crew_pill = true/);
+    fireEvent.click(filterBtn);
+    expect(onMetaFacet).toHaveBeenCalledTimes(1);
+    const [key, value] = onMetaFacet.mock.calls[0];
+    expect(key).toBe('crew_pill');
+    expect(value).toBe(true);           // native boolean, not string "true"
+    expect(typeof value).toBe('boolean');
+  });
+
+  it('passes boolean false (not string "false") to onMetaFacet', () => {
+    const onMetaFacet = vi.fn();
+    render(
+      <MetadataCell
+        metadata={{ active: false }}
+        role="crew-worker"
+        onMetaFacet={onMetaFacet}
+      />,
+    );
+    fireEvent.click(screen.getByTitle(/Filter crew-worker: active = false/));
+    const [, value] = onMetaFacet.mock.calls[0];
+    expect(value).toBe(false);
+    expect(typeof value).toBe('boolean');
+  });
+
+  it('passes native number (not string) to onMetaFacet', () => {
+    const onMetaFacet = vi.fn();
+    render(
+      <MetadataCell
+        metadata={{ confidence: 0.95 }}
+        role="reviewer"
+        onMetaFacet={onMetaFacet}
+      />,
+    );
+    fireEvent.click(screen.getByTitle(/Filter reviewer: confidence = 0.95/));
+    const [, value] = onMetaFacet.mock.calls[0];
+    expect(value).toBe(0.95);
+    expect(typeof value).toBe('number');
+  });
+
+  it('passes string as-is to onMetaFacet', () => {
+    const onMetaFacet = vi.fn();
+    render(
+      <MetadataCell
+        metadata={{ status: 'active' }}
+        role="crew-worker"
+        onMetaFacet={onMetaFacet}
+      />,
+    );
+    fireEvent.click(screen.getByTitle(/Filter crew-worker: status = active/));
+    const [, value] = onMetaFacet.mock.calls[0];
+    expect(value).toBe('active');
+    expect(typeof value).toBe('string');
+  });
+
+  it('passes global search with native boolean (Search icon click)', () => {
+    const onMetaFacet = vi.fn();
+    render(
+      <MetadataCell
+        metadata={{ crew_pill: true }}
+        role="crew-worker"
+        onMetaFacet={onMetaFacet}
+      />,
+    );
+    fireEvent.click(screen.getByTitle(/Search all: crew_pill = true/));
+    const [key, value, , role] = onMetaFacet.mock.calls[0];
+    expect(key).toBe('crew_pill');
+    expect(value).toBe(true);
+    expect(role).toBeNull();  // null = global search
   });
 });

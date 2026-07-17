@@ -108,3 +108,77 @@ describe('EscalationListView', () => {
     expect(screen.getByText('policy-review')).toBeInTheDocument();
   });
 });
+
+describe('EscalationListView — facet-table layout', () => {
+  const TABLE_SCHEMA = {
+    'x-lt-layout': 'facet-table' as const,
+    'x-lt-columns': [
+      { label: 'Title', value: '{{metadata.title}}' },
+      { label: 'Owner', value: '{{metadata.owner}}' },
+    ],
+  };
+
+  const ROW2: LTEscalationRecord = {
+    ...ROW,
+    id: 'e2',
+    metadata: { title: 'Terms of Service', owner: 'Finance' },
+  };
+
+  it('renders column headers from x-lt-columns', () => {
+    render(
+      <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[ROW]} />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByText('Title')).toBeInTheDocument();
+    expect(screen.getByText('Owner')).toBeInTheDocument();
+  });
+
+  it('renders one row per escalation with interpolated values', () => {
+    render(
+      <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[ROW, ROW2]} />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByText('Refund Policy')).toBeInTheDocument();
+    expect(screen.getByText('Legal')).toBeInTheDocument();
+    expect(screen.getByText('Terms of Service')).toBeInTheDocument();
+    expect(screen.getByText('Finance')).toBeInTheDocument();
+  });
+
+  it('renders all rows via data-testid', () => {
+    render(
+      <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[ROW, ROW2]} />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getAllByTestId('facet-table-row')).toHaveLength(2);
+  });
+
+  it('calls onRowClick when a row is clicked', () => {
+    const onClick = vi.fn();
+    render(
+      <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[ROW, ROW2]} onRowClick={onClick} />,
+      { wrapper: wrapper() },
+    );
+    screen.getAllByTestId('facet-table-row')[1].click();
+    expect(onClick).toHaveBeenCalledWith(ROW2);
+  });
+
+  it('shows empty-state when no rows', () => {
+    render(
+      <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[]} />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByText(/No pending items/)).toBeInTheDocument();
+  });
+
+  it('renders em dash for unresolvable token values', () => {
+    render(
+      <EscalationListView
+        role="policy-document"
+        listSchema={{ 'x-lt-layout': 'facet-table', 'x-lt-columns': [{ label: 'Missing', value: '{{metadata.nope}}' }] }}
+        activeEscalations={[ROW]}
+      />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+});

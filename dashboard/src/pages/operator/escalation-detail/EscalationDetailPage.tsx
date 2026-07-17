@@ -98,11 +98,10 @@ export function EscalationDetailPage() {
     (esc?.form_schema ?? wfConfig?.resolver_schema ?? null) as Record<string, any> | null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
 
-  // Initialize json from the form exactly once. Each field is seeded from the
-  // workflow's `envelope.formDefaults` (a resolver-shaped payload, reverse-mapped
-  // through x-lt-bind to the flat form) and falls back to the field's schema
-  // default. So workflow-sent defaults prefill; schema defaults fill the rest.
-  // Subsequent esc refetches (claim events, real-time updates) must NOT reset
+  // Initialize json from the form exactly once. Fields are seeded in priority order:
+  // metadata (facts stamped at enqueue) → envelope.formDefaults (workflow overrides)
+  // → schema default. formDefaults always wins over metadata so the workflow can
+  // override a metadata fact when needed. Subsequent esc refetches must NOT reset
   // user edits. The form arrives embedded on esc, so nothing else to await.
   const jsonInitialized = useRef(false);
   useEffect(() => {
@@ -111,10 +110,12 @@ export function EscalationDetailPage() {
     if (formSchema?.properties) {
       jsonInitialized.current = true;
       const seeded = safeParse(esc?.envelope) as Record<string, any> | null;
-      const seededDefaults = seeded?.formDefaults;
-      const prefill = seededDefaults && typeof seededDefaults === 'object'
-        ? mapPayloadToForm(seededDefaults as Record<string, any>, formSchema)
-        : {};
+      const formDefaults = seeded?.formDefaults;
+      const mergedPrefill: Record<string, any> = {
+        ...(esc?.metadata ?? {}),
+        ...(typeof formDefaults === 'object' && formDefaults !== null ? formDefaults : {}),
+      };
+      const prefill = mapPayloadToForm(mergedPrefill, formSchema);
       const initial: Record<string, any> = { _form_schema: formSchema };
       for (const [key, def] of Object.entries(formSchema.properties)) {
         const fieldDef = def as Record<string, any>;
@@ -125,7 +126,7 @@ export function EscalationDetailPage() {
       jsonInitialized.current = true;
       setJson(JSON.stringify(effectiveSchema, null, 2));
     }
-  }, [effectiveSchema, metadataFormSchema, resolverSchema, esc?.envelope]);
+  }, [effectiveSchema, metadataFormSchema, resolverSchema, esc?.envelope, esc?.metadata]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 

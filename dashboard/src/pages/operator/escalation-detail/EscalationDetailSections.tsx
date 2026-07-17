@@ -4,6 +4,7 @@ import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExh
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ResolverForm } from '../../../components/escalation/ResolverForm';
 import { mapPayloadToForm } from '../../../lib/x-lt-bind';
+import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
 import type { LTEscalationRecord } from '../../../api/types';
@@ -34,6 +35,21 @@ export function expandViewportSrc(src: string, esc: LTEscalationRecord): string 
   } catch {
     return src;
   }
+}
+
+function parseJson(s: string | null | undefined): Record<string, unknown> | null {
+  if (!s) return null;
+  try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
+}
+
+function buildShowIfContext(esc: LTEscalationRecord): ShowIfContext {
+  return {
+    escalation: esc as unknown as Record<string, unknown>,
+    metadata: esc.metadata ?? null,
+    envelope: parseJson(esc.envelope),
+    payload: parseJson(esc.escalation_payload),
+    resolver: null,
+  };
 }
 
 interface EscalationContextProps {
@@ -143,6 +159,7 @@ export function EscalationFormSection({
   hasAI,
 }: FormSectionProps) {
   const schema = effectiveSchema;
+  const showIfCtx = buildShowIfContext(esc);
 
   // Terminal: show the submitted resolution read-only. The stored payload is
   // the NESTED shape (mapped through x-lt-bind on submit) — reverse-map it
@@ -163,6 +180,7 @@ export function EscalationFormSection({
           value={JSON.stringify(value, null, 2)}
           onChange={() => {}}
           disabled
+          escalationContext={showIfCtx}
         />
       </div>
     );
@@ -210,6 +228,7 @@ export function EscalationFormSection({
           disabled={!claimedByMe}
           submitAttempted={submitAttempted}
           showTriage={!!isCertified && !!hasAI}
+          escalationContext={showIfCtx}
         />
       )}
     </div>

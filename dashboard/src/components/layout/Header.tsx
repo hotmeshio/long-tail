@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Inbox, User, BookOpen, Radio, X } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Inbox, User, BookOpen, Radio, X, BookmarkPlus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { useEscalationCounts } from '../../hooks/useEscalationCounts';
@@ -12,15 +12,36 @@ import { clearViewAs } from '../../lib/view-as';
 import { THEMES, THEME_LABELS, THEME_SWATCHES, getTheme, setTheme, type Theme } from '../../lib/theme';
 import { QUEUED_COLOR, ACTIVE_COLOR } from '../../pages/operations/PaceChart';
 
+const BOOKMARKS_KEY = 'lt:bookmarks';
+
+type Bookmark = { label: string; url: string };
+
+function loadBookmarks(): Bookmark[] {
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as Bookmark[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistBookmarks(bookmarks: Bookmark[]): void {
+  try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks)); } catch {}
+}
+
 export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
   const { user, logout } = useAuth();
   const { isBuilder, isOps, viewAs, realIsBuilder } = useAccess();
   const { available, mine } = useEscalationCounts();
   const { connected } = useEventStatus();
   const { data: settings } = useSettings();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [theme, setActiveTheme] = useState<Theme>(getTheme);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(loadBookmarks);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const appName = settings?.branding?.appName;
@@ -28,6 +49,24 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   const selectTheme = (next: Theme) => {
     setTheme(next);
     setActiveTheme(next);
+  };
+
+  const addBookmark = () => {
+    const label = window.prompt('Bookmark label:');
+    if (!label?.trim()) return;
+    const url = location.pathname + location.search;
+    const next = [...bookmarks, { label: label.trim(), url }].sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+    setBookmarks(next);
+    persistBookmarks(next);
+    setMenuOpen(false);
+  };
+
+  const removeBookmark = (bm: Bookmark) => {
+    const next = bookmarks.filter((b) => !(b.label === bm.label && b.url === bm.url));
+    setBookmarks(next);
+    persistBookmarks(next);
   };
 
   useEffect(() => {
@@ -151,7 +190,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                 </svg>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-50">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-50">
                   <Link
                     to="/credentials"
                     onClick={() => setMenuOpen(false)}
@@ -183,6 +222,39 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                   >
                     Sign Out
                   </button>
+
+                  {/* Bookmarks */}
+                  <div className="border-t border-surface-border/60 pt-1">
+                    {bookmarks.map((bm) => (
+                      <div key={`${bm.label}::${bm.url}`} className="flex items-center group px-3 py-1.5 hover:bg-surface-hover">
+                        <Link
+                          to={bm.url}
+                          onClick={() => setMenuOpen(false)}
+                          title={bm.url}
+                          className="flex-1 min-w-0 text-xs text-text-secondary hover:text-text-primary truncate"
+                        >
+                          {bm.label}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => removeBookmark(bm)}
+                          title={`Remove "${bm.label}"`}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-0.5 shrink-0 text-text-quaternary hover:text-status-error"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <hr className="border-surface-border/60 mx-3 my-0.5" />
+                    <button
+                      type="button"
+                      onClick={addBookmark}
+                      className="flex items-center gap-1.5 w-full px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                    >
+                      <BookmarkPlus className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                      Add Bookmark
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
