@@ -93,7 +93,7 @@ export function AvailableEscalationsPage() {
   // Called from timeline card metadata rows.
   // role = null → update this page's facets (shift = AND, else replace)
   // role = string → navigate to role-scoped timeline
-  const onMetaFacet = useCallback((key: string, value: string, shift: boolean, role: string | null) => {
+  const onMetaFacet = useCallback((key: string, value: string | number | boolean, shift: boolean, role: string | null) => {
     if (role) {
       const facets = encodeURIComponent(JSON.stringify({ [key]: value }));
       navigate(`/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`);

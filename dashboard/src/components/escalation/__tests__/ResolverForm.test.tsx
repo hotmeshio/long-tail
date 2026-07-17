@@ -231,4 +231,91 @@ describe('ResolverForm', () => {
     render(<ResolverForm value={json} onChange={vi.fn()} />);
     expect(screen.getByText('Your work email')).toBeInTheDocument();
   });
+
+  // ── x-lt-showIf ──
+  it('shows field when x-lt-showIf condition is truthy', () => {
+    const json = formJson({ shutdown_ack: false }, {
+      properties: {
+        shutdown_ack: { type: 'boolean', 'x-lt-showIf': 'metadata.crew_pill' },
+      },
+    });
+    const ctx = { metadata: { crew_pill: true } };
+    render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={ctx} />);
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
+
+  it('hides field when x-lt-showIf condition is falsy', () => {
+    const json = formJson({ shutdown_ack: false }, {
+      properties: {
+        shutdown_ack: { type: 'boolean', 'x-lt-showIf': 'metadata.crew_pill' },
+      },
+    });
+    const ctx = { metadata: {} };
+    render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={ctx} />);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('shows negated field when condition is absent (! prefix)', () => {
+    const json = formJson({ action_taken: 'done' }, {
+      properties: {
+        action_taken: { type: 'string', 'x-lt-showIf': '!metadata.crew_pill' },
+      },
+    });
+    const ctx = { metadata: {} };
+    render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={ctx} />);
+    expect(screen.getByDisplayValue('done')).toBeInTheDocument();
+  });
+
+  it('hides negated field when condition is truthy (! prefix)', () => {
+    const json = formJson({ action_taken: 'done' }, {
+      properties: {
+        action_taken: { type: 'string', 'x-lt-showIf': '!metadata.crew_pill' },
+      },
+    });
+    const ctx = { metadata: { crew_pill: true } };
+    render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={ctx} />);
+    expect(screen.queryByDisplayValue('done')).not.toBeInTheDocument();
+  });
+
+  it('branches between crew-pill and normal fields based on context', () => {
+    const json = formJson(
+      { action_taken: 'completed', shutdown_ack: false },
+      {
+        properties: {
+          action_taken: { type: 'string', 'x-lt-showIf': '!metadata.crew_pill' },
+          shutdown_ack: { type: 'boolean', 'x-lt-showIf': 'metadata.crew_pill' },
+        },
+      },
+    );
+
+    const { unmount } = render(
+      <ResolverForm value={json} onChange={vi.fn()} escalationContext={{ metadata: { crew_pill: true } }} />,
+    );
+    // crew_pill=true: shutdown_ack shows, action_taken hidden
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('completed')).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <ResolverForm value={json} onChange={vi.fn()} escalationContext={{ metadata: {} }} />,
+    );
+    // crew_pill absent: action_taken shows, shutdown_ack hidden
+    expect(screen.getByDisplayValue('completed')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('shows all fields when escalationContext is absent (safe default)', () => {
+    const json = formJson(
+      { action_taken: 'completed', shutdown_ack: false },
+      {
+        properties: {
+          action_taken: { type: 'string', 'x-lt-showIf': '!metadata.crew_pill' },
+          shutdown_ack: { type: 'boolean', 'x-lt-showIf': 'metadata.crew_pill' },
+        },
+      },
+    );
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue('completed')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
 });

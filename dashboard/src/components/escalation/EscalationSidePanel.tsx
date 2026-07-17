@@ -52,7 +52,9 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
         const displayValue = typeof value === 'object' && value !== null
           ? JSON.stringify(value)
           : String(value);
-        const facets = encodeURIComponent(JSON.stringify({ [key]: displayValue }));
+        // Preserve native type (boolean/number) in the facet query; objects become JSON strings.
+        const facetValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+        const facets = encodeURIComponent(JSON.stringify({ [key]: facetValue }));
         const roleUrl = `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`;
         const globalUrl = `/escalations/available?facets=${facets}&status=all`;
         return (
