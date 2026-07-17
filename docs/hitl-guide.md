@@ -251,6 +251,9 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 | `x-lt-bind` | field | Path this field's value occupies in the resolver payload (e.g. `"customer.email"`) |
 | `x-lt-span` | field | Column span in a `two-column` layout (`2` = full width) |
 | `x-lt-showIf` | field | Show field only when a value exists at `domain.path`; prefix `!` to invert |
+| `x-lt-hide-if-empty` | field | `true` — suppress the field entirely when its value is null, `""`, `false`, or `0` |
+| `x-lt-section` | field | Label to group fields under (e.g. `"Facts"`, `"Station checks"`, `"Action"`) |
+| `x-lt-columns` | schema (list) | Column definitions for `facet-table` layout: `[{ label, value }]` |
 | `x-lt-order` | schema | Field render sequence |
 | `x-lt-layout` | schema | `"two-column"` grid layout |
 | `x-lt-help` | schema | Markdown guidance for the side panel's Help view; `{{domain.path}}` tokens interpolate live record values |
@@ -520,6 +523,45 @@ When `escalation_payload` contains `{ "crew_pill": true }`, only `shutdown_ack` 
 
 `x-lt-showIf` is evaluated against the escalation record at render time — not against the current form values. Hidden fields are not rendered but their values (if any) remain in the form state and are not submitted to the resolver payload via `x-lt-bind` unless they were filled.
 
+### Suppressing Empty Fields (`x-lt-hide-if-empty`)
+
+A field with `"x-lt-hide-if-empty": true` is hidden when its value is null, an empty string, `false`, or `0`. This is primarily useful for `readOnly` fact fields that are only present on some records:
+
+```json
+{
+  "properties": {
+    "heel_raise": {
+      "type": "string",
+      "readOnly": true,
+      "x-lt-hide-if-empty": true,
+      "description": "Heel raise specification — hidden when not present on this order"
+    }
+  }
+}
+```
+
+The field remains in form state and is included in the submitted payload if it has a value. Only the visual row is suppressed.
+
+### Section Headers (`x-lt-section`)
+
+Group related fields under a labeled section by adding `"x-lt-section": "Label"` to each property. Fields that share the same consecutive section name are collected into one group with a header:
+
+```json
+{
+  "x-lt-layout": "two-column",
+  "x-lt-order": ["patient_id", "heel_cup", "pdac", "approved", "notes"],
+  "properties": {
+    "patient_id": { "type": "string", "readOnly": true, "x-lt-section": "Facts", "x-lt-hide-if-empty": true },
+    "heel_cup":   { "type": "string", "readOnly": true, "x-lt-section": "Facts", "x-lt-hide-if-empty": true },
+    "pdac":       { "type": "boolean", "readOnly": true, "x-lt-section": "Facts", "x-lt-hide-if-empty": true },
+    "approved":   { "type": "string",  "enum": ["yes", "no"], "x-lt-section": "Action" },
+    "notes":      { "type": "string",  "format": "textarea", "x-lt-span": 2, "x-lt-section": "Action" }
+  }
+}
+```
+
+Sections are ordered by the first field that carries the section name (respect `x-lt-order`). A field without `x-lt-section` belongs to an unnamed group rendered without a header. Section headers are plain typographic labels with a divider — no borders or cards.
+
 ### Validation (`required`)
 
 Fields listed in `required` show a red asterisk and block submission when empty:
@@ -731,10 +773,11 @@ evaluated against each row); `body` strings render through the markdown renderer
 
 | Key | Level | Purpose |
 |-----|-------|---------|
-| `x-lt-layout` | schema | `"active-history"` (two columns), `"active"` (card only), or `"table"` (fallback) |
+| `x-lt-layout` | schema | `"active-history"` (two columns), `"active"` (card only), `"facet-table"` (multi-row queue), or `"table"` (fallback) |
 | `x-lt-help` | schema | Optional markdown header, interpolated with the active row |
 | `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{label, value}] }` |
 | `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
+| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label: string, value: string }]` — `value` is a `{{domain.path}}` token |
 
 The **active** item is the first non-terminal escalation. The **history** column is not
 auto-loaded — a "Load full history" link fetches resolved items on demand (`status`
@@ -767,6 +810,33 @@ The working reference is `examples/workflows/policy-document/` (role seeded by
 `examples/seed-policy-document.ts`): a looped workflow opens one policy-review
 escalation, parks on it, and folds each resolution into the next revision — so the
 policy facts ride the row's metadata and the list view reads them with `{{metadata.*}}`.
+
+### `facet-table` layout — queue as a column table
+
+Use `"x-lt-layout": "facet-table"` when the queue contains many concurrent rows and the
+role's context is best expressed as a scannable table — a print farm, order queue, or
+batch-processing pond. Every pending escalation is a row; columns are defined by
+`x-lt-columns`.
+
+```json
+{
+  "x-lt-layout": "facet-table",
+  "x-lt-columns": [
+    { "label": "Patient", "value": "{{metadata.patientId}}" },
+    { "label": "Heel cup", "value": "{{metadata.heelCup}}" },
+    { "label": "PDAC",     "value": "{{metadata.pdac}}" },
+    { "label": "Station",  "value": "{{metadata.station}}" },
+    { "label": "Priority", "value": "{{escalation.priority}}" },
+    { "label": "Created",  "value": "{{escalation.created_at}}" }
+  ]
+}
+```
+
+A status dot precedes the first column automatically. ISO datetime values
+(`{{escalation.created_at}}`, `{{escalation.resolved_at}}`, etc.) render as a
+readable relative date with a full-timestamp tooltip. Missing/unresolvable token values
+render as an em dash. Clicking any row navigates to the detail page. `x-lt-help` and
+`x-lt-active` are ignored in this layout.
 
 ---
 

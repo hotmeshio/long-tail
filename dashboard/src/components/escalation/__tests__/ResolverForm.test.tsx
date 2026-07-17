@@ -304,6 +304,37 @@ describe('ResolverForm', () => {
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
+  // ── x-lt-hide-if-empty ──
+  it('hides field with x-lt-hide-if-empty when value is empty string', () => {
+    const json = formJson({ notes: '' }, {
+      properties: {
+        notes: { type: 'string', readOnly: true, 'x-lt-hide-if-empty': true },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.queryByText('notes')).not.toBeInTheDocument();
+  });
+
+  it('shows field with x-lt-hide-if-empty when value is non-empty', () => {
+    const json = formJson({ notes: 'heel cup A' }, {
+      properties: {
+        notes: { type: 'string', readOnly: true, 'x-lt-hide-if-empty': true },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('heel cup A')).toBeInTheDocument();
+  });
+
+  it('hides field with x-lt-hide-if-empty when value is null', () => {
+    const json = formJson({ tag: null }, {
+      properties: {
+        tag: { type: 'string', 'x-lt-hide-if-empty': true },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.queryByText('tag')).not.toBeInTheDocument();
+  });
+
   it('shows all fields when escalationContext is absent (safe default)', () => {
     const json = formJson(
       { action_taken: 'completed', shutdown_ack: false },
@@ -317,5 +348,64 @@ describe('ResolverForm', () => {
     render(<ResolverForm value={json} onChange={vi.fn()} />);
     expect(screen.getByDisplayValue('completed')).toBeInTheDocument();
     expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
+});
+
+// ── x-lt-section ──
+describe('ResolverForm — x-lt-section', () => {
+  it('renders a section header when x-lt-section is set', () => {
+    const json = formJson({ heelCup: 'A' }, {
+      properties: {
+        heelCup: { type: 'string', 'x-lt-section': 'The order' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('The order')).toBeInTheDocument();
+  });
+
+  it('renders no section header when x-lt-section is not set', () => {
+    const json = formJson({ name: 'Alice' });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    // No heading-like element for a section label
+    expect(screen.queryByText('The order')).not.toBeInTheDocument();
+  });
+
+  it('groups fields into separate sections', () => {
+    const json = formJson(
+      { heelCup: 'A', approved: false },
+      {
+        'x-lt-order': ['heelCup', 'approved'],
+        properties: {
+          heelCup: { type: 'string', 'x-lt-section': 'Facts' },
+          approved: { type: 'boolean', 'x-lt-section': 'Action' },
+        },
+      },
+    );
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByText('Facts')).toBeInTheDocument();
+    expect(screen.getByText('Action')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('A')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
+
+  it('renders all fields when sections have different names', () => {
+    const json = formJson(
+      { a: 'first', b: 'second', c: 'third' },
+      {
+        'x-lt-order': ['a', 'b', 'c'],
+        properties: {
+          a: { type: 'string', 'x-lt-section': 'Group 1' },
+          b: { type: 'string', 'x-lt-section': 'Group 1' },
+          c: { type: 'string', 'x-lt-section': 'Group 2' },
+        },
+      },
+    );
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue('first')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('second')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('third')).toBeInTheDocument();
+    // Section headers
+    expect(screen.getByText('Group 1')).toBeInTheDocument();
+    expect(screen.getByText('Group 2')).toBeInTheDocument();
   });
 });

@@ -14,9 +14,10 @@ import type { LTEscalationRecord } from '../../api/types';
  * resolve form: the same `{{domain.path}}` token binding (via interpolateHelp)
  * against each row's context, and MarkdownRenderer for rich bodies.
  *
- * Flagship layout `active-history`: the single live (non-terminal) escalation
- * rendered as a card on the left, and a history column on the right that is NOT
- * auto-loaded — a "Load full history" link fetches resolved items on demand.
+ * Layouts:
+ *   active-history  — single live item as a card on the left + history column on right
+ *   active          — just the single live item card (no history)
+ *   facet-table     — full pending queue as a table, columns from x-lt-columns
  */
 
 interface CardDef {
@@ -32,11 +33,17 @@ interface HistoryDef {
   status?: string;
 }
 
+export interface ColumnDef {
+  label: string;
+  value: string;
+}
+
 interface ListSchema {
   'x-lt-layout'?: string;
   'x-lt-help'?: string;
   'x-lt-active'?: CardDef;
   'x-lt-history'?: HistoryDef;
+  'x-lt-columns'?: ColumnDef[];
 }
 
 /** Build the token context for one escalation row (payloads are JSON strings). */
@@ -203,6 +210,67 @@ function HistoryColumn({ role, def, onRowClick }: {
   );
 }
 
+/** Multi-row pending queue as a facet table. Columns defined by x-lt-columns. */
+function FacetTable({ schema, rows, onRowClick }: {
+  schema: ListSchema;
+  rows: LTEscalationRecord[];
+  onRowClick?: (row: LTEscalationRecord) => void;
+}) {
+  const columns = schema['x-lt-columns'] ?? [];
+
+  if (rows.length === 0) {
+    return <p className="text-xs text-text-tertiary italic">No pending items.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-surface-border/60">
+            <th className="w-4 pb-2 pr-3" aria-label="Status" />
+            {columns.map((col, i) => (
+              <th
+                key={i}
+                className="text-left pb-2 pr-8 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap"
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-surface-border/30">
+          {rows.map((row) => {
+            const ctx = rowContext(row);
+            return (
+              <tr
+                key={row.id}
+                onClick={() => onRowClick?.(row)}
+                className={onRowClick ? 'group cursor-pointer hover:bg-surface-hover' : 'group'}
+                data-testid="facet-table-row"
+              >
+                <td className="py-2.5 pr-3">
+                  <span
+                    className={`w-1.5 h-1.5 inline-block rounded-full dot-ring ${STATUS_DOT_STYLES[row.status] ?? 'bg-status-pending'}`}
+                    title={row.status}
+                  />
+                </td>
+                {columns.map((col, i) => (
+                  <td
+                    key={i}
+                    className="py-2.5 pr-8 text-text-secondary group-hover:text-text-primary transition-colors"
+                  >
+                    <FieldValue raw={interpolateHelp(col.value, ctx)} />
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-3">{children}</p>
@@ -231,6 +299,15 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   ) : help ? (
     <div className="mb-8"><MarkdownRenderer content={help} /></div>
   ) : null;
+
+  if (layout === 'facet-table') {
+    return (
+      <div>
+        {header}
+        <FacetTable schema={listSchema} rows={activeEscalations} onRowClick={onRowClick} />
+      </div>
+    );
+  }
 
   if (layout === 'active-history') {
     return (

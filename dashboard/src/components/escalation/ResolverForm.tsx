@@ -103,10 +103,15 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
       })
     : allEntries;
 
-  // Conditional visibility via x-lt-showIf
-  const entries = ordered.filter(([key]) => {
+  // Conditional visibility via x-lt-showIf and x-lt-hide-if-empty
+  const entries = ordered.filter(([key, val]) => {
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
-    return evaluateShowIf(fieldSchema?.['x-lt-showIf'], escalationContext);
+    if (!evaluateShowIf(fieldSchema?.['x-lt-showIf'], escalationContext)) return false;
+    if (fieldSchema?.['x-lt-hide-if-empty'] === true) {
+      const isEmpty = val === null || val === undefined || val === '' || val === false || val === 0;
+      if (isEmpty) return false;
+    }
+    return true;
   });
 
   const requiredFields = new Set(formSchema?.required as string[] ?? []);
@@ -114,55 +119,69 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   const schemaTitle = formSchema?.title as string | undefined;
   const schemaDescription = formSchema?.description as string | undefined;
 
-  const fieldRows = entries.map(([key, val]) => {
+  // Group entries by x-lt-section for labeled visual grouping.
+  // Fields without x-lt-section or with an empty value form an unnamed group.
+  type SectionGroup = { name: string | null; entries: [string, JsonValue][] };
+  const sectionGroups: SectionGroup[] = [];
+  for (const entry of entries) {
+    const [key] = entry;
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
-    const isReadOnly = fieldSchema?.readOnly === true;
-    const span = (fieldSchema?.['x-lt-span'] as number) ?? 1;
-    const isReq = requiredFields.has(key);
-    const isTouched = touched.has(key) || !!submitAttempted;
-
-    // Derive inline error for touched required fields
-    let error: string | undefined;
-    if (isReq && isTouched) {
-      if (val === undefined || val === null) {
-        error = 'Required';
-      } else if (typeof val === 'string' && val.trim() === '') {
-        error = 'Required';
-      }
+    const sectionName = (fieldSchema?.['x-lt-section'] as string | undefined)?.trim() || null;
+    const last = sectionGroups[sectionGroups.length - 1];
+    if (!last || last.name !== sectionName) {
+      sectionGroups.push({ name: sectionName, entries: [entry] });
+    } else {
+      last.entries.push(entry);
     }
-    // Format-specific validation for touched fields
-    if (isTouched && typeof val === 'string' && val.trim() !== '' && fieldSchema) {
-      const fmt = fieldSchema.format as string | undefined;
-      if (fmt === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-        error = 'Enter a valid email address';
-      }
-      if (fmt === 'uri' && !/^https?:\/\/.+/.test(val)) {
-        error = 'Enter a valid URL';
-      }
-    }
+  }
 
-    return (
-      <div
-        key={key}
-        className={layout === 'two-column' && span >= 2 ? 'col-span-2' : ''}
-      >
-        <FieldRow
-          fieldKey={key}
-          value={val}
-          onChange={(v) => updateField(key, v)}
-          onBlur={() => markTouched(key)}
-          schema={formSchema}
-          isRequired={isReq}
-          isReadOnly={isReadOnly}
-          error={error}
-        />
-      </div>
-    );
-  });
+  const renderGroupFields = (groupEntries: [string, JsonValue][]) =>
+    groupEntries.map(([key, val]) => {
+      const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
+      const isReadOnly = fieldSchema?.readOnly === true;
+      const span = (fieldSchema?.['x-lt-span'] as number) ?? 1;
+      const isReq = requiredFields.has(key);
+      const isTouched = touched.has(key) || !!submitAttempted;
+
+      let error: string | undefined;
+      if (isReq && isTouched) {
+        if (val === undefined || val === null) {
+          error = 'Required';
+        } else if (typeof val === 'string' && val.trim() === '') {
+          error = 'Required';
+        }
+      }
+      if (isTouched && typeof val === 'string' && val.trim() !== '' && fieldSchema) {
+        const fmt = fieldSchema.format as string | undefined;
+        if (fmt === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+          error = 'Enter a valid email address';
+        }
+        if (fmt === 'uri' && !/^https?:\/\/.+/.test(val)) {
+          error = 'Enter a valid URL';
+        }
+      }
+
+      return (
+        <div
+          key={key}
+          className={layout === 'two-column' && span >= 2 ? 'col-span-2' : ''}
+        >
+          <FieldRow
+            fieldKey={key}
+            value={val}
+            onChange={(v) => updateField(key, v)}
+            onBlur={() => markTouched(key)}
+            schema={formSchema}
+            isRequired={isReq}
+            isReadOnly={isReadOnly}
+            error={error}
+          />
+        </div>
+      );
+    });
 
   return (
     <div className={`pb-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
-      {/* Schema title and description */}
       {schemaTitle && (
         <h3 className="text-lg font-light text-text-primary mb-1">{schemaTitle}</h3>
       )}
@@ -170,12 +189,28 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
         <p className="text-sm text-text-secondary leading-relaxed mb-6">{schemaDescription}</p>
       )}
 
-      {/* Layout modes */}
-      {layout === 'two-column' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-6">{fieldRows}</div>
-      ) : (
-        <div className="space-y-6">{fieldRows}</div>
-      )}
+      <div className="space-y-8">
+        {sectionGroups.map((group, i) => (
+          <div key={group.name ?? `__s${i}`}>
+            {group.name && (
+              <div className="mb-4 pb-1.5 border-b border-surface-border/40">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                  {group.name}
+                </p>
+              </div>
+            )}
+            {layout === 'two-column' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-6">
+                {renderGroupFields(group.entries)}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {renderGroupFields(group.entries)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
