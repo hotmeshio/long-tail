@@ -520,6 +520,12 @@ export function AvailableEscalationsPage() {
           listSchema={listSchema!}
           activeEscalations={escalations}
           onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
+          total={total}
+          page={pagination.page}
+          totalPages={pagination.totalPages(total)}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
         />
       ) : (
         <>

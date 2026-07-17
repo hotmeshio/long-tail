@@ -521,7 +521,54 @@ A role where the queue receives both regular work items and crew-pill shutdown s
 
 When `escalation_payload` contains `{ "crew_pill": true }`, only `shutdown_ack` renders. When the payload carries a regular item (no `crew_pill` key), only `action_taken` and `notes` render.
 
-`x-lt-showIf` is evaluated against the escalation record at render time — not against the current form values. Hidden fields are not rendered but their values (if any) remain in the form state and are not submitted to the resolver payload via `x-lt-bind` unless they were filled.
+`x-lt-showIf` is evaluated against the escalation record and the **live form state** (via the `resolver` domain). Conditions based on `metadata`, `payload`, `envelope`, and `escalation` are static (from the stored row); conditions based on `resolver` react in real time as the user edits the form. Hidden fields are not rendered but their values (if any) remain in form state and are submitted only if they were filled before being hidden.
+
+**Example — approval/rejection conditional fields:**
+
+The employee sets `approved`. When they uncheck it, `rejection_reason` and `rejection_notes` appear immediately — no page reload, no submit required. The workflow receives the full payload and branches on `approved`:
+
+```json
+{
+  "title": "Rejection Review",
+  "x-lt-layout": "two-column",
+  "x-lt-order": ["order_id", "rejection_type", "approved", "rejection_reason", "rejection_notes"],
+  "required": ["approved"],
+  "properties": {
+    "order_id":         { "type": "string", "readOnly": true, "x-lt-section": "The Report" },
+    "rejection_type":   { "type": "string", "readOnly": true, "x-lt-section": "The Report" },
+    "approved":         { "type": "boolean", "x-lt-section": "The Verdict" },
+    "rejection_reason": {
+      "type": "string",
+      "enum": ["Quality", "Quantity", "Routing", "Other"],
+      "x-lt-showIf": "!resolver.approved",
+      "x-lt-section": "The Verdict"
+    },
+    "rejection_notes": {
+      "type": "string",
+      "format": "textarea",
+      "x-lt-span": 2,
+      "x-lt-showIf": "!resolver.approved",
+      "x-lt-section": "The Verdict"
+    }
+  }
+}
+```
+
+In the workflow, branch on `approved` from the resolver payload:
+
+```typescript
+const decision = await conditionLT<{
+  approved: boolean;
+  rejection_reason?: string;
+  rejection_notes?: string;
+}>(signalId, { role: 'quality-reviewer', /* ... */ });
+
+if (!decision.approved) {
+  await sendForRework({ reason: decision.rejection_reason, notes: decision.rejection_notes });
+} else {
+  await advanceOrder();
+}
+```
 
 ### Suppressing Empty Fields (`x-lt-hide-if-empty`)
 
@@ -560,7 +607,7 @@ Group related fields under a labeled section by adding `"x-lt-section": "Label"`
 }
 ```
 
-Sections are ordered by the first field that carries the section name (respect `x-lt-order`). A field without `x-lt-section` belongs to an unnamed group rendered without a header. Section headers are plain typographic labels with a divider — no borders or cards.
+Sections are ordered by the first field that carries the section name (respects `x-lt-order`). A field without `x-lt-section` belongs to an unnamed group rendered without a header. Named sections render with a left accent line that spans the full section height, a small icon, and the label in uppercase — spatially grouping the header and its fields without a card or border box.
 
 ### Validation (`required`)
 

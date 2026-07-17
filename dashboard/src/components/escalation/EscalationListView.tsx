@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
+import { StickyPagination } from '../common/data/StickyPagination';
 import { useEscalations } from '../../api/escalations';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import type { LTEscalationRecord } from '../../api/types';
@@ -277,11 +278,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function EscalationListView({ role, listSchema, activeEscalations, onRowClick }: {
+export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
   role: string;
   listSchema: ListSchema;
   activeEscalations: LTEscalationRecord[];
   onRowClick?: (row: LTEscalationRecord) => void;
+  total?: number;
+  page?: number;
+  totalPages?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }) {
   const layout = listSchema['x-lt-layout'];
   const card = listSchema['x-lt-active'] ?? {};
@@ -301,10 +308,26 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   ) : null;
 
   if (layout === 'facet-table') {
+    const resolvedTotal = total ?? activeEscalations.length;
     return (
       <div>
         {header}
+        {resolvedTotal > 0 && (
+          <p className="text-[11px] text-text-tertiary mb-3 tabular-nums">
+            {resolvedTotal.toLocaleString()} result{resolvedTotal !== 1 ? 's' : ''}
+          </p>
+        )}
         <FacetTable schema={listSchema} rows={activeEscalations} onRowClick={onRowClick} />
+        {page !== undefined && totalPages !== undefined && onPageChange && (
+          <StickyPagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+            total={resolvedTotal}
+            pageSize={pageSize ?? 25}
+            onPageSizeChange={onPageSizeChange}
+          />
+        )}
       </div>
     );
   }

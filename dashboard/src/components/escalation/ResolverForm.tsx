@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Layers } from 'lucide-react';
 import { WIDGET_MAP } from './widgets';
 import { evaluateShowIf, type ShowIfContext } from '../../lib/x-lt-show-if';
 
@@ -103,10 +104,14 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
       })
     : allEntries;
 
+  // Merge current form data into the resolver domain so x-lt-showIf: 'resolver.field'
+  // reacts to live edits — the parent context only carries the saved row state.
+  const liveCtx: ShowIfContext = { ...(escalationContext ?? {}), resolver: data as Record<string, unknown> };
+
   // Conditional visibility via x-lt-showIf and x-lt-hide-if-empty
   const entries = ordered.filter(([key, val]) => {
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
-    if (!evaluateShowIf(fieldSchema?.['x-lt-showIf'], escalationContext)) return false;
+    if (!evaluateShowIf(fieldSchema?.['x-lt-showIf'], liveCtx)) return false;
     if (fieldSchema?.['x-lt-hide-if-empty'] === true) {
       const isEmpty = val === null || val === undefined || val === '' || val === false || val === 0;
       if (isEmpty) return false;
@@ -189,11 +194,15 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
         <p className="text-sm text-text-secondary leading-relaxed mb-6">{schemaDescription}</p>
       )}
 
-      <div className="space-y-8">
+      <div className="space-y-10">
         {sectionGroups.map((group, i) => (
-          <div key={group.name ?? `__s${i}`}>
+          <div
+            key={group.name ?? `__s${i}`}
+            className={group.name ? 'pl-4 border-l-2 border-accent/30' : ''}
+          >
             {group.name && (
-              <div className="mb-4 pb-1.5 border-b border-surface-border/40">
+              <div className="mb-5 flex items-center gap-2">
+                <Layers className="w-3.5 h-3.5 text-accent/50 shrink-0" strokeWidth={1.5} />
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                   {group.name}
                 </p>

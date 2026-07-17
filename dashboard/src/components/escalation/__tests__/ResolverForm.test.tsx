@@ -335,7 +335,9 @@ describe('ResolverForm', () => {
     expect(screen.queryByText('tag')).not.toBeInTheDocument();
   });
 
-  it('shows all fields when escalationContext is absent (safe default)', () => {
+  it('evaluates conditions correctly when escalationContext is absent', () => {
+    // Without escalationContext, metadata domain is absent (falsy).
+    // Fields conditioned on !metadata.X show; fields conditioned on metadata.X hide.
     const json = formJson(
       { action_taken: 'completed', shutdown_ack: false },
       {
@@ -347,7 +349,48 @@ describe('ResolverForm', () => {
     );
     render(<ResolverForm value={json} onChange={vi.fn()} />);
     expect(screen.getByDisplayValue('completed')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+});
+
+// ── resolver-domain live conditionality ──
+describe('ResolverForm — resolver.field conditionality', () => {
+  it('hides rejection_reason when approved is true (live resolver domain)', () => {
+    const json = formJson({ approved: true, rejection_reason: '' }, {
+      'x-lt-order': ['approved', 'rejection_reason'],
+      properties: {
+        approved: { type: 'boolean' },
+        rejection_reason: { type: 'string', 'x-lt-showIf': '!resolver.approved' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.queryByDisplayValue('')).not.toBeInTheDocument();
+  });
+
+  it('shows rejection_reason when approved is false (live resolver domain)', () => {
+    const json = formJson({ approved: false, rejection_reason: '' }, {
+      'x-lt-order': ['approved', 'rejection_reason'],
+      properties: {
+        approved: { type: 'boolean' },
+        rejection_reason: { type: 'string', 'x-lt-showIf': '!resolver.approved' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('reveals rejection_reason live when user unchecks approved', async () => {
+    const json = formJson({ approved: true, rejection_reason: '' }, {
+      'x-lt-order': ['approved', 'rejection_reason'],
+      properties: {
+        approved: { type: 'boolean' },
+        rejection_reason: { type: 'string', 'x-lt-showIf': '!resolver.approved' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 });
 
