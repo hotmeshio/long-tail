@@ -181,7 +181,7 @@ The resolver form resolves in order, most specific first:
 
 1. **`metadata.form_schema`** — a full JSON Schema embedded on the escalation row. Use when different escalation points in the same workflow need different forms.
 2. **The role's `form_schema`** — the versioned form every role provides. When the row carries a `metadata.schema_version` pin (set via `schemaVersion` in the `conditionLT` config), the form renders exactly that snapshot even after the role's schema changes; without a pin, the role's latest applies.
-3. **Workflow config `resolver_schema`** — **deprecated** legacy fallback only, used when no role `form_schema` is available.
+3. **Workflow config `resolver_schema`** — lowest-priority fallback, used only when no role `form_schema` is available.
 
 ### Versioned Role Schemas
 
@@ -1251,7 +1251,7 @@ const result = await lt.escalations.resolve({
 });
 ```
 
-This routes through the full resolution path and works for all escalation types — atomic `conditionLT` (signal_key), legacy `conditionLT` (signal_id), and re-run-style escalations.
+This routes through the full resolution path and works for all escalation types — atomic `conditionLT` (signal_key), two-step `conditionLT` (signal_id), and re-run-style escalations.
 
 ### By metadata key-value pair
 
