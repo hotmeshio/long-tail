@@ -13,6 +13,7 @@ import { CopyableId } from '../common/display/CopyableId';
 import { UserName } from '../common/display/UserName';
 import { TriageContext } from './TriageContext';
 import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
+import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
 
 export const ESCALATION_PANEL_VIEWS = {
@@ -52,11 +53,8 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
         const displayValue = typeof value === 'object' && value !== null
           ? JSON.stringify(value)
           : String(value);
-        // Preserve native type (boolean/number) in the facet query; objects become JSON strings.
-        const facetValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
-        const facets = encodeURIComponent(JSON.stringify({ [key]: facetValue }));
-        const roleUrl = `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`;
-        const globalUrl = `/escalations/available?facets=${facets}&status=all`;
+        const roleUrl = metadataFacetUrl(key, value, role);
+        const globalUrl = metadataFacetUrl(key, value);
         return (
           <div key={key} className="group relative">
             <dt className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">

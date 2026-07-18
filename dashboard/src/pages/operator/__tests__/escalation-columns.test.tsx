@@ -183,84 +183,64 @@ describe('EscalationFilterBar', () => {
   });
 });
 
-describe('MetadataCell — native-type facet values', () => {
-  it('passes boolean true (not string "true") to onMetaFacet when filter is clicked', () => {
-    const onMetaFacet = vi.fn();
+describe('MetadataCell — native-type facet URLs', () => {
+  function renderCell(metadata: Record<string, unknown>, role = 'crew-worker') {
     render(
-      <MetadataCell
-        metadata={{ crew_pill: true }}
-        role="crew-worker"
-        onMetaFacet={onMetaFacet}
-      />,
+      <MemoryRouter>
+        <MetadataCell metadata={metadata} role={role} />
+      </MemoryRouter>,
     );
-    // Filter button title includes the display string but the callback gets native type.
-    const filterBtn = screen.getByTitle(/Filter crew-worker: crew_pill = true/);
-    fireEvent.click(filterBtn);
-    expect(onMetaFacet).toHaveBeenCalledTimes(1);
-    const [key, value] = onMetaFacet.mock.calls[0];
-    expect(key).toBe('crew_pill');
-    expect(value).toBe(true);           // native boolean, not string "true"
-    expect(typeof value).toBe('boolean');
+  }
+
+  function filterHref(title: RegExp): string {
+    return screen.getByTitle(title).getAttribute('href') ?? '';
+  }
+
+  it('encodes boolean true as JSON true (not string "true") in the role-filter link', () => {
+    renderCell({ crew_pill: true });
+    const href = filterHref(/Filter crew-worker: crew_pill = true/);
+    const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
+    expect(facets.crew_pill).toBe(true);
+    expect(typeof facets.crew_pill).toBe('boolean');
   });
 
-  it('passes boolean false (not string "false") to onMetaFacet', () => {
-    const onMetaFacet = vi.fn();
-    render(
-      <MetadataCell
-        metadata={{ active: false }}
-        role="crew-worker"
-        onMetaFacet={onMetaFacet}
-      />,
-    );
-    fireEvent.click(screen.getByTitle(/Filter crew-worker: active = false/));
-    const [, value] = onMetaFacet.mock.calls[0];
-    expect(value).toBe(false);
-    expect(typeof value).toBe('boolean');
+  it('encodes boolean false as JSON false in the role-filter link', () => {
+    renderCell({ active: false });
+    const href = filterHref(/Filter crew-worker: active = false/);
+    const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
+    expect(facets.active).toBe(false);
+    expect(typeof facets.active).toBe('boolean');
   });
 
-  it('passes native number (not string) to onMetaFacet', () => {
-    const onMetaFacet = vi.fn();
-    render(
-      <MetadataCell
-        metadata={{ confidence: 0.95 }}
-        role="reviewer"
-        onMetaFacet={onMetaFacet}
-      />,
-    );
-    fireEvent.click(screen.getByTitle(/Filter reviewer: confidence = 0.95/));
-    const [, value] = onMetaFacet.mock.calls[0];
-    expect(value).toBe(0.95);
-    expect(typeof value).toBe('number');
+  it('encodes number as JSON number (not string) in the role-filter link', () => {
+    renderCell({ confidence: 0.95 }, 'reviewer');
+    const href = filterHref(/Filter reviewer: confidence = 0.95/);
+    const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
+    expect(facets.confidence).toBe(0.95);
+    expect(typeof facets.confidence).toBe('number');
   });
 
-  it('passes string as-is to onMetaFacet', () => {
-    const onMetaFacet = vi.fn();
-    render(
-      <MetadataCell
-        metadata={{ status: 'active' }}
-        role="crew-worker"
-        onMetaFacet={onMetaFacet}
-      />,
-    );
-    fireEvent.click(screen.getByTitle(/Filter crew-worker: status = active/));
-    const [, value] = onMetaFacet.mock.calls[0];
-    expect(value).toBe('active');
-    expect(typeof value).toBe('string');
+  it('encodes integer schema_version as JSON number (the original bug)', () => {
+    renderCell({ schema_version: 1 }, 'checklist-operator');
+    const href = filterHref(/Filter checklist-operator: schema_version = 1/);
+    const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
+    expect(facets.schema_version).toBe(1);
+    expect(typeof facets.schema_version).toBe('number');
   });
 
-  it('passes global search with native boolean (Search icon click)', () => {
-    const onMetaFacet = vi.fn();
-    render(
-      <MetadataCell
-        metadata={{ crew_pill: true }}
-        role="crew-worker"
-        onMetaFacet={onMetaFacet}
-      />,
-    );
-    fireEvent.click(screen.getByTitle(/Search all: crew_pill = true/));
-    const [key, value, , role] = onMetaFacet.mock.calls[0];
-    expect(key).toBe('crew_pill');
-    expect(value).toBe(true);
-    expect(role).toBeNull();  // null = global search
+  it('encodes string as JSON string in the role-filter link', () => {
+    renderCell({ status: 'active' });
+    const href = filterHref(/Filter crew-worker: status = active/);
+    const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
+    expect(facets.status).toBe('active');
+    expect(typeof facets.status).toBe('string');
+  });
+
+  it('global search link omits role param and preserves native type', () => {
+    renderCell({ crew_pill: true });
+    const href = filterHref(/Search all: crew_pill = true/);
+    expect(href).not.toContain('role=');
+    const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
+    expect(facets.crew_pill).toBe(true);
   });
 });
