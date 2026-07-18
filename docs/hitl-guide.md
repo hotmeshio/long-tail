@@ -245,7 +245,8 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 
 | Keyword | Level | Purpose |
 |---------|-------|---------|
-| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown` |
+| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist` |
+| `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` (e.g. `"envelope.checklist_items"`) |
 | `x-lt-language` | field | Syntax hint shown by the `code-editor` widget |
 | `accept` | field | File-type filter for the `file-upload` widget (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path this field's value occupies in the resolver payload (e.g. `"customer.email"`) |
@@ -264,11 +265,10 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 | `required` | schema | Fields that must be filled before submit |
 | `title` / `description` | both | Section header / helper text |
 
-The working reference is `examples/workflows/rich-form/` — the `intake-reviewer` role's
-versioned `form_schema` (seeded by `examples/seed-rich-form.ts`) exercises the whole
-vocabulary in one form: side-panel help (`x-lt-help` with a checklist, table, tokens,
-and a relative link), two-column layout, ordering, date and email formats, enum, file
-upload, spans, required fields, and `x-lt-bind` mapping into a nested payload.
+Two working references ship as example workflows:
+
+- `examples/workflows/rich-form/` — the `intake-reviewer` role exercises the whole vocabulary: side-panel help, two-column layout, ordering, date and email formats, enum, file upload, spans, required fields, and `x-lt-bind`.
+- `examples/workflows/checklist-confirmation/` — the `checklist-operator` role demonstrates the `checklist` widget with `x-lt-source` driving a dynamic list of checkboxes from `envelope.checklist_items`.
 
 ### Supported Field Types
 
@@ -316,6 +316,7 @@ For rich inputs beyond standard HTML types:
 | `"signature"` | HTML5 Canvas drawing pad. Outputs PNG data URL. |
 | `"rich-text"` | Tall textarea for formatted text input. |
 | `"markdown"` | Markdown source, rendered with the same engine as the docs drawer (headings, tables, lists, code blocks, callouts). Editable fields get a Write/Preview toggle; with `readOnly: true` the field is a pure content block — see below. |
+| `"checklist"` | Dynamic list of labeled checkboxes. Item definitions come from any context domain at runtime via `x-lt-source`. Stores `Record<string, boolean>` keyed by item id. |
 
 ```json
 {
@@ -365,6 +366,57 @@ source rides along in the resolver payload like any read-only field.
 
 Without `readOnly`, the field is a markdown *editor* — the resolver writes source in
 a Write/Preview toggle and the submitted value is the markdown text.
+
+#### Checklist widget (`x-lt-widget: "checklist"`)
+
+A dynamic list of labeled checkboxes driven by runtime data in the escalation context. The item definitions come from a domain path declared in `x-lt-source` — the form schema itself never changes as item count or labels vary across escalations.
+
+The field type must be `"object"`. The submitted value is `Record<string, boolean>` keyed by item id (e.g. `{ "item_0": true, "item_1": false }`).
+
+```json
+{
+  "properties": {
+    "items": {
+      "type": "object",
+      "description": "Work through each step and check it off.",
+      "x-lt-widget": "checklist",
+      "x-lt-source": "envelope.checklist_items"
+    }
+  },
+  "required": ["items"]
+}
+```
+
+The `x-lt-source` value is `"domain.path"` — the same domain/path convention used by `x-lt-showIf` and `x-lt-help` tokens. The dashboard resolves the path at render time and expects an array of `{ id: string; label: string }` objects.
+
+**Domain choice:**
+- `envelope` — for item definitions that are render data only (no query cost). The workflow puts them in `conditionLT`'s `envelope` parameter.
+- `metadata` — only when items need to be GIN-indexed and searchable as facets. Adds index cost.
+
+**Workflow side:**
+
+```typescript
+const checklistItems = [
+  { id: 'item_0', label: 'Step 1: Verify patient ID' },
+  { id: 'item_1', label: 'Step 2: Confirm dosage' },
+];
+
+const decision = await conditionLT<{ items: Record<string, boolean> }>(signalId, {
+  role: 'checklist-operator',
+  envelope: {
+    checklist_items: checklistItems,
+    formDefaults: {
+      items: Object.fromEntries(checklistItems.map((i) => [i.id, false])),
+    },
+  },
+});
+
+const allConfirmed = Object.values(decision.items).every(Boolean);
+```
+
+Pre-populating `formDefaults.items` with `false` for each id opens the form with every checkbox unchecked rather than indeterminate.
+
+The `examples/workflows/checklist-confirmation/` workflow is the reference: it accepts a `count` input (1–20), generates that many items, suspends for a human to check them off, and returns a summary including `confirmed`, `unconfirmed`, and `allConfirmed`.
 
 ### Help Panel (`x-lt-help`)
 
