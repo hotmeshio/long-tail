@@ -90,20 +90,6 @@ export function AvailableEscalationsPage() {
     setFacetFilters({ ...facetFilters, facets: Object.keys(rest).length > 0 ? rest : undefined });
   }, [facetFilters, setFacetFilters]);
 
-  // Called from timeline card metadata rows.
-  // role = null → update this page's facets (shift = AND, else replace)
-  // role = string → navigate to role-scoped timeline
-  const onMetaFacet = useCallback((key: string, value: string | number | boolean, shift: boolean, role: string | null) => {
-    if (role) {
-      const facets = encodeURIComponent(JSON.stringify({ [key]: value }));
-      navigate(`/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`);
-    } else if (shift) {
-      setFacetFilters({ ...facetFilters, facets: { ...facetFilters.facets, [key]: value } });
-    } else {
-      setFacetFilters({ facets: { [key]: value } });
-    }
-  }, [facetFilters, setFacetFilters, navigate]);
-
   const claim = useClaimEscalation();
   const setPriority = useSetEscalationPriority();
   const bulkClaim = useBulkClaimEscalations();
@@ -294,7 +280,7 @@ export function AvailableEscalationsPage() {
       render: () => null,
       className: 'w-10',
     },
-    ...makeEscalationColumns({ onMetaFacet, highlightKeys: facetHighlightKeys }),
+    ...makeEscalationColumns({ highlightKeys: facetHighlightKeys }),
     {
       key: 'actions',
       label: '',
@@ -507,7 +493,6 @@ export function AvailableEscalationsPage() {
           escalations={escalations}
           highlightKeys={facetHighlightKeys}
           onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
-          onMetaFacet={onMetaFacet}
           total={total}
           page={pagination.page}
           totalPages={Math.ceil(total / timelinePageSize)}

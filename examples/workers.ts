@@ -10,6 +10,7 @@ import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
+import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
 import * as policyDocumentWorkflow from './workflows/policy-document';
 import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
@@ -38,6 +39,7 @@ const SUPERADMIN = 'superadmin';
 const GRINDER = 'grinder';
 const GLUER = 'gluer';
 const INTAKE_REVIEWER = 'intake-reviewer';
+const CHECKLIST_OPERATOR = 'checklist-operator';
 const POLICY_DOCUMENT = 'policy-document';
 
 const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
@@ -115,6 +117,17 @@ const efficientSignalConfig: LTWorkerConfig = {
       approved: { type: 'boolean', default: false, description: 'Approve this deployment?' },
       notes: { type: 'string', default: '', description: 'Reviewer notes — visible to the workflow author' },
     },
+  },
+};
+
+const checklistConfirmationConfig: LTWorkerConfig = {
+  description: 'Checklist confirmation — runtime-driven dynamic checkboxes. Supply count (1–20, default 3); the workflow generates that many labelled steps in the escalation envelope and suspends. The dashboard renders them via the checklist widget. Reference example for x-lt-widget: checklist + x-lt-source.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: CHECKLIST_OPERATOR,
+  envelopeSchema: {
+    data: { count: 5 },
+    metadata: { source: 'dashboard' },
   },
 };
 
@@ -378,6 +391,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: reverterWorkflow.reverter, config: reverterConfig },
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
+  { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },

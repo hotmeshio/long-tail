@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Circle, Bell, Clock, ListFilter, Search } from 'lucide-react';
 import type { Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect, FilterInput, FilterDivider } from '../../components/common/data/FilterBar';
@@ -8,12 +9,10 @@ import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { CountdownTimer } from '../../components/common/display/CountdownTimer';
 import { formatAgoCompact, formatDateTime } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
+import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
 
-export type MetaFacetFn = (key: string, value: string | number | boolean, shift: boolean, role: string | null) => void;
-
 export interface EscalationColumnOpts {
-  onMetaFacet?: MetaFacetFn;
   highlightKeys?: string[];
 }
 
@@ -46,12 +45,10 @@ export function MetadataCell({
   metadata,
   role,
   highlightKeys,
-  onMetaFacet,
 }: {
   metadata: Record<string, unknown> | null;
   role: string;
   highlightKeys?: string[];
-  onMetaFacet?: MetaFacetFn;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -76,10 +73,6 @@ export function MetadataCell({
           const sv = typeof metadata[k] === 'object' && metadata[k] !== null
             ? JSON.stringify(metadata[k])
             : String(metadata[k]);
-          // Native type (boolean/number) preserved for facet queries; objects become JSON strings.
-          const facetValue: string | number | boolean = typeof metadata[k] === 'object' && metadata[k] !== null
-            ? JSON.stringify(metadata[k])
-            : (metadata[k] as string | number | boolean);
           const isHl = hl.includes(k);
           const isLastShown = i === shown.length - 1;
           return (
@@ -96,24 +89,24 @@ export function MetadataCell({
               >
                 {sv}
               </span>
-              {onMetaFacet && (
-                <span className="flex items-center gap-px shrink-0 opacity-0 group-hover/mrow:opacity-100 transition-opacity">
-                  <button
-                    className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
-                    title={`Filter ${role}: ${k} = ${sv}`}
-                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet(k, facetValue, ev.shiftKey, role); }}
-                  >
-                    <ListFilter className="w-3 h-3" />
-                  </button>
-                  <button
-                    className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
-                    title={`Search all: ${k} = ${sv}`}
-                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet(k, facetValue, ev.shiftKey, null); }}
-                  >
-                    <Search className="w-3 h-3" />
-                  </button>
-                </span>
-              )}
+              <span className="flex items-center gap-px shrink-0 opacity-0 group-hover/mrow:opacity-100 transition-opacity">
+                <Link
+                  to={metadataFacetUrl(k, metadata[k], role)}
+                  className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                  title={`Filter ${role}: ${k} = ${sv}`}
+                  onClick={(ev) => ev.stopPropagation()}
+                >
+                  <ListFilter className="w-3 h-3" />
+                </Link>
+                <Link
+                  to={metadataFacetUrl(k, metadata[k])}
+                  className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                  title={`Search all: ${k} = ${sv}`}
+                  onClick={(ev) => ev.stopPropagation()}
+                >
+                  <Search className="w-3 h-3" />
+                </Link>
+              </span>
               {/* +N inline at end of single visible row when collapsed */}
               {!expanded && hiddenCount > 0 && (
                 <button
@@ -170,7 +163,6 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
           metadata={row.metadata}
           role={row.role}
           highlightKeys={opts.highlightKeys}
-          onMetaFacet={opts.onMetaFacet}
         />
       ),
       className: 'w-80 max-w-[19rem] align-top',

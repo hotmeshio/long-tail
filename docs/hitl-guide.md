@@ -181,7 +181,7 @@ The resolver form resolves in order, most specific first:
 
 1. **`metadata.form_schema`** — a full JSON Schema embedded on the escalation row. Use when different escalation points in the same workflow need different forms.
 2. **The role's `form_schema`** — the versioned form every role provides. When the row carries a `metadata.schema_version` pin (set via `schemaVersion` in the `conditionLT` config), the form renders exactly that snapshot even after the role's schema changes; without a pin, the role's latest applies.
-3. **Workflow config `resolver_schema`** — **deprecated** legacy fallback only, used when no role `form_schema` is available.
+3. **Workflow config `resolver_schema`** — lowest-priority fallback, used only when no role `form_schema` is available.
 
 ### Versioned Role Schemas
 
@@ -245,7 +245,8 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 
 | Keyword | Level | Purpose |
 |---------|-------|---------|
-| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown` |
+| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist` |
+| `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` (e.g. `"envelope.checklist_items"`) |
 | `x-lt-language` | field | Syntax hint shown by the `code-editor` widget |
 | `accept` | field | File-type filter for the `file-upload` widget (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path this field's value occupies in the resolver payload (e.g. `"customer.email"`) |
@@ -264,11 +265,10 @@ The full custom vocabulary at a glance — every `x-lt-*` keyword and extension 
 | `required` | schema | Fields that must be filled before submit |
 | `title` / `description` | both | Section header / helper text |
 
-The working reference is `examples/workflows/rich-form/` — the `intake-reviewer` role's
-versioned `form_schema` (seeded by `examples/seed-rich-form.ts`) exercises the whole
-vocabulary in one form: side-panel help (`x-lt-help` with a checklist, table, tokens,
-and a relative link), two-column layout, ordering, date and email formats, enum, file
-upload, spans, required fields, and `x-lt-bind` mapping into a nested payload.
+Two working references ship as example workflows:
+
+- `examples/workflows/rich-form/` — the `intake-reviewer` role exercises the whole vocabulary: side-panel help, two-column layout, ordering, date and email formats, enum, file upload, spans, required fields, and `x-lt-bind`.
+- `examples/workflows/checklist-confirmation/` — the `checklist-operator` role demonstrates the `checklist` widget with `x-lt-source` driving a dynamic list of checkboxes from `envelope.checklist_items`.
 
 ### Supported Field Types
 
@@ -316,6 +316,7 @@ For rich inputs beyond standard HTML types:
 | `"signature"` | HTML5 Canvas drawing pad. Outputs PNG data URL. |
 | `"rich-text"` | Tall textarea for formatted text input. |
 | `"markdown"` | Markdown source, rendered with the same engine as the docs drawer (headings, tables, lists, code blocks, callouts). Editable fields get a Write/Preview toggle; with `readOnly: true` the field is a pure content block — see below. |
+| `"checklist"` | Dynamic list of labeled checkboxes. Item definitions come from any context domain at runtime via `x-lt-source`. Stores `Record<string, boolean>` keyed by item id. |
 
 ```json
 {
@@ -365,6 +366,57 @@ source rides along in the resolver payload like any read-only field.
 
 Without `readOnly`, the field is a markdown *editor* — the resolver writes source in
 a Write/Preview toggle and the submitted value is the markdown text.
+
+#### Checklist widget (`x-lt-widget: "checklist"`)
+
+A dynamic list of labeled checkboxes driven by runtime data in the escalation context. The item definitions come from a domain path declared in `x-lt-source` — the form schema itself never changes as item count or labels vary across escalations.
+
+The field type must be `"object"`. The submitted value is `Record<string, boolean>` keyed by item id (e.g. `{ "item_0": true, "item_1": false }`).
+
+```json
+{
+  "properties": {
+    "items": {
+      "type": "object",
+      "description": "Work through each step and check it off.",
+      "x-lt-widget": "checklist",
+      "x-lt-source": "envelope.checklist_items"
+    }
+  },
+  "required": ["items"]
+}
+```
+
+The `x-lt-source` value is `"domain.path"` — the same domain/path convention used by `x-lt-showIf` and `x-lt-help` tokens. The dashboard resolves the path at render time and expects an array of `{ id: string; label: string }` objects.
+
+**Domain choice:**
+- `envelope` — for item definitions that are render data only (no query cost). The workflow puts them in `conditionLT`'s `envelope` parameter.
+- `metadata` — only when items need to be GIN-indexed and searchable as facets. Adds index cost.
+
+**Workflow side:**
+
+```typescript
+const checklistItems = [
+  { id: 'item_0', label: 'Step 1: Verify patient ID' },
+  { id: 'item_1', label: 'Step 2: Confirm dosage' },
+];
+
+const decision = await conditionLT<{ items: Record<string, boolean> }>(signalId, {
+  role: 'checklist-operator',
+  envelope: {
+    checklist_items: checklistItems,
+    formDefaults: {
+      items: Object.fromEntries(checklistItems.map((i) => [i.id, false])),
+    },
+  },
+});
+
+const allConfirmed = Object.values(decision.items).every(Boolean);
+```
+
+Pre-populating `formDefaults.items` with `false` for each id opens the form with every checkbox unchecked rather than indeterminate.
+
+The `examples/workflows/checklist-confirmation/` workflow is the reference: it accepts a `count` input (1–20), generates that many items, suspends for a human to check them off, and returns a summary including `confirmed`, `unconfirmed`, and `allConfirmed`.
 
 ### Help Panel (`x-lt-help`)
 
@@ -966,75 +1018,167 @@ if (result.confidence < 0.8) {
 
 ## Worked Examples
 
+Each example is a complete `conditionLT` call. The form schema lives in `metadata.form_schema` inside the config; the signal key is the first argument and is never duplicated in metadata.
+
 ### Simple Approval
 
-A workflow needs a yes/no decision with optional notes.
+A workflow pauses for a yes/no decision. The resolver's payload shape is declared as the generic type parameter so the workflow is fully typed after resume.
 
 ```typescript
-metadata: {
-  signal_id: signalId,
-  form_schema: {
-    title: 'Approve Request',
-    description: 'Review the details and approve or reject this request.',
-    required: ['approved'],
-    properties: {
-      approved: { type: 'boolean', description: 'Check to approve' },
-      notes: { type: 'string', format: 'textarea', description: 'Optional comments' },
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function approveSpendWorkflow(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+
+  const decision = await conditionLT<{ approved: boolean; notes?: string }>(
+    `spend-approval-${ctx.workflowId}`,
+    {
+      role: 'finance-reviewer',
+      type: 'approval',
+      description: `Approve spend of $${envelope.data.amount} for ${envelope.data.vendor}`,
+      priority: 2,
+      metadata: {
+        form_schema: {
+          title: 'Spend Approval',
+          description: 'Review and approve or reject this spend request.',
+          required: ['approved'],
+          properties: {
+            approved: { type: 'boolean', description: 'Check to approve' },
+            notes: { type: 'string', format: 'textarea', description: 'Optional comments' },
+          },
+        },
+      },
+      timeout: '48h',
     },
-  },
+  );
+
+  if (decision === null) return { type: 'return' as const, data: { cancelled: true } };
+  if (decision === false) return { type: 'return' as const, data: { timedOut: true } };
+
+  if (decision.approved) {
+    await releasePayment(envelope.data);
+  } else {
+    await notifyRejection(envelope.data, decision.notes);
+  }
 }
 ```
 
-### Document Review with PDF Viewer
+### Multi-Field Intake with Layout
 
-Use an iframe viewport to embed a PDF viewer alongside approval controls.
+A structured intake form — two-column layout, ordered fields, required validation, and `x-lt-help` guidance in the side panel.
 
 ```typescript
-metadata: {
-  signal_id: signalId,
-  form_schema: {
-    title: 'Document Review',
-    'x-lt-viewport': {
-      type: 'iframe',
-      src: 'https://internal.example.com/pdf-reviewer',
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function customerIntakeWorkflow(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+
+  const intake = await conditionLT<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    tier: 'free' | 'pro' | 'enterprise';
+    notes?: string;
+  }>(
+    `intake-${ctx.workflowId}`,
+    {
+      role: 'intake-reviewer',
+      type: 'intake',
+      description: 'New customer intake',
+      priority: 2,
+      envelope: { data: envelope.data },
+      metadata: {
+        form_schema: {
+          title: 'Customer Intake',
+          description: 'Complete all required fields then submit.',
+          'x-lt-layout': 'two-column',
+          'x-lt-order': ['first_name', 'last_name', 'email', 'phone', 'tier', 'notes'],
+          'x-lt-help': '### Intake checklist\n\n1. Confirm the **legal name** matches the ID on file.\n2. Verify the email is reachable — send a test message.\n3. Select tier based on the sales order.\n\n> Escalate non-standard contract language to legal.',
+          required: ['first_name', 'last_name', 'email', 'tier'],
+          properties: {
+            first_name: { type: 'string' },
+            last_name: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            phone: { type: 'string' },
+            tier: {
+              type: 'string',
+              enum: ['free', 'pro', 'enterprise'],
+              description: 'Select the customer tier',
+            },
+            notes: {
+              type: 'string',
+              format: 'textarea',
+              'x-lt-span': 2,
+              description: 'Additional notes',
+            },
+          },
+        },
+      },
     },
-  },
+  );
+
+  if (!intake) return { type: 'return' as const, data: { cancelled: true } };
+
+  await provisionAccount({ ...intake });
 }
 ```
 
-The iframe at `pdf-reviewer` loads the document, renders it with a viewer, and posts `lt:submit` with the review decision.
+### Checklist Confirmation
 
-### Multi-Field Data Entry
-
-A complex form with layout and validation.
+A dynamic checklist where item labels come from the workflow's envelope, not the static schema. Item count and wording can vary per escalation without ever touching the form schema.
 
 ```typescript
-metadata: {
-  signal_id: signalId,
-  form_schema: {
-    title: 'Customer Intake',
-    description: 'Complete the customer information form. All required fields must be filled before submission.',
-    'x-lt-layout': 'two-column',
-    'x-lt-order': ['first_name', 'last_name', 'email', 'phone', 'tier', 'notes'],
-    required: ['first_name', 'last_name', 'email', 'tier'],
-    properties: {
-      first_name: { type: 'string' },
-      last_name: { type: 'string' },
-      email: { type: 'string', format: 'email' },
-      phone: { type: 'string' },
-      tier: {
-        type: 'string',
-        enum: ['free', 'pro', 'enterprise'],
-        description: 'Select the customer tier',
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function stationCheckWorkflow(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+
+  const steps = [
+    { id: 'step_0', label: 'Verify patient ID matches the order' },
+    { id: 'step_1', label: 'Confirm dosage and route of administration' },
+    { id: 'step_2', label: 'Sign the dispensing log' },
+  ];
+
+  const result = await conditionLT<{ checks: Record<string, boolean> }>(
+    `station-check-${ctx.workflowId}`,
+    {
+      role: 'station-operator',
+      type: 'station-check',
+      description: 'Complete all station checks before releasing',
+      priority: 1,
+      envelope: {
+        checklist_items: steps,
+        formDefaults: {
+          // Pre-populate all checkboxes as unchecked
+          checks: Object.fromEntries(steps.map((s) => [s.id, false])),
+        },
       },
-      notes: {
-        type: 'string',
-        format: 'textarea',
-        'x-lt-span': 2,
-        description: 'Additional notes about this customer',
+      metadata: {
+        form_schema: {
+          title: 'Station Check',
+          description: 'Work through each step and confirm completion.',
+          required: ['checks'],
+          properties: {
+            checks: {
+              type: 'object',
+              'x-lt-widget': 'checklist',
+              'x-lt-source': 'envelope.checklist_items',
+              description: 'Check each step when complete',
+            },
+          },
+        },
       },
     },
-  },
+  );
+
+  if (!result) return { type: 'return' as const, data: { cancelled: true } };
+
+  const allClear = Object.values(result.checks).every(Boolean);
+  const failed = steps.filter((s) => !result.checks[s.id]).map((s) => s.label);
+
+  if (!allClear) {
+    await flagIncomplete({ failed });
+  }
 }
 ```
 
@@ -1043,22 +1187,50 @@ metadata: {
 Password fields are automatically redacted and replaced with ephemeral tokens (15-min TTL) before being sent back to the workflow.
 
 ```typescript
-metadata: {
-  signal_id: signalId,
-  form_schema: {
-    title: 'Provide Credentials',
-    description: 'Enter the API credentials for this integration. Passwords are encrypted and stored as ephemeral tokens.',
-    required: ['api_key', 'api_secret'],
-    properties: {
-      api_key: { type: 'string', description: 'API Key' },
-      api_secret: { type: 'string', format: 'password', description: 'API Secret (will be redacted)' },
-      environment: {
-        type: 'string',
-        enum: ['sandbox', 'production'],
-        description: 'Target environment',
+import { conditionLT } from '@hotmeshio/long-tail';
+
+export async function credentialProvisionWorkflow(envelope: LTEnvelope) {
+  const ctx = Durable.workflow.workflowInfo();
+
+  const creds = await conditionLT<{
+    api_key: string;
+    api_secret: string;  // arrives as eph:v1:* token, never plain text
+    environment: 'sandbox' | 'production';
+  }>(
+    `creds-${ctx.workflowId}`,
+    {
+      role: 'integration-admin',
+      type: 'credential-provision',
+      description: `Provide API credentials for ${envelope.data.integration}`,
+      priority: 1,
+      metadata: {
+        form_schema: {
+          title: 'Provide Credentials',
+          description: 'Enter the API credentials. Secrets are encrypted in transit and stored as ephemeral tokens.',
+          required: ['api_key', 'api_secret', 'environment'],
+          properties: {
+            api_key: { type: 'string', description: 'API Key' },
+            api_secret: {
+              type: 'string',
+              format: 'password',
+              description: 'API Secret — redacted before storage, returned as an ephemeral token',
+            },
+            environment: {
+              type: 'string',
+              enum: ['sandbox', 'production'],
+              description: 'Target environment',
+            },
+          },
+        },
       },
+      timeout: '24h',
     },
-  },
+  );
+
+  if (!creds) return { type: 'return' as const, data: { cancelled: true } };
+
+  // creds.api_secret is an eph:v1:* token — pass it to the integration layer for redemption
+  await configureIntegration(envelope.data.integration, creds);
 }
 ```
 
@@ -1079,7 +1251,7 @@ const result = await lt.escalations.resolve({
 });
 ```
 
-This routes through the full resolution path and works for all escalation types — atomic `conditionLT` (signal_key), legacy `conditionLT` (signal_id), and re-run-style escalations.
+This routes through the full resolution path and works for all escalation types — atomic `conditionLT` (signal_key), two-step `conditionLT` (signal_id), and re-run-style escalations.
 
 ### By metadata key-value pair
 

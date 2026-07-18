@@ -180,6 +180,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
             isRequired={isReq}
             isReadOnly={isReadOnly}
             error={error}
+            escalationContext={liveCtx}
           />
         </div>
       );
@@ -228,7 +229,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
 // Field row — renders appropriate input per type
 // ---------------------------------------------------------------------------
 
-function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isReadOnly, error }: {
+function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isReadOnly, error, escalationContext }: {
   fieldKey: string;
   value: JsonValue;
   onChange: (v: JsonValue) => void;
@@ -237,6 +238,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   isRequired?: boolean;
   isReadOnly?: boolean;
   error?: string;
+  escalationContext?: ShowIfContext;
 }) {
   const label = fieldKey.replace(/[_-]/g, ' ');
   const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
@@ -260,10 +262,26 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
     );
   }
 
-  // Custom widget via x-lt-widget (string fields only)
-  if (widgetName && widgetName in WIDGET_MAP && typeof value === 'string') {
+  // Custom widget via x-lt-widget.
+  // String fields pass the value directly. Object fields (e.g. checklist) are
+  // JSON-serialized into the widget and parsed back on change — the widget
+  // interface always deals in strings; FieldRow owns the object ↔ string boundary.
+  if (widgetName && widgetName in WIDGET_MAP) {
     const Widget = WIDGET_MAP[widgetName];
-    return <Widget fieldKey={fieldKey} value={value} onChange={(v) => onChange(v)} schema={fieldSchema} />;
+    if (typeof value === 'string') {
+      return <Widget fieldKey={fieldKey} value={value} onChange={(v) => onChange(v)} schema={fieldSchema} escalationContext={escalationContext} />;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return (
+        <Widget
+          fieldKey={fieldKey}
+          value={JSON.stringify(value)}
+          onChange={(raw) => { try { onChange(JSON.parse(raw) as JsonValue); } catch { onChange(raw); } }}
+          schema={fieldSchema}
+          escalationContext={escalationContext}
+        />
+      );
+    }
   }
 
   // Boolean → checkbox

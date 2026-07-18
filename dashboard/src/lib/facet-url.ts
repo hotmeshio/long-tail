@@ -39,6 +39,24 @@ export function writeFacetParams(p: URLSearchParams, f: FacetFilters): void {
   if (f.available == null) p.delete('available'); else p.set('available', String(f.available));
 }
 
+/**
+ * Build a metadata facet deep-link URL, preserving the native JS type of
+ * `value` (number, boolean, string) so the JSONB containment query is
+ * type-correct. Objects are JSON-stringified; primitives pass through.
+ *
+ * Single source of truth — use this everywhere a metadata-icon click
+ * should navigate to a filtered queue (timeline cards, table rows, detail
+ * panel). Never pass the value through String() first.
+ */
+export function metadataFacetUrl(key: string, value: unknown, role?: string | null): string {
+  const facetValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+  const facets = encodeURIComponent(JSON.stringify({ [key]: facetValue }));
+  if (role) {
+    return `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`;
+  }
+  return `/escalations/available?facets=${facets}&status=all`;
+}
+
 /** Count of active facet conditions (for the trigger badge). */
 export function facetCount(f: FacetFilters): number {
   return (

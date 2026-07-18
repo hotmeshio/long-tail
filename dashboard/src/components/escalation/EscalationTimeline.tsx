@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Search, ListFilter, ChevronDown, ChevronUp } from 'lucide-react';
 import type { LTEscalationRecord } from '../../api/types';
+import { metadataFacetUrl } from '../../lib/facet-url';
+import { isEffectivelyClaimed } from '../../lib/escalation';
 
 const STATUS_COLOR: Record<string, string> = {
   pending:   '#0ea5e9',
@@ -113,12 +116,10 @@ function TimelineCard({
   e,
   highlightKeys,
   onRowClick,
-  onMetaFacet,
 }: {
   e:             Parsed;
   highlightKeys: string[];
   onRowClick?:   (row: LTEscalationRecord) => void;
-  onMetaFacet?:  (key: string, value: string, shift: boolean, role: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -173,22 +174,24 @@ function TimelineCard({
                 >
                   {sv}
                 </span>
-                {/* Filter icons — only trigger on explicit click, stop propagation */}
+                {/* Filter icons — Links so native value type is preserved in the URL */}
                 <span className="flex items-center gap-px shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                  <button
+                  <Link
+                    to={metadataFacetUrl(k, v, e.role)}
                     className="p-0.5 rounded text-slate-300 hover:text-accent transition-colors"
                     title={`Filter ${titleCase(e.role)}: ${k} = ${sv}`}
-                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet?.(k, sv, ev.shiftKey, e.role); }}
+                    onClick={(ev) => ev.stopPropagation()}
                   >
                     <ListFilter className="w-2.5 h-2.5" />
-                  </button>
-                  <button
+                  </Link>
+                  <Link
+                    to={metadataFacetUrl(k, v)}
                     className="p-0.5 rounded text-slate-300 hover:text-accent transition-colors"
                     title={`Search all: ${k} = ${sv}`}
-                    onClick={(ev) => { ev.stopPropagation(); onMetaFacet?.(k, sv, ev.shiftKey, null); }}
+                    onClick={(ev) => ev.stopPropagation()}
                   >
                     <Search className="w-2.5 h-2.5" />
-                  </button>
+                  </Link>
                 </span>
               </div>
             );
@@ -220,7 +223,6 @@ export function EscalationTimeline({
   escalations,
   highlightKeys = [],
   onRowClick,
-  onMetaFacet,
   total: _total,
   page,
   totalPages,
@@ -230,7 +232,6 @@ export function EscalationTimeline({
   escalations:    LTEscalationRecord[];
   highlightKeys?: string[];
   onRowClick?:    (row: LTEscalationRecord) => void;
-  onMetaFacet?:   (key: string, value: string, shift: boolean, role: string | null) => void;
   total:          number;
   page:           number;
   totalPages:     number;
@@ -246,7 +247,7 @@ export function EscalationTimeline({
     const isOpen     = !resolvedMs && e.status !== 'cancelled' && e.status !== 'expired';
     const endMs      = resolvedMs ?? (isOpen ? nowMs : startMs + 30_000);
     const displayStatus =
-      e.status === 'pending' && claimedMs !== null ? 'claimed' : e.status;
+      e.status === 'pending' && isEffectivelyClaimed(e) ? 'claimed' : e.status;
     return { ...e, startMs, claimedMs, endMs, isOpen, displayStatus };
   });
 
@@ -301,7 +302,7 @@ export function EscalationTimeline({
                 <div className="flex-1 flex justify-end items-center">
                   {isLeft ? (
                     <div className="flex items-center">
-                      <TimelineCard e={e} highlightKeys={highlightKeys} onRowClick={onRowClick} onMetaFacet={onMetaFacet} />
+                      <TimelineCard e={e} highlightKeys={highlightKeys} onRowClick={onRowClick} />
                       <div className="flex-shrink-0 h-px bg-slate-200/70" style={{ width: CONNECTOR_W }} />
                     </div>
                   ) : (
@@ -323,7 +324,7 @@ export function EscalationTimeline({
                   {!isLeft ? (
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-px bg-slate-200/70" style={{ width: CONNECTOR_W }} />
-                      <TimelineCard e={e} highlightKeys={highlightKeys} onRowClick={onRowClick} onMetaFacet={onMetaFacet} />
+                      <TimelineCard e={e} highlightKeys={highlightKeys} onRowClick={onRowClick} />
                     </div>
                   ) : (
                     <span className="text-[10px] text-slate-400 font-mono tabular-nums pl-3">
