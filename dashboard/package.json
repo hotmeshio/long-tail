@@ -1,7 +1,7 @@
 {
   "name": "long-tail-dashboard",
   "private": true,
-  "version": "0.4.21",
+  "version": "0.4.22",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.25.4",
+    "@hotmeshio/hotmesh": "^0.26.1",
     "@tanstack/react-query": "^5.62.0",
     "date-fns": "^4.1.0",
     "js-yaml": "^4.1.1",

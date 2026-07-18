@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { mapFormToPayload } from '../../../lib/x-lt-bind';
+import { evaluateShowIf, type ShowIfContext } from '../../../lib/x-lt-show-if';
+import { validateField, type FieldError } from '../../../lib/field-validator';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
@@ -50,6 +52,10 @@ export interface EscalationActionBarProps {
   assignedUntil?: string | null;
   // Validation
   onSubmitAttempt?: () => void;
+  /** Called with structured errors when submit is blocked by validation. */
+  onValidationErrors?: (errors: FieldError[]) => void;
+  /** Escalation context — used to skip required checks on fields hidden by x-lt-showIf. */
+  escalationContext?: ShowIfContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +73,8 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     onCancel,
     assignedTo, assignedUntil,
     onSubmitAttempt,
+    onValidationErrors,
+    escalationContext,
   } = props;
 
   const claimDurations = useClaimDurations();
@@ -110,23 +118,34 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
       return;
     }
 
-    // Validate required fields from embedded _form_schema
+    // Validate all fields against the embedded _form_schema.
+    // Hidden fields (x-lt-showIf evaluates falsy against the live context) are
+    // excluded — a field the user cannot see must never block submission.
     const schema = payload._form_schema as Record<string, unknown> | undefined;
-    const required = schema?.required as string[] | undefined;
-    if (required?.length) {
-      const missing = required.filter((field) => {
-        const val = payload[field];
-        if (val === undefined || val === null) return true;
-        if (typeof val === 'string' && val.trim() === '') return true;
-        return false;
-      });
-      if (missing.length > 0) {
+    if (schema) {
+      const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+      const required = new Set((schema.required as string[] | undefined) ?? []);
+      const liveCtx: ShowIfContext = {
+        ...(escalationContext ?? {}),
+        resolver: payload as Record<string, unknown>,
+      };
+
+      const fieldErrors: FieldError[] = [];
+      for (const [field, fieldSchema] of Object.entries(properties)) {
+        if (!evaluateShowIf(fieldSchema['x-lt-showIf'], liveCtx)) continue;
+        const err = validateField(payload[field], fieldSchema, required.has(field), true, liveCtx as Record<string, unknown>);
+        if (err) fieldErrors.push({ field, message: err });
+      }
+
+      if (fieldErrors.length > 0) {
         onSubmitAttempt?.();
-        const labels = missing.map((f) => f.replace(/[_-]/g, ' '));
+        onValidationErrors?.(fieldErrors);
+        const first = fieldErrors[0];
+        const labels = fieldErrors.map((e) => e.field.replace(/[_-]/g, ' '));
         const display = labels.length <= 2
           ? labels.join(', ')
           : `${labels.slice(0, 2).join(', ')}...`;
-        setParseError(`Required: ${display}`);
+        setParseError(first.message === 'Required' ? `Required: ${display}` : `${first.message} — ${display}`);
         return;
       }
     }
@@ -235,35 +254,21 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
 
             {/* ── Resolve controls ── */}
             {activeView === 'resolve' && (
-              workflowType ? (
-                <div className="flex items-center gap-4">
-                  <div className="flex-1" />
-
-                  {parseError && <span className="text-xs text-status-error">{parseError}</span>}
-                  {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
-
-                  <button
-                    onClick={handleSubmitResolve}
-                    disabled={resolvePending}
-                    className="btn-primary text-xs"
-                  >
-                    {resolvePending ? 'Submitting...' : requestTriage ? 'Send to Triage' : 'Submit'}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <span className="text-xs text-text-secondary">Notification — acknowledge to resolve</span>
-                  <div className="flex-1" />
-                  {resolveError && <span className="text-xs text-status-error mr-3">{resolveError.message}</span>}
-                  <button
-                    onClick={() => onResolve({ acknowledged: true })}
-                    disabled={resolvePending}
-                    className="btn-primary text-xs"
-                  >
-                    {resolvePending ? 'Acknowledging...' : 'Acknowledge'}
-                  </button>
-                </div>
-              )
+              <div className="flex items-center gap-4">
+                <div className="flex-1" />
+                {parseError && <span className="text-xs text-status-error">{parseError}</span>}
+                {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
+                <button
+                  onClick={handleSubmitResolve}
+                  disabled={resolvePending}
+                  className="btn-primary text-xs"
+                >
+                  {resolvePending
+                    ? (workflowType ? 'Submitting...' : 'Acknowledging...')
+                    : requestTriage ? 'Send to Triage'
+                    : workflowType ? 'Submit' : 'Acknowledge'}
+                </button>
+              </div>
             )}
 
             {/* ── Escalate controls ── */}

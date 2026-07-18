@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Layers } from 'lucide-react';
 import { WIDGET_MAP } from './widgets';
 import { evaluateShowIf, type ShowIfContext } from '../../lib/x-lt-show-if';
+import { validateField } from '../../lib/field-validator';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -148,28 +149,12 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
       const isReq = requiredFields.has(key);
       const isTouched = touched.has(key) || !!submitAttempted;
 
-      let error: string | undefined;
-      if (isReq && isTouched) {
-        if (val === undefined || val === null) {
-          error = 'Required';
-        } else if (typeof val === 'string' && val.trim() === '') {
-          error = 'Required';
-        }
-      }
-      if (isTouched && typeof val === 'string' && val.trim() !== '' && fieldSchema) {
-        const fmt = fieldSchema.format as string | undefined;
-        if (fmt === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-          error = 'Enter a valid email address';
-        }
-        if (fmt === 'uri' && !/^https?:\/\/.+/.test(val)) {
-          error = 'Enter a valid URL';
-        }
-      }
+      const error = validateField(val, fieldSchema, isReq, isTouched, liveCtx as Record<string, unknown>);
 
       return (
         <div
           key={key}
-          className={layout === 'two-column' && span >= 2 ? 'col-span-2' : ''}
+          className={`animate-[field-enter_0.2s_ease-out] ${layout === 'two-column' && span >= 2 ? 'col-span-2' : ''}`}
         >
           <FieldRow
             fieldKey={key}
@@ -181,6 +166,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
             isReadOnly={isReadOnly}
             error={error}
             escalationContext={liveCtx}
+            submitAttempted={!!submitAttempted}
           />
         </div>
       );
@@ -199,7 +185,9 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
         {sectionGroups.map((group, i) => (
           <div
             key={group.name ?? `__s${i}`}
-            className={group.name ? 'pl-4 border-l-2 border-accent/30' : ''}
+            className={group.name
+              ? 'border-l-2 border-accent/30 bg-[#f0f6ff4a] rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
+              : ''}
           >
             {group.name && (
               <div className="mb-5 flex items-center gap-2">
@@ -229,7 +217,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
 // Field row — renders appropriate input per type
 // ---------------------------------------------------------------------------
 
-function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isReadOnly, error, escalationContext }: {
+function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isReadOnly, error, escalationContext, submitAttempted }: {
   fieldKey: string;
   value: JsonValue;
   onChange: (v: JsonValue) => void;
@@ -239,6 +227,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   isReadOnly?: boolean;
   error?: string;
   escalationContext?: ShowIfContext;
+  submitAttempted?: boolean;
 }) {
   const label = fieldKey.replace(/[_-]/g, ' ');
   const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
@@ -268,17 +257,16 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   // interface always deals in strings; FieldRow owns the object ↔ string boundary.
   if (widgetName && widgetName in WIDGET_MAP) {
     const Widget = WIDGET_MAP[widgetName];
+    const widgetProps = { fieldKey, schema: fieldSchema, escalationContext, isRequired, submitAttempted, error };
     if (typeof value === 'string') {
-      return <Widget fieldKey={fieldKey} value={value} onChange={(v) => onChange(v)} schema={fieldSchema} escalationContext={escalationContext} />;
+      return <Widget {...widgetProps} value={value} onChange={(v) => onChange(v)} />;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       return (
         <Widget
-          fieldKey={fieldKey}
+          {...widgetProps}
           value={JSON.stringify(value)}
           onChange={(raw) => { try { onChange(JSON.parse(raw) as JsonValue); } catch { onChange(raw); } }}
-          schema={fieldSchema}
-          escalationContext={escalationContext}
         />
       );
     }
@@ -294,6 +282,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             checked={value}
             onChange={(e) => { onChange(e.target.checked); onBlur?.(); }}
             className="w-3.5 h-3.5 rounded accent-accent"
+            data-field-key={fieldKey}
           />
           <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
             {label}
@@ -316,6 +305,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
           onBlur={onBlur}
           step="any"
+          data-field-key={fieldKey}
           className={inputClass(!!error)}
         />
         <FieldError error={error} />
@@ -338,6 +328,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
+            data-field-key={fieldKey}
             className={inputClass(!!error)}
           >
             {enumValues.map((opt) => (
@@ -359,6 +350,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
+            data-field-key={fieldKey}
             className={inputClass(!!error)}
             autoComplete="off"
           />
@@ -385,6 +377,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
+            data-field-key={fieldKey}
             className={inputClass(!!error)}
           />
           <FieldError error={error} />
@@ -394,17 +387,46 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
 
     // Explicit textarea format or long content
     if (format === 'textarea' || value.length > 80) {
+      // Resolve effective maxLength for live counter — static schema wins, then dynamic path
+      const staticMax = fieldSchema?.maxLength as number | undefined;
+      const dynamicMaxPath = fieldSchema?.['x-lt-max-length'] as string | undefined;
+      let resolvedMax: number | undefined = staticMax;
+      if (resolvedMax === undefined && dynamicMaxPath && escalationContext) {
+        const dot = dynamicMaxPath.indexOf('.');
+        if (dot !== -1) {
+          const domain = dynamicMaxPath.slice(0, dot);
+          const path = dynamicMaxPath.slice(dot + 1);
+          const domainObj = (escalationContext as Record<string, unknown>)[domain];
+          if (domainObj && typeof domainObj === 'object') {
+            let cur: unknown = domainObj;
+            for (const p of path.split('.')) {
+              cur = (cur as Record<string, unknown>)[p];
+              if (cur === undefined) break;
+            }
+            if (typeof cur === 'number') resolvedMax = cur;
+            else if (typeof cur === 'string') { const n = Number(cur); if (!Number.isNaN(n)) resolvedMax = n; }
+          }
+        }
+      }
+      const isOverMax = resolvedMax !== undefined && value.length > resolvedMax;
+
       return (
         <div>
           <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
           {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
           <textarea
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => { onChange(e.target.value); onBlur?.(); }}
             onBlur={onBlur}
+            data-field-key={fieldKey}
             className={`${inputClass(!!error)} leading-relaxed`}
             rows={Math.min(6, Math.max(3, Math.ceil(value.length / 60)))}
           />
+          {resolvedMax !== undefined && (
+            <p className={`text-[10px] mt-0.5 text-right tabular-nums ${isOverMax ? 'text-status-error font-medium' : 'text-text-quaternary'}`}>
+              {value.length} / {resolvedMax}
+            </p>
+          )}
           <FieldError error={error} />
         </div>
       );
@@ -419,6 +441,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
+          data-field-key={fieldKey}
           className={inputClass(!!error)}
         />
         <FieldError error={error} />

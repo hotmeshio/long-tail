@@ -42,7 +42,7 @@ function parseJson(s: string | null | undefined): Record<string, unknown> | null
   try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
 }
 
-function buildShowIfContext(esc: LTEscalationRecord): ShowIfContext {
+export function buildShowIfContext(esc: LTEscalationRecord): ShowIfContext {
   return {
     escalation: esc as unknown as Record<string, unknown>,
     metadata: esc.metadata ?? null,

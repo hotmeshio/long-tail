@@ -121,6 +121,103 @@ describe('ChecklistWidget', () => {
     expect(screen.getByText('2 / 3 confirmed')).toBeInTheDocument();
   });
 
+  it('does NOT show "at least one required" hint before a submit attempt', () => {
+    const ctx = makeContext();
+    render(
+      <ChecklistWidget
+        fieldKey="items"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={ctx}
+        isRequired
+        submitAttempted={false}
+      />,
+    );
+    expect(screen.queryByText(/at least one required/i)).not.toBeInTheDocument();
+  });
+
+  it('shows "at least one required" hint after a submit attempt when nothing is checked', () => {
+    const ctx = makeContext();
+    render(
+      <ChecklistWidget
+        fieldKey="items"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={ctx}
+        isRequired
+        submitAttempted
+      />,
+    );
+    expect(screen.getByText(/at least one required/i)).toBeInTheDocument();
+  });
+
+  it('highlights all unchecked items when isRequired fails (none checked after submit)', () => {
+    const items = [
+      { id: 'a', label: 'Required item', required: true },
+      { id: 'b', label: 'Optional item', required: false },
+    ];
+    const ctx = makeContext(items);
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value={JSON.stringify({ a: false, b: false })}
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={ctx}
+        isRequired
+        submitAttempted
+      />,
+    );
+    // Both items unchecked and group requires at least one — both should indicate error
+    expect(screen.getByText('Required item').className).toContain('text-status-error');
+    expect(screen.getByText('Optional item').className).toContain('text-status-error');
+  });
+
+  it('clears all per-item error highlights once at least one item is checked', () => {
+    const items = [
+      { id: 'a', label: 'Required item', required: true },
+      { id: 'b', label: 'Optional item', required: false },
+    ];
+    const ctx = makeContext(items);
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value={JSON.stringify({ a: true, b: false })}
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={ctx}
+        isRequired
+        submitAttempted
+      />,
+    );
+    // 'a' is checked — group requirement met, no item should show error
+    expect(screen.getByText('Required item').className).not.toContain('text-status-error');
+    expect(screen.getByText('Optional item').className).not.toContain('text-status-error');
+  });
+
+  it('highlights individually-required items when isRequired is false and none are checked', () => {
+    const items = [
+      { id: 'a', label: 'Must confirm', required: true },
+      { id: 'b', label: 'Optional step', required: false },
+    ];
+    const ctx = makeContext(items);
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value={JSON.stringify({ a: false, b: false })}
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={ctx}
+        isRequired={false}
+        submitAttempted
+      />,
+    );
+    expect(screen.getByText('Must confirm').className).toContain('text-status-error');
+    expect(screen.getByText('Optional step').className).not.toContain('text-status-error');
+  });
+
   it('reads from a nested source path within a domain', () => {
     const ctx: ShowIfContext = {
       escalation: null,

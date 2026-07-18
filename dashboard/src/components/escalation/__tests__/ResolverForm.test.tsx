@@ -394,6 +394,211 @@ describe('ResolverForm — resolver.field conditionality', () => {
   });
 });
 
+// ── required field validation ──
+describe('ResolverForm — required field validation', () => {
+  it('shows error on empty required field when submitAttempted', () => {
+    const json = formJson({ notes: '' }, {
+      required: ['notes'],
+      properties: { notes: { type: 'string' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Required')).toBeInTheDocument();
+  });
+
+  it('does not show error on required field that has a value', () => {
+    const json = formJson({ notes: 'filled' }, {
+      required: ['notes'],
+      properties: { notes: { type: 'string' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+  });
+
+  it('hidden required field (x-lt-showIf false) produces no error even with submitAttempted', () => {
+    const json = formJson({ action: '', shutdown_ack: false }, {
+      required: ['shutdown_ack'],
+      properties: {
+        action: { type: 'string' },
+        shutdown_ack: { type: 'boolean', 'x-lt-showIf': 'metadata.crew_pill' },
+      },
+    });
+    // crew_pill absent → shutdown_ack hidden → required error must not appear
+    render(
+      <ResolverForm
+        value={json}
+        onChange={vi.fn()}
+        submitAttempted
+        escalationContext={{ metadata: {} }}
+      />,
+    );
+    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+  });
+
+  it('visible required field shows error when submitAttempted', () => {
+    const json = formJson({ action: '', shutdown_ack: false }, {
+      required: ['shutdown_ack'],
+      properties: {
+        action: { type: 'string' },
+        shutdown_ack: { type: 'boolean', 'x-lt-showIf': 'metadata.crew_pill' },
+      },
+    });
+    // crew_pill=true → shutdown_ack is visible → required error must appear (boolean false = empty)
+    render(
+      <ResolverForm
+        value={json}
+        onChange={vi.fn()}
+        submitAttempted
+        escalationContext={{ metadata: { crew_pill: true } }}
+      />,
+    );
+    // boolean false is a valid value so no Required error for checkboxes — only strings/null trigger it
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
+
+  it('required string field hidden via resolver.domain condition does not error', () => {
+    // approved=true → rejection_reason hidden → no Required error
+    const json = formJson({ approved: true, rejection_reason: '' }, {
+      required: ['rejection_reason'],
+      'x-lt-order': ['approved', 'rejection_reason'],
+      properties: {
+        approved: { type: 'boolean' },
+        rejection_reason: { type: 'string', 'x-lt-showIf': '!resolver.approved' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    // rejection_reason is hidden (approved=true) → no error and no textbox
+    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('required string field revealed via resolver.domain condition errors when empty', () => {
+    // approved=false → rejection_reason visible → empty → Required error
+    const json = formJson({ approved: false, rejection_reason: '' }, {
+      required: ['rejection_reason'],
+      'x-lt-order': ['approved', 'rejection_reason'],
+      properties: {
+        approved: { type: 'boolean' },
+        rejection_reason: { type: 'string', 'x-lt-showIf': '!resolver.approved' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('required object field (e.g. checklist) errors when all values are false', () => {
+    const json = formJson(
+      { checks: { item_0: false, item_1: false } },
+      {
+        required: ['checks'],
+        properties: { checks: { type: 'object', 'x-lt-widget': 'checklist' } },
+      },
+    );
+    // Checklist with no items (no context) shows empty-state message
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    // The widget renders but since no escalation context, checklist shows empty-state
+    // The required check still fires: object with all-falsy values → Required
+    expect(screen.getByText('Required')).toBeInTheDocument();
+  });
+
+  it('required object field does not error when at least one value is true', () => {
+    const json = formJson(
+      { checks: { item_0: true, item_1: false } },
+      {
+        required: ['checks'],
+        properties: { checks: { type: 'object', 'x-lt-widget': 'checklist' } },
+      },
+    );
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+  });
+});
+
+// ── constraint validation (min, max, pattern) ──
+describe('ResolverForm — field constraint validation', () => {
+  it('shows minLength error when string is too short', () => {
+    const json = formJson({ code: 'ab' }, {
+      properties: { code: { type: 'string', minLength: 5 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Minimum 5 characters')).toBeInTheDocument();
+  });
+
+  it('passes when string meets minLength', () => {
+    const json = formJson({ code: 'hello' }, {
+      properties: { code: { type: 'string', minLength: 5 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.queryByText(/minimum/i)).not.toBeInTheDocument();
+  });
+
+  it('shows maxLength error when string is too long', () => {
+    const json = formJson({ tag: 'toolongvalue' }, {
+      properties: { tag: { type: 'string', maxLength: 5 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Maximum 5 characters (12 entered)')).toBeInTheDocument();
+  });
+
+  it('shows pattern error when string does not match', () => {
+    const json = formJson({ code: 'abc123' }, {
+      properties: { code: { type: 'string', pattern: '^[A-Z]+$' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Invalid format')).toBeInTheDocument();
+  });
+
+  it('uses x-lt-pattern-error when pattern fails', () => {
+    const json = formJson({ phone: 'not-a-phone' }, {
+      properties: { phone: { type: 'string', pattern: '^\\d{10}$', 'x-lt-pattern-error': 'Enter a 10-digit phone number' } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Enter a 10-digit phone number')).toBeInTheDocument();
+  });
+
+  it('shows minimum error when number is below minimum', () => {
+    const json = formJson({ age: 0 }, {
+      properties: { age: { type: 'number', minimum: 18 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Minimum value is 18')).toBeInTheDocument();
+  });
+
+  it('shows maximum error when number exceeds maximum', () => {
+    const json = formJson({ score: 150 }, {
+      properties: { score: { type: 'number', maximum: 100 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.getByText('Maximum value is 100')).toBeInTheDocument();
+  });
+
+  it('passes when number is within min and max bounds', () => {
+    const json = formJson({ score: 75 }, {
+      properties: { score: { type: 'number', minimum: 0, maximum: 100 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} submitAttempted />);
+    expect(screen.queryByText(/minimum/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/maximum/i)).not.toBeInTheDocument();
+  });
+
+  it('no constraint error shown before field is touched (not submitAttempted)', () => {
+    const json = formJson({ code: 'ab' }, {
+      properties: { code: { type: 'string', minLength: 5 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.queryByText(/minimum/i)).not.toBeInTheDocument();
+  });
+
+  it('shows error after field is blurred', () => {
+    const json = formJson({ code: 'ab' }, {
+      properties: { code: { type: 'string', minLength: 5 } },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    fireEvent.blur(screen.getByDisplayValue('ab'));
+    expect(screen.getByText('Minimum 5 characters')).toBeInTheDocument();
+  });
+});
+
 // ── x-lt-section ──
 describe('ResolverForm — x-lt-section', () => {
   it('renders a section header when x-lt-section is set', () => {

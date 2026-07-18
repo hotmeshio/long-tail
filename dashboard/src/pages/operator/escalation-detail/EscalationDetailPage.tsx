@@ -21,10 +21,13 @@ import { useSettings } from '../../../api/settings';
 import { getAiOverride } from '../../../lib/view-as';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
-import { EscalationSidePanel } from '../../../components/escalation/EscalationSidePanel';
+import { EscalationSidePanel, ESCALATION_PANEL_VIEWS } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
-import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc } from './EscalationDetailSections';
+import type { FieldError } from '../../../lib/field-validator';
+import { validateField } from '../../../lib/field-validator';
+import { evaluateShowIf } from '../../../lib/x-lt-show-if';
+import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc, buildShowIfContext } from './EscalationDetailSections';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 
 // ---------------------------------------------------------------------------
@@ -87,6 +90,29 @@ export function EscalationDetailPage() {
   const [requestTriage, setRequestTriage] = useState(false);
   const [triageNotes, setTriageNotes] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [formErrors, setFormErrors] = useState<FieldError[]>([]);
+  const [panelActiveView, setPanelActiveView] = useState<string | undefined>(undefined);
+
+  // Recompute form errors in real-time once the user has attempted a submit.
+  // This keeps the errors sidebar in sync as the user fixes (or breaks) fields.
+  useEffect(() => {
+    if (!submitAttempted || !esc) return;
+    try {
+      const payload = JSON.parse(json) as Record<string, unknown>;
+      const schema = payload._form_schema as Record<string, unknown> | undefined;
+      if (!schema) { setFormErrors([]); return; }
+      const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+      const required = new Set((schema.required as string[] | undefined) ?? []);
+      const ctx = { ...buildShowIfContext(esc), resolver: payload };
+      const errors: FieldError[] = [];
+      for (const [field, fieldSchema] of Object.entries(properties)) {
+        if (!evaluateShowIf(fieldSchema['x-lt-showIf'], ctx)) continue;
+        const err = validateField(payload[field], fieldSchema, required.has(field), true, ctx as Record<string, unknown>);
+        if (err) errors.push({ field, message: err });
+      }
+      setFormErrors(errors);
+    } catch { /* leave errors unchanged on parse failure */ }
+  }, [json, submitAttempted, esc]);
   // Schema resolution, most specific first:
   //   1. metadata.form_schema — a full form embedded on the row (legacy records)
   //   2. esc.form_schema — the role's form the single-escalation GET already
@@ -346,6 +372,7 @@ export function EscalationDetailPage() {
         )}
 
         {!isIframeMode && <EscalationActionBar
+          escalationContext={buildShowIfContext(esc)}
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}
@@ -369,6 +396,12 @@ export function EscalationDetailPage() {
           assignedTo={esc.assigned_to}
           assignedUntil={esc.assigned_until}
           onSubmitAttempt={() => setSubmitAttempted(true)}
+          onValidationErrors={(errors) => {
+            setFormErrors(errors);
+            setSidePanelOpen(true);
+            savePanelOpen(true);
+            setPanelActiveView(ESCALATION_PANEL_VIEWS.ERRORS);
+          }}
         />}
       </div>
 
@@ -387,6 +420,9 @@ export function EscalationDetailPage() {
         traceUrl={traceUrl}
         open={sidePanelOpen}
         noGutter={isIframeMode}
+        formErrors={formErrors}
+        activePanel={panelActiveView}
+        onPanelChange={setPanelActiveView}
       />
 
       <ConfirmCancelModal
