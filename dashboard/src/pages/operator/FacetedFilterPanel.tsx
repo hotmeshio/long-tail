@@ -3,8 +3,10 @@ import type { FacetFilters, FacetRange, FacetOrder } from '../../api/escalations
 const RANGE_OPS: FacetRange['op'][] = ['<', '<=', '>', '>=', '='];
 const SORT_COLUMNS = ['priority', 'created_at', 'updated_at', 'status', 'role'];
 
-const inputCls =
-  'h-7 rounded border border-surface-border bg-surface px-2 text-xs text-text-primary focus:border-accent focus:outline-none';
+// Compact variants of the core field classes — the panel never invents its own
+// input styling; it dials the shared .input / .select down a size.
+const inputCls = 'input text-xs py-1';
+const selectCls = 'select text-xs py-1';
 const xBtn = 'text-text-tertiary hover:text-text-primary transition-colors';
 
 /** A facet value is JSONB-containment-sensitive: 0.65 (number) ≠ "0.65" (string). */
@@ -124,7 +126,7 @@ export function FacetedFilterPanel({ value, onChange, facetKeys = [], search = '
           <div key={i} className="mb-1 flex items-center gap-1">
             <KeyInput value={r.facet} placeholder="numeric facet"
               onChange={(f) => { const next = [...ranges]; next[i] = { ...r, facet: f }; setRange(next.filter((x) => x.facet)); }} />
-            <select className={inputCls} value={r.op}
+            <select className={selectCls} value={r.op}
               onChange={(e) => { const next = [...ranges]; next[i] = { ...r, op: e.target.value as FacetRange['op'] }; setRange(next.filter((x) => x.facet)); }}>
               {RANGE_OPS.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
@@ -170,7 +172,7 @@ export function FacetedFilterPanel({ value, onChange, facetKeys = [], search = '
             <input list="lt-sort-fields" className={`${inputCls} w-44`} placeholder="column or metadata.key"
               value={s.field}
               onChange={(e) => { const next = [...sorts]; next[i] = { ...s, field: e.target.value }; setSorts(next.filter((x) => x.field)); }} />
-            <select className={inputCls} value={s.direction ?? 'asc'}
+            <select className={selectCls} value={s.direction ?? 'asc'}
               onChange={(e) => { const next = [...sorts]; next[i] = { ...s, direction: e.target.value as 'asc' | 'desc' }; setSorts(next.filter((x) => x.field)); }}>
               <option value="asc">asc</option><option value="desc">desc</option>
             </select>

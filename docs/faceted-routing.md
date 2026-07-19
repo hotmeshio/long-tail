@@ -44,6 +44,7 @@ interface FacetQuery {
   exists?: string[];                // metadata ? key — facet must be present
   status?: string;                  // e.g. 'pending'
   available?: boolean;              // true = unclaimed/expired only; false = held now
+  jeopardy?: boolean;               // true = past the role's priority threshold only
   orderBy?: { field: string; direction?: 'asc' | 'desc'; numeric?: boolean }[];
   limit?: number;
   offset?: number;
@@ -54,6 +55,14 @@ interface FacetQuery {
 `updated_at`, `status`, `role`) or a metadata path written as `metadata.<key>` (extracted as
 text, or numeric when `numeric` is set). Every value is parameterized; only validated column
 names / metadata keys and a fixed operator set are ever interpolated.
+
+`jeopardy` keeps only rows past their role's priority threshold — the exact predicate behind
+the Pace Board's priority count, evaluated per row against the role's dials
+(`priority_facet` metadata timestamp, `created_at` when unset; `priority_threshold_minutes`,
+`sla_minutes` when unset; roles with no threshold contribute no rows). Because the count and
+the list share one expression, a jeopardy list's total always equals the badge that linked to
+it. On the HTTP surface it rides as `jeopardy=1`; the canonical deep link is
+`/escalations/available?role=<r>&jeopardy=1&view=table&orderBy=[{"field":"metadata.<facet>"|"created_at","direction":"asc"}]`.
 
 ```typescript
 // Pending, available diabetic-certified work needing PLA, soonest-deadline first.

@@ -5,7 +5,7 @@ import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
 import type { RoleDetail } from '../../api/roles';
 import { PRIORITY_TEXT_COLOR } from './PaceChart';
-import { priorityQueueLink } from './priority-link';
+import { jeopardyQueueLink } from './priority-link';
 import { displayRoleTitle } from '../../lib/role-display';
 
 interface StationDetailPanelProps {
@@ -162,11 +162,11 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         )}
         {metric && metric.priority_count > 0 && (
           <Link
-            to={priorityQueueLink(role)}
+            to={jeopardyQueueLink(role)}
             className="flex items-center justify-between group"
           >
             <span className="text-[10px]" style={{ color: PRIORITY_TEXT_COLOR }}>
-              {metric.priority_count} priority — pull oldest first
+              {metric.priority_count} in jeopardy — pull oldest first
             </span>
             <ExternalLink className="w-3 h-3 transition-colors" style={{ color: PRIORITY_TEXT_COLOR }} />
           </Link>
@@ -204,7 +204,7 @@ function OverviewPanel({
       <div className="mb-4">
         {stationsAtRisk > 0 ? (
           <p className="text-[11px]" style={{ color: PRIORITY_TEXT_COLOR }}>
-            {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} with priority items
+            {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} with items in jeopardy
           </p>
         ) : stationsWithLoad > 0 ? (
           <p className="text-[11px] text-status-warning">

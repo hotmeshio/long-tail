@@ -227,7 +227,6 @@ export function EscalationTimeline({
   page,
   totalPages,
   onPageChange,
-  sortAsc = false,
 }: {
   escalations:    LTEscalationRecord[];
   highlightKeys?: string[];
@@ -236,7 +235,6 @@ export function EscalationTimeline({
   page:           number;
   totalPages:     number;
   onPageChange:   (page: number) => void;
-  sortAsc?:       boolean;
 }) {
   const nowMs = Date.now();
 
@@ -251,7 +249,10 @@ export function EscalationTimeline({
     return { ...e, startMs, claimedMs, endMs, isOpen, displayStatus };
   });
 
-  const displayed = sortAsc ? [...parsed].reverse() : parsed;
+  // The server's ORDER BY is authoritative for every view — render rows exactly
+  // as given. (A client-side reverse here once assumed newest-first data and
+  // silently cancelled ascending sorts.)
+  const displayed = parsed;
 
   if (displayed.length === 0) {
     return <p className="mt-12 text-center text-sm text-text-tertiary">No escalations matched.</p>;

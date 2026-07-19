@@ -18,6 +18,9 @@ export interface FacetFilters {
   range?: FacetRange[];
   exists?: string[];
   available?: boolean;
+  /** Only rows past their role's priority threshold — the Pace Board pill's
+   *  exact predicate, so a jeopardy list's total equals the pill's count. */
+  jeopardy?: boolean;
   orderBy?: FacetOrder[];
 }
 
@@ -47,6 +50,7 @@ function appendFacetParams(params: URLSearchParams, f: FacetFilters): void {
   if (f.roles?.length) params.set('roles', JSON.stringify(f.roles));
   if (f.orderBy?.length) params.set('orderBy', JSON.stringify(f.orderBy));
   if (f.available !== undefined) params.set('available', String(f.available));
+  if (f.jeopardy === true) params.set('jeopardy', '1');
 }
 
 export interface EscalationStats {

@@ -1,47 +1,52 @@
-import { Zap, Bot, Radio, Inbox, ListChecks, LayoutDashboard } from 'lucide-react';
+import { Zap, Bot, Radio, LayoutDashboard } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 import type { ViewAsRole } from '../../lib/view-as';
 
-const OPERATOR_ENTRIES: NavEntry[] = [
-  { to: '/escalations/queue', label: 'My Queue', icon: Inbox },
-  { to: '/escalations/available', label: 'All', icon: ListChecks },
-];
-
 /**
  * "Monitor" — the reactive, event-driven surface (choreography).
- * Builders configure automations, topics, and capabilities here. Operators,
- * who don't build, get their escalation queue (home is also one logo click away).
- * Operations (COO view) is the first entry for admins and builders.
+ * Builders configure automations, topics, and capabilities here. Operations
+ * (COO view) is the first entry for admins and builders.
+ *
+ * Operators and engineers have no choreography section: their work lives in the
+ * Task Queues section (per-lane, rendered by the shell) and the Claimed card on
+ * the home page. The old generic "My Queue" / "All" links are retired.
  *
  * `viewAs` overrides the rendered variant when the user is simulating a lower role:
- * - 'engineer' → shows the Work queue (even though isOps=true)
+ * - 'engineer' → task queues only (no Monitor)
  * - 'admin'    → shows the Pace Board (same as the isOps branch)
- * - 'operator' → shows the Work queue (same as the operator branch)
+ * - 'operator' → task queues only
  */
 export function ChoreographySidebar({
   aiEnabled = false,
   isBuilder = false,
   isOps = false,
   viewAs = null,
+  canSeePaceBoard = false,
 }: {
   aiEnabled?: boolean;
   isBuilder?: boolean;
   isOps?: boolean;
   viewAs?: ViewAsRole | null;
+  // The Pace Board is a cross-role view — admins and superadmins only. Engineers
+  // are builders and see everything else here, but not this.
+  canSeePaceBoard?: boolean;
 }) {
-  // Operator or engineer view: show work queue
+  const paceEntry: NavEntry = { to: '/operations', label: 'Pace Board', icon: LayoutDashboard };
+
+  // Operator or engineer view: no generic work links — the Task Queues section
+  // (shell) and the home Claimed card carry their work.
   if (!isBuilder && (!isOps || viewAs === 'engineer' || viewAs === 'operator')) {
-    return <SidebarNav heading="Work" entries={OPERATOR_ENTRIES} />;
+    return null;
   }
 
   if (!isBuilder) {
     // Admin/ops only (not builder) — pace board
-    return <SidebarNav heading="Monitor" entries={[{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard }]} />;
+    return <SidebarNav heading="Monitor" entries={canSeePaceBoard ? [paceEntry] : []} />;
   }
 
-  // Full builder view
+  // Full builder view — the Pace Board only for tiers that can read it.
   const entries: NavEntry[] = [
-    ...(isOps || isBuilder ? [{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard } as NavEntry] : []),
+    ...(canSeePaceBoard ? [paceEntry] : []),
     { to: '/topics', label: 'Event Topics', icon: Radio },
     { to: '/agents', label: aiEnabled ? 'Agents' : 'Automations', icon: Bot },
     { to: '/capabilities', label: 'Capabilities', icon: Zap },

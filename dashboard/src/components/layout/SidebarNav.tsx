@@ -10,6 +10,12 @@ export interface NavItem {
   label: string;
   end?: boolean;
   icon?: LucideIcon;
+  /** Render the icon solid (filled) rather than outlined — used to distinguish
+   *  Task Queue lanes from regular nav links. */
+  solid?: boolean;
+  /** Extra classes for the icon (e.g. `rotate-90` to turn a database cylinder
+   *  into a horizontal queue). */
+  iconClassName?: string;
 }
 
 export interface NavGroup {
@@ -118,6 +124,14 @@ function NavItemLink({ entry, collapsed }: { entry: NavItem; collapsed: boolean 
   const { pathname, search } = useLocation();
   const hasQuery = entry.to.includes('?');
 
+  const iconEl = entry.icon && (
+    <entry.icon
+      className={`w-5 h-5 shrink-0 text-accent/75 ${entry.iconClassName ?? ''}`}
+      strokeWidth={1.5}
+      {...(entry.solid ? { fill: 'currentColor' } : {})}
+    />
+  );
+
   if (hasQuery) {
     const [entryPath, entrySearch] = entry.to.split('?');
     const isActive = pathname === entryPath && search === `?${entrySearch}`;
@@ -125,7 +139,7 @@ function NavItemLink({ entry, collapsed }: { entry: NavItem; collapsed: boolean 
 
     return (
       <NavLink to={entry.to} className={cls} title={collapsed ? entry.label : undefined}>
-        {entry.icon && <entry.icon className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} />}
+        {iconEl}
         {!collapsed && <span>{entry.label}</span>}
       </NavLink>
     );
@@ -138,7 +152,7 @@ function NavItemLink({ entry, collapsed }: { entry: NavItem; collapsed: boolean 
       className={getLinkClass(collapsed)}
       title={collapsed ? entry.label : undefined}
     >
-      {entry.icon && <entry.icon className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} />}
+      {iconEl}
       {!collapsed && <span>{entry.label}</span>}
     </NavLink>
   );

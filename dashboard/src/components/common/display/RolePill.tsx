@@ -15,7 +15,7 @@ export function RolePill({ role, size = 'sm', tone = 'default' }: RolePillProps)
   const colorClass = tone === 'inherit' ? 'text-inherit' : 'text-text-secondary';
 
   return (
-    <span className={`inline-flex items-center ${sizeClass} ${colorClass}`}>
+    <span className={`inline-flex items-center whitespace-nowrap ${sizeClass} ${colorClass}`}>
       <User className={`${iconClass} shrink-0 text-accent/75`} />
       {role}
     </span>

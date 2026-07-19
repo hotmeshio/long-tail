@@ -13,17 +13,21 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('ChoreographySidebar — operators (no builder, no ops)', () => {
-  it('shows Work queue entries for plain operators', () => {
-    render(<ChoreographySidebar />, { wrapper });
-    expect(screen.getByText('Work')).toBeInTheDocument();
-    expect(screen.getByText('My Queue')).toBeInTheDocument();
-    expect(screen.getByText('All')).toBeInTheDocument();
+  it('renders no choreography section — work lives in Task Queues + the Claimed card', () => {
+    const { container } = render(<ChoreographySidebar />, { wrapper });
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('does NOT show Pace Board or Monitor entries for plain operators', () => {
+  it('retires the generic My Queue / All links', () => {
     render(<ChoreographySidebar />, { wrapper });
+    expect(screen.queryByText('My Queue')).not.toBeInTheDocument();
+    expect(screen.queryByText('All')).not.toBeInTheDocument();
     expect(screen.queryByText('Pace Board')).not.toBeInTheDocument();
-    expect(screen.queryByText('Event Topics')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when an admin views as operator', () => {
+    const { container } = render(<ChoreographySidebar isOps viewAs="operator" />, { wrapper });
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
@@ -36,11 +40,18 @@ describe('ChoreographySidebar — builders', () => {
     expect(screen.getByText('Capabilities')).toBeInTheDocument();
   });
 
-  it('shows Pace Board as the first item for builders', () => {
-    render(<ChoreographySidebar isBuilder />, { wrapper });
+  it('shows Pace Board first for a builder that can see it (superadmin)', () => {
+    render(<ChoreographySidebar isBuilder canSeePaceBoard />, { wrapper });
     const items = screen.getAllByRole('link');
     const labels = items.map((el) => el.textContent?.trim());
     expect(labels[0]).toContain('Pace Board');
+  });
+
+  it('engineer builder sees everything but the Pace Board', () => {
+    render(<ChoreographySidebar isBuilder />, { wrapper });
+    expect(screen.getByText('Event Topics')).toBeInTheDocument();
+    expect(screen.getByText('Capabilities')).toBeInTheDocument();
+    expect(screen.queryByText('Pace Board')).not.toBeInTheDocument();
   });
 
   it('shows Agents label when aiEnabled is true', () => {
@@ -51,13 +62,13 @@ describe('ChoreographySidebar — builders', () => {
 });
 
 describe('ChoreographySidebar — ops role (admin, not builder)', () => {
-  it('shows Pace Board for isOps users', () => {
-    render(<ChoreographySidebar isOps />, { wrapper });
+  it('shows Pace Board for admins (can see it)', () => {
+    render(<ChoreographySidebar isOps canSeePaceBoard />, { wrapper });
     expect(screen.getByText('Pace Board')).toBeInTheDocument();
   });
 
   it('does NOT show Event Topics or Capabilities for isOps-only users', () => {
-    render(<ChoreographySidebar isOps />, { wrapper });
+    render(<ChoreographySidebar isOps canSeePaceBoard />, { wrapper });
     expect(screen.queryByText('Event Topics')).not.toBeInTheDocument();
     expect(screen.queryByText('Capabilities')).not.toBeInTheDocument();
   });

@@ -6,10 +6,12 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ children, actions }: FilterBarProps) {
+  // The band sits a shade deeper (surface-sunken) so the lightest-fill fields
+  // inside it read as fields, not as underlines-with-pipes.
   return (
     <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-      <div className="bg-surface-sunken rounded-lg px-5 py-2">
-        <div className="flex items-center gap-5 flex-wrap">
+      <div className="bg-surface-sunken rounded-lg px-4 py-2.5">
+        <div className="flex items-center gap-4 flex-wrap">
           {children}
           {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
         </div>
@@ -18,8 +20,12 @@ export function FilterBar({ children, actions }: FilterBarProps) {
   );
 }
 
+/**
+ * @deprecated The pipe separator is retired — the field fill + gap already
+ * separate filters. Kept as a no-op so existing call sites don't break.
+ */
 export function FilterDivider() {
-  return <span className="h-3.5 w-px bg-surface-border shrink-0 self-center -mr-3" />;
+  return null;
 }
 
 interface FilterSelectProps {
@@ -39,7 +45,7 @@ export function FilterSelect({ label, value, onChange, options, required, placeh
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="select text-[11px] py-0.5 pl-0 pr-4"
+        className="select text-[11px] py-1 w-auto min-w-[6rem]"
       >
         {!required && <option value="">{placeholder || 'All'}</option>}
         {options.map((opt) => (
@@ -76,14 +82,14 @@ export function FilterInput({ label, value, onChange, placeholder }: FilterInput
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   return (
-    <div className="flex items-center gap-1.5">
-      <label className="text-[10px] text-text-tertiary whitespace-nowrap">{label}</label>
+    <div className="flex items-center gap-2">
+      <label className="text-[10px] font-medium text-text-tertiary whitespace-nowrap">{label}</label>
       <input
         type="text"
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="input text-[11px] py-1 px-2 w-36 font-mono"
+        className="input text-[11px] py-1 w-36 font-mono"
       />
     </div>
   );

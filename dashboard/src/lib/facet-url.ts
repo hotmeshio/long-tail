@@ -24,6 +24,8 @@ export function parseFacetParams(sp: URLSearchParams): FacetFilters {
   const roles = parse(sp.get('roles')); if (!isEmpty(roles)) f.roles = roles;
   const orderBy = parse(sp.get('orderBy')); if (!isEmpty(orderBy)) f.orderBy = orderBy;
   if (sp.get('available') != null) f.available = sp.get('available') === 'true';
+  const jeopardy = sp.get('jeopardy');
+  if (jeopardy === '1' || jeopardy === 'true') f.jeopardy = true;
   return f;
 }
 
@@ -37,6 +39,7 @@ export function writeFacetParams(p: URLSearchParams, f: FacetFilters): void {
   set('roles', f.roles);
   set('orderBy', f.orderBy);
   if (f.available == null) p.delete('available'); else p.set('available', String(f.available));
+  if (f.jeopardy === true) p.set('jeopardy', '1'); else p.delete('jeopardy');
 }
 
 /**
@@ -57,14 +60,16 @@ export function metadataFacetUrl(key: string, value: unknown, role?: string | nu
   return `/escalations/available?facets=${facets}&status=all`;
 }
 
-/** Count of active facet conditions (for the trigger badge). */
+/** Count of active facet CONDITIONS (for the trigger badge). Sort (orderBy) is
+ *  deliberately excluded — it reorders, it doesn't narrow, and it must never
+ *  flip the page into a filtered presentation (e.g. auto-timeline) by itself. */
 export function facetCount(f: FacetFilters): number {
   return (
     Object.keys(f.facets ?? {}).length +
     (f.block?.length ?? 0) +
     (f.range?.length ?? 0) +
     (f.exists?.length ?? 0) +
-    (f.orderBy?.length ?? 0) +
-    (f.available != null ? 1 : 0)
+    (f.available != null ? 1 : 0) +
+    (f.jeopardy === true ? 1 : 0)
   );
 }

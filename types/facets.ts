@@ -45,6 +45,15 @@ export interface FacetQuery {
   status?: string;
   /** true = only available (unclaimed/expired); false = only held now. */
   available?: boolean;
+  /**
+   * true = only rows past their role's priority threshold — the same predicate
+   * that produces the Pace Board's priority_count, so a jeopardy list's total
+   * always equals the pill's count. Age is measured from the role's
+   * priority_facet metadata timestamp (created_at when unset) against
+   * priority_threshold_minutes (sla_minutes when unset); roles with no
+   * threshold configured contribute no rows.
+   */
+  jeopardy?: boolean;
   orderBy?: FacetOrder[];
   limit?: number;
   offset?: number;

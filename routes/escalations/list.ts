@@ -74,6 +74,7 @@ export function registerListRoutes(router: Router): void {
         exists: jsonParam(req.query.exists),
         orderBy: jsonParam(req.query.orderBy),
         available: req.query.available != null ? req.query.available === 'true' : undefined,
+        jeopardy: req.query.jeopardy === '1' || req.query.jeopardy === 'true' || undefined,
       },
       req.auth!,
     );
@@ -104,6 +105,7 @@ export function registerListRoutes(router: Router): void {
         range: jsonParam(req.query.range),
         exists: jsonParam(req.query.exists),
         orderBy: jsonParam(req.query.orderBy),
+        jeopardy: req.query.jeopardy === '1' || req.query.jeopardy === 'true' || undefined,
       },
       req.auth!,
     );
