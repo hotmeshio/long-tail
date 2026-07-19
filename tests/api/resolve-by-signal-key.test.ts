@@ -89,7 +89,8 @@ describe('resolveBySignalKey (api)', () => {
     expect((result.data as any).signaled).toBe(true);
     expect((result.data as any).escalationId).toBe('esc-uuid');
     // No metadata patch → 3rd arg is undefined; still ONE atomic resolve call.
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined);
+    // The webhook path is claim-agnostic: no assertClaim (4th arg undefined).
+    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined, undefined);
   });
 
   it('returns 409 when the atomic resolve loses the race (no double-resolve)', async () => {
@@ -112,13 +113,13 @@ describe('resolveBySignalKey (api)', () => {
     // The patch rides as the 3rd arg of resolve → merged in the same guarded UPDATE.
     // It is NEVER written via a separate, non-transactional metadata update
     // (no separate-write method exists on the service surface).
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, { outcome: 'approved', durationMs: 1200 });
+    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, { outcome: 'approved', durationMs: 1200 }, undefined);
   });
 
   it('omits the patch (3rd arg undefined) when none is given — backward compatible', async () => {
     mockGetBySignalKey.mockResolvedValue(makeEscalation());
     mockResolve.mockResolvedValue(makeEscalation({ status: 'resolved' }));
     await resolveBySignalKey({ signalKey: 'station-done-wf-1', resolverPayload: { approved: true } }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined);
+    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined, undefined);
   });
 });

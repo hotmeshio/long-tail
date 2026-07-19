@@ -118,6 +118,42 @@ export async function assertWriteAccess(
 }
 
 /**
+ * Claim-liveness gate for resolve, aligned with `isEffectivelyClaimed`: a
+ * claim is a work LOCK that exists only while a TTL window (`assigned_until`)
+ * is active. Blocks exactly two states:
+ * - another principal holds a live window (the lock is theirs), and
+ * - the caller's own window has lapsed (stale work — re-claim to resolve).
+ *
+ * Everything else passes: unclaimed rows (system resolvers act on them by
+ * design), durable pre-assignments (`assigned_to` with no window — the
+ * one-time-user JIT-form shape), and rows whose window lapsed under a
+ * different assignee (the lock is gone; the row is back in the pool).
+ *
+ * Applies to every principal, including global access — the claim is a work
+ * lock, not an authorization scope, so superadmins are equally bound by it.
+ *
+ * Advisory (read-then-check): the signal-key and notification resolve paths
+ * re-assert the same predicate atomically inside the SDK's guarded resolve
+ * UPDATE (`assertClaim`); this pre-check exists so the signal/triage/re-run
+ * paths reject BEFORE their side effects fire.
+ */
+export function assertLiveClaimant(
+  userId: string,
+  escalation: { assigned_to?: string | null; assigned_until?: Date | string | null },
+): { status: number; error: string } | null {
+  if (!escalation.assigned_to || !escalation.assigned_until) return null;
+  const live = new Date(escalation.assigned_until).getTime() > Date.now();
+  const mine = escalation.assigned_to === userId;
+  if (live && !mine) {
+    return { status: 409, error: 'Escalation is claimed by another user' };
+  }
+  if (!live && mine) {
+    return { status: 409, error: 'Your claim has expired — re-claim this escalation to resolve it' };
+  }
+  return null;
+}
+
+/**
  * Require write_scope='all' (or global) for a queue-management verb — release and
  * escalate move an item out of the user's hands, so self-scope owners (who only
  * fill in their own item) and read-only members may not perform them.

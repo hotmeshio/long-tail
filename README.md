@@ -1,6 +1,12 @@
 # Long Tail
 
-Durable workflow for humans in the loop.
+**The queue durable systems forgot.**
+
+Durable platforms are built around determinism — that is their strength and their blind spot. They give you rich, first-class queues for deterministic work (retry, timeout, `backoffCoefficient`, exactly-once) and an `await condition()` to park a workflow until a signal arrives. All of it assumes the thing you are waiting on will, eventually, behave.
+
+Most of the work that decides an outcome behaves on its own schedule: an approval, a person, a shipment, a machine that needs service. You cannot set a `backoffCoefficient` on a person — retrying someone who has not answered just asks twice. This is why "human-in-the-loop" keeps getting bolted on as a feature: the platform perfected the deterministic queue and left the non-deterministic one for you to improvise.
+
+Long Tail makes it a primitive. The same `condition()` wait — except the act of waiting mints a row that is searchable, claimable, deadlined, and role-gated on a shared metadata surface. Machines answer some rows, people answer others; the workflow resumes either way, exactly where it paused.
 
 ```bash
 npm install @hotmeshio/long-tail
@@ -8,7 +14,7 @@ npm install @hotmeshio/long-tail
 
 ## How it works
 
-Route work to machines or people interchangeably with ease.
+One workflow, both queues: `proxyActivities` for the deterministic one, `condition()` for the one reality answers.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
@@ -54,6 +60,19 @@ export async function analyzeContent(content: string) {
 }
 ```
 
+## What the primitive buys
+
+The non-deterministic queue has qualities the deterministic one never needed:
+
+- **RBAC is intrinsic.** The queue is a role; permission lives in the queue itself. Any member answers — a person in the dashboard, a service account through the API — and the workflow is indifferent to which.
+- **The form is data.** A versioned JSON Schema on the role renders the resolver's UI — fields, validation, conditionals, layout — with zero frontend code. Assign an escalation to one named user with self scope and you have a just-in-time form: one person, one item, one auditable edition.
+- **Claims are locks.** A claim is a TTL window with an extend prompt before it lapses and a resolve guard behind it — the platform rejects a submission against an expired claim atomically, in the same statement that settles the row. Stale work cannot land.
+- **Cancel is home.** Cancellation is a first-class settlement, not an exception. When the pressure no longer applies, the waiting flow sees `null` and reconciles to a modeled resting state. Handled is broader than resolved — timeout, cancel, and hop-onward are all endings the loop was built to reach.
+- **One shared surface.** Every actor that touches an item writes to the same metadata-keyed row. The contact point is shared by construction, so there is one place to search, one place to claim, one place to audit.
+- **History accretes.** The surface only ever adds: intent at creation, outcome at settlement, every crossing in between. The object's whole history sits there to replay — frames the queue kept for you.
+- **Objects get lifecycles.** Give an object this queue and a `while` loop and it lives — a digital twin: it advertises when free, asks when it needs service, waits for reality's answer, reconciles when reality gives one. An order, a document only compliance may edit, a machine on a line — all the same shape, an object looping at a role.
+- **What repeats, stops needing people.** Every settled row is a worked example. Recurring patterns become deterministic tools — problems that once required a person, then required AI reasoning, eventually require neither.
+
 ## Start
 
 Point at Postgres. Everything else is optional.
@@ -69,31 +88,9 @@ const lt = await start({
 
 Dashboard at [http://localhost:3000](http://localhost:3000). The [boilerplate](https://github.com/hotmeshio/long-tail-boilerplate) has a working project with workflows, MCP servers, and MinIO.
 
-## The pattern
-
-Four moves, from a plan you write to a plan that keeps up with reality.
-
-**Step 1 — Author a durable workflow.** Your function checkpoints to Postgres. It can sleep, branch, call child workflows, wait for signals. Standard durable execution.
-
-**Step 2 — Certify it.** Promotion to certified adds interceptor guarantees: failures escalate instead of throwing, escalation chains route through RBAC-scoped roles, and every error is either handled or surfaced. It cannot silently fail.
-
-```bash
-curl -X PUT http://localhost:3000/api/workflows/reviewContent/config \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{ "invocable": true, "task_queue": "default", "default_role": "reviewer" }'
-```
-
-**Step 3 — React to events.** Signals are reality reporting back. Workflows publish topics; agents subscribe. When `activity.failed` fires, an automation can re-run the step, notify a team, or trigger a different workflow. The choreography is dynamic — add subscribers through the dashboard without changing code.
-
-**Step 4 — Compile what repeats.** The same workflow has two forms. What you wrote in Step 1 is the *procedural* form — readable, Temporal-like, emulated atop the graph: cheap to maintain, heavier to run. The Designer compiles a working execution into the *graph* form — the same durable workflow as a deterministic DAG: no LLM at runtime, no replay overhead, typed in and out, roughly 3x faster. Every procedural pattern has a graph equivalent and the reverse; you pick readability or speed without giving up durability, escalation, or transactional guarantees. It deploys as a reusable tool that any workflow or API call can invoke.
-
-Over time, the system accumulates compiled tools. Problems that once required a human, then required AI reasoning, eventually require neither.
-
-These four steps map to how the dashboard is organized. **React** is the reactive side (Step 3) — topics, subscriptions, automations. **Orchestrate** is the orchestrated side (Steps 1 and 4) — procedural and graph flows side by side, both durable and pull-based under the hood. **Design** is the optional bridge: with an `ANTHROPIC_API_KEY` it turns a description or a tool run into a graph flow; without one, choreography and orchestration stand on their own, no tradeoff.
-
 ## Register MCP tools
 
-Long Tail connects to any MCP server. Registered tools become durable activities and are available to the Pipeline Designer.
+Long Tail connects to any MCP server. Registered tools become durable activities.
 
 **Existing package — no code:**
 
@@ -147,72 +144,6 @@ const lt = await start({
 
 All three paths produce the same outcome: tools callable as durable activities. See the [MCP guide](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md).
 
-## Compile workflows
-
-The `ltc` compiler scans TypeScript workflow files and compiles them to YAML DAGs — like `tsc` for workflows.
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-npx ltc compile workflows/
-```
-
-The source is the spec. The compiled YAML is the optimized execution. Both live in the repo. See the [Compiler Guide](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md).
-
-## Register a graph flow by hand
-
-`graphWorkflows` is the graph-form peer of `workers`: hand-author the HotMesh YAML and it's created, deployed, and activated at startup. The same human surface is declarative here — a `hook` with an `escalation:` block. When the flow reaches it, the workflow suspends and writes the escalation row; a person resolves it and the flow continues:
-
-```typescript
-const lt = await start({
-  database: { connectionString: process.env.DATABASE_URL },
-  graphWorkflows: [{
-    name: 'order_approval',
-    namespace: 'graph',
-    inputSchema: { type: 'object', properties: { orderId: { type: 'string' }, region: { type: 'string' } }, required: ['orderId'] },
-    yaml: `
-app:
-  id: graph
-  version: '1'
-  graphs:
-    - subscribes: order_approval
-      publishes: order_approval.done
-      input:  { schema: { type: object, properties: { orderId: { type: string }, region: { type: string } } } }
-      output: { schema: { type: object, properties: { approved: { type: boolean } } } }
-      activities:
-        trigger:
-          type: trigger
-        review:
-          type: hook
-          escalation:
-            role: approver
-            type: order-approval
-            priority: 2
-            description: Approve order for dispatch
-            metadata:
-              orderId: '{trigger.output.data.orderId}'
-              region: '{trigger.output.data.region}'
-            envelope:
-              instructions: Review and approve or reject
-          job:
-            maps:
-              approved: '{review.hook.data.approved}'
-      transitions:
-        trigger:
-          - to: review
-      hooks:
-        order_approval.approve:
-          - to: review
-            conditions:
-              match:
-                - expected: '{$job.metadata.jid}'
-                  actual: '{$self.hook.data.id}'
-`,
-  }],
-});
-```
-
-It appears under **Orchestrate › Graph** and routes to a person exactly like the procedural `condition()` above — the same claim-and-resolve surface, declared in YAML. The `metadata` expressions resolve against the live job at suspension time, so the row carries the real order values.
-
 ## Full configuration
 
 ```typescript
@@ -221,10 +152,8 @@ const lt = await start({
   workers: [{ taskQueue: 'default', workflow: reviewContent }],
 
   // Everything below is optional
-  graphWorkflows: [{ name: 'hello_world', namespace: 'graph', yaml: helloWorldYaml }],
   seed: { admin: { externalId: 'admin', password: process.env.ADMIN_PASSWORD } },
   mcp: { server: { enabled: true }, serverFactories: { 'my-tools': createMyToolsServer } },
-  escalation: { strategy: 'mcp' },
   auth: { secret: process.env.JWT_SECRET },
   telemetry: { honeycomb: { apiKey: process.env.HNY } },
   logging: { pino: { level: 'info' } },

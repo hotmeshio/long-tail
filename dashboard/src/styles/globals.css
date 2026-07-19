@@ -235,6 +235,17 @@
   animation: pageFade 200ms ease-out both;
 }
 
+/* Form field / section enter animations */
+@keyframes field-enter {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes section-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Form field validation animations */
 @keyframes field-shake {
   0%, 100% { transform: translateX(0); }

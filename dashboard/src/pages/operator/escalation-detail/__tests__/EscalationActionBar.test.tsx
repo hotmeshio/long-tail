@@ -187,14 +187,34 @@ describe('EscalationActionBar', () => {
     });
   });
 
-  it('shows acknowledge for notification escalations (no workflowType)', () => {
-    const onResolve = vi.fn();
-    renderBar({ mode: 'claimed_by_me', workflowType: null, onResolve });
-    const acknowledgeButtons = screen.getAllByText('Acknowledge');
-    expect(acknowledgeButtons.length).toBeGreaterThanOrEqual(1);
+  it('shows Acknowledge button for notification escalations (no workflowType)', () => {
+    renderBar({ mode: 'claimed_by_me', workflowType: null });
+    // Tab label and button label both say Acknowledge
+    const acknowledgeEls = screen.getAllByText('Acknowledge');
+    expect(acknowledgeEls.length).toBeGreaterThanOrEqual(1);
+  });
 
-    fireEvent.click(acknowledgeButtons[acknowledgeButtons.length - 1]);
-    expect(onResolve).toHaveBeenCalledWith({ acknowledged: true });
+  it('Acknowledge runs the same validation and submits form payload', () => {
+    const onResolve = vi.fn();
+    const json = JSON.stringify({ approved: true, _form_schema: {
+      required: ['approved'],
+      properties: { approved: { type: 'boolean' } },
+    }});
+    renderBar({ mode: 'claimed_by_me', workflowType: null, json, onResolve });
+    fireEvent.click(screen.getAllByText('Acknowledge').slice(-1)[0]);
+    expect(onResolve).toHaveBeenCalledWith({ approved: true });
+  });
+
+  it('Acknowledge blocks submission when a required field is empty', () => {
+    const onResolve = vi.fn();
+    const json = JSON.stringify({ notes: '', _form_schema: {
+      required: ['notes'],
+      properties: { notes: { type: 'string' } },
+    }});
+    renderBar({ mode: 'claimed_by_me', workflowType: null, json, onResolve });
+    fireEvent.click(screen.getAllByText('Acknowledge').slice(-1)[0]);
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/Required: notes/i)).toBeInTheDocument();
   });
 
   // ── Claimed by me: escalate ──
@@ -256,5 +276,213 @@ describe('EscalationActionBar', () => {
   it('shows resolve error', () => {
     renderBar({ mode: 'claimed_by_me', resolveError: new Error('Server error') });
     expect(screen.getByText('Server error')).toBeInTheDocument();
+  });
+});
+
+// ── Required field visibility-aware validation ──
+describe('EscalationActionBar — required field submit validation', () => {
+  function makeJson(fields: Record<string, unknown>, schema?: Record<string, unknown>) {
+    const payload: Record<string, unknown> = { ...fields };
+    if (schema) payload._form_schema = schema;
+    return JSON.stringify(payload);
+  }
+
+  it('blocks submit and shows required error when visible required string field is empty', () => {
+    const onResolve = vi.fn();
+    const onSubmitAttempt = vi.fn();
+    const json = makeJson({ notes: '' }, {
+      required: ['notes'],
+      properties: { notes: { type: 'string' } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onSubmitAttempt });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(onSubmitAttempt).toHaveBeenCalled();
+    expect(screen.getByText(/Required: notes/i)).toBeInTheDocument();
+  });
+
+  it('allows submit when visible required string field has a value', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ notes: 'done' }, {
+      required: ['notes'],
+      properties: { notes: { type: 'string' } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).toHaveBeenCalled();
+  });
+
+  it('allows submit when required field is hidden via x-lt-showIf (escalation context)', () => {
+    const onResolve = vi.fn();
+    const onSubmitAttempt = vi.fn();
+    // action is required but hidden because metadata.crew_pill is absent
+    const json = makeJson({ action: '', notes: 'done' }, {
+      required: ['action'],
+      properties: {
+        notes: { type: 'string' },
+        action: { type: 'string', 'x-lt-showIf': 'metadata.crew_pill' },
+      },
+    });
+    renderBar({
+      mode: 'claimed_by_me',
+      json,
+      onResolve,
+      onSubmitAttempt,
+      escalationContext: { metadata: {} },
+    });
+    fireEvent.click(screen.getByText('Submit'));
+    // hidden required field must not block
+    expect(onResolve).toHaveBeenCalled();
+    expect(onSubmitAttempt).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit when required field IS visible (x-lt-showIf truthy) and empty', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ action: '' }, {
+      required: ['action'],
+      properties: {
+        action: { type: 'string', 'x-lt-showIf': 'metadata.crew_pill' },
+      },
+    });
+    renderBar({
+      mode: 'claimed_by_me',
+      json,
+      onResolve,
+      escalationContext: { metadata: { crew_pill: true } },
+    });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/Required: action/i)).toBeInTheDocument();
+  });
+
+  it('blocks submit when required object (checklist) field has all-falsy values', () => {
+    const onResolve = vi.fn();
+    const json = makeJson(
+      { checks: { item_0: false, item_1: false } },
+      {
+        required: ['checks'],
+        properties: { checks: { type: 'object' } },
+      },
+    );
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/Required: checks/i)).toBeInTheDocument();
+  });
+
+  it('allows submit when required object (checklist) field has at least one truthy value', () => {
+    const onResolve = vi.fn();
+    const json = makeJson(
+      { checks: { item_0: true, item_1: false } },
+      {
+        required: ['checks'],
+        properties: { checks: { type: 'object' } },
+      },
+    );
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).toHaveBeenCalled();
+  });
+
+  it('blocks submit when a string field violates minLength', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ code: 'ab' }, {
+      properties: { code: { type: 'string', minLength: 5 } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/minimum 5 characters/i)).toBeInTheDocument();
+  });
+
+  it('blocks submit when a number field violates maximum', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ score: 150 }, {
+      properties: { score: { type: 'number', maximum: 100 } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/maximum value is 100/i)).toBeInTheDocument();
+  });
+
+  it('blocks submit when a string field violates pattern', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ code: 'abc' }, {
+      properties: { code: { type: 'string', pattern: '^[0-9]+$', 'x-lt-pattern-error': 'Digits only' } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/digits only/i)).toBeInTheDocument();
+  });
+
+  it('allows submit when all field constraints pass', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ code: '12345', score: 85 }, {
+      properties: {
+        code: { type: 'string', minLength: 5, maxLength: 10 },
+        score: { type: 'number', minimum: 0, maximum: 100 },
+      },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).toHaveBeenCalled();
+  });
+
+  it('allows submit when required boolean field is true', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ approved: true }, {
+      required: ['approved'],
+      properties: { approved: { type: 'boolean' } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).toHaveBeenCalledWith({ approved: true });
+  });
+
+  it('blocks submit when required boolean field is false (unchecked)', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ approved: false }, {
+      required: ['approved'],
+      properties: { approved: { type: 'boolean' } },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/Required: approved/i)).toBeInTheDocument();
+  });
+
+  it('allows submit when an optional string field is empty', () => {
+    const onResolve = vi.fn();
+    const json = makeJson({ title: 'done', notes: '' }, {
+      required: ['title'],
+      properties: {
+        title: { type: 'string' },
+        notes: { type: 'string' },
+      },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).toHaveBeenCalled();
+  });
+
+  it('reports all failing fields via onValidationErrors callback', () => {
+    const onResolve = vi.fn();
+    const onValidationErrors = vi.fn();
+    const json = makeJson({ name: '', score: 0 }, {
+      required: ['name', 'score'],
+      properties: {
+        name: { type: 'string' },
+        score: { type: 'number', minimum: 1 },
+      },
+    });
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    const errors = onValidationErrors.mock.calls[0][0] as { field: string; message: string }[];
+    expect(errors.length).toBeGreaterThanOrEqual(2);
+    expect(errors.some((e) => e.field === 'name')).toBe(true);
+    expect(errors.some((e) => e.field === 'score')).toBe(true);
   });
 });

@@ -14,6 +14,12 @@ export interface WidgetProps {
   schema?: Record<string, unknown>;
   /** Escalation context — used by widgets that read from envelope/metadata/payload at render time. */
   escalationContext?: ShowIfContext;
+  /** Whether this field is listed in the schema's required array. */
+  isRequired?: boolean;
+  /** Whether the user has attempted to submit — triggers required/validation display in widgets. */
+  submitAttempted?: boolean;
+  /** Validation error to display inside the widget. */
+  error?: string;
 }
 
 /**

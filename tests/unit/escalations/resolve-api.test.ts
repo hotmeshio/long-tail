@@ -12,6 +12,7 @@ vi.mock('../../../services/escalation', () => ({
 vi.mock('../../../api/escalations/helpers', () => ({
   assertReadAccess: vi.fn(),
   assertWriteAccess: vi.fn(),
+  assertLiveClaimant: vi.fn(),
   getEscalationWriteScope: vi.fn(),
 }));
 
@@ -41,7 +42,7 @@ vi.mock('../../../modules/defaults', () => ({
 }));
 
 import * as svc from '../../../services/escalation';
-import { assertReadAccess, assertWriteAccess } from '../../../api/escalations/helpers';
+import { assertReadAccess, assertWriteAccess, assertLiveClaimant } from '../../../api/escalations/helpers';
 import { createClient } from '../../../workers';
 import { resolveEscalation, resolveBySignalKey, resolveByIds } from '../../../api/escalations/resolve';
 
@@ -50,6 +51,7 @@ const mockGetBySignal = vi.mocked(svc.getEscalationBySignalKey);
 const mockResolve = vi.mocked(svc.resolveEscalation);
 const mockReadAccess = vi.mocked(assertReadAccess);
 const mockWriteAccess = vi.mocked(assertWriteAccess);
+const mockLiveClaimant = vi.mocked(assertLiveClaimant);
 const mockCreateClient = vi.mocked(createClient);
 
 const AUTH = { userId: 'user-1' };
@@ -75,6 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockReadAccess.mockResolvedValue(null);   // access allowed
   mockWriteAccess.mockResolvedValue(null);  // write allowed
+  mockLiveClaimant.mockReturnValue(null);   // claim live (or row unclaimed)
 });
 
 // ── Input validation ──────────────────────────────────────────────────────────
@@ -126,6 +129,71 @@ describe('resolveEscalation — RBAC', () => {
   });
 });
 
+// ── Claim-liveness gate ──────────────────────────────────────────────────────
+
+describe('resolveEscalation — claim-liveness gate', () => {
+  it('returns 409 when the caller\'s claim has expired', async () => {
+    mockGet.mockResolvedValue(makePending({ signal_key: 'sig-1' }));
+    mockLiveClaimant.mockReturnValue({ status: 409, error: 'Your claim has expired — re-claim this escalation to resolve it' });
+    const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { ok: true } }, AUTH);
+    expect(result.status).toBe(409);
+    expect(result.error).toContain('claim has expired');
+    // Gate fires BEFORE any resolution path — no side effects
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when another user holds the claim', async () => {
+    mockGet.mockResolvedValue(makePending({ signal_key: 'sig-1' }));
+    mockLiveClaimant.mockReturnValue({ status: 409, error: 'Escalation is claimed by another user' });
+    const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { ok: true } }, AUTH);
+    expect(result.status).toBe(409);
+    expect(mockResolve).not.toHaveBeenCalled();
+  });
+
+  it('gates the signal-routed path before the signal fires', async () => {
+    const esc = makePending({ signal_key: null, metadata: { signal_id: 'sig-abc' } });
+    mockGet.mockResolvedValue(esc);
+    mockLiveClaimant.mockReturnValue({ status: 409, error: 'Your claim has expired — re-claim this escalation to resolve it' });
+    const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { ok: true } }, AUTH);
+    expect(result.status).toBe(409);
+    // Path A signals the workflow directly — the gate must reject before that
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it('passes the gate and forwards the caller as assertClaim on the atomic path', async () => {
+    const esc = makePending({ signal_key: 'sig-1' });
+    mockGet.mockResolvedValue(esc);
+    mockResolve.mockResolvedValue(esc);
+    const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { ok: true } }, AUTH);
+    expect(mockLiveClaimant).toHaveBeenCalledWith('user-1', esc);
+    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, 'user-1');
+    expect(result.status).toBe(200);
+  });
+});
+
+// ── Path D: notification-only (no workflow) ──────────────────────────────────
+
+describe('resolveEscalation — Path D (notification-only)', () => {
+  it('acknowledges with assertClaim forwarded to the atomic resolve', async () => {
+    const esc = makePending({ workflow_type: null, task_queue: null, signal_key: null });
+    mockGet.mockResolvedValue(esc);
+    mockResolve.mockResolvedValue(esc);
+    const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { acknowledged: true } }, AUTH);
+    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, 'user-1');
+    expect(result.status).toBe(200);
+    expect((result.data as any).acknowledged).toBe(true);
+  });
+
+  it('returns 409 when the guarded resolve blocks (race lost or claim assertion failed)', async () => {
+    const esc = makePending({ workflow_type: null, task_queue: null, signal_key: null });
+    mockGet.mockResolvedValue(esc);
+    mockResolve.mockResolvedValue(null);
+    const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { acknowledged: true } }, AUTH);
+    expect(result.status).toBe(409);
+  });
+});
+
 // ── Path 0: signal_key (atomic efficient resolve) ─────────────────────────────
 
 describe('resolveEscalation — Path 0 (signal_key)', () => {
@@ -134,7 +202,7 @@ describe('resolveEscalation — Path 0 (signal_key)', () => {
     mockGet.mockResolvedValue(esc);
     mockResolve.mockResolvedValue(esc);
     const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { approved: true } }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined);
+    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, 'user-1');
     expect(result.status).toBe(200);
     expect((result.data as any).signaled).toBe(true);
   });
@@ -226,7 +294,8 @@ describe('resolveBySignalKey', () => {
     mockGetBySignal.mockResolvedValue(esc);
     mockResolve.mockResolvedValue(esc);
     const result = await resolveBySignalKey({ signalKey: 'sig-xyz', resolverPayload: { ok: true } }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined);
+    // Webhook path stays claim-agnostic — no assertClaim forwarded
+    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, undefined);
     expect(result.status).toBe(200);
   });
 });

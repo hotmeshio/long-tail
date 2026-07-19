@@ -11,6 +11,7 @@ import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
+import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as policyDocumentWorkflow from './workflows/policy-document';
 import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
@@ -40,6 +41,7 @@ const GRINDER = 'grinder';
 const GLUER = 'gluer';
 const INTAKE_REVIEWER = 'intake-reviewer';
 const CHECKLIST_OPERATOR = 'checklist-operator';
+const QUALITY_REVIEWER = 'quality-reviewer';
 const POLICY_DOCUMENT = 'policy-document';
 
 const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
@@ -127,6 +129,25 @@ const checklistConfirmationConfig: LTWorkerConfig = {
   defaultRole: CHECKLIST_OPERATOR,
   envelopeSchema: {
     data: { count: 5 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const constraintFormConfig: LTWorkerConfig = {
+  description: 'Constraint form — reference example for every pre-submission guard: dynamic min/max (score floor from envelope.min_score, notes cap from envelope.max_notes_length), pattern (reference code), hidden required field (rejection_reason visible only when unapproved), and checklist widget with per-item required flags. Invoke with different min_score values to see dynamic bounds in action.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: QUALITY_REVIEWER,
+  envelopeSchema: {
+    data: {
+      min_score: 60,
+      max_notes_length: 500,
+      checklist_items: [
+        { id: 'documentation', label: 'All supporting documentation is attached', required: true },
+        { id: 'contact_verified', label: 'Contact details have been verified', required: true },
+        { id: 'photos', label: 'Before/after photos are present', required: false },
+      ],
+    },
     metadata: { source: 'dashboard' },
   },
 };
@@ -392,6 +413,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
+  { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },

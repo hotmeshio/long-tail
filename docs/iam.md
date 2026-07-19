@@ -39,7 +39,7 @@ The five member profiles:
 
 Scope makes limited-surface users first-class. A workflow assigns an escalation to a named person — a pre-claim, setting `assigned_to` to that user — and provisions them as a `member` with `read_scope=self` and `write_scope=self`. They see and act on exactly that one item: a just-in-time form surface scoped by RBAC, with no access to the rest of the queue and no direct table access. A follow-up or update is simply another workflow firing another escalation to that same person. Because `self` scope keys off durable `assigned_to` (independent of the soft-lock claim TTL), the assignment persists until the workflow resolves it.
 
-See the [Roles API](api/http/roles.md#work-surface-scope) for the assignment contract and the [HITL Guide](hitl-guide.md#role-based-routing) for the workflow-side flow.
+See the [Roles API](api/http/roles.md#work-surface-scope) for the assignment contract and [roles.md](hitl/roles.md#role-based-routing) in the HITL guide for the workflow-side flow.
 
 ### Enforcement
 

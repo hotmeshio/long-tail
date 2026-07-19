@@ -1,6 +1,6 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { HelpCircle, Info, Tags, Layers, Braces, Sparkles, User, ListFilter, Search } from 'lucide-react';
+import { HelpCircle, Info, Tags, Layers, Braces, Sparkles, User, ListFilter, Search, AlertCircle } from 'lucide-react';
 import { SlidePanel, SlidePanelViews, PanelField, type SlidePanelView } from '../common/layout/SlidePanel';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { JsonViewer } from '../common/data/JsonViewer';
@@ -15,6 +15,7 @@ import { TriageContext } from './TriageContext';
 import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
+import type { FieldError } from '../../lib/field-validator';
 
 export const ESCALATION_PANEL_VIEWS = {
   HELP: 'help',
@@ -23,6 +24,7 @@ export const ESCALATION_PANEL_VIEWS = {
   METADATA: 'metadata',
   CONTEXT: 'context',
   RECORD: 'record',
+  ERRORS: 'errors',
 } as const;
 
 const PANEL_VIEW_KEY = 'lt:escalation:panel:view';
@@ -158,6 +160,49 @@ function DetailsList({ esc, claimed, isTerminal, isBuilder, traceUrl }: {
   );
 }
 
+function ErrorsPanel({ errors }: { errors: FieldError[] }) {
+  const focusField = (field: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-field-key="${field}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.focus({ preventScroll: true });
+  };
+
+  if (errors.length === 0) {
+    return <p className="text-xs text-text-tertiary italic">No errors to display.</p>;
+  }
+
+  return (
+    <div className="space-y-1" role="alert" aria-live="polite">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-status-error mb-4">
+        {errors.length} {errors.length === 1 ? 'issue' : 'issues'} to resolve
+      </p>
+      <div className="space-y-1.5">
+        {errors.map(({ field, message }) => (
+          <button
+            key={field}
+            onClick={() => focusField(field)}
+            className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded hover:bg-status-error/5 transition-colors group"
+          >
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-status-error/60 group-hover:text-status-error transition-colors" />
+            <div>
+              <p className="text-[11px] font-semibold text-text-primary capitalize leading-snug">
+                {field.replace(/[_-]/g, ' ')}
+              </p>
+              <p className="text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors leading-snug mt-0.5">
+                {message}
+              </p>
+            </div>
+          </button>
+        ))}
+      </div>
+      <p className="text-[10px] text-text-quaternary mt-4 px-3">
+        Click an issue to scroll to and focus the field.
+      </p>
+    </div>
+  );
+}
+
 /**
  * The escalation detail side panel — a set of views beside the resolve form,
  * ordered by specificity:
@@ -187,6 +232,9 @@ export function EscalationSidePanel({
   traceUrl,
   open,
   noGutter,
+  formErrors,
+  activePanel,
+  onPanelChange,
 }: {
   esc: LTEscalationRecord;
   schema: Record<string, unknown> | null;
@@ -203,15 +251,31 @@ export function EscalationSidePanel({
   open: boolean;
   /** Remove the left gutter so the panel background is flush with the content column (used in full-bleed iframe mode). */
   noGutter?: boolean;
+  /** Structured form validation errors from the last submit attempt. When non-empty, the errors panel is available. */
+  formErrors?: FieldError[];
+  /** Controlled active panel view id. When provided, the panel uses this instead of internal state. */
+  activePanel?: string;
+  /** Called when the user changes the active panel view. */
+  onPanelChange?: (id: string) => void;
 }) {
   const navigate = useNavigate();
   const ALL_VIEW_IDS = Object.values(ESCALATION_PANEL_VIEWS) as readonly string[];
-  const [activeView, setActiveView] = useState<PanelViewId>(() => readPanelView(ALL_VIEW_IDS));
+  const [internalView, setInternalView] = useState<PanelViewId>(() => readPanelView(ALL_VIEW_IDS));
+
+  const activeView = (activePanel as PanelViewId | undefined) ?? internalView;
 
   const handleViewChange = useCallback((id: string) => {
     try { localStorage.setItem(PANEL_VIEW_KEY, id); } catch {}
-    setActiveView(id as PanelViewId);
-  }, []);
+    setInternalView(id as PanelViewId);
+    onPanelChange?.(id);
+  }, [onPanelChange]);
+
+  // Sync to controlled activePanel when it changes externally (e.g. page forces 'errors' after submit).
+  useEffect(() => {
+    if (activePanel && activePanel !== internalView) {
+      setInternalView(activePanel as PanelViewId);
+    }
+  }, [activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const helpMarkdown = useMemo(() => {
     const authored = buildHelpMarkdown(schema, {
@@ -282,6 +346,16 @@ export function EscalationSidePanel({
           icon: Braces,
           label: 'Record',
           content: <JsonViewer data={esc} label="Escalation Record" />,
+        }]
+      : []),
+    ...(formErrors && formErrors.length > 0
+      ? [{
+          id: ESCALATION_PANEL_VIEWS.ERRORS,
+          icon: (({ className }: { className?: string }) => (
+            <AlertCircle className={`${className ?? ''} text-status-error`} />
+          )) as SlidePanelView['icon'],
+          label: 'Errors',
+          content: <ErrorsPanel errors={formErrors} />,
         }]
       : []),
   ];

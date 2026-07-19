@@ -118,9 +118,14 @@ export async function resolveEscalation(
   id: string,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
+  assertClaim?: string,
 ): Promise<LTEscalationRecord | null> {
   const client = await escalations();
-  const result = await client.resolve({ id, resolverPayload, metadata });
+  // `assertClaim` rides the SDK's guarded UPDATE: no active claim lock may
+  // stand against this assignee, or the resolve blocks (claim-expired /
+  // claimed-by-other). The API layer's advisory pre-check (assertLiveClaimant)
+  // rejects early; this assertion is the atomic arbiter.
+  const result = await client.resolve({ id, resolverPayload, metadata, assertClaim });
   if (!result.ok) return null;
 
   const escalation = toEscalationRecord(result.entry);
