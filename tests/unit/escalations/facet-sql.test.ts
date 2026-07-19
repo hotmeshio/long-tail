@@ -100,6 +100,42 @@ describe('buildFacetWhere', () => {
     expect(clause).toContain('assigned_to IS NOT NULL AND assigned_until > NOW()');
   });
 
+  it('jeopardy=true adds the role-threshold age predicate (same expression as priority_count)', () => {
+    const { clause, params } = where({ jeopardy: true });
+    // Correlated on the role's dials with the same fallbacks as the pill count
+    expect(clause).toContain('FROM lt_roles rt');
+    expect(clause).toContain('rt.priority_facet');
+    expect(clause).toContain('pg_input_is_valid');
+    expect(clause).toContain('COALESCE(rt.priority_threshold_minutes, rt.sla_minutes)');
+    // Outer row qualified so lt_roles.role never shadows it
+    expect(clause).toContain('rt.role = lt_escalations.role');
+    expect(clause).toContain('lt_escalations.created_at');
+    // Pure SQL predicate — no bound params needed
+    expect(params).toHaveLength(0);
+  });
+
+  it('jeopardy honors a custom outer table ref for hmsh callers', () => {
+    const params: unknown[] = [];
+    const clause = buildFacetWhere({ jeopardy: true }, params, { tableRef: 'e' });
+    expect(clause).toContain('rt.role = e.role');
+    expect(clause).toContain('e.created_at');
+    expect(clause).not.toContain('lt_escalations.');
+  });
+
+  it('jeopardy composes with role and available (the pill deeplink shape)', () => {
+    const { clause } = where({ role: 'intake-reviewer', available: true, jeopardy: true });
+    const parts = clause.split('\n  AND ');
+    expect(parts).toHaveLength(3);
+    expect(clause).toContain('role = $1');
+    expect(clause).toContain('assigned_to IS NULL');
+    expect(clause).toContain('FROM lt_roles rt');
+  });
+
+  it('jeopardy absent emits no threshold clause', () => {
+    expect(where({}).clause).not.toContain('lt_roles');
+    expect(where({ available: true }).clause).not.toContain('lt_roles');
+  });
+
   it('composes multiple clauses with AND', () => {
     const { clause, params } = where({ role: 'reviewer', status: 'pending', available: true });
     const parts = clause.split('\n  AND ');

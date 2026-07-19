@@ -36,4 +36,25 @@ describe('facet-url — deep-link round-trip', () => {
     expect(facetCount({ facets: { a: 1, b: 2 }, range: [{ facet: 'x', op: '<', value: 1 }] })).toBe(3);
     expect(facetCount({})).toBe(0);
   });
+
+  it('round-trips the jeopardy filter as jeopardy=1', () => {
+    const p = new URLSearchParams();
+    writeFacetParams(p, { jeopardy: true });
+    expect(p.get('jeopardy')).toBe('1');
+    expect(parseFacetParams(p)).toEqual({ jeopardy: true });
+
+    // Clearing it removes the param entirely
+    writeFacetParams(p, {});
+    expect(p.get('jeopardy')).toBeNull();
+  });
+
+  it('accepts jeopardy=true as an equivalent hand-typed form', () => {
+    expect(parseFacetParams(new URLSearchParams('jeopardy=true'))).toEqual({ jeopardy: true });
+  });
+
+  it('jeopardy counts as a condition; orderBy never does (sort reorders, it does not narrow)', () => {
+    expect(facetCount({ jeopardy: true })).toBe(1);
+    expect(facetCount({ orderBy: [{ field: 'created_at', direction: 'asc' }] })).toBe(0);
+    expect(facetCount({ jeopardy: true, orderBy: [{ field: 'metadata.authorized_at', direction: 'asc' }] })).toBe(1);
+  });
 });

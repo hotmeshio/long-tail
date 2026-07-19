@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, GitMerge, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList,
+  Tag, GitBranch, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -36,33 +36,9 @@ function safeParseJson(text: string): { ok: boolean; value?: Record<string, unkn
   }
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
-
-function SectionHead({
-  icon: Icon,
-  color,
-  label,
-  aside,
-}: {
-  icon: React.ElementType;
-  color: string;
-  label: string;
-  aside?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between mb-3 pb-2 border-b border-surface-border">
-      <div className="flex items-center gap-2">
-        <Icon className={`w-4 h-4 ${color}`} strokeWidth={1.5} />
-        <h2 className="section-h2">{label}</h2>
-      </div>
-      {aside}
-    </div>
-  );
-}
-
 // ── Section group — eyebrow (icon + tiny title + annotation) over a left-ruled
-//    body. The page's top-level grouping treatment; sub-sections inside a group
-//    keep SectionHead. ──────────────────────────────────────────────────────────
+//    body. The page's single grouping treatment; fields inside a group use plain
+//    form-field labels, never a second heading tier. ──────────────────────────
 
 function SectionGroup({
   icon: Icon,
@@ -134,27 +110,7 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
   }
 
   return (
-    <div className="space-y-3">
-      {targets.length === 0 ? (
-        <p className="text-[11px] text-text-tertiary">Add a target role to route hand-offs.</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {targets.map((t) => (
-            <span
-              key={t}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-surface-sunken rounded font-mono text-text-secondary"
-            >
-              {t}
-              <button
-                onClick={() => removeChain.mutate({ source_role: role.role, target_role: t })}
-                className="text-text-quaternary hover:text-status-error transition-colors leading-none ml-0.5"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+    <div className="space-y-2">
       {available.length > 0 && (
         <div className="flex items-center gap-2">
           <select
@@ -177,6 +133,41 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
           </button>
         </div>
       )}
+      <PillWell
+        items={targets}
+        empty="Roles this one can escalate to. Add a target above and it lands here."
+        onRemove={(t) => removeChain.mutate({ source_role: role.role, target_role: t })}
+      />
+    </div>
+  );
+}
+
+/**
+ * Where chosen pills land — no enclosing box. Empty, it shows the instruction
+ * (which doubles as the hint); filled, it shows the pills and drops the text.
+ * The instruction is sized to occupy about the same height a pill row would, so
+ * the control barely changes size as items come and go.
+ */
+function PillWell({ items, empty, onRemove }: { items: string[]; empty: string; onRemove: (item: string) => void }) {
+  if (items.length === 0) {
+    return <p className="text-[10px] text-text-tertiary leading-relaxed">{empty}</p>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span
+          key={item}
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-accent/10 rounded-sm font-mono text-accent"
+        >
+          {item}
+          <button
+            onClick={() => onRemove(item)}
+            className="text-accent/50 hover:text-status-error transition-colors leading-none ml-0.5"
+          >
+            ×
+          </button>
+        </span>
+      ))}
     </div>
   );
 }
@@ -206,31 +197,7 @@ function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleD
     updateRole.mutate({ role: role.role, upstream_roles: next }, { onSuccess: () => setNewUpstream('') });
 
   return (
-    <div className="space-y-3">
-      {upstreams.length === 0 ? (
-        <p className="text-[11px] text-text-tertiary">
-          Add a role from another sequence that this station draws input from.
-          Prior Step sets where this role sits in its own sequence; upstream
-          inputs mark the side-quests that land here.
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {upstreams.map((u) => (
-            <span
-              key={u}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-surface-sunken rounded font-mono text-text-secondary"
-            >
-              {u}
-              <button
-                onClick={() => save(upstreams.filter((x) => x !== u))}
-                className="text-text-quaternary hover:text-status-error transition-colors leading-none ml-0.5"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+    <div className="space-y-2">
       {available.length > 0 && (
         <div className="flex items-center gap-2">
           <select
@@ -250,6 +217,11 @@ function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleD
           </button>
         </div>
       )}
+      <PillWell
+        items={upstreams}
+        empty="Roles from other sequences this station draws input from. Add one above and it lands here."
+        onRemove={(u) => save(upstreams.filter((x) => x !== u))}
+      />
       {updateRole.error && (
         <p className="text-[10px] text-status-error">{(updateRole.error as Error).message}</p>
       )}
@@ -631,10 +603,12 @@ export function RoleDetailPage() {
               annotation="where this station sits on the floor"
               accent
             >
-              <div className="space-y-14">
+              <div className="space-y-8">
                 {/* Prior Step */}
-                <div className="space-y-5">
-                  <SectionHead icon={GitBranch} color="text-text-tertiary" label="Prior Step" />
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+                    Prior Step
+                  </label>
                   <select
                     value={draft.parent_role}
                     onChange={(e) => update({ parent_role: e.target.value })}
@@ -647,20 +621,20 @@ export function RoleDetailPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-text-tertiary leading-relaxed">
+                  <p className="text-[10px] text-text-tertiary leading-relaxed mt-1.5">
                     Places this role in one Pace Board sequence. A role with no prior
                     step starts its own sequence.
                   </p>
                 </div>
 
                 {/* Upstream inputs — cross-sequence graph edges, live-save */}
-                <div className="space-y-5">
-                  <SectionHead
-                    icon={GitMerge}
-                    color="text-text-tertiary"
-                    label="Upstream Inputs"
-                    aside={<LiveBadge />}
-                  />
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                      Upstream Inputs
+                    </label>
+                    <LiveBadge />
+                  </div>
                   <UpstreamSection role={role} allRoles={roles} />
                 </div>
               </div>

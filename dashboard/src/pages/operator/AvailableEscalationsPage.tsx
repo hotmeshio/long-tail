@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
 import { useAccess } from '../../hooks/useAccess';
+import { useAuth } from '../../hooks/useAuth';
+import { isSystemTierRole } from '../../lib/task-queues';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
   useEscalations,
@@ -17,22 +19,26 @@ import {
   useBulkTriageEscalations,
   useBulkCancelEscalations,
   type FacetFilters,
+  type FacetOrder,
 } from '../../api/escalations';
 import { FacetedFilterPanel } from './FacetedFilterPanel';
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
-import { useRoles, useRoleListSchema } from '../../api/roles';
+import { useRoles, useRoleDetails, useRoleListSchema } from '../../api/roles';
+import { displayRoleTitle } from '../../lib/role-display';
+import { EscalationTitleSelect } from './EscalationTitleSelect';
+import { EscalationSortControl } from './EscalationSortControl';
 import { EscalationListView } from '../../components/escalation/EscalationListView';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
-import { PageHeader } from '../../components/common/layout/PageHeader';
 import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
-import { Activity, Lock, SlidersHorizontal, X, LayoutList, Table, ArrowUp, ArrowDown } from 'lucide-react';
+import { Activity, Lock, SlidersHorizontal, X, LayoutList, Table, BookOpen, TriangleAlert } from 'lucide-react';
+import { formatDurationCompact } from '../../lib/format';
 import { makeEscalationColumns, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
@@ -44,7 +50,7 @@ import type { LTEscalationRecord } from '../../api/types';
 export function AvailableEscalationsPage() {
   useEscalationListEvents();
   const navigate = useNavigate();
-  const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
+  const { filters, setFilter, pagination } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available', search: '' },
   });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
@@ -75,14 +81,31 @@ export function AvailableEscalationsPage() {
   const [triageModalOpen, setTriageModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [timelineSortAsc, setTimelineSortAsc] = useState(false);
+
+  // One sort model for every view: orderBy is deep-linked in the URL and routes
+  // the request through the robust faceted path (hasFacetQuery is true whenever
+  // orderBy is set). Default is created_at desc when no orderBy is present.
+  const setOrderBy = useCallback(
+    (next: FacetOrder[] | undefined) => setFacetFilters({ ...facetFilters, orderBy: next }),
+    [facetFilters, setFacetFilters],
+  );
 
   const { canBulk: canBulkManage } = useAccess();
-  // Timeline view: available to everyone when a faceted metadata search is active.
-  // Defaults on when facets are present so deeplinks land directly in the timeline.
-  const [timelineMode, setTimelineMode] = useState<'auto' | 'off'>('auto');
-  const showTimeline = timelineMode !== 'off' && activeFacetCount > 0;
   const facetHighlightKeys = facetFilters.facets ? Object.keys(facetFilters.facets) : [];
+
+  // View mode is DEEP-LINKED (?view=table|timeline|rich) and tied to the filter-bar
+  // toggles — a shared link reproduces the exact presentation. Explicit param wins;
+  // absent, the page auto-picks: timeline when a filter narrows the set, else the
+  // role's rich list view when one exists, else the table.
+  const viewParam = searchParams.get('view');
+  const setViewParam = useCallback((v: 'table' | 'timeline' | 'rich' | null) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (v) p.set('view', v); else p.delete('view');
+      return p;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const showTimeline = viewParam ? viewParam === 'timeline' : activeFacetCount > 0;
 
   // Remove a single facet key from the active query.
   const removeFacet = useCallback((key: string) => {
@@ -98,7 +121,23 @@ export function AvailableEscalationsPage() {
   const bulkTriage = useBulkTriageEscalations();
   const bulkCancel = useBulkCancelEscalations();
   const { data: rolesData } = useRoles();
+  const { data: roleDetails } = useRoleDetails();
   const { data: typesData } = useEscalationTypes();
+  const { user, isSuperAdmin, hasRoleType } = useAuth();
+  // Global viewers (superadmin / admin) can filter any queue; a scoped user sees
+  // only the queues they belong to — the title menu never offers a role whose
+  // escalations they can't read.
+  const isGlobalViewer = isSuperAdmin || hasRoleType('admin');
+  const memberRoleSet = useMemo(() => new Set((user?.roles ?? []).map((r) => r.role)), [user]);
+  const roleOptions = useMemo(() => {
+    const all = roleDetails?.roles ?? [];
+    const visible = isGlobalViewer
+      ? all
+      : all.filter((r) => memberRoleSet.has(r.role) && !isSystemTierRole(r.role));
+    return visible
+      .map((r) => ({ value: r.role, label: displayRoleTitle(r) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [roleDetails, isGlobalViewer, memberRoleSet]);
 
   // Clear selections on filter/page changes
   useEffect(() => {
@@ -126,8 +165,10 @@ export function AvailableEscalationsPage() {
     priority: filters.priority ? parseInt(filters.priority) : undefined,
     limit: showTimeline ? timelinePageSize : pagination.pageSize,
     offset: pagination.offset,
-    sort_by: sort.sort_by || 'created_at',
-    order: sort.order || 'desc',
+    // Basic-path fallback only; when orderBy is present (any real sort) the
+    // request routes faceted and orderBy drives the ordering instead.
+    sort_by: 'created_at',
+    order: 'desc',
     search: debouncedSearch || undefined,
     // Faceted metadata query (composes with role-scope + the basic filters in SQL).
     ...facetFilters,
@@ -157,8 +198,8 @@ export function AvailableEscalationsPage() {
     type: filters.type || undefined,
     priority: filters.priority || undefined,
     search: debouncedSearch || undefined,
-    sort_by: sort.sort_by || 'created_at',
-    order: sort.order || 'desc',
+    sort_by: 'created_at',
+    order: 'desc',
     limit: pagination.pageSize,
     offset: pagination.offset,
     // Faceted query — JSON-encoded so the copy-URL/curl reproduces the exact query.
@@ -181,13 +222,22 @@ export function AvailableEscalationsPage() {
   // flip back to the columns.
   const singleRole = filters.role
     || (facetFilters.roles?.length === 1 ? facetFilters.roles[0] : null);
-  const [forceTable, setForceTable] = useState(false);
   const listSchemaQuery = useRoleListSchema(singleRole ?? '', undefined, !!singleRole);
   const listSchema = (listSchemaQuery.data?.list_schema ?? null) as Record<string, any> | null;
   // A rich view is available for this list; the toggle flips to the table.
   const hasRichView = !!singleRole && !!listSchema
     && !!listSchema['x-lt-layout'] && listSchema['x-lt-layout'] !== 'table';
-  const useRichView = hasRichView && !forceTable;
+  const useRichView = hasRichView && !showTimeline
+    && (viewParam ? viewParam === 'rich' : true);
+
+  // The jeopardy pill names the role's limit so the red filter is self-explaining
+  // ("in jeopardy · > 15m"): priority_threshold_minutes, falling back to SLA.
+  const jeopardyThresholdLabel = useMemo(() => {
+    if (!facetFilters.jeopardy || !singleRole) return null;
+    const r = (roleDetails?.roles ?? []).find((x) => x.role === singleRole);
+    const mins = r?.priority_threshold_minutes ?? r?.sla_minutes ?? null;
+    return mins != null ? formatDurationCompact(mins * 60_000) : null;
+  }, [facetFilters.jeopardy, singleRole, roleDetails]);
 
   const selectedRoles = useMemo(() => {
     const roles = new Set<string>();
@@ -301,7 +351,18 @@ export function AvailableEscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="All Escalations" docsHash="#docs:dashboard.md:all-escalations" />
+      {/* The title IS the queue selector: it reads as the chosen role's title,
+          or "All Escalations". The role filter therefore leaves the bar. */}
+      <div className="flex items-center gap-2 mb-10 min-w-0">
+        <EscalationTitleSelect role={filters.role} options={roleOptions} onChange={(v) => setFilter('role', v)} />
+        <button
+          onClick={() => { window.location.hash = '#docs:dashboard.md:all-escalations'; }}
+          className="text-text-quaternary hover:text-accent transition-colors mt-1 shrink-0"
+          title="Open docs for this page"
+        >
+          <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+        </button>
+      </div>
 
       <EscalationFilterBar
         filters={filters}
@@ -309,37 +370,22 @@ export function AvailableEscalationsPage() {
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
         showStatus
+        showRole={false}
         showSearch={false}
         actions={
           <>
             {showTimeline && (
-              <>
-                <span className="text-[11px] text-text-tertiary whitespace-nowrap">
-                  {total > 100 && (
-                    <><span className="font-medium text-text-secondary">{(pagination.page - 1) * 100 + 1}–{Math.min(pagination.page * 100, total)}</span>{' of '}</>
-                  )}
-                  <span className="font-medium text-text-secondary">{total}</span>{' '}
-                  {total === 1 ? 'escalation' : 'escalations'}
-                </span>
-                <div className="flex items-center rounded overflow-hidden border border-slate-200">
-                  <button
-                    onClick={() => setTimelineSortAsc(false)}
-                    className={`px-1.5 py-1 transition-colors ${!timelineSortAsc ? 'bg-accent text-white' : 'text-text-tertiary hover:bg-surface-hover'}`}
-                    title="Newest first"
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setTimelineSortAsc(true)}
-                    className={`px-1.5 py-1 border-l border-slate-200 transition-colors ${timelineSortAsc ? 'bg-accent text-white' : 'text-text-tertiary hover:bg-surface-hover'}`}
-                    title="Oldest first"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <span className="h-3.5 w-px bg-surface-border shrink-0" />
-              </>
+              <span className="text-[11px] text-text-tertiary whitespace-nowrap">
+                {total > 100 && (
+                  <><span className="font-medium text-text-secondary">{(pagination.page - 1) * 100 + 1}–{Math.min(pagination.page * 100, total)}</span>{' of '}</>
+                )}
+                <span className="font-medium text-text-secondary">{total}</span>{' '}
+                {total === 1 ? 'escalation' : 'escalations'}
+              </span>
             )}
+            {/* Universal sort — one control for table, timeline, and rich views. */}
+            <EscalationSortControl orderBy={facetFilters.orderBy} onChange={setOrderBy} />
+            <span className="h-3.5 w-px bg-surface-border shrink-0" />
             <ListToolbar
               onRefresh={() => refetch()}
               isFetching={isFetching}
@@ -347,18 +393,18 @@ export function AvailableEscalationsPage() {
             />
             {hasRichView && !showTimeline && (
               <button
-                onClick={() => setForceTable((v) => !v)}
+                onClick={() => setViewParam(useRichView ? 'table' : 'rich')}
                 className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
-                title={forceTable ? 'Rich view' : 'Table view'}
+                title={useRichView ? 'Table view' : 'Rich view'}
               >
-                {forceTable
-                  ? <LayoutList className="w-4 h-4" />
-                  : <Table className="w-4 h-4" />}
+                {useRichView
+                  ? <Table className="w-4 h-4" />
+                  : <LayoutList className="w-4 h-4" />}
               </button>
             )}
             {activeFacetCount > 0 && (
               <button
-                onClick={() => setTimelineMode((m) => m === 'off' ? 'auto' : 'off')}
+                onClick={() => setViewParam(showTimeline ? 'table' : 'timeline')}
                 className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
                 title={showTimeline ? 'Table view' : 'Timeline view'}
               >
@@ -450,9 +496,23 @@ export function AvailableEscalationsPage() {
         />
 
       {/* Active facet pills — sticky below the shell header, opaque so timeline scrolls beneath */}
-      {facetFilters.facets && Object.keys(facetFilters.facets).length > 0 && (
+      {((facetFilters.facets && Object.keys(facetFilters.facets).length > 0) || facetFilters.jeopardy) && (
         <div className="sticky top-14 z-30 bg-surface/98 backdrop-blur-sm border-b border-surface-border/30 -mx-10 px-10 py-2 flex items-center gap-1.5 flex-wrap">
-          {Object.entries(facetFilters.facets).map(([k, v]) => (
+          {facetFilters.jeopardy && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-status-error px-2.5 py-0.5 text-[10px] font-semibold text-white">
+              <TriangleAlert className="w-2.5 h-2.5" strokeWidth={2.5} />
+              in jeopardy
+              {jeopardyThresholdLabel && <span className="font-mono font-normal opacity-90">&gt; {jeopardyThresholdLabel}</span>}
+              <button
+                onClick={() => setFacetFilters({ ...facetFilters, jeopardy: undefined })}
+                className="ml-0.5 -mr-0.5 flex items-center text-white/70 hover:text-white transition-colors"
+                aria-label="Clear jeopardy filter"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+          {Object.entries(facetFilters.facets ?? {}).map(([k, v]) => (
             <span
               key={k}
               className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/8 px-2.5 py-0.5 text-[10px] font-medium text-accent/90"
@@ -469,7 +529,7 @@ export function AvailableEscalationsPage() {
               </button>
             </span>
           ))}
-          {Object.keys(facetFilters.facets).length > 1 && (
+          {Object.keys(facetFilters.facets ?? {}).length > 1 && (
             <button
               onClick={() => setFacetFilters({ ...facetFilters, facets: undefined })}
               className="text-[10px] text-text-quaternary hover:text-text-secondary transition-colors px-1"
@@ -497,7 +557,6 @@ export function AvailableEscalationsPage() {
           page={pagination.page}
           totalPages={Math.ceil(total / timelinePageSize)}
           onPageChange={pagination.setPage}
-          sortAsc={timelineSortAsc}
         />
       ) : useRichView ? (
         <EscalationListView
@@ -521,8 +580,6 @@ export function AvailableEscalationsPage() {
             onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
             isLoading={isLoading}
             emptyMessage={queryError ? 'Unable to load data' : 'No escalations'}
-            sort={sort}
-            onSort={setSort}
           />
 
           <StickyPagination

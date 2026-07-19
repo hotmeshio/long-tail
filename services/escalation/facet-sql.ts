@@ -25,8 +25,18 @@ function metaExpr(key: string, numeric = false): string {
  * Build the WHERE clause for a faceted query, pushing bound params into `params`.
  * Every value is parameterized; only validated column names / metadata keys and
  * a fixed operator set are interpolated. Returns `TRUE` when empty.
+ *
+ * `opts.tableRef` names the outer table for correlated clauses (the jeopardy
+ * predicate joins lt_roles, whose own `role` column would otherwise shadow the
+ * outer row's). Callers querying `public.hmsh_escalations` pass its name; the
+ * default matches the `public.lt_escalations` view the list paths read.
  */
-export function buildFacetWhere(q: FacetQuery, params: unknown[]): string {
+export function buildFacetWhere(
+  q: FacetQuery,
+  params: unknown[],
+  opts: { tableRef?: string } = {},
+): string {
+  const ref = opts.tableRef ?? 'lt_escalations';
   const clauses: string[] = [];
 
   if (q.role) {
@@ -67,6 +77,31 @@ export function buildFacetWhere(q: FacetQuery, params: unknown[]): string {
     clauses.push(`(assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW())`);
   } else if (q.available === false) {
     clauses.push(`(assigned_to IS NOT NULL AND assigned_until > NOW())`);
+  }
+
+  // Jeopardy: the row is past its role's priority threshold — the SAME
+  // expression the Pace Board's priority_count uses (services/escalation/
+  // sql.ts live_counts), so a jeopardy list's total always equals the pill.
+  // Age origin: the role's priority_facet metadata timestamp (created_at when
+  // unset), guarded by pg_input_is_valid so malformed values never throw.
+  // Threshold: priority_threshold_minutes, falling back to sla_minutes. A role
+  // with neither configured (or a missing lt_roles row) yields NULL → false →
+  // contributes no rows, matching a pill that never rendered. Purely the age
+  // predicate — compose `available: true` for the unclaimed pool the pill
+  // counts. The per-row scalar subquery is a PK lookup on the small, cached
+  // lt_roles table (same cost shape as the count query); if a fixed-facet
+  // deployment ever needs more, an expression index on the cast is the
+  // escape hatch.
+  if (q.jeopardy === true) {
+    clauses.push(
+      `(SELECT CASE
+          WHEN rt.priority_facet IS NULL THEN ${ref}.created_at
+          WHEN pg_input_is_valid(${ref}.metadata->>rt.priority_facet, 'timestamptz')
+            THEN (${ref}.metadata->>rt.priority_facet)::timestamptz
+          ELSE NULL
+        END < NOW() - (COALESCE(rt.priority_threshold_minutes, rt.sla_minutes) * INTERVAL '1 minute')
+        FROM lt_roles rt WHERE rt.role = ${ref}.role)`,
+    );
   }
 
   return clauses.length ? clauses.join('\n  AND ') : 'TRUE';

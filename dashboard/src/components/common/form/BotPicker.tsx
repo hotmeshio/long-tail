@@ -30,7 +30,7 @@ export function BotPicker({ selected, onChange, placeholder }: BotPickerProps) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 w-full px-1 py-1.5 bg-transparent border-b border-surface-border/60 text-left cursor-pointer hover:border-accent/50 transition-colors focus:outline-none focus:border-accent/50"
+        className="field flex items-center gap-1.5 text-left cursor-pointer hover:border-accent"
       >
         {selected && selectedBot ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/[0.08] text-text-secondary text-[11px]">

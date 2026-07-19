@@ -13,6 +13,8 @@ export interface FacetInput {
   range?: FacetRange[];
   exists?: string[];
   available?: boolean;
+  /** Only rows past their role's priority threshold — see FacetQuery.jeopardy. */
+  jeopardy?: boolean;
   orderBy?: FacetOrder[];
 }
 
@@ -25,7 +27,8 @@ function hasFacetQuery(i: FacetInput): boolean {
     i.exists?.length ||
     i.orderBy?.length ||
     i.roles?.length ||
-    i.available != null
+    i.available != null ||
+    i.jeopardy === true
   );
 }
 
@@ -89,6 +92,7 @@ export async function listEscalations(
           block: input.block,
           range: input.range,
           exists: input.exists,
+          jeopardy: input.jeopardy,
           orderBy: input.orderBy,
         },
         type: input.type,
@@ -178,6 +182,7 @@ export async function listAvailableEscalations(
           block: input.block,
           range: input.range,
           exists: input.exists,
+          jeopardy: input.jeopardy,
           orderBy: input.orderBy,
         },
         type: input.type,

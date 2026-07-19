@@ -19,7 +19,6 @@ import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { PaceChart, type ChartStation } from '../operations/PaceChart';
 import { buildFragments } from '../operations/OperationsPage';
-import { priorityQueueLink } from '../operations/priority-link';
 import { TaskQueueCards } from './TaskQueueCards';
 
 const STATUS_DOT: Record<string, string> = {
@@ -184,20 +183,28 @@ export function HomePage() {
   useWorkflowListEvents();
   useStationMetricsEvents();
 
-  // The home page renders one of three persona layouts (see the return below).
-  // Gate each data source to the tiers that render it, so no one fires a request
-  // they can't access (403 on control-plane apps → empty namespace → 400 on jobs):
-  // - Pace Board + the All/My firehose  → canonical tiers (admin, superadmin)
-  // - Procedural/Graph workflow columns → builders (engineer, superadmin)
+  // The home page renders one of two layouts (see the return below): the
+  // operator's task-queue cards, or the builder home shared by admin, engineer,
+  // and superadmin. Gate each data source to the tiers that render it, so no one
+  // fires a request they can't access (403 on control-plane apps → empty
+  // namespace → 400 on jobs):
+  // - All/My escalation firehose → the builder home (everyone except operator)
+  // - Pace Board                 → admin, superadmin only
+  // - Procedural/Graph workflows  → builders (engineer, superadmin)
   // - Task-queue cards fetch their own scoped metrics inside TaskQueueCards.
+  const builderHome = !persona.showTaskQueueCards;
+  // Row 2 width adapts to what the tier can see: pace + both workflow columns
+  // (superadmin), workflows only (engineer), or pace only, full-width (admin).
+  const row2GridClass = persona.canSeePaceBoard && persona.canSeeWorkflows ? 'lg:grid-cols-3'
+    : persona.canSeeWorkflows ? 'lg:grid-cols-2' : '';
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
   const stationQ = useStationMetrics('1h', { enabled: persona.canSeePaceBoard });
   const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: persona.canSeeWorkflows });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
   const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: persona.canSeeWorkflows });
-  const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc', enabled: persona.canSeePaceBoard });
-  const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc', enabled: persona.canSeePaceBoard });
+  const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
+  const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
 
   // Delayed refetch — allows signal-routed escalation resolutions
   // (durable activity) time to commit before refreshing the list
@@ -223,10 +230,6 @@ export function HomePage() {
       metric: metrics.find((m) => m.role === r.role),
     }));
   }, [rolesQ.data, stationQ.data]);
-  const paceRoleByName = useMemo(
-    () => new Map((rolesQ.data?.roles ?? []).map((r) => [r.role, r])),
-    [rolesQ.data],
-  );
 
   const jobs = jobsQ.data?.jobs ?? [];
   const jobsTotal = jobsQ.data?.total;
@@ -300,28 +303,20 @@ export function HomePage() {
     </div>
   );
 
-  // ── Scoped personas (operator, engineer): their own lanes as Task Queue
-  //    cards. Engineers get a single compact card row with the workflow columns
-  //    below; operators get the fuller two-row surface and nothing else. No
-  //    Pace Board (a cross-role view only canonical tiers can read), no firehose.
+  // ── Operator: their own lanes as Task Queue cards, nothing else. Scoped to
+  //    the roles they belong to; no firehose, no Pace Board, no workflows.
   if (persona.showTaskQueueCards) {
     return (
       <div>
         <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
-        <TaskQueueCards maxRows={persona.canSeeWorkflows ? 1 : 2} />
-        {persona.canSeeWorkflows && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 mt-14">
-            {proceduralColumn}
-            {graphColumn}
-          </div>
-        )}
+        <TaskQueueCards maxRows={2} />
       </div>
     );
   }
 
-  // ── Canonical personas (admin, superadmin): the All/My firehose and the
-  //    cross-role Pace Board. Superadmins (builders) also get the workflow
-  //    columns; admins get the Pace Board full-width.
+  // ── Builder home (admin, engineer, superadmin): the All/My firehose, plus the
+  //    Pace Board (admin/superadmin) and the workflow columns (engineer/
+  //    superadmin). Engineers see everything here except the Pace Board.
   return (
     <div>
       <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
@@ -402,41 +397,41 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* ── Row 2: Pace Board | Procedural | Graph — mirrors the left nav.
-          Superadmins (builders) see all three; admins can't see workflows, so
-          their Pace Board spans the full row. */}
-      <div className={`grid grid-cols-1 ${isBuilder ? 'lg:grid-cols-3' : ''} gap-x-14 mt-14`}>
+      {/* ── Row 2: Pace Board (admin/superadmin) | Procedural | Graph (builders).
+          Engineers get the workflow columns but no Pace Board; admins get the
+          Pace Board full-width. */}
+      {(persona.canSeePaceBoard || persona.canSeeWorkflows) && (
+        <div className={`grid grid-cols-1 ${row2GridClass} gap-x-14 mt-14`}>
 
-        {/* Col 1: Pace Board — the story being told, at a glance */}
-        <div>
-          <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
-            <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
-          }>
-            Pace Board
-          </SectionHeader>
-          {paceStations.length === 0 ? (
-            <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
-          ) : (
-            <div className={`${isBuilder ? 'h-64' : 'h-80'} cursor-pointer`} onClick={() => navigate('/operations')}>
-              <PaceChart
-                stations={paceStations}
-                selectedRole={null}
-                onSelect={() => navigate('/operations')}
-                onUpstreamSelect={() => navigate('/operations')}
-                onPrioritySelect={(role) => {
-                  const detail = paceRoleByName.get(role);
-                  if (detail) navigate(priorityQueueLink(detail));
-                }}
-                periodHours={1}
-              />
+          {/* Pace Board — the story being told, at a glance */}
+          {persona.canSeePaceBoard && (
+            <div>
+              <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
+                <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
+              }>
+                Pace Board
+              </SectionHeader>
+              {paceStations.length === 0 ? (
+                <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
+              ) : (
+                <div className={`${isBuilder ? 'h-64' : 'h-80'} cursor-pointer`} onClick={() => navigate('/operations')}>
+                  <PaceChart
+                    stations={paceStations}
+                    selectedRole={null}
+                    onSelect={() => navigate('/operations')}
+                    onUpstreamSelect={() => navigate('/operations')}
+                    periodHours={1}
+                  />
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Cols 2 & 3: workflow executions (superadmin builders only) */}
-        {isBuilder && proceduralColumn}
-        {isBuilder && graphColumn}
-      </div>
+          {/* Workflow executions — builders (engineer, superadmin) */}
+          {persona.canSeeWorkflows && proceduralColumn}
+          {persona.canSeeWorkflows && graphColumn}
+        </div>
+      )}
     </div>
   );
 }

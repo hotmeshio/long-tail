@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
+import { usePersona } from '../../hooks/usePersona';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
@@ -21,6 +22,7 @@ import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 
 function ShellLayout() {
   const { isBuilder, isOps, viewAs } = useAccess();
+  const { canSeePaceBoard } = usePersona();
   const { data: settings } = useSettings();
   const aiOverride = getAiOverride();
   const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
@@ -64,7 +66,7 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} />
+            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
             <TaskQueuesSidebar />
             {isBuilder && <OrchestrationSidebar />}
             {isBuilder && aiEnabled && <DesignSidebar />}

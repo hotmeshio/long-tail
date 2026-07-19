@@ -18,6 +18,8 @@ export default {
           sunken: themed('--lt-surface-sunken'),
           hover: themed('--lt-surface-hover'),
           border: themed('--lt-surface-border'),
+          field: themed('--lt-field'),
+          'field-focus': themed('--lt-field-focus'),
         },
         text: {
           primary: themed('--lt-text-primary'),

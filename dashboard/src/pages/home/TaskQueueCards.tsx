@@ -32,12 +32,24 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
     [rolesQ.data],
   );
 
-  // Card #1 is always Claimed; the rest of the grid is lanes. Cap to the
-  // persona's row budget and surface any overflow rather than hiding it.
+  // Lanes lead with the most at-risk: sort by jeopardy count (a hard limit the
+  // plant manager pulls to the front of the line), then alphabetically for a
+  // stable order among ties. Card #1 is always Claimed, ahead of these.
+  const sortedRoles = useMemo(() => {
+    return [...roles].sort((a, b) => {
+      const ja = metricByRole.get(a)?.priority_count ?? 0;
+      const jb = metricByRole.get(b)?.priority_count ?? 0;
+      if (jb !== ja) return jb - ja;
+      return a.localeCompare(b);
+    });
+  }, [roles, metricByRole]);
+
+  // The rest of the grid is lanes. Cap to the persona's row budget and surface
+  // any overflow rather than hiding it.
   const slots = maxRows * 4;
   const laneBudget = slots - 1;
-  const shownRoles = roles.slice(0, laneBudget);
-  const overflow = roles.length - shownRoles.length;
+  const shownRoles = sortedRoles.slice(0, laneBudget);
+  const overflow = sortedRoles.length - shownRoles.length;
 
   return (
     <div>

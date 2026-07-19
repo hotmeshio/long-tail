@@ -150,8 +150,18 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       className: 'max-w-0',
     },
     {
+      key: 'priority',
+      label: 'Priority',
+      render: (row) => (
+        <span className={CELL_TEXT}>
+          <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
+        </span>
+      ),
+      className: 'w-14',
+    },
+    {
       key: 'workflow_type',
-      label: 'Workflow',
+      label: 'Workflow Type',
       render: (row) => <WorkflowPill type={row.workflow_type || row.type} />,
       className: 'w-40 whitespace-nowrap',
     },
@@ -178,17 +188,6 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       className: 'w-28',
     },
     {
-      key: 'priority',
-      label: 'Priority',
-      render: (row) => (
-        <span className={CELL_TEXT}>
-          <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
-        </span>
-      ),
-      className: 'w-14',
-      sortable: true,
-    },
-    {
       key: 'created_time',
       label: 'Created',
       render: (row) => (
@@ -197,7 +196,6 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
         </span>
       ),
       className: 'w-40 whitespace-nowrap',
-      sortable: true,
     },
     {
       key: 'created_at',
@@ -287,6 +285,7 @@ export function EscalationFilterBar({
   types,
   showStatus = false,
   showSearch = true,
+  showRole = true,
   actions,
 }: {
   filters: { role: string; type: string; priority: string; status?: string; search?: string };
@@ -297,6 +296,9 @@ export function EscalationFilterBar({
   // Free-text search lives here by default, but the faceted page folds it into
   // the drawer instead so there's a single search surface.
   showSearch?: boolean;
+  // The role filter can move into the page title (a queue selector); pages that
+  // do that hide it here so there's one place to pick a role.
+  showRole?: boolean;
   actions?: React.ReactNode;
 }) {
   return (
@@ -312,25 +314,29 @@ export function EscalationFilterBar({
           <FilterDivider />
         </>
       )}
-      <FilterSelect
-        label="Role"
-        value={filters.role}
-        onChange={(v) => setFilter('role', v)}
-        options={roles.map((r) => ({ value: r, label: r }))}
-      />
-      <FilterDivider />
-      <FilterSelect
-        label="Type"
-        value={filters.type}
-        onChange={(v) => setFilter('type', v)}
-        options={types.map((t) => ({ value: t, label: t }))}
-      />
-      <FilterDivider />
+      {showRole && (
+        <>
+          <FilterSelect
+            label="Role"
+            value={filters.role}
+            onChange={(v) => setFilter('role', v)}
+            options={roles.map((r) => ({ value: r, label: r }))}
+          />
+          <FilterDivider />
+        </>
+      )}
       <FilterSelect
         label="Priority"
         value={filters.priority}
         onChange={(v) => setFilter('priority', v)}
         options={PRIORITY_OPTIONS}
+      />
+      <FilterDivider />
+      <FilterSelect
+        label="Workflow Type"
+        value={filters.type}
+        onChange={(v) => setFilter('type', v)}
+        options={types.map((t) => ({ value: t, label: t }))}
       />
       {showSearch && (
         <>

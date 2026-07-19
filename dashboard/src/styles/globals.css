@@ -19,6 +19,8 @@
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
     --lt-surface-hover: 239 246 255;  /* #EFF6FF */
     --lt-surface-sunken: 235 243 255; /* #EBF3FF */
+    --lt-field: 248 251 255;          /* #F8FBFF — lightest: the form-field fill */
+    --lt-field-focus: 236 243 254;    /* #ECF3FE — field deepens on focus */
     /* Tinted neutrals carry real electric-blue chroma (matched to the vivid
      * rose theme) so labels, helper text, and lines read blue — not gray. */
     --lt-surface-border: 166 196 245; /* #A6C4F5 — visible blue underline */
@@ -29,6 +31,13 @@
     --lt-heading: 29 78 216;          /* #1D4ED8 */
   }
 
+  /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
+     the UI accent. Scoped to this theme so every other theme's logo keeps
+     tinting to its own accent (via the --lt-logo fallback in .logo-mark). */
+  [data-theme='blue'] {
+    --lt-logo: 24 116 240;            /* #1874F0 */
+  }
+
   [data-theme='violet'] {
     --lt-accent: 123 59 224;          /* violet at Redis-logo intensity #7B3BE0 */
     --lt-accent-hover: 98 41 190;     /* #6229BE */
@@ -36,6 +45,8 @@
     --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
     --lt-surface-hover: 246 241 253;  /* #F6F1FD */
     --lt-surface-sunken: 242 237 250; /* #F2EDFA */
+    --lt-field: 250 248 254;          /* #FAF8FE — lightest field fill */
+    --lt-field-focus: 244 238 252;    /* #F4EEFC */
     --lt-surface-border: 210 191 240; /* #D2BFF0 */
     --lt-text-primary: 18 6 41;       /* #120629 */
     --lt-text-secondary: 62 44 99;    /* #3E2C63 */
@@ -51,6 +62,8 @@
     --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
     --lt-surface-hover: 252 241 239;  /* #FCF1EF */
     --lt-surface-sunken: 249 236 233; /* #F9ECE9 */
+    --lt-field: 254 250 249;          /* #FEFAF9 — lightest field fill */
+    --lt-field-focus: 252 242 240;    /* #FCF2F0 */
     --lt-surface-border: 233 194 188; /* #E9C2BC */
     --lt-text-primary: 41 10 7;       /* #290A07 */
     --lt-text-secondary: 102 59 52;   /* #663B34 */
@@ -66,6 +79,8 @@
     --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
     --lt-surface-hover: 240 253 244;  /* #F0FDF4 */
     --lt-surface-sunken: 220 252 231; /* #DCFCE7 */
+    --lt-field: 249 254 251;          /* #F9FEFB — lightest field fill */
+    --lt-field-focus: 240 253 244;    /* #F0FDF4 */
     --lt-surface-border: 110 206 148; /* #6ECE94 */
     --lt-text-primary: 2 44 26;       /* #022C1A */
     --lt-text-secondary: 20 83 45;    /* #14532D */
@@ -81,6 +96,8 @@
     --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
     --lt-surface-hover: 253 242 248;  /* #FDF2F8 */
     --lt-surface-sunken: 251 228 241; /* #FBE4F1 */
+    --lt-field: 255 250 253;          /* #FFFAFD — lightest field fill */
+    --lt-field-focus: 253 242 248;    /* #FDF2F8 */
     --lt-surface-border: 244 173 214; /* #F4ADD6 */
     --lt-text-primary: 60 8 37;       /* #3C0825 */
     --lt-text-secondary: 131 24 67;   /* #831843 */
@@ -96,12 +113,21 @@
     --lt-accent-faint: 255 247 237;   /* #FFF7ED */
     --lt-surface-hover: 255 251 247;  /* barely warm white */
     --lt-surface-sunken: 255 248 240; /* #FFF8F0 */
+    --lt-field: 255 252 249;          /* #FFFCF9 — lightest field fill */
+    --lt-field-focus: 255 247 237;    /* #FFF7ED */
     --lt-surface-border: 254 215 170; /* #FED7AA */
     --lt-text-primary: 12 8 3;        /* near-black warm */
     --lt-text-secondary: 124 45 18;   /* #7C2D12 */
     --lt-text-tertiary: 154 80 35;    /* warm mid */
     --lt-text-quaternary: 200 135 85; /* lighter warm */
     --lt-heading: 234 88 12;          /* #EA580C */
+  }
+
+  /* Structural tokens (hue-independent). The single knob for the universal
+   * field shape — a customer override of these + the theme color tokens
+   * restyles every form control at once. */
+  :root {
+    --lt-radius-field: 0.125rem;   /* 2px — the soft enclosure on every field */
   }
 
   body {
@@ -135,35 +161,64 @@
     @apply transition-colors duration-100;
   }
 
-  .input {
-    @apply w-full bg-transparent border-b border-surface-border/60 px-1 py-1.5 text-sm
+  /* ── The universal form field ─────────────────────────────────────────────
+     ONE canonical treatment for every text input, select, and textarea —
+     authored React pages AND the JSON-schema forms we generate for customers.
+     A lightest-tint fill + soft radius + a bottom border that deepens to accent
+     on focus: it encloses a field without boxing it in, and it is impossible to
+     mistake for a section rule. Override --lt-field / --lt-radius-field / the
+     .field rule in one place to restyle every field in the product. */
+  .field,
+  .input,
+  .select,
+  .textarea {
+    @apply bg-surface-field border-b border-surface-border px-2.5 py-1.5 text-sm
            text-text-primary placeholder:text-text-tertiary
-           focus:outline-none focus:border-accent/50
+           focus:outline-none focus:border-accent focus:bg-surface-field-focus
            transition-colors duration-150;
+    border-radius: var(--lt-radius-field);
   }
 
-  .input-json {
-    @apply w-full bg-transparent border border-surface-border/40 rounded-md px-3 py-2 text-[11px] font-mono
-           text-text-primary placeholder:text-text-tertiary
-           focus:outline-none focus:border-accent/50
-           leading-relaxed tabular-nums resize-y transition-colors duration-150;
+  /* Text-ish fields fill their container; selects size to content unless a
+     width utility is added at the call site. */
+  .field,
+  .input,
+  .textarea {
+    @apply w-full;
   }
 
-  /* Quiet multiline field — a whisper of background marks the writable
-     region (borderless prose fields disappear otherwise); the underline is
-     the only stroke, deepening to accent on focus. Pairs with
-     AutoGrowTextarea, which grows the height with the content. */
-  .textarea-quiet {
-    @apply w-full bg-surface-sunken/50 rounded-t-md border-b border-surface-border/60 px-3 py-2 text-sm
-           text-text-primary placeholder:text-text-tertiary leading-relaxed
-           focus:outline-none focus:border-accent/50 focus:bg-surface-sunken/80
-           transition-colors duration-150 resize-none overflow-hidden;
-  }
-
+  /* Select: same field body, native affordance removed, chevron drawn in so
+     every select looks identical regardless of platform. */
   .select {
-    @apply bg-transparent border-b border-surface-border/60 px-1 py-1.5 text-sm
-           text-text-primary focus:outline-none focus:border-accent/50
-           transition-colors duration-150 appearance-none cursor-pointer;
+    @apply appearance-none cursor-pointer pr-7;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1rem;
+  }
+
+  .textarea {
+    @apply leading-relaxed resize-y;
+  }
+
+  /* Code / JSON field — mono variant of the exact same field: fill + bottom
+     border + radius, no enclosing box. Consistent with every other control. */
+  .input-json {
+    @apply w-full bg-surface-field border-b border-surface-border px-3 py-2 text-[11px] font-mono
+           text-text-primary placeholder:text-text-tertiary
+           focus:outline-none focus:border-accent focus:bg-surface-field-focus
+           leading-relaxed tabular-nums resize-y transition-colors duration-150;
+    border-radius: var(--lt-radius-field);
+  }
+
+  /* Quiet multiline field — the same field body, auto-growing (no scrollbar).
+     Pairs with AutoGrowTextarea, which grows the height with the content. */
+  .textarea-quiet {
+    @apply w-full bg-surface-field border-b border-surface-border px-3 py-2 text-sm
+           text-text-primary placeholder:text-text-tertiary leading-relaxed
+           focus:outline-none focus:border-accent focus:bg-surface-field-focus
+           transition-colors duration-150 resize-none overflow-hidden;
+    border-radius: var(--lt-radius-field);
   }
 
   .label {
@@ -198,10 +253,12 @@
     -webkit-mask-image: radial-gradient(circle closest-side, transparent calc(100% - 1.5px), #000 calc(100% - 0.75px));
   }
 
-  /* The pineapple mark, silhouette tinted to the active theme accent.
+  /* The pineapple mark, silhouette tinted to --lt-logo (falls back to the
+     theme accent). A dedicated token lets the logo run a purer, less-violet
+     electric blue than the UI accent without shifting the rest of the theme.
      The logo asset is a flat single-color PNG used as an alpha mask. */
   .logo-mark {
-    background-color: rgb(var(--lt-accent));
+    background-color: rgb(var(--lt-logo, var(--lt-accent)));
     mask-image: var(--logo-url);
     mask-repeat: no-repeat;
     mask-position: center;

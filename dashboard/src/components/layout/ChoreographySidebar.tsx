@@ -21,12 +21,18 @@ export function ChoreographySidebar({
   isBuilder = false,
   isOps = false,
   viewAs = null,
+  canSeePaceBoard = false,
 }: {
   aiEnabled?: boolean;
   isBuilder?: boolean;
   isOps?: boolean;
   viewAs?: ViewAsRole | null;
+  // The Pace Board is a cross-role view — admins and superadmins only. Engineers
+  // are builders and see everything else here, but not this.
+  canSeePaceBoard?: boolean;
 }) {
+  const paceEntry: NavEntry = { to: '/operations', label: 'Pace Board', icon: LayoutDashboard };
+
   // Operator or engineer view: no generic work links — the Task Queues section
   // (shell) and the home Claimed card carry their work.
   if (!isBuilder && (!isOps || viewAs === 'engineer' || viewAs === 'operator')) {
@@ -35,12 +41,12 @@ export function ChoreographySidebar({
 
   if (!isBuilder) {
     // Admin/ops only (not builder) — pace board
-    return <SidebarNav heading="Monitor" entries={[{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard }]} />;
+    return <SidebarNav heading="Monitor" entries={canSeePaceBoard ? [paceEntry] : []} />;
   }
 
-  // Full builder view
+  // Full builder view — the Pace Board only for tiers that can read it.
   const entries: NavEntry[] = [
-    ...(isOps || isBuilder ? [{ to: '/operations', label: 'Pace Board', icon: LayoutDashboard } as NavEntry] : []),
+    ...(canSeePaceBoard ? [paceEntry] : []),
     { to: '/topics', label: 'Event Topics', icon: Radio },
     { to: '/agents', label: aiEnabled ? 'Agents' : 'Automations', icon: Bot },
     { to: '/capabilities', label: 'Capabilities', icon: Zap },

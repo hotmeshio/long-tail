@@ -1,12 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink, TriangleAlert, Hand } from 'lucide-react';
 import type { StationMetric } from '../../api/escalations';
-import { priorityQueueLink } from '../operations/priority-link';
-
-// The jeopardy signal shares the Pace Board's powder-blue priority language, so
-// a runner learns one color across the whole product.
-const JEOPARDY_BG = '#e2f1f4';
-const JEOPARDY_FG = '#3f7d92';
+import { jeopardyQueueLink } from '../operations/priority-link';
 
 function Stat({ n, label, tone }: { n: number; label: string; tone?: 'muted' }) {
   return (
@@ -76,13 +71,12 @@ export function TaskQueueCard({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(priorityQueueLink({ role, priority_facet: priorityFacet }));
+              navigate(jeopardyQueueLink({ role, priority_facet: priorityFacet }));
             }}
-            style={{ backgroundColor: JEOPARDY_BG, color: JEOPARDY_FG }}
-            className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full text-[11px] font-semibold tabular-nums transition-transform hover:scale-[1.03]"
-            title="Past the priority threshold — open oldest first"
+            className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full text-[11px] font-semibold tabular-nums bg-status-error text-white transition-transform hover:scale-[1.05]"
+            title="Past the priority threshold — a hard limit; open oldest first"
           >
-            <TriangleAlert className="w-3 h-3" strokeWidth={2} />
+            <TriangleAlert className="w-3 h-3" strokeWidth={2.5} />
             {jeopardy} in jeopardy
           </button>
         ) : (

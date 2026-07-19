@@ -147,7 +147,7 @@ describe('EscalationFilterBar', () => {
       />,
     );
     expect(screen.getByText('Role')).toBeInTheDocument();
-    expect(screen.getByText('Type')).toBeInTheDocument();
+    expect(screen.getByText('Workflow Type')).toBeInTheDocument();
     expect(screen.getByText('Priority')).toBeInTheDocument();
   });
 
@@ -177,8 +177,8 @@ describe('EscalationFilterBar', () => {
       />,
     );
     const selects = screen.getAllByRole('combobox');
-    // Priority is the third select
-    fireEvent.change(selects[2], { target: { value: '1' } });
+    // Order (no status shown): Role, Priority, Workflow Type
+    fireEvent.change(selects[1], { target: { value: '1' } });
     expect(setFilter).toHaveBeenCalledWith('priority', '1');
   });
 });

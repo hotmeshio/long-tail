@@ -19,7 +19,6 @@ interface PaceChartProps {
   /** Merge-glyph click — jump to the sequence that feeds this station. */
   onUpstreamSelect?: (upstreamRole: string) => void;
   /** Priority-badge click — open the station's queue oldest-first by its age facet. */
-  onPrioritySelect?: (role: string) => void;
   /** Cmd/meta+click on a resolved dot — navigate to the role's full queue. */
   onCmdClick?: (role: string) => void;
   /** Selected window length in hours — target count = target_per_hour × this. */
@@ -109,8 +108,10 @@ export const TARGET_COLOR = '#94a3b8';   // target pace line — slate gray
 // Priority — unclaimed items past the role's age threshold, the count the
 // floor pulls to the front of the rack. Powder blue for the badge circle;
 // the count text uses the same hue deepened enough to read at chart sizes.
-export const PRIORITY_COLOR = '#b0e0e6';
-export const PRIORITY_TEXT_COLOR = '#5b93ad';
+// Jeopardy shares one red across the product (the pill, the table sub-row,
+// this chart's badge) — the hard-limit alarm, distinct from every pace hue.
+export const PRIORITY_COLOR = '#DC2626';
+export const PRIORITY_TEXT_COLOR = '#DC2626';
 
 // ── End-label stacking — spread close labels so text doesn't collide ────────────
 
@@ -135,7 +136,7 @@ function spreadLabels<T extends { y: number }>(labels: T[], maxY: number): (T & 
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
-export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onPrioritySelect, onCmdClick, periodHours }: PaceChartProps) {
+export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onCmdClick, periodHours }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const n = stations.length;
@@ -345,7 +346,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
             : `${row.actual} resolved · target ${Math.round(row.expected)}`
               + (row.pending > row.active ? ` · ${row.pending - row.active} pending` : '')
               + (row.active > 0 ? ` · ${row.active} claimed` : '')
-              + (row.priorityCount > 0 ? ` · ${row.priorityCount} priority` : '');
+              + (row.priorityCount > 0 ? ` · ${row.priorityCount} in jeopardy` : '');
         const tipW = tooltip.length * 5.5 + 20;
         const tipX = Math.max(ML + tipW / 2 + 4, Math.min(right - tipW / 2 - 4, x));
         const tipY = cy - r - 10;
@@ -378,37 +379,6 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
               {isSelected && <circle r={r + 4} fill="none" stroke="#6366f1" strokeWidth={2} />}
             </g>
 
-            {/* Priority badge — powder blue circle carrying the count of
-                unclaimed items past the role's age threshold. Clicking opens
-                the station's queue oldest-first by the priority facet so the
-                runner grabs the top few and moves them to the front. */}
-            {row.priorityCount > 0 && (
-              <g
-                transform={`translate(${x + 15} ${Math.max(cy - 15, 12)})`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPrioritySelect?.(s.role);
-                }}
-                style={{ cursor: 'pointer', transition: `transform ${EASE}` }}
-              >
-                <title>{`${row.priorityCount} past the priority threshold — click to pull oldest first`}</title>
-                <circle
-                  r={6.5 + (String(row.priorityCount).length - 1) * 2}
-                  fill={PRIORITY_COLOR}
-                  opacity={0.9}
-                />
-                <text
-                  y={2.5}
-                  textAnchor="middle"
-                  fontSize={7}
-                  fill={PRIORITY_TEXT_COLOR}
-                  fontFamily="ui-monospace, monospace"
-                  fontWeight="700"
-                >
-                  {row.priorityCount}
-                </text>
-              </g>
-            )}
 
             {/* Merge affordance — this station also receives input from another
                 sequence. The dashed drop into the floor says "a side-quest

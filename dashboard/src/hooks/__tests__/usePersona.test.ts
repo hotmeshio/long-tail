@@ -35,13 +35,14 @@ describe('usePersona', () => {
     expect(result.current.taskQueueSource).toBe('membership');
   });
 
-  it('engineer: workflows + cards but no pace board, membership source', () => {
+  it('engineer: full builder home (workflows, no pace board), NOT the operator cards', () => {
     mockAuth.mockReturnValue(auth({ engineer: true }));
     const { result } = renderHook(() => usePersona());
     expect(result.current.tier).toBe('engineer');
     expect(result.current.canSeePaceBoard).toBe(false);
     expect(result.current.canSeeWorkflows).toBe(true);
-    expect(result.current.showTaskQueueCards).toBe(true);
+    // Engineers are builders — the task-queue-cards home is the operator's only.
+    expect(result.current.showTaskQueueCards).toBe(false);
     expect(result.current.taskQueueSource).toBe('membership');
   });
 

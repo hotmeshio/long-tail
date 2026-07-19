@@ -351,7 +351,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             data-field-key={fieldKey}
-            className={inputClass(!!error)}
+            className={selectClass(!!error)}
             {...ariaProps}
           >
             {enumValues.map((opt) => (
@@ -550,4 +550,12 @@ function inputClass(hasError?: boolean): string {
   return hasError
     ? 'input text-sm w-full mt-1 border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
     : 'input text-sm w-full mt-1';
+}
+
+// Select shares the field recipe but adds the unified chevron (via .select), so
+// generated dropdowns match every other select in the product.
+function selectClass(hasError?: boolean): string {
+  return hasError
+    ? 'select text-sm w-full mt-1 border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
+    : 'select text-sm w-full mt-1';
 }

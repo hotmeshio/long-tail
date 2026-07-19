@@ -22,7 +22,12 @@ export interface Persona {
   canSeePaceBoard: boolean;
   /** Procedural + graph workflow execution surfaces. Builders only. */
   canSeeWorkflows: boolean;
-  /** The per-lane task-queue cards (poor-man's pace board). Scoped tiers only. */
+  /**
+   * The per-lane task-queue cards as the whole home page. This is the OPERATOR's
+   * home only. Engineers are builders — they see the full builder home (minus
+   * the Pace Board) and reach their task queues through the sidebar, by
+   * membership. `canSeePaceBoard`/`canSeeWorkflows` gate the builder home.
+   */
   showTaskQueueCards: boolean;
   /**
    * Where the sidebar's Task Queues section draws its roles from:
@@ -66,7 +71,7 @@ export function usePersona(): Persona {
     viewAs,
     canSeePaceBoard: tier === 'superadmin' || tier === 'admin',
     canSeeWorkflows: tier === 'superadmin' || tier === 'engineer',
-    showTaskQueueCards: tier === 'engineer' || tier === 'operator',
+    showTaskQueueCards: tier === 'operator',
     taskQueueSource: realTier === 'superadmin' || realTier === 'admin' ? 'manual' : 'membership',
   };
 }
