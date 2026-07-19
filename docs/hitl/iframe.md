@@ -1,6 +1,6 @@
 # Iframe Viewport Protocol
 
-For fully custom UIs — PDF viewers, complex multi-step forms, specialized domain interfaces — replace the generated form with an iframe.
+For fully custom UIs — PDF viewers, complex multi-step forms, specialized domain interfaces — replace the generated form with an iframe. The iframe owns its entire surface: platform-side validation, layout, widgets, and draft persistence apply to the generated form, so the embedded app provides its own. Reach for the schema-driven form first ([choosing your surface](../hitl-guide.md#choosing-your-surface)); use the iframe when the domain demands a surface the schema cannot express.
 
 ---
 
@@ -51,12 +51,15 @@ const WORKBENCH_FORM_SCHEMA = {
   },
 };
 
-// Escalation creation — workflow side
-await createEscalation({
+// Workflow side — the wait is a normal conditionLT; the iframe submits the payload
+const design = await conditionLT<{ stl_url: string }>(signalId, {
   role: 'cad-designer',
   description: 'Design the orthotic insole for this order.',
   escalation_payload: JSON.stringify({ workbenchId, companyId }),
 });
+if (design) {
+  await attachDesign(design.stl_url);
+}
 ```
 
 At render time the dashboard produces:

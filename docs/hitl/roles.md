@@ -2,7 +2,7 @@
 
 ## Role-Based Routing
 
-Escalations are routed by role. Users only see escalations for roles they hold. Set `role` on every `conditionLT` config to name the target queue:
+Escalations are routed by role, and any member of the role can handle them — a person working the queue in the dashboard, or a service account claiming and resolving through the API or MCP tools. Members only see escalations for roles they hold. Set `role` on every `conditionLT` config to name the target queue:
 
 ```typescript
 const decision = await conditionLT<{ approved: boolean }>(signalId, {

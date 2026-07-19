@@ -29,11 +29,17 @@ export function Modal({ open, onClose, title, children, maxWidth }: ModalProps) 
         onClick={onClose}
       />
       {/* Dialog */}
-      <div className={`relative bg-surface-raised border border-surface-border rounded-lg shadow-xl w-full ${maxWidth ?? 'max-w-md'} mx-4 max-h-[85vh] flex flex-col`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lt-modal-title"
+        className={`relative bg-surface-raised border border-surface-border rounded-lg shadow-xl w-full ${maxWidth ?? 'max-w-md'} mx-4 max-h-[85vh] flex flex-col`}
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-          <h2 className="text-sm font-medium text-text-primary">{title}</h2>
+          <h2 id="lt-modal-title" className="text-sm font-medium text-text-primary">{title}</h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="text-text-tertiary hover:text-text-primary text-lg leading-none"
           >
             &times;

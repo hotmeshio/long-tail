@@ -173,7 +173,13 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
     });
 
   return (
-    <div className={`pb-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
+    // `inert` (not just pointer-events) locks a disabled form for keyboard and
+    // assistive-tech users too — fields leave the tab order entirely.
+    <div
+      className={`pb-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
+      inert={disabled || undefined}
+      aria-disabled={disabled || undefined}
+    >
       {schemaTitle && (
         <h3 className="text-lg font-light text-text-primary mb-1">{schemaTitle}</h3>
       )}
@@ -233,6 +239,20 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
   const widgetName = fieldSchema?.['x-lt-widget'] as string | undefined;
 
+  // Accessible wiring shared by every input branch: explicit label-for-input
+  // association, and error/helper text linked via aria-describedby.
+  const fieldId = `lt-field-${fieldKey}`;
+  const errorId = `${fieldId}-error`;
+  const helpId = `${fieldId}-help`;
+  const hasHelper = typeof fieldSchema?.description === 'string' && fieldSchema.description.length > 0;
+  const describedBy = error ? errorId : hasHelper ? helpId : undefined;
+  const ariaProps = {
+    id: fieldId,
+    'aria-required': isRequired || undefined,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedBy,
+  } as const;
+
   // Markdown dispatches ahead of the read-only branch: a readOnly markdown
   // field is a CONTENT BLOCK — the widget renders its source as HTML (the
   // versioned schema carries the page source), not as static text.
@@ -283,13 +303,14 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             onChange={(e) => { onChange(e.target.checked); onBlur?.(); }}
             className="w-3.5 h-3.5 rounded accent-accent"
             data-field-key={fieldKey}
+            {...ariaProps}
           />
           <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
             {label}
             {isRequired && <span className="text-status-error ml-0.5">*</span>}
           </span>
         </label>
-        <FieldError error={error} />
+        <FieldError error={error} id={errorId} />
       </div>
     );
   }
@@ -298,7 +319,7 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   if (typeof value === 'number') {
     return (
       <div>
-        <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
+        <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
         <input
           type="number"
           value={value}
@@ -307,8 +328,9 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
           step="any"
           data-field-key={fieldKey}
           className={inputClass(!!error)}
+          {...ariaProps}
         />
-        <FieldError error={error} />
+        <FieldError error={error} id={errorId} />
       </div>
     );
   }
@@ -322,20 +344,21 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
     if (enumValues?.length) {
       return (
         <div>
-          <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
-          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+          {helperText && <p id={helpId} className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
           <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             data-field-key={fieldKey}
             className={inputClass(!!error)}
+            {...ariaProps}
           >
             {enumValues.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
-          <FieldError error={error} />
+          <FieldError error={error} id={errorId} />
         </div>
       );
     }
@@ -343,8 +366,8 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
     if (isPassword) {
       return (
         <div>
-          <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
-          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+          {helperText && <p id={helpId} className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
           <input
             type="password"
             value={value}
@@ -353,8 +376,9 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             data-field-key={fieldKey}
             className={inputClass(!!error)}
             autoComplete="off"
+            {...ariaProps}
           />
-          <FieldError error={error} />
+          <FieldError error={error} id={errorId} />
         </div>
       );
     }
@@ -370,8 +394,8 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
     if (format && format in FORMAT_INPUT_TYPES) {
       return (
         <div>
-          <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
-          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+          {helperText && <p id={helpId} className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
           <input
             type={FORMAT_INPUT_TYPES[format]}
             value={value}
@@ -379,8 +403,9 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             onBlur={onBlur}
             data-field-key={fieldKey}
             className={inputClass(!!error)}
+            {...ariaProps}
           />
-          <FieldError error={error} />
+          <FieldError error={error} id={errorId} />
         </div>
       );
     }
@@ -412,8 +437,8 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
 
       return (
         <div>
-          <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
-          {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+          {helperText && <p id={helpId} className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
           <textarea
             value={value}
             onChange={(e) => { onChange(e.target.value); onBlur?.(); }}
@@ -421,21 +446,22 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
             data-field-key={fieldKey}
             className={`${inputClass(!!error)} leading-relaxed`}
             rows={Math.min(6, Math.max(3, Math.ceil(value.length / 60)))}
+            {...ariaProps}
           />
           {resolvedMax !== undefined && (
             <p className={`text-[10px] mt-0.5 text-right tabular-nums ${isOverMax ? 'text-status-error font-medium' : 'text-text-quaternary'}`}>
               {value.length} / {resolvedMax}
             </p>
           )}
-          <FieldError error={error} />
+          <FieldError error={error} id={errorId} />
         </div>
       );
     }
 
     return (
       <div>
-        <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
-        {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+        <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+        {helperText && <p id={helpId} className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
         <input
           type="text"
           value={value}
@@ -443,8 +469,9 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
           onBlur={onBlur}
           data-field-key={fieldKey}
           className={inputClass(!!error)}
+          {...ariaProps}
         />
-        <FieldError error={error} />
+        <FieldError error={error} id={errorId} />
       </div>
     );
   }
@@ -501,19 +528,19 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
   return null;
 }
 
-function FieldLabel({ children, isRequired }: { children: React.ReactNode; isRequired?: boolean }) {
+function FieldLabel({ children, isRequired, htmlFor }: { children: React.ReactNode; isRequired?: boolean; htmlFor?: string }) {
   return (
-    <label className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+    <label htmlFor={htmlFor} className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
       {children}
       {isRequired && <span className="text-status-error ml-0.5">*</span>}
     </label>
   );
 }
 
-function FieldError({ error }: { error?: string }) {
+function FieldError({ error, id }: { error?: string; id?: string }) {
   if (!error) return null;
   return (
-    <p className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
+    <p id={id} role="alert" className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
       {error}
     </p>
   );

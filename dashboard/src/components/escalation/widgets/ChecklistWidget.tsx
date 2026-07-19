@@ -66,9 +66,10 @@ export function ChecklistWidget({
   }
 
   const checkedCount = items.filter((item) => state[item.id]).length;
+  const groupLabel = (schema?.description as string | undefined) || 'Checklist';
 
   return (
-    <div>
+    <div role="group" aria-label={groupLabel} aria-required={isRequired || undefined} aria-invalid={error ? true : undefined}>
       <div className="space-y-2.5 mt-1">
         {items.map((item) => {
           const checked = state[item.id] ?? false;
@@ -110,7 +111,7 @@ export function ChecklistWidget({
         )}
       </p>
       {error && (
-        <p className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
+        <p role="alert" className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
           {error}
         </p>
       )}

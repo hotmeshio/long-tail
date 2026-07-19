@@ -5,7 +5,7 @@ import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemer
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS, ESCALATION_BULK_RESOLVE_MAX } from '../../modules/defaults';
-import { assertReadAccess, assertWriteAccess, getEscalationWriteScope } from './helpers';
+import { assertReadAccess, assertWriteAccess, assertLiveClaimant, getEscalationWriteScope } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Orchestrator ─────────────────────────────────────────────────────────
@@ -50,6 +50,13 @@ export async function resolveEscalation(
     const denied = await assertWriteAccess(auth.userId, escalation);
     if (denied) return denied;
 
+    // Claim-liveness gate: a claim-tracked row resolves only under a live claim
+    // held by the caller. Advisory here (rejects the signal/triage/re-run paths
+    // before their side effects); the signal-key and notification paths below
+    // re-assert the same predicate atomically inside the guarded resolve UPDATE.
+    const stale = assertLiveClaimant(auth.userId, escalation);
+    if (stale) return stale;
+
     // The resolver payload is stored exactly as submitted — its shape is the
     // workflow's contract, formed by the caller (the React app maps the form to
     // the payload via x-lt-bind before submitting). No server-side transform.
@@ -77,7 +84,7 @@ export async function resolveEscalation(
     // `condition(signalId, config)`. The SDK's resolve marks it resolved AND
     // delivers the signal to `signal_key`, resuming THIS job — no re-run.
     if (escalation.signal_key) {
-      return resolveViaSignalKey(escalation, resolverPayload, metadata);
+      return resolveViaSignalKey(escalation, resolverPayload, metadata, auth.userId);
     }
 
     // Path C: escalation strategy may redirect to triage
@@ -92,7 +99,12 @@ export async function resolveEscalation(
 
     // Path D: notification-only — no workflow to restart. One atomic resolve.
     if (!escalation.workflow_type || !escalation.task_queue) {
-      await escalationService.resolveEscalation(escalation.id, resolverPayload, metadata);
+      const resolved = await escalationService.resolveEscalation(
+        escalation.id, resolverPayload, metadata, auth.userId,
+      );
+      if (!resolved) {
+        return { status: 409, error: 'Escalation not available for resolution' };
+      }
       return { status: 200, data: { acknowledged: true, escalationId: escalation.id } };
     }
 
@@ -340,11 +352,14 @@ async function resolveViaSignalKey(
   escalation: any,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
+  assertClaim?: string,
 ): Promise<LTApiResult> {
   const signalPayload = await redactPasswords(resolverPayload, (escalation.metadata as any)?.form_schema);
   // One atomic call: status→resolved, signal delivered, and the outcome patch merged
   // into the GIN-indexed metadata — all inside the single WHERE-guarded UPDATE.
-  const resolved = await escalationService.resolveEscalation(escalation.id, signalPayload, metadata);
+  // `assertClaim` (interactive path only) makes the claim-liveness gate part of
+  // that same UPDATE; the webhook path (resolveBySignalKey) stays claim-agnostic.
+  const resolved = await escalationService.resolveEscalation(escalation.id, signalPayload, metadata, assertClaim);
   if (!resolved) {
     return { status: 409, error: 'Escalation not available for resolution' };
   }

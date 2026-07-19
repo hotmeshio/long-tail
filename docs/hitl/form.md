@@ -130,6 +130,26 @@ The workflow receives the `eph:v1:*` token and passes it to the integration laye
 
 ---
 
+## Draft Persistence
+
+Form edits are saved locally (browser storage, per escalation) a moment after each change and restored when the resolver returns to the item — a lapsed claim, an accidental navigation, or a browser restart keeps typed input intact. The draft holds field values only; the form definition always renders from the current schema resolution, so a draft never resurrects a stale form. Pristine, untouched defaults are not stored. The draft clears when the escalation is resolved, acknowledged, or cancelled from that browser.
+
+---
+
+## Accessibility
+
+Generated form controls carry the wiring assistive technology depends on:
+
+- Every input is associated with its label (`label[for]` → `input[id]`), and checkbox labels wrap their controls.
+- Required fields set `aria-required`; failing fields set `aria-invalid` and link their message via `aria-describedby`.
+- Inline validation messages and the side panel's error list render as `role="alert"` live regions, so corrections are announced as they happen.
+- The checklist widget is a `role="group"` labeled by its field description.
+- A locked form (unclaimed, claimed by another user, or a lapsed claim) is `inert`: its fields leave the tab order entirely rather than merely looking disabled.
+- Modals are `role="dialog"` with `aria-modal` and a labelled title; Escape closes them.
+- The error panel's entries are buttons — clicking one scrolls to and focuses the failing field, keyboard included.
+
+---
+
 ## Designing the Form
 
 To create a polished resolve experience:

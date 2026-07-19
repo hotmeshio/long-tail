@@ -269,7 +269,7 @@ Accessible at `/admin/roles/:role/schema`. The versioned form behind a role's es
 
 ### Escalations List Schema
 
-Accessible at `/admin/roles/:role/list-schema`. The versioned rich view for the role's escalation **list** page — the list-page analog of the resolve form. Opt-in: when a role owns a `list_schema`, its list page renders a role-authored view (the live item as a card plus a load-on-demand history) instead of the engineer table, scoped to that one role. See the [HITL guide](hitl-guide.md#escalations-list-schema) for the `x-lt-layout` / `x-lt-active` / `x-lt-history` vocabulary.
+Accessible at `/admin/roles/:role/list-schema`. The versioned rich view for the role's escalation **list** page — the list-page analog of the resolve form. Opt-in: when a role owns a `list_schema`, its list page renders a role-authored view (the live item as a card plus a load-on-demand history) instead of the engineer table, scoped to that one role. See [x-lt-list-schema.md](hitl/x-lt-list-schema.md) for the `x-lt-layout` / `x-lt-active` / `x-lt-history` vocabulary.
 
 - **Editor + version rail** — same shape as the Escalation Schema editor, but on its own **independent** version timeline: editing the list view never advances the resolve form's version.
 - The list always renders the latest version — no pinning (a display template, not a payload contract).

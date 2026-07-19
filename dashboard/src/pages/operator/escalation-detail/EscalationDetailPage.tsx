@@ -29,6 +29,9 @@ import { validateField } from '../../../lib/field-validator';
 import { evaluateShowIf } from '../../../lib/x-lt-show-if';
 import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc, buildShowIfContext } from './EscalationDetailSections';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
+import { ClaimExpiryModal } from './ClaimExpiryModal';
+import { useClaimClock } from '../../../hooks/useClaimClock';
+import { readDraft, saveDraft, clearDraft } from '../../../lib/draft-store';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -93,6 +96,14 @@ export function EscalationDetailPage() {
   const [formErrors, setFormErrors] = useState<FieldError[]>([]);
   const [panelActiveView, setPanelActiveView] = useState<string | undefined>(undefined);
 
+  // Claim clock: re-renders at the warning threshold (extend prompt) and at
+  // expiry (isEffectivelyClaimed flips false on that render — the form locks
+  // and the action bar returns to its available state). Dismissal is keyed by
+  // the assigned_until value so an ignored prompt stays away for that claim
+  // window but returns after an extension starts a new one.
+  const claimClock = useClaimClock(esc?.assigned_until);
+  const [extendDismissedUntil, setExtendDismissedUntil] = useState<string | null>(null);
+
   // Recompute form errors in real-time once the user has attempted a submit.
   // This keeps the errors sidebar in sync as the user fixes (or breaks) fields.
   useEffect(() => {
@@ -130,6 +141,7 @@ export function EscalationDetailPage() {
   // override a metadata fact when needed. Subsequent esc refetches must NOT reset
   // user edits. The form arrives embedded on esc, so nothing else to await.
   const jsonInitialized = useRef(false);
+  const initialJsonRef = useRef<string | null>(null);
   useEffect(() => {
     if (jsonInitialized.current) return;
     const formSchema = metadataFormSchema ?? (resolverSchema?.properties ? resolverSchema : null);
@@ -147,12 +159,38 @@ export function EscalationDetailPage() {
         const fieldDef = def as Record<string, any>;
         initial[key] = prefill[key] ?? fieldDef.default ?? '';
       }
-      setJson(JSON.stringify(initial, null, 2));
+      initialJsonRef.current = JSON.stringify(initial, null, 2);
+      // A saved draft (typed input from an earlier visit or a lapsed claim)
+      // wins over the seeded defaults. The schema is always taken fresh —
+      // a draft never resurrects a stale form definition.
+      const terminal = esc?.status === 'resolved' || esc?.status === 'cancelled';
+      const draft = !terminal && esc?.id ? readDraft(esc.id) : null;
+      const draftObj = draft ? (safeParse(draft) as Record<string, any> | null) : null;
+      if (draftObj && typeof draftObj === 'object' && !Array.isArray(draftObj)) {
+        setJson(JSON.stringify({ ...draftObj, _form_schema: formSchema }, null, 2));
+      } else {
+        setJson(initialJsonRef.current);
+      }
     } else if (effectiveSchema) {
       jsonInitialized.current = true;
       setJson(JSON.stringify(effectiveSchema, null, 2));
     }
-  }, [effectiveSchema, metadataFormSchema, resolverSchema, esc?.envelope, esc?.metadata]);
+  }, [effectiveSchema, metadataFormSchema, resolverSchema, esc?.envelope, esc?.metadata, esc?.id, esc?.status]);
+
+  // Persist edits as a local draft (debounced). Best-effort insurance against
+  // a lapsed claim or accidental navigation. Pristine defaults are not saved,
+  // and reverting to them removes the stored draft; a terminal outcome
+  // through this client clears it too (see handleResolve / handleConfirmCancel).
+  useEffect(() => {
+    if (!jsonInitialized.current || initialJsonRef.current === null || !esc?.id) return;
+    if (esc.status !== 'pending') return;
+    const escalationId = esc.id;
+    const timer = window.setTimeout(() => {
+      if (json === initialJsonRef.current) clearDraft(escalationId);
+      else saveDraft(escalationId, json);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [json, esc?.id, esc?.status]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
@@ -212,6 +250,7 @@ export function EscalationDetailPage() {
 
   const handleResolve = async (payload: Record<string, unknown>) => {
     await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
+    clearDraft(esc.id);
     goBack();
   };
 
@@ -240,6 +279,7 @@ export function EscalationDetailPage() {
 
   const handleConfirmCancel = async () => {
     await cancel.mutateAsync(esc.id);
+    clearDraft(esc.id);
     setCancelModalOpen(false);
     goBack();
   };
@@ -432,6 +472,16 @@ export function EscalationDetailPage() {
         isPending={cancel.isPending}
         error={cancel.error as Error | null}
       />
+
+      {claimedByMe && !isTerminal && esc.assigned_until && (
+        <ClaimExpiryModal
+          open={claimClock.expiringSoon && esc.assigned_until !== extendDismissedUntil}
+          assignedUntil={esc.assigned_until}
+          onClose={() => setExtendDismissedUntil(esc.assigned_until ?? null)}
+          onExtend={handleClaim}
+          isPending={claim.isPending}
+        />
+      )}
     </div>
   );
 }

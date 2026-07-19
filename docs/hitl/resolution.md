@@ -1,5 +1,37 @@
 # Resolution
 
+## Claim Lifecycle
+
+A claim is a **work lock**: `assigned_to` names the holder and `assigned_until` bounds the window. The lock exists only while the window is active — this is what `isEffectivelyClaimed` means throughout the platform. Two related shapes use the same columns without being locks:
+
+- **Unclaimed** (`assigned_to` null) — available to the whole role queue, and resolvable by system code.
+- **Durable pre-assignment** (`assigned_to` set, no window) — a workflow targeting a named user (the one-time-user JIT-form shape, see [roles.md](roles.md#one-time-and-pre-assigned-escalations)). Routing, not a lock.
+
+### Claiming and extending
+
+Claiming takes a duration (configurable options via `LT_CLAIM_DURATION_OPTIONS`; a custom duration is always available). Re-claiming a row you already hold extends the window — the claim endpoint is idempotent per assignee and reports `isExtension: true`.
+
+In the dashboard, 90 seconds before the window lapses a **Claim Expiring** dialog offers the same duration options to extend. Dismissing it lets the window run out: at expiry the form locks, the action bar returns to its claim state, and the item is available to the queue again. Typed input survives — see draft persistence in [form.md](form.md#draft-persistence) — so re-claiming picks up exactly where the resolver left off.
+
+### The claim-liveness rule
+
+A resolve presented **by escalation id** must not act against a claim lock. The rule blocks exactly two states:
+
+| Row state | Resolve by id |
+|-----------|---------------|
+| Unclaimed | Allowed (system resolvers act on unclaimed rows by design) |
+| Durable pre-assignment (no window) | Allowed |
+| Live window, held by the caller | Allowed |
+| Live window, held by someone else | **409** — the lock is theirs |
+| Caller's own window, lapsed | **409** — stale work; re-claim to resolve |
+| Someone else's window, lapsed | Allowed — the lock is gone, the row is back in the pool |
+
+The rule applies to every principal, including superadmins: the claim is a work lock, not an authorization scope. It is enforced twice — an advisory check before any resolution side effects fire, and atomically inside the SDK's guarded resolve UPDATE (`assertClaim`), so a claim that lapses mid-request still cannot land a stale resolution.
+
+`resolveBySignalKey` and `resolveByMetadata` are claim-agnostic: they are system ingress surfaces (webhooks, domain events) that resolve on behalf of the process, not a claimant.
+
+---
+
 ## Resolving from System Code
 
 When a backend service (not the dashboard UI) needs to resolve an escalation — for example, an ingress handler that receives a webhook or processes a domain event — use the escalation SDK methods directly.

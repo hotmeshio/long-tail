@@ -173,7 +173,7 @@ function ErrorsPanel({ errors }: { errors: FieldError[] }) {
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" role="alert" aria-live="polite">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-status-error mb-4">
         {errors.length} {errors.length === 1 ? 'issue' : 'issues'} to resolve
       </p>
