@@ -125,3 +125,77 @@ describe('validateField — required + constraint composition', () => {
     expect(validateField('hello', { minLength: 3, maxLength: 10 }, true, true)).toBeUndefined();
   });
 });
+
+describe('validateField — x-lt-require-all (checklist completion guard)', () => {
+  const schema = {
+    type: 'object',
+    'x-lt-widget': 'checklist',
+    'x-lt-source': 'envelope.checklist_items',
+    'x-lt-require-all': true,
+  };
+  const ctx = (items: unknown) => ({ envelope: { checklist_items: items } });
+  const ITEMS = [
+    { id: 'doc', label: 'Documentation attached', required: true },
+    { id: 'contact', label: 'Contact verified' }, // no required key = mandatory
+    { id: 'photos', label: 'Photos present', required: false }, // explicit opt-out
+  ];
+
+  it('passes when every mandatory item is checked (opt-out may stay unchecked)', () => {
+    const value = { doc: true, contact: true, photos: false };
+    expect(validateField(value, schema, true, true, ctx(ITEMS))).toBeUndefined();
+  });
+
+  it('blocks with "N of M checks incomplete" when one mandatory item is unchecked', () => {
+    const value = { doc: true, contact: false, photos: true };
+    expect(validateField(value, schema, true, true, ctx(ITEMS))).toBe('1 of 2 checks incomplete');
+  });
+
+  it('counts only mandatory items — all unchecked reads 2 of 2, not 3 of 3', () => {
+    const value = { doc: false, contact: false, photos: false };
+    expect(validateField(value, schema, false, true, ctx(ITEMS))).toBe('2 of 2 checks incomplete');
+  });
+
+  it('an item with no required key at all is mandatory', () => {
+    const value = { doc: true, contact: false, photos: false };
+    expect(validateField(value, schema, false, true, ctx(ITEMS))).toBe('1 of 2 checks incomplete');
+  });
+
+  it('is vacuous when the source resolves to an empty array', () => {
+    expect(validateField({}, schema, false, true, ctx([]))).toBeUndefined();
+  });
+
+  it('is vacuous when the source path is missing entirely', () => {
+    expect(validateField({}, schema, false, true, { envelope: {} })).toBeUndefined();
+  });
+
+  it('is vacuous when every item is an explicit opt-out', () => {
+    const items = [{ id: 'a', label: 'A', required: false }];
+    expect(validateField({}, schema, false, true, ctx(items))).toBeUndefined();
+  });
+
+  it('composes with the required array: at-least-one fires first when nothing is checked', () => {
+    // Field listed in required AND require-all: empty state fails the
+    // at-least-one check (Required); require-all takes over once any is checked.
+    const empty = { doc: false, contact: false, photos: false };
+    expect(validateField(empty, schema, true, true, ctx(ITEMS))).toBe('Required');
+    const partial = { doc: true, contact: false, photos: false };
+    expect(validateField(partial, schema, true, true, ctx(ITEMS))).toBe('1 of 2 checks incomplete');
+  });
+
+  it('enforces even when the field is NOT in the required array — require-all stands alone', () => {
+    const partial = { doc: true, contact: false };
+    expect(validateField(partial, schema, false, true, ctx(ITEMS))).toBe('1 of 2 checks incomplete');
+  });
+
+  it('does not fire without the keyword or on non-checklist fields', () => {
+    const noKeyword = { ...schema, 'x-lt-require-all': undefined };
+    expect(validateField({ doc: true }, noKeyword, false, true, ctx(ITEMS))).toBeUndefined();
+    const notChecklist = { 'x-lt-require-all': true };
+    expect(validateField({ doc: false }, notChecklist, false, true, ctx(ITEMS))).toBeUndefined();
+  });
+
+  it('is untouched-silent like every other guard', () => {
+    const value = { doc: false, contact: false };
+    expect(validateField(value, schema, false, false, ctx(ITEMS))).toBeUndefined();
+  });
+});

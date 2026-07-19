@@ -1,5 +1,57 @@
 export interface FieldError { field: string; message: string }
 
+interface ChecklistItem { id: string; label: string; required?: boolean }
+
+/**
+ * Resolve a checklist widget's item definitions from its `x-lt-source`
+ * "domain.path" against the escalation context. Missing domain/path or a
+ * non-array value yields an empty list.
+ */
+export function resolveChecklistItems(
+  sourcePath: unknown,
+  ctx: Record<string, unknown> | undefined,
+): ChecklistItem[] {
+  if (typeof sourcePath !== 'string' || !ctx) return [];
+  const dot = sourcePath.indexOf('.');
+  if (dot === -1) return [];
+  const domainObj = ctx[sourcePath.slice(0, dot)];
+  if (!domainObj || typeof domainObj !== 'object') return [];
+  let cur: unknown = domainObj;
+  for (const p of sourcePath.slice(dot + 1).split('.')) {
+    cur = (cur as Record<string, unknown>)[p];
+    if (cur === undefined) return [];
+  }
+  return Array.isArray(cur) ? (cur as ChecklistItem[]) : [];
+}
+
+/**
+ * The checklist completion guard (`x-lt-require-all`): every rendered item must
+ * be checked, except items whose definition carries `required: false` (the
+ * explicit opt-out). Vacuous when the source resolves to no items — never
+ * blocks on zero. Returns the panel message, or undefined when satisfied.
+ * Stricter than (and composes with) the field-level required-array entry,
+ * which remains the at-least-one check.
+ */
+export function validateRequireAll(
+  value: unknown,
+  fieldSchema: Record<string, unknown> | undefined,
+  ctx?: Record<string, unknown>,
+): string | undefined {
+  if (fieldSchema?.['x-lt-widget'] !== 'checklist') return undefined;
+  if (fieldSchema['x-lt-require-all'] !== true) return undefined;
+
+  const items = resolveChecklistItems(fieldSchema['x-lt-source'], ctx);
+  const mandatory = items.filter((i) => i.required !== false);
+  if (mandatory.length === 0) return undefined;
+
+  const state = (typeof value === 'object' && value !== null && !Array.isArray(value))
+    ? (value as Record<string, unknown>)
+    : {};
+  const incomplete = mandatory.filter((i) => !state[i.id]).length;
+  if (incomplete === 0) return undefined;
+  return `${incomplete} of ${mandatory.length} checks incomplete`;
+}
+
 /**
  * Per-field JSON Schema validation — subset used by the resolver form.
  *
@@ -124,6 +176,11 @@ export function validateField(
       if (vals.length === 0 || vals.every((v) => !v)) return 'Required';
     }
   }
+
+  // Checklist completion — the stricter guard runs regardless of the
+  // required-array entry (which stays at-least-one when present).
+  const requireAll = validateRequireAll(value, fieldSchema, ctx);
+  if (requireAll) return requireAll;
 
   return validateFieldConstraints(value, fieldSchema, ctx);
 }

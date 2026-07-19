@@ -122,7 +122,17 @@ The field type must be `"object"`. The submitted value is `Record<string, boolea
 - `"envelope"` — for item definitions that are render data only (no query cost). The workflow puts them in `conditionLT`'s `envelope` parameter.
 - `"metadata"` — only when items need to be GIN-indexed and searchable as facets. Adds index cost.
 
-Marking an item `required: true` flags it with an asterisk in the UI. A `required` checklist field is blocked from submission until at least one item is checked. When no items are checked after a submission attempt, every unchecked item that is individually required (or all unchecked items when the field itself is required) highlights in red. Once any item is checked — satisfying the group requirement — all per-item highlights clear.
+A checklist enforces one of three completion levels:
+
+| Level | Declaration | Blocks submission until |
+|-------|-------------|------------------------|
+| None | field absent from `required` | Never — items are informational |
+| At least one | field listed in `required` | Any one item is checked |
+| All | `"x-lt-require-all": true` on the field | Every item is checked, except items declared `required: false` |
+
+Marking an item `required: true` flags it with an asterisk in the UI. In at-least-one mode, unchecked items highlight red after a submission attempt only while zero are checked; once any item is checked the group requirement is met and all highlights clear.
+
+`x-lt-require-all` is the completion guard for station forms where every check is a confirmation: every item must be checked before submit — except items whose definition carries `required: false`, the explicit opt-out. Unchecked mandatory items highlight red after a submission attempt and clear live as they are checked; the error panel reads `N of M checks incomplete`. It composes with the `required` array (at-least-one stays lawful; require-all is stricter and wins), and it is vacuous when the source resolves to no items. See [x-lt-validation.md](x-lt-validation.md#checklist-completion-x-lt-require-all).
 
 **Workflow side:**
 

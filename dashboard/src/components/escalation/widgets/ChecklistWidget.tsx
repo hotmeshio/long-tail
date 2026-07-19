@@ -19,9 +19,15 @@ interface ChecklistItem { id: string; label: string; required?: boolean }
  * Field-level required (schema.required includes this key): the widget shows
  *   an error when all items are unchecked and submitAttempted is true.
  *
+ * "x-lt-require-all": true — completion guard: every item must be checked
+ *   before submission, except items whose definition carries required: false
+ *   (the explicit opt-out). Unchecked mandatory items highlight red after a
+ *   submit attempt and clear live as they are checked.
+ *
  * Value stored: Record<string, boolean> keyed by item id.
  */
 export function ChecklistWidget({
+  fieldKey,
   value,
   onChange,
   schema,
@@ -31,6 +37,7 @@ export function ChecklistWidget({
   error,
 }: WidgetProps & { escalationContext?: ShowIfContext }) {
   const sourcePath = schema?.['x-lt-source'] as string | undefined;
+  const requireAll = schema?.['x-lt-require-all'] === true;
   const items: ChecklistItem[] = [];
 
   if (sourcePath && escalationContext) {
@@ -67,15 +74,24 @@ export function ChecklistWidget({
 
   const checkedCount = items.filter((item) => state[item.id]).length;
   const groupLabel = (schema?.description as string | undefined) || 'Checklist';
+  // The click-to-focus anchor: the first unchecked mandatory item, so the
+  // error panel lands the user on the next box to tick (first item when done).
+  const focusId = (items.find((i) => !state[i.id] && i.required !== false) ?? items[0]).id;
 
   return (
     <div role="group" aria-label={groupLabel} aria-required={isRequired || undefined} aria-invalid={error ? true : undefined}>
       <div className="space-y-2.5 mt-1">
         {items.map((item) => {
           const checked = state[item.id] ?? false;
-          // Highlight unchecked items only when ZERO are checked — once any item is
-          // confirmed the group requirement is met and all per-item highlights clear.
-          const showItemError = !checked && !!submitAttempted && checkedCount === 0 && (item.required || isRequired);
+          // require-all: every unchecked mandatory item (required !== false) is an
+          // error after a submit attempt, clearing live as each is checked.
+          // At-least-one mode: highlight only while ZERO are checked — once any
+          // item is confirmed the group requirement is met and highlights clear.
+          const showItemError = !checked && !!submitAttempted && (
+            requireAll
+              ? item.required !== false
+              : checkedCount === 0 && (item.required || isRequired)
+          );
           return (
             <label
               key={item.id}
@@ -89,6 +105,7 @@ export function ChecklistWidget({
                 onChange={() => toggle(item.id)}
                 className={`mt-0.5 w-3.5 h-3.5 shrink-0 rounded ${showItemError ? 'accent-status-error' : 'accent-accent'}`}
                 data-testid={`checklist-item-${item.id}`}
+                {...(item.id === focusId ? { 'data-field-key': fieldKey } : {})}
               />
               <span className={`text-sm leading-snug transition-colors ${
                 showItemError
@@ -106,7 +123,11 @@ export function ChecklistWidget({
       </div>
       <p className="text-[10px] text-text-quaternary mt-3 tabular-nums">
         {checkedCount} / {items.length} confirmed
-        {isRequired && checkedCount === 0 && !!submitAttempted && (
+        {requireAll ? (
+          <span className="ml-1 text-text-quaternary/60">
+            (all required{items.some((i) => i.required === false) ? ' except optional' : ''})
+          </span>
+        ) : isRequired && checkedCount === 0 && !!submitAttempted && (
           <span className="ml-1 text-text-quaternary/60">(at least one required)</span>
         )}
       </p>

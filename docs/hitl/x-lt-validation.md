@@ -93,6 +93,33 @@ When `envelope.min_score` is `60`, submitting a score of `45` blocks with "Minim
 
 ---
 
+## Checklist Completion (`x-lt-require-all`)
+
+A checklist-widget field can require every item to be checked before submission:
+
+```json
+{
+  "properties": {
+    "checks": {
+      "type": "object",
+      "x-lt-widget": "checklist",
+      "x-lt-source": "envelope.checklist_items",
+      "x-lt-require-all": true
+    }
+  }
+}
+```
+
+With `"x-lt-require-all": true`, the pre-submission pass fails unless every rendered item is checked — except items whose definition carries `required: false`, the explicit opt-out (e.g. an optional photos step). An item with `required: true` or no `required` key at all must be checked.
+
+- A field hidden by `x-lt-showIf` at submit time is skipped entirely (the same rule as `required`).
+- When `x-lt-source` resolves to a missing or empty array, the guard is vacuous — zero items never block.
+- Composes with the `required` array: listing the field in `required` remains lawful and means at-least-one; `x-lt-require-all` is the stricter check and wins when both are present.
+
+On a blocked submit, each unchecked mandatory item highlights red inline, and the error panel reads `N of M checks incomplete` with click-to-focus landing on the first unchecked item. Errors clear in real time as items are checked. The group carries `aria-invalid` and the message is announced as an alert, consistent with the rest of the validation wiring.
+
+---
+
 ## Pattern Guard
 
 Apply a regular expression guard with `pattern`. If the input does not match, the field blocks submission. Provide `x-lt-pattern-error` for a human-readable error message; otherwise the generic "Invalid format" is shown.

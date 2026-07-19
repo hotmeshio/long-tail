@@ -336,6 +336,36 @@ describe('EscalationActionBar — required field submit validation', () => {
     expect(onSubmitAttempt).not.toHaveBeenCalled();
   });
 
+  // Chained conditions: A reveals B, B reveals C. Visibility is evaluated
+  // per-field against the resolver VALUES, so the guard follows the chain.
+  const CHAIN_PROPS = {
+    required: ['escalation_notes'],
+    properties: {
+      needs_review: { type: 'boolean' },
+      escalate: { type: 'boolean', 'x-lt-showIf': 'resolver.needs_review' },
+      escalation_notes: { type: 'string', 'x-lt-showIf': 'resolver.escalate' },
+    },
+  };
+
+  it('allows submit when a required field is hidden two levels deep (chained x-lt-showIf)', () => {
+    const onResolve = vi.fn();
+    // A unchecked → B hidden (and false) → C hidden: required C must not block
+    const json = makeJson({ needs_review: false, escalate: false, escalation_notes: '' }, CHAIN_PROPS);
+    renderBar({ mode: 'claimed_by_me', json, onResolve, escalationContext: { metadata: {} } });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).toHaveBeenCalled();
+  });
+
+  it('blocks submit when the full chain is open and the required leaf is empty', () => {
+    const onResolve = vi.fn();
+    // A and B both true → C visible and required
+    const json = makeJson({ needs_review: true, escalate: true, escalation_notes: '' }, CHAIN_PROPS);
+    renderBar({ mode: 'claimed_by_me', json, onResolve, escalationContext: { metadata: {} } });
+    fireEvent.click(screen.getByText('Submit'));
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByText(/Required: escalation.notes/i)).toBeInTheDocument();
+  });
+
   it('blocks submit when required field IS visible (x-lt-showIf truthy) and empty', () => {
     const onResolve = vi.fn();
     const json = makeJson({ action: '' }, {
