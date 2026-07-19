@@ -192,7 +192,11 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
           <div
             key={group.name ?? `__s${i}`}
             className={group.name
-              ? 'border-l-2 border-accent/30 bg-[#f0f6ff4a] rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
+              // Sections sit on the sunken band — a shade DARKER than the
+              // lightest field fill, so embedded inputs pop against the group
+              // the same way they pop against the filter bars. Theme-driven,
+              // never a hardcoded hex.
+              ? 'border-l-2 border-accent/30 bg-surface-sunken/80 rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
               : ''}
           >
             {group.name && (

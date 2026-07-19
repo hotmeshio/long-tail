@@ -218,6 +218,67 @@ describe('ChecklistWidget', () => {
     expect(screen.getByText('Optional step').className).not.toContain('text-status-error');
   });
 
+  it('require-all: highlights every unchecked mandatory item after submit, opt-out stays calm', () => {
+    const items = [
+      { id: 'a', label: 'Mandatory implicit' },              // no key = mandatory
+      { id: 'b', label: 'Mandatory explicit', required: true },
+      { id: 'c', label: 'Optional step', required: false },  // opt-out
+    ];
+    const ctx = makeContext(items);
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value={JSON.stringify({ a: false, b: true, c: false })}
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-require-all': true }}
+        escalationContext={ctx}
+        submitAttempted
+      />,
+    );
+    // Unchecked mandatory highlights; checked mandatory and unchecked opt-out do not
+    expect(screen.getByText('Mandatory implicit').className).toContain('text-status-error');
+    expect(screen.getByText('Mandatory explicit').className).not.toContain('text-status-error');
+    expect(screen.getByText('Optional step').className).not.toContain('text-status-error');
+    // The hint names the rule
+    expect(screen.getByText(/all required except optional/)).toBeInTheDocument();
+  });
+
+  it('require-all: no highlights before a submit attempt', () => {
+    const items = [{ id: 'a', label: 'Mandatory implicit' }];
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-require-all': true }}
+        escalationContext={makeContext(items)}
+        submitAttempted={false}
+      />,
+    );
+    expect(screen.getByText('Mandatory implicit').className).not.toContain('text-status-error');
+  });
+
+  it('anchors data-field-key on the first unchecked mandatory item for click-to-focus', () => {
+    const items = [
+      { id: 'a', label: 'Done', required: true },
+      { id: 'b', label: 'Skip me', required: false },
+      { id: 'c', label: 'Next up', required: true },
+    ];
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value={JSON.stringify({ a: true, b: false, c: false })}
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-require-all': true }}
+        escalationContext={makeContext(items)}
+        submitAttempted
+      />,
+    );
+    // 'b' is unchecked but an opt-out — the anchor is 'c', the next box to tick
+    expect(screen.getByTestId('checklist-item-c')).toHaveAttribute('data-field-key', 'checks');
+    expect(screen.getByTestId('checklist-item-b')).not.toHaveAttribute('data-field-key');
+  });
+
   it('reads from a nested source path within a domain', () => {
     const ctx: ShowIfContext = {
       escalation: null,

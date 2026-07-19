@@ -95,6 +95,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 |---------|-------|---------|
 | `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist` |
 | `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` |
+| `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
 | `x-lt-language` | field | Syntax hint for the `code-editor` widget |
 | `accept` | field | File-type filter for `file-upload` (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path in the resolver payload (e.g. `"customer.email"`) |

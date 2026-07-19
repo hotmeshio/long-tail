@@ -4,8 +4,9 @@
  *
  *   - required with x-lt-showIf: a required field that is only enforced when
  *     visible (the form itself hides it based on a sibling field's value)
- *   - checklist widget: items are driven from envelope.checklist_items at runtime;
- *     individual items carry required?: true for per-item asterisk highlighting
+ *   - checklist widget with x-lt-require-all: items are driven from
+ *     envelope.checklist_items at runtime; every item blocks submission until
+ *     checked, except the seeded required: false opt-out (photos)
  *   - minLength / maxLength — static and dynamic (x-lt-min-length / x-lt-max-length
  *     resolve a numeric value from the escalation context at submission time)
  *   - minimum / maximum — static and dynamic (x-lt-minimum / x-lt-maximum)
@@ -61,7 +62,8 @@ export const CONSTRAINT_FORM_SCHEMA = {
     '',
     '**Notes** must not exceed **{{envelope.max_notes_length}} characters**.',
     '',
-    '**Checklist** — each item marked \\* must be checked before you can submit.',
+    '**Checklist** — every item must be checked before you can submit; only steps',
+  'marked optional may stay unchecked.',
   ].join('\n'),
   required: ['reference_code', 'score', 'checks'],
   properties: {
@@ -110,6 +112,10 @@ export const CONSTRAINT_FORM_SCHEMA = {
       // Items are sourced from envelope.checklist_items at render time.
       'x-lt-widget': 'checklist',
       'x-lt-source': 'envelope.checklist_items',
+      // Completion guard: every item must be checked before submission —
+      // except items whose definition carries required: false (the seeded
+      // "photos" step), so the opt-out path is exercisable without code changes.
+      'x-lt-require-all': true,
     },
   },
 };

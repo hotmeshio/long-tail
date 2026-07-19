@@ -392,6 +392,45 @@ describe('ResolverForm — resolver.field conditionality', () => {
     fireEvent.click(screen.getByRole('checkbox'));
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
+
+  // Chained conditions: a condition which begets a condition. Each field's
+  // visibility evaluates independently against the LIVE resolver values, so
+  // A's value reveals B, and B's value reveals C — arbitrary depth.
+  const CHAIN_SCHEMA = {
+    'x-lt-order': ['needs_review', 'escalate', 'escalation_notes'],
+    properties: {
+      needs_review: { type: 'boolean' },
+      escalate: { type: 'boolean', 'x-lt-showIf': 'resolver.needs_review' },
+      escalation_notes: { type: 'string', 'x-lt-showIf': 'resolver.escalate' },
+    },
+  };
+
+  it('chained x-lt-showIf: A reveals B, then B reveals C — live, in sequence', () => {
+    const json = formJson({ needs_review: false, escalate: false, escalation_notes: '' }, CHAIN_SCHEMA);
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    // Only A rendered
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    // Check A → B appears (C still hidden: escalate is false)
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    // Check B → C appears — the condition begat a condition
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('chained x-lt-showIf: unchecking mid-chain collapses everything downstream', () => {
+    const json = formJson({ needs_review: true, escalate: true, escalation_notes: 'x' }, CHAIN_SCHEMA);
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+
+    // Uncheck B — C hides immediately
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
 });
 
 // ── required field validation ──
