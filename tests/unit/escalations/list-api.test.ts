@@ -220,6 +220,22 @@ describe('getStationMetrics', () => {
     expect(mockStations).toHaveBeenCalledWith(['reviewer', 'grinder'], '1h');
   });
 
+  it('includes self-scope roles — queue shape is role-wide, so a self-scoped member sees their lane', async () => {
+    // Station metrics are aggregate depth/jeopardy counts, not per-item
+    // disclosure; a read_scope='self' member must still see their lane's shape.
+    mockScope.mockResolvedValue(SELF);
+    mockStations.mockResolvedValue([stationRow]);
+    await getStationMetrics({ period: '24h' }, AUTH);
+    expect(mockStations).toHaveBeenCalledWith(['reviewer'], '24h');
+  });
+
+  it('unions allRoles and selfRoles for a mixed-scope member', async () => {
+    mockScope.mockResolvedValue({ global: false, allRoles: ['grinder'], selfRoles: ['reviewer'] });
+    mockStations.mockResolvedValue([stationRow]);
+    await getStationMetrics({ period: '24h' }, AUTH);
+    expect(mockStations).toHaveBeenCalledWith(['grinder', 'reviewer'], '24h');
+  });
+
   it('includes throughput_pct in returned stations', async () => {
     mockScope.mockResolvedValue(GLOBAL);
     mockStations.mockResolvedValue([stationRow]);

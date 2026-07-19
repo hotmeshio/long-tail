@@ -8,6 +8,7 @@ import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { Header } from './Header';
 import { ChoreographySidebar } from './ChoreographySidebar';
+import { TaskQueuesSidebar } from './TaskQueuesSidebar';
 import { OrchestrationSidebar } from './OrchestrationSidebar';
 import { DesignSidebar } from './DesignSidebar';
 import { StorageSidebar } from './StorageSidebar';
@@ -64,6 +65,7 @@ function ShellLayout() {
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
             <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} />
+            <TaskQueuesSidebar />
             {isBuilder && <OrchestrationSidebar />}
             {isBuilder && aiEnabled && <DesignSidebar />}
             {isBuilder && <StorageSidebar />}

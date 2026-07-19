@@ -11,6 +11,7 @@ import { useMcpRuns } from '../../api/pipelines';
 import { useControlPlaneApps } from '../../api/controlplane';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
+import { usePersona } from '../../hooks/usePersona';
 import { useEscalationStatsEvents, useWorkflowListEvents, useStationMetricsEvents } from '../../hooks/useEventHooks';
 import { DateValue } from '../../components/common/display/DateValue';
 import { RolePill } from '../../components/common/display/RolePill';
@@ -19,6 +20,7 @@ import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { PaceChart, type ChartStation } from '../operations/PaceChart';
 import { buildFragments } from '../operations/OperationsPage';
 import { priorityQueueLink } from '../operations/priority-link';
+import { TaskQueueCards } from './TaskQueueCards';
 
 const STATUS_DOT: Record<string, string> = {
   completed: 'bg-status-success',
@@ -163,7 +165,8 @@ function AppPicker({ appIds, selected, onSelect }: {
 export function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isBuilder, isOps } = useAccess();
+  const { isBuilder } = useAccess();
+  const persona = usePersona();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: cpData } = useControlPlaneApps({ enabled: isBuilder });
   const allAppIds = useMemo(() => (cpData?.apps ?? []).map((a: any) => a.appId).sort(), [cpData]);
@@ -181,20 +184,20 @@ export function HomePage() {
   useWorkflowListEvents();
   useStationMetricsEvents();
 
-  // Row 2: the Pace Board shows for builders (superadmin/engineer) AND ops (admin);
-  // the execution columns are builder-only — admins historically cannot see
-  // workflows, so their Pace Board spans the full row. Disable queries per tier
-  // so roles don't fire requests they can't access (403 on control-plane apps →
-  // empty namespace → 400 on jobs).
-  const showPace = isBuilder || isOps;
-  const rolesQ = useRoleDetails({ enabled: showPace });
-  const stationQ = useStationMetrics('1h', { enabled: showPace });
-  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: isBuilder });
+  // The home page renders one of three persona layouts (see the return below).
+  // Gate each data source to the tiers that render it, so no one fires a request
+  // they can't access (403 on control-plane apps → empty namespace → 400 on jobs):
+  // - Pace Board + the All/My firehose  → canonical tiers (admin, superadmin)
+  // - Procedural/Graph workflow columns → builders (engineer, superadmin)
+  // - Task-queue cards fetch their own scoped metrics inside TaskQueueCards.
+  const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
+  const stationQ = useStationMetrics('1h', { enabled: persona.canSeePaceBoard });
+  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: persona.canSeeWorkflows });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
-  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: isBuilder });
-  const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc' });
-  const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc' });
+  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: persona.canSeeWorkflows });
+  const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc', enabled: persona.canSeePaceBoard });
+  const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc', enabled: persona.canSeePaceBoard });
 
   // Delayed refetch — allows signal-routed escalation resolutions
   // (durable activity) time to commit before refreshing the list
@@ -234,6 +237,91 @@ export function HomePage() {
   const myEscalations = myEscQ.data?.escalations ?? [];
   const myEscTotal = myEscQ.data?.total;
 
+  // The two workflow execution columns, shared by the builder branches (the
+  // engineer layout below and the superadmin Row 2). Defined once so the JSX
+  // has a single source of truth.
+  const proceduralColumn = (
+    <div>
+      <SectionHeader icon={Code2} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:procedural-executions" actions={
+        <div className="flex items-center gap-2">
+          <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
+          <NavIcon to="/workflows/executions" icon={ExternalLink} title="All procedural executions" />
+        </div>
+      }>
+        Procedural
+      </SectionHeader>
+      <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
+      {jobs.length === 0 ? (
+        <EmptyPanel icon={Code2} text="No recent procedural runs" />
+      ) : (
+        <div className="space-y-1">
+          {jobs.map((job: any) => (
+            <ExecutionRow
+              key={job.workflow_id}
+              dot={statusDotClass(job.status)}
+              pill={<WorkflowPill type={job.entity || job.type || 'workflow'} size="xs" />}
+              id={job.workflow_id}
+              date={job.updated_at ?? job.created_at}
+              onClick={() => navigate(`/workflows/executions/${job.workflow_id}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const graphColumn = (
+    <div>
+      <SectionHeader icon={Workflow} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:graph-executions" actions={
+        <div className="flex items-center gap-2">
+          <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
+          <NavIcon to="/mcp/executions" icon={ExternalLink} title="All graph executions" />
+        </div>
+      }>
+        Graph
+      </SectionHeader>
+      <AppPicker appIds={pipelineAppIds} selected={pipelineNs} onSelect={(ns) => setNs('pipelinenamespace', ns)} />
+      {mcpRuns.length === 0 ? (
+        <EmptyPanel icon={Workflow} text="No recent graph runs" />
+      ) : (
+        <div className="space-y-1">
+          {mcpRuns.map((run: any) => (
+            <ExecutionRow
+              key={run.workflow_id}
+              dot={statusDotClass(run.status)}
+              pill={<WorkflowPill type={run.entity || run.workflow_name || 'pipeline'} variant="pipeline" size="xs" />}
+              id={run.workflow_id}
+              date={run.updated_at ?? run.created_at}
+              onClick={() => navigate(`/mcp/executions/${run.workflow_id}?namespace=${pipelineNs}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Scoped personas (operator, engineer): their own lanes as Task Queue
+  //    cards. Engineers get a single compact card row with the workflow columns
+  //    below; operators get the fuller two-row surface and nothing else. No
+  //    Pace Board (a cross-role view only canonical tiers can read), no firehose.
+  if (persona.showTaskQueueCards) {
+    return (
+      <div>
+        <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
+        <TaskQueueCards maxRows={persona.canSeeWorkflows ? 1 : 2} />
+        {persona.canSeeWorkflows && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 mt-14">
+            {proceduralColumn}
+            {graphColumn}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Canonical personas (admin, superadmin): the All/My firehose and the
+  //    cross-role Pace Board. Superadmins (builders) also get the workflow
+  //    columns; admins get the Pace Board full-width.
   return (
     <div>
       <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
@@ -315,9 +403,9 @@ export function HomePage() {
       </div>
 
       {/* ── Row 2: Pace Board | Procedural | Graph — mirrors the left nav.
-          Builders see all three; ops (admin) can't see workflows, so their
-          Pace Board spans the full row. Operators see neither. */}
-      {showPace && <div className={`grid grid-cols-1 ${isBuilder ? 'lg:grid-cols-3' : ''} gap-x-14 mt-14`}>
+          Superadmins (builders) see all three; admins can't see workflows, so
+          their Pace Board spans the full row. */}
+      <div className={`grid grid-cols-1 ${isBuilder ? 'lg:grid-cols-3' : ''} gap-x-14 mt-14`}>
 
         {/* Col 1: Pace Board — the story being told, at a glance */}
         <div>
@@ -345,64 +433,10 @@ export function HomePage() {
           )}
         </div>
 
-        {/* Col 2: Procedural executions (builders only) */}
-        {isBuilder && <div>
-          <SectionHeader icon={Code2} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:procedural-executions" actions={
-            <div className="flex items-center gap-2">
-              <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
-              <NavIcon to="/workflows/executions" icon={ExternalLink} title="All procedural executions" />
-            </div>
-          }>
-            Procedural
-          </SectionHeader>
-          <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
-          {jobs.length === 0 ? (
-            <EmptyPanel icon={Code2} text="No recent procedural runs" />
-          ) : (
-            <div className="space-y-1">
-              {jobs.map((job: any) => (
-                <ExecutionRow
-                  key={job.workflow_id}
-                  dot={statusDotClass(job.status)}
-                  pill={<WorkflowPill type={job.entity || job.type || 'workflow'} size="xs" />}
-                  id={job.workflow_id}
-                  date={job.updated_at ?? job.created_at}
-                  onClick={() => navigate(`/workflows/executions/${job.workflow_id}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>}
-
-        {/* Col 3: Graph executions (builders only) */}
-        {isBuilder && <div>
-          <SectionHeader icon={Workflow} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:graph-executions" actions={
-            <div className="flex items-center gap-2">
-              <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
-              <NavIcon to="/mcp/executions" icon={ExternalLink} title="All graph executions" />
-            </div>
-          }>
-            Graph
-          </SectionHeader>
-          <AppPicker appIds={pipelineAppIds} selected={pipelineNs} onSelect={(ns) => setNs('pipelinenamespace', ns)} />
-          {mcpRuns.length === 0 ? (
-            <EmptyPanel icon={Workflow} text="No recent graph runs" />
-          ) : (
-            <div className="space-y-1">
-              {mcpRuns.map((run: any) => (
-                <ExecutionRow
-                  key={run.workflow_id}
-                  dot={statusDotClass(run.status)}
-                  pill={<WorkflowPill type={run.entity || run.workflow_name || 'pipeline'} variant="pipeline" size="xs" />}
-                  id={run.workflow_id}
-                  date={run.updated_at ?? run.created_at}
-                  onClick={() => navigate(`/mcp/executions/${run.workflow_id}?namespace=${pipelineNs}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>}
-      </div>}
+        {/* Cols 2 & 3: workflow executions (superadmin builders only) */}
+        {isBuilder && proceduralColumn}
+        {isBuilder && graphColumn}
+      </div>
     </div>
   );
 }

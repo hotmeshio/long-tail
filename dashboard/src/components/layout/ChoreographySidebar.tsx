@@ -1,22 +1,20 @@
-import { Zap, Bot, Radio, Inbox, ListChecks, LayoutDashboard } from 'lucide-react';
+import { Zap, Bot, Radio, LayoutDashboard } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 import type { ViewAsRole } from '../../lib/view-as';
 
-const OPERATOR_ENTRIES: NavEntry[] = [
-  { to: '/escalations/queue', label: 'My Queue', icon: Inbox },
-  { to: '/escalations/available', label: 'All', icon: ListChecks },
-];
-
 /**
  * "Monitor" — the reactive, event-driven surface (choreography).
- * Builders configure automations, topics, and capabilities here. Operators,
- * who don't build, get their escalation queue (home is also one logo click away).
- * Operations (COO view) is the first entry for admins and builders.
+ * Builders configure automations, topics, and capabilities here. Operations
+ * (COO view) is the first entry for admins and builders.
+ *
+ * Operators and engineers have no choreography section: their work lives in the
+ * Task Queues section (per-lane, rendered by the shell) and the Claimed card on
+ * the home page. The old generic "My Queue" / "All" links are retired.
  *
  * `viewAs` overrides the rendered variant when the user is simulating a lower role:
- * - 'engineer' → shows the Work queue (even though isOps=true)
+ * - 'engineer' → task queues only (no Monitor)
  * - 'admin'    → shows the Pace Board (same as the isOps branch)
- * - 'operator' → shows the Work queue (same as the operator branch)
+ * - 'operator' → task queues only
  */
 export function ChoreographySidebar({
   aiEnabled = false,
@@ -29,9 +27,10 @@ export function ChoreographySidebar({
   isOps?: boolean;
   viewAs?: ViewAsRole | null;
 }) {
-  // Operator or engineer view: show work queue
+  // Operator or engineer view: no generic work links — the Task Queues section
+  // (shell) and the home Claimed card carry their work.
   if (!isBuilder && (!isOps || viewAs === 'engineer' || viewAs === 'operator')) {
-    return <SidebarNav heading="Work" entries={OPERATOR_ENTRIES} />;
+    return null;
   }
 
   if (!isBuilder) {

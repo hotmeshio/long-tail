@@ -19,11 +19,13 @@
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
     --lt-surface-hover: 239 246 255;  /* #EFF6FF */
     --lt-surface-sunken: 235 243 255; /* #EBF3FF */
-    --lt-surface-border: 191 219 254; /* #BFDBFE */
+    /* Tinted neutrals carry real electric-blue chroma (matched to the vivid
+     * rose theme) so labels, helper text, and lines read blue — not gray. */
+    --lt-surface-border: 166 196 245; /* #A6C4F5 — visible blue underline */
     --lt-text-primary: 10 16 38;      /* #0A1026 */
-    --lt-text-secondary: 30 58 138;   /* #1E3A8A */
-    --lt-text-tertiary: 96 125 185;   /* #607DB9 */
-    --lt-text-quaternary: 147 172 220;/* #93ACD8 */
+    --lt-text-secondary: 28 64 176;   /* #1C40B0 — electric-blue labels */
+    --lt-text-tertiary: 58 102 214;   /* #3A66D6 — vivid, not washed */
+    --lt-text-quaternary: 110 147 230;/* #6E93E6 */
     --lt-heading: 29 78 216;          /* #1D4ED8 */
   }
 

@@ -13,17 +13,21 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('ChoreographySidebar — operators (no builder, no ops)', () => {
-  it('shows Work queue entries for plain operators', () => {
-    render(<ChoreographySidebar />, { wrapper });
-    expect(screen.getByText('Work')).toBeInTheDocument();
-    expect(screen.getByText('My Queue')).toBeInTheDocument();
-    expect(screen.getByText('All')).toBeInTheDocument();
+  it('renders no choreography section — work lives in Task Queues + the Claimed card', () => {
+    const { container } = render(<ChoreographySidebar />, { wrapper });
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('does NOT show Pace Board or Monitor entries for plain operators', () => {
+  it('retires the generic My Queue / All links', () => {
     render(<ChoreographySidebar />, { wrapper });
+    expect(screen.queryByText('My Queue')).not.toBeInTheDocument();
+    expect(screen.queryByText('All')).not.toBeInTheDocument();
     expect(screen.queryByText('Pace Board')).not.toBeInTheDocument();
-    expect(screen.queryByText('Event Topics')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when an admin views as operator', () => {
+    const { container } = render(<ChoreographySidebar isOps viewAs="operator" />, { wrapper });
+    expect(container).toBeEmptyDOMElement();
   });
 });
 

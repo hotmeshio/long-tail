@@ -293,12 +293,19 @@ export async function getStationMetrics(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
+    // Station metrics are aggregate queue-SHAPE counts (pending/claimed/resolved
+    // + jeopardy) per role — the depth of a lane, not the disclosure of any one
+    // item. Membership in a role entitles you to see its shape, so this view
+    // spans every role the user belongs to, including read_scope='self' roles
+    // (whose per-item lists stay narrowed elsewhere). Without the selfRoles
+    // union, a self-scoped operator would see an empty board on their own lanes.
     const scope = await getEscalationReadScope(auth.userId);
-    if (!scope.global && scope.allRoles.length === 0) {
+    const memberRoles = [...scope.allRoles, ...scope.selfRoles];
+    if (!scope.global && memberRoles.length === 0) {
       return { status: 200, data: { stations: [] } };
     }
     const stations = await escalationService.getStationMetrics(
-      scope.global ? undefined : scope.allRoles,
+      scope.global ? undefined : memberRoles,
       input.period,
     );
     return { status: 200, data: { stations } };
