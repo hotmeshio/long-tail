@@ -10,6 +10,7 @@ For rich inputs beyond standard HTML types, set `x-lt-widget` on any field:
 | `"rich-text"` | Tall textarea for formatted text input. |
 | `"markdown"` | Markdown source rendered with headings, tables, lists, code blocks. Editable by default; set `readOnly: true` for a pure content block. |
 | `"checklist"` | Dynamic labeled checkboxes driven by runtime data. Items come from a `"domain.path"` declared in `x-lt-source`. |
+| `"attachment"` | ReadOnly display of a captured binary (data URL or fetchable URL): images inline with click-to-full-size, everything else as a safe open/download link. `"image"` is an accepted alias. |
 
 ---
 
@@ -72,6 +73,27 @@ The submitted value is a base64 data URL (`data:image/png;base64,...`). `accept`
 ```
 
 The submitted value is a PNG data URL of the canvas drawing.
+
+---
+
+## Attachment
+
+ReadOnly display of a binary captured earlier — typically by the `file-upload` widget on a prior form. The reporting form uploads the evidence (a defect photo, a signed PDF, a scan); the review form shows it:
+
+```json
+{
+  "properties": {
+    "defect_evidence": {
+      "type": "string",
+      "readOnly": true,
+      "x-lt-widget": "attachment",
+      "description": "Uploaded by the reporting form"
+    }
+  }
+}
+```
+
+The value is a data URL or a fetchable URL. Rendering dispatches on content type: `image/*` renders inline (constrained, click for full size); everything else — PDFs, scans, arbitrary binaries — renders as a labeled open/download affordance and is never embedded as a document (inlining arbitrary `data:` content is an XSS vector; the image context is script-inert). `"image"` is an accepted alias when the schema wants to name the constrained intent. An empty value reads as a quiet "No attachment".
 
 ---
 

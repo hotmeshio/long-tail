@@ -57,6 +57,13 @@ export interface RoleDetail {
   /** Version of the live list_schema; null until the role first carries one. */
   current_list_schema_version: number | null;
   /**
+   * Pinned-view seeds this role hands its members: [{ label, url, badge? }].
+   * On first render, a member without an own pin of the same label sees these
+   * in their Pinned nav section (marked role-provided); users promote, hide,
+   * or reorder them through their own preferences. URLs only — never data.
+   */
+  default_pins: { label: string; url: string; badge?: boolean }[] | null;
+  /**
    * Roles this station draws input from that live in OTHER sequences.
    * parent_role is the single "prior step" placing the role in one sequence;
    * upstream inputs are the remaining graph edges (mixin-like, many allowed),
@@ -116,6 +123,7 @@ export interface UpdateRoleInput {
   metadata_schema?: Record<string, any> | null;
   /** JSON contract that richly formats this role's escalation list page. */
   list_schema?: Record<string, any> | null;
+  default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
   parent_role?: string | null;

@@ -13,6 +13,7 @@ import { seedPolicyDocumentRole } from './seed-policy-document';
 import { seedWorkbenchRole, seedWorkbenchEscalation } from './seed-workbench';
 import { seedChecklistRole } from './seed-checklist';
 import { seedConstraintFormRole, seedConstraintFormEscalations } from './seed-constraint-form';
+import { seedFleetSimRole, seedFleetSimEscalations } from './seed-fleet-sim';
 
 // ── Seed functions ───────────────────────────────────────────────────────────
 
@@ -82,6 +83,8 @@ export async function seedExamples(client: any): Promise<void> {
   await seedChecklistRole();
   await seedConstraintFormRole();
   await seedConstraintFormEscalations();
+  await seedFleetSimRole();
+  await seedFleetSimEscalations();
   await seedUsers();
   await seedEscalationChains();
 

@@ -5,6 +5,7 @@ import { SignatureWidget } from './SignatureWidget';
 import { RichTextWidget } from './RichTextWidget';
 import { MarkdownWidget } from './MarkdownWidget';
 import { ChecklistWidget } from './ChecklistWidget';
+import { AttachmentWidget } from './AttachmentWidget';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 
 export interface WidgetProps {
@@ -34,4 +35,9 @@ export const WIDGET_MAP: Record<string, ComponentType<WidgetProps>> = {
   'rich-text': RichTextWidget,
   'markdown': MarkdownWidget,
   'checklist': ChecklistWidget,
+  // Attachment renders a captured binary (data URL / fetchable URL): images
+  // inline, everything else as a safe open/download link. "image" is an alias
+  // so schemas can name the constrained intent.
+  'attachment': AttachmentWidget,
+  'image': AttachmentWidget,
 };

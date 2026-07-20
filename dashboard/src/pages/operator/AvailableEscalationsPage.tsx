@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
 import { useAccess } from '../../hooks/useAccess';
 import { useAuth } from '../../hooks/useAuth';
@@ -37,7 +37,9 @@ import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
-import { Activity, Lock, SlidersHorizontal, X, LayoutList, Table, BookOpen, TriangleAlert } from 'lucide-react';
+import { Activity, Lock, SlidersHorizontal, X, LayoutList, Table, BookOpen, TriangleAlert, Pin } from 'lucide-react';
+import { usePatchPreferences, usePreferences } from '../../api/preferences';
+import { newPinId } from '../../lib/pinned-views';
 import { formatDurationCompact } from '../../lib/format';
 import { makeEscalationColumns, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
@@ -89,6 +91,25 @@ export function AvailableEscalationsPage() {
     (next: FacetOrder[] | undefined) => setFacetFilters({ ...facetFilters, orderBy: next }),
     [facetFilters, setFacetFilters],
   );
+
+  // Pin current view: capture the live URL (every filter — role, status,
+  // facets, orderBy, view, jeopardy — is already deep-linked) as a pinned
+  // view, prompting only for the label. Badged by default: a pinned query's
+  // live count is its value.
+  const location = useLocation();
+  const { data: prefsData } = usePreferences();
+  const patchPrefs = usePatchPreferences();
+  const pinCurrentView = useCallback(() => {
+    const label = window.prompt('Pin label:');
+    if (!label?.trim()) return;
+    const existing = prefsData?.preferences?.pinnedViews ?? [];
+    patchPrefs.mutate({
+      pinnedViews: [
+        ...existing,
+        { id: newPinId(), label: label.trim(), url: location.pathname + location.search, badge: true },
+      ],
+    });
+  }, [location.pathname, location.search, prefsData, patchPrefs]);
 
   const { canBulk: canBulkManage } = useAccess();
   const facetHighlightKeys = facetFilters.facets ? Object.keys(facetFilters.facets) : [];
@@ -414,6 +435,14 @@ export function AvailableEscalationsPage() {
               </button>
             )}
             <button
+              onClick={pinCurrentView}
+              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-accent transition-colors"
+              title="Pin this view — save the current filters to your Pinned section"
+              data-testid="pin-current-view"
+            >
+              <Pin className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setFacetDrawerOpen((v) => !v)}
               className="relative ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
               title="Faceted query"
@@ -564,6 +593,7 @@ export function AvailableEscalationsPage() {
           listSchema={listSchema!}
           activeEscalations={escalations}
           onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
+          onOpenGroup={(url) => navigate(url)}
           total={total}
           page={pagination.page}
           totalPages={pagination.totalPages(total)}

@@ -90,3 +90,58 @@ describe('evaluateShowIf', () => {
     expect(evaluateShowIf('metadata.count', c)).toBe(true);
   });
 });
+
+describe('evaluateShowIf — equality forms', () => {
+  const eqCtx: ShowIfContext = {
+    metadata: { station: 'DRAFT', count: 3, live: true },
+    payload: null,
+    envelope: null,
+    escalation: null,
+    resolver: { designatedStation: 'DRAFT', notes: '' },
+  };
+
+  it('= matches the string value', () => {
+    expect(evaluateShowIf('resolver.designatedStation=DRAFT', eqCtx)).toBe(true);
+    expect(evaluateShowIf('resolver.designatedStation=PRINT', eqCtx)).toBe(false);
+  });
+
+  it('!= is the inverse', () => {
+    expect(evaluateShowIf('resolver.designatedStation!=PRINT', eqCtx)).toBe(true);
+    expect(evaluateShowIf('resolver.designatedStation!=DRAFT', eqCtx)).toBe(false);
+  });
+
+  it('numbers and booleans compare via their string form', () => {
+    expect(evaluateShowIf('metadata.count=3', eqCtx)).toBe(true);
+    expect(evaluateShowIf('metadata.live=true', eqCtx)).toBe(true);
+    expect(evaluateShowIf('metadata.count=4', eqCtx)).toBe(false);
+  });
+
+  it('an absent value compares as empty string', () => {
+    expect(evaluateShowIf('metadata.missing=X', eqCtx)).toBe(false);
+    expect(evaluateShowIf('metadata.missing!=X', eqCtx)).toBe(true);
+    expect(evaluateShowIf('metadata.missing=', eqCtx)).toBe(true); // '' === ''
+  });
+
+  it('an empty string value equals the empty expected', () => {
+    expect(evaluateShowIf('resolver.notes=', eqCtx)).toBe(true);
+    expect(evaluateShowIf('resolver.notes!=', eqCtx)).toBe(false);
+  });
+
+  it('expected value is the raw remainder — spaces trimmed, no quoting', () => {
+    expect(evaluateShowIf('resolver.designatedStation= DRAFT ', eqCtx)).toBe(true);
+  });
+
+  it('leading ! composes with equality (negated match)', () => {
+    expect(evaluateShowIf('!resolver.designatedStation=DRAFT', eqCtx)).toBe(false);
+    expect(evaluateShowIf('!resolver.designatedStation=PRINT', eqCtx)).toBe(true);
+  });
+
+  it('unknown domain with equality stays the safe default (show)', () => {
+    expect(evaluateShowIf('bogus.path=X', eqCtx)).toBe(true);
+  });
+
+  it('truthy forms are untouched by the extension', () => {
+    expect(evaluateShowIf('metadata.live', eqCtx)).toBe(true);
+    expect(evaluateShowIf('!metadata.missing', eqCtx)).toBe(true);
+  });
+});

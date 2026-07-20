@@ -42,6 +42,9 @@ export const SEED_USERS = [
       // Also holds the rich-form escalation surface so the intake demo is
       // claimable by a normal (non-superadmin) user.
       { role: 'intake-reviewer', type: 'member' as const },
+      // Fleet membership: this user sees the fleet-sim's default pins and
+      // facet-board from first login — the persona-views demo, no setup.
+      { role: 'fleet-servicer', type: 'member' as const },
     ],
   },
   {

@@ -183,6 +183,8 @@ export async function updateRole(input: {
   metadata_schema?: Record<string, any> | null;
   /** The escalation LIST schema — rich formatting for this role's list page. */
   list_schema?: Record<string, any> | null;
+  /** Pinned-view seeds for the role's members: [{ label, url, badge? }] or null to clear. */
+  default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
   parent_role?: string | null;
@@ -220,6 +222,17 @@ export async function updateRole(input: {
     if (input.parent_role != null && input.parent_role === input.role) {
       return { status: 400, error: 'parent_role must reference a different role' };
     }
+    if (input.default_pins != null) {
+      const pinsValid = Array.isArray(input.default_pins) && input.default_pins.every(
+        (p) => p && typeof p === 'object'
+          && typeof p.label === 'string' && p.label.trim() !== ''
+          && typeof p.url === 'string' && p.url.startsWith('/')
+          && (p.badge === undefined || typeof p.badge === 'boolean'),
+      );
+      if (!pinsValid) {
+        return { status: 400, error: 'default_pins must be [{ label, url, badge? }] with dashboard-relative urls' };
+      }
+    }
     if (input.upstream_roles != null) {
       if (!Array.isArray(input.upstream_roles) || input.upstream_roles.some((u) => typeof u !== 'string' || !u.trim())) {
         return { status: 400, error: 'upstream_roles must be an array of role names' };
@@ -239,6 +252,7 @@ export async function updateRole(input: {
       form_schema: input.form_schema,
       metadata_schema: input.metadata_schema,
       list_schema: input.list_schema,
+      default_pins: input.default_pins,
       properties: input.properties,
       ops_visible: input.ops_visible,
       parent_role: input.parent_role,

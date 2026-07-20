@@ -12,11 +12,15 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 
 | Key | Level | Purpose |
 |-----|-------|---------|
-| `x-lt-layout` | schema | `"active-history"`, `"active"`, `"facet-table"`, or `"table"` |
+| `x-lt-layout` | schema | `"active-history"`, `"active"`, `"facet-table"`, `"facet-board"`, or `"table"` |
 | `x-lt-help` | schema | Optional markdown header, interpolated with the active row |
 | `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{ label, value }] }` |
 | `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
-| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label: string, value: string }]` |
+| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format? }]` |
+| `x-lt-group-by` | schema | `facet-board`: the `"domain.path"` whose value identifies each entity |
+| `x-lt-card` | schema | `facet-board`: the per-entity card — `{ title, state?, fields?: [{ label, value, format? }] }` |
+
+`format: "age"` on a `facet-table` column or `facet-board` field renders a timestamp as a compact age (`12m`, `3h`, `2d`) with the absolute time as its tooltip, repainted each minute — aging interim states are scannable at a glance.
 
 The **active** item is the first non-terminal escalation. The **history** column is lazy-loaded — a "Load full history" link fetches resolved items on demand (`status` defaults to `"resolved"`, `limit` to 25). Unknown or absent `x-lt-layout` is a safe no-op that falls back to the table.
 
@@ -73,3 +77,27 @@ Use when the queue contains many concurrent rows and the role's context is best 
 ```
 
 A status dot precedes the first column automatically. ISO datetime values render as a readable relative date with a full-timestamp tooltip. Missing token values render as an em dash. Clicking any row navigates to the detail page. `x-lt-help` and `x-lt-active` are ignored in this layout.
+
+### `"facet-board"` — entity board
+
+Use when the rows describe **entities** (machines, stations) rather than a queue: within the current filter scope, rows group by the resolved `x-lt-group-by` value and each group renders one card from its most recent row (by `created_at`). The board reflects the scope — groups with no matching rows simply don't render.
+
+```json
+{
+  "x-lt-layout": "facet-board",
+  "x-lt-group-by": "metadata.fleetMachine",
+  "x-lt-card": {
+    "title": "{{metadata.fleetMachine}}",
+    "state": "{{metadata.machineState}}",
+    "fields": [
+      { "label": "PO",    "value": "{{metadata.po}}" },
+      { "label": "Order", "value": "{{metadata.orderId}}" },
+      { "label": "Since", "value": "{{escalation.created_at}}", "format": "age" }
+    ]
+  }
+}
+```
+
+The card's `state` renders as a status chip (a stable hue per token — commonly a subtype or a metadata state facet). The grid wraps to the viewport (wall-screen friendly). Clicking a card opens the entity's history: the table view filtered to that facet value (`x-lt-group-by` should therefore be a `metadata.*` path). `x-lt-help` renders above the board as in `facet-table`. In the digital-twin pattern — each machine advertising one live pending row — the board is exact by construction; for wider scopes it groups the fetched page, with standard pagination beyond it.
+
+The reference: `examples/seed-fleet-sim.ts` — one advert per machine, a `format: "age"` "Since" field, and role default pins (see [pinned-views.md](pinned-views.md)).

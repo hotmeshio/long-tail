@@ -82,6 +82,9 @@ export const DELETE_ROLE = `
  * of the form/metadata pair: its own current_list_schema_version and its own
  * snapshot table (lt_role_list_schemas), so a list-view edit never advances the
  * resolve form's version. It shares $26 as the change summary.
+ *
+ * default_pins ($31 = provided sentinel, $32 = value) is unversioned config:
+ * the pinned-view seeds a role hands its members.
  */
 export const UPDATE_ROLE_METADATA = `
   WITH updated AS (
@@ -100,6 +103,7 @@ export const UPDATE_ROLE_METADATA = `
                       = CASE WHEN $22::boolean THEN $23::numeric                      ELSE priority_threshold_minutes END,
       priority_facet  = CASE WHEN $24::boolean THEN $25                               ELSE priority_facet  END,
       list_schema     = CASE WHEN $29::boolean THEN $30::jsonb                        ELSE list_schema     END,
+      default_pins    = CASE WHEN $31::boolean THEN $32::jsonb                        ELSE default_pins    END,
       current_schema_version = CASE
         WHEN ($6::boolean AND $7::jsonb IS DISTINCT FROM form_schema)
           OR ($8::boolean AND $9::jsonb IS DISTINCT FROM metadata_schema)
@@ -114,7 +118,8 @@ export const UPDATE_ROLE_METADATA = `
       role, title, description, form_schema, metadata_schema, properties,
       ops_visible, parent_role, sla_minutes, target_per_hour, worker_count,
       priority_threshold_minutes, priority_facet,
-      current_schema_version, list_schema, current_list_schema_version
+      current_schema_version, list_schema, current_list_schema_version,
+      default_pins
   ), snapshot AS (
     INSERT INTO lt_role_schemas (role, version, form_schema, metadata_schema, change_summary)
     SELECT role, current_schema_version, form_schema, metadata_schema, $26
@@ -261,6 +266,7 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.current_schema_version,
     r.list_schema,
     r.current_list_schema_version,
+    r.default_pins,
     COALESCE(up.ups, '{}') AS upstream_roles,
     COALESCE(uc.cnt, 0) AS user_count,
     COALESCE(cc.cnt, 0) AS chain_count,

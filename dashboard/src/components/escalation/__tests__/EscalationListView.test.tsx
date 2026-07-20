@@ -182,3 +182,117 @@ describe('EscalationListView — facet-table layout', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 });
+
+// ── facet-board ──────────────────────────────────────────────────────────────
+
+describe('EscalationListView — facet-board', () => {
+  const BOARD_SCHEMA = {
+    'x-lt-layout': 'facet-board',
+    'x-lt-group-by': 'metadata.fleetMachine',
+    'x-lt-card': {
+      title: '{{metadata.fleetMachine}}',
+      state: '{{escalation.subtype}}',
+      fields: [
+        { label: 'PO', value: '{{metadata.po}}' },
+        { label: 'Since', value: '{{escalation.created_at}}', format: 'age' },
+      ],
+    },
+  };
+
+  const machineRow = (over: Partial<LTEscalationRecord>): LTEscalationRecord => ({
+    ...ROW,
+    metadata: { fleetMachine: 'M-01', po: 'PO-9' },
+    ...over,
+  });
+
+  it('groups rows by the facet and renders one card per machine (mixed subtypes)', () => {
+    const rows = [
+      machineRow({ id: 'a1', subtype: 'printing', metadata: { fleetMachine: 'M-01', po: 'PO-9' } }),
+      machineRow({ id: 'b1', subtype: 'idle', metadata: { fleetMachine: 'M-02', po: 'PO-4' } }),
+      machineRow({ id: 'b2', subtype: 'finished', metadata: { fleetMachine: 'M-02', po: 'PO-5' }, created_at: '2026-07-15T00:00:00.000Z' }),
+    ];
+    render(
+      <EscalationListView role="fleet" listSchema={BOARD_SCHEMA} activeEscalations={rows} />,
+      { wrapper: wrapper() },
+    );
+    const cards = screen.getAllByTestId('facet-board-card');
+    expect(cards).toHaveLength(2);
+    expect(screen.getByText('M-01')).toBeInTheDocument();
+    expect(screen.getByText('M-02')).toBeInTheDocument();
+  });
+
+  it('each card renders from the group latest row by created_at', () => {
+    const rows = [
+      machineRow({ id: 'b1', subtype: 'idle', metadata: { fleetMachine: 'M-02', po: 'PO-4' }, created_at: '2026-07-13T00:00:00.000Z' }),
+      machineRow({ id: 'b2', subtype: 'finished', metadata: { fleetMachine: 'M-02', po: 'PO-5' }, created_at: '2026-07-15T00:00:00.000Z' }),
+    ];
+    render(
+      <EscalationListView role="fleet" listSchema={BOARD_SCHEMA} activeEscalations={rows} />,
+      { wrapper: wrapper() },
+    );
+    // Latest row wins: state chip + fields come from b2
+    expect(screen.getByText('finished')).toBeInTheDocument();
+    expect(screen.queryByText('idle')).not.toBeInTheDocument();
+    expect(screen.getByText('PO-5')).toBeInTheDocument();
+    expect(screen.getByText('2 rows in scope')).toBeInTheDocument();
+  });
+
+  it('rows missing the group-by facet are skipped — the board never invents entities', () => {
+    const rows = [
+      machineRow({ id: 'a1', metadata: { fleetMachine: 'M-01', po: 'PO-9' } }),
+      machineRow({ id: 'x1', metadata: { po: 'PO-0' } }), // no fleetMachine
+    ];
+    render(
+      <EscalationListView role="fleet" listSchema={BOARD_SCHEMA} activeEscalations={rows} />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getAllByTestId('facet-board-card')).toHaveLength(1);
+  });
+
+  it('format:"age" renders a compact age with the absolute time as tooltip', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-14T03:00:00.000Z'));
+    try {
+      render(
+        <EscalationListView
+          role="fleet"
+          listSchema={BOARD_SCHEMA}
+          activeEscalations={[machineRow({ id: 'a1', created_at: '2026-07-14T00:00:00.000Z' })]}
+        />,
+        { wrapper: wrapper() },
+      );
+      const age = screen.getByText('3h');
+      expect(age).toHaveAttribute('title');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('card click opens the group history — table view filtered to the facet value', () => {
+    const onOpenGroup = vi.fn();
+    render(
+      <EscalationListView
+        role="fleet"
+        listSchema={BOARD_SCHEMA}
+        activeEscalations={[machineRow({ id: 'a1' })]}
+        onOpenGroup={onOpenGroup}
+      />,
+      { wrapper: wrapper() },
+    );
+    screen.getByTestId('facet-board-card').click();
+    expect(onOpenGroup).toHaveBeenCalledTimes(1);
+    const url = onOpenGroup.mock.calls[0][0] as string;
+    expect(url).toContain('/escalations/available');
+    expect(url).toContain('role=fleet');
+    expect(url).toContain('view=table');
+    expect(decodeURIComponent(url)).toContain('"fleetMachine":"M-01"');
+  });
+
+  it('empty scope renders the quiet no-entities state', () => {
+    render(
+      <EscalationListView role="fleet" listSchema={BOARD_SCHEMA} activeEscalations={[]} />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByText('No entities in scope.')).toBeInTheDocument();
+  });
+});
