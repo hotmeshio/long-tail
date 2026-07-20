@@ -373,6 +373,8 @@ When the update changes `form_schema` or `metadata_schema`, the new pair is snap
 | `priority_threshold_minutes` | `number \| null` | Priority age threshold in minutes; falls back to `sla_minutes` |
 | `priority_facet` | `string \| null` | Metadata key for the priority age origin (letters, numbers, underscores); falls back to `created_at` |
 | `upstream_roles` | `string[] \| null` | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Every entry must name an existing role other than this one. Distinct from `parent_role`, which places the role in its own sequence. |
+| `list_schema` | `object \| null` | Rich formatting (x-lt-* markup) for this role's escalation LIST page. Versions independently of `form_schema`; the list always renders the latest |
+| `default_pins` | `array \| null` | Pinned-view seeds for members: `[{ label, url, badge? }]` with dashboard-relative `url`s. Members promote, hide, or reorder them via their own preferences (`/api/me/preferences`). `null` clears |
 | `change_summary` | `string` | Label recorded on the schema version snapshot when this update changes a schema field |
 
 **Example request** — configure a role as a station in the ops view:

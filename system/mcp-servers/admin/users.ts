@@ -219,9 +219,10 @@ export function registerUserTools(server: McpServer): void {
       title: 'Update Role',
       description:
         'Update role metadata with PATCH semantics — omitted fields keep their ' +
-        'values. Covers display name, description, form/metadata schemas, the ' +
-        'free properties bag, ops_visible flag, parent role, and the typed ' +
-        'operational targets (sla_minutes, target_per_hour, worker_count, ' +
+        'values. Covers display name, description, form/metadata/list schemas, ' +
+        'the free properties bag, ops_visible flag, parent role, default_pins ' +
+        '(member pinned-view seeds), and the typed operational targets ' +
+        '(sla_minutes, target_per_hour, worker_count, ' +
         'priority_threshold_minutes, priority_facet).',
       inputSchema: updateRoleSchema,
     },
@@ -240,6 +241,8 @@ export function registerUserTools(server: McpServer): void {
         priority_threshold_minutes: args.priority_threshold_minutes,
         priority_facet: args.priority_facet,
         upstream_roles: args.upstream_roles,
+        list_schema: args.list_schema as Record<string, any> | null | undefined,
+        default_pins: args.default_pins,
         change_summary: args.change_summary,
       });
       if (!updated) {
