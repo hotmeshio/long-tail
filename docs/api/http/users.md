@@ -187,3 +187,42 @@ Deletes the user and all associated role assignments (cascade).
 ```json
 { "error": "User not found" }
 ```
+
+---
+
+## Self-Service — `/api/me`
+
+Operations on the **authenticated caller** — no ids, no admin gates. Any signed-in user (or service account) may call them.
+
+### GET /api/me/preferences
+
+The caller's preferences document — a generic per-user JSON store for presentation state (pinned views are the first tenant). Reads `{}` when unset.
+
+**Response 200:**
+
+```json
+{
+  "preferences": {
+    "pinnedViews": [
+      { "id": "pin-x1", "label": "Needs harvesting", "url": "/escalations/available?role=fleet-servicer&jeopardy=1&view=table", "badge": true }
+    ],
+    "hiddenRolePins": ["My machines"]
+  }
+}
+```
+
+### PATCH /api/me/preferences
+
+Shallow-merge the body into the caller's preferences: top-level keys overwrite whole, a `null` value deletes its key. The merge is a single guarded statement (no read-then-write) and the stored document is size-capped (~32 KB). Preferences carry presentation state only — URLs and UI choices, never data and never authorization.
+
+**Request body** — any JSON object of preference keys:
+
+```json
+{ "pinnedViews": [ { "id": "pin-x1", "label": "Needs harvesting", "url": "/escalations/available?role=fleet-servicer&jeopardy=1", "badge": true } ], "theme": null }
+```
+
+**Response 200:** the merged document, `{ "preferences": { ... } }`.
+
+**Response 400:** body is not a JSON object. **Response 413:** the patch or the merged document would exceed the size cap (nothing is written).
+
+See the [Pinned Views guide](../../hitl/pinned-views.md) for how the dashboard uses this store.

@@ -29,3 +29,4 @@ export {
 } from './scope';
 export { verifyPassword } from './auth';
 export { seedAdmin } from './seed-admin';
+export { getPreferences, patchPreferences, PREFERENCES_MAX_BYTES } from './preferences';

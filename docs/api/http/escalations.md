@@ -58,6 +58,7 @@ GET /api/escalations
 | `exists` | array of strings | Keys that must be present — `metadata ? key` |
 | `roles` | array of strings | Restrict to these roles (narrows within scope, never widens) |
 | `available` | `true`/`false` | `true` = unclaimed/expired only; `false` = held now |
+| `jeopardy` | `1`/`true` | Only rows past their role's priority threshold — the exact predicate behind the Pace Board's priority count, so a jeopardy list's total equals the badge. Age from the role's `priority_facet` metadata timestamp (`created_at` when unset) against `priority_threshold_minutes` (`sla_minutes` when unset); undialed roles contribute no rows |
 | `orderBy` | array of `{field, direction?, numeric?}` | Sort by column or `metadata.<key>` |
 
 When any faceted parameter is present the request runs through the scoped faceted query.

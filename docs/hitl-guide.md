@@ -86,6 +86,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Iframe viewport protocol | [iframe.md](hitl/iframe.md) |
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |
 | Role routing, RBAC, scope, chains | [roles.md](hitl/roles.md) |
+| Pinned views, user preferences, role default pins | [pinned-views.md](hitl/pinned-views.md) |
 
 ---
 
@@ -93,14 +94,14 @@ Ordered as a learning path — each file adds one capability to the same form:
 
 | Keyword | Level | Purpose |
 |---------|-------|---------|
-| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist` |
+| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
 | `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` |
 | `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
 | `x-lt-language` | field | Syntax hint for the `code-editor` widget |
 | `accept` | field | File-type filter for `file-upload` (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path in the resolver payload (e.g. `"customer.email"`) |
 | `x-lt-span` | field | Column span in a `two-column` layout (`2` = full width) |
-| `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert |
+| `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form |
 | `x-lt-hide-if-empty` | field | `true` — suppress the field when its value is null, `""`, `false`, or `0` |
 | `x-lt-section` | field | Section group label |
 | `x-lt-minimum` | field | Dynamic lower bound — resolves a `"domain.path"` from the escalation context |
@@ -109,7 +110,9 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-max-length` | field | Dynamic maximum string length — resolves a `"domain.path"` |
 | `x-lt-pattern-error` | field | Human-readable label for a `pattern` validation failure |
 | `x-lt-order` | schema | Field render sequence |
-| `x-lt-layout` | schema | `"two-column"` grid layout (form) or `"active-history"` / `"facet-table"` (list) |
+| `x-lt-layout` | schema | `"two-column"` grid layout (form) or `"active-history"` / `"facet-table"` / `"facet-board"` (list) |
+| `x-lt-group-by` | schema (list) | `facet-board`: the `"domain.path"` identifying each entity |
+| `x-lt-card` | schema (list) | `facet-board`: per-entity card — `{ title, state?, fields? }`; fields accept `format: "age"` |
 | `x-lt-help` | schema | Markdown guidance for the side panel's Help view |
 | `x-lt-context` | schema | Plain-text fallback for the Help view when `x-lt-help` is absent |
 | `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI |

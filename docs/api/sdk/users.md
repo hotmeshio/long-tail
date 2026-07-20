@@ -219,3 +219,42 @@ const result = await lt.users.removeRole({
 **Returns:** `LTApiResult<{ removed: true }>` -- returns 404 if role not found.
 
 **Auth:** Not required
+
+---
+
+## me — the authenticated caller
+
+Self-service operations bound to the client's auth context (no ids, no admin gates).
+
+### me.getPreferences
+
+```typescript
+const result = await lt.me.getPreferences();
+// { status: 200, data: { preferences: { pinnedViews: [...] } } }
+```
+
+**Returns:** `LTApiResult<{ preferences: Record<string, unknown> }>` — `{}` when unset.
+
+### me.patchPreferences
+
+Shallow-merge a patch into the caller's preferences: top-level keys overwrite whole, `null` deletes a key. The merge is one guarded statement; the stored document is size-capped (~32 KB → 413).
+
+```typescript
+const result = await lt.me.patchPreferences({
+  patch: {
+    pinnedViews: [
+      { id: 'pin-x1', label: 'Needs harvesting', url: '/escalations/available?role=fleet-servicer&jeopardy=1', badge: true },
+    ],
+  },
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `patch` | `object` | Yes | Preference keys to merge; a `null` value deletes its key |
+
+**Returns:** `LTApiResult<{ preferences: Record<string, unknown> }>` — the merged document.
+
+**Auth:** Required (the operation targets the caller).

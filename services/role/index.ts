@@ -185,6 +185,7 @@ export async function updateRoleMetadata(
     input.change_summary ?? null,
     provided('upstream_roles'), upstreams,
     provided('list_schema'), input.list_schema != null ? JSON.stringify(input.list_schema) : null,
+    provided('default_pins'), input.default_pins != null ? JSON.stringify(input.default_pins) : null,
   ]);
   if (!rows[0]) return null;
   // The statement's CTEs share one snapshot, so the returned row cannot see

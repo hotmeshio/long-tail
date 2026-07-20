@@ -28,6 +28,8 @@ export interface RoleDetail {
   list_schema: Record<string, unknown> | null;
   /** Version of the live list_schema; advances only on list-schema edits. Null until the role first carries one. */
   current_list_schema_version: number | null;
+  /** Pinned-view seeds for members: [{ label, url, badge? }]. Users promote/hide/reorder via preferences. */
+  default_pins: { label: string; url: string; badge?: boolean }[] | null;
   /**
    * Roles this station draws input from that live in other sequences.
    * parent_role is the single prior step placing the role in one sequence;
@@ -86,6 +88,7 @@ export interface UpdateRoleInput {
   form_schema?: Record<string, unknown> | null;
   metadata_schema?: Record<string, unknown> | null;
   list_schema?: Record<string, unknown> | null;
+  default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, unknown> | null;
   ops_visible?: boolean;
   parent_role?: string | null;

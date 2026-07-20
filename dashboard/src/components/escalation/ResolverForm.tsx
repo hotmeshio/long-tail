@@ -257,13 +257,14 @@ function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isRea
     'aria-describedby': describedBy,
   } as const;
 
-  // Markdown dispatches ahead of the read-only branch: a readOnly markdown
-  // field is a CONTENT BLOCK — the widget renders its source as HTML (the
-  // versioned schema carries the page source), not as static text.
+  // Some widgets dispatch ahead of the read-only branch: a readOnly markdown
+  // field is a CONTENT BLOCK (renders its source as HTML), and a readOnly
+  // attachment/image renders the captured binary — never static text.
   const isMarkdown = widgetName === 'markdown' && typeof value === 'string';
+  const isAttachment = (widgetName === 'attachment' || widgetName === 'image') && typeof value === 'string';
 
   // Read-only fields display as static text
-  if (isReadOnly && !isMarkdown) {
+  if (isReadOnly && !isMarkdown && !isAttachment) {
     const displayValue = value === null ? 'null'
       : typeof value === 'object' ? JSON.stringify(value, null, 2)
       : String(value);

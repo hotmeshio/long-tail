@@ -422,6 +422,22 @@ describe('ResolverForm — resolver.field conditionality', () => {
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
+  it('equality x-lt-showIf reacts live to resolver edits (per-designation sub-surfaces)', () => {
+    const json = formJson({ designatedStation: 'DRAFT', draft_notes: '' }, {
+      'x-lt-order': ['designatedStation', 'draft_notes'],
+      properties: {
+        designatedStation: { type: 'string', enum: ['DRAFT', 'PRINT'] },
+        draft_notes: { type: 'string', 'x-lt-showIf': 'resolver.designatedStation=DRAFT' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} />);
+    // DRAFT selected → the DRAFT-only field is visible
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    // Switch designation → the sub-surface swaps out live
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'PRINT' } });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
   it('chained x-lt-showIf: unchecking mid-chain collapses everything downstream', () => {
     const json = formJson({ needs_review: true, escalate: true, escalation_notes: 'x' }, CHAIN_SCHEMA);
     render(<ResolverForm value={json} onChange={vi.fn()} />);

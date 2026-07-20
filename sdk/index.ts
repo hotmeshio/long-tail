@@ -3,6 +3,7 @@ import * as escalationsApi from '../api/escalations';
 import * as workflowsApi from '../api/workflows';
 import * as yamlWorkflowsApi from '../api/yaml-workflows';
 import * as usersApi from '../api/users';
+import * as meApi from '../api/me';
 import * as rolesApi from '../api/roles';
 import * as authApi from '../api/auth';
 import * as mcpApi from '../api/mcp';
@@ -178,6 +179,16 @@ export function createClient(options: LTClientOptions = {}) {
       getRoles: usersApi.getUserRoles,
       addRole: usersApi.addUserRole,
       removeRole: usersApi.removeUserRole,
+    },
+
+    // ── Me — the authenticated caller (preferences, presentation state) ────
+    me: {
+      getPreferences: (callAuth?: LTApiAuth) => {
+        const resolved = callAuth ?? auth;
+        if (!resolved) return Promise.resolve({ status: 401, error: 'Auth context required' } as LTApiResult);
+        return meApi.getMyPreferences(resolved);
+      },
+      patchPreferences: bindAuth(meApi.patchMyPreferences, auth),
     },
 
     // ── Roles ──────────────────────────────────────────────────────────────

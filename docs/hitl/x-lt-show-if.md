@@ -10,6 +10,17 @@ A field can be shown or hidden based on a value in the escalation context. Apply
 
 The value at `domain.path` is evaluated for truthiness. If truthy, the field shows; if absent, null, false, or an empty string, it is hidden. Prefix `!` to invert — show when the value is absent or falsy.
 
+### Equality forms
+
+Compare the resolved value's string form against a literal:
+
+```json
+"x-lt-showIf": "resolver.designatedStation=DRAFT"
+"x-lt-showIf": "resolver.designatedStation!=DRAFT"
+```
+
+The expected value is the raw remainder after the operator (trimmed; no quoting). Numbers and booleans compare via their string form (`metadata.count=3`, `metadata.live=true`). An absent value compares as the empty string — so `=X` is false and `!=X` is true when the path is missing. `resolver.` conditions react live as the user edits, exactly like the truthy form — this is what drives per-designation sub-surfaces on verdict forms (different fields for send-to-design vs send-to-printing).
+
 ### Domains
 
 | Domain | Resolves against |

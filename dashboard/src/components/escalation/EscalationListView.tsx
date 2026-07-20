@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { interpolateHelp, type HelpTokenContext } from '../../lib/x-lt-help';
 import { ArrowRight } from 'lucide-react';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
@@ -7,6 +7,10 @@ import { DateValue } from '../common/display/DateValue';
 import { StickyPagination } from '../common/data/StickyPagination';
 import { useEscalations } from '../../api/escalations';
 import { isEffectivelyClaimed } from '../../lib/escalation';
+import { formatAgoCompact } from '../../lib/format';
+import { metadataFacetUrl } from '../../lib/facet-url';
+import { getDeep } from '../../lib/x-lt-bind';
+import { typeColor } from '../../lib/type-color';
 import type { LTEscalationRecord } from '../../api/types';
 
 /**
@@ -19,13 +23,15 @@ import type { LTEscalationRecord } from '../../api/types';
  *   active-history  — single live item as a card on the left + history column on right
  *   active          — just the single live item card (no history)
  *   facet-table     — full pending queue as a table, columns from x-lt-columns
+ *   facet-board     — one card per x-lt-group-by facet value (an entity board:
+ *                     machines, stations), rendered from each group's latest row
  */
 
 interface CardDef {
   title?: string;
   subtitle?: string;
   body?: string;
-  fields?: { label: string; value: string }[];
+  fields?: { label: string; value: string; format?: string }[];
 }
 
 interface HistoryDef {
@@ -37,6 +43,15 @@ interface HistoryDef {
 export interface ColumnDef {
   label: string;
   value: string;
+  /** "age" renders an ISO timestamp as a compact age with an absolute tooltip. */
+  format?: string;
+}
+
+interface BoardCardDef {
+  title?: string;
+  /** Status chip — any token (commonly {{escalation.subtype}}). */
+  state?: string;
+  fields?: { label: string; value: string; format?: string }[];
 }
 
 interface ListSchema {
@@ -45,6 +60,29 @@ interface ListSchema {
   'x-lt-active'?: CardDef;
   'x-lt-history'?: HistoryDef;
   'x-lt-columns'?: ColumnDef[];
+  /** facet-board: the "domain.path" whose value identifies each entity. */
+  'x-lt-group-by'?: string;
+  /** facet-board: the per-entity card definition. */
+  'x-lt-card'?: BoardCardDef;
+}
+
+/**
+ * Repaint-only minute tick so `format: "age"` values stay current. Pure
+ * re-render — no network. Mounted once at the view root, only when the
+ * schema actually uses ages.
+ */
+function useAgeTick(enabled: boolean): void {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const t = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(t);
+  }, [enabled]);
+}
+
+function schemaUsesAge(schema: ListSchema): boolean {
+  return [...(schema['x-lt-columns'] ?? []), ...(schema['x-lt-card']?.fields ?? [])]
+    .some((f) => f.format === 'age');
 }
 
 /** Build the token context for one escalation row (payloads are JSON strings). */
@@ -71,12 +109,20 @@ const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const EM_DASH = '—';
 
 /**
- * Render an interpolated field value with a little care: a full ISO datetime
- * becomes a friendly, hoverable date; an empty value a quiet em dash; anything
- * else plain text. Authors bind tokens; we make the common shapes look right.
+ * Render an interpolated field value with a little care: `format: "age"` turns
+ * a timestamp into a compact age ("12m", "3h") with the absolute time as its
+ * tooltip; a full ISO datetime becomes a friendly, hoverable date; an empty
+ * value a quiet em dash; anything else plain text. Authors bind tokens; we
+ * make the common shapes look right.
  */
-function FieldValue({ raw }: { raw: string }) {
+function FieldValue({ raw, format }: { raw: string; format?: string }) {
   if (!raw || raw === EM_DASH) return <span className="text-text-quaternary">{EM_DASH}</span>;
+  if (format === 'age') {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      return <span title={d.toLocaleString()} className="tabular-nums whitespace-nowrap">{formatAgoCompact(raw)}</span>;
+    }
+  }
   if (ISO_DATETIME.test(raw)) return <DateValue date={raw} format="datetime" className="text-text-primary" />;
   return <>{raw}</>;
 }
@@ -260,7 +306,7 @@ function FacetTable({ schema, rows, onRowClick }: {
                     key={i}
                     className="py-2.5 pr-8 text-text-secondary group-hover:text-text-primary transition-colors"
                   >
-                    <FieldValue raw={interpolateHelp(col.value, ctx)} />
+                    <FieldValue raw={interpolateHelp(col.value, ctx)} format={col.format} />
                   </td>
                 ))}
               </tr>
@@ -278,11 +324,133 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
+// ── facet-board — one card per entity (machine, station) ─────────────────────
+
+interface BoardGroup {
+  key: string;
+  /** The group's identity as stored (native type preserved for the facet URL). */
+  rawValue: unknown;
+  latest: LTEscalationRecord;
+  count: number;
+}
+
+/**
+ * Group rows by the resolved x-lt-group-by value; each card renders from the
+ * group's most recent row (by created_at). Rows without the facet are skipped —
+ * the board reflects the scope, it doesn't invent entities.
+ */
+export function groupBoardRows(rows: LTEscalationRecord[], groupBy: string): BoardGroup[] {
+  const dot = groupBy.indexOf('.');
+  const facetKey = groupBy.startsWith('metadata.') ? groupBy.slice('metadata.'.length) : null;
+  const groups = new Map<string, BoardGroup>();
+  for (const row of rows) {
+    const ctx = rowContext(row);
+    let v: unknown;
+    try {
+      v = dot === -1
+        ? (ctx as unknown as Record<string, unknown>)[groupBy]
+        : getDeep((ctx as unknown as Record<string, unknown>)[groupBy.slice(0, dot)], groupBy.slice(dot + 1));
+    } catch {
+      v = undefined;
+    }
+    if (v === undefined || v === null || v === '') continue;
+    const key = String(v);
+    const rawValue = facetKey ? (row.metadata?.[facetKey] ?? v) : v;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { key, rawValue, latest: row, count: 1 });
+    } else {
+      existing.count += 1;
+      if (new Date(row.created_at) > new Date(existing.latest.created_at)) existing.latest = row;
+    }
+  }
+  return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
+function FacetBoard({ schema, rows, role, onOpenGroup }: {
+  schema: ListSchema;
+  rows: LTEscalationRecord[];
+  role: string;
+  onOpenGroup?: (url: string) => void;
+}) {
+  const groupBy = schema['x-lt-group-by'];
+  const card = schema['x-lt-card'] ?? {};
+
+  if (!groupBy) {
+    return <p className="text-xs text-text-tertiary italic">facet-board needs an x-lt-group-by path.</p>;
+  }
+  const facetKey = groupBy.startsWith('metadata.') ? groupBy.slice('metadata.'.length) : null;
+  const groups = groupBoardRows(rows, groupBy);
+  if (groups.length === 0) {
+    return <p className="text-xs text-text-tertiary italic">No entities in scope.</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4" data-testid="facet-board">
+      {groups.map((g) => {
+        const ctx = rowContext(g.latest);
+        const title = card.title ? interpolateHelp(card.title, ctx) : g.key;
+        const state = card.state ? interpolateHelp(card.state, ctx) : (g.latest.subtype || g.latest.status);
+        const stateHue = typeColor(state);
+        // The group's history: the table view filtered to this facet value.
+        const href = facetKey && onOpenGroup
+          ? `${metadataFacetUrl(facetKey, g.rawValue, role)}&view=table`
+          : null;
+        return (
+          <div
+            key={g.key}
+            role={href ? 'button' : undefined}
+            tabIndex={href ? 0 : undefined}
+            onClick={href ? () => onOpenGroup!(href) : undefined}
+            onKeyDown={href ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenGroup!(href); }
+            } : undefined}
+            className={`border-l-2 border-accent/30 bg-surface-sunken/40 rounded-[0.125em] px-4 py-3.5 ${
+              href ? 'cursor-pointer transition-colors hover:bg-surface-sunken/70 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/40' : ''
+            }`}
+            data-testid="facet-board-card"
+          >
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary truncate">
+                {title}
+              </span>
+              <span
+                className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium"
+                style={{ color: stateHue.text, backgroundColor: stateHue.bg }}
+                title={state}
+              >
+                {state}
+              </span>
+            </div>
+            {card.fields && card.fields.length > 0 && (
+              <dl className="space-y-1">
+                {card.fields.map((f, i) => (
+                  <div key={i} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[9px] uppercase tracking-wider text-text-quaternary shrink-0">{f.label}</dt>
+                    <dd className="text-[11px] text-text-primary truncate">
+                      <FieldValue raw={interpolateHelp(f.value, ctx)} format={f.format} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {g.count > 1 && (
+              <p className="mt-2 text-[9px] text-text-quaternary tabular-nums">{g.count} rows in scope</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, onOpenGroup, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
   role: string;
   listSchema: ListSchema;
   activeEscalations: LTEscalationRecord[];
   onRowClick?: (row: LTEscalationRecord) => void;
+  /** facet-board card click — receives the group's history deep link. */
+  onOpenGroup?: (url: string) => void;
   total?: number;
   page?: number;
   totalPages?: number;
@@ -294,6 +462,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   const card = listSchema['x-lt-active'] ?? {};
   const active = activeEscalations[0];
   const help = listSchema['x-lt-help'];
+  useAgeTick(schemaUsesAge(listSchema));
 
   const activeBlock = active ? (
     <ActiveCard esc={active} card={card} onOpen={() => onRowClick?.(active)} />
@@ -324,6 +493,25 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
             totalPages={totalPages}
             onPageChange={onPageChange}
             total={resolvedTotal}
+            pageSize={pageSize ?? 25}
+            onPageSizeChange={onPageSizeChange}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (layout === 'facet-board') {
+    return (
+      <div>
+        {header}
+        <FacetBoard schema={listSchema} rows={activeEscalations} role={role} onOpenGroup={onOpenGroup} />
+        {page !== undefined && totalPages !== undefined && onPageChange && totalPages > 1 && (
+          <StickyPagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+            total={total ?? activeEscalations.length}
             pageSize={pageSize ?? 25}
             onPageSizeChange={onPageSizeChange}
           />
