@@ -595,12 +595,16 @@ export async function claimByMetadata(
 
 export interface ResolveByMetadataResult {
   /**
-   * 'resolved'        = done atomically in SQL (no signal backing).
-   * 'signal_required' = signal backing present, caller must deliver the signal.
-   * 'conflict'        = signal_id row already claimed by a concurrent caller; skip re-signal.
-   * 'not_found'       = no pending escalation matched the metadata filter.
+   * 'resolved'            = done atomically in SQL (no signal backing).
+   * 'signal_required'     = signal backing present, caller must deliver the signal.
+   * 'conflict'            = signal_id row already claimed by a concurrent caller; skip re-signal.
+   * 'not_found'           = no pending escalation matched the metadata filter.
+   * 'validation_required' = the target's role enforces its schema; NOTHING was
+   *                         written. The caller validates the payload against
+   *                         `row`, then re-invokes with assertId = row.id (and
+   *                         no enforcing set) to claim + resolve.
    */
-  outcome: 'resolved' | 'signal_required' | 'conflict' | 'not_found';
+  outcome: 'resolved' | 'signal_required' | 'conflict' | 'not_found' | 'validation_required';
   /** The resolved escalation (when outcome = 'resolved') */
   escalation?: LTEscalationRecord;
   /** Legacy conditionLT signal info (when signalId is set, caller uses handle.signal) */
@@ -611,6 +615,14 @@ export interface ResolveByMetadataResult {
   workflowId?: string;
   workflowType?: string;
   taskQueue?: string;
+  /** The unmodified target row fields the schema gate validates against (when outcome = 'validation_required') */
+  row?: {
+    id: string;
+    role: string | null;
+    metadata: Record<string, any> | null;
+    envelope: string | null;
+    escalation_payload: string | null;
+  };
 }
 
 /**
@@ -631,6 +643,8 @@ export async function resolveByMetadataAtomic(
   metadata?: Record<string, any>,
   writeAllRoles?: string[] | null,
   writeSelfRoles?: string[] | null,
+  enforcingRoles?: string[] | null,
+  assertId?: string | null,
 ): Promise<ResolveByMetadataResult> {
   await ensureEscalationCompatView();
   const pool = getPool();
@@ -643,12 +657,29 @@ export async function resolveByMetadataAtomic(
   const selfRoles = writeSelfRoles ?? null;
   const { rows } = await pool.query(
     RESOLVE_BY_METADATA_ATOMIC,
-    [filter, userId, payloadJson, metaPatch, allRoles, selfRoles],
+    [filter, userId, payloadJson, metaPatch, allRoles, selfRoles,
+      enforcingRoles?.length ? enforcingRoles : null, assertId ?? null],
   );
 
   if (rows.length === 0) return { outcome: 'not_found' };
 
   const row = rows[0];
+
+  // Enforcing-role target — nothing written; hand the row's validation surface
+  // back so the API layer can run the schema gate and re-invoke with assertId.
+  if (row.outcome === 'validation_required') {
+    return {
+      outcome: 'validation_required',
+      escalationId: row.target_id,
+      row: {
+        id: row.target_id,
+        role: row.target_role ?? null,
+        metadata: row.target_metadata ?? null,
+        envelope: row.target_envelope ?? null,
+        escalation_payload: row.target_escalation_payload ?? null,
+      },
+    };
+  }
 
   if (row.outcome === 'resolved') {
     const escalation = toEscalationRecord(row);

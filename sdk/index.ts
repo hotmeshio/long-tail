@@ -377,3 +377,23 @@ export function createClient(options: LTClientOptions = {}) {
 
 /** The return type of createClient(). */
 export type LTClient = ReturnType<typeof createClient>;
+
+// ── Canonical error shapes ──────────────────────────────────────────────
+// A 422 from any resolve surface carries the full LTValidationErrorBody in
+// `result.data` with `result.code === LT_ERROR_CODES.SCHEMA_VALIDATION`.
+// `isValidationErrorBody(result.data)` narrows it for typed handling.
+export {
+  LT_ERROR_CODES,
+  isValidationErrorBody,
+} from '../types/validation';
+export type {
+  LTErrorCode,
+  LTFieldViolation,
+  LTValidationErrorBody,
+} from '../types/validation';
+export type { LTApiAuth, LTApiResult } from '../types/sdk';
+
+// ── Typed resolution parsing ────────────────────────────────────────────
+// Workflow/activity code declares its payload shape as a zod schema and
+// parses resolutions through it — typed values with runtime assurance.
+export { parseResolverPayload, ResolverPayloadTypeError } from '../lib/typed-resolution';

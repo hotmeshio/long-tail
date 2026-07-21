@@ -6,9 +6,16 @@
  * workflow owns as `IntakeResolverV1`. So this activity reads `customer.name` /
  * `contract.tier`, never `customer_name` / `tier` — the form can be re-laid-out
  * without changing this consumer.
+ *
+ * `parseResolverPayload` runs the declared zod schema over the resolution at
+ * the activity boundary: business logic below works with a checked, typed
+ * value, and a non-conforming payload fails loud with a per-field violation
+ * list rather than propagating partial data.
  */
 
-import type { IntakeResolverV1 } from './forms';
+import { parseResolverPayload } from '../../../lib/typed-resolution';
+
+import { IntakeResolverV1Schema, type IntakeResolverV1 } from './forms';
 
 export async function processIntake(input: IntakeResolverV1): Promise<{
   received: boolean;
@@ -18,14 +25,13 @@ export async function processIntake(input: IntakeResolverV1): Promise<{
   approved: boolean;
   processedAt: string;
 }> {
-  const customer = input.customer ?? {};
-  const contract = input.contract ?? {};
+  const intake = parseResolverPayload(IntakeResolverV1Schema, input);
   return {
     received: true,
-    customerName: customer.name ?? '',
-    contactEmail: customer.email ?? '',
-    tier: contract.tier ?? '',
-    approved: contract.approved ?? false,
+    customerName: intake.customer.name,
+    contactEmail: intake.customer.email,
+    tier: intake.contract.tier,
+    approved: intake.contract.approved,
     processedAt: new Date().toISOString(),
   };
 }

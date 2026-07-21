@@ -195,6 +195,8 @@ export async function updateRole(input: {
   priority_threshold_minutes?: number | null;
   /** Escalation metadata key holding the age origin (ISO 8601 UTC timestamp). Falls back to created_at. */
   priority_facet?: string | null;
+  /** Turn server-side resolver schema validation on/off for this role. */
+  enforce_schema?: boolean;
   /** Replace the upstream-input set (omitted = preserve; null or [] = clear). */
   upstream_roles?: string[] | null;
   /** Recorded on the schema snapshot when this update changes a schema field. */
@@ -218,6 +220,9 @@ export async function updateRole(input: {
     }
     if (input.ops_visible !== undefined && typeof input.ops_visible !== 'boolean') {
       return { status: 400, error: 'ops_visible must be a boolean' };
+    }
+    if (input.enforce_schema !== undefined && typeof input.enforce_schema !== 'boolean') {
+      return { status: 400, error: 'enforce_schema must be a boolean' };
     }
     if (input.parent_role != null && input.parent_role === input.role) {
       return { status: 400, error: 'parent_role must reference a different role' };
@@ -261,6 +266,7 @@ export async function updateRole(input: {
       worker_count: input.worker_count,
       priority_threshold_minutes: input.priority_threshold_minutes,
       priority_facet: input.priority_facet,
+      enforce_schema: input.enforce_schema,
       upstream_roles: input.upstream_roles,
       change_summary: input.change_summary,
     });

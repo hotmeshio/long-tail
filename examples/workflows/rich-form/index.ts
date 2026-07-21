@@ -58,7 +58,7 @@ export async function richForm(envelope: LTEnvelope): Promise<any> {
     type: 'intake',
     subtype: 'rich-form',
     priority: 2,
-    description: 'Complete the customer intake form. Review all fields carefully before submitting.',
+    description: 'Customer Intake Form',
     workflowType: 'richForm',
     envelope: { source: 'rich-form', formDefaults },
     schemaVersion: INTAKE_SCHEMA_VERSION,

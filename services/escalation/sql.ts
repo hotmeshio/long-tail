@@ -119,12 +119,22 @@ export function searchEscalationsQuery(orderBy: string): string {
  *
  * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
  * $4 = metadata patch (jsonb, nullable), $5 = write_all roles (text[], null = global /
- * no filter), $6 = write_self roles (text[], nullable).
+ * no filter), $6 = write_self roles (text[], nullable), $7 = enforcing roles
+ * (text[], null = none), $8 = assert id (uuid, nullable).
  *
  * Write-scope is folded into the same FOR UPDATE statement (no TOCTOU): the row
  * is resolvable if the caller has global access ($5 NULL), or the row's role is in
  * their write_all set, or the row's role is in their write_self set AND it is
  * already assigned to them ($2). assigned_to is indexed, so the self-branch scales.
+ *
+ * Schema enforcement rides as a fifth outcome: when the target's role is in $7,
+ * NOTHING is written — the statement returns 'validation_required' with the
+ * row's role/metadata/envelope so the API layer can validate the payload, then
+ * re-invoke with $8 = the validated row's id and $7 = NULL. The asserted second
+ * pass claims + resolves exactly as a first pass would (state re-asserted:
+ * status must still be pending and the id must still match, so a concurrent
+ * resolution surfaces as zero rows → the caller's conflict handling). This is
+ * the same pick-then-guarded-finish shape the signal outcomes already use.
  */
 export const RESOLVE_BY_METADATA_ATOMIC = `\
 WITH target AS MATERIALIZED (
@@ -137,6 +147,7 @@ WITH target AS MATERIALIZED (
       OR role = ANY($5)
       OR (role = ANY($6::text[]) AND assigned_to = $2)
     )
+    AND ($8::uuid IS NULL OR id = $8::uuid)
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE
@@ -158,6 +169,7 @@ claimed AS (
   FROM target
   WHERE e.id = target.id
     AND target.signal_key IS NULL
+    AND ($7::text[] IS NULL OR NOT (target.role = ANY($7)))
   RETURNING e.*
 ),
 resolved AS (
@@ -174,6 +186,10 @@ resolved AS (
 SELECT
   resolved.*,
   target.id AS target_id,
+  target.role AS target_role,
+  target.metadata AS target_metadata,
+  target.envelope AS target_envelope,
+  target.escalation_payload AS target_escalation_payload,
   target.metadata->>'signal_id' AS signal_id,
   target.signal_key AS signal_key,
   target.workflow_id AS target_workflow_id,
@@ -182,7 +198,11 @@ SELECT
   (target.assigned_to IS NOT NULL
     AND target.assigned_until IS NOT NULL
     AND target.assigned_until > NOW()) AS signal_already_claimed,
-  CASE WHEN resolved.id IS NOT NULL THEN 'resolved' ELSE 'signal_required' END AS outcome
+  CASE
+    WHEN resolved.id IS NOT NULL THEN 'resolved'
+    WHEN $7::text[] IS NOT NULL AND target.role = ANY($7) THEN 'validation_required'
+    ELSE 'signal_required'
+  END AS outcome
 FROM target
 LEFT JOIN resolved ON resolved.id = target.id`;
 

@@ -85,6 +85,10 @@ export const DELETE_ROLE = `
  *
  * default_pins ($31 = provided sentinel, $32 = value) is unversioned config:
  * the pinned-view seeds a role hands its members.
+ *
+ * enforce_schema ($33 = provided sentinel, $34 = value) is unversioned config:
+ * the server-side resolver-validation opt-in. The service layer invalidates
+ * the enforcement cache after this statement commits.
  */
 export const UPDATE_ROLE_METADATA = `
   WITH updated AS (
@@ -104,6 +108,7 @@ export const UPDATE_ROLE_METADATA = `
       priority_facet  = CASE WHEN $24::boolean THEN $25                               ELSE priority_facet  END,
       list_schema     = CASE WHEN $29::boolean THEN $30::jsonb                        ELSE list_schema     END,
       default_pins    = CASE WHEN $31::boolean THEN $32::jsonb                        ELSE default_pins    END,
+      enforce_schema  = CASE WHEN $33::boolean THEN COALESCE($34::boolean, false)     ELSE enforce_schema  END,
       current_schema_version = CASE
         WHEN ($6::boolean AND $7::jsonb IS DISTINCT FROM form_schema)
           OR ($8::boolean AND $9::jsonb IS DISTINCT FROM metadata_schema)
@@ -119,7 +124,7 @@ export const UPDATE_ROLE_METADATA = `
       ops_visible, parent_role, sla_minutes, target_per_hour, worker_count,
       priority_threshold_minutes, priority_facet,
       current_schema_version, list_schema, current_list_schema_version,
-      default_pins
+      default_pins, enforce_schema
   ), snapshot AS (
     INSERT INTO lt_role_schemas (role, version, form_schema, metadata_schema, change_summary)
     SELECT role, current_schema_version, form_schema, metadata_schema, $26
@@ -145,6 +150,14 @@ export const UPDATE_ROLE_METADATA = `
 
 export const GET_ROLE_FORM_SCHEMA = `
   SELECT form_schema FROM lt_roles WHERE role = $1`;
+
+/**
+ * The set of roles with server-side resolver validation turned on. Small and
+ * slow-changing — the enforcement cache holds it under a short TTL so the
+ * resolve hot path costs zero SQL when no role (or no involved role) enforces.
+ */
+export const LIST_ENFORCING_ROLES = `
+  SELECT role FROM lt_roles WHERE enforce_schema`;
 
 export const GET_ROLE_METADATA_SCHEMA = `
   SELECT metadata_schema FROM lt_roles WHERE role = $1`;
@@ -267,6 +280,7 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.list_schema,
     r.current_list_schema_version,
     r.default_pins,
+    r.enforce_schema,
     COALESCE(up.ups, '{}') AS upstream_roles,
     COALESCE(uc.cnt, 0) AS user_count,
     COALESCE(cc.cnt, 0) AS chain_count,

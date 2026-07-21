@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies — fast, no Postgres.
+// Schema enforcement gate: exercised in tests/api/resolve-schema-enforcement.test.ts.
+// Here the enforcing set is empty, so the gate is a no-op with zero reads.
+vi.mock('../../services/role/enforcement-cache', () => ({
+  getEnforcingRoles: vi.fn(async () => new Set<string>()),
+  getEnforcedFormSchema: vi.fn(async () => null),
+}));
+
 vi.mock('../../services/escalation');
 vi.mock('../../services/user');
 vi.mock('../../services/task');

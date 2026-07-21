@@ -205,7 +205,21 @@ Resolving an escalation starts a new workflow execution with the resolver's payl
 | `resolverPayload` | `object` | yes | The reviewer's decision — injected into `envelope.resolver` |
 | `metadata` | `object` | no | Outcome facets merged into the escalation's GIN-indexed metadata. Records *what happened* (disposition, timing) next to *what was asked*; `@>`-queryable. Distinct from `resolverPayload`, which resumes the workflow and is not indexed |
 
-The `resolverPayload` is stored exactly as submitted — the resolver payload is the payload. There is no server-side validation and no server-side mapping of its shape. The client forms the final payload: the React dashboard maps the flat form to the nested payload via each field's `x-lt-bind` before submitting.
+The `resolverPayload` is stored exactly as submitted — the resolver payload is the payload, with no server-side mapping of its shape. The client forms the final payload: the React dashboard maps the flat form to the nested payload via each field's `x-lt-bind` before submitting.
+
+**Schema enforcement (roles with `enforce_schema`):** every resolve surface validates the submitted `resolverPayload` against the escalation's resolved form schema (`metadata.form_schema` override, else the pinned `lt_role_schemas` snapshot, else the role's latest) and rejects violations with **422** before any state changes. The body is the canonical validation shape, identical across HTTP, SDK, MCP, and CLI — see [Schema Enforcement](../../schema-enforcement.md):
+
+```json
+{
+  "error": "resolverPayload failed schema validation (1 violation)",
+  "code": "schema_validation",
+  "violations": [{ "field": "contact_email", "message": "Enter a valid email address" }],
+  "role": "intake-reviewer",
+  "schemaVersion": 3
+}
+```
+
+Bulk surfaces (`resolve-by-ids`, `resolve-all-or-none`) tag each violation with its `escalationId`, and one failing item blocks the batch before anything resolves.
 
 **Example request:**
 

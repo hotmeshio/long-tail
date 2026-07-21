@@ -14,6 +14,8 @@ export interface RoleDetail {
   metadata_schema: Record<string, unknown> | null;
   properties: Record<string, unknown>;
   ops_visible: boolean;
+  /** Server-side resolver schema validation: every resolve surface rejects payloads violating the form schema. */
+  enforce_schema: boolean;
   parent_role: string | null;
   sla_minutes: number | null;
   target_per_hour: number | null;
@@ -91,6 +93,8 @@ export interface UpdateRoleInput {
   default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, unknown> | null;
   ops_visible?: boolean;
+  /** Turn server-side resolver schema validation on/off for this role. */
+  enforce_schema?: boolean;
   parent_role?: string | null;
   sla_minutes?: number | null;
   target_per_hour?: number | null;

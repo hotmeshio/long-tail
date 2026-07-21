@@ -1,9 +1,14 @@
 import { resolveAuth } from './auth';
+import { isValidationErrorBody, type LTFieldViolation } from '../../types/validation';
 
 export class CLIError extends Error {
-  constructor(message: string, public status?: number) {
+  /** Field-level violations from a schema_validation 422, when present. */
+  public violations?: LTFieldViolation[];
+
+  constructor(message: string, public status?: number, violations?: LTFieldViolation[]) {
     super(message);
     this.name = 'CLIError';
+    this.violations = violations;
   }
 }
 
@@ -27,7 +32,11 @@ export async function apiFetch<T = any>(
   const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
   if (!res.ok) {
-    throw new CLIError(body.error || `HTTP ${res.status}`, res.status);
+    throw new CLIError(
+      body.error || `HTTP ${res.status}`,
+      res.status,
+      isValidationErrorBody(body) ? body.violations : undefined,
+    );
   }
 
   return body as T;

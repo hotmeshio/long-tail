@@ -3,6 +3,23 @@ import { LT_BASE } from '../lib/base-path';
 
 const BASE_URL = `${LT_BASE}/api`;
 
+/**
+ * A non-2xx API response. `body` is the parsed JSON error body — for 422
+ * schema-validation rejections it is the canonical LTValidationErrorBody
+ * (error, code, violations, role, schemaVersion), which the escalation detail
+ * page maps into the same errors panel the pre-submission pass feeds.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public body: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 let authToken: string | null = null;
 
 export function setToken(token: string | null) {
@@ -106,7 +123,7 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.message || body.error || res.statusText);
+    throw new ApiError(body.message || body.error || res.statusText, res.status, body);
   }
 
   return res.json();

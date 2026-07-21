@@ -231,6 +231,7 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](https
 | [Compiler](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
 | [CLI](https://github.com/hotmeshio/long-tail/blob/main/docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
 | [Escalation Strategies](https://github.com/hotmeshio/long-tail/blob/main/docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
+| [Schema Enforcement](https://github.com/hotmeshio/long-tail/blob/main/docs/schema-enforcement.md) | form_schema as an enforced API contract on every resolve surface |
 | [Faceted Routing](https://github.com/hotmeshio/long-tail/blob/main/docs/faceted-routing.md) | Query and atomically claim the queue by facets; dispatcher pattern |
 | [SDK](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
 | [Architecture](https://github.com/hotmeshio/long-tail/blob/main/docs/architecture.md) | Project structure, conventions, discovery |

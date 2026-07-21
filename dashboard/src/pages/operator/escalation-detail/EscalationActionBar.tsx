@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { mapFormToPayload } from '../../../lib/x-lt-bind';
-import { evaluateShowIf, type ShowIfContext } from '../../../lib/x-lt-show-if';
-import { validateField, type FieldError } from '../../../lib/field-validator';
+import { type ShowIfContext } from '../../../lib/x-lt-show-if';
+import { validateResolverForm, type FieldError } from '../../../lib/field-validator';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
@@ -118,24 +118,14 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
       return;
     }
 
-    // Validate all fields against the embedded _form_schema.
-    // Hidden fields (x-lt-showIf evaluates falsy against the live context) are
-    // excluded — a field the user cannot see must never block submission.
+    // Validate all fields against the embedded _form_schema — the same shared
+    // pass the API layer runs on enforced roles, so the panel and a server 422
+    // report the identical list. Hidden fields (x-lt-showIf evaluates falsy
+    // against the live context) are excluded — a field the user cannot see
+    // must never block submission.
     const schema = payload._form_schema as Record<string, unknown> | undefined;
     if (schema) {
-      const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
-      const required = new Set((schema.required as string[] | undefined) ?? []);
-      const liveCtx: ShowIfContext = {
-        ...(escalationContext ?? {}),
-        resolver: payload as Record<string, unknown>,
-      };
-
-      const fieldErrors: FieldError[] = [];
-      for (const [field, fieldSchema] of Object.entries(properties)) {
-        if (!evaluateShowIf(fieldSchema['x-lt-showIf'], liveCtx)) continue;
-        const err = validateField(payload[field], fieldSchema, required.has(field), true, liveCtx as Record<string, unknown>);
-        if (err) fieldErrors.push({ field, message: err });
-      }
+      const fieldErrors: FieldError[] = validateResolverForm(schema, payload, escalationContext);
 
       if (fieldErrors.length > 0) {
         onSubmitAttempt?.();

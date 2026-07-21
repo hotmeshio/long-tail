@@ -10,6 +10,8 @@ import {
   useEscalateToRole,
   useCancelEscalation,
 } from '../../../api/escalations';
+import { ApiError } from '../../../api/client';
+import { isValidationErrorBody } from '../../../lib/validation';
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
 import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
@@ -25,8 +27,7 @@ import { EscalationSidePanel, ESCALATION_PANEL_VIEWS } from '../../../components
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
 import type { FieldError } from '../../../lib/field-validator';
-import { validateField } from '../../../lib/field-validator';
-import { evaluateShowIf } from '../../../lib/x-lt-show-if';
+import { validateResolverForm } from '../../../lib/field-validator';
 import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc, buildShowIfContext } from './EscalationDetailSections';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ClaimExpiryModal } from './ClaimExpiryModal';
@@ -112,16 +113,7 @@ export function EscalationDetailPage() {
       const payload = JSON.parse(json) as Record<string, unknown>;
       const schema = payload._form_schema as Record<string, unknown> | undefined;
       if (!schema) { setFormErrors([]); return; }
-      const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
-      const required = new Set((schema.required as string[] | undefined) ?? []);
-      const ctx = { ...buildShowIfContext(esc), resolver: payload };
-      const errors: FieldError[] = [];
-      for (const [field, fieldSchema] of Object.entries(properties)) {
-        if (!evaluateShowIf(fieldSchema['x-lt-showIf'], ctx)) continue;
-        const err = validateField(payload[field], fieldSchema, required.has(field), true, ctx as Record<string, unknown>);
-        if (err) errors.push({ field, message: err });
-      }
-      setFormErrors(errors);
+      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc)));
     } catch { /* leave errors unchanged on parse failure */ }
   }, [json, submitAttempted, esc]);
   // Schema resolution, most specific first:
@@ -249,7 +241,20 @@ export function EscalationDetailPage() {
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
-    await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
+    try {
+      await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
+    } catch (err) {
+      // Server-side schema enforcement (enforce_schema roles) — the 422 body
+      // carries the same field-error list the pre-submission pass produces;
+      // route it into the same errors panel.
+      if (err instanceof ApiError && isValidationErrorBody(err.body)) {
+        setSubmitAttempted(true);
+        setFormErrors(err.body.violations);
+        setPanelActiveView(ESCALATION_PANEL_VIEWS.ERRORS);
+        return;
+      }
+      throw err;
+    }
     clearDraft(esc.id);
     goBack();
   };

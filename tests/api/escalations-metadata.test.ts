@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock dependencies. Keep the pure scope helpers (effectiveScope etc.) real;
 // only stub the DB-touching user functions the scope partition + assignee
 // resolution depend on.
+// Schema enforcement gate: exercised in tests/api/resolve-schema-enforcement.test.ts.
+// Here the enforcing set is empty, so the gate is a no-op with zero reads.
+vi.mock('../../services/role/enforcement-cache', () => ({
+  getEnforcingRoles: vi.fn(async () => new Set<string>()),
+  getEnforcedFormSchema: vi.fn(async () => null),
+}));
+
 vi.mock('../../services/escalation');
 vi.mock('../../services/user', async (importActual) => {
   const actual = await importActual<typeof import('../../services/user')>();
@@ -359,10 +366,11 @@ describe('resolveByMetadata', () => {
       metadata: { completedBy: 'jimbo' },
     }, SYSTEM_AUTH);
 
-    // Global caller → both write-scope filters null (no role filter).
+    // Global caller → both write-scope filters null (no role filter); the
+    // trailing null is the enforcing-role set (empty here → single-call path).
     expect(mockResolveByMetadataAtomic).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid',
-      { approved: true }, { completedBy: 'jimbo' }, null, null,
+      { approved: true }, { completedBy: 'jimbo' }, null, null, null,
     );
   });
 });
