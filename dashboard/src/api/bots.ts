@@ -9,6 +9,8 @@ interface BotListResponse {
 }
 
 interface BotFilters {
+  status?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -17,6 +19,8 @@ interface BotFilters {
 
 export function useBots(filters: BotFilters = {}) {
   const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.search) params.set('search', filters.search);
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.offset !== undefined) params.set('offset', String(filters.offset));
 

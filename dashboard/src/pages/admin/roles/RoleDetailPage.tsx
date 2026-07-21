@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList, Pin as PinIcon,
+  Tag, Inbox, GitBranch, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList, Pin as PinIcon,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -466,7 +466,7 @@ export function RoleDetailPage() {
   if (!role) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Tag className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
+        <Inbox className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
         <h2 className="text-lg font-medium text-text-primary mb-2">Role not found</h2>
       </div>
     );
@@ -496,7 +496,7 @@ export function RoleDetailPage() {
         <div className="flex items-center justify-between gap-4 min-w-0">
           <div className="min-w-0">
             <div className="flex items-center gap-3 mb-1">
-              <Tag className="w-5 h-5 text-accent" strokeWidth={1.5} />
+              <Inbox className="w-5 h-5 text-accent" strokeWidth={1.5} />
               <h1 className="text-lg font-mono font-medium text-text-primary">{role.role}</h1>
               <button
                 onClick={() => { window.location.hash = '#docs:dashboard.md:role-detail'; }}

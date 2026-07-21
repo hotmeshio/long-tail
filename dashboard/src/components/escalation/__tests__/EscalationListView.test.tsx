@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -234,7 +234,6 @@ describe('EscalationListView — facet-board', () => {
     expect(screen.getByText('finished')).toBeInTheDocument();
     expect(screen.queryByText('idle')).not.toBeInTheDocument();
     expect(screen.getByText('PO-5')).toBeInTheDocument();
-    expect(screen.getByText('2 rows in scope')).toBeInTheDocument();
   });
 
   it('rows missing the group-by facet are skipped — the board never invents entities', () => {
@@ -268,24 +267,90 @@ describe('EscalationListView — facet-board', () => {
     }
   });
 
-  it('card click opens the group history — table view filtered to the facet value', () => {
+  it('card click opens the group\'s LATEST row in the detail view', () => {
+    const onRowClick = vi.fn();
     const onOpenGroup = vi.fn();
+    const rows = [
+      machineRow({ id: 'a1', created_at: '2026-07-13T00:00:00.000Z' }),
+      machineRow({ id: 'a2', created_at: '2026-07-15T00:00:00.000Z' }),
+    ];
+    render(
+      <EscalationListView
+        role="fleet"
+        listSchema={BOARD_SCHEMA}
+        activeEscalations={rows}
+        onRowClick={onRowClick}
+        onOpenGroup={onOpenGroup}
+      />,
+      { wrapper: wrapper() },
+    );
+    fireEvent.click(screen.getByTestId('facet-board-card'));
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowClick.mock.calls[0][0].id).toBe('a2');
+    expect(onOpenGroup).not.toHaveBeenCalled();
+  });
+
+  it('shift+click adds the entity facet to the live filter set (additive)', () => {
+    const onRowClick = vi.fn();
+    const onAddFacet = vi.fn();
+    render(
+      <EscalationListView
+        role="fleet"
+        listSchema={BOARD_SCHEMA}
+        activeEscalations={[machineRow({ id: 'a1' })]}
+        onRowClick={onRowClick}
+        onAddFacet={onAddFacet}
+      />,
+      { wrapper: wrapper() },
+    );
+    fireEvent.click(screen.getByTestId('facet-board-card'), { shiftKey: true });
+    expect(onAddFacet).toHaveBeenCalledWith('fleetMachine', 'M-01');
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('metadata-bound fields carry the filter/search pair; ⇧ click is additive', () => {
+    const onOpenGroup = vi.fn();
+    const onAddFacet = vi.fn();
     render(
       <EscalationListView
         role="fleet"
         listSchema={BOARD_SCHEMA}
         activeEscalations={[machineRow({ id: 'a1' })]}
         onOpenGroup={onOpenGroup}
+        onAddFacet={onAddFacet}
       />,
       { wrapper: wrapper() },
     );
-    screen.getByTestId('facet-board-card').click();
-    expect(onOpenGroup).toHaveBeenCalledTimes(1);
-    const url = onOpenGroup.mock.calls[0][0] as string;
-    expect(url).toContain('/escalations/available');
-    expect(url).toContain('role=fleet');
-    expect(url).toContain('view=table');
-    expect(decodeURIComponent(url)).toContain('"fleetMachine":"M-01"');
+    // Only PO is a pure {{metadata.*}} binding — the age field is not linkable.
+    const fieldFilters = screen.getAllByTestId('facet-field-filter');
+    expect(fieldFilters).toHaveLength(1);
+
+    // Filter — scoped to the current role (same URL the table's metadata cell builds).
+    fireEvent.click(fieldFilters[0]);
+    const filterUrl = decodeURIComponent(onOpenGroup.mock.calls[0][0] as string);
+    expect(filterUrl).toContain('role=fleet');
+    expect(filterUrl).toContain('"po":"PO-9"');
+
+    // Search — across ALL roles (no role in the URL).
+    fireEvent.click(screen.getAllByTestId('facet-field-search')[0]);
+    const searchUrl = decodeURIComponent(onOpenGroup.mock.calls[1][0] as string);
+    expect(searchUrl).not.toContain('role=');
+    expect(searchUrl).toContain('"po":"PO-9"');
+
+    fireEvent.click(fieldFilters[0], { shiftKey: true });
+    expect(onAddFacet).toHaveBeenCalledWith('po', 'PO-9');
+  });
+
+  it('cards render no scope count or footer — every card IS a row', () => {
+    render(
+      <EscalationListView
+        role="fleet"
+        listSchema={BOARD_SCHEMA}
+        activeEscalations={[machineRow({ id: 'a1' })]}
+      />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.queryByText(/row(s)? in scope/)).not.toBeInTheDocument();
   });
 
   it('empty scope renders the quiet no-entities state', () => {

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useRoles } from '../../../api/roles';
 import { useAddUserRole, useRemoveUserRole } from '../../../api/users';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
-import { User } from 'lucide-react';
+import { RolePill } from '../../../components/common/display/RolePill';
 import { ScopeBadge } from '../../../components/common/display/ScopeBadge';
 import {
   SCOPE_PRESETS,
@@ -67,21 +67,23 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
           {currentRoles.length === 0 ? (
             <p className="text-xs text-text-tertiary">No roles assigned.</p>
           ) : (
-            <div className="flex flex-col gap-2 items-start">
+            <div className="flex flex-col gap-2">
               {currentRoles.map((r) => (
                 <span
                   key={r.role}
-                  className="flex items-center gap-2.5 pl-2.5 pr-2 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
+                  className="flex items-center gap-2.5 w-full min-w-0 pl-2.5 pr-2 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
                 >
-                  <span className="inline-flex items-center gap-1 w-24 shrink-0 min-w-0">
-                    <User className="w-2.5 h-2.5 shrink-0 text-accent/75" />
-                    <span className="truncate" title={r.role}>{r.role}</span>
+                  {/* The universal role pill leads and truncates; the fixed
+                      facts (type, scope, remove) keep their width so columns
+                      align across stacked rows. */}
+                  <span className="flex-1 min-w-0 truncate" title={r.role}>
+                    <RolePill role={r.role} tone="inherit" />
                   </span>
                   <span className="w-14 shrink-0 text-[9px] uppercase tracking-wide text-text-tertiary">{r.type}</span>
                   {r.type === 'member' && (
                     <>
                       <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
-                      <ScopeBadge read={r.read_scope} write={r.write_scope} />
+                      <ScopeBadge read={r.read_scope} write={r.write_scope} className="shrink-0" />
                     </>
                   )}
                   <button
@@ -97,57 +99,65 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
           )}
 
           {available.length > 0 && (
-            <div className="pt-3 border-t border-surface-border">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+            <div className="pt-3 border-t border-surface-border space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                 Add Role
               </p>
-              <div className="flex items-center gap-2">
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="select text-xs font-mono flex-1"
-                  aria-label="Role"
-                >
-                  <option value="">Select a role...</option>
-                  {available.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-                <select
-                  value={newType}
-                  onChange={(e) => setNewType(e.target.value as LTRoleType)}
-                  className="select text-xs w-24"
-                  aria-label="Role type"
-                >
-                  <option value="member">member</option>
-                  <option value="admin">admin</option>
-                  <option value="superadmin">superadmin</option>
-                </select>
+              {/* Stacked, label-over-control fields (the app's form pattern) —
+                  every control is w-full/min-w-0, so a long role key or scope
+                  label can never widen the column or push the button away. */}
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                className="select text-xs font-mono w-full min-w-0"
+                aria-label="Role"
+              >
+                <option value="">Select a role...</option>
+                {available.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="min-w-0">
+                  <label className="block text-[10px] text-text-tertiary mb-1">Type</label>
+                  <select
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value as LTRoleType)}
+                    className="select text-xs w-full min-w-0"
+                    aria-label="Role type"
+                  >
+                    <option value="member">member</option>
+                    <option value="admin">admin</option>
+                    <option value="superadmin">superadmin</option>
+                  </select>
+                </div>
+                {newType === 'member' && (
+                  <div className="min-w-0">
+                    <label className="block text-[10px] text-text-tertiary mb-1">Scope</label>
+                    <select
+                      value={newScope}
+                      onChange={(e) => setNewScope(e.target.value)}
+                      className="select text-xs w-full min-w-0"
+                      aria-label="Work-surface scope"
+                    >
+                      {SCOPE_PRESETS.map((p) => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end pt-1">
                 <button
                   onClick={handleAdd}
                   disabled={!newRole || addRole.isPending}
                   className="btn-primary text-xs"
                 >
-                  {addRole.isPending ? '...' : 'Add'}
+                  {addRole.isPending ? '...' : 'Add Role'}
                 </button>
               </div>
-              {newType === 'member' && (
-                <div className="mt-2">
-                  <label className="block text-[10px] text-text-tertiary mb-1">Scope</label>
-                  <select
-                    value={newScope}
-                    onChange={(e) => setNewScope(e.target.value)}
-                    className="select text-xs w-full"
-                    aria-label="Work-surface scope"
-                  >
-                    {SCOPE_PRESETS.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
               {addRole.error && (
-                <p className="text-[10px] text-status-error mt-1">{(addRole.error as Error).message}</p>
+                <p className="text-[10px] text-status-error">{(addRole.error as Error).message}</p>
               )}
             </div>
           )}

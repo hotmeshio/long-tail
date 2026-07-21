@@ -96,6 +96,14 @@ describe('RolesPage', () => {
     expect(screen.getByText('Station Operator')).toBeInTheDocument();
   });
 
+  it('derives a Title Case display name for roles with no title', () => {
+    renderPage();
+    // reviewer has no title — the leading cell shows the derived name and the
+    // exact key renders as the secondary field.
+    expect(screen.getByText('Reviewer')).toBeInTheDocument();
+    expect(screen.getByText('reviewer')).toBeInTheDocument();
+  });
+
   it('renders triangle values for roles with ops metrics', () => {
     renderPage();
     // operator has sla_minutes=30, target_per_hour=20, worker_count=4
@@ -146,8 +154,8 @@ describe('RolesPage', () => {
   it('renders table column headers', () => {
     renderPage();
     expect(screen.getByText('Role')).toBeInTheDocument();
-    expect(screen.getByText('Label')).toBeInTheDocument();
-    expect(screen.getByText('Member Count')).toBeInTheDocument();
+    expect(screen.getByText('Key')).toBeInTheDocument();
+    expect(screen.getByText('Members')).toBeInTheDocument();
     expect(screen.getByText('SLA/M')).toBeInTheDocument();
   });
 

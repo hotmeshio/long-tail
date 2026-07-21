@@ -149,6 +149,18 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       ),
       className: 'max-w-0',
     },
+    // Facet columns mirror the filter bar's order (Role · Priority ·
+    // Workflow Type) so the eye maps a filter straight onto its column.
+    {
+      key: 'role',
+      label: 'Role',
+      render: (row) => (
+        <span className={CELL_TEXT}>
+          <RolePill role={row.role} size="md" tone="inherit" />
+        </span>
+      ),
+      className: 'w-28',
+    },
     {
       key: 'priority',
       label: 'Priority',
@@ -176,16 +188,6 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
         />
       ),
       className: 'w-80 max-w-[19rem] align-top',
-    },
-    {
-      key: 'role',
-      label: 'Role',
-      render: (row) => (
-        <span className={CELL_TEXT}>
-          <RolePill role={row.role} size="md" tone="inherit" />
-        </span>
-      ),
-      className: 'w-28',
     },
     {
       key: 'created_time',
@@ -285,7 +287,6 @@ export function EscalationFilterBar({
   types,
   showStatus = false,
   showSearch = true,
-  showRole = true,
   actions,
 }: {
   filters: { role: string; type: string; priority: string; status?: string; search?: string };
@@ -296,9 +297,6 @@ export function EscalationFilterBar({
   // Free-text search lives here by default, but the faceted page folds it into
   // the drawer instead so there's a single search surface.
   showSearch?: boolean;
-  // The role filter can move into the page title (a queue selector); pages that
-  // do that hide it here so there's one place to pick a role.
-  showRole?: boolean;
   actions?: React.ReactNode;
 }) {
   return (
@@ -314,17 +312,16 @@ export function EscalationFilterBar({
           <FilterDivider />
         </>
       )}
-      {showRole && (
-        <>
-          <FilterSelect
-            label="Role"
-            value={filters.role}
-            onChange={(v) => setFilter('role', v)}
-            options={roles.map((r) => ({ value: r, label: r }))}
-          />
-          <FilterDivider />
-        </>
-      )}
+      {/* Role is the queue's primary facet — always present, always URL-driven
+          (?role=). Pages whose title doubles as a queue selector share the same
+          param, so the two controls mirror each other. */}
+      <FilterSelect
+        label="Role"
+        value={filters.role}
+        onChange={(v) => setFilter('role', v)}
+        options={roles.map((r) => ({ value: r, label: r }))}
+      />
+      <FilterDivider />
       <FilterSelect
         label="Priority"
         value={filters.priority}

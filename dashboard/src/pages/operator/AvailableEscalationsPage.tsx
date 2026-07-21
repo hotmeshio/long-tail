@@ -391,7 +391,6 @@ export function AvailableEscalationsPage() {
         roles={rolesData?.roles ?? []}
         types={typesData?.types ?? []}
         showStatus
-        showRole={false}
         showSearch={false}
         actions={
           <>
@@ -594,6 +593,15 @@ export function AvailableEscalationsPage() {
           activeEscalations={escalations}
           onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
           onOpenGroup={(url) => navigate(url)}
+          onAddFacet={(key, value) => setFacetFilters({
+            ...facetFilters,
+            // Same native-type handling as metadataFacetUrl: objects stringify,
+            // primitives keep their type so JSONB containment stays type-correct.
+            facets: {
+              ...(facetFilters.facets ?? {}),
+              [key]: typeof value === 'object' && value !== null ? JSON.stringify(value) : value,
+            },
+          })}
           total={total}
           page={pagination.page}
           totalPages={pagination.totalPages(total)}

@@ -220,7 +220,9 @@ describe('UsersPage', () => {
 
     // Alice has 'admin' assigned; 'operator' and 'viewer' should be available
     await user.click(screen.getByText('Alice Smith'));
-    expect(screen.getByText('Add Role')).toBeInTheDocument();
+    // Section eyebrow and the submit button both read "Add Role".
+    expect(screen.getAllByText('Add Role').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Add Role' })).toBeInTheDocument();
     expect(screen.getByText('Select a role...')).toBeInTheDocument();
   });
 });

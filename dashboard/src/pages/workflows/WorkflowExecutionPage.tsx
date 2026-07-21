@@ -45,7 +45,7 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-20">
+        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100]">
           <button
             onClick={() => { onAction('restart'); setOpen(false); }}
             className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"

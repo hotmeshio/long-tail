@@ -395,7 +395,7 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
       {open && (
         <div
           role="listbox"
-          className="absolute z-40 top-full left-4 mt-1.5 min-w-[20rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1"
+          className="absolute z-[100] top-full left-4 mt-1.5 min-w-[20rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1"
         >
           {fragments.map((f) => {
             const a = aggregates.get(f.origin.role);

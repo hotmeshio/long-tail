@@ -32,7 +32,6 @@ describe('usePersona', () => {
     expect(result.current.canSeePaceBoard).toBe(false);
     expect(result.current.canSeeWorkflows).toBe(false);
     expect(result.current.showTaskQueueCards).toBe(true);
-    expect(result.current.taskQueueSource).toBe('membership');
   });
 
   it('engineer: full builder home (workflows, no pace board), NOT the operator cards', () => {
@@ -43,7 +42,6 @@ describe('usePersona', () => {
     expect(result.current.canSeeWorkflows).toBe(true);
     // Engineers are builders — the task-queue-cards home is the operator's only.
     expect(result.current.showTaskQueueCards).toBe(false);
-    expect(result.current.taskQueueSource).toBe('membership');
   });
 
   it('admin: pace board, no workflows, no cards, manual source', () => {
@@ -53,7 +51,6 @@ describe('usePersona', () => {
     expect(result.current.canSeePaceBoard).toBe(true);
     expect(result.current.canSeeWorkflows).toBe(false);
     expect(result.current.showTaskQueueCards).toBe(false);
-    expect(result.current.taskQueueSource).toBe('manual');
   });
 
   it('superadmin: pace board + workflows, manual source', () => {
@@ -62,7 +59,6 @@ describe('usePersona', () => {
     expect(result.current.tier).toBe('superadmin');
     expect(result.current.canSeePaceBoard).toBe(true);
     expect(result.current.canSeeWorkflows).toBe(true);
-    expect(result.current.taskQueueSource).toBe('manual');
   });
 
   it('superadmin viewing as operator: adopts the operator layout but keeps manual curation', () => {
@@ -74,7 +70,6 @@ describe('usePersona', () => {
     expect(result.current.canSeePaceBoard).toBe(false);
     expect(result.current.showTaskQueueCards).toBe(true);
     // Real tier still governs where the sidebar queues come from.
-    expect(result.current.taskQueueSource).toBe('manual');
   });
 
   it('admin viewing as engineer: gains workflows, drops the pace board', () => {

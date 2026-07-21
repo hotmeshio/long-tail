@@ -64,7 +64,7 @@ export function EscalationTitleSelect({
       </button>
 
       {open && (
-        <div className="absolute z-30 top-full left-0 mt-2 min-w-[16rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1">
+        <div className="absolute z-[100] top-full left-0 mt-2 min-w-[16rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1">
           <button type="button" onClick={() => { onChange(''); setOpen(false); }} className={itemCls(!role)}>
             All Escalations
           </button>

@@ -443,7 +443,7 @@ function MappingFieldInput({ value, onChange, suggestions, fieldType, placeholde
         placeholder={placeholder}
       />
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
+        <div className="absolute z-[100] left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
           {filtered.map((s) => (
             <button
               key={s.value}
@@ -508,7 +508,7 @@ function TopicCombobox({ value, onChange, topics }: {
       />
 
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
+        <div className="absolute z-[100] left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
           {filtered.map((t) => {
             const catCls = CATEGORY_COLORS[t.category] ?? 'bg-surface-sunken text-text-tertiary';
             return (

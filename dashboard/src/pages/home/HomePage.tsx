@@ -141,7 +141,7 @@ function AppPicker({ appIds, selected, onSelect }: {
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-surface-raised border border-surface-border rounded-md shadow-lg z-30 py-1 min-w-[120px]">
+        <div className="absolute top-full left-0 mt-1 bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100] py-1 min-w-[120px]">
           {appIds.map((id) => (
             <button
               key={id}

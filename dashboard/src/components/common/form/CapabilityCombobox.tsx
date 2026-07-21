@@ -77,7 +77,7 @@ export function CapabilityCombobox({ serverId, toolName, onChange }: {
       )}
 
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
+        <div className="absolute z-[100] left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-surface-border bg-surface shadow-lg">
           {filtered.map((t) => (
             <button
               key={`${t.serverId}:${t.name}`}
@@ -105,7 +105,7 @@ export function CapabilityCombobox({ serverId, toolName, onChange }: {
       )}
 
       {open && filtered.length === 0 && filter && (
-        <div className="absolute z-50 left-0 right-0 mt-1 rounded-md border border-surface-border bg-surface shadow-lg px-3 py-4 text-center">
+        <div className="absolute z-[100] left-0 right-0 mt-1 rounded-md border border-surface-border bg-surface shadow-lg px-3 py-4 text-center">
           <p className="text-[11px] text-text-quaternary">No capabilities match "{filter}"</p>
         </div>
       )}

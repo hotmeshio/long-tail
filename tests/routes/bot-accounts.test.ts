@@ -78,6 +78,35 @@ describe('Bot account routes', () => {
       expect(body.bots.some((b: any) => b.id === botId)).toBe(true);
     });
 
+    it('GET /api/bot-accounts filters by search server-side', async () => {
+      // The created bot's name is unique per run — searching it returns the
+      // row and a matching total; searching noise returns zero of each.
+      const hit = await fetch(`${ctx.BASE}/bot-accounts?search=${encodeURIComponent(botName)}`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      expect(hit.status).toBe(200);
+      const hitBody = await hit.json() as any;
+      expect(hitBody.total).toBe(1);
+      expect(hitBody.bots[0].id).toBe(botId);
+
+      const miss = await fetch(`${ctx.BASE}/bot-accounts?search=zzz-no-such-bot`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      const missBody = await miss.json() as any;
+      expect(missBody.total).toBe(0);
+      expect(missBody.bots).toHaveLength(0);
+    });
+
+    it('GET /api/bot-accounts filters by status server-side', async () => {
+      const res = await fetch(`${ctx.BASE}/bot-accounts?status=suspended&search=${encodeURIComponent(botName)}`, {
+        headers: authHeaders(ctx.builderToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      // The freshly created bot is active — a suspended filter excludes it.
+      expect(body.total).toBe(0);
+    });
+
     it('GET /api/bot-accounts/:id returns single bot', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}`, {
         headers: authHeaders(ctx.builderToken),

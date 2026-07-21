@@ -13,12 +13,14 @@ router.use(requireBuilder);
 /**
  * GET /api/bot-accounts
  * List all bot accounts.
- * Query: ?limit=50&offset=0
+ * Query: ?limit=50&offset=0&status=active&search=mcp
  */
 router.get('/', async (req, res) => {
   const result = await api.listBots({
     limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
     offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+    status: (req.query.status as string) || undefined,
+    search: (req.query.search as string) || undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

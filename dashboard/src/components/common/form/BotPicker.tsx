@@ -54,7 +54,7 @@ export function BotPicker({ selected, onChange, placeholder }: BotPickerProps) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-surface-raised border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-[100] mt-1 w-full bg-surface-raised border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {/* Default: invoking user */}
           <button
             type="button"

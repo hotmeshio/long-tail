@@ -23,14 +23,28 @@ export const CLEANUP_EXPIRED_EPHEMERAL = `
 
 // ─── Bot accounts ───────────────────────────────────────────────────────────
 
+// $3 = status (nullable), $4 = search (nullable) — free text over the bot's
+// display fields, mirroring listUsers' search so the two Accounts tabs offer
+// the same server-side filter surface.
 export const LIST_BOTS = `
   SELECT * FROM lt_users
   WHERE account_type = 'bot'
+    AND ($3::text IS NULL OR status = $3)
+    AND ($4::text IS NULL
+      OR display_name ILIKE '%' || $4 || '%'
+      OR external_id ILIKE '%' || $4 || '%'
+      OR metadata->>'description' ILIKE '%' || $4 || '%')
   ORDER BY created_at DESC
   LIMIT $1 OFFSET $2`;
 
 export const COUNT_BOTS = `
-  SELECT COUNT(*)::int AS total FROM lt_users WHERE account_type = 'bot'`;
+  SELECT COUNT(*)::int AS total FROM lt_users
+  WHERE account_type = 'bot'
+    AND ($1::text IS NULL OR status = $1)
+    AND ($2::text IS NULL
+      OR display_name ILIKE '%' || $2 || '%'
+      OR external_id ILIKE '%' || $2 || '%'
+      OR metadata->>'description' ILIKE '%' || $2 || '%')`;
 
 export const SET_ACCOUNT_TYPE_BOT = `
   UPDATE lt_users SET account_type = $1 WHERE id = $2`;

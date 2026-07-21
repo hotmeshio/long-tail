@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Pencil, Trash2, Search } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useBots, useDeleteBot } from '../../../api/bots';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
+import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
-import { TimestampCell } from '../../../components/common/display/TimestampCell';
+import { DateValue } from '../../../components/common/display/DateValue';
 import type { BotRecord } from '../../../api/types';
 import { CreateBotModal } from './CreateBotModal';
 import { EditBotModal } from './EditBotModal';
@@ -20,17 +21,29 @@ const statusDot: Record<string, string> = {
   suspended: 'bg-status-error',
 };
 
+const statusOptions = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+];
+
 export function BotsPage({ embedded = false }: { embedded?: boolean }) {
-  const { pagination } = useFilterParams({ filters: {} });
+  // Same filter surface as the User Accounts tab: search + status, both
+  // URL-driven and resolved server-side (never a client-side pass over a
+  // paginated page).
+  const { filters, setFilter, pagination } = useFilterParams({
+    filters: { status: '', search: '' },
+  });
   const deleteBot = useDeleteBot();
 
   const [showCreate, setShowCreate] = useState(false);
   const [editingBot, setEditingBot] = useState<BotRecord | null>(null);
   const [selectedBot, setSelectedBot] = useState<BotRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotRecord | null>(null);
-  const [search, setSearch] = useState('');
 
   const { data, isLoading } = useBots({
+    status: filters.status || undefined,
+    search: filters.search || undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
   });
@@ -43,17 +56,6 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
     return bots.find((b) => b.id === selectedBot.id) ?? selectedBot;
   }, [bots, selectedBot]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return bots;
-    const q = search.toLowerCase();
-    return bots.filter(
-      (b) =>
-        (b.display_name ?? '').toLowerCase().includes(q) ||
-        b.external_id.toLowerCase().includes(q) ||
-        (b.description ?? '').toLowerCase().includes(q),
-    );
-  }, [bots, search]);
-
   const columns: Column<BotRecord>[] = [
     {
       key: 'display_name',
@@ -64,15 +66,22 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
             className={`w-2 h-2 rounded-full dot-ring shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
             title={row.status}
           />
-          <div>
-            <p className="text-sm text-text-primary">
-              {row.display_name || row.external_id}
-            </p>
-            {row.description && (
-              <p className="text-xs text-text-tertiary">{row.description}</p>
-            )}
-          </div>
+          <span className="text-sm text-text-primary whitespace-nowrap">
+            {row.display_name || row.external_id}
+          </span>
         </div>
+      ),
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      render: (row) => (
+        <span
+          className="block max-w-[32rem] truncate text-xs text-text-tertiary"
+          title={row.description ?? undefined}
+        >
+          {row.description ?? ''}
+        </span>
       ),
     },
     {
@@ -89,8 +98,8 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
     {
       key: 'created_at',
       label: 'Created',
-      render: (row) => <TimestampCell date={row.created_at} />,
-      className: 'w-44',
+      render: (row) => <DateValue date={row.created_at} />,
+      className: 'w-36 whitespace-nowrap',
     },
     {
       key: 'actions',
@@ -143,27 +152,26 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
         />
       )}
 
+      <FilterBar>
+        <FilterInput
+          label="Search"
+          value={filters.search}
+          onChange={(v) => setFilter('search', v)}
+          placeholder="name, id, description…"
+        />
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          onChange={(v) => setFilter('status', v)}
+          options={statusOptions}
+        />
+      </FilterBar>
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="overflow-x-clip">
-          {/* Sticky search bar */}
-          <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-            <div className="bg-surface-sunken rounded-lg px-5 py-2">
-              <div className="relative w-1/2">
-                <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-text-quaternary" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={`Search ${bots.length} service accounts…`}
-                  className="w-full pl-5 py-1 text-sm bg-transparent border-b border-surface-border/60 text-text-primary placeholder:text-text-quaternary focus:outline-none focus:border-accent/50 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-
           <DataTable
             columns={columns}
-            data={filtered}
+            data={bots}
             keyFn={(row) => row.id}
             isLoading={isLoading}
             emptyMessage="No service accounts yet"

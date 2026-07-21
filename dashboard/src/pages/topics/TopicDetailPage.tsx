@@ -273,7 +273,7 @@ export function TopicDetailPage() {
                 </h2>
                 <span className="relative group ml-auto">
                   <Info className="w-3 h-3 text-text-quaternary cursor-help" strokeWidth={1.5} />
-                  <span className="absolute right-0 top-full mt-1 w-48 p-2 rounded bg-surface-raised border border-surface-border shadow-lg text-[10px] text-text-secondary leading-relaxed hidden group-hover:block z-10">
+                  <span className="absolute right-0 top-full mt-1 w-48 p-2 rounded bg-surface-raised border border-surface-border shadow-lg text-[10px] text-text-secondary leading-relaxed hidden group-hover:block z-[100]">
                     Publishing a test event is live — these subscribers will receive and process the payload.
                   </span>
                 </span>

@@ -81,11 +81,14 @@ export async function getBot(id: string): Promise<BotAccountRecord | null> {
 export async function listBots(
   limit: number = 50,
   offset: number = 0,
+  filters: { status?: string; search?: string } = {},
 ): Promise<{ bots: BotAccountRecord[]; total: number }> {
   const pool = await getPool();
+  const status = filters.status || null;
+  const search = filters.search || null;
   const [{ rows }, countResult] = await Promise.all([
-    pool.query(LIST_BOTS, [limit, offset]),
-    pool.query(COUNT_BOTS),
+    pool.query(LIST_BOTS, [limit, offset, status, search]),
+    pool.query(COUNT_BOTS, [status, search]),
   ]);
 
   // Attach roles to each bot
