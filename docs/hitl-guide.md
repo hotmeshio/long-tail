@@ -19,7 +19,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Fields that appear based on another answer | `x-lt-showIf` | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Sections, columns, ordering, side-panel help | Layout keywords | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Runtime-driven items, files, signatures, SOP blocks | Widgets | [x-lt-widget.md](hitl/x-lt-widget.md) |
-| A role-authored list page for the whole queue | List schema | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
+| A role-authored list page — document views, facet tables, entity card boards | List schema | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | A fully custom UI nothing above can express | Iframe viewport | [iframe.md](hitl/iframe.md) |
 
 ---
@@ -62,6 +62,7 @@ When you author a HITL-backed workflow, the platform handles:
 - **Escalation chains** — users can re-route work to other roles
 - **AI triage** — optional auto-resolution for common patterns
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
+- **Schema enforcement** — roles with `enforce_schema` validate every resolver payload server-side (dashboard, API, MCP, CLI alike) with the same pass the form runs, rejecting violations as a structured 422 (see [schema-enforcement.md](schema-enforcement.md))
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces
 - **Bulk operations** — bulk claim, assign, escalate, triage, and cancel for queue management
 - **Cancellation** — cancel pending escalations from the API or dashboard
@@ -82,7 +83,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Layout, ordering, sections, binding, help panel | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Custom widgets (checklist, file upload, code editor, signature, markdown) | [x-lt-widget.md](hitl/x-lt-widget.md) |
-| List schema (`active-history`, `facet-table`) | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
+| List schema (`active-history`, `active`, `facet-table`, `facet-board` cards) | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | Iframe viewport protocol | [iframe.md](hitl/iframe.md) |
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |
 | Role routing, RBAC, scope, chains | [roles.md](hitl/roles.md) |
