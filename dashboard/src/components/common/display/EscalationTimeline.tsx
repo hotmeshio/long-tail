@@ -2,12 +2,14 @@ import { formatDurationCompact } from '../../../lib/format';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
 import type { LTEscalationRecord } from '../../../api/types';
 
-// Matches the palette used in EscalationTimeline (the spine view) and PaceChart
+// Matches the palette used in EscalationTimeline (the spine view) and PaceChart.
+// Hues resolve through the --lt-* status tokens so registered themes restyle
+// the bar; the navy default keeps the sky/orange/green/red look.
 const COLORS = {
-  pending:   '#0ea5e9', // sky blue  — waiting to be claimed
-  claimed:   '#f97316', // orange    — actively being worked
-  resolved:  '#16a34a', // green     — done
-  cancelled: '#ef4444', // red       — cancelled or expired
+  pending:   'rgb(var(--lt-status-queued-graphic))',  // sky blue  — waiting to be claimed
+  claimed:   'rgb(var(--lt-status-claimed-graphic))', // orange    — actively being worked
+  resolved:  'rgb(var(--lt-status-success-graphic))', // green     — done
+  cancelled: 'rgb(var(--lt-status-error))',           // red       — cancelled or expired
 } as const;
 
 const BAR_H = 5; // px
@@ -20,7 +22,7 @@ function Marker({ pct, place, label, title, emphasis }: {
   title: string;
   emphasis?: boolean;
 }) {
-  const tick = <span className="w-px h-1.5 bg-slate-300" aria-hidden />;
+  const tick = <span className="w-px h-1.5 bg-text-quaternary" aria-hidden />;
   const text = (
     <span className={`whitespace-nowrap leading-none tabular-nums ${emphasis ? 'text-text-secondary' : 'text-text-tertiary'}`}>
       {label}
@@ -84,7 +86,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
   return (
     <div className={className} title={legend}>
       {/* claim split label (above bar) */}
-      <div className="relative h-3 text-[9px] font-mono">
+      <div className="relative h-3 text-2xs font-mono">
         {showClaimed && (
           <Marker
             pct={pendingPct}
@@ -98,7 +100,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
       {/* Bar track */}
       <div
         className="flex w-full rounded-full overflow-hidden"
-        style={{ height: BAR_H, backgroundColor: '#e2e8f0' }}
+        style={{ height: BAR_H, backgroundColor: 'rgb(var(--lt-surface-sunken))' }}
         title={legend}
       >
         {/* Pending (blue) */}
@@ -116,7 +118,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
       </div>
 
       {/* Total / age label (below bar, anchored at right edge) */}
-      <div className="relative h-3 text-[9px] font-mono">
+      <div className="relative h-3 text-2xs font-mono">
         <Marker pct={100} place="below" emphasis label={totalStr} title={totalTip} />
       </div>
     </div>

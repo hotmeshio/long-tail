@@ -130,7 +130,7 @@ export function KnowledgeDetailPanel({ domain, entryKey, onClose, onDeleted }: K
         ) : entry && entry.found !== false ? (
           <>
             {/* Metadata row */}
-            <div className="flex items-center gap-4 mb-4 text-[10px] text-text-tertiary uppercase tracking-wider">
+            <div className="flex items-center gap-4 mb-4 text-2xs text-text-tertiary uppercase tracking-wider">
               <span>{domain}</span>
               <span className="text-surface-border">|</span>
               <span><TimeAgo date={entry.updated_at} /></span>
@@ -139,7 +139,7 @@ export function KnowledgeDetailPanel({ domain, entryKey, onClose, onDeleted }: K
             {entry.tags && entry.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-4">
                 {entry.tags.map((tag) => (
-                  <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
+                  <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-accent/10 text-accent">
                     {tag}
                   </span>
                 ))}
@@ -191,7 +191,7 @@ export function KnowledgeDetailPanel({ domain, entryKey, onClose, onDeleted }: K
                       <tr key={field} className="border-b border-surface-border last:border-b-0 group">
                         {/* Field name */}
                         <td className="px-3 py-2.5 align-top w-[120px] bg-surface-sunken/50">
-                          <span className="text-[11px] font-medium text-text-secondary break-all">{field}</span>
+                          <span className="text-2xs font-medium text-text-secondary break-all">{field}</span>
                         </td>
                         {/* Value */}
                         <td className="px-3 py-2.5 align-top">
@@ -231,7 +231,7 @@ export function KnowledgeDetailPanel({ domain, entryKey, onClose, onDeleted }: K
                                 {isSimple(value) ? (
                                   <p className="text-xs text-text-primary break-words whitespace-pre-wrap">{String(value)}</p>
                                 ) : (
-                                  <pre className="text-[11px] text-text-primary font-mono whitespace-pre-wrap break-words bg-surface-sunken rounded p-2 max-h-[200px] overflow-y-auto">
+                                  <pre className="text-2xs text-text-primary font-mono whitespace-pre-wrap break-words bg-surface-sunken rounded p-2 max-h-[200px] overflow-y-auto">
                                     {JSON.stringify(value, null, 2)}
                                   </pre>
                                 )}

@@ -59,7 +59,7 @@ function buildColumns(
       label: 'Tool',
       render: (row) => row.entity
         ? <WorkflowPill type={row.entity} variant="pipeline" size="xs" />
-        : <span className="text-[10px] text-text-tertiary">—</span>,
+        : <span className="text-2xs text-text-tertiary">—</span>,
       className: 'w-44 shrink-0',
     },
     {
@@ -208,7 +208,7 @@ export function McpRunsPage() {
           placeholder="Search run ID..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="input text-[11px] py-1 px-2 w-56"
+          className="input text-2xs py-1 px-2 w-56"
         />
         <FilterSelect
           label="Tool"

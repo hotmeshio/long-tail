@@ -59,7 +59,7 @@ export function ScheduleStep({ form, set }: Props) {
     return (
       <div>
         <div className="border-l-2 border-accent/30 pl-3 py-1 mb-8 flex items-start justify-between">
-          <p className="text-[12px] text-text-secondary italic leading-relaxed">
+          <p className="text-xs text-text-secondary italic leading-relaxed">
             Optional. Each schedule runs a workflow on a cron timer.
           </p>
           <button onClick={() => { window.location.hash = '#docs:agents.md:schedule'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Schedule"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
@@ -67,7 +67,7 @@ export function ScheduleStep({ form, set }: Props) {
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Clock className="w-8 h-8 text-text-quaternary/40 mb-3" strokeWidth={1} />
           <p className="text-sm text-text-tertiary mb-2">No schedules</p>
-          <p className="text-[11px] text-text-quaternary max-w-sm mb-6">
+          <p className="text-2xs text-text-quaternary max-w-sm mb-6">
             Add a schedule to run a workflow on a recurring cron timer.
           </p>
           <button onClick={addSched} className="flex items-center gap-2 text-xs text-accent hover:text-accent-hover transition-colors">
@@ -81,7 +81,7 @@ export function ScheduleStep({ form, set }: Props) {
   return (
     <div>
       <div className="border-l-2 border-accent/30 pl-3 py-1 mb-6 flex items-start justify-between">
-        <p className="text-[12px] text-text-secondary italic leading-relaxed">
+        <p className="text-xs text-text-secondary italic leading-relaxed">
           Each schedule runs a workflow on a timer. An automation can have multiple schedules targeting different workflows.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:schedule'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Schedule"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
@@ -95,15 +95,15 @@ export function ScheduleStep({ form, set }: Props) {
               selected === i ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
             }`}>
               <button onClick={() => setSelected(i)} className="flex-1 text-left px-3 py-2 min-w-0">
-                <span className="text-[11px] font-mono block">{s.cron || 'new schedule'}</span>
-                <span className="text-[9px] text-text-quaternary">{(s.reaction_type === 'pipeline' ? s.pipeline_id : s.workflow_type) || 'no target'} · {describeCron(s.cron)}</span>
+                <span className="text-2xs font-mono block">{s.cron || 'new schedule'}</span>
+                <span className="text-2xs text-text-quaternary">{(s.reaction_type === 'pipeline' ? s.pipeline_id : s.workflow_type) || 'no target'} · {describeCron(s.cron)}</span>
               </button>
               <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove schedule "${s.cron || 'new'}"?\n\nThis takes effect when you save.`)) removeSched(i); }} className="opacity-0 group-hover/sched:opacity-100 px-2 text-text-quaternary hover:text-status-error transition-all" title="Remove">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
           ))}
-          <button onClick={addSched} className="w-full flex items-center gap-1.5 px-3 py-2 text-[11px] text-accent hover:text-accent-hover transition-colors">
+          <button onClick={addSched} className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs text-accent hover:text-accent-hover transition-colors">
             <Plus className="w-3 h-3" /> Add
           </button>
         </div>
@@ -116,11 +116,11 @@ export function ScheduleStep({ form, set }: Props) {
             <div>
               <label className={sectionCls}>Run every</label>
               <input type="text" value={sched.cron} onChange={(e) => updateSched(selected, 'cron', e.target.value)} placeholder="0 * * * *" className={`${inputCls} font-mono`} />
-              {sched.cron && <p className="text-[11px] text-accent/80 mt-1">{describeCron(sched.cron)}</p>}
+              {sched.cron && <p className="text-2xs text-accent/80 mt-1">{describeCron(sched.cron)}</p>}
               <div className="flex gap-3 mt-2 overflow-x-auto">
                 {CRON_PRESETS.map((p) => (
                   <button key={p} type="button" onClick={() => updateSched(selected, 'cron', p)}
-                    className={`text-[10px] font-mono whitespace-nowrap transition-colors ${sched.cron === p ? 'text-accent font-medium' : 'text-accent/50 hover:text-accent'}`}
+                    className={`text-2xs font-mono whitespace-nowrap transition-colors ${sched.cron === p ? 'text-accent font-medium' : 'text-accent/50 hover:text-accent'}`}
                   >{describeCron(p)}</button>
                 ))}
               </div>

@@ -43,7 +43,7 @@ export function TraceLink({ traceId, href }: { traceId: string; href?: string })
           }
         </svg>
       </button>
-      <span className="text-[11px] text-accent">Trace Details</span>
+      <span className="text-2xs text-accent">Trace Details</span>
     </span>
   );
 }

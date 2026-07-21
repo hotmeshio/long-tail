@@ -33,7 +33,7 @@ export function EscalationSortControl({ orderBy, onChange }: {
   return (
     <div className="flex items-center gap-1.5">
       {!isDefaultField && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/8 px-2 py-0.5 text-[10px] font-medium text-accent/90">
+        <span className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/8 px-2 py-0.5 text-2xs font-medium text-accent/90">
           <span className="text-text-quaternary">sort</span>
           <span className="font-mono max-w-[120px] truncate" title={field}>{sortLabel(field)}</span>
           <button
@@ -51,7 +51,7 @@ export function EscalationSortControl({ orderBy, onChange }: {
           role="radio"
           aria-checked={direction === 'desc'}
           onClick={() => set('desc')}
-          className={`px-1.5 py-1 transition-colors ${direction === 'desc' ? 'bg-accent text-white' : 'text-text-tertiary hover:bg-surface-hover'}`}
+          className={`px-1.5 py-1 transition-colors ${direction === 'desc' ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:bg-surface-hover'}`}
           title={isDefaultField ? 'Newest first' : `${sortLabel(field)} descending`}
         >
           <ArrowDown className="w-3.5 h-3.5" />
@@ -61,7 +61,7 @@ export function EscalationSortControl({ orderBy, onChange }: {
           role="radio"
           aria-checked={direction === 'asc'}
           onClick={() => set('asc')}
-          className={`px-1.5 py-1 border-l border-surface-border transition-colors ${direction === 'asc' ? 'bg-accent text-white' : 'text-text-tertiary hover:bg-surface-hover'}`}
+          className={`px-1.5 py-1 border-l border-surface-border transition-colors ${direction === 'asc' ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:bg-surface-hover'}`}
           title={isDefaultField ? 'Oldest first' : `${sortLabel(field)} ascending`}
         >
           <ArrowUp className="w-3.5 h-3.5" />

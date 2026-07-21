@@ -201,35 +201,35 @@ export function TopicDetailPage() {
       {/* ── Details band ─────────────────────────────────────────── */}
       <div className="bg-surface-sunken/50 rounded-md px-5 py-3 flex flex-wrap gap-x-6 gap-y-3 items-start mb-5 relative">
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Category</p>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${categoryPillCls}`}>{topic.category}</span>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Category</p>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium ${categoryPillCls}`}>{topic.category}</span>
         </div>
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Source</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Source</p>
           <span className="text-xs font-mono text-text-secondary">{topic.source}</span>
         </div>
         {topic.tags?.length > 0 && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</p>
             <div className="flex items-center gap-1.5">
               <Tag className="w-2.5 h-2.5 text-text-quaternary" strokeWidth={1.5} />
               {topic.tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-text-tertiary bg-surface-sunken">{tag}</span>
+                <span key={tag} className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-mono text-text-tertiary bg-surface-sunken">{tag}</span>
               ))}
             </div>
           </div>
         )}
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Created</p>
           <span className="text-xs text-text-secondary"><DateValue date={topic.created_at} /></span>
         </div>
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Updated</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Updated</p>
           <span className="text-xs text-text-secondary"><DateValue date={topic.updated_at} /></span>
         </div>
         {topic.last_seen_at && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Last Seen</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Last Seen</p>
             <span className="text-xs text-text-secondary"><DateValue date={topic.last_seen_at} /></span>
           </div>
         )}
@@ -247,7 +247,7 @@ export function TopicDetailPage() {
             {topic.payload_schema ? (
               <JsonViewer data={topic.payload_schema} />
             ) : (
-              <p className="text-[11px] text-text-quaternary">No schema defined. Click Edit to add one.</p>
+              <p className="text-2xs text-text-quaternary">No schema defined. Click Edit to add one.</p>
             )}
           </div>
 
@@ -257,7 +257,7 @@ export function TopicDetailPage() {
             {topic.example_payload ? (
               <JsonViewer data={topic.example_payload} />
             ) : (
-              <p className="text-[11px] text-text-quaternary">No example defined. Click Edit to add one.</p>
+              <p className="text-2xs text-text-quaternary">No example defined. Click Edit to add one.</p>
             )}
           </div>
 
@@ -268,12 +268,12 @@ export function TopicDetailPage() {
             <div className="bg-surface-sunken/30 rounded-md px-4 py-3">
               <div className="flex items-center gap-2 mb-2">
                 <Bot className="w-3.5 h-3.5 text-status-success" strokeWidth={1.5} />
-                <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                <h2 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
                   Target Subscribers
                 </h2>
                 <span className="relative group ml-auto">
                   <Info className="w-3 h-3 text-text-quaternary cursor-help" strokeWidth={1.5} />
-                  <span className="absolute right-0 top-full mt-1 w-48 p-2 rounded bg-surface-raised border border-surface-border shadow-lg text-[10px] text-text-secondary leading-relaxed hidden group-hover:block z-[100]">
+                  <span className="absolute right-0 top-full mt-1 w-48 p-2 rounded bg-surface-raised border border-surface-border shadow-lg text-2xs text-text-secondary leading-relaxed hidden group-hover:block z-[100]">
                     Publishing a test event is live — these subscribers will receive and process the payload.
                   </span>
                 </span>
@@ -287,13 +287,13 @@ export function TopicDetailPage() {
                       className="flex items-center gap-2 w-full text-left py-1 rounded hover:bg-surface-hover/50 transition-colors"
                     >
                       <Bot className="w-2.5 h-2.5 text-status-success shrink-0" strokeWidth={1.5} />
-                      <span className="text-[11px] text-text-primary hover:text-accent transition-colors truncate">{sub.agent_name}</span>
-                      <span className="text-[9px] font-mono text-text-quaternary ml-auto shrink-0">{sub.reaction_type}</span>
+                      <span className="text-2xs text-text-primary hover:text-accent transition-colors truncate">{sub.agent_name}</span>
+                      <span className="text-2xs font-mono text-text-quaternary ml-auto shrink-0">{sub.reaction_type}</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-text-quaternary">No {subscriberLabel} subscribed.</p>
+                <p className="text-2xs text-text-quaternary">No {subscriberLabel} subscribed.</p>
               )}
             </div>
 
@@ -301,62 +301,62 @@ export function TopicDetailPage() {
             <div className="sticky top-16 bg-surface-sunken/40 rounded-md p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Send className="w-3.5 h-3.5 text-accent" strokeWidth={1.5} />
-                <h2 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Publish</h2>
+                <h2 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Publish</h2>
               </div>
-              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Event ID</label>
+              <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Event ID</label>
               <input
                 value={publishEventId}
                 onChange={(e) => setPublishEventId(e.target.value)}
-                className="input w-full text-[11px] font-mono mb-3"
+                className="input w-full text-2xs font-mono mb-3"
                 spellCheck={false}
                 placeholder="evt-1720368000000-a3f2"
               />
-              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Subject</label>
+              <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Subject</label>
               <input
                 value={publishSubject || topic.topic}
                 onChange={(e) => setPublishSubject(e.target.value)}
-                className="input w-full text-[11px] font-mono mb-3"
+                className="input w-full text-2xs font-mono mb-3"
                 spellCheck={false}
               />
               {showWorkflowFields && (
                 <div className="grid grid-cols-2 gap-x-3">
                   <div>
-                    <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Workflow Name</label>
+                    <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Workflow Name</label>
                     <input
                       value={publishWorkflowName}
                       onChange={(e) => setPublishWorkflowName(e.target.value)}
-                      className="input w-full text-[11px] font-mono mb-3"
+                      className="input w-full text-2xs font-mono mb-3"
                       spellCheck={false}
                       placeholder="myWorkflow"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Workflow ID</label>
+                    <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Workflow ID</label>
                     <input
                       value={publishWorkflowId}
                       onChange={(e) => setPublishWorkflowId(e.target.value)}
-                      className="input w-full text-[11px] font-mono mb-3"
+                      className="input w-full text-2xs font-mono mb-3"
                       spellCheck={false}
                       placeholder="wf-001"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Task Queue</label>
+                    <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Task Queue</label>
                     <input
                       value={publishTaskQueue}
                       onChange={(e) => setPublishTaskQueue(e.target.value)}
-                      className="input w-full text-[11px] font-mono mb-3"
+                      className="input w-full text-2xs font-mono mb-3"
                       spellCheck={false}
                       placeholder="default"
                     />
                   </div>
                   {showStatus && (
                     <div>
-                      <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Status</label>
+                      <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Status</label>
                       <input
                         value={publishStatus || statusDefault}
                         onChange={(e) => setPublishStatus(e.target.value)}
-                        className="input w-full text-[11px] font-mono mb-3"
+                        className="input w-full text-2xs font-mono mb-3"
                         spellCheck={false}
                         placeholder={statusDefault}
                       />
@@ -364,11 +364,11 @@ export function TopicDetailPage() {
                   )}
                   {fam === 'escalation' && (
                     <div>
-                      <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Escalation ID</label>
+                      <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Escalation ID</label>
                       <input
                         value={publishEscalationId}
                         onChange={(e) => setPublishEscalationId(e.target.value)}
-                        className="input w-full text-[11px] font-mono mb-3"
+                        className="input w-full text-2xs font-mono mb-3"
                         spellCheck={false}
                         placeholder="esc-001"
                       />
@@ -376,11 +376,11 @@ export function TopicDetailPage() {
                   )}
                   {fam === 'activity' && (
                     <div>
-                      <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Activity Name</label>
+                      <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Activity Name</label>
                       <input
                         value={publishActivityName}
                         onChange={(e) => setPublishActivityName(e.target.value)}
-                        className="input w-full text-[11px] font-mono mb-3"
+                        className="input w-full text-2xs font-mono mb-3"
                         spellCheck={false}
                         placeholder="myActivity"
                       />
@@ -388,17 +388,17 @@ export function TopicDetailPage() {
                   )}
                 </div>
               )}
-              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1">Payload</label>
+              <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1">Payload</label>
               <textarea
                 value={publishPayload || defaultPayload}
                 onChange={(e) => setPublishPayload(e.target.value)}
-                className="input-json w-full text-[11px]"
+                className="input-json w-full text-2xs"
                 rows={6}
                 spellCheck={false}
                 placeholder='{ "key": "value" }'
               />
-              <label className="block text-[10px] text-text-quaternary uppercase tracking-wide mb-1 mt-3">Event Preview</label>
-              <pre className="bg-surface-sunken/60 rounded px-2 py-2 text-[10px] font-mono text-text-tertiary overflow-auto max-h-44 whitespace-pre">{eventPreview}</pre>
+              <label className="block text-2xs text-text-quaternary uppercase tracking-wide mb-1 mt-3">Event Preview</label>
+              <pre className="bg-surface-sunken/60 rounded px-2 py-2 text-2xs font-mono text-text-tertiary overflow-auto max-h-44 whitespace-pre">{eventPreview}</pre>
               <div className="mt-3">
                 <button
                   onClick={() => {
@@ -418,10 +418,10 @@ export function TopicDetailPage() {
                 </button>
               </div>
               {publishMutation.isSuccess && (
-                <p className="text-[10px] text-status-success mt-2 animate-page-enter">Event published</p>
+                <p className="text-2xs text-status-success mt-2 animate-page-enter">Event published</p>
               )}
               {publishMutation.isError && (
-                <p className="text-[10px] text-status-error mt-2">{publishMutation.error.message}</p>
+                <p className="text-2xs text-status-error mt-2">{publishMutation.error.message}</p>
               )}
             </div>
           </div>
@@ -461,7 +461,7 @@ export function TopicDetailPage() {
               className="input-json w-full"
               placeholder={'{\n  "type": "object",\n  "properties": {\n    "orderId": { "type": "string" }\n  }\n}'}
             />
-            {schemaError && <p className="text-[10px] text-status-error mt-1">{schemaError}</p>}
+            {schemaError && <p className="text-2xs text-status-error mt-1">{schemaError}</p>}
             <p className="hint">JSON Schema describing the event.data shape.</p>
           </div>
         </div>

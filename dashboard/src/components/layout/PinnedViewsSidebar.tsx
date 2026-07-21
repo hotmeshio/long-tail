@@ -131,7 +131,7 @@ function PinnedItem({ pin, collapsed, draggable, onDragStart, onDropOn, onRemove
         <span className="truncate">{pin.label}</span>
         {pin.badge && <PinBadge url={pin.url} />}
         {pin.fromRole && (
-          <span className="shrink-0 text-[9px] uppercase tracking-wider text-text-quaternary" title={`Provided by the ${pin.fromRole} role`}>
+          <span className="shrink-0 text-2xs uppercase tracking-wider text-text-quaternary" title={`Provided by the ${pin.fromRole} role`}>
             role
           </span>
         )}
@@ -179,7 +179,7 @@ function PinBadge({ url }: { url: string }) {
   const q = spec.available ? availableQ : listQ;
   if (q.isError || q.data?.total === undefined) return null;
   return (
-    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-semibold tabular-nums">
+    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-semibold tabular-nums">
       {q.data.total}
     </span>
   );

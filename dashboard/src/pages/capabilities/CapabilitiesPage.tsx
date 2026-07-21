@@ -197,7 +197,7 @@ function ToolRow({
       {isSelected && <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full" />}
       <div className="flex items-center gap-3">
         <ToolPill name={tool.name} size="md" />
-        <p className="flex-1 min-w-0 truncate text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+        <p className="flex-1 min-w-0 truncate text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors">
           {tool.description}
         </p>
         <div className="flex items-center gap-2 shrink-0">

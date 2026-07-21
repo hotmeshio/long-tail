@@ -61,17 +61,17 @@ function ApiKeysSection({ botId }: { botId: string }) {
 
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-3">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-3">
         API Keys
       </p>
 
       {generatedKey && (
         <div className="mb-3 p-3 bg-status-success/10 border border-status-success/30 rounded-md">
-          <p className="text-[10px] font-semibold text-status-success mb-1">
+          <p className="text-2xs font-semibold text-status-success mb-1">
             Key generated — copy now, it won't be shown again
           </p>
           <div className="flex items-center gap-2">
-            <code className="text-[11px] font-mono text-text-primary bg-surface-sunken px-2 py-1 rounded flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            <code className="text-2xs font-mono text-text-primary bg-surface-sunken px-2 py-1 rounded flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
               {generatedKey}
             </code>
             <button
@@ -98,12 +98,12 @@ function ApiKeysSection({ botId }: { botId: string }) {
                 <Key className="w-3 h-3 text-text-tertiary" />
                 <span className="text-text-primary font-mono">{k.name}</span>
                 {(k.scopes ?? []).map((s: string) => (
-                  <span key={s} className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${s.includes('full') ? 'bg-status-warning/15 text-status-warning' : 'bg-accent/10 text-accent'}`}>
+                  <span key={s} className={`px-1.5 py-0.5 rounded text-2xs font-mono ${s.includes('full') ? 'bg-status-warning/15 text-status-warning' : 'bg-accent/10 text-accent'}`}>
                     {s}
                   </span>
                 ))}
                 {k.last_used_at && (
-                  <span className="text-[10px] text-text-tertiary">
+                  <span className="text-2xs text-text-tertiary">
                     used <TimeAgo date={k.last_used_at} />
                   </span>
                 )}
@@ -139,9 +139,9 @@ function ApiKeysSection({ botId }: { botId: string }) {
                 type="button"
                 onClick={() => setSelectedScope(key)}
                 title={preset.hint}
-                className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                className={`px-2.5 py-1 text-2xs font-medium transition-colors ${
                   selectedScope === key
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent text-text-inverse'
                     : 'bg-surface text-text-secondary hover:bg-surface-hover'
                 }`}
               >
@@ -160,7 +160,7 @@ function ApiKeysSection({ botId }: { botId: string }) {
         </div>
       </div>
       {createKey.error && (
-        <p className="text-[10px] text-status-error mt-1">{(createKey.error as Error).message}</p>
+        <p className="text-2xs text-status-error mt-1">{(createKey.error as Error).message}</p>
       )}
 
       <ConfirmDeleteModal
@@ -213,7 +213,7 @@ function RolesSection({ bot }: { bot: BotRecord }) {
 
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-3">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-3">
         Roles
       </p>
 
@@ -227,7 +227,7 @@ function RolesSection({ bot }: { bot: BotRecord }) {
               className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
             >
               <RolePill role={r.role} />
-              <span className="text-[9px] text-text-tertiary">{r.type}</span>
+              <span className="text-2xs text-text-tertiary">{r.type}</span>
               <button
                 onClick={() => handleRemove(r.role)}
                 className="text-text-tertiary hover:text-status-error transition-colors ml-0.5"
@@ -257,7 +257,7 @@ function RolesSection({ bot }: { bot: BotRecord }) {
           </select>
           <div className="grid grid-cols-2 gap-2 items-end">
             <div className="min-w-0">
-              <label className="block text-[10px] text-text-tertiary mb-1">Type</label>
+              <label className="block text-2xs text-text-tertiary mb-1">Type</label>
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as LTRoleType)}
@@ -282,7 +282,7 @@ function RolesSection({ bot }: { bot: BotRecord }) {
         </div>
       )}
       {addRole.error && (
-        <p className="text-[10px] text-status-error mt-1">{(addRole.error as Error).message}</p>
+        <p className="text-2xs text-status-error mt-1">{(addRole.error as Error).message}</p>
       )}
     </div>
   );

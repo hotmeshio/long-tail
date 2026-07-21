@@ -353,7 +353,7 @@ export function EscalationDetailPage() {
                   >
                     {icon}
                   </button>
-                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 rounded text-[11px] bg-surface-sunken text-text-primary whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity">
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 rounded text-2xs bg-surface-sunken text-text-primary whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity">
                     {label}
                   </span>
                 </div>

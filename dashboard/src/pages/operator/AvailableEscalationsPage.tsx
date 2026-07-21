@@ -418,7 +418,7 @@ export function AvailableEscalationsPage() {
         actions={
           <>
             {showTimeline && (
-              <span className="text-[11px] text-text-tertiary whitespace-nowrap">
+              <span className="text-2xs text-text-tertiary whitespace-nowrap">
                 {total > 100 && (
                   <><span className="font-medium text-text-secondary">{(pagination.page - 1) * 100 + 1}–{Math.min(pagination.page * 100, total)}</span>{' of '}</>
                 )}
@@ -471,7 +471,7 @@ export function AvailableEscalationsPage() {
             >
               <SlidersHorizontal className="w-4 h-4" />
               {activeFacetCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-[9px] font-medium text-text-inverse">
+                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-2xs font-medium text-text-inverse">
                   {activeFacetCount}
                 </span>
               )}
@@ -503,7 +503,7 @@ export function AvailableEscalationsPage() {
       {((facetFilters.facets && Object.keys(facetFilters.facets).length > 0) || facetFilters.jeopardy) && (
         <div className="sticky top-14 z-30 bg-surface/98 backdrop-blur-sm border-b border-surface-border/30 -mx-page-x px-page-x py-2 flex items-center gap-1.5 flex-wrap">
           {facetFilters.jeopardy && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-status-error px-2.5 py-0.5 text-[10px] font-semibold text-text-inverse">
+            <span className="inline-flex items-center gap-1 rounded-full bg-status-error px-2.5 py-0.5 text-2xs font-semibold text-text-inverse">
               <TriangleAlert className="w-2.5 h-2.5" strokeWidth={2.5} />
               in jeopardy
               {jeopardyThresholdLabel && <span className="font-mono font-normal opacity-90">&gt; {jeopardyThresholdLabel}</span>}
@@ -519,7 +519,7 @@ export function AvailableEscalationsPage() {
           {Object.entries(facetFilters.facets ?? {}).map(([k, v]) => (
             <span
               key={k}
-              className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/8 px-2.5 py-0.5 text-[10px] font-medium text-accent/90"
+              className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/8 px-2.5 py-0.5 text-2xs font-medium text-accent/90"
             >
               <span className="font-mono text-text-tertiary">{k}</span>
               <span className="text-text-quaternary">=</span>
@@ -536,7 +536,7 @@ export function AvailableEscalationsPage() {
           {Object.keys(facetFilters.facets ?? {}).length > 1 && (
             <button
               onClick={() => setFacetFilters({ ...facetFilters, facets: undefined })}
-              className="text-[10px] text-text-quaternary hover:text-text-secondary transition-colors px-1"
+              className="text-2xs text-text-quaternary hover:text-text-secondary transition-colors px-1"
             >
               clear all
             </button>

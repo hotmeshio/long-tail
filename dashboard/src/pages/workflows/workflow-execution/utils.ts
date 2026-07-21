@@ -22,11 +22,16 @@ export interface Lane {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
+// Category hues resolve through the --lt-* tokens so registered themes
+// restyle the timeline. Bars use the -graphic variants (bright, 3:1 graphic
+// contrast); text uses the text-safe status values. Role mapping: activities
+// take the theme accent, signals the success green, timers the pending amber,
+// child workflows the claimed orange (spawned work in flight).
 export const CATEGORY_COLORS: Record<string, { bar: string; outline: string; text: string; label: string }> = {
-  activity:       { bar: 'bg-blue-500',       outline: 'border border-blue-400/40 bg-blue-400/15',       text: 'text-blue-500',      label: 'Activities' },
-  signal:         { bar: 'bg-emerald-500',    outline: 'border border-emerald-400/40 bg-emerald-400/15', text: 'text-emerald-500',   label: 'Signals' },
-  timer:          { bar: 'bg-status-warning', outline: 'border border-amber-400/40 bg-amber-400/15',    text: 'text-status-warning', label: 'Timers' },
-  child_workflow: { bar: 'bg-violet-500',     outline: 'border border-violet-400/40 bg-violet-400/15',  text: 'text-violet-500',    label: 'Child Workflows' },
+  activity:       { bar: 'bg-accent',                 outline: 'border border-accent/40 bg-accent/15',                                   text: 'text-accent',         label: 'Activities' },
+  signal:         { bar: 'bg-status-success-graphic', outline: 'border border-status-success-graphic/40 bg-status-success-graphic/15',   text: 'text-status-success', label: 'Signals' },
+  timer:          { bar: 'bg-status-pending-graphic', outline: 'border border-status-pending-graphic/40 bg-status-pending-graphic/15',   text: 'text-status-warning', label: 'Timers' },
+  child_workflow: { bar: 'bg-status-claimed-graphic', outline: 'border border-status-claimed-graphic/40 bg-status-claimed-graphic/15',   text: 'text-status-claimed', label: 'Child Workflows' },
 };
 
 export const PENDING_CLASS = 'bg-stripes animate-pulse opacity-70';

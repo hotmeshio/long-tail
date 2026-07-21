@@ -72,7 +72,7 @@ export function QueueCard({
         return (
           <div className="flex items-center gap-2" title={row.engine_id}>
             <span className="text-xs text-text-secondary truncate max-w-[180px]">{label}</span>
-            {source && <span className="text-[9px] text-text-tertiary/50">{source}</span>}
+            {source && <span className="text-2xs text-text-tertiary/50">{source}</span>}
           </div>
         );
       },
@@ -137,13 +137,13 @@ export function QueueCard({
         <span className="flex-1" />
 
         {errors > 0 && (
-          <span className="text-[10px] text-status-error font-medium mr-2">
+          <span className="text-2xs text-status-error font-medium mr-2">
             {errors} errors
           </span>
         )}
 
         {pending > 0 && (
-          <span className="flex items-center gap-1 text-[10px] text-status-warning w-20">
+          <span className="flex items-center gap-1 text-2xs text-status-warning w-20">
             <Inbox className="w-3 h-3 shrink-0" strokeWidth={1.5} />
             <span className="font-mono tabular-nums">{pending.toLocaleString()}</span>
           </span>

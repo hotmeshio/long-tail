@@ -16,9 +16,9 @@ import { CreateRoleModal } from './CreateRoleModal';
 const GRID = '200px 160px 1fr 130px 160px 88px 204px';
 
 const CELL_TEXT = 'text-text-secondary transition-colors group-hover/row:text-text-primary';
-// Header/cell sizes match the app's list standard (DataTable): text-[10px]
+// Header/cell sizes match the app's list standard (DataTable): text-2xs
 // headers, text-sm body cells.
-const HDR = 'text-[10px] font-semibold uppercase tracking-widest text-text-quaternary';
+const HDR = 'text-2xs font-semibold uppercase tracking-widest text-text-quaternary';
 
 // ── Table header ──────────────────────────────────────────────────────────────
 
@@ -208,7 +208,7 @@ export function RolesPage() {
               className="input w-56"
             />
             {search && filtered.length !== roles.length && (
-              <span className="text-[10px] text-text-quaternary tabular-nums shrink-0">
+              <span className="text-2xs text-text-quaternary tabular-nums shrink-0">
                 {filtered.length} of {roles.length}
               </span>
             )}

@@ -23,7 +23,7 @@ function splitEntityKey(compound: string): { taskQueue: string; workflowType: st
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+    <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
       {children}
     </p>
   );
@@ -48,9 +48,9 @@ function EscalationRows({ escalations }: { escalations: LTEscalationRecord[] }) 
             <span className="block text-xs font-mono text-text-primary group-hover:text-accent transition-colors truncate" title={esc.type}>
               {esc.type}
             </span>
-            <span className="block text-[10px] text-text-tertiary truncate">{esc.role}</span>
+            <span className="block text-2xs text-text-tertiary truncate">{esc.role}</span>
           </span>
-          <DateValue date={esc.created_at} format="relative" className="text-[10px] text-text-tertiary whitespace-nowrap" />
+          <DateValue date={esc.created_at} format="relative" className="text-2xs text-text-tertiary whitespace-nowrap" />
           <span className="w-20 flex justify-end"><StatusBadge status={esc.status} /></span>
         </Link>
       ))}
@@ -71,9 +71,9 @@ function TaskRows({ tasks }: { tasks: LTTaskRecord[] }) {
             <span className="block text-xs font-mono text-text-primary group-hover:text-accent transition-colors truncate" title={t.workflow_type}>
               {t.workflow_type}
             </span>
-            <span className="block text-[10px] text-text-tertiary truncate">{t.lt_type}</span>
+            <span className="block text-2xs text-text-tertiary truncate">{t.lt_type}</span>
           </span>
-          <DateValue date={t.created_at} format="relative" className="text-[10px] text-text-tertiary whitespace-nowrap" />
+          <DateValue date={t.created_at} format="relative" className="text-2xs text-text-tertiary whitespace-nowrap" />
           <span className="w-20 flex justify-end"><StatusBadge status={t.status} /></span>
         </Link>
       ))}

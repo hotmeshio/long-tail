@@ -118,7 +118,7 @@ export function BulkAssignModal({
                     {user.display_name || user.external_id}
                   </p>
                   {user.email && (
-                    <p className="text-[10px] text-text-tertiary">
+                    <p className="text-2xs text-text-tertiary">
                       {user.email}
                     </p>
                   )}

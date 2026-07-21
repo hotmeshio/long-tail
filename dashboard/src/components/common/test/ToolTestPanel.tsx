@@ -16,9 +16,9 @@ function ToolErrorDisplay({ error }: { error: Error | null }) {
       <div className="bg-status-warning/10 border border-status-warning/30 rounded-md px-3 py-2 flex items-start gap-2">
         <KeyRound size={14} className="text-status-warning mt-0.5 shrink-0" />
         <div>
-          <p className="text-[11px] font-medium text-text-primary mb-0.5">Credential required</p>
-          <p className="text-[11px] text-text-secondary mb-1">{msg}</p>
-          <Link to="/credentials" className="text-[11px] text-accent hover:underline inline-flex items-center gap-1">
+          <p className="text-2xs font-medium text-text-primary mb-0.5">Credential required</p>
+          <p className="text-2xs text-text-secondary mb-1">{msg}</p>
+          <Link to="/credentials" className="text-2xs text-accent hover:underline inline-flex items-center gap-1">
             Go to Credentials <ExternalLink size={10} />
           </Link>
         </div>
@@ -27,7 +27,7 @@ function ToolErrorDisplay({ error }: { error: Error | null }) {
   }
   return (
     <div className="bg-status-error/10 border border-status-error/20 rounded-md px-3 py-2">
-      <p className="text-[11px] text-status-error">{msg || 'Tool call failed'}</p>
+      <p className="text-2xs text-status-error">{msg || 'Tool call failed'}</p>
     </div>
   );
 }
@@ -139,7 +139,7 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
       <div className="px-4 py-4 space-y-5">
         {tool.description && (
           <div className="border-l-2 border-accent/30 pl-3 py-1">
-            <p className="text-[11px] text-text-secondary leading-relaxed italic">{tool.description}</p>
+            <p className="text-2xs text-text-secondary leading-relaxed italic">{tool.description}</p>
           </div>
         )}
 
@@ -152,8 +152,8 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
         {/* Form / JSON toggle input */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-text-quaternary">Parameters</span>
-            <button onClick={toggleMode} className="text-[10px] text-accent/70 hover:text-accent transition-colors">
+            <span className="text-2xs text-text-quaternary">Parameters</span>
+            <button onClick={toggleMode} className="text-2xs text-accent/70 hover:text-accent transition-colors">
               {jsonMode ? 'Form view' : 'JSON view'}
             </button>
           </div>
@@ -216,16 +216,16 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
                         placeholder={propSchema?.type === 'string' ? propSchema?.example || '' : ''}
                       />
                     )}
-                    {hint && <p className="text-[9px] text-text-quaternary/70 mt-0.5 leading-snug">{hint}</p>}
+                    {hint && <p className="text-2xs text-text-quaternary/70 mt-0.5 leading-snug">{hint}</p>}
                   </div>
                 );
               })}
               {Object.keys(fields).length === 0 && (
-                <p className="text-[11px] text-text-quaternary">No parameters</p>
+                <p className="text-2xs text-text-quaternary">No parameters</p>
               )}
             </div>
           )}
-          {jsonError && <p className="text-[11px] text-status-error mt-1">{jsonError}</p>}
+          {jsonError && <p className="text-2xs text-status-error mt-1">{jsonError}</p>}
         </div>
 
         {/* Run button */}
@@ -246,7 +246,7 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
         {/* Response */}
         {callTool.isPending && (
           <div className="animate-pulse">
-            <p className="text-[10px] text-text-quaternary mb-1">Response</p>
+            <p className="text-2xs text-text-quaternary mb-1">Response</p>
             <div className="h-20 bg-surface-sunken/50 rounded-md" />
           </div>
         )}
@@ -258,7 +258,7 @@ export function ToolTestPanel({ serverId, serverName, tool, onClose }: ToolTestP
         ) : null}
         {callTool.error ? (
           <div>
-            <p className="text-[10px] text-text-quaternary mb-1">Response</p>
+            <p className="text-2xs text-text-quaternary mb-1">Response</p>
             <ToolErrorDisplay error={callTool.error as Error | null} />
           </div>
         ) : null}

@@ -61,9 +61,9 @@ function SectionGroup({
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-1.5 min-w-0">
           <Icon className={`w-3 h-3 ${hue} shrink-0`} strokeWidth={1.5} />
-          <span className={`text-[9px] font-semibold uppercase tracking-widest ${hue}`}>{label}</span>
+          <span className={`text-2xs font-semibold uppercase tracking-widest ${hue}`}>{label}</span>
           {annotation && (
-            <span className="text-[9px] text-text-quaternary truncate">— {annotation}</span>
+            <span className="text-2xs text-text-quaternary truncate">— {annotation}</span>
           )}
         </div>
         {aside}
@@ -80,7 +80,7 @@ function LiveBadge() {
   return (
     <div className="flex items-center gap-1">
       <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
-      <span className="text-[9px] font-semibold uppercase tracking-widest text-status-success">Live</span>
+      <span className="text-2xs font-semibold uppercase tracking-widest text-status-success">Live</span>
     </div>
   );
 }
@@ -106,7 +106,7 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
   );
 
   if (role.role === 'superadmin') {
-    return <p className="text-[11px] text-text-tertiary">Superadmins can escalate to any role implicitly.</p>;
+    return <p className="text-2xs text-text-tertiary">Superadmins can escalate to any role implicitly.</p>;
   }
 
   return (
@@ -150,14 +150,14 @@ function EscalationSection({ role, allRoles }: { role: RoleDetail; allRoles: Rol
  */
 function PillWell({ items, empty, onRemove }: { items: string[]; empty: string; onRemove: (item: string) => void }) {
   if (items.length === 0) {
-    return <p className="text-[10px] text-text-tertiary leading-relaxed">{empty}</p>;
+    return <p className="text-2xs text-text-tertiary leading-relaxed">{empty}</p>;
   }
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((item) => (
         <span
           key={item}
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-accent/10 rounded-sm font-mono text-accent"
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs bg-accent/10 rounded-sm font-mono text-accent"
         >
           {item}
           <button
@@ -223,7 +223,7 @@ function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleD
         onRemove={(u) => save(upstreams.filter((x) => x !== u))}
       />
       {updateRole.error && (
-        <p className="text-[10px] text-status-error">{(updateRole.error as Error).message}</p>
+        <p className="text-2xs text-status-error">{(updateRole.error as Error).message}</p>
       )}
     </div>
   );
@@ -267,7 +267,7 @@ function DefaultPinsSection({ role }: { role: RoleDetail }) {
           placeholder="/escalations/available?role=…"
           className="input text-xs font-mono flex-1"
         />
-        <label className="flex items-center gap-1 text-[10px] text-text-tertiary shrink-0" title="Show a live count beside the label">
+        <label className="flex items-center gap-1 text-2xs text-text-tertiary shrink-0" title="Show a live count beside the label">
           <input type="checkbox" checked={badge} onChange={(e) => setBadge(e.target.checked)} className="w-3 h-3 accent-accent" />
           count
         </label>
@@ -280,16 +280,16 @@ function DefaultPinsSection({ role }: { role: RoleDetail }) {
         </button>
       </div>
       {pins.length === 0 ? (
-        <p className="text-[10px] text-text-tertiary leading-relaxed">
+        <p className="text-2xs text-text-tertiary leading-relaxed">
           Pinned views every member starts with — the persona's exact queries.
           Add one above and it lands here.
         </p>
       ) : (
         <div className="space-y-1">
           {pins.map((p) => (
-            <div key={p.label} className="flex items-baseline gap-2 text-[11px]">
+            <div key={p.label} className="flex items-baseline gap-2 text-2xs">
               <span className="font-medium text-text-secondary shrink-0">{p.label}</span>
-              {p.badge && <span className="text-[9px] text-accent shrink-0" title="Shows a live count">count</span>}
+              {p.badge && <span className="text-2xs text-accent shrink-0" title="Shows a live count">count</span>}
               <span className="font-mono text-text-quaternary truncate flex-1" title={p.url}>{p.url}</span>
               <button
                 onClick={() => save(pins.filter((x) => x.label !== p.label))}
@@ -303,7 +303,7 @@ function DefaultPinsSection({ role }: { role: RoleDetail }) {
         </div>
       )}
       {updateRole.error && (
-        <p className="text-[10px] text-status-error">{(updateRole.error as Error).message}</p>
+        <p className="text-2xs text-status-error">{(updateRole.error as Error).message}</p>
       )}
     </div>
   );
@@ -506,7 +506,7 @@ export function RoleDetailPage() {
                 <BookOpen className="w-4 h-4" strokeWidth={1.5} />
               </button>
               {role.parent_role && (
-                <span className="flex items-center gap-1 text-[10px] text-text-quaternary font-mono">
+                <span className="flex items-center gap-1 text-2xs text-text-quaternary font-mono">
                   <GitBranch className="w-3 h-3" /> {role.parent_role}
                 </span>
               )}
@@ -516,7 +516,7 @@ export function RoleDetailPage() {
 
           {/* Pace Board — this role is (or isn't) a station on the Pace Board */}
           <div className="flex items-center gap-2 shrink-0" title="Show as a station on the Pace Board">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Pace Board</span>
+            <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Pace Board</span>
             <button
               onClick={() => update({ ops_visible: !draft.ops_visible })}
               className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
@@ -524,7 +524,7 @@ export function RoleDetailPage() {
               }`}
             >
               <span
-                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
+                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-text-inverse transition-transform shadow ${
                   draft.ops_visible ? 'translate-x-[18px]' : 'translate-x-[3px]'
                 }`}
               />
@@ -537,7 +537,7 @@ export function RoleDetailPage() {
             className="flex items-center gap-2 shrink-0"
             title="Validate every resolve payload against this role's form schema — API, MCP, and CLI submissions are rejected with field-level errors when they violate it"
           >
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Enforce Schema</span>
+            <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Enforce Schema</span>
             <button
               onClick={() => update({ enforce_schema: !draft.enforce_schema })}
               className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
@@ -545,7 +545,7 @@ export function RoleDetailPage() {
               }`}
             >
               <span
-                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
+                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-text-inverse transition-transform shadow ${
                   draft.enforce_schema ? 'translate-x-[18px]' : 'translate-x-[3px]'
                 }`}
               />
@@ -565,7 +565,7 @@ export function RoleDetailPage() {
             { key: 'worker_count' as const,     label: 'Workers', unit: '',    placeholder: '4' },
           ].map(({ key, label, unit, placeholder }) => (
             <div key={key}>
-              <label className="block text-[9px] font-semibold uppercase tracking-widest text-text-quaternary mb-1">
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-quaternary mb-1">
                 {label}
                 {unit && <span className="normal-case font-normal ml-1">{unit}</span>}
               </label>
@@ -581,7 +581,7 @@ export function RoleDetailPage() {
             </div>
           ))}
           {derivedCapacityHint && (
-            <span className="text-[10px] text-accent font-mono whitespace-nowrap pb-2">
+            <span className="text-2xs text-accent font-mono whitespace-nowrap pb-2">
               {derivedCapacityHint}
             </span>
           )}
@@ -596,7 +596,7 @@ export function RoleDetailPage() {
             title="Pending unclaimed items older than the threshold count as priority on the Pace Board. Age is measured from the metadata facet (an ISO 8601 UTC timestamp, e.g. authorized_at) or from created_at when the facet is blank; the threshold falls back to SLA when blank."
           >
             <div>
-              <label className="block text-[9px] font-semibold uppercase tracking-widest text-text-quaternary mb-1">
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-quaternary mb-1">
                 Priority
                 <span className="normal-case font-normal ml-1">min</span>
               </label>
@@ -611,7 +611,7 @@ export function RoleDetailPage() {
               />
             </div>
             <div>
-              <label className="block text-[9px] font-semibold uppercase tracking-widest text-text-quaternary mb-1">
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-quaternary mb-1">
                 Facet
               </label>
               <input
@@ -622,7 +622,7 @@ export function RoleDetailPage() {
                 className="input text-xs w-28 font-mono"
               />
               {errors.priority_facet && (
-                <p className="text-[9px] text-status-error mt-0.5">{errors.priority_facet}</p>
+                <p className="text-2xs text-status-error mt-0.5">{errors.priority_facet}</p>
               )}
             </div>
           </div>
@@ -667,7 +667,7 @@ export function RoleDetailPage() {
           <SectionGroup icon={Tag} label="Identity" annotation="name and description" accent>
             <div className="space-y-8">
               <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+                <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
                   Display Name
                 </label>
                 <input
@@ -680,7 +680,7 @@ export function RoleDetailPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+                <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
                   Description
                 </label>
                 <AutoGrowTextarea
@@ -710,7 +710,7 @@ export function RoleDetailPage() {
               <div className="space-y-8">
                 {/* Prior Step */}
                 <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+                  <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
                     Prior Step
                   </label>
                   <select
@@ -725,7 +725,7 @@ export function RoleDetailPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-text-tertiary leading-relaxed mt-1.5">
+                  <p className="text-2xs text-text-tertiary leading-relaxed mt-1.5">
                     Places this role in one Pace Board sequence. A role with no prior
                     step starts its own sequence.
                   </p>
@@ -734,7 +734,7 @@ export function RoleDetailPage() {
                 {/* Upstream inputs — cross-sequence graph edges, live-save */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                    <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
                       Upstream Inputs
                     </label>
                     <LiveBadge />
@@ -790,11 +790,11 @@ export function RoleDetailPage() {
             accent
             aside={
               role.current_schema_version != null ? (
-                <span className="text-[9px] font-mono text-text-quaternary">v{role.current_schema_version} in use</span>
+                <span className="text-2xs font-mono text-text-quaternary">v{role.current_schema_version} in use</span>
               ) : undefined
             }
           >
-            <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
+            <p className="text-2xs text-text-tertiary mb-3 leading-relaxed">
               The form a person completes to resolve this role's escalations.
               Versioned — each save adds one; workflows pin any version via{' '}
               <code className="font-mono">schemaVersion</code>.
@@ -816,11 +816,11 @@ export function RoleDetailPage() {
             annotation="rich list view"
             aside={
               role.current_list_schema_version != null ? (
-                <span className="text-[9px] font-mono text-text-quaternary">v{role.current_list_schema_version} in use</span>
+                <span className="text-2xs font-mono text-text-quaternary">v{role.current_list_schema_version} in use</span>
               ) : undefined
             }
           >
-            <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
+            <p className="text-2xs text-text-tertiary mb-3 leading-relaxed">
               Richly formats the escalation list when it's scoped to just this role.
               Versioned on its own timeline — separate from the resolve form.
             </p>
@@ -841,11 +841,11 @@ export function RoleDetailPage() {
             annotation="validates metadata at creation"
             aside={
               !editingJson.has('metadata_schema') && role.metadata_schema ? (
-                <button onClick={() => startEditingJson('metadata_schema')} className="text-[9px] text-accent hover:underline">Edit</button>
+                <button onClick={() => startEditingJson('metadata_schema')} className="text-2xs text-accent hover:underline">Edit</button>
               ) : undefined
             }
           >
-            <p className="text-[10px] text-text-tertiary mb-3 leading-relaxed">
+            <p className="text-2xs text-text-tertiary mb-3 leading-relaxed">
               Validates <code className="font-mono">metadata</code> at creation time. Keys appear in faceted search autocomplete.
             </p>
             {!editingJson.has('metadata_schema') && role.metadata_schema ? (
@@ -864,7 +864,7 @@ export function RoleDetailPage() {
                   className="input text-xs font-mono w-full resize-y"
                   placeholder={'{\n  "type": "object",\n  "properties": {\n    "order_id": { "type": "string" }\n  },\n  "required": ["order_id"]\n}'}
                 />
-                {errors.metadata_schema && <p className="text-[10px] text-status-error mt-1">{errors.metadata_schema}</p>}
+                {errors.metadata_schema && <p className="text-2xs text-status-error mt-1">{errors.metadata_schema}</p>}
               </>
             )}
           </SectionGroup>

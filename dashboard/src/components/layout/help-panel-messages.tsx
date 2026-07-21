@@ -66,7 +66,7 @@ export function ThinkingIndicator({ msg }: { msg: HelpMessage }) {
       {msg.workflowId && (
         <Link
           to={`/workflows/executions/${msg.workflowId}`}
-          className="inline-flex items-center gap-1 text-[10px] text-accent/70 hover:text-accent transition-colors"
+          className="inline-flex items-center gap-1 text-2xs text-accent/70 hover:text-accent transition-colors"
         >
           <Workflow className="w-2.5 h-2.5" strokeWidth={1.5} />
           watch execution
@@ -82,11 +82,11 @@ export function MessageMeta({ msg, compileMessage }: { msg: HelpMessage; compile
   const isAssistant = msg.role === 'assistant';
   return (
     <div className={`flex items-center gap-1.5 ${isAssistant ? 'justify-start' : 'justify-end'}`}>
-      <DateValue date={msg.timestamp} format="time" className="!text-[9px] text-text-muted/50" />
+      <DateValue date={msg.timestamp} format="time" className="!text-2xs text-text-muted/50" />
       {msg.durationMs != null && (
         <>
-          <span className="text-text-muted/30 text-[8px]">&middot;</span>
-          <DurationValue ms={msg.durationMs} className="!text-[9px] text-text-muted/50" />
+          <span className="text-text-muted/30 text-2xs">&middot;</span>
+          <DurationValue ms={msg.durationMs} className="!text-2xs text-text-muted/50" />
         </>
       )}
       {msg.workflowId && (

@@ -98,13 +98,13 @@ export function EscalationChainsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-mono">{role}</span>
                         {isSuperAdminRole && (
-                          <span className="text-[10px] text-text-tertiary">
+                          <span className="text-2xs text-text-tertiary">
                             — all roles
                           </span>
                         )}
                       </div>
                       {!isSuperAdminRole && count > 0 && (
-                        <span className="text-[10px] text-text-tertiary bg-surface-sunken px-1.5 py-0.5 rounded-full">
+                        <span className="text-2xs text-text-tertiary bg-surface-sunken px-1.5 py-0.5 rounded-full">
                           {count}
                         </span>
                       )}

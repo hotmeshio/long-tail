@@ -11,8 +11,8 @@ interface ToolPillProps {
  */
 export function ToolPill({ name, size = 'sm' }: ToolPillProps) {
   const sizeClass = size === 'md'
-    ? 'px-2 py-0.5 text-[12px] gap-1.5'
-    : 'px-1.5 py-px text-[11px] gap-1';
+    ? 'px-2 py-0.5 text-xs gap-1.5'
+    : 'px-1.5 py-px text-2xs gap-1';
   const iconClass = size === 'md' ? 'w-2.5 h-2.5' : 'w-2 h-2';
 
   return (

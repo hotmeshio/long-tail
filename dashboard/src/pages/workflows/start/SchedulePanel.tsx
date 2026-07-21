@@ -122,13 +122,13 @@ export function SchedulePanel({
       {/* Cron execution identity */}
       <div className="bg-surface-sunken rounded-lg px-4 py-3">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-2">Cron runs as</span>
+          <span className="text-2xs text-text-tertiary uppercase tracking-wider font-medium mr-2">Cron runs as</span>
           <Bot className="w-3.5 h-3.5 text-accent/70" />
           <span className="text-xs text-text-primary font-mono">
             {selected.execute_as ?? 'lt-system'}
           </span>
           {!selected.execute_as && (
-            <span className="text-[9px] text-text-tertiary ml-1">system bot</span>
+            <span className="text-2xs text-text-tertiary ml-1">system bot</span>
           )}
         </div>
       </div>
@@ -160,8 +160,8 @@ export function SchedulePanel({
             </button>
           )}
         </div>
-        {setCron.isSuccess && <p className="text-[10px] text-status-success mt-2">Schedule updated</p>}
-        {setCron.error && <p className="text-[10px] text-status-error mt-2">{setCron.error.message}</p>}
+        {setCron.isSuccess && <p className="text-2xs text-status-success mt-2">Schedule updated</p>}
+        {setCron.error && <p className="text-2xs text-status-error mt-2">{setCron.error.message}</p>}
       </div>
 
       {/* Common patterns */}
@@ -175,8 +175,8 @@ export function SchedulePanel({
               onClick={() => { setCronInput(expr); setCron.reset(); }}
               className="flex items-center gap-2 text-left py-0.5 group"
             >
-              <code className="font-mono text-[11px] text-accent group-hover:text-accent-hover">{expr}</code>
-              <span className="text-[10px] text-text-tertiary">{desc}</span>
+              <code className="font-mono text-2xs text-accent group-hover:text-accent-hover">{expr}</code>
+              <span className="text-2xs text-text-tertiary">{desc}</span>
             </button>
           ))}
         </div>
@@ -188,19 +188,19 @@ export function SchedulePanel({
           <SectionLabel>Cron Envelope</SectionLabel>
           <div className="flex items-center gap-3">
             {isEnvelopeModified && (
-              <button type="button" onClick={handleResetEnvelope} className="text-[10px] text-status-warning hover:text-status-warning/80 transition-colors">
+              <button type="button" onClick={handleResetEnvelope} className="text-2xs text-status-warning hover:text-status-warning/80 transition-colors">
                 Reset to default
               </button>
             )}
             {formFields && (
               <div className="flex rounded overflow-hidden border border-surface-border">
-                <button type="button" onClick={() => setViewMode('form')} className={`px-2 py-0.5 text-[10px] transition-colors ${viewMode === 'form' ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-secondary'}`}>Form</button>
-                <button type="button" onClick={() => setViewMode('json')} className={`px-2 py-0.5 text-[10px] transition-colors ${viewMode === 'json' ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-secondary'}`}>JSON</button>
+                <button type="button" onClick={() => setViewMode('form')} className={`px-2 py-0.5 text-2xs transition-colors ${viewMode === 'form' ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-secondary'}`}>Form</button>
+                <button type="button" onClick={() => setViewMode('json')} className={`px-2 py-0.5 text-2xs transition-colors ${viewMode === 'json' ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text-secondary'}`}>JSON</button>
               </div>
             )}
           </div>
         </div>
-        <p className="text-[10px] text-text-tertiary mb-3">
+        <p className="text-2xs text-text-tertiary mb-3">
           This envelope is sent as the workflow input on each cron invocation.
         </p>
 
@@ -208,7 +208,7 @@ export function SchedulePanel({
           <div className="space-y-3">
             {formFields.map(({ key, value, type }) => (
               <div key={key}>
-                <label className="block text-[11px] text-text-secondary mb-1 font-mono">{key}</label>
+                <label className="block text-2xs text-text-secondary mb-1 font-mono">{key}</label>
                 {type === 'boolean' ? (
                   <select value={value} onChange={(e) => handleFormFieldChange(key, e.target.value)} className="input text-xs w-full">
                     <option value="true">true</option>
@@ -230,8 +230,8 @@ export function SchedulePanel({
           />
         )}
 
-        {envelopeError && <p className="text-[10px] text-status-error mt-2">{envelopeError}</p>}
-        {isEnvelopeModified && <p className="text-[10px] text-accent mt-1.5">Envelope has been customized. Changes will be saved with the schedule.</p>}
+        {envelopeError && <p className="text-2xs text-status-error mt-2">{envelopeError}</p>}
+        {isEnvelopeModified && <p className="text-2xs text-accent mt-1.5">Envelope has been customized. Changes will be saved with the schedule.</p>}
       </div>
 
       {/* Recent executions */}

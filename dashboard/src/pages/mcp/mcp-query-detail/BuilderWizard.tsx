@@ -96,7 +96,7 @@ export function BuilderWizard() {
         title="MCP Tool Designer"
         actions={
           <div className="flex items-center gap-3">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Direct Build</span>
+            <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Direct Build</span>
             <StatusBadge status={isClarification ? 'pending' : isBuilding ? 'in_progress' : hasYaml ? 'completed' : 'failed'} />
           </div>
         }

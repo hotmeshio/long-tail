@@ -131,14 +131,14 @@ export function EscalationSchemaPage() {
             </button>
             <span className="font-mono text-sm text-text-tertiary">{role.role}</span>
             {role.current_schema_version != null && (
-              <span className="text-[10px] font-mono text-text-quaternary">
+              <span className="text-2xs font-mono text-text-quaternary">
                 v{role.current_schema_version} in use
               </span>
             )}
           </div>
           <button
             onClick={() => { window.location.hash = '#docs:hitl-guide.md:json-schema-form-authoring'; }}
-            className="text-[11px] text-accent hover:underline pl-8"
+            className="text-2xs text-accent hover:underline pl-8"
           >
             Form authoring reference — field types, widgets, and every x-lt-* keyword →
           </button>
@@ -176,10 +176,10 @@ export function EscalationSchemaPage() {
             className="input text-xs font-mono w-full resize-y leading-relaxed"
             placeholder={PLACEHOLDER}
           />
-          {jsonError && <p className="text-[10px] text-status-error -mt-4">Invalid JSON</p>}
+          {jsonError && <p className="text-2xs text-status-error -mt-4">Invalid JSON</p>}
 
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
               Change Summary
             </label>
             <input
@@ -189,7 +189,7 @@ export function EscalationSchemaPage() {
               placeholder="e.g., Added lotNumber field for shoe orders"
               className="input text-sm w-full"
             />
-            <p className="text-[10px] text-text-quaternary mt-1.5">
+            <p className="text-2xs text-text-quaternary mt-1.5">
               Recorded on the version this save creates.
             </p>
           </div>
@@ -220,7 +220,7 @@ function VersionRail({
 
   if (versions.length === 0) {
     return (
-      <p className="text-[11px] text-text-tertiary leading-relaxed">
+      <p className="text-2xs text-text-tertiary leading-relaxed">
         Versions appear here after the first save. Each schema change adds one;
         earlier versions stay viewable and loadable as an editing base.
       </p>
@@ -255,15 +255,15 @@ function VersionEntry({
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono text-text-secondary">v{summary.version}</span>
           {summary.is_current && (
-            <span className="text-[9px] font-bold uppercase tracking-wider text-accent">current</span>
+            <span className="text-2xs font-bold uppercase tracking-wider text-accent">current</span>
           )}
           <span className="flex-1" />
-          <span className="text-[10px] text-text-quaternary shrink-0">
+          <span className="text-2xs text-text-quaternary shrink-0">
             {new Date(summary.created_at).toLocaleDateString()}
           </span>
         </div>
         {summary.change_summary && (
-          <p className="mt-0.5 text-[10px] text-text-tertiary truncate">{summary.change_summary}</p>
+          <p className="mt-0.5 text-2xs text-text-tertiary truncate">{summary.change_summary}</p>
         )}
       </button>
       {open && (
@@ -272,16 +272,16 @@ function VersionEntry({
             <>
               {snapshot.data.form_schema
                 ? <JsonViewer data={snapshot.data.form_schema} defaultCollapsed />
-                : <p className="text-[10px] text-text-quaternary">This version carries no form schema.</p>}
+                : <p className="text-2xs text-text-quaternary">This version carries no form schema.</p>}
               <button
                 onClick={() => onLoad((snapshot.data!.form_schema ?? null) as Record<string, unknown> | null)}
-                className="text-[10px] text-accent hover:underline"
+                className="text-2xs text-accent hover:underline"
               >
                 Load into editor
               </button>
             </>
           ) : (
-            <p className="text-[10px] text-text-quaternary">Loading…</p>
+            <p className="text-2xs text-text-quaternary">Loading…</p>
           )}
         </div>
       )}

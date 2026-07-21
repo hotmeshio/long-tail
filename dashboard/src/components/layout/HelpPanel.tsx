@@ -92,7 +92,7 @@ export function HelpPanel() {
       }`}>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-text-primary truncate">Help Assistant</p>
-          <p className="text-[10px] text-text-tertiary truncate">{pageName}</p>
+          <p className="text-2xs text-text-tertiary truncate">{pageName}</p>
         </div>
         <div className="flex items-center gap-1 ml-2">
           <div className="flex items-center gap-0.5 border border-surface-border rounded p-0.5" role="radiogroup" aria-label="Panel size">

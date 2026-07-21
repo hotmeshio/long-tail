@@ -66,7 +66,7 @@ export const jobColumns: Column<LTJob>[] = [
     key: 'workflow_id',
     label: 'Workflow ID',
     render: (row) => (
-      <span className="font-mono text-[11px] text-text-secondary">
+      <span className="font-mono text-2xs text-text-secondary">
         {row.workflow_id.length > 40
           ? `${row.workflow_id.slice(0, 40)}...`
           : row.workflow_id}

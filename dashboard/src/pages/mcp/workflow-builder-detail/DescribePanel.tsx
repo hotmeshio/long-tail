@@ -159,11 +159,11 @@ export function DescribePanel({ workflowId, status, builderData, onBuilt, onNext
                     <phase.icon className="w-3.5 h-3.5 text-text-tertiary/40 shrink-0 mt-0.5" strokeWidth={1.5} />
                   )}
                   <div>
-                    <p className={`text-[11px] font-medium ${isDone ? 'text-text-primary' : isActive ? 'text-text-primary' : 'text-text-tertiary/50'}`}>
+                    <p className={`text-2xs font-medium ${isDone ? 'text-text-primary' : isActive ? 'text-text-primary' : 'text-text-tertiary/50'}`}>
                       {phase.label}
                     </p>
                     {isDone && !isBuilding && (
-                      <p className="text-[10px] text-status-success mt-0.5">complete</p>
+                      <p className="text-2xs text-status-success mt-0.5">complete</p>
                     )}
                   </div>
                 </div>
@@ -171,19 +171,19 @@ export function DescribePanel({ workflowId, status, builderData, onBuilt, onNext
             })}
 
             {isBuilding && (
-              <p className="text-[10px] text-text-tertiary pl-6">
+              <p className="text-2xs text-text-tertiary pl-6">
                 Elapsed: {execution?.duration_ms ? `${(execution.duration_ms / 1000).toFixed(0)}s` : '...'}
               </p>
             )}
 
             {isComplete && builderData.build_attempts > 1 && (
-              <p className="text-[10px] text-text-tertiary pl-6">
+              <p className="text-2xs text-text-tertiary pl-6">
                 Built in {builderData.build_attempts} attempts
               </p>
             )}
 
             {isFailed && (
-              <p className="text-[10px] text-status-error pl-6">
+              <p className="text-2xs text-status-error pl-6">
                 {builderData?.summary || 'Build failed'}
               </p>
             )}

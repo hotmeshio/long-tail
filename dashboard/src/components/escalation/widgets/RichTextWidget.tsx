@@ -15,10 +15,10 @@ export function RichTextWidget({ fieldKey, value, onChange, schema }: RichTextWi
 
   return (
     <div>
-      <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+      <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
         {label}
       </label>
-      {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+      {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

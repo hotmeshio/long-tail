@@ -82,10 +82,10 @@ export function DateTooltip({ options, children, className = '' }: DateTooltipPr
               onClick={(e) => { e.stopPropagation(); handleCopy(opt.value, opt.label); }}
               className="flex items-center justify-between w-full px-2.5 py-1 text-left hover:bg-surface-hover transition-colors"
             >
-              <span className="text-[9px] font-medium uppercase tracking-wider text-text-tertiary w-10 shrink-0">
+              <span className="text-2xs font-medium uppercase tracking-wider text-text-tertiary w-10 shrink-0">
                 {opt.label}
               </span>
-              <span className="text-[10px] font-mono text-text-secondary truncate ml-2">
+              <span className="text-2xs font-mono text-text-secondary truncate ml-2">
                 {copied === opt.label ? '\u2713' : opt.value}
               </span>
             </button>

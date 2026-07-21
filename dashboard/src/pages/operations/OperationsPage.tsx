@@ -13,6 +13,7 @@ import {
   RESOLVED_COLOR,
   TARGET_COLOR,
   PRIORITY_TEXT_COLOR,
+  withAlpha,
   type ChartStation,
 } from './PaceChart';
 import { StationDetailPanel } from './StationDetailPanel';
@@ -22,11 +23,11 @@ import { displayRoleTitle } from '../../lib/role-display';
 // Column band tints — same hues as the chart bands (~8% alpha).
 // Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, sla=amber.
 const SLA_COLOR  = TARGET_COLOR;
-const TARGET_BAND   = `${TARGET_COLOR}18`;
-const SLA_BAND      = `${TARGET_COLOR}18`;
-const PENDING_BAND  = `${QUEUED_COLOR}14`;
-const ACTIVE_BAND   = `${ACTIVE_COLOR}14`;
-const RESOLVED_BAND = `${RESOLVED_COLOR}14`;
+const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.09);
+const SLA_BAND      = withAlpha(TARGET_COLOR, 0.09);
+const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.08);
+const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.08);
+const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.08);
 
 // Station table grid. The 5 colored columns are grouped into a single auto
 // cell rendered as a flex row with no internal gap so they touch each other.
@@ -204,7 +205,7 @@ function StationRow({
         </div>
 
         {/* Role id */}
-        <span className="font-mono text-[11px] text-text-tertiary truncate py-1.5">
+        <span className="font-mono text-2xs text-text-tertiary truncate py-1.5">
           {role.role}
         </span>
 
@@ -274,7 +275,7 @@ function StationRow({
             <div className={`h-full rounded-full ${color}`} style={{ width: `${barWidth}%` }} />
           </div>
           <span
-            className={`text-[10px] font-mono tabular-nums ${
+            className={`text-2xs font-mono tabular-nums ${
               pct != null && pct > 100
                 ? 'text-status-warning font-semibold'
                 : 'text-text-quaternary'
@@ -382,7 +383,7 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
         <span className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
           {displayRoleTitle(active.origin)}
         </span>
-        <span className="text-[10px] font-mono text-text-quaternary tabular-nums">
+        <span className="text-2xs font-mono text-text-quaternary tabular-nums">
           {agg?.stations ?? active.stations.length} station{(agg?.stations ?? active.stations.length) === 1 ? '' : 's'} · {agg?.pending ?? 0} pending
         </span>
         <JeopardyCount n={agg?.jeopardy ?? 0} />
@@ -412,13 +413,13 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
                 }`}
               >
                 <span className="text-xs font-medium truncate">{displayRoleTitle(f.origin)}</span>
-                <span className="ml-auto text-[10px] font-mono text-text-quaternary tabular-nums shrink-0">
+                <span className="ml-auto text-2xs font-mono text-text-quaternary tabular-nums shrink-0">
                   {a?.stations ?? f.stations.length} st · {a?.pending ?? 0} pending
                 </span>
                 {/* Fixed-width, left-aligned jeopardy column: every ⚠ starts at
                     the same x, so the icons stack vertically whether the count
                     is 1 or 9+. */}
-                <span className="w-12 shrink-0 text-left text-[10px]">
+                <span className="w-12 shrink-0 text-left text-2xs">
                   <JeopardyCount n={a?.jeopardy ?? 0} />
                 </span>
               </button>
@@ -445,8 +446,8 @@ function TableHead() {
       className="grid items-center gap-4 px-3 border-b border-surface-border mb-0.5"
       style={{ gridTemplateColumns: STATION_GRID_COLS }}
     >
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5">NAME</span>
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5">ROLE</span>
+      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">NAME</span>
+      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">ROLE</span>
 
       {/* Touching colored column group */}
       <div className="self-stretch flex items-stretch">
@@ -456,17 +457,17 @@ function TableHead() {
             className={`${col.w} shrink-0 flex items-center justify-end ${'px' in col ? col.px : 'px-1.5'}`}
             style={{ backgroundColor: col.band }}
           >
-            <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: col.hue }}>
+            <span className="text-2xs font-semibold uppercase tracking-wider" style={{ color: col.hue }}>
               {col.label}
             </span>
           </div>
         ))}
       </div>
 
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WAIT</span>
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WORK</span>
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5">TREND</span>
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-center">ACTIONS</span>
+      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WAIT</span>
+      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WORK</span>
+      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">TREND</span>
+      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-center">ACTIONS</span>
     </div>
   );
 }
@@ -589,7 +590,7 @@ export function OperationsPage() {
         <button
           key={p}
           onClick={() => setPeriod(p)}
-          className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors ${
+          className={`px-2.5 py-1 text-2xs font-mono rounded transition-colors ${
             period === p
               ? 'bg-accent/10 text-accent font-semibold'
               : 'text-text-quaternary hover:text-text-secondary'

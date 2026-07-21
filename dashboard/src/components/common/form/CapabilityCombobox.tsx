@@ -73,7 +73,7 @@ export function CapabilityCombobox({ serverId, toolName, onChange }: {
 
       {/* Selected tool description */}
       {!open && selectedTool?.description && (
-        <p className="text-[10px] text-text-tertiary mt-1 italic">{selectedTool.description}</p>
+        <p className="text-2xs text-text-tertiary mt-1 italic">{selectedTool.description}</p>
       )}
 
       {open && filtered.length > 0 && (
@@ -91,13 +91,13 @@ export function CapabilityCombobox({ serverId, toolName, onChange }: {
                 serverId === t.serverId && toolName === t.name ? 'bg-accent/5' : ''
               }`}
             >
-              <span className="text-[11px] font-mono text-text-primary shrink-0">{t.name}</span>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0 bg-accent/10 text-accent">
+              <span className="text-2xs font-mono text-text-primary shrink-0">{t.name}</span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-medium shrink-0 bg-accent/10 text-accent">
                 <Server className="w-2 h-2" strokeWidth={1.5} />
                 {t.serverName}
               </span>
               {t.description && (
-                <span className="text-[10px] text-text-quaternary truncate">{t.description}</span>
+                <span className="text-2xs text-text-quaternary truncate">{t.description}</span>
               )}
             </button>
           ))}
@@ -106,7 +106,7 @@ export function CapabilityCombobox({ serverId, toolName, onChange }: {
 
       {open && filtered.length === 0 && filter && (
         <div className="absolute z-[100] left-0 right-0 mt-1 rounded-md border border-surface-border bg-surface shadow-lg px-3 py-4 text-center">
-          <p className="text-[11px] text-text-quaternary">No capabilities match "{filter}"</p>
+          <p className="text-2xs text-text-quaternary">No capabilities match "{filter}"</p>
         </div>
       )}
     </div>

@@ -68,7 +68,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
           return (
             <div key={src} className="flex items-center gap-1">
               <span className={`w-2 h-2 rounded-full dot-ring ${s.dot}`} />
-              <span className="text-[9px] text-text-tertiary">{s.label}</span>
+              <span className="text-2xs text-text-tertiary">{s.label}</span>
             </div>
           );
         })}
@@ -81,7 +81,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
           {Array.from({ length: numLayers }).map((_, i) => (
             <span
               key={i}
-              className="absolute text-[9px] font-mono text-text-tertiary bottom-1 -translate-x-1/2"
+              className="absolute text-2xs font-mono text-text-tertiary bottom-1 -translate-x-1/2"
               style={{ left: `${((i + 0.5) / numLayers) * 100}%` }}
             >
               {i === 0 ? 'entry' : `step ${i}`}
@@ -144,7 +144,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
                     minWidth: 40,
                   }}
                 >
-                  <span className="absolute inset-0 flex items-center px-2 text-[9px] font-mono text-white truncate">
+                  <span className="absolute inset-0 flex items-center px-2 text-2xs font-mono text-text-inverse truncate">
                     {entry.mcp_tool_name ?? entry.tool_source}
                   </span>
                 </div>
@@ -169,7 +169,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
                 markerHeight="5"
                 orient="auto-start-reverse"
               >
-                <path d="M0 0 L10 4 L0 8 Z" fill="#6B7280" opacity="0.6" />
+                <path d="M0 0 L10 4 L0 8 Z" className="fill-text-quaternary" opacity="0.6" />
               </marker>
             </defs>
 
@@ -198,7 +198,7 @@ export function DagCanvas({ manifest, selectedId, onSelect, yaml }: DagCanvasPro
                   key={i}
                   d={`M${x1} ${y1} C${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`}
                   fill="none"
-                  stroke="#6B7280"
+                  className="stroke-text-quaternary"
                   strokeWidth={1.5}
                   opacity={0.4}
                   markerEnd="url(#dag-edge-arrow)"

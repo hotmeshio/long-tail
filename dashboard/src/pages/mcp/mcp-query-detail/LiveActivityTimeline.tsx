@@ -3,10 +3,10 @@ import type { ActivityStep } from '../../../hooks/useYamlActivityEvents';
 import { ToolPill } from '../../../components/common/display/ToolPill';
 
 const TOOL_SOURCE_COLORS: Record<string, { border: string; text: string; icon: string }> = {
-  mcp:       { border: 'border-blue-500', text: 'text-blue-500', icon: 'MCP' },
-  db:        { border: 'border-blue-500', text: 'text-blue-500', icon: 'DB' },
-  llm:       { border: 'border-violet-500', text: 'text-violet-500', icon: 'LLM' },
-  transform: { border: 'border-emerald-500', text: 'text-emerald-500', icon: 'Map' },
+  mcp:       { border: 'border-accent', text: 'text-accent', icon: 'MCP' },
+  db:        { border: 'border-accent', text: 'text-accent', icon: 'DB' },
+  llm:       { border: 'border-status-claimed', text: 'text-status-claimed', icon: 'LLM' },
+  transform: { border: 'border-status-success', text: 'text-status-success', icon: 'Map' },
 };
 
 export function LiveActivityTimeline({
@@ -76,7 +76,7 @@ export function LiveActivityTimeline({
                   {step.title}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[9px] font-mono px-1 py-0.5 rounded border ${step.colors.border} ${step.colors.text} bg-transparent`}>
+                  <span className={`text-2xs font-mono px-1 py-0.5 rounded border ${step.colors.border} ${step.colors.text} bg-transparent`}>
                     {step.colors.icon}
                   </span>
                   {step.toolName && (
@@ -84,7 +84,7 @@ export function LiveActivityTimeline({
                   )}
                 </div>
                 {step.error && (
-                  <p className="text-[10px] text-status-error mt-1">{step.error}</p>
+                  <p className="text-2xs text-status-error mt-1">{step.error}</p>
                 )}
               </div>
             </div>
@@ -93,7 +93,7 @@ export function LiveActivityTimeline({
       </div>
 
       {isComplete && (
-        <p className="text-[10px] text-text-tertiary mt-3 text-center">Closing...</p>
+        <p className="text-2xs text-text-tertiary mt-3 text-center">Closing...</p>
       )}
     </div>
   );

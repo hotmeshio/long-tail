@@ -33,7 +33,7 @@ function SectionHeader({ icon: Icon, color, children, actions }: { icon: React.E
 }
 
 function EmptyHint({ text }: { text: string }) {
-  return <p className="text-[11px] text-text-quaternary py-2">{text}</p>;
+  return <p className="text-2xs text-text-quaternary py-2">{text}</p>;
 }
 
 /** Per-section deeplink — jumps straight to that section instead of Edit → navigate. */
@@ -173,7 +173,7 @@ export function AgentDetailPage() {
       {/* Description callout */}
       {agent.description && (
         <div className="border-l-2 border-accent/30 pl-4 py-1 mb-10">
-          <p className="text-[13px] text-text-secondary italic leading-relaxed">{agent.description}</p>
+          <p className="text-sm text-text-secondary italic leading-relaxed">{agent.description}</p>
         </div>
       )}
 
@@ -188,14 +188,14 @@ export function AgentDetailPage() {
           <div className="grid grid-cols-2 gap-x-14 bg-surface-sunken/20 rounded-lg px-5 py-4">
             {agent.goals && (
               <div>
-                <p className="text-[9px] text-text-quaternary uppercase tracking-widest mb-1.5">Goals</p>
-                <p className="text-[13px] text-text-primary leading-relaxed">{agent.goals}</p>
+                <p className="text-2xs text-text-quaternary uppercase tracking-widest mb-1.5">Goals</p>
+                <p className="text-sm text-text-primary leading-relaxed">{agent.goals}</p>
               </div>
             )}
             {agent.rules && (
               <div>
-                <p className="text-[9px] text-text-quaternary uppercase tracking-widest mb-1.5">Rules</p>
-                <p className="text-[13px] text-text-primary leading-relaxed">{agent.rules}</p>
+                <p className="text-2xs text-text-quaternary uppercase tracking-widest mb-1.5">Rules</p>
+                <p className="text-sm text-text-primary leading-relaxed">{agent.rules}</p>
               </div>
             )}
           </div>
@@ -222,7 +222,7 @@ export function AgentDetailPage() {
                 <div key={sub.id} className="flex items-center py-2">
                   <div className="flex-1 min-w-0"><EventTopicPill topic={sub.topic} /></div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-text-quaternary text-[10px]">→</span>
+                    <span className="text-text-quaternary text-2xs">→</span>
                     <WorkflowPill
                       type={sub.reaction_type === 'capability' ? sub.tool_name : sub.workflow_type || sub.reaction_type}
                       variant={sub.reaction_type === 'pipeline' ? 'pipeline' : sub.reaction_type === 'capability' ? 'capability' : 'durable'}
@@ -246,14 +246,14 @@ export function AgentDetailPage() {
               {schedules.map((s: any, i: number) => (
                 <div key={i} className="flex items-center py-2">
                   <div className="flex-1 min-w-0"><CronLabel cron={s.cron} /></div>
-                  <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span><WorkflowPill type={s.workflow_type || 'workflow'} /></div>
+                  <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-2xs">→</span><WorkflowPill type={s.workflow_type || 'workflow'} /></div>
                 </div>
               ))}
             </div>
           ) : legacyCron ? (
             <div className="flex items-center py-1">
               <div className="flex-1 min-w-0"><CronLabel cron={legacyCron} /></div>
-              {agent.workflow_type && <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span><WorkflowPill type={agent.workflow_type} /></div>}
+              {agent.workflow_type && <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-2xs">→</span><WorkflowPill type={agent.workflow_type} /></div>}
             </div>
           ) : (
             <EmptyHint text="No schedules configured" />
@@ -276,7 +276,7 @@ export function AgentDetailPage() {
             {agent.knowledge_domain ? (
               <button onClick={() => navigate(`/knowledge?domain=${agent.knowledge_domain}`)} className="group text-left flex items-center gap-3">
                 <span className="text-sm font-mono text-text-primary group-hover:text-accent transition-colors">{agent.knowledge_domain}</span>
-                <span className="text-[10px] text-text-quaternary">{agent.stats?.knowledge_count?.toLocaleString() ?? 0} entries</span>
+                <span className="text-2xs text-text-quaternary">{agent.stats?.knowledge_count?.toLocaleString() ?? 0} entries</span>
                 <ArrowRight className="w-3 h-3 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             ) : (
@@ -289,7 +289,7 @@ export function AgentDetailPage() {
               actions={
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full dot-ring transition-colors duration-500 ${pulse ? 'bg-status-success' : 'bg-surface-border'}`} />
-                  <span className="text-[10px] text-text-quaternary">live</span>
+                  <span className="text-2xs text-text-quaternary">live</span>
                 </div>
               }
             >
@@ -302,8 +302,8 @@ export function AgentDetailPage() {
                 {liveEvents.map((ev) => (
                   <div key={ev.id}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] text-text-primary font-mono truncate flex-1">{ev.label || '—'}</span>
-                      <span className="text-[10px] text-text-quaternary shrink-0 ml-2">{formatTime(ev.timestamp)}</span>
+                      <span className="text-2xs text-text-primary font-mono truncate flex-1">{ev.label || '—'}</span>
+                      <span className="text-2xs text-text-quaternary shrink-0 ml-2">{formatTime(ev.timestamp)}</span>
                     </div>
                     <EventTopicPill topic={ev.type} />
                   </div>

@@ -22,7 +22,7 @@ export function StepIndicator({ steps, currentStep, onStepClick }: StepIndicator
               className={`flex items-center gap-1 ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
             >
               <span
-                className={`w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0 transition-colors ${
+                className={`w-5 h-5 rounded-full text-2xs font-semibold flex items-center justify-center shrink-0 transition-colors ${
                   active
                     ? 'bg-accent text-text-inverse'
                     : done
@@ -33,7 +33,7 @@ export function StepIndicator({ steps, currentStep, onStepClick }: StepIndicator
                 {i + 1}
               </span>
               <span
-                className={`text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                className={`text-2xs font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
                   active ? 'text-text-primary' : 'text-text-tertiary'
                 } ${clickable && !active ? 'hover:text-text-primary' : ''}`}
               >

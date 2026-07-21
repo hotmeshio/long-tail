@@ -222,7 +222,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
               />
               <button
                 onClick={() => setEditingTags(false)}
-                className="text-[10px] text-text-tertiary hover:text-text-secondary shrink-0"
+                className="text-2xs text-text-tertiary hover:text-text-secondary shrink-0"
               >
                 Done
               </button>
@@ -235,20 +235,20 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
             >
               {entry.tags && entry.tags.length > 0 ? (
                 entry.tags.map((tag) => (
-                  <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
+                  <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-accent/10 text-accent">
                     {tag}
                   </span>
                 ))
               ) : (
-                <span className="text-[10px] text-text-tertiary/40 italic group-hover:text-text-tertiary">add tags...</span>
+                <span className="text-2xs text-text-tertiary/40 italic group-hover:text-text-tertiary">add tags...</span>
               )}
             </div>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[10px] text-text-tertiary"><TimeAgo date={entry.updated_at} /></span>
+          <span className="text-2xs text-text-tertiary"><TimeAgo date={entry.updated_at} /></span>
           {confirmDelete ? (
-            <span className="flex items-center gap-2 text-[10px]">
+            <span className="flex items-center gap-2 text-2xs">
               <span className="text-status-error">Delete entry?</span>
               <button
                 onClick={async () => {
@@ -291,7 +291,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
       {/* Field/value grid */}
       <table className="w-full border-collapse">
         <thead className="sticky top-0 z-10 bg-surface">
-          <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary border-b border-surface-border">
+          <tr className="text-left text-2xs uppercase tracking-wider text-text-tertiary border-b border-surface-border">
             <th className="px-3 py-2 font-medium w-[200px] border-r border-surface-border">Field</th>
             <th className="px-3 py-2 font-medium">Value</th>
           </tr>
@@ -317,14 +317,14 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
                 <div className="flex gap-2 mt-1.5">
                   <button
                     onClick={commitGhostRow}
-                    className="text-[10px] font-medium text-accent hover:text-accent-hover"
+                    className="text-2xs font-medium text-accent hover:text-accent-hover"
                     disabled={storeMutation.isPending}
                   >
                     {storeMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
                   <button
                     onClick={() => { setGhostField(''); setGhostValue(''); }}
-                    className="text-[10px] text-text-tertiary hover:text-text-secondary"
+                    className="text-2xs text-text-tertiary hover:text-text-secondary"
                   >
                     Cancel
                   </button>
@@ -352,10 +352,10 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
                       <AutoTextarea value={draft} onChange={setDraft} onKeyDown={handleKeyDown} placeholder="field name" />
                       {isDirty && (
                         <div className="flex gap-2 mt-1.5">
-                          <button onClick={commitEdit} className="text-[10px] font-medium text-accent hover:text-accent-hover" disabled={storeMutation.isPending}>
+                          <button onClick={commitEdit} className="text-2xs font-medium text-accent hover:text-accent-hover" disabled={storeMutation.isPending}>
                             {storeMutation.isPending ? 'Saving...' : 'Save'}
                           </button>
-                          <button onClick={cancelEdit} className="text-[10px] text-text-tertiary hover:text-text-secondary">Cancel</button>
+                          <button onClick={cancelEdit} className="text-2xs text-text-tertiary hover:text-text-secondary">Cancel</button>
                         </div>
                       )}
                     </div>
@@ -370,7 +370,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
                   onClick={() => !isEditingValue && !isRemoving && startEdit(field, 'value')}
                 >
                   {isRemoving ? (
-                    <span className="flex items-center justify-end gap-2 text-[10px]">
+                    <span className="flex items-center justify-end gap-2 text-2xs">
                       <span className="text-status-error">Remove <span className="font-medium">{field}</span>?</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeField(field); }}
@@ -397,14 +397,14 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
                       />
                       <div className="flex gap-2 mt-1.5">
                         {isDirty && (
-                          <button onClick={commitEdit} className="text-[10px] font-medium text-accent hover:text-accent-hover" disabled={storeMutation.isPending}>
+                          <button onClick={commitEdit} className="text-2xs font-medium text-accent hover:text-accent-hover" disabled={storeMutation.isPending}>
                             {storeMutation.isPending ? 'Saving...' : 'Save'}
                           </button>
                         )}
-                        <button onClick={cancelEdit} className="text-[10px] text-text-tertiary hover:text-text-secondary">Cancel</button>
+                        <button onClick={cancelEdit} className="text-2xs text-text-tertiary hover:text-text-secondary">Cancel</button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setPendingRemove(field); }}
-                          className="text-[10px] text-status-error/50 hover:text-status-error ml-auto"
+                          className="text-2xs text-status-error/50 hover:text-status-error ml-auto"
                         >
                           Remove
                         </button>

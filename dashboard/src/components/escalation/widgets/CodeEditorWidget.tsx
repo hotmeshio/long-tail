@@ -31,13 +31,13 @@ export function CodeEditorWidget({ fieldKey, value, onChange, schema }: CodeEdit
 
   return (
     <div>
-      <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+      <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
         {label}
         {language && (
           <span className="ml-2 text-text-tertiary/60 normal-case font-normal">{language}</span>
         )}
       </label>
-      {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+      {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -9,7 +9,7 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: 'muted' }) 
       <div className={`text-2xl font-light tabular-nums leading-none ${tone === 'muted' ? 'text-text-tertiary' : 'text-text-primary'}`}>
         {n}
       </div>
-      <div className="text-[9px] uppercase tracking-wider text-text-quaternary mt-1 truncate">{label}</div>
+      <div className="text-2xs uppercase tracking-wider text-text-quaternary mt-1 truncate">{label}</div>
     </div>
   );
 }
@@ -53,7 +53,7 @@ export function TaskQueueCard({
       className="group h-full border-l-2 border-accent/30 bg-surface-sunken/40 rounded-[0.125em] px-4 py-3.5 cursor-pointer transition-colors hover:bg-surface-sunken/70 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
     >
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary truncate">
+        <span className="text-2xs font-semibold uppercase tracking-wider text-text-secondary truncate">
           {title || role}
         </span>
         <ExternalLink className="w-3 h-3 shrink-0 text-text-quaternary opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
@@ -73,14 +73,14 @@ export function TaskQueueCard({
               e.stopPropagation();
               navigate(jeopardyQueueLink({ role, priority_facet: priorityFacet }));
             }}
-            className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full text-[11px] font-semibold tabular-nums bg-status-error text-white transition-transform hover:scale-[1.05]"
+            className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full text-2xs font-semibold tabular-nums bg-status-error text-text-inverse transition-transform hover:scale-[1.05]"
             title="Past the priority threshold — a hard limit; open oldest first"
           >
             <TriangleAlert className="w-3 h-3" strokeWidth={2.5} />
             {jeopardy} in jeopardy
           </button>
         ) : (
-          <span className="text-[10px] text-text-quaternary">on pace</span>
+          <span className="text-2xs text-text-quaternary">on pace</span>
         )}
       </div>
     </div>
@@ -107,7 +107,7 @@ export function ClaimedCard({ count }: { count: number }) {
       className="group h-full border-l-2 border-status-warning/70 bg-status-warning/[0.06] rounded-[0.125em] px-4 py-3.5 cursor-pointer transition-colors hover:bg-status-warning/[0.1] focus:outline-none focus-visible:ring-1 focus-visible:ring-status-warning/40"
     >
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-status-warning">
+        <span className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-status-warning">
           <Hand className="w-3 h-3" strokeWidth={2} />
           Claimed
         </span>
@@ -115,10 +115,10 @@ export function ClaimedCard({ count }: { count: number }) {
       </div>
 
       <div className="text-2xl font-light tabular-nums leading-none text-text-primary">{count}</div>
-      <div className="text-[9px] uppercase tracking-wider text-text-quaternary mt-1">assigned to you</div>
+      <div className="text-2xs uppercase tracking-wider text-text-quaternary mt-1">assigned to you</div>
 
       <div className="mt-3 h-6 flex items-center">
-        <span className="text-[11px] font-medium text-status-warning">
+        <span className="text-2xs font-medium text-status-warning">
           {count > 0 ? 'Finish these first →' : 'Nothing claimed'}
         </span>
       </div>

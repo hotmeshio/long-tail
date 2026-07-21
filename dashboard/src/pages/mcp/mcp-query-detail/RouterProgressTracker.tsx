@@ -75,7 +75,7 @@ export function RouterProgressTracker({ events, status, verifyRunId }: RouterPro
           return (
             <div key={label} className="flex items-center gap-1 flex-1">
               <div className="flex items-center gap-2 flex-1">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-medium shrink-0 transition-colors ${
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-2xs font-medium shrink-0 transition-colors ${
                   isComplete ? 'bg-status-success/20 text-status-success' :
                   isActive ? 'bg-accent/20 text-accent animate-pulse' :
                   'bg-surface-sunken text-text-tertiary'
@@ -86,7 +86,7 @@ export function RouterProgressTracker({ events, status, verifyRunId }: RouterPro
                     </svg>
                   ) : stepNum}
                 </div>
-                <span className={`text-[10px] font-medium whitespace-nowrap ${
+                <span className={`text-2xs font-medium whitespace-nowrap ${
                   isComplete ? 'text-text-secondary' : isActive ? 'text-text-primary' : 'text-text-tertiary'
                 }`}>{label}</span>
               </div>
@@ -102,12 +102,12 @@ export function RouterProgressTracker({ events, status, verifyRunId }: RouterPro
       <div className="flex items-center gap-2 flex-wrap">
         <p className="text-xs text-text-secondary">{phase.detail}</p>
         {phase.path === 'deterministic' && (
-          <span className="text-[10px] bg-status-success/10 text-status-success px-2 py-0.5 rounded-full">
+          <span className="text-2xs bg-status-success/10 text-status-success px-2 py-0.5 rounded-full">
             Deterministic
           </span>
         )}
         {phase.path === 'dynamic' && (
-          <span className="text-[10px] bg-status-pending/10 text-status-pending px-2 py-0.5 rounded-full">
+          <span className="text-2xs bg-status-pending/10 text-status-pending px-2 py-0.5 rounded-full">
             Dynamic
           </span>
         )}
@@ -117,7 +117,7 @@ export function RouterProgressTracker({ events, status, verifyRunId }: RouterPro
       {verifyRunId && phase.step >= 1 && (
         <Link
           to={`/workflows/executions/${verifyRunId}`}
-          className="text-[10px] text-accent hover:underline"
+          className="text-2xs text-accent hover:underline"
         >
           View execution tree
         </Link>

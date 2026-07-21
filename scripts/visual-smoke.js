@@ -21,6 +21,13 @@ async function main() {
   await page.click('button[type="submit"]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
+  const PAGES = [
+    ['home', '/'],
+    ['operations', '/operations'],
+    ['workflows', '/workflows/executions'],
+    ['admin-roles', '/admin/roles'],
+  ];
+
   for (const theme of ['blue', 'midnight']) {
     await page.evaluate((t) => localStorage.setItem('lt.theme', t), theme);
     for (const [w, h, label] of [[1366, 900, 'desktop'], [1024, 768, 'ipad-landscape'], [768, 1024, 'ipad-portrait']]) {
@@ -29,8 +36,13 @@ async function main() {
       await page.waitForTimeout(1500);
       await page.screenshot({ path: `${OUT}/list-${theme}-${label}.png` });
     }
-    // First escalation detail (form)
     await page.setViewportSize({ width: 1366, height: 900 });
+    for (const [name, path] of PAGES) {
+      await page.goto(`${BASE}${path}`);
+      await page.waitForTimeout(1500);
+      await page.screenshot({ path: `${OUT}/${name}-${theme}.png` });
+    }
+    // First escalation detail (form)
     await page.goto(`${BASE}/escalations/available`);
     await page.waitForTimeout(1500);
     const row = page.locator('table tbody tr, [data-testid="escalation-row"]').first();

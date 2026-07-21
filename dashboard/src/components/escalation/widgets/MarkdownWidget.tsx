@@ -32,7 +32,7 @@ export function MarkdownWidget({ fieldKey, value, onChange, schema }: MarkdownWi
   return (
     <div>
       <div className="flex items-center justify-between">
-        <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           {label}
         </label>
         <div className="flex items-center gap-0.5">
@@ -41,7 +41,7 @@ export function MarkdownWidget({ fieldKey, value, onChange, schema }: MarkdownWi
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+              className={`px-2 py-0.5 text-2xs rounded transition-colors ${
                 tab === t
                   ? 'bg-accent/10 text-accent font-semibold'
                   : 'text-text-quaternary hover:text-text-secondary'
@@ -52,7 +52,7 @@ export function MarkdownWidget({ fieldKey, value, onChange, schema }: MarkdownWi
           ))}
         </div>
       </div>
-      {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+      {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       {tab === 'write' ? (
         <textarea
           value={value}

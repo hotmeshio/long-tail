@@ -64,7 +64,7 @@ export function ChecklistWidget({
           No checklist items. Provide checklist_items in the escalation envelope or metadata.
         </p>
         {error && (
-          <p className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
+          <p className="text-2xs text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
             {error}
           </p>
         )}
@@ -114,14 +114,14 @@ export function ChecklistWidget({
               }`}>
                 {item.label}
                 {item.required && (
-                  <span className={`ml-0.5 text-[10px] ${showItemError ? 'text-status-error' : 'text-text-quaternary'}`}>*</span>
+                  <span className={`ml-0.5 text-2xs ${showItemError ? 'text-status-error' : 'text-text-quaternary'}`}>*</span>
                 )}
               </span>
             </label>
           );
         })}
       </div>
-      <p className="text-[10px] text-text-quaternary mt-3 tabular-nums">
+      <p className="text-2xs text-text-quaternary mt-3 tabular-nums">
         {checkedCount} / {items.length} confirmed
         {requireAll ? (
           <span className="ml-1 text-text-quaternary/60">
@@ -132,7 +132,7 @@ export function ChecklistWidget({
         )}
       </p>
       {error && (
-        <p role="alert" className="text-[10px] text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
+        <p role="alert" className="text-2xs text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">
           {error}
         </p>
       )}

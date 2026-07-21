@@ -30,7 +30,7 @@ export function OriginalQueryPanel({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Input */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input</p>
           {originalEnvelope ? (
             <JsonViewer data={originalEnvelope} defaultMode="tree" />
           ) : originalPrompt ? (
@@ -42,7 +42,7 @@ export function OriginalQueryPanel({
 
         {/* Right: Output */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output</p>
           {status !== 'completed' && status !== 'failed' ? (
             <p className="text-sm text-text-secondary animate-pulse">Pending...</p>
           ) : originalOutput ? (
@@ -53,7 +53,7 @@ export function OriginalQueryPanel({
             <p className="text-xs text-text-tertiary italic">No structured output</p>
           )}
           {originalDurationMs != null && (
-            <p className="text-[10px] text-text-tertiary mt-2">{(originalDurationMs / 1000).toFixed(1)}s</p>
+            <p className="text-2xs text-text-tertiary mt-2">{(originalDurationMs / 1000).toFixed(1)}s</p>
           )}
         </div>
       </div>

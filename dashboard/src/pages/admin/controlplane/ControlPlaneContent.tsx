@@ -90,7 +90,7 @@ export function ControlPlaneContent({
           ) : (
             <>
               <div className="flex justify-end mb-2">
-                <button onClick={toggleAllQueues} className="text-[10px] text-accent hover:underline">
+                <button onClick={toggleAllQueues} className="text-2xs text-accent hover:underline">
                   {allQueuesExpanded ? 'Collapse all' : 'Expand all'}
                 </button>
               </div>

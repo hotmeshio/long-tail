@@ -108,7 +108,7 @@ function ShellLayout() {
           {/* Version line — long-tail + HotMesh SDK, shown when expanded. Single line. */}
           {!collapsed && settings?.environment && (
             <div
-              className="shrink-0 px-5 pb-3 text-[10px] leading-tight text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis"
+              className="shrink-0 px-5 pb-3 text-2xs leading-tight text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis"
               title={`long-tail v${settings.environment.longTailVersion} · HotMesh v${settings.environment.hotmeshVersion} · Node ${settings.environment.nodeVersion} · ${settings.environment.nodeEnv}`}
             >
               long-tail v{settings.environment.longTailVersion}

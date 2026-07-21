@@ -74,7 +74,7 @@ export function YamlComposer({
           onClick={() => {
             setViewMode('design');
           }}
-          className={`px-2.5 py-1 text-[10px] font-medium rounded transition-colors ${
+          className={`px-2.5 py-1 text-2xs font-medium rounded transition-colors ${
             viewMode === 'design'
               ? 'bg-accent/10 text-accent'
               : 'text-text-tertiary hover:text-text-secondary'
@@ -87,7 +87,7 @@ export function YamlComposer({
             setViewMode('raw');
             onNodeSelect(null);
           }}
-          className={`px-2.5 py-1 text-[10px] font-medium rounded transition-colors ${
+          className={`px-2.5 py-1 text-2xs font-medium rounded transition-colors ${
             viewMode === 'raw'
               ? 'bg-accent/10 text-accent'
               : 'text-text-tertiary hover:text-text-secondary'

@@ -36,7 +36,7 @@ function fmt(min: number | null): string {
 function MetricRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</span>
+      <span className="text-2xs text-text-tertiary uppercase tracking-wider">{label}</span>
       <span className="text-xs font-mono font-medium text-text-primary tabular-nums">{value}</span>
     </div>
   );
@@ -49,7 +49,7 @@ function PeriodSelector({ period, onChange }: { period: Period; onChange: (p: Pe
         <button
           key={p}
           onClick={() => onChange(p)}
-          className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${
+          className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
             period === p
               ? 'bg-accent/10 text-accent font-semibold'
               : 'text-text-quaternary hover:text-text-secondary'
@@ -79,10 +79,10 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-sm font-bold text-text-primary">{displayRoleTitle(role)}</span>
-            <span className="text-[10px] font-mono text-text-secondary">{role.role}</span>
+            <span className="text-2xs font-mono text-text-secondary">{role.role}</span>
           </div>
           {role.description && (
-            <p className="text-[10px] text-text-tertiary mt-1 line-clamp-2 leading-relaxed">
+            <p className="text-2xs text-text-tertiary mt-1 line-clamp-2 leading-relaxed">
               {role.description}
             </p>
           )}
@@ -98,14 +98,14 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
       <div className="flex items-center gap-3 mb-6">
         <Link
           to={`/admin/roles/${encodeURIComponent(role.role)}`}
-          className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+          className="flex items-center gap-1 text-2xs text-accent hover:underline"
         >
           <Settings className="w-2.5 h-2.5" />
           Edit in Roles
         </Link>
         <Link
           to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
-          className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+          className="flex items-center gap-1 text-2xs text-accent hover:underline"
         >
           <List className="w-2.5 h-2.5" />
           View full queue
@@ -116,7 +116,7 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
 
       {/* Capacity settings */}
       {(targetPerHour || slaMinutes || workerCount) && (
-        <div className="flex items-center gap-6 mb-6 text-[10px] border-b border-surface-border/30 pb-5">
+        <div className="flex items-center gap-6 mb-6 text-2xs border-b border-surface-border/30 pb-5">
           {targetPerHour && (
             <div>
               <div className="font-mono font-semibold text-text-primary text-sm">{targetPerHour}/h</div>
@@ -141,12 +141,12 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
       {/* Two-column wait / work grid */}
       <div className="grid grid-cols-2 gap-x-4 mb-2">
         <div>
-          <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-2">Wait (queue)</p>
+          <p className="text-2xs text-text-quaternary uppercase tracking-wider mb-2">Wait (queue)</p>
           <MetricRow label="P99" value={fmt(metric?.wait.p99 ?? null)} />
           <MetricRow label="avg" value={fmt(metric?.wait.avg ?? null)} />
         </div>
         <div>
-          <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-2">Work (proc.)</p>
+          <p className="text-2xs text-text-quaternary uppercase tracking-wider mb-2">Work (proc.)</p>
           <MetricRow label="P99" value={fmt(metric?.work.p99 ?? null)} />
           <MetricRow label="avg" value={fmt(metric?.work.avg ?? null)} />
         </div>
@@ -156,7 +156,7 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
       <div className="border-t border-surface-border/40 pt-4 mt-5 space-y-2.5">
         {slaMinutes && (
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-text-tertiary">SLA target</span>
+            <span className="text-2xs text-text-tertiary">SLA target</span>
             <span className="text-xs font-mono text-text-secondary">{slaMinutes}m</span>
           </div>
         )}
@@ -165,7 +165,7 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
             to={jeopardyQueueLink(role)}
             className="flex items-center justify-between group"
           >
-            <span className="text-[10px]" style={{ color: PRIORITY_TEXT_COLOR }}>
+            <span className="text-2xs" style={{ color: PRIORITY_TEXT_COLOR }}>
               {metric.priority_count} in jeopardy — pull oldest first
             </span>
             <ExternalLink className="w-3 h-3 transition-colors" style={{ color: PRIORITY_TEXT_COLOR }} />
@@ -196,42 +196,42 @@ function OverviewPanel({
 
   return (
     <>
-      <p className="text-[9px] text-text-quaternary uppercase tracking-wider mb-3">
+      <p className="text-2xs text-text-quaternary uppercase tracking-wider mb-3">
         Pipeline · {period}
       </p>
 
       {/* Health headline */}
       <div className="mb-4">
         {stationsAtRisk > 0 ? (
-          <p className="text-[11px]" style={{ color: PRIORITY_TEXT_COLOR }}>
+          <p className="text-2xs" style={{ color: PRIORITY_TEXT_COLOR }}>
             {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} with items in jeopardy
           </p>
         ) : stationsWithLoad > 0 ? (
-          <p className="text-[11px] text-status-warning">
+          <p className="text-2xs text-status-warning">
             {stationsWithLoad} station{stationsWithLoad > 1 ? 's' : ''} with backlog
           </p>
         ) : totalResolved > 0 ? (
-          <p className="text-[11px] text-status-success">Flowing — queue clear</p>
+          <p className="text-2xs text-status-success">Flowing — queue clear</p>
         ) : (
-          <p className="text-[11px] text-text-quaternary">Quiet — awaiting work</p>
+          <p className="text-2xs text-text-quaternary">Quiet — awaiting work</p>
         )}
       </div>
 
       {/* Key counters */}
       <div className="space-y-1.5 mb-4">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Pending</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider">Pending</span>
           <span className={`text-xs font-mono tabular-nums ${totalPending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'}`}>
             {totalPending}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Resolved · {period}</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider">Resolved · {period}</span>
           <span className="text-xs font-mono tabular-nums text-text-secondary">{totalResolved}</span>
         </div>
         {totalPriority > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-text-quaternary uppercase tracking-wider">Priority</span>
+            <span className="text-2xs text-text-quaternary uppercase tracking-wider">Priority</span>
             <span className="text-xs font-mono tabular-nums font-semibold" style={{ color: PRIORITY_TEXT_COLOR }}>
               {totalPriority}
             </span>
@@ -242,10 +242,10 @@ function OverviewPanel({
       {/* Divider + column headers */}
       <div className="border-t border-surface-border/40 pt-2 mb-1">
         <div className="flex items-center gap-2">
-          <span className="text-[8px] text-text-quaternary uppercase tracking-wider flex-1">Station</span>
-          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">pend</span>
-          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">clmd</span>
-          <span className="text-[8px] text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">res</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider flex-1">Station</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">pend</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">clmd</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">res</span>
         </div>
       </div>
 
@@ -264,28 +264,28 @@ function OverviewPanel({
           return (
             <div key={r.role} className="flex items-center gap-2 py-0.5">
               <span
-                className={`text-[10px] font-mono flex-1 truncate ${
+                className={`text-2xs font-mono flex-1 truncate ${
                   hasLoad ? 'text-text-primary' : 'text-text-quaternary'
                 }`}
               >
                 {label}
                 {hasAlert && (
-                  <span className="ml-1 text-[8px] font-semibold" style={{ color: PRIORITY_TEXT_COLOR }}>
+                  <span className="ml-1 text-2xs font-semibold" style={{ color: PRIORITY_TEXT_COLOR }}>
                     {priorityCount} PRIORITY
                   </span>
                 )}
               </span>
               <span
-                className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${
+                className={`text-2xs font-mono tabular-nums w-8 text-right shrink-0 ${
                   hasLoad ? 'text-text-primary font-semibold' : 'text-text-quaternary'
                 }`}
               >
                 {pending > 0 ? pending : '—'}
               </span>
-              <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'}`}>
+              <span className={`text-2xs font-mono tabular-nums w-8 text-right shrink-0 ${claimed > 0 ? 'text-accent font-semibold' : 'text-text-quaternary'}`}>
                 {claimed > 0 ? claimed : '—'}
               </span>
-              <span className={`text-[10px] font-mono tabular-nums w-8 text-right shrink-0 ${resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'}`}>
+              <span className={`text-2xs font-mono tabular-nums w-8 text-right shrink-0 ${resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'}`}>
                 {resolved > 0 ? resolved : '—'}
               </span>
             </div>
@@ -293,7 +293,7 @@ function OverviewPanel({
         })}
       </div>
 
-      <p className="text-[9px] text-text-quaternary mt-5">
+      <p className="text-2xs text-text-quaternary mt-5">
         Select a station for queue detail.
       </p>
     </>

@@ -112,7 +112,7 @@ export function getEngineColumns(opts: ColumnOptions): Column<QuorumProfile>[] {
         return (
           <div className="flex flex-col" title={row.engine_id}>
             <span className="text-xs text-text-secondary truncate max-w-[160px]">{label}</span>
-            {source && <span className="text-[9px] text-text-tertiary/60">{source}</span>}
+            {source && <span className="text-2xs text-text-tertiary/60">{source}</span>}
           </div>
         );
       },
@@ -133,7 +133,7 @@ export function getEngineColumns(opts: ColumnOptions): Column<QuorumProfile>[] {
                 style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%` }}
               />
             </div>
-            <span className="text-[10px] font-mono tabular-nums text-text-tertiary w-16">
+            <span className="text-2xs font-mono tabular-nums text-text-tertiary w-16">
               {c.total > 0 ? `${c.total.toLocaleString()}` : '--'}
             </span>
           </div>
@@ -158,7 +158,7 @@ export function getEngineColumns(opts: ColumnOptions): Column<QuorumProfile>[] {
       key: 'uptime',
       label: 'Uptime',
       render: (row) => (
-        <span className="text-[10px] font-mono text-text-tertiary">
+        <span className="text-2xs font-mono text-text-tertiary">
           {formatUptime(row.inited)}
         </span>
       ),

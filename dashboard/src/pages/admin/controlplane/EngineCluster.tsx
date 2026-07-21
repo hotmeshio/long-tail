@@ -60,27 +60,27 @@ function EngineRow({ engine, isFirst, onThrottle }: {
       <span className={`${isFirst ? 'text-base font-medium' : 'text-xs'} text-text-primary truncate max-w-[180px]`} title={engine.engine_id}>
         {label}
       </span>
-      {source && <span className="text-[10px] text-text-tertiary/50">{source}</span>}
+      {source && <span className="text-2xs text-text-tertiary/50">{source}</span>}
 
       {engine.is_scout && (
-        <span className="text-[9px] text-status-warning uppercase tracking-widest">scout</span>
+        <span className="text-2xs text-status-warning uppercase tracking-widest">scout</span>
       )}
 
       <span className="flex-1" />
 
       {paused && (
-        <span className="text-[10px] text-status-warning">{engine.throttle === -1 ? 'Paused' : formatThrottleHuman(engine.throttle)}</span>
+        <span className="text-2xs text-status-warning">{engine.throttle === -1 ? 'Paused' : formatThrottleHuman(engine.throttle)}</span>
       )}
 
       {counts.total > 0 && (
-        <span className="text-[10px] font-mono tabular-nums text-text-tertiary w-16 text-right">{counts.total.toLocaleString()}</span>
+        <span className="text-2xs font-mono tabular-nums text-text-tertiary w-16 text-right">{counts.total.toLocaleString()}</span>
       )}
 
       {pending > 0 && (
-        <span className={`text-[10px] font-mono tabular-nums w-14 text-right ${pending > 100 ? 'text-status-warning' : 'text-text-tertiary/50'}`}>{pending.toLocaleString()} q</span>
+        <span className={`text-2xs font-mono tabular-nums w-14 text-right ${pending > 100 ? 'text-status-warning' : 'text-text-tertiary/50'}`}>{pending.toLocaleString()} q</span>
       )}
 
-      <span className="text-[10px] font-mono text-text-tertiary/40 w-12 text-right">{formatUptime(engine.inited)}</span>
+      <span className="text-2xs font-mono text-text-tertiary/40 w-12 text-right">{formatUptime(engine.inited)}</span>
 
       <span className="opacity-0 group-hover/row:opacity-100 transition-opacity">
         <button
@@ -107,7 +107,7 @@ function CollapsibleGroup({ label, engines, onThrottle }: {
     <div className="mt-1">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors py-1"
+        className="flex items-center gap-1.5 text-2xs text-text-tertiary hover:text-text-secondary transition-colors py-1"
       >
         <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} strokeWidth={2} />
         {engines.length} {label}
@@ -142,7 +142,7 @@ export function EngineCluster({ engines, onThrottle, isLoading }: EngineClusterP
           <CirclePause className="w-4 h-4 text-status-error shrink-0" strokeWidth={1.5} />
           <span className="text-base text-status-error font-medium">All {engines.length} engines paused</span>
         </div>
-        <p className="text-[10px] text-text-tertiary ml-7">Messages are accumulating. Resume at least one engine to restore processing.</p>
+        <p className="text-2xs text-text-tertiary ml-7">Messages are accumulating. Resume at least one engine to restore processing.</p>
         <div className="ml-1 mt-2">
           {paused.map((e) => (
             <EngineRow key={e.engine_id} engine={e} onThrottle={onThrottle} />

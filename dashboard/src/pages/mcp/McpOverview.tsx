@@ -150,7 +150,7 @@ export function McpOverview() {
     navigate(`/mcp/executions${qs ? `?${qs}` : ''}`);
   };
 
-  const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
+  const thCls = 'pb-2 text-2xs font-semibold uppercase tracking-widest text-text-tertiary';
 
   return (
     <div>
@@ -263,7 +263,7 @@ export function McpOverview() {
               server{servers.length !== 1 ? 's' : ''} · {serverToolCount} tool{serverToolCount !== 1 ? 's' : ''}
             </span>
           </p>
-          <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
+          <p className="text-2xs text-text-tertiary leading-relaxed mt-2">
             Built-in and external MCP servers. Each server exposes tools that workflows and agents can call.
           </p>
         </button>
@@ -282,7 +282,7 @@ export function McpOverview() {
               workflow{yamlWorkflows.length !== 1 ? 's' : ''} · {workflowServerCount} server{workflowServerCount !== 1 ? 's' : ''}
             </span>
           </p>
-          <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
+          <p className="text-2xs text-text-tertiary leading-relaxed mt-2">
             Compiled from discovery runs. Deterministic tool-to-tool pipelines — no LLM, no token costs.
           </p>
         </button>

@@ -129,13 +129,13 @@ function WorkflowRow({
       <div className="flex items-center gap-3">
         <WorkflowPill type={config.workflow_type} size="md" variant={variant} />
         {config.description && (
-          <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+          <p className="flex-1 min-w-0 truncate text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors">
             {config.description}
           </p>
         )}
         <span className="ml-auto flex items-center gap-2 shrink-0">
           {config.execute_as && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] bg-accent/10 text-accent rounded">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-2xs bg-accent/10 text-accent rounded">
               <Bot className="w-2.5 h-2.5" />
               {config.execute_as}
             </span>

@@ -124,7 +124,7 @@ export function WorkflowsOverview() {
     navigate(`/workflows/executions${qs ? `?${qs}` : ''}`);
   };
 
-  const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
+  const thCls = 'pb-2 text-2xs font-semibold uppercase tracking-widest text-text-tertiary';
 
   return (
     <div>

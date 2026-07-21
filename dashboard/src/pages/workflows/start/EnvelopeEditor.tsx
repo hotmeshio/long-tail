@@ -41,17 +41,17 @@ export function EnvelopeEditor({
             <button
               type="button"
               onClick={onToggleMode}
-              className="text-[10px] text-accent hover:underline"
+              className="text-2xs text-accent hover:underline"
             >
               {isJsonMode ? 'Form view' : 'JSON view'}
             </button>
           )}
           {selectedConfig.envelope_schema ? (
-            <span className="text-[10px] text-accent">
+            <span className="text-2xs text-accent">
               Pre-filled from workflow config
             </span>
           ) : (
-            <span className="text-[10px] text-status-warning">
+            <span className="text-2xs text-status-warning">
               No template
             </span>
           )}
@@ -94,7 +94,7 @@ export function EnvelopeEditor({
             );
             return (
               <div key={key}>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+                <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                   {key}
                   <span className="ml-2 font-normal normal-case">
                     {type}
@@ -148,7 +148,7 @@ export function EnvelopeEditor({
           })}
         </div>
       )}
-      <p className="text-[10px] text-text-tertiary mt-1.5">
+      <p className="text-2xs text-text-tertiary mt-1.5">
         The envelope wraps your workflow input. <code className="text-accent/80">data</code> holds workflow-specific fields; <code className="text-accent/80">metadata</code> is optional context.
       </p>
     </div>

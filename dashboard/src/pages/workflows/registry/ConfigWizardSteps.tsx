@@ -51,7 +51,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
               ))}
             </div>
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-[10px] text-text-tertiary">or</span>
+              <span className="text-2xs text-text-tertiary">or</span>
               <input
                 type="text"
                 onChange={(e) => set('workflow_type', e.target.value)}
@@ -73,7 +73,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
             {!editing && form.workflow_type && durableTypes.length > 0 && (
               <button
                 onClick={() => set('workflow_type', '')}
-                className="text-[10px] text-accent hover:underline mt-1"
+                className="text-2xs text-accent hover:underline mt-1"
               >
                 Choose from durable workflows
               </button>
@@ -179,7 +179,7 @@ export function InvocationStep({ form, set }: StepProps) {
               Should include <span className="font-mono">data</span> (workflow input) and optional <span className="font-mono">metadata</span> (context).
             </p>
             {form.envelope_schema.trim() && !jsonValid(form.envelope_schema) && (
-              <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
+              <p className="text-2xs text-status-error mt-1">Invalid JSON</p>
             )}
           </div>
         </>

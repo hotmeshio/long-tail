@@ -221,7 +221,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
           placeholder="Search workflow ID..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="input text-[11px] py-1 px-2 w-56"
+          className="input text-2xs py-1 px-2 w-56"
         />
         <FilterDivider />
         <FilterSelect

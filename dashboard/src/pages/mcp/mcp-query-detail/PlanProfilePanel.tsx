@@ -114,7 +114,7 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
       <div className="grid grid-cols-[300px_1fr] gap-4 mb-6">
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Server Name</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Server Name</label>
             {editable && !isLocked ? (
               <input
                 value={appId}
@@ -126,11 +126,11 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
               <p className="text-sm font-mono text-text-primary py-1.5">{wf.app_id || appId}</p>
             )}
             {isLocked && editable && (
-              <p className="text-[10px] text-text-tertiary mt-1">Locked to match other workflows in this set.</p>
+              <p className="text-2xs text-text-tertiary mt-1">Locked to match other workflows in this set.</p>
             )}
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Tool Name</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Tool Name</label>
             {editable ? (
               <input
                 value={name}
@@ -143,7 +143,7 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
             )}
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
             {editable ? (
               <TagInput tags={tags} onChange={setTags} compact />
             ) : (
@@ -157,11 +157,11 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
         </div>
         <div className="flex flex-col">
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
+            <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
             {saved && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 transition-colors"
+                className="flex items-center gap-1 text-2xs text-accent hover:text-accent/80 transition-colors"
               >
                 <Pencil className="w-3 h-3" strokeWidth={1.5} />
                 Edit
@@ -179,11 +179,11 @@ export function PlanProfilePanel({ yamlId, planItem, lockedAppId, isSaved, onSav
           )}
           {isEditing && (
             <div className="flex justify-end gap-2 mt-2">
-              <button onClick={() => setIsEditing(false)} className="text-[10px] text-text-tertiary hover:text-text-primary">Cancel</button>
+              <button onClick={() => setIsEditing(false)} className="text-2xs text-text-tertiary hover:text-text-primary">Cancel</button>
               <button
                 onClick={handleSave}
                 disabled={updateYaml.isPending}
-                className="text-[10px] text-accent hover:text-accent/80 font-medium"
+                className="text-2xs text-accent hover:text-accent/80 font-medium"
               >
                 {updateYaml.isPending ? 'Saving...' : 'Save Changes'}
               </button>

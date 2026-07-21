@@ -60,7 +60,7 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
 
         {/* Request */}
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Request
           </label>
           <textarea
@@ -76,7 +76,7 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
         {/* Response */}
         {callTool.isPending && (
           <div className="animate-pulse">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
             <div className="h-20 bg-surface-sunken rounded-md" />
           </div>
         )}
@@ -101,7 +101,7 @@ export function TryToolModal({ open, onClose, serverId, serverName, tool }: TryT
         ) : null}
         {callTool.error ? (
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Response</p>
             {(() => {
               const msg = callTool.error instanceof Error ? callTool.error.message : '';
               const isMissingCred = msg.startsWith('No credential found for provider');

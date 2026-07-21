@@ -35,7 +35,7 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
               <div className="flex items-baseline gap-3">
                 <p className="text-sm text-text-primary">{item.label}</p>
                 {item.timestamp && (
-                  <time className="text-[10px] text-text-tertiary font-mono shrink-0">
+                  <time className="text-2xs text-text-tertiary font-mono shrink-0">
                     {new Date(item.timestamp).toLocaleTimeString()}
                   </time>
                 )}

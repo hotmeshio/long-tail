@@ -39,7 +39,7 @@ export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartP
     return (
       <div key={`${s.stream_type}-${s.stream_name}`} className="flex items-center gap-3">
         <span
-          className={`text-[9px] font-mono ${labelColor} w-36 truncate text-right shrink-0`}
+          className={`text-2xs font-mono ${labelColor} w-36 truncate text-right shrink-0`}
           title={s.stream_name}
         >
           {label}
@@ -50,14 +50,14 @@ export function StreamVolumeChart({ byStream, onNodeFilter }: StreamVolumeChartP
             style={{ width: animated ? `${pct}%` : '0%' }}
           />
         </div>
-        <span className="text-[10px] font-mono tabular-nums text-text-secondary w-12 text-right shrink-0">
+        <span className="text-2xs font-mono tabular-nums text-text-secondary w-12 text-right shrink-0">
           {s.count.toLocaleString()}
         </span>
       </div>
     );
   };
 
-  const labelCls = 'text-[9px] uppercase tracking-widest font-semibold mb-1 cursor-pointer hover:underline';
+  const labelCls = 'text-2xs uppercase tracking-widest font-semibold mb-1 cursor-pointer hover:underline';
 
   return (
     <div className="space-y-1.5">

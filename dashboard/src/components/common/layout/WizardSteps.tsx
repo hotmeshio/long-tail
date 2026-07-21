@@ -24,7 +24,7 @@ export function WizardSteps({ labels, current, maxReachable, onStepClick }: Wiza
               <button
                 onClick={() => isReachable && onStepClick(s)}
                 disabled={!isReachable}
-                className={`w-6 h-6 rounded-full text-[11px] font-semibold flex items-center justify-center transition-colors ${
+                className={`w-6 h-6 rounded-full text-2xs font-semibold flex items-center justify-center transition-colors ${
                   current === s
                     ? 'bg-accent text-text-inverse'
                     : isReachable

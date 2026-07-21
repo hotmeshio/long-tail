@@ -78,7 +78,7 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
                   className="max-w-full max-h-80 rounded-md border border-surface-border"
                 />
               </a>
-              <p className="text-[10px] text-text-tertiary mt-1 font-mono">{imgPath}</p>
+              <p className="text-2xs text-text-tertiary mt-1 font-mono">{imgPath}</p>
             </div>
           ))}
         </div>
@@ -87,7 +87,7 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
       {/* Other file links */}
       {otherFiles.length > 0 && (
         <div className="mb-10">
-          <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <h4 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
             Files
           </h4>
           <div className="space-y-1">
@@ -109,10 +109,10 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
       {/* Raw result data */}
       {hasResult && (
         <div className="mb-10">
-          <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <h4 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
             Result
           </h4>
-          <pre className="text-[11px] text-text-secondary bg-surface-sunken border border-surface-border rounded-md p-4 overflow-x-auto max-h-60 whitespace-pre-wrap">
+          <pre className="text-2xs text-text-secondary bg-surface-sunken border border-surface-border rounded-md p-4 overflow-x-auto max-h-60 whitespace-pre-wrap">
             {typeof result.result === 'string'
               ? result.result
               : JSON.stringify(result.result, null, 2)}
@@ -121,7 +121,7 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
       )}
 
       {/* Meta */}
-      <div className="flex items-center gap-4 mt-10 text-[10px] text-text-tertiary">
+      <div className="flex items-center gap-4 mt-10 text-2xs text-text-tertiary">
         <span>
           {result.tool_calls_made} tool call{result.tool_calls_made !== 1 ? 's' : ''}
         </span>

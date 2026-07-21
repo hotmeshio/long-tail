@@ -79,44 +79,44 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
       {/* Row 1: Headers + metadata (aligned) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Query Prompt</p>
-          <p className="text-[10px] text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Query Prompt</p>
+          <p className="text-2xs text-text-tertiary">
             {testPrompt !== resolvedPrompt && resolvedPrompt
               ? <button onClick={() => setTestPrompt(resolvedPrompt)} className="text-accent hover:underline">Reset to original</button>
               : 'Edit and submit to verify'}
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Result</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Result</p>
           {!verifyRunId && (
-            <p className="text-[10px] text-text-tertiary italic">Awaiting submission</p>
+            <p className="text-2xs text-text-tertiary italic">Awaiting submission</p>
           )}
           {isRunning && (
             <div className="flex items-center gap-2">
               <StatusBadge status="in_progress" />
-              <span className="text-[10px] text-text-secondary animate-pulse">Routing...</span>
+              <span className="text-2xs text-text-secondary animate-pulse">Routing...</span>
             </div>
           )}
           {verifyStatus === 'failed' && (
             <div className="flex items-center gap-2">
               <StatusBadge status="failed" />
-              <span className="text-[10px] text-status-error">Failed</span>
+              <span className="text-2xs text-status-error">Failed</span>
             </div>
           )}
           {verifyStatus === 'completed' && (
             <div className="flex items-center gap-2 flex-wrap">
               <StatusBadge status="completed" />
               {usedDeterministic ? (
-                <span className="text-[10px] bg-status-success/10 text-status-success px-2 py-0.5 rounded-full">
+                <span className="text-2xs bg-status-success/10 text-status-success px-2 py-0.5 rounded-full">
                   Deterministic ({((verifyDiscovery?.confidence as number) * 100).toFixed(0)}%)
                 </span>
               ) : (
-                <span className="text-[10px] bg-status-pending/10 text-status-pending px-2 py-0.5 rounded-full">
+                <span className="text-2xs bg-status-pending/10 text-status-pending px-2 py-0.5 rounded-full">
                   Dynamic (no match)
                 </span>
               )}
               {verifyExecution?.duration_ms != null && (
-                <span className="text-[10px] text-text-tertiary">{(verifyExecution.duration_ms / 1000).toFixed(1)}s</span>
+                <span className="text-2xs text-text-tertiary">{(verifyExecution.duration_ms / 1000).toFixed(1)}s</span>
               )}
             </div>
           )}
@@ -172,10 +172,10 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
                 <JsonViewer data={verifyData.result} defaultMode="tree" />
               )}
               <div className="flex items-center gap-3 pt-1">
-                <Link to={`/mcp/queries/${verifyRunId}`} className="text-[10px] text-accent hover:underline">
+                <Link to={`/mcp/queries/${verifyRunId}`} className="text-2xs text-accent hover:underline">
                   View full details
                 </Link>
-                <button onClick={() => setVerifyRunId(null)} className="text-[10px] text-text-tertiary hover:text-text-primary">
+                <button onClick={() => setVerifyRunId(null)} className="text-2xs text-text-tertiary hover:text-text-primary">
                   Clear
                 </button>
               </div>
@@ -190,7 +190,7 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
 
       <WizardNav>
         <button onClick={onBack} className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary">Back</button>
-        <span className="text-[10px] text-text-tertiary">End-to-end verification — modify the prompt and submit to test the full pipeline</span>
+        <span className="text-2xs text-text-tertiary">End-to-end verification — modify the prompt and submit to test the full pipeline</span>
       </WizardNav>
     </div>
   );

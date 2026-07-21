@@ -72,7 +72,7 @@ export function ConfigurationSection({
                 <button
                   type="button"
                   onClick={() => setAdvancedMode(!advancedMode)}
-                  className="text-[10px] text-text-tertiary hover:text-text-primary"
+                  className="text-2xs text-text-tertiary hover:text-text-primary"
                 >
                   {advancedMode ? 'Visual editor' : 'Advanced (JSON)'}
                 </button>
@@ -81,7 +81,7 @@ export function ConfigurationSection({
             <div className="flex items-center gap-3">
               {configEditing && (
                 <>
-                  <button onClick={onCancel} className="text-[10px] text-text-tertiary hover:text-text-primary">
+                  <button onClick={onCancel} className="text-2xs text-text-tertiary hover:text-text-primary">
                     Cancel
                   </button>
                   <button
@@ -91,7 +91,7 @@ export function ConfigurationSection({
                       && inputSchemaDraft === JSON.stringify(wf.input_schema, null, 2)
                       && outputSchemaDraft === JSON.stringify(wf.output_schema, null, 2)
                     )}
-                    className="text-[10px] text-accent hover:underline disabled:opacity-40 disabled:no-underline"
+                    className="text-2xs text-accent hover:underline disabled:opacity-40 disabled:no-underline"
                   >
                     {updateMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
@@ -106,7 +106,7 @@ export function ConfigurationSection({
             <button
               type="button"
               onClick={() => setAdvancedMode(!advancedMode)}
-              className="text-[10px] text-text-tertiary hover:text-text-primary"
+              className="text-2xs text-text-tertiary hover:text-text-primary"
             >
               {advancedMode ? 'Visual editor' : 'Advanced (JSON)'}
             </button>
@@ -123,7 +123,7 @@ export function ConfigurationSection({
           <div>
             {configEditing && hasFieldMeta && !advancedMode ? (
               <>
-                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
+                <h4 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
                 <InputSchemaEditor
                   fields={inputFieldMetaDraft}
                   onChange={setInputFieldMetaDraft}
@@ -132,7 +132,7 @@ export function ConfigurationSection({
               </>
             ) : configEditing ? (
               <>
-                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
+                <h4 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input Schema</h4>
                 <textarea
                   value={inputSchemaDraft}
                   onChange={(e) => setInputSchemaDraft(e.target.value)}
@@ -151,7 +151,7 @@ export function ConfigurationSection({
           <div>
             {configEditing ? (
               <>
-                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
+                <h4 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Output Schema</h4>
                 <textarea
                   value={outputSchemaDraft}
                   onChange={(e) => setOutputSchemaDraft(e.target.value)}

@@ -53,7 +53,7 @@ export function MetadataCell({
   const [expanded, setExpanded] = useState(false);
 
   if (!metadata || Object.keys(metadata).length === 0) {
-    return <span className="text-[11px] text-text-tertiary">—</span>;
+    return <span className="text-2xs text-text-tertiary">—</span>;
   }
 
   const hl = highlightKeys ?? [];
@@ -78,13 +78,13 @@ export function MetadataCell({
           return (
             <div key={k} className="group/mrow flex items-center gap-1 min-w-0">
               <span
-                className={`shrink-0 w-14 text-[9px] font-mono uppercase tracking-wide truncate ${isHl ? 'text-accent' : 'text-text-tertiary'}`}
+                className={`shrink-0 w-14 text-2xs font-mono uppercase tracking-wide truncate ${isHl ? 'text-accent' : 'text-text-tertiary'}`}
                 title={k}
               >
                 {k}
               </span>
               <span
-                className={`flex-1 min-w-0 text-[11px] font-medium truncate ${isHl ? 'text-text-primary' : 'text-text-secondary'}`}
+                className={`flex-1 min-w-0 text-2xs font-medium truncate ${isHl ? 'text-text-primary' : 'text-text-secondary'}`}
                 title={sv}
               >
                 {sv}
@@ -111,7 +111,7 @@ export function MetadataCell({
               {!expanded && hiddenCount > 0 && (
                 <button
                   onClick={(ev) => { ev.stopPropagation(); setExpanded(true); }}
-                  className="shrink-0 text-[9px] text-text-quaternary hover:text-accent transition-colors font-mono"
+                  className="shrink-0 text-2xs text-text-quaternary hover:text-accent transition-colors font-mono"
                   title={`Show ${hiddenCount} more fields`}
                 >
                   +{hiddenCount}
@@ -121,7 +121,7 @@ export function MetadataCell({
               {expanded && isLastShown && hiddenCount > 0 && (
                 <button
                   onClick={(ev) => { ev.stopPropagation(); setExpanded(false); }}
-                  className="shrink-0 text-[9px] text-text-quaternary hover:text-accent transition-colors"
+                  className="shrink-0 text-2xs text-text-quaternary hover:text-accent transition-colors"
                   title="Show less"
                 >
                   ↑
@@ -193,7 +193,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       key: 'created_time',
       label: 'Created',
       render: (row) => (
-        <span className={`text-[11px] font-mono whitespace-nowrap ${CELL_TEXT}`} title={row.created_at}>
+        <span className={`text-2xs font-mono whitespace-nowrap ${CELL_TEXT}`} title={row.created_at}>
           {formatDateTime(row.created_at)}
         </span>
       ),

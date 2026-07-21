@@ -41,11 +41,11 @@ interface FilterSelectProps {
 export function FilterSelect({ label, value, onChange, options, required, placeholder }: FilterSelectProps) {
   return (
     <div className="flex items-center gap-2">
-      <label className="text-[10px] font-medium text-text-tertiary whitespace-nowrap">{label}</label>
+      <label className="text-2xs font-medium text-text-tertiary whitespace-nowrap">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="select text-[11px] py-1 w-auto min-w-[6rem]"
+        className="select text-2xs py-1 w-auto min-w-[6rem]"
       >
         {!required && <option value="">{placeholder || 'All'}</option>}
         {options.map((opt) => (
@@ -83,13 +83,13 @@ export function FilterInput({ label, value, onChange, placeholder }: FilterInput
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-[10px] font-medium text-text-tertiary whitespace-nowrap">{label}</label>
+      <label className="text-2xs font-medium text-text-tertiary whitespace-nowrap">{label}</label>
       <input
         type="text"
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="input text-[11px] py-1 w-36 font-mono"
+        className="input text-2xs py-1 w-36 font-mono"
       />
     </div>
   );

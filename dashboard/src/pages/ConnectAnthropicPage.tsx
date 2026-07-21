@@ -154,7 +154,7 @@ export function ConnectAnthropicPage() {
           <div>
             <span className="font-medium text-text-secondary">Recommended:</span>{' '}
             Run{' '}
-            <code className="px-1 py-0.5 bg-surface-sunken rounded text-[11px]">claude setup-token</code>{' '}
+            <code className="px-1 py-0.5 bg-surface-sunken rounded text-2xs">claude setup-token</code>{' '}
             in your terminal to generate an OAuth token that uses your subscription.
           </div>
           <div>

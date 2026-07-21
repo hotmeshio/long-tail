@@ -174,6 +174,7 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
   }
 
   return (
+    // bg-white stays literal: customer HTML iframes assume a white canvas.
     <div className="rounded-md border border-surface-border overflow-hidden bg-white">
       <iframe
         ref={iframeRef}

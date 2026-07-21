@@ -5,7 +5,7 @@ interface ActivityManifestSectionProps {
 export function ActivityManifestSection({ manifest }: ActivityManifestSectionProps) {
   return (
     <div>
-      <h4 className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-3">Activity Manifest</h4>
+      <h4 className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-3">Activity Manifest</h4>
       <div className="space-y-3">
         {manifest
           .filter((a: any) => a.tool_source !== 'trigger')
@@ -16,15 +16,15 @@ export function ActivityManifestSection({ manifest }: ActivityManifestSectionPro
             return (
               <div key={a.activity_id} className="bg-surface-sunken rounded-md p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-mono text-text-tertiary">{a.activity_id}</span>
+                  <span className="text-2xs font-mono text-text-tertiary">{a.activity_id}</span>
                   <span className="text-xs font-medium text-text-primary">{a.title}</span>
                   {a.mcp_tool_name && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-raised text-text-secondary">{a.mcp_tool_name}</span>
+                    <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-surface-raised text-text-secondary">{a.mcp_tool_name}</span>
                   )}
                 </div>
                 {hasMappings && (
                   <div className={hasArgs ? 'mb-3' : ''}>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Runtime Wiring</p>
+                    <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Runtime Wiring</p>
                     <div className="grid gap-1">
                       {Object.entries(a.input_mappings).map(([k, v]) => (
                         <div key={k} className="flex items-baseline gap-2 text-xs">
@@ -40,8 +40,8 @@ export function ActivityManifestSection({ manifest }: ActivityManifestSectionPro
                 )}
                 {hasArgs && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Discovery Reference</p>
-                    <p className="text-[10px] text-text-tertiary mb-1.5">Values from the original execution, stored for context. Runtime values are determined by the wiring above.</p>
+                    <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Discovery Reference</p>
+                    <p className="text-2xs text-text-tertiary mb-1.5">Values from the original execution, stored for context. Runtime values are determined by the wiring above.</p>
                     <div className="grid gap-1 opacity-60">
                       {Object.entries(a.tool_arguments).map(([k, v]) => {
                         const val = typeof v === 'string' ? v : JSON.stringify(v);

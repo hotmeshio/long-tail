@@ -126,7 +126,7 @@ export function ComposerPanel() {
             </div>
             <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border bg-surface-sunken/30">
               {mode === 'plan' ? (
-                <span className="text-[10px] text-text-tertiary">
+                <span className="text-2xs text-text-tertiary">
                   Decomposes into composable pipeline tools — builds leaf-first
                 </span>
               ) : mode === 'discover' ? (
@@ -135,22 +135,22 @@ export function ComposerPanel() {
                     type="checkbox"
                     checked={forceDiscovery}
                     onChange={(e) => setForceDiscovery(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-border text-accent-primary focus:ring-accent-primary/50 bg-surface-sunken cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-surface-border text-accent focus:ring-accent/50 bg-surface-sunken cursor-pointer"
                   />
-                  <span className="text-[10px] text-text-secondary group-hover:text-text-primary transition-colors">Force discovery</span>
-                  <span className="text-[10px] text-text-tertiary">{forceDiscovery ? '— skip compiled pipelines' : '— prefer compiled pipelines'}</span>
+                  <span className="text-2xs text-text-secondary group-hover:text-text-primary transition-colors">Force discovery</span>
+                  <span className="text-2xs text-text-tertiary">{forceDiscovery ? '— skip compiled pipelines' : '— prefer compiled pipelines'}</span>
                 </label>
               ) : (
-                <span className="text-[10px] text-text-tertiary">
+                <span className="text-2xs text-text-tertiary">
                   LLM builds pipeline from tool schemas — no execution needed
                 </span>
               )}
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-text-tertiary">Cmd+Enter</span>
+                <span className="text-2xs text-text-tertiary">Cmd+Enter</span>
                 <button
                   type="submit"
                   disabled={!promptText.trim() || activeMutation.isPending}
-                  className="px-4 py-1.5 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-1.5 bg-accent text-text-inverse text-xs font-medium rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {activeMutation.isPending ? 'Starting...' : mode === 'plan' ? 'Plan' : mode === 'discover' ? 'Discover' : 'Build'}
                 </button>
@@ -167,8 +167,8 @@ export function ComposerPanel() {
             <div key={step.title} className="flex items-start gap-2.5">
               <step.icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${step.color}`} strokeWidth={1.5} />
               <div>
-                <p className="text-[11px] font-medium text-text-primary">{step.title}</p>
-                <p className="text-[10px] text-text-tertiary mt-0.5 leading-relaxed">{step.detail}</p>
+                <p className="text-2xs font-medium text-text-primary">{step.title}</p>
+                <p className="text-2xs text-text-tertiary mt-0.5 leading-relaxed">{step.detail}</p>
               </div>
             </div>
           ))}

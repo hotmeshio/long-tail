@@ -50,7 +50,7 @@ export function TagInput({ tags, onChange, placeholder = 'Add tag...', compact }
       {tags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-medium"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-medium"
         >
           {tag}
           <button

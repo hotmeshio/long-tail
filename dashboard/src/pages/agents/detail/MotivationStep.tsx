@@ -11,7 +11,7 @@ export function MotivationStep({ form, set }: Props) {
   return (
     <div className="space-y-8">
       <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between">
-        <p className="text-[12px] text-text-secondary italic leading-relaxed">
+        <p className="text-xs text-text-secondary italic leading-relaxed">
           Goals define what drives the automation. Rules define what constrains it.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:motivation'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Motivation"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>

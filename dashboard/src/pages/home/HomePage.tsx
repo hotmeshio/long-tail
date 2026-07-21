@@ -42,7 +42,7 @@ function SectionHeader({ icon: Icon, color, docsHash, count, children, actions }
         <Icon className={`w-4.5 h-4.5 ${color || 'text-accent/60'}`} strokeWidth={1.5} />
         <h2 className="section-h2">{children}</h2>
         {count !== undefined && count > 0 && (
-          <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-semibold tabular-nums">
+          <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-semibold tabular-nums">
             {formatCountCompact(count)}
           </span>
         )}
@@ -87,8 +87,8 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
         <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${dot}`} />
-        <span className="text-[12px] text-text-primary font-mono truncate max-w-[60%]">{midEllipsis(id)}</span>
-        <span className="text-[10px] text-text-quaternary shrink-0 ml-auto whitespace-nowrap"><DateValue date={date} /></span>
+        <span className="text-xs text-text-primary font-mono truncate max-w-[60%]">{midEllipsis(id)}</span>
+        <span className="text-2xs text-text-quaternary shrink-0 ml-auto whitespace-nowrap"><DateValue date={date} /></span>
       </div>
       <div className="pl-3.5 flex items-center gap-1 overflow-hidden">{pill}</div>
     </button>
@@ -133,7 +133,7 @@ function AppPicker({ appIds, selected, onSelect }: {
     <div className="relative mb-3 -mt-2" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+        className="flex items-center gap-1 px-2 py-0.5 text-2xs rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
       >
         {selected}
         <svg className={`w-2.5 h-2.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -146,7 +146,7 @@ function AppPicker({ appIds, selected, onSelect }: {
             <button
               key={id}
               onClick={() => { onSelect(id); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+              className={`w-full text-left px-3 py-1.5 text-2xs transition-colors ${
                 selected === id ? 'text-accent bg-accent/5' : 'text-text-secondary hover:bg-surface-hover'
               }`}
             >
@@ -345,9 +345,9 @@ export function HomePage() {
                   className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors"
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[9px] text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-[12px] text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
+                    <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
+                    <span className="text-xs text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
+                    <span className="text-2xs text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
                   </div>
                   <div className="flex items-center gap-2 pl-5">
                     <WorkflowPill type={esc.type || 'unknown'} size="xs" />
@@ -381,9 +381,9 @@ export function HomePage() {
                   className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors"
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[9px] text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-[12px] text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
+                    <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
+                    <span className="text-xs text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
+                    <span className="text-2xs text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
                   </div>
                   <div className="flex items-center gap-2 pl-5">
                     <WorkflowPill type={esc.type || 'unknown'} size="xs" />

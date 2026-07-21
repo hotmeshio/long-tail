@@ -226,9 +226,9 @@ export function PlanWizard() {
         title="MCP Tool Designer"
         actions={
           <div className="flex items-center gap-3">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Plan</span>
+            <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Plan</span>
             {totalCount > 0 && (
-              <span className="text-[10px] text-text-tertiary">
+              <span className="text-2xs text-text-tertiary">
                 {builtCount}/{totalCount} built
                 {activeCount > 0 && ` | ${activeCount} deployed`}
               </span>

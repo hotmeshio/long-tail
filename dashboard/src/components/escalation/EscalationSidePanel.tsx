@@ -64,7 +64,7 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
               {deriveFieldLabel(key)}
             </dt>
             <dd className="mt-0.5 flex items-center gap-1">
-              <span className="text-[12px] text-text-primary font-mono break-all flex-1">
+              <span className="text-xs text-text-primary font-mono break-all flex-1">
                 {displayValue}
               </span>
               <Link
@@ -175,7 +175,7 @@ function ErrorsPanel({ errors, schema }: { errors: FieldError[]; schema?: Record
 
   return (
     <div className="space-y-1" role="alert" aria-live="polite">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-status-error mb-4">
+      <p className="text-2xs font-semibold uppercase tracking-wider text-status-error mb-4">
         {errors.length} {errors.length === 1 ? 'issue' : 'issues'} to resolve
       </p>
       <div className="space-y-1.5">
@@ -197,7 +197,7 @@ function ErrorsPanel({ errors, schema }: { errors: FieldError[]; schema?: Record
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-text-quaternary mt-4 px-3">
+      <p className="text-2xs text-text-quaternary mt-4 px-3">
         Click an issue to scroll to and focus the field.
       </p>
     </div>

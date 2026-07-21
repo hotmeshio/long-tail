@@ -101,7 +101,7 @@ function ToolList({ tools }: { tools: { name: string; description?: string }[] }
         <div key={t.name} className="px-3 py-2">
           <span className="text-xs font-medium text-text-primary font-mono">{t.name}</span>
           {t.description && (
-            <span className="block text-[10px] text-text-tertiary mt-0.5 line-clamp-2">{t.description}</span>
+            <span className="block text-2xs text-text-tertiary mt-0.5 line-clamp-2">{t.description}</span>
           )}
         </div>
       ))}

@@ -8,7 +8,7 @@ export function MetricCell({
 }) {
   return (
     <div>
-      <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">
         {label}
       </p>
       <div className="text-xs text-text-primary">{children}</div>

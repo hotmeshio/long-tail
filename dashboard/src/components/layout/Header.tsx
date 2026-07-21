@@ -147,7 +147,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                     onToggleEventFeed?.();
                   }
                 }}
-                className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+                className={`flex items-center gap-1.5 text-2xs transition-colors ${
                   connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
                 }`}
                 title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
@@ -163,7 +163,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
               {/* Docs */}
               <button
                 onClick={onToggleDocs}
-                className="flex items-center gap-1.5 text-[11px] text-text-quaternary hover:text-text-secondary transition-colors"
+                className="flex items-center gap-1.5 text-2xs text-text-quaternary hover:text-text-secondary transition-colors"
                 title="Documentation"
               >
                 <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -175,7 +175,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           {/* View-as indicator — visible when simulating a lower role */}
           {viewAs && (
             <>
-              <span className="flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-[10px] text-accent select-none">
+              <span className="flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-2xs text-accent select-none">
                 <span className="capitalize font-medium tracking-wide">{viewAs} View</span>
                 <button
                   onClick={clearViewAs}
@@ -213,7 +213,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                     Credentials
                   </Link>
                   <div className="px-3 py-2 border-t border-surface-border/60">
-                    <p className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Theme</p>
+                    <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Theme</p>
                     <div className="flex items-center gap-2 flex-wrap">
                       {allThemes.map((t) => (
                         <button

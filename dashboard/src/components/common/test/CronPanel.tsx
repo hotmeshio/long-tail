@@ -85,7 +85,7 @@ export function CronPanel({ workflow, onClose }: CronPanelProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">
         <div className="min-w-0">
           <p className="text-xs font-medium text-text-primary truncate">Cron Schedule</p>
-          <code className="text-[11px] font-mono text-accent truncate block">{workflow.graph_topic}</code>
+          <code className="text-2xs font-mono text-accent truncate block">{workflow.graph_topic}</code>
         </div>
         <button onClick={onClose} className="p-1 text-text-tertiary hover:text-text-primary shrink-0 ml-2">
           <X className="w-4 h-4" />
@@ -109,7 +109,7 @@ export function CronPanel({ workflow, onClose }: CronPanelProps) {
         <div>
           <div className="flex items-center justify-between mb-1">
             <SectionLabel>Default Input</SectionLabel>
-            <button onClick={toggleMode} className="text-[10px] text-accent hover:underline">
+            <button onClick={toggleMode} className="text-2xs text-accent hover:underline">
               {jsonMode ? 'Form view' : 'JSON view'}
             </button>
           </div>
@@ -118,7 +118,7 @@ export function CronPanel({ workflow, onClose }: CronPanelProps) {
             <textarea
               value={argsJson}
               onChange={(e) => setArgsJson(e.target.value)}
-              className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
+              className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-2xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
               rows={6}
               spellCheck={false}
             />
@@ -126,7 +126,7 @@ export function CronPanel({ workflow, onClose }: CronPanelProps) {
             <div className="space-y-3 max-h-[200px] overflow-y-auto">
               {Object.entries(fields).map(([key, value]) => (
                 <div key={key}>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
+                  <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
                   {typeof value === 'boolean' ? (
                     <select
                       value={String(value)}
@@ -153,7 +153,7 @@ export function CronPanel({ workflow, onClose }: CronPanelProps) {
                 </div>
               ))}
               {Object.keys(fields).length === 0 && (
-                <p className="text-[11px] text-text-tertiary italic">No input fields defined</p>
+                <p className="text-2xs text-text-tertiary italic">No input fields defined</p>
               )}
             </div>
           )}

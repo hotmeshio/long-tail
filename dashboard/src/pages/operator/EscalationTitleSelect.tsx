@@ -72,7 +72,7 @@ export function EscalationTitleSelect({
           {options.map((o) => (
             <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }} className={itemCls(role === o.value)}>
               <span className="truncate">{o.label}</span>
-              {o.label !== o.value && <span className="text-[10px] font-mono text-text-quaternary shrink-0">{o.value}</span>}
+              {o.label !== o.value && <span className="text-2xs font-mono text-text-quaternary shrink-0">{o.value}</span>}
             </button>
           ))}
         </div>

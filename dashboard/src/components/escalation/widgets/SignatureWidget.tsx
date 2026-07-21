@@ -23,6 +23,8 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
     if (!ctx) return;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
+    // Deliberately unthemed: the signature is a captured document artifact —
+    // the exported PNG must read like ink on paper regardless of theme.
     ctx.strokeStyle = '#1E1535';
 
     if (value && value.startsWith('data:')) {
@@ -78,10 +80,10 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
 
   return (
     <div>
-      <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+      <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
         {label}
       </label>
-      {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+      {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       <div className="mt-1 border border-surface-border rounded-md overflow-hidden bg-white">
         <canvas
           ref={canvasRef}
@@ -100,7 +102,7 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
       <button
         type="button"
         onClick={clear}
-        className="mt-1 text-[10px] text-text-tertiary hover:text-accent transition-colors"
+        className="mt-1 text-2xs text-text-tertiary hover:text-accent transition-colors"
       >
         Clear
       </button>

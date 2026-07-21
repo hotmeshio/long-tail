@@ -20,7 +20,7 @@ export function ScopeBadge({
   className?: string;
 }) {
   return (
-    <span className={`inline-flex items-center gap-2.5 text-[10px] text-text-tertiary ${className}`}>
+    <span className={`inline-flex items-center gap-2.5 text-2xs text-text-tertiary ${className}`}>
       <span className="inline-flex items-center gap-1" title="Can see">
         <Eye className="w-3 h-3 shrink-0 opacity-70" />
         <span className="w-7">{SEE[read]}</span>

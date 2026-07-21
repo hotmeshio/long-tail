@@ -38,7 +38,7 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-0.5 pl-2 pr-1 py-1 rounded-md text-[11px] font-medium text-text-tertiary hover:text-accent hover:bg-surface-hover transition-colors"
+        className="flex items-center gap-0.5 pl-2 pr-1 py-1 rounded-md text-2xs font-medium text-text-tertiary hover:text-accent hover:bg-surface-hover transition-colors"
         title="Actions"
       >
         Actions

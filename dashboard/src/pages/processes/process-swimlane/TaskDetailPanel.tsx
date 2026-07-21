@@ -47,14 +47,14 @@ export function TaskDetailPanel({
 
         {task.milestones.length > 0 && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
               Milestones
             </p>
             <div className="flex flex-wrap gap-1.5">
               {task.milestones.map((m, i) => (
                 <span
                   key={i}
-                  className="px-2 py-0.5 text-[10px] font-mono bg-accent-faint/50 rounded text-text-secondary"
+                  className="px-2 py-0.5 text-2xs font-mono bg-accent-faint/50 rounded text-text-secondary"
                 >
                   {m.name}: {String(m.value)}
                 </span>
@@ -68,13 +68,13 @@ export function TaskDetailPanel({
       <div className="flex flex-col items-end gap-2">
         <Link
           to={`/workflows/executions/${encodeURIComponent(task.workflow_id)}`}
-          className="block text-[11px] text-accent hover:underline"
+          className="block text-2xs text-accent hover:underline"
         >
           Execution Details
         </Link>
         <Link
           to={`/workflows/tasks/detail/${task.id}`}
-          className="block text-[11px] text-accent hover:underline"
+          className="block text-2xs text-accent hover:underline"
         >
           Task Details
         </Link>

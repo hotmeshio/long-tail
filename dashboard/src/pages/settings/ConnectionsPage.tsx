@@ -75,12 +75,12 @@ export function ConnectionsPage() {
                     {conn.provider}
                   </span>
                   {conn.label !== 'default' && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-surface-sunken rounded text-text-tertiary">
+                    <span className="text-2xs px-1.5 py-0.5 bg-surface-sunken rounded text-text-tertiary">
                       {conn.label}
                     </span>
                   )}
                   {conn.credential_type && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-accent-faint rounded text-accent">
+                    <span className="text-2xs px-1.5 py-0.5 bg-accent-faint rounded text-accent">
                       {conn.credential_type}
                     </span>
                   )}
@@ -110,7 +110,7 @@ export function ConnectionsPage() {
       )}
 
       <div className="mt-8 pt-6 border-t border-surface-border">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
           Add Connection
         </p>
         <div className="flex gap-3">

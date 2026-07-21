@@ -2,17 +2,22 @@ import type { ActivityManifestEntry } from '../../../api/types';
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 
+// Node palette resolves through the --lt-* status tokens so registered themes
+// (including dark) restyle the DAG. Role mapping: trigger keeps the theme
+// accent; MCP/DB external calls take the queued sky; LLM calls take the
+// claimed orange (work in flight); transforms take the success green; signals
+// take the pending amber.
 const SOURCE_STYLES: Record<string, { bar: string; dot: string; hex: string; label: string }> = {
-  trigger:   { bar: 'bg-accent',      dot: 'bg-accent',      hex: 'rgb(var(--lt-accent))', label: 'Trigger' },
-  mcp:       { bar: 'bg-blue-500',    dot: 'bg-blue-500',    hex: '#3B82F6', label: 'MCP' },
-  db:        { bar: 'bg-blue-500',    dot: 'bg-blue-500',    hex: '#3B82F6', label: 'Database' },
-  llm:       { bar: 'bg-violet-500',  dot: 'bg-violet-500',  hex: '#8B5CF6', label: 'LLM' },
-  transform: { bar: 'bg-emerald-500', dot: 'bg-emerald-500', hex: '#10B981', label: 'Transform' },
-  signal:    { bar: 'bg-amber-500',   dot: 'bg-amber-500',   hex: '#F59E0B', label: 'Signal' },
+  trigger:   { bar: 'bg-accent',                  dot: 'bg-accent',                  hex: 'rgb(var(--lt-accent))', label: 'Trigger' },
+  mcp:       { bar: 'bg-status-queued-graphic',   dot: 'bg-status-queued-graphic',   hex: 'rgb(var(--lt-status-queued-graphic))', label: 'MCP' },
+  db:        { bar: 'bg-status-queued-graphic',   dot: 'bg-status-queued-graphic',   hex: 'rgb(var(--lt-status-queued-graphic))', label: 'Database' },
+  llm:       { bar: 'bg-status-claimed-graphic',  dot: 'bg-status-claimed-graphic',  hex: 'rgb(var(--lt-status-claimed-graphic))', label: 'LLM' },
+  transform: { bar: 'bg-status-success-graphic',  dot: 'bg-status-success-graphic',  hex: 'rgb(var(--lt-status-success-graphic))', label: 'Transform' },
+  signal:    { bar: 'bg-status-pending-graphic',  dot: 'bg-status-pending-graphic',  hex: 'rgb(var(--lt-status-pending-graphic))', label: 'Signal' },
 };
 
 export function styleFor(source: string) {
-  return SOURCE_STYLES[source] ?? { bar: 'bg-gray-500', dot: 'bg-gray-500', hex: '#6B7280', label: source };
+  return SOURCE_STYLES[source] ?? { bar: 'bg-text-quaternary', dot: 'bg-text-quaternary', hex: 'rgb(var(--lt-text-quaternary))', label: source };
 }
 
 // ── Graph helpers ───────────────────────────────────────────────────────────

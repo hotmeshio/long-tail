@@ -81,7 +81,7 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
               <p className="text-xs font-medium text-text-primary">
                 Request AI Triage
               </p>
-              <p className="text-[10px] text-text-tertiary">
+              <p className="text-2xs text-text-tertiary">
                 Route to the MCP triage orchestrator for AI-assisted remediation
               </p>
             </div>
@@ -89,7 +89,7 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
 
           {requestTriage && (
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                 Describe the Problem
               </label>
               <textarea
@@ -99,7 +99,7 @@ export function ResolveModal({ open, onClose, workflowType, resolverSchema, onRe
                 className="input text-xs w-full"
                 rows={3}
               />
-              <p className="text-[10px] text-text-tertiary mt-1">
+              <p className="text-2xs text-text-tertiary mt-1">
                 AI will diagnose and apply the fix using MCP tools
               </p>
             </div>

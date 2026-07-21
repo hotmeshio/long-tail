@@ -150,10 +150,10 @@ export function McpServersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
                     Server / Tool
                   </th>
-                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+                  <th className="sticky top-[2.75rem] z-10 bg-surface px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary w-28">
                     Status
                   </th>
                   <th className="sticky top-[2.75rem] z-10 bg-surface w-16" />

@@ -89,7 +89,7 @@ export function RoleManagementModal({
       {user && (
         <div className="space-y-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
               Current Roles
             </p>
             {localRoles.length === 0 ? (
@@ -103,7 +103,7 @@ export function RoleManagementModal({
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-sm font-mono text-text-primary w-28 shrink-0 truncate" title={r.role}>{r.role}</span>
-                      <span className="w-14 shrink-0 text-[9px] uppercase tracking-wide text-text-tertiary">{r.type}</span>
+                      <span className="w-14 shrink-0 text-2xs uppercase tracking-wide text-text-tertiary">{r.type}</span>
                       {r.type === 'member' && (
                         <>
                           <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
@@ -113,7 +113,7 @@ export function RoleManagementModal({
                     </div>
                     <button
                       onClick={() => handleRemove(r.role)}
-                      className="text-[10px] text-status-error hover:underline"
+                      className="text-2xs text-status-error hover:underline"
                       disabled={removeRole.isPending}
                     >
                       Remove
@@ -130,12 +130,12 @@ export function RoleManagementModal({
             if (available.length === 0) return null;
             return (
               <div className="border-t border-surface-border pt-4">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+                <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
                   Add Role
                 </p>
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-text-tertiary mb-1">Role</label>
+                    <label className="block text-2xs text-text-tertiary mb-1">Role</label>
                     <select
                       value={newRole}
                       onChange={(e) => setNewRole(e.target.value)}
@@ -148,7 +148,7 @@ export function RoleManagementModal({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-text-tertiary mb-1">Type</label>
+                    <label className="block text-2xs text-text-tertiary mb-1">Type</label>
                     <select
                       value={newRoleType}
                       onChange={(e) => setNewRoleType(e.target.value as LTRoleType)}
@@ -162,7 +162,7 @@ export function RoleManagementModal({
                   </div>
                   {newRoleType === 'member' && (
                     <div>
-                      <label className="block text-[10px] text-text-tertiary mb-1">Scope</label>
+                      <label className="block text-2xs text-text-tertiary mb-1">Scope</label>
                       <select
                         value={newScope}
                         onChange={(e) => setNewScope(e.target.value)}

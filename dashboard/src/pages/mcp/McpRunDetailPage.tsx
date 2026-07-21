@@ -173,31 +173,31 @@ export function McpRunDetailPage() {
         {/* Row 2: Namespace, Topic, Duration, Started, Trace */}
         <div className="grid grid-cols-6 gap-x-6">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Server</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Server</p>
             <p className="text-xs font-mono text-text-primary truncate">{namespace}</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Tool</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Tool</p>
             <p className="text-xs font-mono text-text-primary truncate">{execution.workflow_type || '—'}</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>
             <DurationValue ms={execution.duration_ms} className="font-mono text-text-primary" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Started</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Started</p>
             {execution.start_time
               ? <DateValue date={execution.start_time} format="datetime" className="font-mono text-text-primary" />
               : <span className="text-xs text-text-tertiary">--</span>}
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Completed</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Completed</p>
             {execution.close_time
               ? <DateValue date={execution.close_time} format="datetime" className="font-mono text-text-primary" />
               : <span className="text-xs text-text-tertiary">--</span>}
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Trace</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Trace</p>
             {execution.trace_id ? (
               <CopyableId
                 label=""

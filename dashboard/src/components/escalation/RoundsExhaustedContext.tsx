@@ -14,7 +14,7 @@ interface RoundsExhaustedContextProps {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{children}</p>
+    <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{children}</p>
   );
 }
 
@@ -46,7 +46,7 @@ export function RoundsExhaustedContext({ payload, isTerminal, resolverPayload, o
             <span className="text-xs font-medium text-status-success">Resolved by AI Triage</span>
           </div>
           {typeof toolCalls === 'number' && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-status-success/10 text-status-success">
+            <span className="text-2xs font-mono px-2 py-0.5 rounded-full bg-status-success/10 text-status-success">
               {toolCalls} tool calls used
             </span>
           )}
@@ -71,7 +71,7 @@ export function RoundsExhaustedContext({ payload, isTerminal, resolverPayload, o
             {triageWorkflowId && (
               <Link
                 to={`/workflows/executions/${triageWorkflowId}`}
-                className="text-[10px] text-accent hover:underline"
+                className="text-2xs text-accent hover:underline"
               >
                 View triage execution
               </Link>
@@ -94,7 +94,7 @@ export function RoundsExhaustedContext({ payload, isTerminal, resolverPayload, o
           <span className="text-xs font-medium text-status-warning">Tool Rounds Exhausted</span>
         </div>
         {typeof toolCalls === 'number' && (
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-status-warning/10 text-status-warning">
+          <span className="text-2xs font-mono px-2 py-0.5 rounded-full bg-status-warning/10 text-status-warning">
             {toolCalls} tool calls used
           </span>
         )}
@@ -128,7 +128,7 @@ export function RoundsExhaustedContext({ payload, isTerminal, resolverPayload, o
           <div>
             <button
               onClick={() => setShowResult(!showResult)}
-              className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary hover:text-text-secondary transition-colors"
+              className="flex items-center gap-1 text-2xs font-semibold uppercase tracking-widest text-text-tertiary hover:text-text-secondary transition-colors"
             >
               <svg className={`w-3 h-3 transition-transform ${showResult ? 'rotate-90' : ''}`} viewBox="0 0 12 12" fill="currentColor">
                 <path d="M4.5 2l4 4-4 4" />

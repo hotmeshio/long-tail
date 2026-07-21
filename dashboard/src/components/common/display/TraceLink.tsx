@@ -18,7 +18,7 @@ export function TraceLink({ traceId, spanId, traceUrl, className = '' }: TraceLi
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={`text-[10px] font-mono text-accent hover:underline truncate ${className}`}
+        className={`text-2xs font-mono text-accent hover:underline truncate ${className}`}
         title={`Trace: ${traceId}`}
       >
         trace &rarr;
@@ -28,7 +28,7 @@ export function TraceLink({ traceId, spanId, traceUrl, className = '' }: TraceLi
 
   return (
     <span
-      className={`text-[10px] font-mono text-text-tertiary truncate cursor-default ${className}`}
+      className={`text-2xs font-mono text-text-tertiary truncate cursor-default ${className}`}
       title={`Trace: ${traceId}${spanId ? `\nSpan: ${spanId}` : ''}`}
     >
       {traceId.slice(0, 12)}&hellip;

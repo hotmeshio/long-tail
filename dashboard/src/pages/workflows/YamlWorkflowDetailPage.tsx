@@ -20,13 +20,13 @@ function SectionHeader({ icon: Icon, color, children }: { icon: React.ElementTyp
 }
 
 function EmptyHint({ text }: { text: string }) {
-  return <p className="text-[11px] text-text-quaternary py-2">{text}</p>;
+  return <p className="text-2xs text-text-quaternary py-2">{text}</p>;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between py-2 gap-4">
-      <span className="text-[10px] uppercase tracking-widest text-text-quaternary shrink-0">{label}</span>
+      <span className="text-2xs uppercase tracking-widest text-text-quaternary shrink-0">{label}</span>
       <span className="text-xs text-text-primary text-right min-w-0 truncate">{children}</span>
     </div>
   );
@@ -55,9 +55,9 @@ function FieldList({ schema, empty }: { schema: Record<string, unknown> | undefi
         <div key={f.key} className="py-2">
           <div className="flex items-baseline gap-2">
             <code className="text-xs font-mono text-text-primary">{f.key}</code>
-            <span className="text-[10px] font-mono text-text-quaternary">{f.type}</span>
+            <span className="text-2xs font-mono text-text-quaternary">{f.type}</span>
           </div>
-          {f.description && <p className="text-[11px] text-text-tertiary mt-0.5 leading-snug">{f.description}</p>}
+          {f.description && <p className="text-2xs text-text-tertiary mt-0.5 leading-snug">{f.description}</p>}
         </div>
       ))}
     </div>
@@ -126,7 +126,7 @@ export function YamlWorkflowDetailPage() {
       <div className="flex items-center gap-3 mb-2">
         <StatusBadge status={flow.status} />
         <NamespacePill namespace={flow.app_id} />
-        <span className="text-[11px] font-mono text-text-quaternary">v{flow.content_version}</span>
+        <span className="text-2xs font-mono text-text-quaternary">v{flow.content_version}</span>
       </div>
 
       {flow.description && (
@@ -177,9 +177,9 @@ export function YamlWorkflowDetailPage() {
                 <div key={a.activity_id} className="flex items-center justify-between py-2 gap-3">
                   <div className="min-w-0">
                     <code className="text-xs font-mono text-text-primary">{a.title || a.activity_id}</code>
-                    {a.topic && <p className="text-[10px] font-mono text-text-quaternary truncate">{a.topic}</p>}
+                    {a.topic && <p className="text-2xs font-mono text-text-quaternary truncate">{a.topic}</p>}
                   </div>
-                  <span className="text-[10px] uppercase tracking-widest text-text-quaternary shrink-0">{a.tool_source || a.type}</span>
+                  <span className="text-2xs uppercase tracking-widest text-text-quaternary shrink-0">{a.tool_source || a.type}</span>
                 </div>
               ))}
             </div>
@@ -190,7 +190,7 @@ export function YamlWorkflowDetailPage() {
       {/* Graph definition source */}
       <div className="mb-12">
         <SectionHeader icon={FileCode2} color="text-accent">Definition</SectionHeader>
-        <pre className="text-[11px] font-mono text-text-secondary bg-surface-sunken/50 rounded-md p-4 overflow-x-auto leading-relaxed">
+        <pre className="text-2xs font-mono text-text-secondary bg-surface-sunken/50 rounded-md p-4 overflow-x-auto leading-relaxed">
           {flow.yaml_content}
         </pre>
       </div>
@@ -206,9 +206,9 @@ export function YamlWorkflowDetailPage() {
               <div key={v.id} className="flex items-center justify-between py-2 gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-mono text-text-primary">v{v.version}</span>
-                  {v.change_summary && <span className="text-[11px] text-text-tertiary truncate">{v.change_summary}</span>}
+                  {v.change_summary && <span className="text-2xs text-text-tertiary truncate">{v.change_summary}</span>}
                 </div>
-                <span className="text-[10px] text-text-quaternary shrink-0">{formatDate(v.created_at)}</span>
+                <span className="text-2xs text-text-quaternary shrink-0">{formatDate(v.created_at)}</span>
               </div>
             ))}
           </div>

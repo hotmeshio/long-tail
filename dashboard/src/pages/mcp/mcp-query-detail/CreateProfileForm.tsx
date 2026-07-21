@@ -110,40 +110,40 @@ export function CreateProfileForm({
         {/* Col 1: identity fields (~30%) */}
         <div className="w-[30%] shrink-0 space-y-4">
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Namespace *</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Namespace *</label>
             <input type="text" value={compileAppId} onChange={(e) => setCompileAppId(sanitizeServerName(e.target.value))}
               className="input" placeholder="e.g. longtail" />
             {allAppIds.length > 0 && (
               <div className="flex gap-1.5 mt-1.5 flex-wrap">
                 {allAppIds.map((id) => (
                   <button key={id} type="button" onClick={() => setCompileAppId(id)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${compileAppId === id ? 'bg-accent/20 text-accent' : 'bg-surface-sunken text-text-tertiary hover:text-text-secondary'}`}>{id}</button>
+                    className={`text-2xs px-2 py-0.5 rounded-full transition-colors ${compileAppId === id ? 'bg-accent/20 text-accent' : 'bg-surface-sunken text-text-tertiary hover:text-text-secondary'}`}>{id}</button>
                 ))}
               </div>
             )}
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Name *</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Name *</label>
             <input type="text" value={compileName} onChange={(e) => setCompileName(sanitizeToolName(e.target.value))}
               className="input" placeholder="e.g. auth_screenshot_all_nav_pages" />
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
             <TagInput tags={compileTags} onChange={setCompileTags} placeholder="e.g. browser, screenshots, login" />
-            <p className="text-[10px] text-text-tertiary mt-1">Press Enter or comma to add.</p>
+            <p className="text-2xs text-text-tertiary mt-1">Press Enter or comma to add.</p>
           </div>
         </div>
 
         {/* Col 2: description (~80%) */}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
-            {!compileDescription && !describeData && describePrompt && <span className="text-[10px] text-accent animate-pulse">Generating...</span>}
+            <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
+            {!compileDescription && !describeData && describePrompt && <span className="text-2xs text-accent animate-pulse">Generating...</span>}
           </div>
           <textarea value={compileDescription} onChange={(e) => setCompileDescription(e.target.value)}
             placeholder="Describe what this workflow does as a reusable tool..."
             className="flex-1 min-h-[120px] w-full px-3 py-2 bg-surface-sunken border border-surface-border rounded-md text-sm text-text-primary placeholder:text-text-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary" />
-          <p className="text-[10px] text-text-tertiary mt-1">{describeData ? 'AI-generated. Edit to refine.' : 'Describe what this workflow does so future queries can find it.'}</p>
+          <p className="text-2xs text-text-tertiary mt-1">{describeData ? 'AI-generated. Edit to refine.' : 'Describe what this workflow does so future queries can find it.'}</p>
         </div>
       </div>
 

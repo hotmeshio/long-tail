@@ -44,7 +44,7 @@ export function TransportStep({ form, set, isBuiltin }: Props) {
                 <span className={`text-xs font-medium ${active ? 'text-accent' : 'text-text-primary'}`}>
                   {m.label}
                 </span>
-                <span className="block text-[10px] text-text-tertiary mt-0.5">{m.hint}</span>
+                <span className="block text-2xs text-text-tertiary mt-0.5">{m.hint}</span>
               </button>
             );
           })}

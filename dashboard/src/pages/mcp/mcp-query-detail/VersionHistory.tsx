@@ -39,7 +39,7 @@ export function VersionHistory({
               <span className="font-mono font-medium">v{v.version}</span>
               {isCurrent && <span className="text-text-tertiary ml-1">(current)</span>}
               {v.change_summary && (
-                <p className="text-[10px] text-text-tertiary truncate mt-0.5">{v.change_summary}</p>
+                <p className="text-2xs text-text-tertiary truncate mt-0.5">{v.change_summary}</p>
               )}
             </button>
           );

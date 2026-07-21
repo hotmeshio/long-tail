@@ -113,7 +113,7 @@ export function UserRolesPage() {
             <RolePill key={r.role} role={r.role} />
           ))}
           {(row.roles ?? []).length === 0 && (
-            <span className="text-[10px] text-text-tertiary">No roles</span>
+            <span className="text-2xs text-text-tertiary">No roles</span>
           )}
         </div>
       ),
@@ -167,7 +167,7 @@ export function UserRolesPage() {
           <div className="space-y-4">
             {/* Current roles */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+              <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
                 Current Roles
               </p>
               {(editingUser.roles ?? []).length === 0 ? (
@@ -183,7 +183,7 @@ export function UserRolesPage() {
                         <span className="text-sm font-mono text-text-primary w-28 shrink-0 truncate" title={r.role}>
                           {r.role}
                         </span>
-                        <span className="w-14 shrink-0 text-[9px] uppercase tracking-wide text-text-tertiary">{r.type}</span>
+                        <span className="w-14 shrink-0 text-2xs uppercase tracking-wide text-text-tertiary">{r.type}</span>
                         {r.type === 'member' && (
                           <>
                             <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
@@ -193,7 +193,7 @@ export function UserRolesPage() {
                       </div>
                       <button
                         onClick={() => handleRemoveRole(editingUser.id, r.role)}
-                        className="text-[10px] text-status-error hover:underline"
+                        className="text-2xs text-status-error hover:underline"
                         disabled={removeRole.isPending}
                       >
                         Remove
@@ -211,12 +211,12 @@ export function UserRolesPage() {
               if (available.length === 0) return null;
               return (
                 <div className="border-t border-surface-border pt-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+                  <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
                     Add Role
                   </p>
                   <div className="flex items-end gap-3">
                     <div className="flex-1">
-                      <label className="block text-[10px] text-text-tertiary mb-1">
+                      <label className="block text-2xs text-text-tertiary mb-1">
                         Role
                       </label>
                       <select
@@ -231,7 +231,7 @@ export function UserRolesPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] text-text-tertiary mb-1">
+                      <label className="block text-2xs text-text-tertiary mb-1">
                         Type
                       </label>
                       <select
@@ -246,7 +246,7 @@ export function UserRolesPage() {
                     </div>
                     {newRoleType === 'member' && (
                       <div>
-                        <label className="block text-[10px] text-text-tertiary mb-1">
+                        <label className="block text-2xs text-text-tertiary mb-1">
                           Scope
                         </label>
                         <select

@@ -32,7 +32,7 @@ export function PlanStep1({ specification, description, plan, isPlanning, isFail
       {/* Original specification */}
       {specification && (
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Specification</label>
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Specification</label>
           <div className="rounded-md bg-surface-sunken/50 px-4 py-3">
             <p className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap">
               {specification}
@@ -62,7 +62,7 @@ export function PlanStep1({ specification, description, plan, isPlanning, isFail
           {description && (
             <p className="text-sm text-text-secondary mb-4 leading-relaxed">{description}</p>
           )}
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
             Planned Workflows ({plan.length})
           </label>
           <div className="space-y-2">
@@ -70,13 +70,13 @@ export function PlanStep1({ specification, description, plan, isPlanning, isFail
               <div key={item.name} className="px-3 py-2.5 rounded-md bg-surface-raised/50">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-text-primary">{item.name}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-sunken text-text-tertiary">{roleLabel(item.role)}</span>
+                  <span className="text-2xs px-1.5 py-0.5 rounded bg-surface-sunken text-text-tertiary">{roleLabel(item.role)}</span>
                 </div>
-                <p className="text-[11px] text-text-secondary mt-1">{item.description}</p>
+                <p className="text-2xs text-text-secondary mt-1">{item.description}</p>
                 {item.dependencies.length > 0 && (
                   <div className="flex items-center gap-1 mt-1">
                     <GitBranch className="w-2.5 h-2.5 text-text-tertiary" />
-                    <span className="text-[10px] text-text-tertiary">{item.dependencies.join(', ')}</span>
+                    <span className="text-2xs text-text-tertiary">{item.dependencies.join(', ')}</span>
                   </div>
                 )}
               </div>
@@ -88,7 +88,7 @@ export function PlanStep1({ specification, description, plan, isPlanning, isFail
       {!isPlanning && !isFailed && plan.length > 0 && (
         <button
           onClick={onContinue}
-          className="px-4 py-2 bg-accent text-white text-xs font-medium rounded-md hover:bg-accent/90 transition-colors"
+          className="px-4 py-2 bg-accent text-text-inverse text-xs font-medium rounded-md hover:bg-accent/90 transition-colors"
         >
           Continue to Profile
         </button>

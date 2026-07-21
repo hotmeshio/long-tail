@@ -28,10 +28,10 @@ const anyPending = (props: BulkActionBarProps) =>
 // hairline border, a barely-there 3px radius (square reads timeless, not dated),
 // definition on hover. Selects share it so the toolbar is one cohesive set.
 const CTRL =
-  'inline-flex items-center h-7 px-2.5 text-[11px] font-medium text-text-secondary bg-surface border border-surface-border rounded-[4px] hover:border-accent/50 hover:text-text-primary transition-colors disabled:opacity-50 disabled:hover:border-surface-border';
+  'inline-flex items-center h-7 px-2.5 text-2xs font-medium text-text-secondary bg-surface border border-surface-border rounded-[4px] hover:border-accent/50 hover:text-text-primary transition-colors disabled:opacity-50 disabled:hover:border-surface-border';
 const SELECT = `${CTRL} appearance-none cursor-pointer`;
 const DANGER =
-  'inline-flex items-center h-7 px-2.5 text-[11px] font-medium text-status-error bg-surface border border-status-error/30 rounded-[4px] hover:border-status-error hover:bg-status-error/5 transition-colors disabled:opacity-50';
+  'inline-flex items-center h-7 px-2.5 text-2xs font-medium text-status-error bg-surface border border-status-error/30 rounded-[4px] hover:border-status-error hover:bg-status-error/5 transition-colors disabled:opacity-50';
 
 export function BulkActionBar(props: BulkActionBarProps) {
   const disabled = anyPending(props);
@@ -56,7 +56,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
         {/* Contextual band: neutral fill + a 2px accent left rule anchors it as a
             distinct "selection mode" surface without a rounded card. */}
         <div className="flex flex-wrap items-center gap-2 py-2.5 pl-3 pr-2 mt-4 mb-3 bg-surface-sunken/60 border-l-2 border-l-accent">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-accent tabular-nums">
+      <span className="text-2xs font-semibold uppercase tracking-wider text-accent tabular-nums">
         {props.selectedCount} selected
       </span>
 
@@ -135,13 +135,13 @@ export function BulkActionBar(props: BulkActionBarProps) {
       <div className="flex-1" />
 
       {disabled && (
-        <span className="text-[11px] text-text-tertiary animate-pulse">Processing…</span>
+        <span className="text-2xs text-text-tertiary animate-pulse">Processing…</span>
       )}
 
       {/* Clear */}
       <button
         onClick={props.onClearSelection}
-        className="px-1 text-[11px] font-medium text-text-tertiary hover:text-text-primary transition-colors"
+        className="px-1 text-2xs font-medium text-text-tertiary hover:text-text-primary transition-colors"
       >
         Clear
       </button>

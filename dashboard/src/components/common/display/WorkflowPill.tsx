@@ -19,9 +19,9 @@ const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
 };
 
 const SIZE_CONFIG = {
-  xs: { pill: 'px-1 py-px text-[9px] gap-1', icon: 'w-2 h-2' },
-  sm: { pill: 'px-1.5 py-px text-[11px] gap-1', icon: 'w-2 h-2' },
-  md: { pill: 'px-2 py-0.5 text-[12px] gap-1.5', icon: 'w-2.5 h-2.5' },
+  xs: { pill: 'px-1 py-px text-2xs gap-1', icon: 'w-2 h-2' },
+  sm: { pill: 'px-1.5 py-px text-2xs gap-1', icon: 'w-2 h-2' },
+  md: { pill: 'px-2 py-0.5 text-xs gap-1.5', icon: 'w-2.5 h-2.5' },
 } as const;
 
 /**

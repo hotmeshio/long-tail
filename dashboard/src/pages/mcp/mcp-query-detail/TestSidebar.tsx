@@ -55,7 +55,7 @@ export function TestSidebar({
       {activeJobId ? (
         /* Live execution timeline */
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-3">Execution</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-3">Execution</p>
           <LiveActivityTimeline
             steps={activitySteps}
             manifest={activityManifest ?? []}
@@ -66,12 +66,12 @@ export function TestSidebar({
         /* Input form */
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Test Inputs</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Test Inputs</p>
             <button onClick={() => {
               if (!invokeJsonMode) setInvokeJson(JSON.stringify(invokeFields, null, 2));
               else try { setInvokeFields(JSON.parse(invokeJson)); } catch { /* keep fields */ }
               setInvokeJsonMode(!invokeJsonMode);
-            }} className="text-[10px] text-accent hover:underline">
+            }} className="text-2xs text-accent hover:underline">
               {invokeJsonMode ? 'Form view' : 'JSON view'}
             </button>
           </div>
@@ -89,7 +89,7 @@ export function TestSidebar({
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
               {Object.entries(invokeFields).map(([key, value]) => (
                 <div key={key}>
-                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
+                  <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
                   {typeof value === 'boolean' ? (
                     <select
                       value={String(value)}
