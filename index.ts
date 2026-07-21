@@ -1,5 +1,6 @@
 import { config } from './modules/config';
 import { loggerRegistry } from './lib/logger';
+import { midnightTheme } from './examples/themes/midnight';
 
 import { start } from './start';
 
@@ -87,7 +88,12 @@ async function main() {
     escalation: {
       strategy: 'mcp',
     },
-    branding: process.env.WHITE_LABEL ? { appName: process.env.WHITE_LABEL } : undefined,
+    branding: {
+      ...(process.env.WHITE_LABEL ? { appName: process.env.WHITE_LABEL } : {}),
+      // Midnight ships as a registered theme — the working proof that a
+      // deployment-supplied stylesheet controls the entire design system.
+      themes: [midnightTheme],
+    },
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
     events: config.EVENT_TRANSPORT === 'nats'
       ? { nats: { url: config.NATS_URL, wsUrl: config.NATS_WS_URL || undefined, token: config.NATS_TOKEN || undefined } }

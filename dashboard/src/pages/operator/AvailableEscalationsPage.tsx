@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
 import { useAccess } from '../../hooks/useAccess';
@@ -21,7 +20,8 @@ import {
   type FacetFilters,
   type FacetOrder,
 } from '../../api/escalations';
-import { FacetedFilterPanel } from './FacetedFilterPanel';
+import { FacetQueryPanel } from './FacetQueryPanel';
+import { useShellPanel } from '../../hooks/useShellPanel';
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
 import { useRoles, useRoleDetails, useRoleListSchema } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
@@ -80,6 +80,29 @@ export function AvailableEscalationsPage() {
   // The free-text term now lives in the drawer alongside the facets, so it counts
   // toward the active-query badge and is cleared by the drawer's Clear.
   const activeFacetCount = facetCount(facetFilters) + (filters.search ? 1 : 0);
+
+  // Faceted query editor rides the shell's global right panel. Re-invoked on
+  // every dependency change so the panel content always reflects live state.
+  const { setPanel, closePanel } = useShellPanel();
+  useEffect(() => {
+    if (!facetDrawerOpen) {
+      closePanel();
+      return;
+    }
+    setPanel(
+      <FacetQueryPanel
+        value={facetFilters}
+        onChange={setFacetFilters}
+        facetKeys={facetKeysData?.keys ?? []}
+        search={filters.search ?? ''}
+        onSearchChange={(v) => setFilter('search', v)}
+        activeFacetCount={activeFacetCount}
+        onClear={() => { setFacetFilters({}); setFilter('search', ''); }}
+        onClose={() => setFacetDrawerOpen(false)}
+      />,
+      { width: 420 },
+    );
+  }, [facetDrawerOpen, facetFilters, setFacetFilters, facetKeysData, filters.search, setFilter, activeFacetCount, setPanel, closePanel]);
   const [triageModalOpen, setTriageModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -448,7 +471,7 @@ export function AvailableEscalationsPage() {
             >
               <SlidersHorizontal className="w-4 h-4" />
               {activeFacetCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-[9px] font-medium text-white">
+                <span className="absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-[9px] font-medium text-text-inverse">
                   {activeFacetCount}
                 </span>
               )}
@@ -456,53 +479,6 @@ export function AvailableEscalationsPage() {
           </>
         }
       />
-
-      {/* Faceted query — slide-out drawer (deep-linked state), portaled so fixed positioning
-          works. Always mounted so it slides open/closed with a subtle transition. */}
-      {createPortal(
-        <div
-          className={`fixed right-0 bottom-0 w-[420px] z-40 border-l border-surface-border bg-surface overflow-y-auto shadow-lg transition-transform duration-200 ease-out ${facetDrawerOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'}`}
-          style={{ top: '3.5rem' }}
-          aria-hidden={!facetDrawerOpen}
-        >
-          <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-surface border-b border-surface-border/50">
-            <span className="text-xs font-medium text-text-primary">Faceted query</span>
-            <div className="flex items-center gap-2">
-              {activeFacetCount > 0 && (
-                <button
-                  onClick={() => { setFacetFilters({}); setFilter('search', ''); }}
-                  className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-              <button
-                onClick={() => setFacetDrawerOpen(false)}
-                className="p-1 rounded hover:bg-surface-hover text-text-tertiary hover:text-text-primary transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          <div className="px-4 py-2">
-            <p className="mb-2 text-[11px] leading-snug text-text-tertiary">
-              Precise metadata facets plus exact correlation-id lookup — they compose in one
-              SQL query. Facet keys are the ones that actually exist in your visible escalations.
-              Set status to <span className="font-medium">All</span> to find an order across every
-              status; the whole query is shareable via the URL.
-            </p>
-            <FacetedFilterPanel
-              value={facetFilters}
-              onChange={setFacetFilters}
-              facetKeys={facetKeysData?.keys ?? []}
-              search={filters.search ?? ''}
-              onSearchChange={(v) => setFilter('search', v)}
-            />
-          </div>
-        </div>,
-        document.body,
-      )}
 
       {/* Always mounted so the bar can animate in AND out as the selection changes. */}
       <BulkActionBar
@@ -525,15 +501,15 @@ export function AvailableEscalationsPage() {
 
       {/* Active facet pills — sticky below the shell header, opaque so timeline scrolls beneath */}
       {((facetFilters.facets && Object.keys(facetFilters.facets).length > 0) || facetFilters.jeopardy) && (
-        <div className="sticky top-14 z-30 bg-surface/98 backdrop-blur-sm border-b border-surface-border/30 -mx-10 px-10 py-2 flex items-center gap-1.5 flex-wrap">
+        <div className="sticky top-14 z-30 bg-surface/98 backdrop-blur-sm border-b border-surface-border/30 -mx-page-x px-page-x py-2 flex items-center gap-1.5 flex-wrap">
           {facetFilters.jeopardy && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-status-error px-2.5 py-0.5 text-[10px] font-semibold text-white">
+            <span className="inline-flex items-center gap-1 rounded-full bg-status-error px-2.5 py-0.5 text-[10px] font-semibold text-text-inverse">
               <TriangleAlert className="w-2.5 h-2.5" strokeWidth={2.5} />
               in jeopardy
               {jeopardyThresholdLabel && <span className="font-mono font-normal opacity-90">&gt; {jeopardyThresholdLabel}</span>}
               <button
                 onClick={() => setFacetFilters({ ...facetFilters, jeopardy: undefined })}
-                className="ml-0.5 -mr-0.5 flex items-center text-white/70 hover:text-white transition-colors"
+                className="ml-0.5 -mr-0.5 flex items-center text-text-inverse/70 hover:text-text-inverse transition-colors"
                 aria-label="Clear jeopardy filter"
               >
                 <X className="w-2.5 h-2.5" />

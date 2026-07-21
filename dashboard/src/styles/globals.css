@@ -19,8 +19,7 @@
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
     --lt-surface-hover: 239 246 255;  /* #EFF6FF */
     --lt-surface-sunken: 235 243 255; /* #EBF3FF */
-    --lt-field: 248 251 255;          /* #F8FBFF — lightest: the form-field fill */
-    --lt-field-focus: 236 243 254;    /* #ECF3FE — field deepens on focus */
+    --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
     /* Tinted neutrals carry real electric-blue chroma (matched to the vivid
      * rose theme) so labels, helper text, and lines read blue — not gray. */
     --lt-surface-border: 166 196 245; /* #A6C4F5 — visible blue underline */
@@ -45,13 +44,12 @@
     --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
     --lt-surface-hover: 246 241 253;  /* #F6F1FD */
     --lt-surface-sunken: 242 237 250; /* #F2EDFA */
-    --lt-field: 250 248 254;          /* #FAF8FE — lightest field fill */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
     --lt-surface-border: 210 191 240; /* #D2BFF0 */
     --lt-text-primary: 18 6 41;       /* #120629 */
     --lt-text-secondary: 62 44 99;    /* #3E2C63 */
-    --lt-text-tertiary: 117 101 158;  /* #75659E */
-    --lt-text-quaternary: 157 143 192;/* #9D8FC0 */
+    --lt-text-tertiary: 117 101 158;  /* #75659E — 5.1:1 on white */
+    --lt-text-quaternary: 141 126 178;/* #8D7EB2 — 3.6:1, large/meta only */
     --lt-heading: 98 36 184;          /* #6224B8 */
   }
 
@@ -62,13 +60,12 @@
     --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
     --lt-surface-hover: 252 241 239;  /* #FCF1EF */
     --lt-surface-sunken: 249 236 233; /* #F9ECE9 */
-    --lt-field: 254 250 249;          /* #FEFAF9 — lightest field fill */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
     --lt-surface-border: 233 194 188; /* #E9C2BC */
     --lt-text-primary: 41 10 7;       /* #290A07 */
     --lt-text-secondary: 102 59 52;   /* #663B34 */
-    --lt-text-tertiary: 150 110 102;  /* #966E66 */
-    --lt-text-quaternary: 188 154 147;/* #BC9A93 */
+    --lt-text-tertiary: 140 100 92;   /* #8C645C — 5.1:1 on white */
+    --lt-text-quaternary: 168 122 113;/* #A87A71 — 3.7:1, large/meta only */
     --lt-heading: 173 33 25;          /* #AD2119 */
   }
 
@@ -79,13 +76,12 @@
     --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
     --lt-surface-hover: 240 253 244;  /* #F0FDF4 */
     --lt-surface-sunken: 220 252 231; /* #DCFCE7 */
-    --lt-field: 249 254 251;          /* #F9FEFB — lightest field fill */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
     --lt-surface-border: 110 206 148; /* #6ECE94 */
     --lt-text-primary: 2 44 26;       /* #022C1A */
     --lt-text-secondary: 20 83 45;    /* #14532D */
-    --lt-text-tertiary: 22 163 74;    /* #16A34A */
-    --lt-text-quaternary: 74 173 104; /* #4AAD68 */
+    --lt-text-tertiary: 15 118 55;    /* #0F7637 — 5.7:1 (was #16A34A at 3.3:1) */
+    --lt-text-quaternary: 58 148 88;  /* #3A9458 — 3.8:1, large/meta only */
     --lt-heading: 20 83 45;           /* #14532D */
   }
 
@@ -96,7 +92,6 @@
     --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
     --lt-surface-hover: 253 242 248;  /* #FDF2F8 */
     --lt-surface-sunken: 251 228 241; /* #FBE4F1 */
-    --lt-field: 255 250 253;          /* #FFFAFD — lightest field fill */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
     --lt-surface-border: 244 173 214; /* #F4ADD6 */
     --lt-text-primary: 60 8 37;       /* #3C0825 */
@@ -113,25 +108,81 @@
     --lt-accent-faint: 255 247 237;   /* #FFF7ED */
     --lt-surface-hover: 255 251 247;  /* barely warm white */
     --lt-surface-sunken: 255 248 240; /* #FFF8F0 */
-    --lt-field: 255 252 249;          /* #FFFCF9 — lightest field fill */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
     --lt-surface-border: 254 215 170; /* #FED7AA */
     --lt-text-primary: 12 8 3;        /* near-black warm */
     --lt-text-secondary: 124 45 18;   /* #7C2D12 */
-    --lt-text-tertiary: 154 80 35;    /* warm mid */
-    --lt-text-quaternary: 200 135 85; /* lighter warm */
+    --lt-text-tertiary: 154 80 35;    /* #9A5023 — 5.9:1 on white */
+    --lt-text-quaternary: 180 115 66; /* #B47342 — 3.9:1, large/meta only */
     --lt-heading: 234 88 12;          /* #EA580C */
   }
 
-  /* Structural tokens (hue-independent). The single knob for the universal
-   * field shape — a customer override of these + the theme color tokens
-   * restyles every form control at once. */
+  /* Structural tokens (hue-independent). Every color, size, and spacing knob
+   * the dashboard uses flows through a --lt-* variable so a registered custom
+   * stylesheet (see branding.customCss / branding.themes in start()) can
+   * restyle the entire product — including dark themes — with zero source
+   * changes. Themes override any of these under their [data-theme] block. */
   :root {
     --lt-radius-field: 0.125rem;   /* 2px — the soft enclosure on every field */
+
+    /* Native form-control rendering. Dark themes set this to `dark` so
+       scrollbars, date pickers, and checkboxes follow the surface. */
+    --lt-color-scheme: light;
+
+    /* Surfaces */
+    --lt-surface: 255 255 255;          /* page background */
+    --lt-surface-raised: 255 255 255;   /* header, sidebar, sheets */
+    --lt-text-inverse: 255 255 255;     /* text on accent / status fills */
+
+    /* Status family — text-safe values, ≥4.5:1 on the light surface.
+       The -graphic variants keep the traditional brighter hues for dots,
+       bars, and charts where 3:1 graphic contrast applies. */
+    --lt-status-active: 37 99 235;      /* #2563EB */
+    --lt-status-pending: 180 83 9;      /* #B45309 */
+    --lt-status-draft: 194 65 12;       /* #C2410C */
+    --lt-status-success: 22 101 52;     /* #166534 */
+    --lt-status-warning: 180 83 9;      /* #B45309 */
+    --lt-status-error: 220 38 38;       /* #DC2626 */
+    --lt-status-pending-graphic: 245 158 11;  /* #F59E0B */
+    --lt-status-draft-graphic: 249 115 22;    /* #F97316 */
+    --lt-status-success-graphic: 22 163 74;   /* #16A34A */
+
+    /* Pace vocabulary — queued (waiting) and claimed (being worked). */
+    --lt-status-queued: 3 105 161;            /* #0369A1 */
+    --lt-status-claimed: 194 65 12;           /* #C2410C */
+    --lt-status-queued-graphic: 14 165 233;   /* #0EA5E9 */
+    --lt-status-claimed-graphic: 249 115 22;  /* #F97316 */
+
+    /* The universal field: white body + light neutral border. Themes keep
+       their tint on the focus fill (--lt-field-focus). */
+    --lt-field-bg: 255 255 255;
+    --lt-field-border: 203 213 225;     /* #CBD5E1 */
+
+    /* Select chevron — the whole url() is the token because an SVG data URI
+       cannot reference CSS variables. Dark themes swap in a light stroke. */
+    --lt-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+    /* Type scale. 11px (--lt-type-2xs) is the floor for informative text —
+       nothing readable renders below it. */
+    --lt-type-2xs: 0.6875rem;  /* 11px */
+    --lt-type-xs: 0.75rem;     /* 12px */
+    --lt-type-sm: 0.875rem;    /* 14px */
+    --lt-type-base: 1rem;      /* 16px */
+    --lt-type-lg: 1.125rem;    /* 18px */
+    --lt-type-xl: 1.375rem;    /* 22px */
+    --lt-type-2xl: 1.75rem;    /* 28px */
+
+    /* Spacing scale. page-x flexes for iPad (768–1366) down to 20px and up
+       to the classic 40px on wide desktops. */
+    --lt-space-page-x: clamp(1.25rem, 3vw, 2.5rem);
+    --lt-space-page-y: 2rem;
+    --lt-space-field-y: 1.25rem;
+    --lt-space-col-gap: clamp(1.5rem, 3vw, 3.5rem);
   }
 
   body {
     @apply bg-surface text-text-primary antialiased;
+    color-scheme: var(--lt-color-scheme);
   }
 
   * {
@@ -164,15 +215,15 @@
   /* ── The universal form field ─────────────────────────────────────────────
      ONE canonical treatment for every text input, select, and textarea —
      authored React pages AND the JSON-schema forms we generate for customers.
-     A lightest-tint fill + soft radius + a bottom border that deepens to accent
-     on focus: it encloses a field without boxing it in, and it is impossible to
-     mistake for a section rule. Override --lt-field / --lt-radius-field / the
-     .field rule in one place to restyle every field in the product. */
+     A white body with a light neutral border and soft radius; the border
+     deepens to accent and the fill takes the theme tint on focus. Override
+     --lt-field-bg / --lt-field-border / --lt-radius-field in one place to
+     restyle every field in the product. */
   .field,
   .input,
   .select,
   .textarea {
-    @apply bg-surface-field border-b border-surface-border px-2.5 py-1.5 text-sm
+    @apply bg-surface-field border border-surface-field-border px-2.5 py-1.5 text-sm
            text-text-primary placeholder:text-text-tertiary
            focus:outline-none focus:border-accent focus:bg-surface-field-focus
            transition-colors duration-150;
@@ -191,7 +242,7 @@
      every select looks identical regardless of platform. */
   .select {
     @apply appearance-none cursor-pointer pr-7;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-image: var(--lt-select-chevron);
     background-repeat: no-repeat;
     background-position: right 0.5rem center;
     background-size: 1rem;
@@ -201,10 +252,10 @@
     @apply leading-relaxed resize-y;
   }
 
-  /* Code / JSON field — mono variant of the exact same field: fill + bottom
-     border + radius, no enclosing box. Consistent with every other control. */
+  /* Code / JSON field — mono variant of the exact same field: white body +
+     light border + radius. Consistent with every other control. */
   .input-json {
-    @apply w-full bg-surface-field border-b border-surface-border px-3 py-2 text-[11px] font-mono
+    @apply w-full bg-surface-field border border-surface-field-border px-3 py-2 text-2xs font-mono
            text-text-primary placeholder:text-text-tertiary
            focus:outline-none focus:border-accent focus:bg-surface-field-focus
            leading-relaxed tabular-nums resize-y transition-colors duration-150;
@@ -214,7 +265,7 @@
   /* Quiet multiline field — the same field body, auto-growing (no scrollbar).
      Pairs with AutoGrowTextarea, which grows the height with the content. */
   .textarea-quiet {
-    @apply w-full bg-surface-field border-b border-surface-border px-3 py-2 text-sm
+    @apply w-full bg-surface-field border border-surface-field-border px-3 py-2 text-sm
            text-text-primary placeholder:text-text-tertiary leading-relaxed
            focus:outline-none focus:border-accent focus:bg-surface-field-focus
            transition-colors duration-150 resize-none overflow-hidden;
@@ -222,17 +273,17 @@
   }
 
   .label {
-    @apply block text-xs font-medium text-text-tertiary mb-0.5;
+    @apply block text-xs font-semibold text-text-secondary mb-0.5;
   }
 
   .hint {
-    @apply text-[9px] text-text-tertiary/70 mt-1 leading-snug;
+    @apply text-2xs text-text-tertiary mt-1 leading-snug;
   }
 
   .section-header {
     @apply block mb-3 pb-1.5 border-b border-surface-border/30;
     font-size: 1.05rem;
-    font-weight: 300;
+    font-weight: 500;
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
     color: rgb(var(--lt-heading));
@@ -240,7 +291,7 @@
 
   .section-h2 {
     font-size: 1.05rem;
-    font-weight: 300;
+    font-weight: 500;
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
     color: rgb(var(--lt-heading));
@@ -326,8 +377,8 @@
     -45deg,
     transparent,
     transparent 3px,
-    rgba(255, 255, 255, 0.15) 3px,
-    rgba(255, 255, 255, 0.15) 6px
+    rgb(var(--lt-text-inverse) / 0.15) 3px,
+    rgb(var(--lt-text-inverse) / 0.15) 6px
   );
-  background-color: var(--color-status-warning, #f59e0b);
+  background-color: rgb(var(--lt-status-pending-graphic));
 }

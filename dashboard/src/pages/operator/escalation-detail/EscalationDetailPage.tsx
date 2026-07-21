@@ -409,6 +409,11 @@ export function EscalationDetailPage() {
                 submitAttempted={submitAttempted}
                 isCertified={isCertified}
                 hasAI={hasAI}
+                onOpenHelp={() => {
+                  setSidePanelOpen(true);
+                  savePanelOpen(true);
+                  setPanelActiveView(ESCALATION_PANEL_VIEWS.HELP);
+                }}
               />
 
               <div className="h-10" />

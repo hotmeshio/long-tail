@@ -13,6 +13,7 @@ import { CopyableId } from '../common/display/CopyableId';
 import { UserName } from '../common/display/UserName';
 import { TriageContext } from './TriageContext';
 import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
+import { deriveFieldLabel } from '../../lib/derive-field-label';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
 import type { FieldError } from '../../lib/field-validator';
@@ -59,8 +60,8 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
         const globalUrl = metadataFacetUrl(key, value);
         return (
           <div key={key} className="group relative">
-            <dt className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">
-              {key.replace(/[_-]/g, ' ')}
+            <dt className="text-2xs font-medium text-text-secondary uppercase tracking-wide">
+              {deriveFieldLabel(key)}
             </dt>
             <dd className="mt-0.5 flex items-center gap-1">
               <span className="text-[12px] text-text-primary font-mono break-all flex-1">
@@ -160,7 +161,7 @@ function DetailsList({ esc, claimed, isTerminal, isBuilder, traceUrl }: {
   );
 }
 
-function ErrorsPanel({ errors }: { errors: FieldError[] }) {
+function ErrorsPanel({ errors, schema }: { errors: FieldError[]; schema?: Record<string, unknown> | null }) {
   const focusField = (field: string) => {
     const el = document.querySelector<HTMLElement>(`[data-field-key="${field}"]`);
     if (!el) return;
@@ -186,10 +187,10 @@ function ErrorsPanel({ errors }: { errors: FieldError[] }) {
           >
             <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-status-error/60 group-hover:text-status-error transition-colors" />
             <div>
-              <p className="text-[11px] font-semibold text-text-primary capitalize leading-snug">
-                {field.replace(/[_-]/g, ' ')}
+              <p className="text-2xs font-semibold text-text-primary leading-snug">
+                {deriveFieldLabel(field, (schema?.properties as Record<string, Record<string, unknown>> | undefined)?.[field])}
               </p>
-              <p className="text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors leading-snug mt-0.5">
+              <p className="text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors leading-snug mt-0.5">
                 {message}
               </p>
             </div>
@@ -355,7 +356,7 @@ export function EscalationSidePanel({
             <AlertCircle className={`${className ?? ''} text-status-error`} />
           )) as SlidePanelView['icon'],
           label: 'Errors',
-          content: <ErrorsPanel errors={formErrors} />,
+          content: <ErrorsPanel errors={formErrors} schema={schema} />,
         }]
       : []),
   ];

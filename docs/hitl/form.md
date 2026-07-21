@@ -4,6 +4,26 @@ The dashboard renders forms automatically from JSON Schema. No frontend code nee
 
 ---
 
+## Field Labels
+
+A field's label resolves in order:
+
+1. The `title` keyword — the author's explicit label, always wins.
+2. Snake/kebab keys title-cased: `left_quantity` → `Left Quantity`. All-caps tokens inside a key keep their casing (`po_number` → `Po Number`, `PO_number` → `PO Number`).
+3. Single-token keys pass through unchanged: `PO`, `SKU`, `LEFTQUANTITY`.
+
+Declare `title` on every field whose key isn't already a readable label — it is the difference between `LEFTQUANTITY` and `Left Quantity` everywhere the field faces a human: the form, the dictionary display, and the errors panel.
+
+```json
+{
+  "properties": {
+    "LEFTQUANTITY": { "type": "number", "title": "Left Quantity" }
+  }
+}
+```
+
+---
+
 ## Field Types
 
 | JSON Type | Renders As |

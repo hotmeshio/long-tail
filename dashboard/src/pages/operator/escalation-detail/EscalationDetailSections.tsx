@@ -129,6 +129,8 @@ interface FormSectionProps {
   submitAttempted?: boolean;
   isCertified?: boolean;
   hasAI?: boolean;
+  /** Opens the Instructions side-panel view (form help icon). */
+  onOpenHelp?: () => void;
 }
 
 /**
@@ -157,6 +159,7 @@ export function EscalationFormSection({
   submitAttempted,
   isCertified,
   hasAI,
+  onOpenHelp,
 }: FormSectionProps) {
   const schema = effectiveSchema;
   const showIfCtx = buildShowIfContext(esc);
@@ -229,6 +232,7 @@ export function EscalationFormSection({
           submitAttempted={submitAttempted}
           showTriage={!!isCertified && !!hasAI}
           escalationContext={showIfCtx}
+          onOpenHelp={onOpenHelp}
         />
       )}
     </div>

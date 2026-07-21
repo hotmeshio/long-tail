@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Inbox, User, BookOpen, Radio, X, BookmarkPlus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,8 +9,7 @@ import { useSettings } from '../../api/settings';
 import { AppLogo } from '../common/display/AppLogo';
 import { EasterEggPanel } from './EasterEggPanel';
 import { clearViewAs } from '../../lib/view-as';
-import { THEMES, THEME_LABELS, THEME_SWATCHES, getTheme, setTheme, type Theme } from '../../lib/theme';
-import { QUEUED_COLOR, ACTIVE_COLOR } from '../../pages/operations/PaceChart';
+import { getAllThemes, registerThemes, getTheme, setTheme, type Theme } from '../../lib/theme';
 
 const BOOKMARKS_KEY = 'lt:bookmarks';
 
@@ -45,6 +44,14 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   const menuRef = useRef<HTMLDivElement>(null);
 
   const appName = settings?.branding?.appName;
+
+  // Deployment-registered themes join the picker beside the built-ins; their
+  // CSS is already loaded via /api/settings/custom.css.
+  const brandThemes = settings?.branding?.themes;
+  const allThemes = useMemo(() => {
+    registerThemes(brandThemes ?? []);
+    return getAllThemes();
+  }, [brandThemes]);
 
   const selectTheme = (next: Theme) => {
     setTheme(next);
@@ -83,10 +90,10 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   return (
     <>
       {/* The header is its own stacking context, so its children's z is capped
-          by the header's z against page-level fixed layers (facet drawer z-40,
-          help panel z-[45], docs drawer z-50). At rest it sits at z-30 so those
-          drawers may cover it; while the user menu is open it lifts to the menu
-          tier (z-[100]) so an open menu is never occluded. */}
+          by the header's z against page-level fixed layers (help panel z-[45],
+          docs drawer z-50). At rest it sits at z-30 so those overlays may cover
+          it; while the user menu is open it lifts to the menu tier (z-[100])
+          so an open menu is never occluded. */}
       <header className={`h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between pl-2 pr-5 relative ${menuOpen ? 'z-[100]' : 'z-30'}`}>
         <Link
           to="/"
@@ -105,8 +112,9 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           {/* Escalations: all */}
           <Link
             to="/escalations/available"
-            className="flex items-center gap-1.5 text-[11px] transition-colors text-text-quaternary hover:text-text-secondary"
-            style={available > 0 ? { color: QUEUED_COLOR } : undefined}
+            className={`flex items-center gap-1.5 text-2xs transition-colors ${
+              available > 0 ? 'text-status-queued' : 'text-text-quaternary hover:text-text-secondary'
+            }`}
             title="All escalations"
           >
             <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -116,8 +124,9 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           {/* Escalations: mine */}
           <Link
             to="/escalations/queue"
-            className="flex items-center gap-1.5 text-[11px] transition-colors text-text-quaternary hover:text-text-secondary"
-            style={mine > 0 ? { color: ACTIVE_COLOR } : undefined}
+            className={`flex items-center gap-1.5 text-2xs transition-colors ${
+              mine > 0 ? 'text-status-claimed' : 'text-text-quaternary hover:text-text-secondary'
+            }`}
             title="My escalation queue"
           >
             <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -205,18 +214,18 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                   </Link>
                   <div className="px-3 py-2 border-t border-surface-border/60">
                     <p className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Theme</p>
-                    <div className="flex items-center gap-2">
-                      {THEMES.map((t) => (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {allThemes.map((t) => (
                         <button
-                          key={t}
+                          key={t.id}
                           type="button"
-                          onClick={() => selectTheme(t)}
-                          title={THEME_LABELS[t]}
-                          aria-label={`${THEME_LABELS[t]} theme`}
+                          onClick={() => selectTheme(t.id)}
+                          title={t.label}
+                          aria-label={`${t.label} theme`}
                           className={`w-4 h-4 rounded-full transition-transform hover:scale-110 ${
-                            theme === t ? 'ring-2 ring-offset-1 ring-surface-border' : ''
+                            theme === t.id ? 'ring-2 ring-offset-1 ring-surface-border' : ''
                           }`}
-                          style={{ backgroundColor: THEME_SWATCHES[t] }}
+                          style={{ backgroundColor: t.swatch }}
                         />
                       ))}
                     </div>

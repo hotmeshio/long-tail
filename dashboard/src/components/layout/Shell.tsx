@@ -7,6 +7,8 @@ import { usePersona } from '../../hooks/usePersona';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
+import { ShellPanelProvider, useShellPanel } from '../../hooks/useShellPanel';
+import { SlidePanel } from '../common/layout/SlidePanel';
 import { Header } from './Header';
 import { ChoreographySidebar } from './ChoreographySidebar';
 import { PinnedViewsSidebar } from './PinnedViewsSidebar';
@@ -20,6 +22,20 @@ import { HelpButton } from './HelpButton';
 import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 
+/**
+ * The canonical container layout. Every authenticated page renders inside it:
+ *
+ *   ┌──────────────── Header (full width) ────────────────┐
+ *   │ left nav │        main viewport        │ right panel │
+ *   └──────────────── EventFeed (full width) ─────────────┘
+ *
+ * - Header and EventFeed span the full width.
+ * - The left nav and the global right SlidePanel are flex siblings of the
+ *   main viewport — content narrows when either opens, nothing overlays it.
+ *   Pages fill the right panel via useShellPanel().
+ * - DocsDrawer is the full-screen overlay for markdown docs (#docs hash).
+ * - Pages exempt from the shell: Login and OAuth connect flows only.
+ */
 function ShellLayout() {
   const { isBuilder, isOps, viewAs } = useAccess();
   const { canSeePaceBoard } = usePersona();
@@ -103,12 +119,17 @@ function ShellLayout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           {/* Full width — pages get all the room the window offers */}
-          <div ref={contentRef} className="w-full px-10 py-10 pb-16 animate-page-in h-full flex flex-col">
+          <div ref={contentRef} className="w-full px-page-x py-8 pb-16 animate-page-in h-full flex flex-col">
             <Outlet />
           </div>
         </main>
+
+        {/* Global right panel — the mirror of the left nav. Pages populate it
+            via useShellPanel(); it animates as a flex sibling so the main
+            viewport narrows rather than being covered. */}
+        <ShellRightPanel />
       </div>
 
       {/* Global event feed */}
@@ -117,6 +138,15 @@ function ShellLayout() {
       {aiEnabled && <HelpButton />}
       {aiEnabled && <HelpPanel />}
     </div>
+  );
+}
+
+function ShellRightPanel() {
+  const { node, width, open } = useShellPanel();
+  return (
+    <SlidePanel open={open} width={width} className="border-l border-surface-border bg-surface-raised">
+      {node}
+    </SlidePanel>
   );
 }
 
@@ -130,9 +160,11 @@ export function Shell() {
 
   return (
     <SidebarProvider>
-      <HelpAssistantProvider>
-        <ShellLayout />
-      </HelpAssistantProvider>
+      <ShellPanelProvider>
+        <HelpAssistantProvider>
+          <ShellLayout />
+        </HelpAssistantProvider>
+      </ShellPanelProvider>
     </SidebarProvider>
   );
 }

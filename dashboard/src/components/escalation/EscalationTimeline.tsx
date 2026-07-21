@@ -348,7 +348,7 @@ export function EscalationTimeline({
 
       {/* Sticky pagination */}
       {totalPages > 1 && (
-        <div className="sticky bottom-0 z-20 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 pt-2 pb-4 flex items-center justify-between mt-10">
+        <div className="sticky bottom-0 z-20 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-page-x px-page-x pt-2 pb-4 flex items-center justify-between mt-10">
           <span className="text-[11px] text-text-tertiary">
             Page <span className="font-medium text-text-secondary">{page}</span>
             {' '}of <span className="font-medium text-text-secondary">{totalPages}</span>

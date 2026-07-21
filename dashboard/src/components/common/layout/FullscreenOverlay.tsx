@@ -97,7 +97,7 @@ export function FullscreenOverlay({ open, onClose, sourceRef, children }: Fullsc
         transition: `transform ${DURATION}ms ${EASING}, opacity ${DURATION}ms ${EASING}`,
         transform,
         opacity,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'rgb(var(--lt-surface))',
       }}
       onTransitionEnd={handleTransitionEnd}
     >
