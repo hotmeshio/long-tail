@@ -1,7 +1,7 @@
 import {
   Users,
   Database,
-  Tag,
+  Inbox,
   Network,
   Braces,
 } from 'lucide-react';
@@ -23,7 +23,7 @@ export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?:
 
   const identityItems: NavItem[] = [
     { to: '/admin/users', label: 'Accounts', icon: Users },
-    ...(isBuilder || isOps ? [{ to: '/admin/roles', label: 'Roles', icon: Tag }] : []),
+    ...(isBuilder || isOps ? [{ to: '/admin/roles', label: 'Roles', icon: Inbox }] : []),
   ];
 
   const infraItems: NavItem[] = [

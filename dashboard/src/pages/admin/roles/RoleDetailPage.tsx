@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Tag, GitBranch, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList, Pin as PinIcon,
+  Tag, Inbox, GitBranch, Network, Trash2, Check, Braces, Users, BookOpen, LayoutDashboard, LayoutList, Pin as PinIcon,
 } from 'lucide-react';
 import {
   useRoleDetails,
@@ -315,6 +315,7 @@ interface Draft {
   title: string;
   description: string;
   ops_visible: boolean;
+  enforce_schema: boolean;
   parent_role: string;
   metadata_schema: string;
   properties: string;
@@ -330,6 +331,7 @@ function draftFrom(role: RoleDetail): Draft {
     title: role.title ?? '',
     description: role.description ?? '',
     ops_visible: role.ops_visible,
+    enforce_schema: role.enforce_schema,
     parent_role: role.parent_role ?? '',
     metadata_schema: safePrettyPrint(role.metadata_schema),
     properties: safePrettyPrint(role.properties) || '{}',
@@ -358,7 +360,7 @@ export function RoleDetailPage() {
   const role = roles.find((r) => r.role === roleKey);
 
   const [draft, setDraft] = useState<Draft>({
-    title: '', description: '', ops_visible: false, parent_role: '',
+    title: '', description: '', ops_visible: false, enforce_schema: false, parent_role: '',
     metadata_schema: '', properties: '{}',
     sla_minutes: '', target_per_hour: '', worker_count: '',
     priority_threshold_minutes: '', priority_facet: '',
@@ -423,6 +425,7 @@ export function RoleDetailPage() {
         title: draft.title.trim() || null,
         description: draft.description.trim() || null,
         ops_visible: draft.ops_visible,
+        enforce_schema: draft.enforce_schema,
         parent_role: draft.parent_role || null,
         metadata_schema: metaResult.value ?? null,
         properties: propsResult.value ?? {},
@@ -463,7 +466,7 @@ export function RoleDetailPage() {
   if (!role) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Tag className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
+        <Inbox className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
         <h2 className="text-lg font-medium text-text-primary mb-2">Role not found</h2>
       </div>
     );
@@ -493,7 +496,7 @@ export function RoleDetailPage() {
         <div className="flex items-center justify-between gap-4 min-w-0">
           <div className="min-w-0">
             <div className="flex items-center gap-3 mb-1">
-              <Tag className="w-5 h-5 text-accent" strokeWidth={1.5} />
+              <Inbox className="w-5 h-5 text-accent" strokeWidth={1.5} />
               <h1 className="text-lg font-mono font-medium text-text-primary">{role.role}</h1>
               <button
                 onClick={() => { window.location.hash = '#docs:dashboard.md:role-detail'; }}
@@ -523,6 +526,27 @@ export function RoleDetailPage() {
               <span
                 className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
                   draft.ops_visible ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Enforce Schema — every resolve surface validates payloads against
+              this role's form schema and rejects violations with 422 */}
+          <div
+            className="flex items-center gap-2 shrink-0"
+            title="Validate every resolve payload against this role's form schema — API, MCP, and CLI submissions are rejected with field-level errors when they violate it"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Enforce Schema</span>
+            <button
+              onClick={() => update({ enforce_schema: !draft.enforce_schema })}
+              className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
+                draft.enforce_schema ? 'bg-accent' : 'bg-surface-border'
+              }`}
+            >
+              <span
+                className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-white transition-transform shadow ${
+                  draft.enforce_schema ? 'translate-x-[18px]' : 'translate-x-[3px]'
                 }`}
               />
             </button>

@@ -7,6 +7,8 @@
  * contract, owned here in TypeScript (`IntakeResolverV1`).
  */
 
+import { z } from 'zod';
+
 /** The role that owns the intake escalation surface. */
 export const INTAKE_ROLE = 'intake-reviewer';
 
@@ -21,22 +23,30 @@ export const INTAKE_SCHEMA_VERSION = 1;
 
 /**
  * The payload shape the workflow gets back from `conditionLT` — the workflow's
- * own contract, produced by the form's `x-lt-bind` map. This lives in workflow
- * code (validate with zod on the return if you want); nothing on the role
- * validates it. Version the type name alongside the form version so a drift is
- * a visible edit.
+ * own contract, produced by the form's `x-lt-bind` map. Declared once as a zod
+ * schema: the TYPE derives from it (z.infer) and activities parse resolutions
+ * through it via `parseResolverPayload` for runtime assurance. With
+ * enforce_schema on the role, the API layer already rejected non-conforming
+ * submissions; this is the consuming side of the same contract. Version the
+ * schema name alongside the form version so a drift is a visible edit.
  */
-export interface IntakeResolverV1 {
-  customer: { name: string; email: string; phone?: string };
-  contract: {
-    tier: 'free' | 'starter' | 'professional' | 'enterprise';
-    startDate: string;
-    budget?: number;
-    approved: boolean;
-  };
-  notes?: string;
-  attachment?: string;
-}
+export const IntakeResolverV1Schema = z.object({
+  customer: z.object({
+    name: z.string(),
+    email: z.string(),
+    phone: z.string().optional(),
+  }),
+  contract: z.object({
+    tier: z.enum(['free', 'starter', 'professional', 'enterprise']),
+    startDate: z.string(),
+    budget: z.number().optional(),
+    approved: z.boolean(),
+  }),
+  notes: z.string().optional(),
+  attachment: z.string().optional(),
+});
+
+export type IntakeResolverV1 = z.infer<typeof IntakeResolverV1Schema>;
 
 /**
  * The versioned FORM: a flat, two-column customer-intake form. Exercises every

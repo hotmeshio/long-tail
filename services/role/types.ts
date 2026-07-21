@@ -57,6 +57,13 @@ export interface RoleDetail {
   /** Version of the live list_schema; null until the role first carries one. */
   current_list_schema_version: number | null;
   /**
+   * When true, every resolve surface validates the submitted resolverPayload
+   * against the escalation's resolved form schema (same pass the dashboard
+   * runs) and rejects violations with 422 before any state changes. Opt-in
+   * per role; false leaves resolution behavior unchanged.
+   */
+  enforce_schema: boolean;
+  /**
    * Pinned-view seeds this role hands its members: [{ label, url, badge? }].
    * On first render, a member without an own pin of the same label sees these
    * in their Pinned nav section (marked role-provided); users promote, hide,
@@ -132,6 +139,8 @@ export interface UpdateRoleInput {
   worker_count?: number | null;
   priority_threshold_minutes?: number | null;
   priority_facet?: string | null;
+  /** Turn server-side resolver schema validation on/off for this role. */
+  enforce_schema?: boolean;
   /**
    * Replace the upstream-input set (omitted = preserve; null or [] = clear).
    * Every entry must name an existing role other than this one.

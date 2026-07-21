@@ -98,6 +98,13 @@ Use when the rows describe **entities** (machines, stations) rather than a queue
 }
 ```
 
-The card's `state` renders as a status chip (a stable hue per token — commonly a subtype or a metadata state facet). The grid wraps to the viewport (wall-screen friendly). Clicking a card opens the entity's history: the table view filtered to that facet value (`x-lt-group-by` should therefore be a `metadata.*` path). `x-lt-help` renders above the board as in `facet-table`. In the digital-twin pattern — each machine advertising one live pending row — the board is exact by construction; for wider scopes it groups the fetched page, with standard pagination beyond it.
+The card's `state` renders as a status chip (a stable hue per token — commonly a subtype or a metadata state facet). The grid wraps to the viewport (wall-screen friendly). `x-lt-help` renders above the board as in `facet-table`. In the digital-twin pattern — each machine advertising one live pending row — the board is exact by construction; for wider scopes it groups the fetched page, with standard pagination beyond it.
+
+Cards are fully interactive (`x-lt-group-by` should be a `metadata.*` path so the facet affordances apply):
+
+- **Click** opens the group's latest row in the detail view.
+- **⇧ click** adds the entity's facet to the live filter set — additive, so shift-clicking narrows the board in place and the facet chips row shows each condition with its own remove.
+- **Hovering the card footer** reveals the entity's history as the filtered **table** or **timeline** view (the same view modes the queue offers everywhere else).
+- **Fields bound to a pure `{{metadata.KEY}}` token** carry the same hover pair the table's metadata cells offer: **filter** (narrows within the current role; ⇧ click adds to the current filters) and **search** (the facet across all roles).
 
 The reference: `examples/seed-fleet-sim.ts` — one advert per machine, a `format: "age"` "Since" field, and role default pins (see [pinned-views.md](pinned-views.md)).

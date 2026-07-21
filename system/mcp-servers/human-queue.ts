@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
 import * as escalationService from '../../services/escalation';
+import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
+import { getEnforcingRoles } from '../../services/role/enforcement-cache';
 import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import {
   escalateSchema,
@@ -15,6 +17,32 @@ import {
 } from './human-queue-schemas';
 
 let server: McpServer | null = null;
+
+/**
+ * Schema enforcement for the MCP resolve tools — the same gate the HTTP
+ * surfaces run (agents and the sim workforce submit through these tools, so
+ * they get the same contract and the same canonical violation body). Costs
+ * zero reads when no role enforces (cached set); otherwise one row read.
+ * Returns the MCP error content when the payload is rejected, null to proceed.
+ */
+async function checkResolveToolPayload(
+  escalationId: string,
+  payload: Record<string, any>,
+): Promise<{ content: Array<{ type: 'text'; text: string }>; isError: true } | null> {
+  const enforcing = await getEnforcingRoles();
+  if (enforcing.size === 0) return null;
+  const escalation = await escalationService.getEscalation(escalationId);
+  if (!escalation || !enforcing.has(escalation.role)) return null;
+  const report = await checkResolverPayload(escalation, payload);
+  if (!report) return null;
+  return {
+    content: [{
+      type: 'text' as const,
+      text: JSON.stringify(toValidationErrorBody(report)),
+    }],
+    isError: true,
+  };
+}
 
 /**
  * Create the Long Tail Human Queue MCP server.
@@ -111,6 +139,11 @@ export async function createHumanQueueServer(options?: {
       } else if (escalation.status === 'pending' && detail.form_schema) {
         // The shape the resolver payload should take (fields + x-lt-bind paths).
         result.form_schema = detail.form_schema;
+        // Tell the agent when this role ENFORCES the form: an incomplete or
+        // mis-typed payload will be rejected with a schema_validation error.
+        if ((await getEnforcingRoles()).has(escalation.role)) {
+          result.schema_enforced = true;
+        }
       }
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
@@ -154,10 +187,14 @@ export async function createHumanQueueServer(options?: {
     'claim_and_resolve',
     {
       title: 'Claim and Resolve',
-      description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation.',
+      description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation. Roles with enforce_schema validate the payload against the form_schema (see check_resolution) and reject violations with a schema_validation error listing each field.',
       inputSchema: claimAndResolveSchema,
     },
     async (args: z.infer<typeof claimAndResolveSchema>) => {
+      // Validate BEFORE claiming — a rejected payload must never strand a claim.
+      const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
+      if (rejected) return rejected;
+
       const claimed = await escalationService.claimEscalation(
         args.escalation_id,
         args.resolver_id,
@@ -203,10 +240,13 @@ export async function createHumanQueueServer(options?: {
     'resolve_escalation',
     {
       title: 'Resolve Escalation',
-      description: 'Resolve an already-claimed escalation with a payload. Use when the claim happened externally (e.g. via API).',
+      description: 'Resolve an already-claimed escalation with a payload. Use when the claim happened externally (e.g. via API). Roles with enforce_schema validate the payload against the form_schema (see check_resolution) and reject violations with a schema_validation error listing each field.',
       inputSchema: resolveEscalationSchema,
     },
     async (args: z.infer<typeof resolveEscalationSchema>) => {
+      const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
+      if (rejected) return rejected;
+
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,

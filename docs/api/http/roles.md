@@ -268,6 +268,7 @@ Returns all roles with metadata and usage counts.
 | `metadata_schema` | `object \| null` | JSON Schema declaring the expected shape of `lt_escalations.metadata` for this role. Drives faceted-query key autocomplete and creation-time validation |
 | `properties` | `object` | Free user-owned bag — icons, colors, tags, etc. No reserved keys |
 | `ops_visible` | `boolean` | When `true`, the role appears as a station on the `/operations` view |
+| `enforce_schema` | `boolean` | When `true`, every resolve surface validates submitted payloads against this role's form schema and rejects violations with `422` (`code: schema_validation`) — see [Schema Enforcement](../../schema-enforcement.md) |
 | `parent_role` | `string \| null` | Parent role in the process dependency graph; `null` for root stations |
 | `sla_minutes` | `number \| null` | Target resolution time in minutes (capacity setting) |
 | `target_per_hour` | `number \| null` | Intended throughput — items resolved per hour (capacity setting) |
@@ -366,6 +367,7 @@ When the update changes `form_schema` or `metadata_schema`, the new pair is snap
 | `metadata_schema` | `object \| null` | JSON Schema for `lt_escalations.metadata` |
 | `properties` | `object \| null` | Free user-owned bag |
 | `ops_visible` | `boolean` | Include in the `/operations` view |
+| `enforce_schema` | `boolean` | Turn server-side resolver schema validation on/off |
 | `parent_role` | `string \| null` | Parent in the process dependency graph |
 | `sla_minutes` | `number \| null` | SLA target in minutes |
 | `target_per_hour` | `number \| null` | Throughput target (items per hour) |

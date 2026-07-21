@@ -29,15 +29,6 @@ export interface Persona {
    * membership. `canSeePaceBoard`/`canSeeWorkflows` gate the builder home.
    */
   showTaskQueueCards: boolean;
-  /**
-   * Where the sidebar's Task Queues section draws its roles from:
-   * - `membership` — the roles the user belongs to (operator, engineer)
-   * - `manual`     — a hand-curated list in localStorage (admin, superadmin)
-   *
-   * Keyed off the REAL tier: a canonical user previewing a lower role still
-   * curates their own queues rather than inheriting non-existent memberships.
-   */
-  taskQueueSource: 'membership' | 'manual';
 }
 
 /**
@@ -72,6 +63,5 @@ export function usePersona(): Persona {
     canSeePaceBoard: tier === 'superadmin' || tier === 'admin',
     canSeeWorkflows: tier === 'superadmin' || tier === 'engineer',
     showTaskQueueCards: tier === 'operator',
-    taskQueueSource: realTier === 'superadmin' || realTier === 'admin' ? 'manual' : 'membership',
   };
 }

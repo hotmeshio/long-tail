@@ -7,16 +7,20 @@ import type { LTApiResult, LTApiAuth } from '../types/sdk';
  *
  * @param input.limit — maximum number of bots to return (default 50)
  * @param input.offset — number of bots to skip for pagination (default 0)
+ * @param input.status — filter by account status
+ * @param input.search — free-text match on display name, external id, or description
  * @returns `{ status: 200, data: Bot[] }` paginated list of bots
  */
 export async function listBots(input: {
   limit?: number;
   offset?: number;
+  status?: string;
+  search?: string;
 }): Promise<LTApiResult> {
   try {
     const limit = input.limit ?? 50;
     const offset = input.offset ?? 0;
-    const result = await iam.listBots(limit, offset);
+    const result = await iam.listBots(limit, offset, { status: input.status, search: input.search });
     return { status: 200, data: result };
   } catch (err: any) {
     return { status: 500, error: err.message };

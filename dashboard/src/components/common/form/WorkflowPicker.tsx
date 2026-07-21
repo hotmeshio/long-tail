@@ -64,7 +64,7 @@ export function WorkflowPicker({ options, selected, onChange, placeholder }: Wor
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-[100] mt-1 w-full bg-white border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {options.length === 0 ? (
             <p className="px-3 py-2 text-xs text-text-tertiary">No registered workflows</p>
           ) : (

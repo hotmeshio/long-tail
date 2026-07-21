@@ -118,7 +118,7 @@ export function FilePreviewPanel({ filePath, onClose, onDeleted }: FilePreviewPa
                 <span>Share</span>
               </button>
               {showShareMenu && (
-                <div className="absolute top-full left-0 mt-1 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-20 min-w-[120px]">
+                <div className="absolute top-full left-0 mt-1 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-[100] min-w-[120px]">
                   {EXPIRY_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}

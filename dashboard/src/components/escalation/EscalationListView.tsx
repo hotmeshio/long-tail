@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { interpolateHelp, type HelpTokenContext } from '../../lib/x-lt-help';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ListFilter, Search } from 'lucide-react';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
@@ -367,11 +367,19 @@ export function groupBoardRows(rows: LTEscalationRecord[], groupBy: string): Boa
   return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
-function FacetBoard({ schema, rows, role, onOpenGroup }: {
+/** A field value token that is a pure metadata binding — facet-linkable. */
+const METADATA_TOKEN = /^\{\{\s*metadata\.([a-zA-Z0-9_]+)\s*\}\}$/;
+
+function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet }: {
   schema: ListSchema;
   rows: LTEscalationRecord[];
   role: string;
+  /** Plain card click — the group's latest row opens in the detail view. */
+  onOpenDetail?: (row: LTEscalationRecord) => void;
+  /** History affordances — receive a filtered table/timeline deep link. */
   onOpenGroup?: (url: string) => void;
+  /** Shift+click — merge one facet into the live filter set (additive). */
+  onAddFacet?: (key: string, value: unknown) => void;
 }) {
   const groupBy = schema['x-lt-group-by'];
   const card = schema['x-lt-card'] ?? {};
@@ -392,22 +400,26 @@ function FacetBoard({ schema, rows, role, onOpenGroup }: {
         const title = card.title ? interpolateHelp(card.title, ctx) : g.key;
         const state = card.state ? interpolateHelp(card.state, ctx) : (g.latest.subtype || g.latest.status);
         const stateHue = typeColor(state);
-        // The group's history: the table view filtered to this facet value.
-        const href = facetKey && onOpenGroup
-          ? `${metadataFacetUrl(facetKey, g.rawValue, role)}&view=table`
-          : null;
+
+        const activate = (e: { shiftKey: boolean }) => {
+          if (e.shiftKey && facetKey && onAddFacet) {
+            onAddFacet(facetKey, g.rawValue);
+            return;
+          }
+          onOpenDetail?.(g.latest);
+        };
+
         return (
           <div
             key={g.key}
-            role={href ? 'button' : undefined}
-            tabIndex={href ? 0 : undefined}
-            onClick={href ? () => onOpenGroup!(href) : undefined}
-            onKeyDown={href ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenGroup!(href); }
-            } : undefined}
-            className={`border-l-2 border-accent/30 bg-surface-sunken/40 rounded-[0.125em] px-4 py-3.5 ${
-              href ? 'cursor-pointer transition-colors hover:bg-surface-sunken/70 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/40' : ''
-            }`}
+            role="button"
+            tabIndex={0}
+            onClick={activate}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(e); }
+            }}
+            title={facetKey ? 'Open the latest item · ⇧ click to filter the board' : 'Open the latest item'}
+            className="group/card border-l-2 border-accent/30 bg-surface-sunken/40 rounded-[0.125em] px-4 py-3.5 cursor-pointer transition-colors hover:bg-surface-sunken/70 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
             data-testid="facet-board-card"
           >
             <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -424,19 +436,59 @@ function FacetBoard({ schema, rows, role, onOpenGroup }: {
             </div>
             {card.fields && card.fields.length > 0 && (
               <dl className="space-y-1">
-                {card.fields.map((f, i) => (
-                  <div key={i} className="flex items-baseline justify-between gap-3">
-                    <dt className="text-[9px] uppercase tracking-wider text-text-quaternary shrink-0">{f.label}</dt>
-                    <dd className="text-[11px] text-text-primary truncate">
-                      <FieldValue raw={interpolateHelp(f.value, ctx)} format={f.format} />
-                    </dd>
-                  </div>
-                ))}
+                {card.fields.map((f, i) => {
+                  // Pure metadata bindings get the same hover filter affordance
+                  // the table's MetadataCell offers; ⇧ click adds instead of replacing.
+                  const bound = f.value.match(METADATA_TOKEN)?.[1];
+                  const raw = bound ? g.latest.metadata?.[bound] : undefined;
+                  const linkable = bound != null && raw !== undefined && raw !== null && raw !== '';
+                  return (
+                    <div key={i} className="group/frow flex items-baseline justify-between gap-3">
+                      <dt className="text-[9px] uppercase tracking-wider text-text-quaternary shrink-0">{f.label}</dt>
+                      <dd className="min-w-0 flex items-baseline gap-1 text-[11px] text-text-primary">
+                        <span className="truncate">
+                          <FieldValue raw={interpolateHelp(f.value, ctx)} format={f.format} />
+                        </span>
+                        {/* Fixed-width trailing slot on EVERY row — linkable rows
+                            fill it with the filter/search pair the table's
+                            metadata cells offer — so all values share one right
+                            rail regardless of linkability. */}
+                        <span className="shrink-0 w-9 self-center flex items-center justify-end gap-px">
+                          {linkable && (onOpenGroup || onAddFacet) && (
+                            <span className="flex items-center gap-px opacity-0 group-hover/frow:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (e.shiftKey && onAddFacet) onAddFacet(bound, raw);
+                                  else onOpenGroup?.(metadataFacetUrl(bound, raw, role));
+                                }}
+                                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                                title={`Filter ${role}: ${bound} = ${String(raw)} · ⇧ click adds to current filters`}
+                                data-testid="facet-field-filter"
+                              >
+                                <ListFilter className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenGroup?.(metadataFacetUrl(bound, raw));
+                                }}
+                                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                                title={`Search all: ${bound} = ${String(raw)}`}
+                                data-testid="facet-field-search"
+                              >
+                                <Search className="w-3 h-3" />
+                              </button>
+                            </span>
+                          )}
+                        </span>
+                      </dd>
+                    </div>
+                  );
+                })}
               </dl>
             )}
-            {g.count > 1 && (
-              <p className="mt-2 text-[9px] text-text-quaternary tabular-nums">{g.count} rows in scope</p>
-            )}
+
           </div>
         );
       })}
@@ -444,13 +496,15 @@ function FacetBoard({ schema, rows, role, onOpenGroup }: {
   );
 }
 
-export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, onOpenGroup, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
+export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, onOpenGroup, onAddFacet, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
   role: string;
   listSchema: ListSchema;
   activeEscalations: LTEscalationRecord[];
   onRowClick?: (row: LTEscalationRecord) => void;
-  /** facet-board card click — receives the group's history deep link. */
+  /** facet-board history affordances — receive a filtered deep link. */
   onOpenGroup?: (url: string) => void;
+  /** facet-board ⇧ click — merge one facet into the live filter set. */
+  onAddFacet?: (key: string, value: unknown) => void;
   total?: number;
   page?: number;
   totalPages?: number;
@@ -505,7 +559,14 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
     return (
       <div>
         {header}
-        <FacetBoard schema={listSchema} rows={activeEscalations} role={role} onOpenGroup={onOpenGroup} />
+        <FacetBoard
+          schema={listSchema}
+          rows={activeEscalations}
+          role={role}
+          onOpenDetail={onRowClick}
+          onOpenGroup={onOpenGroup}
+          onAddFacet={onAddFacet}
+        />
         {page !== undefined && totalPages !== undefined && onPageChange && totalPages > 1 && (
           <StickyPagination
             page={page}

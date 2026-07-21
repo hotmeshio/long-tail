@@ -5,6 +5,9 @@ import {
   resolveAssignee,
   type ProvisionIfAbsent,
 } from './helpers';
+import { checkResolverPayload } from '../../services/escalation/resolver-validation';
+import { getEnforcingRoles } from '../../services/role/enforcement-cache';
+import { validationFailure } from './resolve';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 /**
@@ -121,10 +124,32 @@ export async function resolveByMetadata(
     const writeAllRoles = writeScope.global ? null : writeScope.allRoles;
     const writeSelfRoles = writeScope.global ? null : writeScope.selfRoles;
 
-    const result = await escalationService.resolveByMetadataAtomic(
+    // Schema enforcement rides the atomic statement: with the cached enforcing
+    // set empty (the common case) the single-call behavior is unchanged. When
+    // the picked row's role enforces, the statement returns the row WITHOUT
+    // writing; the payload validates here, then a second asserted pass claims
+    // + resolves the same row with pending re-checked inside the statement.
+    const enforcing = await getEnforcingRoles();
+    let result = await escalationService.resolveByMetadataAtomic(
       input.key, input.value, resolveUserId,
       input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
+      enforcing.size > 0 ? [...enforcing] : null,
     );
+
+    if (result.outcome === 'validation_required' && result.row) {
+      const report = await checkResolverPayload(result.row, input.resolverPayload);
+      if (report) return validationFailure(report);
+      result = await escalationService.resolveByMetadataAtomic(
+        input.key, input.value, resolveUserId,
+        input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
+        null, result.row.id,
+      );
+      // The asserted row left pending between the two passes — a concurrent
+      // resolution won the row; surface it as the conflict it is.
+      if (result.outcome === 'not_found') {
+        return { status: 409, error: 'A concurrent resolution is already in progress for this escalation' };
+      }
+    }
 
     if (result.outcome === 'not_found') {
       return { status: 404, error: 'No pending escalation found for this metadata, or insufficient role permissions' };

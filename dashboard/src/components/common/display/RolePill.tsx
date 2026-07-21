@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 
 interface RolePillProps {
   role: string;
@@ -7,6 +7,11 @@ interface RolePillProps {
   tone?: 'default' | 'inherit';
 }
 
+/**
+ * The universal role symbol. A role is a QUEUE — a tray work arrives into and
+ * is claimed from — so the inbox glyph carries it everywhere a role appears:
+ * this pill, the admin sidebar's Roles entry, and the role detail page.
+ */
 export function RolePill({ role, size = 'sm', tone = 'default' }: RolePillProps) {
   const sizeClass = size === 'md'
     ? 'py-0.5 text-xs gap-1.5'
@@ -16,7 +21,7 @@ export function RolePill({ role, size = 'sm', tone = 'default' }: RolePillProps)
 
   return (
     <span className={`inline-flex items-center whitespace-nowrap ${sizeClass} ${colorClass}`}>
-      <User className={`${iconClass} shrink-0 text-accent/75`} />
+      <Inbox className={`${iconClass} shrink-0 text-accent/75`} />
       {role}
     </span>
   );

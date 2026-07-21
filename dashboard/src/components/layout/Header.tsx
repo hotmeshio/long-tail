@@ -82,7 +82,12 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
 
   return (
     <>
-      <header className="h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between pl-2 pr-5 relative z-30">
+      {/* The header is its own stacking context, so its children's z is capped
+          by the header's z against page-level fixed layers (facet drawer z-40,
+          help panel z-[45], docs drawer z-50). At rest it sits at z-30 so those
+          drawers may cover it; while the user menu is open it lifts to the menu
+          tier (z-[100]) so an open menu is never occluded. */}
+      <header className={`h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between pl-2 pr-5 relative ${menuOpen ? 'z-[100]' : 'z-30'}`}>
         <Link
           to="/"
           aria-label="Home"
@@ -190,7 +195,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                 </svg>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-50">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-surface-border rounded-md shadow-lg py-1 z-[100]">
                   <Link
                     to="/credentials"
                     onClick={() => setMenuOpen(false)}

@@ -6,7 +6,7 @@ import { useUsers, useDeleteUser } from '../../../api/users';
 import { useFilterParams } from '../../../hooks/useFilterParams';
 import { DataTable, type Column } from '../../../components/common/data/DataTable';
 import { StickyPagination } from '../../../components/common/data/StickyPagination';
-import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
+import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RowAction, RowActionGroup } from '../../../components/common/layout/RowActions';
@@ -60,7 +60,7 @@ export function UsersPage() {
 function UserAccountsPanel() {
   const { isBuilder } = useAccess();
   const { filters, setFilter, pagination } = useFilterParams({
-    filters: { status: '' },
+    filters: { status: '', search: '' },
   });
   const deleteUser = useDeleteUser();
 
@@ -71,6 +71,7 @@ function UserAccountsPanel() {
 
   const { data, isLoading } = useUsers({
     status: filters.status || undefined,
+    search: filters.search || undefined,
     limit: pagination.pageSize,
     offset: pagination.offset,
   });
@@ -165,7 +166,14 @@ function UserAccountsPanel() {
         </div>
       )}
 
+      {/* Same filter surface as the Service Accounts tab: search + status. */}
       <FilterBar>
+        <FilterInput
+          label="Search"
+          value={filters.search}
+          onChange={(v) => setFilter('search', v)}
+          placeholder="name, email, id…"
+        />
         <FilterSelect
           label="Status"
           value={filters.status}
@@ -174,7 +182,9 @@ function UserAccountsPanel() {
         />
       </FilterBar>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+      {/* 360px right column — same width as the Service Accounts tab's panel
+          (BotsPage), so the two Accounts tabs share one layout rhythm. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
         {/* Left — users table */}
         <div className="overflow-x-clip">
           <DataTable

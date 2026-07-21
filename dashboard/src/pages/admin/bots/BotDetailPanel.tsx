@@ -71,7 +71,7 @@ function ApiKeysSection({ botId }: { botId: string }) {
             Key generated — copy now, it won't be shown again
           </p>
           <div className="flex items-center gap-2">
-            <code className="text-[11px] font-mono text-text-primary bg-surface-sunken px-2 py-1 rounded flex-1 overflow-hidden text-ellipsis">
+            <code className="text-[11px] font-mono text-text-primary bg-surface-sunken px-2 py-1 rounded flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
               {generatedKey}
             </code>
             <button
@@ -120,39 +120,44 @@ function ApiKeysSection({ botId }: { botId: string }) {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
+      {/* Stacked like the user panel's Add Role form — the input takes the
+          full row, then the fixed-width scope toggle and button share the
+          second row. Nothing here can widen the 360px column. */}
+      <div className="space-y-2">
         <input
           type="text"
           value={newKeyName}
           onChange={(e) => setNewKeyName(e.target.value)}
           placeholder="Key name..."
-          className="input text-xs flex-1 font-mono"
+          className="input text-xs font-mono"
         />
-        <div className="flex rounded-md border border-surface-border overflow-hidden shrink-0">
-          {(Object.entries(SCOPE_PRESETS) as [keyof typeof SCOPE_PRESETS, typeof SCOPE_PRESETS[keyof typeof SCOPE_PRESETS]][]).map(([key, preset]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSelectedScope(key)}
-              title={preset.hint}
-              className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
-                selectedScope === key
-                  ? 'bg-accent text-white'
-                  : 'bg-surface text-text-secondary hover:bg-surface-hover'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex rounded-md border border-surface-border overflow-hidden shrink-0">
+            {(Object.entries(SCOPE_PRESETS) as [keyof typeof SCOPE_PRESETS, typeof SCOPE_PRESETS[keyof typeof SCOPE_PRESETS]][]).map(([key, preset]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedScope(key)}
+                title={preset.hint}
+                className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                  selectedScope === key
+                    ? 'bg-accent text-white'
+                    : 'bg-surface text-text-secondary hover:bg-surface-hover'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={!newKeyName.trim() || createKey.isPending}
+            className="btn-primary text-xs inline-flex items-center gap-1 shrink-0"
+          >
+            <Plus className="w-3 h-3" />
+            {createKey.isPending ? '...' : 'Generate'}
+          </button>
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={!newKeyName.trim() || createKey.isPending}
-          className="btn-primary text-xs inline-flex items-center gap-1"
-        >
-          <Plus className="w-3 h-3" />
-          {createKey.isPending ? '...' : 'Generate'}
-        </button>
       </div>
       {createKey.error && (
         <p className="text-[10px] text-status-error mt-1">{(createKey.error as Error).message}</p>
@@ -236,33 +241,44 @@ function RolesSection({ bot }: { bot: BotRecord }) {
       )}
 
       {available.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="space-y-2">
+          {/* Same stacked form as the user panel's Add Role — full-width
+              selects that can never push the button off-screen. */}
           <select
             value={newRole}
             onChange={(e) => setNewRole(e.target.value)}
-            className="select text-xs font-mono flex-1"
+            className="select text-xs font-mono w-full min-w-0"
+            aria-label="Role"
           >
             <option value="">Select a role...</option>
             {available.map((r) => (
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
-          <select
-            value={newType}
-            onChange={(e) => setNewType(e.target.value as LTRoleType)}
-            className="select text-xs w-24"
-          >
-            <option value="member">member</option>
-            <option value="admin">admin</option>
-            <option value="superadmin">superadmin</option>
-          </select>
-          <button
-            onClick={handleAdd}
-            disabled={!newRole || addRole.isPending}
-            className="btn-primary text-xs"
-          >
-            {addRole.isPending ? '...' : 'Add'}
-          </button>
+          <div className="grid grid-cols-2 gap-2 items-end">
+            <div className="min-w-0">
+              <label className="block text-[10px] text-text-tertiary mb-1">Type</label>
+              <select
+                value={newType}
+                onChange={(e) => setNewType(e.target.value as LTRoleType)}
+                className="select text-xs w-full min-w-0"
+                aria-label="Role type"
+              >
+                <option value="member">member</option>
+                <option value="admin">admin</option>
+                <option value="superadmin">superadmin</option>
+              </select>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={handleAdd}
+                disabled={!newRole || addRole.isPending}
+                className="btn-primary text-xs"
+              >
+                {addRole.isPending ? '...' : 'Add Role'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {addRole.error && (

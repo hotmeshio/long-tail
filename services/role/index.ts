@@ -28,6 +28,8 @@ import {
   COUNT_ACTIVE_ESCALATION_REFS,
 } from './sql';
 
+import { invalidateRoleEnforcement } from './enforcement-cache';
+
 import type {
   EscalationChain,
   RoleDetail,
@@ -186,8 +188,12 @@ export async function updateRoleMetadata(
     provided('upstream_roles'), upstreams,
     provided('list_schema'), input.list_schema != null ? JSON.stringify(input.list_schema) : null,
     provided('default_pins'), input.default_pins != null ? JSON.stringify(input.default_pins) : null,
+    provided('enforce_schema'), input.enforce_schema ?? null,
   ]);
   if (!rows[0]) return null;
+  // Enforcement state may have changed — drop this role's cached entries so
+  // the resolve gate sees the write immediately in this process.
+  invalidateRoleEnforcement(role);
   // The statement's CTEs share one snapshot, so the returned row cannot see
   // the upstream sync it just performed — echo the write, or read when the
   // field wasn't touched.

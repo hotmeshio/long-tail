@@ -75,7 +75,7 @@ export function RolePicker({ selected, onChange, single, placeholder }: RolePick
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-[100] mt-1 w-full bg-white border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {allRoles.length === 0 ? (
             <p className="px-3 py-2 text-xs text-text-tertiary">No roles defined</p>
           ) : (

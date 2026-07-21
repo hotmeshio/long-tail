@@ -28,8 +28,9 @@ const FLEET_LIST_SCHEMA = {
   'x-lt-help': [
     '# Fleet board',
     '',
-    'One card per machine, showing its latest advertised state. Click a card',
-    'for the machine\'s history. **finished** machines need harvesting.',
+    'One card per machine, showing its latest advertised state. Click a card to',
+    'open its latest item; hover for the machine\'s history (table or timeline);',
+    '⇧ click filters the board. **finished** machines need harvesting.',
   ].join('\n'),
   'x-lt-card': {
     title: '{{metadata.fleetMachine}}',

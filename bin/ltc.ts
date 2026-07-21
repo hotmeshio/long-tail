@@ -30,7 +30,16 @@ const envLoaded = fs.existsSync(envPath);
 
 function handleError(err: any): never {
   const msg = err.message || String(err);
-  console.error(`\n  ${pc.red('✗')} ${msg}\n`);
+  console.error(`\n  ${pc.red('✗')} ${msg}`);
+  // Schema-validation rejections carry field-level violations — print each
+  // one the way the dashboard's errors panel lists them.
+  if (Array.isArray(err.violations)) {
+    for (const v of err.violations) {
+      const where = v.escalationId ? `${v.escalationId} · ${v.field}` : v.field;
+      console.error(`    ${pc.dim('·')} ${pc.bold(where)} — ${v.message}`);
+    }
+  }
+  console.error('');
   process.exit(1);
 }
 

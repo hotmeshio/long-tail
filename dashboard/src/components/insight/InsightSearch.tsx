@@ -76,7 +76,7 @@ export function InsightSearch() {
 
         {/* Suggestion dropdown */}
         {suggestionsOpen && !input.trim() && (
-          <div className="absolute top-full right-0 mt-1 w-[28rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg z-40 py-1">
+          <div className="absolute top-full right-0 mt-1 w-[28rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100] py-1">
             <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">
               Try something
             </div>

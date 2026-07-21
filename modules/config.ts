@@ -20,6 +20,12 @@ export const config = {
   JWT_SECRET: process.env.JWT_SECRET || '',
 
   HONEYCOMB_API_KEY: process.env.HONEYCOMB_API_KEY || '',
+
+  // Resolver schema enforcement: TTL for the cached enforcing-role set and
+  // latest role form schemas. Bounds cross-container staleness after a role
+  // admin flips enforce_schema or edits a schema; pinned snapshots are
+  // immutable and cache indefinitely.
+  ROLE_ENFORCEMENT_CACHE_TTL_MS: parseInt(process.env.ROLE_ENFORCEMENT_CACHE_TTL_MS || '30000', 10),
 };
 
 export const postgres_options: Record<string, unknown> = {

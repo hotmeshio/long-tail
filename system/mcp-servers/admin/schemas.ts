@@ -293,6 +293,7 @@ export const updateRoleSchema = z.object({
   worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
   priority_threshold_minutes: z.number().min(0).nullable().optional().describe('Max age in minutes before a pending unclaimed escalation counts toward the Pace Board priority count. Falls back to sla_minutes when null.'),
   priority_facet: z.string().regex(FACET_KEY).nullable().optional().describe('lt_escalations.metadata key holding the age origin for the priority count as an ISO 8601 UTC timestamp (e.g. authorized_at). Falls back to created_at when null. When set, items missing the key or holding an unparseable value are not counted.'),
+  enforce_schema: z.boolean().optional().describe('When true, every resolve surface validates the submitted resolverPayload against the escalation\'s form schema (the same pass the dashboard runs) and rejects violations with a structured schema_validation error before any state changes.'),
   upstream_roles: z.array(z.string()).nullable().optional().describe('Replace the set of roles this station draws input from across other sequences (parent_role stays the single prior step in its own sequence). Omitted = preserve; null or [] = clear.'),
   list_schema: z.record(z.any()).nullable().optional().describe('JSON contract (x-lt-* markup) that richly formats this role\'s escalation LIST page. Versioned independently of form_schema; the list always renders the latest version.'),
   default_pins: z.array(z.object({

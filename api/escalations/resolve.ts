@@ -6,7 +6,11 @@ import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deploye
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS, ESCALATION_BULK_RESOLVE_MAX } from '../../modules/defaults';
 import { assertReadAccess, assertWriteAccess, assertLiveClaimant, getEscalationWriteScope } from './helpers';
+import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
+import { getEnforcingRoles } from '../../services/role/enforcement-cache';
+import type { ResolverSchemaViolationReport } from '../../services/escalation/resolver-validation';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
+import type { LTFieldViolation } from '../../types/validation';
 
 // ── Orchestrator ─────────────────────────────────────────────────────────
 
@@ -56,6 +60,15 @@ export async function resolveEscalation(
     // re-assert the same predicate atomically inside the guarded resolve UPDATE.
     const stale = assertLiveClaimant(auth.userId, escalation);
     if (stale) return stale;
+
+    // Schema enforcement (enforce_schema roles): validate the payload against
+    // the escalation's resolved form schema BEFORE any resolution path runs.
+    // Costs nothing when the role does not enforce (cached role set); the
+    // task-fallback envelope read only happens for enforcing roles.
+    const violation = await checkResolverPayload(
+      escalation, resolverPayload, () => reconstructEnvelope(escalation),
+    );
+    if (violation) return validationFailure(violation);
 
     // The resolver payload is stored exactly as submitted — its shape is the
     // workflow's contract, formed by the caller (the React app maps the form to
@@ -138,6 +151,11 @@ export async function resolveBySignalKey(
     const denied = await assertWriteAccess(auth.userId, escalation);
     if (denied) return { status: 404, error: 'Escalation not found' };
 
+    // Schema enforcement — the row (envelope included) is already loaded, so
+    // this costs zero extra reads beyond the cached schema.
+    const violation = await checkResolverPayload(escalation, resolverPayload);
+    if (violation) return validationFailure(violation);
+
     // The payload is delivered as the signal the parked workflow's condition()
     // receives — stored exactly as submitted (the caller formed its shape).
     return resolveViaSignalKey(escalation, resolverPayload, metadata);
@@ -175,16 +193,37 @@ export async function resolveByIds(
     // resolve any item in the role; write_self roles may resolve only items assigned
     // to the caller (same rule single-resolve applies via assertWriteAccess). Global
     // bypasses. A missing id or any out-of-scope item → 404 (non-disclosure), and
-    // nothing is resolved.
+    // nothing is resolved. The scope-row read is shared with the enforcement
+    // gate below — one indexed read serves both.
     const writeScope = await getEscalationWriteScope(auth.userId);
+    const enforcing = await getEnforcingRoles();
+    let scopeRows: Array<{ id: string; role: string; assigned_to: string | null }> | null = null;
     if (!writeScope.global) {
       const allSet = new Set(writeScope.allRoles);
       const selfSet = new Set(writeScope.selfRoles);
-      const rows = await escalationService.getEscalationScopeRows(ids);
+      scopeRows = await escalationService.getEscalationScopeRows(ids);
       const writable = (r: { role: string; assigned_to: string | null }): boolean =>
         allSet.has(r.role) || (selfSet.has(r.role) && r.assigned_to === auth.userId);
-      if (rows.length !== ids.length || !rows.every(writable)) {
+      if (scopeRows.length !== ids.length || !scopeRows.every(writable)) {
         return { status: 404, error: 'One or more escalations not found' };
+      }
+    }
+
+    // Schema enforcement (enforce_schema roles): with the cached enforcing set
+    // empty this path adds zero reads. Otherwise the scope rows identify which
+    // targets enforce, and only those rows load in full for validation — the
+    // one payload is validated against each enforcing row's own context.
+    if (enforcing.size > 0) {
+      const rows = scopeRows ?? await escalationService.getEscalationScopeRows(ids);
+      const involved = rows.filter((r) => enforcing.has(r.role)).map((r) => r.id);
+      if (involved.length > 0) {
+        const fullRows = await escalationService.getEscalationsByIds(involved);
+        const failed: Array<{ id: string; report: ResolverSchemaViolationReport }> = [];
+        for (const row of fullRows) {
+          const report = await checkResolverPayload(row, resolverPayload);
+          if (report) failed.push({ id: row.id, report });
+        }
+        if (failed.length > 0) return bulkValidationFailure(failed);
       }
     }
 
@@ -280,6 +319,22 @@ export async function resolveAllOrNone(
       // the 409 body must carry BOTH the message and the blocking ids
       const error = 'One or more escalations require the single-resolve path (legacy signal routing)';
       return { status: 409, error, data: { error, failedIds: failed.map((f) => f.id), failed } };
+    }
+
+    // Schema enforcement (enforce_schema roles): every item validates against
+    // its own row's context before ANYTHING resolves — all-or-none extends to
+    // validation. Rows are already in hand, so the only added reads are the
+    // cached schemas of enforcing roles.
+    const enforcing = await getEnforcingRoles();
+    if (enforcing.size > 0) {
+      const failed: Array<{ id: string; report: ResolverSchemaViolationReport }> = [];
+      for (const item of items) {
+        const row = rowById.get(item.id);
+        if (!row || !row.role || !enforcing.has(row.role)) continue;
+        const report = await checkResolverPayload(row, item.resolverPayload);
+        if (report) failed.push({ id: item.id, report });
+      }
+      if (failed.length > 0) return bulkValidationFailure(failed);
     }
 
     // Per-row password redaction against each row's own form schema — the
@@ -497,6 +552,36 @@ function signaledResult(escalation: any, workflowId: string): LTApiResult {
     status: 200,
     data: { signaled: true, escalationId: escalation.id, workflowId },
   };
+}
+
+/**
+ * The canonical 422 for a schema-validation rejection. The full body rides in
+ * `data` (routes serialize `data ?? { error }`), so every transport — HTTP,
+ * SDK, CLI, dashboard — receives the same shape: error, code, violations,
+ * role, schemaVersion. `code` also sits on the envelope for SDK branching.
+ */
+export function validationFailure(report: ResolverSchemaViolationReport): LTApiResult {
+  const body = toValidationErrorBody(report);
+  return { status: 422, error: body.error, code: body.code, data: body };
+}
+
+/**
+ * The bulk-surface 422: violations from every failing row, each tagged with
+ * its escalationId so callers can attribute them. Role/schemaVersion echo the
+ * first failing report (bulk resolves target homogeneous role groups).
+ */
+function bulkValidationFailure(
+  failed: Array<{ id: string; report: ResolverSchemaViolationReport }>,
+): LTApiResult {
+  const violations: LTFieldViolation[] = failed.flatMap(({ id, report }) =>
+    report.violations.map((v) => ({ ...v, escalationId: id })),
+  );
+  const body = {
+    ...toValidationErrorBody(failed[0].report),
+    error: `resolverPayload failed schema validation for ${failed.length} escalation${failed.length === 1 ? '' : 's'} (${violations.length} violation${violations.length === 1 ? '' : 's'})`,
+    violations,
+  };
+  return { status: 422, error: body.error, code: body.code, data: body };
 }
 
 

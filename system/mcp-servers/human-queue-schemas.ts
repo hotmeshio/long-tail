@@ -27,7 +27,10 @@ export const getAvailableWorkSchema = z.object({
 // payload. Shape it to match the role form's x-lt-bind paths (see the form_schema
 // check_resolution returns for a pending escalation); no server-side transform.
 const RESOLVER_PAYLOAD_DESC =
-  'Resolution payload, stored as-is. Match the shape the workflow consumes (the form_schema\'s x-lt-bind paths).';
+  'Resolution payload, stored as-is. Match the shape the workflow consumes (the form_schema\'s x-lt-bind paths). '
+  + 'Roles with enforce_schema validate it server-side: required fields (respecting x-lt-showIf), declared types '
+  + '(number vs string), enums, bounds, patterns, and x-lt-require-all checklists. Violations return a '
+  + 'schema_validation error listing each field.';
 
 export const claimAndResolveSchema = z.object({
   escalation_id: z.string().describe('The escalation ID to claim and resolve'),

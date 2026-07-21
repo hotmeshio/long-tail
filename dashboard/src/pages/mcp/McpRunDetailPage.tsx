@@ -52,7 +52,7 @@ function ActionsDropdown({ isRunning, onTerminate }: {
         Actions
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-10">
+        <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100]">
           <button
             onClick={() => { onTerminate(); setOpen(false); }}
             className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
