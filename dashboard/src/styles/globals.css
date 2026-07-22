@@ -95,7 +95,7 @@
    * restyle the entire product — including dark themes — with zero source
    * changes. Themes override any of these under their [data-theme] block. */
   :root {
-    --lt-radius-field: 0.1875rem;  /* 3px — the visibly-soft corner on every field */
+    --lt-radius-field: 0.25rem;    /* 4px — the soft corner on every field and button */
 
     /* Native form-control rendering. Dark themes set this to `dark` so
        scrollbars, date pickers, and checkboxes follow the surface. */
@@ -181,19 +181,24 @@
 }
 
 @layer components {
+  /* Buttons share the control radius with fields — one knob rounds every
+     interactive rectangle in the product. */
   .btn-primary {
-    @apply px-5 py-2.5 bg-accent text-text-inverse rounded-md text-sm font-medium
+    @apply px-5 py-2.5 bg-accent text-text-inverse text-sm font-medium
            hover:bg-accent-hover transition-colors duration-150;
+    border-radius: var(--lt-radius-field);
   }
 
   .btn-secondary {
-    @apply px-5 py-2.5 bg-surface-raised border border-surface-border rounded-md text-sm font-medium
+    @apply px-5 py-2.5 bg-surface-raised border border-surface-border text-sm font-medium
            text-text-primary hover:bg-surface-hover transition-colors duration-150;
+    border-radius: var(--lt-radius-field);
   }
 
   .btn-ghost {
-    @apply px-4 py-2.5 rounded-md text-sm font-medium text-text-secondary
+    @apply px-4 py-2.5 text-sm font-medium text-text-secondary
            hover:bg-surface-hover transition-colors duration-150;
+    border-radius: var(--lt-radius-field);
   }
 
   /* Centralized row hover — no background tint on hover (kept intentionally flat).
