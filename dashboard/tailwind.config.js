@@ -77,7 +77,9 @@ export default {
         'dict-inline': '22rem', /* label sits beside value (one pair per row) */
         'grp-cols': '26rem',    /* x-lt-column-group renders 2-up */
         'form-cols': '34rem',   /* section two-column grid splits */
-        filters: '56rem',       /* filters inline only when ONE line fits; below, the fold */
+        filters: '72rem',       /* filters inline only when ONE line fits — sized for the
+                                   heaviest bar (four selects + count + toolbar cluster);
+                                   below, the fold. Escaping early beats wrapping. */
         'dict-pairs': '38rem',  /* dictionary renders two pairs per row */
         table: '48rem',         /* tables render as tables; below, console cards */
         split: '54rem',         /* two-pane page grids split */

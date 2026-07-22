@@ -175,8 +175,10 @@ Nothing loops, nothing floats.
    where the viewport is the container.
 2. **Thresholds are named container tokens** (tailwind `containers`):
    `@dict-inline` 22rem · `@grp-cols` 26rem · `@form-cols` 34rem ·
-   `@filters` 56rem · `@dict-pairs` 38rem · `@table` 48rem. Components use
-   the names, never raw rem values.
+   `@filters` 72rem · `@dict-pairs` 38rem · `@table` 48rem. Components use
+   the names, never raw rem values. A fold threshold is sized for the
+   HEAVIEST content its component carries — escaping to the condensed
+   format early beats ever letting a bar wrap.
 3. **The dictionary reflow ladder** — the poster child. The same
    label/value pairs render as: two pairs per row at `@dict-pairs`; one
    label|value pair per row at `@dict-inline`; label stacked over value
