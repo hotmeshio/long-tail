@@ -165,24 +165,24 @@ const richFormConfig: LTWorkerConfig = {
   },
 };
 
-const acmeOrderConfig: LTWorkerConfig = {
-  description: 'Acme order — the reference two-station manufacturing flow behind the perfect-form pair: a dictionary of order facts, one explicit Choose… decision, linear conditional reveals, pre-checked standard checks beside clickable custom work, and the rejection report. The acme-addons and acme-print-qa roles own the versioned forms.',
+const acmeWidgetConfig: LTWorkerConfig = {
+  description: 'Acme widget — the reference two-station fabrication flow behind the perfect-form pair: a dictionary of widget facts, one explicit Choose… decision, linear conditional reveals, pre-checked standard checks beside clickable custom work, and the rejection report. The acme-addons and acme-final-qa roles own the versioned forms.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: ACME_ADDONS_ROLE,
   envelopeSchema: {
     data: {
       po: 'ACME-1042',
-      orderId: 'ord-8127',
+      widgetId: 'wgt-8127',
       leftQuantity: 1,
       rightQuantity: 1,
-      orthoticType: 'Functional',
-      shoeSize: 'M10',
-      material: 'polymax',
+      widgetType: 'Standard',
+      sizeCode: 'S2',
+      material: 'alloy',
       certified: false,
       addons: [
-        { id: 'wedge_medial', label: 'Wedge — medial, left — verified on the piece' },
-        { id: 'met_pad', label: 'Met pad — standard — verified on the piece' },
+        { id: 'mount_front', label: 'Mount — front, left — verified on the widget' },
+        { id: 'gasket_std', label: 'Gasket — standard — verified on the widget' },
       ],
     },
     metadata: { source: 'dashboard' },
@@ -441,7 +441,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
-  { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeOrder, config: acmeOrderConfig },
+  { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },

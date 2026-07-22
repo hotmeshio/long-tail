@@ -19,7 +19,7 @@ async function main() {
   await page.click('button[type="submit"]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  // The pending addons escalation from the seeded acmeOrder run.
+  // The pending addons escalation from the seeded acmeWidget run.
   await page.goto(`${BASE}/escalations/available?role=acme-addons`);
   await page.waitForTimeout(1500);
   const row = page.locator('table tbody tr').first();
@@ -47,7 +47,7 @@ async function main() {
   await page.screenshot({ path: `${OUT}/acme-4-reject-reveal.png`, fullPage: true });
 
   // Back to Complete, click the custom work, submit — stage 1 resolves and
-  // the workflow mints the Post-print QA escalation.
+  // the workflow mints the Final QA escalation.
   await outcome.selectOption('Complete');
   await page.waitForTimeout(400);
   await page.locator('input[type="checkbox"][data-item-id], [data-field-key="customChecks"] input[type="checkbox"]').first().waitFor({ timeout: 3000 }).catch(() => {});
@@ -62,7 +62,7 @@ async function main() {
   await page.waitForTimeout(2500);
 
   // The QA stage: claim and capture the 2×2 reject reveal.
-  await page.goto(`${BASE}/escalations/available?role=acme-print-qa`);
+  await page.goto(`${BASE}/escalations/available?role=acme-final-qa`);
   await page.waitForTimeout(1500);
   await page.locator('table tbody tr').first().click();
   await page.waitForTimeout(1500);

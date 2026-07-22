@@ -38,7 +38,7 @@ export async function processAddons(input: AcmeAddonsResolverV1): Promise<Statio
 export async function processQa(input: AcmeQaResolverV1): Promise<StationOutcome> {
   const result = parseResolverPayload(AcmeQaResolverV1Schema, input);
   return {
-    station: 'post-print-qa',
+    station: 'final-qa',
     outcome: result.outcome,
     reportedReason: result.report?.reason,
     sendBackTo: result.report?.sendBackTo,

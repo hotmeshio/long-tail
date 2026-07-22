@@ -19,7 +19,7 @@ const qaCtx = {
   envelope: {
     checklist_items: [
       { id: 'counts', label: 'Counts match' },
-      { id: 'strings', label: 'No strings' },
+      { id: 'burrs', label: 'No burrs' },
     ],
     reject_reason_items: [{ id: 'warping', label: 'Warping' }],
     maxRejectLeft: 2,
@@ -29,16 +29,16 @@ const qaCtx = {
 
 const QA_FACTS = {
   po: 'ACME-1042',
-  orderId: 'ord-8127',
+  widgetId: 'wgt-8127',
   leftQuantity: '2',
   rightQuantity: '2',
-  orthoticType: 'Functional',
-  shoeSize: 'M10',
-  material: 'polymax',
+  widgetType: 'Standard',
+  sizeCode: 'S2',
+  material: 'alloy',
   certified: 'false',
 };
 
-describe('acme-print-qa form', () => {
+describe('acme-final-qa form', () => {
   it('blocks until the decision is made (Choose… state)', () => {
     const errors = validateResolverForm(QA, { ...QA_FACTS, outcome: '', notes: '' }, qaCtx);
     expect(errors.map((e) => e.field)).toContain('outcome');
@@ -48,7 +48,7 @@ describe('acme-print-qa form', () => {
     const form = {
       ...QA_FACTS,
       outcome: 'Pass',
-      checks: { counts: true, strings: true },
+      checks: { counts: true, burrs: true },
       rejectReason: '',
       notes: '',
     };
@@ -59,7 +59,7 @@ describe('acme-print-qa form', () => {
     const form = {
       ...QA_FACTS,
       outcome: 'Pass',
-      checks: { counts: true, strings: false },
+      checks: { counts: true, burrs: false },
       rejectReason: '',
       notes: '',
     };
@@ -67,7 +67,7 @@ describe('acme-print-qa form', () => {
     expect(errors.map((e) => e.field)).toContain('checks');
   });
 
-  it('Reject path: requires the written reason and caps counts at the order quantities', () => {
+  it('Reject path: requires the written reason and caps counts at the run quantities', () => {
     const form = {
       ...QA_FACTS,
       outcome: 'Reject',
@@ -75,7 +75,7 @@ describe('acme-print-qa form', () => {
       rejectReason: 'short',
       rejectLeftQuantity: 3,
       rejectRightQuantity: 1,
-      sendBackTo: 'Printing',
+      sendBackTo: 'Fabrication',
       notes: '',
     };
     const fields = validateResolverForm(QA, form, { ...qaCtx, resolver: form }).map((e) => e.field);
@@ -89,10 +89,10 @@ describe('acme-print-qa form', () => {
       ...QA_FACTS,
       outcome: 'Reject',
       rejectReasons: {},
-      rejectReason: 'Warping across the medial edge on both pieces.',
+      rejectReason: 'Warping across the outer edge on both widgets.',
       rejectLeftQuantity: 1,
       rejectRightQuantity: 0,
-      sendBackTo: 'Printing',
+      sendBackTo: 'Fabrication',
       notes: '',
     };
     const fields = validateResolverForm(QA, form, { ...qaCtx, resolver: form }).map((e) => e.field);
@@ -103,10 +103,10 @@ describe('acme-print-qa form', () => {
     const form = {
       outcome: 'Reject',
       rejectReasons: { warping: true },
-      rejectReason: 'Warping across the medial edge on both pieces.',
+      rejectReason: 'Warping across the outer edge on both widgets.',
       rejectLeftQuantity: 1,
       rejectRightQuantity: 0,
-      sendBackTo: 'Printing',
+      sendBackTo: 'Fabrication',
       notes: 'Second occurrence this week.',
     };
     const payload = mapFormToPayload(form, QA);
@@ -114,7 +114,7 @@ describe('acme-print-qa form', () => {
     expect(parsed.outcome).toBe('Reject');
     expect(parsed.report?.reason).toContain('Warping');
     expect(parsed.report?.left).toBe(1);
-    expect(parsed.report?.sendBackTo).toBe('Printing');
+    expect(parsed.report?.sendBackTo).toBe('Fabrication');
   });
 });
 
@@ -123,11 +123,11 @@ describe('acme-addons form', () => {
     envelope: {
       checklist_items: [
         { id: 'attached', label: 'Every addon attached' },
-        { id: 'angles', label: 'Angles verified' },
+        { id: 'alignment', label: 'Alignment verified' },
       ],
       custom_items: [
-        { id: 'wedge_medial', label: 'Wedge — medial, left' },
-        { id: 'met_pad', label: 'Met pad — standard' },
+        { id: 'mount_front', label: 'Mount — front, left' },
+        { id: 'gasket_std', label: 'Gasket — standard' },
       ],
       reject_reason_items: [{ id: 'damage', label: 'Handling damage' }],
     },
@@ -136,10 +136,10 @@ describe('acme-addons form', () => {
   it('Complete path: pre-checked standard items plus clicked custom work passes', () => {
     const form = {
       po: 'ACME-1042',
-      orderId: 'ord-8127',
+      widgetId: 'wgt-8127',
       outcome: 'Complete',
-      checks: { attached: true, angles: true },
-      customChecks: { wedge_medial: true, met_pad: true },
+      checks: { attached: true, alignment: true },
+      customChecks: { mount_front: true, gasket_std: true },
       rejectReason: '',
       notes: '',
     };
@@ -149,8 +149,8 @@ describe('acme-addons form', () => {
   it('Complete path: unclicked custom work blocks — those clicks are the record', () => {
     const form = {
       outcome: 'Complete',
-      checks: { attached: true, angles: true },
-      customChecks: { wedge_medial: true, met_pad: false },
+      checks: { attached: true, alignment: true },
+      customChecks: { mount_front: true, gasket_std: false },
       rejectReason: '',
       notes: '',
     };
@@ -161,13 +161,13 @@ describe('acme-addons form', () => {
   it('maps a completion into the nested resolver contract', () => {
     const form = {
       outcome: 'Complete',
-      checks: { attached: true, angles: true },
-      customChecks: { wedge_medial: true, met_pad: true },
+      checks: { attached: true, alignment: true },
+      customChecks: { mount_front: true, gasket_std: true },
       notes: '',
     };
     const parsed = AcmeAddonsResolverV1Schema.parse(mapFormToPayload(form, ADDONS));
     expect(parsed.outcome).toBe('Complete');
-    expect(parsed.customChecks).toEqual({ wedge_medial: true, met_pad: true });
+    expect(parsed.customChecks).toEqual({ mount_front: true, gasket_std: true });
   });
 
   it('a Complete submission carrying hidden report defaults parses clean', () => {
@@ -175,11 +175,11 @@ describe('acme-addons form', () => {
     // '' for untouched text/checklists, [''] for the empty upload slot.
     const form = {
       outcome: 'Complete',
-      checks: { attached: true, angles: true },
-      customChecks: { wedge_medial: true, met_pad: true },
+      checks: { attached: true, alignment: true },
+      customChecks: { mount_front: true, gasket_std: true },
       rejectReasons: '',
       rejectReason: '',
-      sendBackTo: 'Printing',
+      sendBackTo: 'Fabrication',
       rejectPhoto: '',
       notes: '',
     };

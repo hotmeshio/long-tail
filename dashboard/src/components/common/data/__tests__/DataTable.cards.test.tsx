@@ -9,7 +9,7 @@ import { DataTable, partitionColumns, type Column } from '../DataTable';
 interface Row { id: string; name: string; role: string; age: string; extra: string }
 
 const ROWS: Row[] = [
-  { id: 'a', name: 'Post-print QA — ACME-1042', role: 'acme-print-qa', age: '5m', extra: 'x' },
+  { id: 'a', name: 'Final QA — ACME-1042', role: 'acme-final-qa', age: '5m', extra: 'x' },
   { id: 'b', name: 'Addons — ACME-1042', role: 'acme-addons', age: '9m', extra: 'y' },
 ];
 
@@ -53,13 +53,13 @@ describe('DataTable card mode', () => {
       <DataTable columns={COLUMNS} data={ROWS} keyFn={(r) => r.id} forceCardMode />,
     );
     expect(container.querySelector('table')).toBeNull();
-    expect(screen.getByText('Post-print QA — ACME-1042')).toBeInTheDocument();
+    expect(screen.getByText('Final QA — ACME-1042')).toBeInTheDocument();
     expect(screen.getByText('5m')).toBeInTheDocument();
     // Meta pairs render label + value in a dictionary
     const dl = container.querySelector('dl');
     expect(dl).not.toBeNull();
     expect(dl!.textContent).toContain('Role');
-    expect(dl!.textContent).toContain('acme-print-qa');
+    expect(dl!.textContent).toContain('acme-final-qa');
     // Priority 3 dropped
     expect(screen.queryByText('x')).toBeNull();
     expect(screen.queryByText('Extra')).toBeNull();

@@ -1,6 +1,6 @@
 /**
  * Acme station roles — declares the two roles behind the "perfect form" pair
- * (examples/workflows/acme-stations): `acme-addons` and `acme-print-qa`, each
+ * (examples/workflows/acme-stations): `acme-addons` and `acme-final-qa`, each
  * owning its versioned form_schema.
  *
  * Mirrors seed-rich-form.ts: create the bare role row, then layer the title,
@@ -22,13 +22,13 @@ const ACME_ROLES = [
   {
     role: ACME_ADDONS_ROLE,
     title: 'Addons',
-    description: 'Extrinsic work attached after printing — the custom-work checklist names what each order carries.',
+    description: 'Extrinsic work attached after fabrication — the custom-work checklist names what each widget carries.',
     form_schema: ACME_ADDONS_FORM_SCHEMA,
   },
   {
     role: ACME_QA_ROLE,
-    title: 'Post-print QA',
-    description: 'Post-print inspection — the fixed review ritual and the rejection report.',
+    title: 'Final QA',
+    description: 'Final inspection — the fixed review ritual and the rejection report.',
     form_schema: ACME_QA_FORM_SCHEMA,
   },
 ] as const;

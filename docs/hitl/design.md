@@ -62,7 +62,7 @@ small-caps, light-weight, generously sized; section names you declare in
 
 The shape that makes a resolver fast:
 
-1. **Facts first, as a dictionary** — read-only order facts render as a dense
+1. **Facts first, as a dictionary** — read-only work-item facts render as a dense
    spec sheet (`x-lt-display: "dictionary"`), not as form rows.
 2. **One explicit decision gates the form** — until the outcome is chosen,
    the page shows facts and the decision, nothing else.
@@ -125,20 +125,20 @@ economist: say what to do, to the actor, and stop.
 | Write | In place of |
 |-------|-------------|
 | Pick Reject to file a report | Reject files a report |
-| Confirm each custom item on the piece | Items should be confirmed |
-| Enter the count printed on the traveler | Quantity field |
-| Resolve — the order moves on to post-print QA | When resolved, the order will be moved on |
+| Confirm each custom item on the widget | Items should be confirmed |
+| Enter the count from the work ticket | Quantity field |
+| Resolve — the widget moves on to final QA | When resolved, the widget will be moved on |
 
 - **Every input carries a `title` and one `description` line.** The
   description is the instruction: imperative, actor-addressed, one line.
   Inputs sharing a row should carry instructions of similar length so their
   controls align.
-- **Consequences ride the same sentence.** "Pick Complete to send the order
-  to post-print QA" tells the actor what to do and what happens, in one
+- **Consequences ride the same sentence.** "Pick Complete to send the widget
+  to final QA" tells the actor what to do and what happens, in one
   breath. A second sentence is almost always the start of a paragraph nobody
   reads.
 - **The escalation `description` is a title, not a sentence.** It names the
-  artifact — "Addons — ACME-1042 · ord-8127" — because it becomes the detail
+  artifact — "Addons — ACME-1042 · wgt-8127" — because it becomes the detail
   page's heading and the list's summary line.
 - **The WHY lives in `x-lt-help`.** Reference tables, vocabulary, and
   decision consequences belong in the side panel, in markdown, where the
@@ -146,7 +146,7 @@ economist: say what to do, to the actor, and stop.
   factual; skip the motivation.
 - **Let defaults do the routine work.** Standard confirmations arrive
   pre-checked via `formDefaults` — the resolver unchecks what isn't true.
-  The order's own custom items arrive unchecked; those clicks are the record.
+  The work item's own custom items arrive unchecked; those clicks are the record.
 
 ---
 

@@ -110,7 +110,7 @@ Chroma is spent, not spread.
 
 The reference implementation is `examples/workflows/acme-stations` — mimic it.
 
-1. **Facts first, as a dictionary.** Read-only order facts render as a dense
+1. **Facts first, as a dictionary.** Read-only work-item facts render as a dense
    label/value spec sheet (`x-lt-display: "dictionary"`), not form rows.
 2. **One explicit decision** gates the form. Until it is made the page shows
    facts, the decision, nothing else — even sign-off waits.
@@ -123,7 +123,7 @@ The reference implementation is `examples/workflows/acme-stations` — mimic it.
    them in one cell, the 2×2).
 5. **Checklists**: standard confirmations may arrive pre-checked
    (formDefaults) — the standard is the default and the resolver unchecks
-   what isn't true. The order's own custom work arrives unchecked; those
+   what isn't true. The work item's own custom work arrives unchecked; those
    clicks are the record. `x-lt-require-all` guards completion.
 6. **Every input carries a `title` and one instructional `description`
    line — no input goes without.** The anatomy is fixed and identical for
@@ -139,14 +139,14 @@ The reference implementation is `examples/workflows/acme-stations` — mimic it.
 ## 7. Copy — the economist tone
 
 The escalation `description` is the detail page's title: a short noun
-phrase naming the artifact — "Post-print QA — ACME-1042 · ord-8127" —
+phrase naming the artifact — "Final QA — ACME-1042 · wgt-8127" —
 never a sentence, never an instruction, never a status report.
 
 Say what to do. Speak to the actor, in the imperative, always: "Pick Reject
 to file a report" — never "Reject files a report." The system is never the
 subject of an instruction, and passive voice never appears. One line per
-instruction; consequences ride the same sentence ("Resolve — the order moves
-on to gluing"). Reference tables over paragraphs. Never preachy, never
+instruction; consequences ride the same sentence ("Resolve — the widget moves
+on to assembly"). Reference tables over paragraphs. Never preachy, never
 motivational, never "you're the first human — do well." State what a thing is
 and does, never what it lacks.
 

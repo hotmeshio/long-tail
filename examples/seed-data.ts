@@ -83,7 +83,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeOrder';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeWidget';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -223,29 +223,29 @@ export const SEED_ENVELOPES: Array<{
     },
   },
 
-  // -- Process 7b: Acme Order (the perfect-form pair)
+  // -- Process 7b: Acme Widget (the perfect-form pair)
   {
-    label: 'Process 7b — Acme Order',
-    workflowName: 'acmeOrder',
+    label: 'Process 7b — Acme Widget',
+    workflowName: 'acmeWidget',
     taskQueue: 'long-tail-examples',
     envelope: {
       data: {
         po: 'ACME-1042',
-        orderId: 'ord-8127',
+        widgetId: 'wgt-8127',
         leftQuantity: 2,
         rightQuantity: 2,
-        orthoticType: 'Functional',
-        shoeSize: 'M10',
-        material: 'polymax',
+        widgetType: 'Standard',
+        sizeCode: 'S2',
+        material: 'alloy',
         certified: false,
         addons: [
-          { id: 'wedge_medial', label: 'Wedge — medial, left — verified on the piece' },
-          { id: 'met_pad', label: 'Met pad — standard — verified on the piece' },
+          { id: 'mount_front', label: 'Mount — front, left — verified on the widget' },
+          { id: 'gasket_std', label: 'Gasket — standard — verified on the widget' },
         ],
       },
       metadata: {
         source: 'seed',
-        process: 'acme-order',
+        process: 'acme-widget',
         description: 'The perfect-form pair: dictionary facts, one explicit Choose… decision, linear reveals, pre-checked standard checks beside clickable custom work, and the rejection report.',
       },
     },

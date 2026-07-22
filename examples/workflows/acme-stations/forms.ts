@@ -1,10 +1,10 @@
 /**
  * Acme station interfaces — the reference "perfect form" pair. Two roles own
- * versioned escalation forms for one manufacturing order flow:
+ * versioned escalation forms for one generic two-station fabrication flow:
  *
- *   acme-addons    — extrinsic work attached after printing (the custom-work
- *                    checklist is the centerpiece: named per order, clickable)
- *   acme-print-qa  — post-print inspection (the fixed review ritual and the
+ *   acme-addons    — extrinsic work attached after fabrication (the custom-work
+ *                    checklist is the centerpiece: named per widget, clickable)
+ *   acme-final-qa  — final inspection (the fixed review ritual and the
  *                    rejection report)
  *
  * The form doctrine both schemas follow:
@@ -18,14 +18,14 @@
  *   - Every input carries a `title` and one instructional `description` line.
  *     The WHY lives in `x-lt-help` (the side panel); the form says what to do.
  *   - Common checklist items arrive pre-checked (formDefaults); the custom,
- *     per-order work arrives unchecked — those are the clicks that matter.
+ *     per-widget work arrives unchecked — those are the clicks that matter.
  *   - Sign-off last. Required fields enforce themselves only while visible.
  */
 
 import { z } from 'zod';
 
 export const ACME_ADDONS_ROLE = 'acme-addons';
-export const ACME_QA_ROLE = 'acme-print-qa';
+export const ACME_QA_ROLE = 'acme-final-qa';
 
 /** Form versions the workflow is written against (pinned via schemaVersion). */
 export const ACME_ADDONS_SCHEMA_VERSION = 1;
@@ -84,7 +84,7 @@ export type AcmeQaResolverV1 = z.infer<typeof AcmeQaResolverV1Schema>;
 // Shared fact fields — the work ticket, rendered as a dictionary.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A read-only order fact; renders as a dictionary row via the section option. */
+/** A read-only widget fact; renders as a dictionary row via the section option. */
 function fact(bind: string, title: string, description: string): Record<string, unknown> {
   return {
     type: 'string',
@@ -92,20 +92,20 @@ function fact(bind: string, title: string, description: string): Record<string, 
     readOnly: true,
     default: '',
     'x-lt-bind': bind,
-    'x-lt-section': 'The order',
+    'x-lt-section': 'The widget',
     'x-lt-hide-if-empty': true,
     description,
   };
 }
 
-const ORDER_FACTS: Record<string, Record<string, unknown>> = {
+const WIDGET_FACTS: Record<string, Record<string, unknown>> = {
   po: { ...fact('po', 'PO', 'The customer’s purchase order'), 'x-lt-hide-if-empty': false },
-  orderId: { ...fact('orderId', 'Order', 'The order at this station'), 'x-lt-hide-if-empty': false },
-  leftQuantity: fact('leftQuantity', 'Left Qty', 'Left units in the order'),
-  rightQuantity: fact('rightQuantity', 'Right Qty', 'Right units in the order'),
-  orthoticType: fact('orthoticType', 'Orthotic Type', 'The catalog type'),
-  shoeSize: fact('shoeSize', 'Shoe Size', 'Ticket format: M10 / F8'),
-  material: fact('material', 'Material', 'The printed material'),
+  widgetId: { ...fact('widgetId', 'Widget', 'The widget at this station'), 'x-lt-hide-if-empty': false },
+  leftQuantity: fact('leftQuantity', 'Left Qty', 'Left units in the run'),
+  rightQuantity: fact('rightQuantity', 'Right Qty', 'Right units in the run'),
+  widgetType: fact('widgetType', 'Widget Type', 'The catalog type'),
+  sizeCode: fact('sizeCode', 'Size', 'The catalog size code'),
+  material: fact('material', 'Material', 'The stock material'),
   certified: fact('certified', 'Certified', 'Certified handling rules apply when true'),
 };
 
@@ -118,25 +118,25 @@ export const ACME_ADDONS_FORM_SCHEMA = {
   // No schema title: the escalation's own name is the page title.
   'x-lt-layout': 'two-column',
   'x-lt-section-options': {
-    'The order': { display: 'dictionary', columns: 2 },
+    'The widget': { display: 'dictionary', columns: 2 },
   },
   'x-lt-help': [
     '### Addons',
     '',
-    'The catalog policy routed this order here: it carries extrinsic work — postings, pads, components — attached after printing, before gluing.',
+    'The catalog policy routed this widget here: it carries extrinsic work — fittings, mounts, components — attached after fabrication, before assembly.',
     '',
-    '**Custom work — this order** names exactly what it carries. The facts carry the angles and values.',
+    '**Custom work — this widget** names exactly what it carries. The facts carry the specs and values.',
     '',
-    'Done: set **Outcome → Complete**, confirm each custom item on the piece, Resolve — the order moves on to post-print QA.',
+    'Done: set **Outcome → Complete**, confirm each custom item on the widget, Resolve — the widget moves on to final QA.',
     '',
     'Problem: set **Outcome → Reject** — check the reasons, describe what you see, pick the destination, attach a photo. Resolve to send the report to the manager’s review.',
     '',
-    '**The facts on this item** — the side panel’s Metadata view carries the order’s work facts. Hover any value to find every order that shares it.',
+    '**The facts on this item** — the side panel’s Metadata view carries the widget’s work facts. Hover any value to find every widget that shares it.',
   ].join('\n'),
   'x-lt-order': [
-    'po', 'orderId',
+    'po', 'widgetId',
     'leftQuantity', 'rightQuantity',
-    'orthoticType', 'material',
+    'widgetType', 'material',
     'outcome',
     'checks',
     'customChecks',
@@ -147,12 +147,12 @@ export const ACME_ADDONS_FORM_SCHEMA = {
   ],
   required: ['outcome', 'rejectReasons', 'rejectReason'],
   properties: {
-    po: ORDER_FACTS.po,
-    orderId: ORDER_FACTS.orderId,
-    leftQuantity: ORDER_FACTS.leftQuantity,
-    rightQuantity: ORDER_FACTS.rightQuantity,
-    orthoticType: ORDER_FACTS.orthoticType,
-    material: ORDER_FACTS.material,
+    po: WIDGET_FACTS.po,
+    widgetId: WIDGET_FACTS.widgetId,
+    leftQuantity: WIDGET_FACTS.leftQuantity,
+    rightQuantity: WIDGET_FACTS.rightQuantity,
+    widgetType: WIDGET_FACTS.widgetType,
+    material: WIDGET_FACTS.material,
     // ── The decision — one explicit choice; the form waits on it ──
     outcome: {
       type: 'string',
@@ -162,18 +162,18 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-span': 2,
       'x-lt-bind': 'outcome',
       'x-lt-section': 'The decision',
-      description: 'Pick Complete to send the order to post-print QA; pick Reject to file a report',
+      description: 'Pick Complete to send the widget to final QA; pick Reject to file a report',
     },
     // ── Complete: the standard ritual (arrives pre-checked) + the custom work ──
     checks: {
       type: 'object',
-      title: 'Every order',
+      title: 'Every widget',
       'x-lt-widget': 'checklist',
       'x-lt-source': 'envelope.checklist_items',
       'x-lt-require-all': true,
       'x-lt-span': 2,
       'x-lt-bind': 'checks',
-      'x-lt-section': 'Fixed review — every order',
+      'x-lt-section': 'Fixed review — every widget',
       'x-lt-showIf': 'resolver.outcome=Complete',
       description: 'Uncheck anything that is not true — the standard arrives confirmed',
     },
@@ -185,9 +185,9 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-require-all': true,
       'x-lt-span': 2,
       'x-lt-bind': 'customChecks',
-      'x-lt-section': 'Custom work — this order',
+      'x-lt-section': 'Custom work — this widget',
       'x-lt-showIf': 'resolver.outcome=Complete',
-      description: 'Confirm each item on the piece — this is what the order carries beyond the standard',
+      description: 'Confirm each item on the widget — this is what it carries beyond the standard',
     },
     // ── Reject: the report (fades in with the choice) ──
     rejectReasons: {
@@ -218,12 +218,12 @@ export const ACME_ADDONS_FORM_SCHEMA = {
     sendBackTo: {
       type: 'string',
       title: 'Send back to',
-      enum: ['Printing', 'Design'],
-      default: 'Printing',
+      enum: ['Fabrication', 'Design'],
+      default: 'Fabrication',
       'x-lt-bind': 'report.sendBackTo',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Pick Printing to remake it, or Design to return it to the designer',
+      description: 'Pick Fabrication to remake it, or Design to return it to the designer',
     },
     rejectPhoto: {
       type: 'string',
@@ -253,40 +253,40 @@ export const ACME_ADDONS_FORM_SCHEMA = {
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The POST-PRINT QA form — the fixed review ritual and the rejection report.
+// The FINAL QA form — the fixed review ritual and the rejection report.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ACME_QA_FORM_SCHEMA = {
   type: 'object',
   'x-lt-layout': 'two-column',
   'x-lt-section-options': {
-    'The order': { display: 'dictionary', columns: 2 },
+    'The widget': { display: 'dictionary', columns: 2 },
   },
   'x-lt-help': [
-    '### Post-print inspection',
+    '### Final inspection',
     '',
-    'Match the prints to the facts on this item: counts, sides, material. Then work the checklist.',
+    'Match the widgets to the facts on this item: counts, sides, material. Then work the checklist.',
     '',
     '| Look for | It looks like |',
     '|---|---|',
-    '| Strings & burrs | Wisps on the surface — the most common reject |',
-    '| Layer separation | A seam you can catch a fingernail on |',
-    '| Warping | The piece rocks on a flat table |',
+    '| Burrs & rough edges | Roughness at the seams — the most common reject |',
+    '| Seam separation | A gap you can catch a fingernail on |',
+    '| Warping | The widget rocks on a flat table |',
     '| Incomplete fill | Light shows through where it shouldn’t |',
-    '| Wrong material | Certified orders must match the spool tag |',
+    '| Wrong material | Certified widgets must match the stock tag |',
     '',
-    'Pass: set **Outcome → Pass**, complete the checklist, Resolve — the order moves on to gluing.',
+    'Pass: set **Outcome → Pass**, complete the checklist, Resolve — the widget moves on to assembly.',
     '',
-    'Problem: set **Outcome → Reject** — reasons, description, counts (max {{envelope.maxRejectLeft}} left · {{envelope.maxRejectRight}} right — the order’s own quantities), destination, photo.',
+    'Problem: set **Outcome → Reject** — reasons, description, counts (max {{envelope.maxRejectLeft}} left · {{envelope.maxRejectRight}} right — the run’s own quantities), destination, photo.',
     '',
-    'Resolve to send the report to the manager’s review; the verdict moves the order.',
+    'Resolve to send the report to the manager’s review; the verdict moves the widget.',
     '',
-    '**The facts on this item** — the side panel’s Metadata view carries the order’s work facts. Hover any value to find every order that shares it.',
+    '**The facts on this item** — the side panel’s Metadata view carries the widget’s work facts. Hover any value to find every widget that shares it.',
   ].join('\n'),
   'x-lt-order': [
-    'po', 'orderId',
+    'po', 'widgetId',
     'leftQuantity', 'rightQuantity',
-    'orthoticType', 'shoeSize',
+    'widgetType', 'sizeCode',
     'material', 'certified',
     'outcome',
     'checks',
@@ -299,14 +299,14 @@ export const ACME_QA_FORM_SCHEMA = {
   ],
   required: ['outcome', 'rejectReasons', 'rejectReason'],
   properties: {
-    po: ORDER_FACTS.po,
-    orderId: ORDER_FACTS.orderId,
-    leftQuantity: ORDER_FACTS.leftQuantity,
-    rightQuantity: ORDER_FACTS.rightQuantity,
-    orthoticType: ORDER_FACTS.orthoticType,
-    shoeSize: ORDER_FACTS.shoeSize,
-    material: ORDER_FACTS.material,
-    certified: ORDER_FACTS.certified,
+    po: WIDGET_FACTS.po,
+    widgetId: WIDGET_FACTS.widgetId,
+    leftQuantity: WIDGET_FACTS.leftQuantity,
+    rightQuantity: WIDGET_FACTS.rightQuantity,
+    widgetType: WIDGET_FACTS.widgetType,
+    sizeCode: WIDGET_FACTS.sizeCode,
+    material: WIDGET_FACTS.material,
+    certified: WIDGET_FACTS.certified,
     // ── The decision ──
     outcome: {
       type: 'string',
@@ -316,7 +316,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-span': 2,
       'x-lt-bind': 'outcome',
       'x-lt-section': 'The decision',
-      description: 'Pick Pass to send the order to gluing; pick Reject to file a report',
+      description: 'Pick Pass to send the widget to assembly; pick Reject to file a report',
     },
     // ── Pass: the inspection ritual ──
     checks: {
@@ -327,9 +327,9 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-require-all': true,
       'x-lt-span': 2,
       'x-lt-bind': 'checks',
-      'x-lt-section': 'Fixed review — every order',
+      'x-lt-section': 'Fixed review — every widget',
       'x-lt-showIf': 'resolver.outcome=Pass',
-      description: 'Confirm each on the physical prints — not from memory',
+      description: 'Confirm each on the physical widgets — not from memory',
     },
     // ── Reject: the report ──
     rejectReasons: {
@@ -386,12 +386,12 @@ export const ACME_QA_FORM_SCHEMA = {
     sendBackTo: {
       type: 'string',
       title: 'Send back to',
-      enum: ['Printing', 'Addons', 'Design'],
-      default: 'Printing',
+      enum: ['Fabrication', 'Addons', 'Design'],
+      default: 'Fabrication',
       'x-lt-bind': 'report.sendBackTo',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Pick Printing to remake it, or Design to return it to the designer',
+      description: 'Pick Fabrication to remake it, or Design to return it to the designer',
     },
     rejectPhoto: {
       type: 'string',
