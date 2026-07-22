@@ -11,18 +11,20 @@
  * data-theme selectors on specificity, so source order decides the winner.
  */
 @layer base {
+  /* The value discipline (Midnight's, inverted): surfaces stay near-neutral —
+   * paper with a whisper of the theme hue — so the saturated accent appears
+   * only in small doses (links, buttons, checks, section labels) and every
+   * callout pops against a quiet field. Chroma never lands on large bands. */
   :root,
   [data-theme='blue'] {
     --lt-accent: 37 99 235;           /* electric blue #2563EB */
     --lt-accent-hover: 29 78 216;     /* #1D4ED8 */
     --lt-accent-muted: 147 197 253;   /* #93C5FD */
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
-    --lt-surface-hover: 239 246 255;  /* #EFF6FF */
-    --lt-surface-sunken: 235 243 255; /* #EBF3FF */
+    --lt-surface-hover: 244 247 251;  /* #F4F7FB */
+    --lt-surface-sunken: 240 244 250; /* #F0F4FA */
     --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
-    /* Chrome (borders, hovers, sunken bands) carries the theme chroma; the
-     * text ramp is the shared neutral in :root so labels read black. */
-    --lt-surface-border: 166 196 245; /* #A6C4F5 — visible blue rule */
+    --lt-surface-border: 208 217 231; /* #D0D9E7 */
   }
 
   /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
@@ -37,10 +39,10 @@
     --lt-accent-hover: 98 41 190;     /* #6229BE */
     --lt-accent-muted: 187 156 239;   /* #BB9CEF */
     --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
-    --lt-surface-hover: 246 241 253;  /* #F6F1FD */
-    --lt-surface-sunken: 242 237 250; /* #F2EDFA */
+    --lt-surface-hover: 246 245 250;  /* #F6F5FA */
+    --lt-surface-sunken: 242 241 248; /* #F2F1F8 */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
-    --lt-surface-border: 210 191 240; /* #D2BFF0 */
+    --lt-surface-border: 215 210 228; /* #D7D2E4 */
   }
 
   [data-theme='red'] {
@@ -48,10 +50,10 @@
     --lt-accent-hover: 179 42 34;     /* #B32A22 */
     --lt-accent-muted: 236 154 147;   /* #EC9A93 */
     --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
-    --lt-surface-hover: 252 241 239;  /* #FCF1EF */
-    --lt-surface-sunken: 249 236 233; /* #F9ECE9 */
+    --lt-surface-hover: 250 246 245;  /* #FAF6F5 */
+    --lt-surface-sunken: 247 242 241; /* #F7F2F1 */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
-    --lt-surface-border: 233 194 188; /* #E9C2BC */
+    --lt-surface-border: 226 211 208; /* #E2D3D0 */
   }
 
   [data-theme='green'] {
@@ -59,10 +61,10 @@
     --lt-accent-hover: 15 118 55;     /* #0F7637 */
     --lt-accent-muted: 74 222 128;    /* #4ADE80 */
     --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
-    --lt-surface-hover: 240 253 244;  /* #F0FDF4 */
-    --lt-surface-sunken: 220 252 231; /* #DCFCE7 */
+    --lt-surface-hover: 244 249 246;  /* #F4F9F6 */
+    --lt-surface-sunken: 239 246 241; /* #EFF6F1 */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
-    --lt-surface-border: 110 206 148; /* #6ECE94 */
+    --lt-surface-border: 205 223 211; /* #CDDFD3 */
   }
 
   [data-theme='rose'] {
@@ -70,10 +72,10 @@
     --lt-accent-hover: 219 39 119;    /* #DB2777 */
     --lt-accent-muted: 249 168 212;   /* #F9A8D4 */
     --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
-    --lt-surface-hover: 253 242 248;  /* #FDF2F8 */
-    --lt-surface-sunken: 251 228 241; /* #FBE4F1 */
+    --lt-surface-hover: 250 246 248;  /* #FAF6F8 */
+    --lt-surface-sunken: 247 241 244; /* #F7F1F4 */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
-    --lt-surface-border: 244 173 214; /* #F4ADD6 */
+    --lt-surface-border: 228 209 218; /* #E4D1DA */
   }
 
   [data-theme='orange'] {
@@ -81,10 +83,10 @@
     --lt-accent-hover: 234 88 12;     /* #EA580C */
     --lt-accent-muted: 254 215 170;   /* #FED7AA */
     --lt-accent-faint: 255 247 237;   /* #FFF7ED */
-    --lt-surface-hover: 255 251 247;  /* barely warm white */
-    --lt-surface-sunken: 255 248 240; /* #FFF8F0 */
+    --lt-surface-hover: 250 247 244;  /* #FAF7F4 */
+    --lt-surface-sunken: 247 243 238; /* #F7F3EE */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
-    --lt-surface-border: 254 215 170; /* #FED7AA */
+    --lt-surface-border: 228 216 202; /* #E4D8CA */
   }
 
   /* Structural tokens (hue-independent). Every color, size, and spacing knob
