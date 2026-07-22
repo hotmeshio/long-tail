@@ -75,9 +75,10 @@ function midEllipsis(s: string, maxLen = 37): string {
   return `${s.slice(0, keep)}...${s.slice(-keep)}`;
 }
 
-/** Consistent console row for all execution lists — the title takes whatever
- *  width the container gives it (flex-1 min-w-0 + truncate), so the same row
- *  reads clean in a half column, a quarter column, or full width. */
+/** Consistent console row for all execution lists. The COLUMN is the
+ *  container: with room (@dict-inline) the date shares the id line; in a
+ *  tight half column it drops below beside the pill — the row condenses,
+ *  the pair of columns never stacks. */
 function ExecutionRow({ dot, pill, id, date, onClick }: {
   dot: string;
   pill: React.ReactNode;
@@ -90,26 +91,34 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
       <div className="flex items-center gap-2 mb-0.5">
         <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${dot}`} />
         <span className="text-xs text-text-primary font-mono truncate flex-1 min-w-0">{midEllipsis(id)}</span>
-        <span className="text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
+        <span className="hidden @dict-inline:inline text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
       </div>
-      <div className="pl-3.5 flex items-center gap-1 overflow-hidden">{pill}</div>
+      <div className="pl-3.5 flex items-center gap-1 overflow-hidden">
+        {pill}
+        <span className="flex-1 min-w-0" />
+        <span className="@dict-inline:hidden text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
+      </div>
     </button>
   );
 }
 
-/** Console row for the escalation firehose lists — same scaling law. */
+/** Console row for the escalation firehose lists — same condensing law.
+ *  The workflow pill is enrichment (the column budget): it returns when the
+ *  column has room; the floor is priority, title, role, age. */
 function EscalationRow({ esc, onClick }: { esc: any; onClick: () => void }) {
+  const date = <DateValue date={esc.updated_at ?? esc.created_at} />;
   return (
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
         <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
         <span className="text-xs text-text-primary truncate flex-1 min-w-0">{esc.description || esc.subtype || esc.type}</span>
-        <span className="text-2xs text-text-quaternary shrink-0"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
+        <span className="hidden @dict-inline:inline text-2xs text-text-quaternary shrink-0">{date}</span>
       </div>
       <div className="flex items-center gap-2 pl-5 overflow-hidden">
-        <WorkflowPill type={esc.type || 'unknown'} size="xs" />
+        <span className="hidden @dict-inline:inline-flex min-w-0"><WorkflowPill type={esc.type || 'unknown'} size="xs" /></span>
         <span className="flex-1 min-w-0" />
         <RolePill role={esc.role} />
+        <span className="@dict-inline:hidden text-2xs text-text-quaternary shrink-0">{date}</span>
       </div>
     </button>
   );
@@ -262,7 +271,7 @@ export function HomePage() {
   // engineer layout below and the superadmin Row 2). Defined once so the JSX
   // has a single source of truth.
   const proceduralColumn = (
-    <div>
+    <div className="@container min-w-0">
       <SectionHeader icon={Code2} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:procedural-executions" actions={
         <div className="flex items-center gap-2">
           <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
@@ -292,7 +301,7 @@ export function HomePage() {
   );
 
   const graphColumn = (
-    <div>
+    <div className="@container min-w-0">
       <SectionHeader icon={Workflow} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:graph-executions" actions={
         <div className="flex items-center gap-2">
           <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
@@ -335,17 +344,18 @@ export function HomePage() {
   // ── Builder home. Admin/superadmin: escalations left|right, Pace Board full
   //    width beneath — the operational story in two rows. Engineer: a 2×2
   //    console — escalations up top, the workflow execution columns below.
-  //    Every grid follows the CONTAINER (@split), so each layout folds to one
-  //    clean column when a panel narrows it.
+  //    The pairs stay side by side at EVERY width — the pair IS the console.
+  //    Each COLUMN is a container: its rows condense (date drops below, the
+  //    enrichment pill yields) when the column narrows, and the pair holds.
   return (
     <div>
       <h1 className="heading-1 mb-10">Recent Activity</h1>
 
       {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
-      <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap gap-y-10">
+      <div className="grid grid-cols-2 gap-x-4 @split:gap-x-col-gap">
 
         {/* Col 1: All Escalations */}
-        <div>
+        <div className="@container min-w-0">
           <SectionHeader icon={Inbox} color="text-accent" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
@@ -366,7 +376,7 @@ export function HomePage() {
         </div>
 
         {/* Col 2: My Escalations */}
-        <div>
+        <div className="@container min-w-0">
           <SectionHeader icon={Inbox} color="text-accent" count={myEscTotal} docsHash="#docs:dashboard.md:escalations-overview" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => myEscQ.refetch()} isFetching={myEscQ.isFetching} apiPath={`/escalations?assigned_to=${user?.userId ?? ''}&status=pending&limit=5&sort_by=created_at&order=desc`} />
@@ -387,8 +397,8 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* ── Row 2 (admin/superadmin): the Pace Board, full width. The chart is
-          the story being told — the whole line at a glance. */}
+      {/* ── Row 2 (admin/superadmin): the Pace Board — 100% width, half the
+          viewport tall. The chart is the story; this is the space it earns. */}
       {persona.canSeePaceBoard && (
         <div className="mt-14">
           <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
@@ -399,7 +409,7 @@ export function HomePage() {
           {paceStations.length === 0 ? (
             <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
           ) : (
-            <div className="h-80 cursor-pointer" onClick={() => navigate('/operations')}>
+            <div className="h-[50vh] cursor-pointer" onClick={() => navigate('/operations')}>
               <PaceChart
                 stations={paceStations}
                 selectedRole={null}
@@ -412,9 +422,10 @@ export function HomePage() {
         </div>
       )}
 
-      {/* ── Row 2 (engineer): Procedural | Graph — the lower half of the 2×2. */}
+      {/* ── Row 2 (engineer): Procedural | Graph — the lower half of the 2×2,
+          side by side at every width like the row above. */}
       {showWorkflowColumns && (
-        <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap gap-y-10 mt-14">
+        <div className="grid grid-cols-2 gap-x-4 @split:gap-x-col-gap mt-14">
           {proceduralColumn}
           {graphColumn}
         </div>
