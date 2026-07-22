@@ -81,6 +81,18 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Forces the expanded presentation inside its subtree — the nav DRAWER always
+ * shows labels, whatever the rail's collapsed state says.
+ */
+export function SidebarExpandedScope({ children }: { children: ReactNode }) {
+  return (
+    <SidebarContext.Provider value={{ collapsed: false, toggle: () => {} }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+}
+
 export function useSidebar(): SidebarContextValue {
   const ctx = useContext(SidebarContext);
   if (!ctx) throw new Error('useSidebar must be used within SidebarProvider');

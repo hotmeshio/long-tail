@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { ShellNavSections, type ShellNavSectionsProps } from './ShellNavSections';
+import { SidebarExpandedScope } from '../../hooks/useSidebar';
 
 /**
  * The below-lg navigation drawer — the left mirror of the DocsDrawer pattern.
@@ -42,7 +43,10 @@ export function NavDrawer({ open, onClose, ...nav }: {
           </button>
         </div>
         <nav className="flex-1 px-3 pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-          <ShellNavSections {...nav} />
+          {/* The drawer is always the expanded nav — labels, never bare icons. */}
+          <SidebarExpandedScope>
+            <ShellNavSections {...nav} />
+          </SidebarExpandedScope>
         </nav>
       </div>
     </div>
