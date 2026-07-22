@@ -111,7 +111,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           <Link
             to="/"
             aria-label="Home"
-            className="overflow-hidden shrink-0"
+            className="shrink-0"
             onClick={(e) => {
               if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
