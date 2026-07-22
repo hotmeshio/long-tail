@@ -24,9 +24,15 @@ swatches, and overlay scrims.
 
 Chroma is spent, not spread.
 
-- **Surfaces are near-neutral.** Hover fills, sunken section bands, and
-  borders carry only a whisper of the theme hue. Chroma never lands on a
-  large rectangle — a colored slab makes every real accent invisible.
+- **Surfaces are near-neutral.** Hover fills, section bands, and borders
+  carry only a whisper of the theme hue. Chroma never lands on a large
+  rectangle — a colored slab makes every real accent invisible.
+- **One elevation logic, both polarities.** The page carries the base wash
+  (a light theme tint by day, the deep shade at night); sections and sheets
+  are distinct surfaces on it (white paper by day, the deeper well at
+  night); fields are wells that step AWAY from their surface (darker than
+  white by day, lighter than the shade at night). Light is Midnight
+  inverted — never a flat white page with white sections.
 - **The accent appears in small doses**: links, buttons, checks, pills,
   section labels, focus states. Because it is scarce, it reads as "act here."
 - **Dark themes are the same principle, inverted** — near-black neutral

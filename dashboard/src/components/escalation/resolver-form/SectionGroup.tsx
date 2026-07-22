@@ -59,10 +59,10 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
   return (
     <div
       className={name
-        // Sections sit on the sunken band — a shade DARKER than the field
-        // fill, so embedded inputs pop against the group the same way they
-        // pop against the filter bars. Theme-driven, never a hardcoded hex.
-        ? 'border border-surface-border/60 border-l-2 border-l-accent/30 bg-surface-sunken/80 rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
+        // Sections are distinct surfaces on the page wash — white paper in
+        // light themes, the deeper well at night — with field wells stepping
+        // away from them. Theme-driven, never a hardcoded hex.
+        ? 'border border-surface-border/60 border-l-2 border-l-accent/30 bg-surface-sunken rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
         : ''}
     >
       {name && (
