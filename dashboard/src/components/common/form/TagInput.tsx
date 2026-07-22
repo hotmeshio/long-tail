@@ -43,7 +43,7 @@ export function TagInput({ tags, onChange, placeholder = 'Add tag...', compact }
       className={
         compact
           ? 'flex flex-wrap items-center gap-1.5'
-          : 'flex flex-wrap items-center gap-1.5 bg-surface-sunken border border-surface-border rounded-md px-2 py-1.5 focus-within:ring-1 focus-within:ring-accent-primary cursor-text'
+          : 'flex flex-wrap items-center gap-1.5 bg-surface-field border border-surface-field-border rounded-[var(--lt-radius-field)] px-2 py-1.5 focus-within:border-accent transition-colors cursor-text'
       }
       onClick={() => inputRef.current?.focus()}
     >

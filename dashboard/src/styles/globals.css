@@ -20,13 +20,9 @@
     --lt-surface-hover: 239 246 255;  /* #EFF6FF */
     --lt-surface-sunken: 235 243 255; /* #EBF3FF */
     --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
-    /* Tinted neutrals carry real electric-blue chroma (matched to the vivid
-     * rose theme) so labels, helper text, and lines read blue — not gray. */
-    --lt-surface-border: 166 196 245; /* #A6C4F5 — visible blue underline */
-    --lt-text-primary: 10 16 38;      /* #0A1026 */
-    --lt-text-secondary: 28 64 176;   /* #1C40B0 — electric-blue labels */
-    --lt-text-tertiary: 58 102 214;   /* #3A66D6 — vivid, not washed */
-    --lt-text-quaternary: 110 147 230;/* #6E93E6 */
+    /* Chrome (borders, hovers, sunken bands) carries the theme chroma; the
+     * text ramp is the shared neutral in :root so labels read black. */
+    --lt-surface-border: 166 196 245; /* #A6C4F5 — visible blue rule */
   }
 
   /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
@@ -45,10 +41,6 @@
     --lt-surface-sunken: 242 237 250; /* #F2EDFA */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
     --lt-surface-border: 210 191 240; /* #D2BFF0 */
-    --lt-text-primary: 18 6 41;       /* #120629 */
-    --lt-text-secondary: 62 44 99;    /* #3E2C63 */
-    --lt-text-tertiary: 117 101 158;  /* #75659E — 5.1:1 on white */
-    --lt-text-quaternary: 141 126 178;/* #8D7EB2 — 3.6:1, large/meta only */
   }
 
   [data-theme='red'] {
@@ -60,10 +52,6 @@
     --lt-surface-sunken: 249 236 233; /* #F9ECE9 */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
     --lt-surface-border: 233 194 188; /* #E9C2BC */
-    --lt-text-primary: 41 10 7;       /* #290A07 */
-    --lt-text-secondary: 102 59 52;   /* #663B34 */
-    --lt-text-tertiary: 140 100 92;   /* #8C645C — 5.1:1 on white */
-    --lt-text-quaternary: 168 122 113;/* #A87A71 — 3.7:1, large/meta only */
   }
 
   [data-theme='green'] {
@@ -75,10 +63,6 @@
     --lt-surface-sunken: 220 252 231; /* #DCFCE7 */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
     --lt-surface-border: 110 206 148; /* #6ECE94 */
-    --lt-text-primary: 2 44 26;       /* #022C1A */
-    --lt-text-secondary: 20 83 45;    /* #14532D */
-    --lt-text-tertiary: 15 118 55;    /* #0F7637 — 5.7:1 (was #16A34A at 3.3:1) */
-    --lt-text-quaternary: 58 148 88;  /* #3A9458 — 3.8:1, large/meta only */
   }
 
   [data-theme='rose'] {
@@ -90,10 +74,6 @@
     --lt-surface-sunken: 251 228 241; /* #FBE4F1 */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
     --lt-surface-border: 244 173 214; /* #F4ADD6 */
-    --lt-text-primary: 60 8 37;       /* #3C0825 */
-    --lt-text-secondary: 131 24 67;   /* #831843 */
-    --lt-text-tertiary: 190 24 93;    /* #BE185D */
-    --lt-text-quaternary: 216 90 143; /* #D85A8F */
   }
 
   [data-theme='orange'] {
@@ -105,10 +85,6 @@
     --lt-surface-sunken: 255 248 240; /* #FFF8F0 */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
     --lt-surface-border: 254 215 170; /* #FED7AA */
-    --lt-text-primary: 12 8 3;        /* near-black warm */
-    --lt-text-secondary: 124 45 18;   /* #7C2D12 */
-    --lt-text-tertiary: 154 80 35;    /* #9A5023 — 5.9:1 on white */
-    --lt-text-quaternary: 180 115 66; /* #B47342 — 3.9:1, large/meta only */
   }
 
   /* Structural tokens (hue-independent). Every color, size, and spacing knob
@@ -117,7 +93,7 @@
    * restyle the entire product — including dark themes — with zero source
    * changes. Themes override any of these under their [data-theme] block. */
   :root {
-    --lt-radius-field: 0.125rem;   /* 2px — the soft enclosure on every field */
+    --lt-radius-field: 0.1875rem;  /* 3px — the visibly-soft corner on every field */
 
     /* Native form-control rendering. Dark themes set this to `dark` so
        scrollbars, date pickers, and checkboxes follow the surface. */
@@ -131,6 +107,15 @@
     /* Headings — near-black in every light theme so titles anchor the page
        (12.6:1 on white); dark themes override with a light value. */
     --lt-heading: 51 51 51;             /* #333333 */
+
+    /* Text ramp — one neutral near-black ramp shared by every light theme.
+       Copy and labels read black; ONLY interactive elements (links, buttons,
+       pills) carry the accent, so a label is never mistaken for a link.
+       Dark themes override with a light ramp. */
+    --lt-text-primary: 23 23 23;        /* #171717 */
+    --lt-text-secondary: 55 55 55;      /* #373737 — labels */
+    --lt-text-tertiary: 100 100 100;    /* #646464 — 5.9:1 helper text */
+    --lt-text-quaternary: 140 140 140;  /* #8C8C8C — 3.4:1, large/meta only */
 
     /* Status family — text-safe values, ≥4.5:1 on the light surface.
        The -graphic variants keep the traditional brighter hues for dots,
