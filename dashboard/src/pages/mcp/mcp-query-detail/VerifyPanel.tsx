@@ -69,7 +69,7 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
 
   return (
     <div>
-      <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Verify</h2>
+      <h2 className="heading-2 mb-1">Verify</h2>
       <p className="text-base text-text-secondary mb-6">
         Submit the original prompt through the router to verify that
         <span className="font-mono text-text-primary mx-1">{workflowName}</span>

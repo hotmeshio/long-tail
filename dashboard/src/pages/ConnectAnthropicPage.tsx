@@ -70,7 +70,7 @@ export function ConnectAnthropicPage() {
 
         <div className="flex items-center gap-2 mb-6">
           <OAuthIcon provider="anthropic" className="w-6 h-6" />
-          <h2 className="text-lg font-semibold text-text-primary">
+          <h2 className="heading-3">
             Connect Anthropic
           </h2>
         </div>

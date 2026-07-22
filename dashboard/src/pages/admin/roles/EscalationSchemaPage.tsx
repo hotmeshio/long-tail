@@ -109,7 +109,7 @@ export function EscalationSchemaPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <Braces className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
-        <h2 className="text-lg font-medium text-text-primary mb-2">Role not found</h2>
+        <h2 className="heading-3 mb-2">Role not found</h2>
       </div>
     );
   }
@@ -121,7 +121,7 @@ export function EscalationSchemaPage() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <Braces className="w-5 h-5 text-accent" strokeWidth={1.5} />
-            <h1 className="text-lg font-medium text-text-primary">Escalation Schema</h1>
+            <h1 className="heading-3">Escalation Schema</h1>
             <button
               onClick={() => { window.location.hash = '#docs:dashboard.md:escalation-schema'; }}
               className="text-text-quaternary hover:text-accent transition-colors"

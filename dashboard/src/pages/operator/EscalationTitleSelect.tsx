@@ -54,7 +54,7 @@ export function EscalationTitleSelect({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex items-center gap-2 min-w-0 text-3xl font-light text-text-primary hover:text-accent transition-colors"
+        className="group flex items-center gap-2 min-w-0 heading-1 hover:text-accent transition-colors"
       >
         <span className="truncate">{current}</span>
         <ChevronDown

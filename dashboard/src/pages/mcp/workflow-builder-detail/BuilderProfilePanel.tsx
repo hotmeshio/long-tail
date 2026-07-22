@@ -57,7 +57,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
 
   return (
     <div>
-      <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Profile</h2>
+      <h2 className="heading-2 mb-1">Profile</h2>
       <p className="text-base text-text-secondary mb-6">
         Name the MCP server and tool, add tags for discovery, and describe what this pipeline does.
       </p>

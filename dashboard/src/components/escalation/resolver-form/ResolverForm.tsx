@@ -186,7 +186,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
       {(schemaTitle || (hasAuthoredHelp && onOpenHelp)) && (
         <div className="mb-1 flex items-center gap-1.5">
           {schemaTitle && (
-            <h3 className="text-lg font-medium text-text-primary">{schemaTitle}</h3>
+            <h3 className="heading-3">{schemaTitle}</h3>
           )}
           {hasAuthoredHelp && onOpenHelp && (
             <button

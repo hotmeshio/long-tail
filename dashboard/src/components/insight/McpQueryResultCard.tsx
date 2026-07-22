@@ -50,7 +50,7 @@ export function McpQueryResultCard({ result }: McpQueryResultCardProps) {
   return (
     <div className="mt-10">
       {/* Title */}
-      <h3 className="text-xl font-medium text-text-primary">
+      <h3 className="heading-3">
         {result.title || 'Done'}
       </h3>
 

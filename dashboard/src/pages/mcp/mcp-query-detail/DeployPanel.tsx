@@ -170,7 +170,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
       <div className="min-w-0 overflow-hidden">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Deploy</h2>
+            <h2 className="heading-2 mb-1">Deploy</h2>
             <p className="text-base text-text-secondary">
               Review and edit the workflow definition. Re/deploy when ready.
             </p>

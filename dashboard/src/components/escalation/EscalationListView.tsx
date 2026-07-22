@@ -139,7 +139,7 @@ function ActiveCard({ esc, card, onOpen }: {
     <div>
       <div className="flex items-start justify-between gap-6">
         <button onClick={onOpen} className="text-left group min-w-0">
-          <h3 className="text-2xl font-light text-text-primary group-hover:text-accent transition-colors leading-tight">
+          <h3 className="heading-2 group-hover:text-accent transition-colors leading-tight">
             {title}
           </h3>
           {card.subtitle && (

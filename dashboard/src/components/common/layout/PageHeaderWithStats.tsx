@@ -26,7 +26,7 @@ export function PageHeaderWithStats({
     <div className="flex items-baseline justify-between mb-10">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-light text-text-primary">{title}</h1>
+          <h1 className="heading-1">{title}</h1>
           {docsHash && (
             <button
               onClick={() => { window.location.hash = docsHash; }}

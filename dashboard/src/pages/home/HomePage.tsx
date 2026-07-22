@@ -308,7 +308,7 @@ export function HomePage() {
   if (persona.showTaskQueueCards) {
     return (
       <div>
-        <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
+        <h1 className="heading-1 mb-10">Recent Activity</h1>
         <TaskQueueCards maxRows={2} />
       </div>
     );
@@ -319,7 +319,7 @@ export function HomePage() {
   //    superadmin). Engineers see everything here except the Pace Board.
   return (
     <div>
-      <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
+      <h1 className="heading-1 mb-10">Recent Activity</h1>
 
       {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 min-h-[35vh]">

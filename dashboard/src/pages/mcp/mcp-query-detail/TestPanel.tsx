@@ -176,7 +176,7 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
       <div className="min-w-0 overflow-hidden">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Test</h2>
+            <h2 className="heading-2 mb-1">Test</h2>
             <p className="text-base text-text-secondary">
               {builderMode
                 ? 'Run the pipeline with test inputs and review the results.'

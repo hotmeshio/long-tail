@@ -27,7 +27,6 @@
     --lt-text-secondary: 28 64 176;   /* #1C40B0 — electric-blue labels */
     --lt-text-tertiary: 58 102 214;   /* #3A66D6 — vivid, not washed */
     --lt-text-quaternary: 110 147 230;/* #6E93E6 */
-    --lt-heading: 29 78 216;          /* #1D4ED8 */
   }
 
   /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
@@ -50,7 +49,6 @@
     --lt-text-secondary: 62 44 99;    /* #3E2C63 */
     --lt-text-tertiary: 117 101 158;  /* #75659E — 5.1:1 on white */
     --lt-text-quaternary: 141 126 178;/* #8D7EB2 — 3.6:1, large/meta only */
-    --lt-heading: 98 36 184;          /* #6224B8 */
   }
 
   [data-theme='red'] {
@@ -66,7 +64,6 @@
     --lt-text-secondary: 102 59 52;   /* #663B34 */
     --lt-text-tertiary: 140 100 92;   /* #8C645C — 5.1:1 on white */
     --lt-text-quaternary: 168 122 113;/* #A87A71 — 3.7:1, large/meta only */
-    --lt-heading: 173 33 25;          /* #AD2119 */
   }
 
   [data-theme='green'] {
@@ -82,7 +79,6 @@
     --lt-text-secondary: 20 83 45;    /* #14532D */
     --lt-text-tertiary: 15 118 55;    /* #0F7637 — 5.7:1 (was #16A34A at 3.3:1) */
     --lt-text-quaternary: 58 148 88;  /* #3A9458 — 3.8:1, large/meta only */
-    --lt-heading: 20 83 45;           /* #14532D */
   }
 
   [data-theme='rose'] {
@@ -98,7 +94,6 @@
     --lt-text-secondary: 131 24 67;   /* #831843 */
     --lt-text-tertiary: 190 24 93;    /* #BE185D */
     --lt-text-quaternary: 216 90 143; /* #D85A8F */
-    --lt-heading: 157 23 77;          /* #9D174D */
   }
 
   [data-theme='orange'] {
@@ -114,7 +109,6 @@
     --lt-text-secondary: 124 45 18;   /* #7C2D12 */
     --lt-text-tertiary: 154 80 35;    /* #9A5023 — 5.9:1 on white */
     --lt-text-quaternary: 180 115 66; /* #B47342 — 3.9:1, large/meta only */
-    --lt-heading: 234 88 12;          /* #EA580C */
   }
 
   /* Structural tokens (hue-independent). Every color, size, and spacing knob
@@ -133,6 +127,10 @@
     --lt-surface: 255 255 255;          /* page background */
     --lt-surface-raised: 255 255 255;   /* header, sidebar, sheets */
     --lt-text-inverse: 255 255 255;     /* text on accent / status fills */
+
+    /* Headings — near-black in every light theme so titles anchor the page
+       (12.6:1 on white); dark themes override with a light value. */
+    --lt-heading: 51 51 51;             /* #333333 */
 
     /* Status family — text-safe values, ≥4.5:1 on the light surface.
        The -graphic variants keep the traditional brighter hues for dots,
@@ -280,18 +278,47 @@
     @apply text-2xs text-text-tertiary mt-1 leading-snug;
   }
 
+  /* ── Headings — one voice for every title tier ────────────────────────────
+     Near-black (--lt-heading), light 300 weight, small caps. The generous
+     size carries the hierarchy; the weight keeps it elegant rather than
+     shouty. Dark themes restyle via the heading token. */
+  .heading-1 {
+    font-size: 2.125rem;
+    font-weight: 300;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    color: rgb(var(--lt-heading));
+  }
+
+  .heading-2 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.02em;
+    color: rgb(var(--lt-heading));
+  }
+
+  .heading-3 {
+    font-size: 1.25rem;
+    font-weight: 300;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.02em;
+    color: rgb(var(--lt-heading));
+  }
+
   .section-header {
     @apply block mb-3 pb-1.5 border-b border-surface-border/30;
-    font-size: 1.05rem;
-    font-weight: 500;
+    font-size: 1.25rem;
+    font-weight: 300;
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
     color: rgb(var(--lt-heading));
   }
 
   .section-h2 {
-    font-size: 1.05rem;
-    font-weight: 500;
+    font-size: 1.25rem;
+    font-weight: 300;
     font-variant-caps: small-caps;
     letter-spacing: 0.03em;
     color: rgb(var(--lt-heading));

@@ -15,7 +15,7 @@ export function PageHeader({ title, actions, center, docsHash }: PageHeaderProps
     <div className="flex items-center gap-4 mb-10">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <h1
-          className="text-3xl font-light text-text-primary min-w-0 truncate"
+          className="heading-1 min-w-0 truncate"
           title={typeof title === 'string' ? title : undefined}
         >
           {title}

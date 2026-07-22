@@ -467,7 +467,7 @@ export function RoleDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <Inbox className="w-12 h-12 text-text-quaternary mb-4" strokeWidth={1} />
-        <h2 className="text-lg font-medium text-text-primary mb-2">Role not found</h2>
+        <h2 className="heading-3 mb-2">Role not found</h2>
       </div>
     );
   }

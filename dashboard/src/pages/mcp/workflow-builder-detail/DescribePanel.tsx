@@ -66,7 +66,7 @@ export function DescribePanel({ workflowId, status, builderData, onBuilt, onNext
   // Two-column layout mirroring the composer: prompt on left, progress on right
   return (
     <div>
-      <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Describe</h2>
+      <h2 className="heading-2 mb-1">Describe</h2>
       <p className="text-base text-text-secondary mb-6">
         {isClarification
           ? 'The builder identified tools but needs more details before constructing the workflow.'
