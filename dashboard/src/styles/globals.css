@@ -111,7 +111,7 @@
     --lt-accent-hover: 29 78 216;     /* #1D4ED8 */
     --lt-accent-muted: 147 197 253;   /* #93C5FD */
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
-    --lt-surface: 240 245 251;      /* #F0F5FB — the page wash */
+    --lt-surface: 248 250 253;      /* #F8FAFD — the page wash */
     --lt-surface-hover: 232 239 247;  /* #E8EFF7 */
     --lt-field-bg: 228 236 246;         /* #E4ECF6 — the themed field well */
     --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
@@ -130,7 +130,7 @@
     --lt-accent-hover: 98 41 190;     /* #6229BE */
     --lt-accent-muted: 187 156 239;   /* #BB9CEF */
     --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
-    --lt-surface: 243 241 249;      /* #F3F1F9 — the page wash */
+    --lt-surface: 249 248 252;      /* #F9F8FC — the page wash */
     --lt-surface-hover: 236 234 245;  /* #ECEAF5 */
     --lt-field-bg: 232 229 242;         /* #E8E5F2 — the themed field well */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
@@ -142,7 +142,7 @@
     --lt-accent-hover: 179 42 34;     /* #B32A22 */
     --lt-accent-muted: 236 154 147;   /* #EC9A93 */
     --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
-    --lt-surface: 249 244 242;      /* #F9F4F2 — the page wash */
+    --lt-surface: 252 250 249;      /* #FCFAF9 — the page wash */
     --lt-surface-hover: 244 236 233;  /* #F4ECE9 */
     --lt-field-bg: 242 233 230;         /* #F2E9E6 — the themed field well */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
@@ -154,7 +154,7 @@
     --lt-accent-hover: 15 118 55;     /* #0F7637 */
     --lt-accent-muted: 74 222 128;    /* #4ADE80 */
     --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
-    --lt-surface: 241 247 243;      /* #F1F7F3 — the page wash */
+    --lt-surface: 248 251 249;      /* #F8FBF9 — the page wash */
     --lt-surface-hover: 234 242 237;  /* #EAF2ED */
     --lt-field-bg: 229 240 233;         /* #E5F0E9 — the themed field well */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
@@ -166,7 +166,7 @@
     --lt-accent-hover: 219 39 119;    /* #DB2777 */
     --lt-accent-muted: 249 168 212;   /* #F9A8D4 */
     --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
-    --lt-surface: 249 243 245;      /* #F9F3F5 — the page wash */
+    --lt-surface: 252 249 250;      /* #FCF9FA — the page wash */
     --lt-surface-hover: 244 235 239;  /* #F4EBEF */
     --lt-field-bg: 242 232 236;         /* #F2E8EC — the themed field well */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
@@ -178,7 +178,7 @@
     --lt-accent-hover: 234 88 12;     /* #EA580C */
     --lt-accent-muted: 254 215 170;   /* #FED7AA */
     --lt-accent-faint: 255 247 237;   /* #FFF7ED */
-    --lt-surface: 249 245 240;      /* #F9F5F0 — the page wash */
+    --lt-surface: 252 250 248;      /* #FCFAF8 — the page wash */
     --lt-surface-hover: 244 237 230;  /* #F4EDE6 */
     --lt-field-bg: 242 235 226;         /* #F2EBE2 — the themed field well */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
