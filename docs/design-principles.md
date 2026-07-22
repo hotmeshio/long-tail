@@ -186,18 +186,23 @@ Nothing loops, nothing floats.
    fold into label/value pairs on the dictionary ladder. **Tables never
    scroll horizontally** — master lists use `layout="fixed"` so a table
    physically cannot outgrow its container.
-5. **The column budget.** A master list carries at most: identity, owner,
-   urgency, age. Everything else lives in the facet drawer and the detail
-   page. The floor reads a list at a glance — above the fold, no scrolling
-   for information.
-6. **Disclosure order**: drop priority-3 columns, fold priority-2 into
+5. **The column budget, disclosed both ways.** The floor set — identity,
+   owner, urgency, age — always renders. Enrichment columns (workflow,
+   metadata facets) return only when the table's container has room
+   (`showFrom: '@split' | '@wall'`); below that they fold into card pairs.
+   The list is a jumping-off spot: the metadata cell carries the refine
+   icons — filter within the role, search across roles, shift+click to AND
+   facets — the ELK-style drill the whole product surfaces.
+6. **Refine icons are always visible enough to tap** — half-opacity at
+   rest, full on hover. Hover-only affordances do not exist on the floor.
+7. **Disclosure order**: drop priority-3 columns, fold priority-2 into
    pairs, keep priority-1 always.
-7. **Touch parity**: every hover-only affordance has a tap equivalent —
+8. **Touch parity**: every hover-only affordance has a tap equivalent —
    the iPad floor has no hover.
-8. **The header diet ladder** (below lg): mark-only logo, icon+count links,
+9. **The header diet ladder** (below lg): mark-only logo, icon+count links,
    secondary actions fold into the user menu, the nav rail becomes a
    drawer behind a menu button.
-9. **Sticky elements are never containers** — `container-type` breaks
+10. **Sticky elements are never containers** — `container-type` breaks
    `position: sticky` on the same element; wrap the geometry element
    instead.
 

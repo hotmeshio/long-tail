@@ -52,8 +52,17 @@ describe('ESCALATION_COLUMNS', () => {
   });
 
   // ── The column budget: identity, owner, urgency, age — nothing else ──
-  it('holds the manufacturing-floor column budget (no workflow/metadata/timestamp columns)', () => {
-    expect(ESCALATION_COLUMNS.map((c) => c.key)).toEqual(['description', 'role', 'priority', 'created_at']);
+  it('holds the floor budget with enrichment columns gated behind room', () => {
+    expect(ESCALATION_COLUMNS.map((c) => c.key)).toEqual(['description', 'role', 'priority', 'workflow_type', 'metadata', 'created_at']);
+    const byKey = Object.fromEntries(ESCALATION_COLUMNS.map((c) => [c.key, c]));
+    // The always-on floor: identity, owner, urgency, age.
+    expect(byKey.description.showFrom).toBeUndefined();
+    expect(byKey.role.showFrom).toBeUndefined();
+    expect(byKey.priority.showFrom).toBeUndefined();
+    expect(byKey.created_at.showFrom).toBeUndefined();
+    // Enrichment returns with room.
+    expect(byKey.workflow_type.showFrom).toBe('split');
+    expect(byKey.metadata.showFrom).toBe('wall');
   });
 
   // ── Role column ──

@@ -17,7 +17,19 @@ export interface Column<T> {
    * 3 = dropped in card mode.
    */
   priority?: 1 | 2 | 3;
+  /**
+   * Table-mode disclosure: the column renders only when the table's
+   * container clears the named threshold. The column budget governs the
+   * floor; enrichment columns return with room.
+   */
+  showFrom?: 'split' | 'wall';
 }
+
+/* Literal class strings so Tailwind's scanner sees the container variants. */
+const SHOW_FROM_CLASS: Record<NonNullable<Column<unknown>['showFrom']>, string> = {
+  split: 'hidden @split/table:table-cell',
+  wall: 'hidden @wall/table:table-cell',
+};
 
 /**
  * Split columns by card-fold priority. When NO column declares a priority,
@@ -227,7 +239,7 @@ export function DataTable<T>({
                 <th
                   key={col.key}
                   onClick={isSortable ? () => onSort(col.key) : undefined}
-                  className={`${inline ? '' : 'sticky top-[60px] z-10 '}bg-surface px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.className ?? ''} ${
+                  className={`${inline ? '' : 'sticky top-[60px] z-10 '}bg-surface px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''} ${
                     isSortable ? 'cursor-pointer select-none group/sorthead hover:text-text-secondary transition-colors' : ''
                   }`}
                 >
@@ -256,7 +268,7 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={`px-6 py-2.5 text-sm ${col.className ?? ''}`}
+                  className={`px-6 py-2.5 text-sm ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''}`}
                 >
                   {col.render(row, index)}
                 </td>

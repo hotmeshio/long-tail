@@ -70,14 +70,14 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
               <Link
                 to={roleUrl}
                 title={`Filter this queue: ${key} = ${displayValue}`}
-                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
+                className="opacity-50 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
               >
                 <ListFilter className="w-3 h-3" />
               </Link>
               <Link
                 to={globalUrl}
                 title={`Search all queues: ${key} = ${displayValue}`}
-                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
+                className="opacity-50 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
               >
                 <Search className="w-3 h-3" />
               </Link>

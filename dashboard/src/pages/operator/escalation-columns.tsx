@@ -5,6 +5,7 @@ import type { Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect, FilterInput, FilterDivider } from '../../components/common/data/FilterBar';
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
+import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { CountdownTimer } from '../../components/common/display/CountdownTimer';
 import { formatAgoCompact } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
@@ -88,7 +89,7 @@ export function MetadataCell({
               >
                 {sv}
               </span>
-              <span className="flex items-center gap-px shrink-0 opacity-0 group-hover/mrow:opacity-100 transition-opacity">
+              <span className="flex items-center gap-px shrink-0 opacity-50 group-hover/mrow:opacity-100 transition-opacity">
                 <Link
                   to={metadataFacetUrl(k, metadata[k], role)}
                   className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
@@ -135,7 +136,7 @@ export function MetadataCell({
 }
 
 /** Build the shared column set, optionally wiring metadata filter callbacks. */
-export function makeEscalationColumns(_opts: EscalationColumnOpts = {}): Column<LTEscalationRecord>[] {
+export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<LTEscalationRecord>[] {
   return [
     {
       key: 'description',
@@ -173,6 +174,33 @@ export function makeEscalationColumns(_opts: EscalationColumnOpts = {}): Column<
         </span>
       ),
       className: 'w-20',
+    },
+    // Enrichment columns — the jumping-off facets. The budget governs the
+    // floor: these return only when the table has room (@split / @wall),
+    // and in card mode they fold to pairs. The metadata cell carries the
+    // clickable refine icons: filter within the role, search across roles
+    // (admins), shift+click to AND facets.
+    {
+      key: 'workflow_type',
+      label: 'Workflow',
+      priority: 2,
+      showFrom: 'split',
+      render: (row) => <WorkflowPill type={row.workflow_type || row.type} />,
+      className: 'w-40 whitespace-nowrap',
+    },
+    {
+      key: 'metadata',
+      label: 'Metadata',
+      priority: 2,
+      showFrom: 'wall',
+      render: (row) => (
+        <MetadataCell
+          metadata={row.metadata}
+          role={row.role}
+          highlightKeys={opts.highlightKeys}
+        />
+      ),
+      className: 'w-80 max-w-[19rem] align-top',
     },
     {
       key: 'created_at',
