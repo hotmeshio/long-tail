@@ -149,7 +149,11 @@ export function EscalationDetailPage() {
       const initial: Record<string, any> = { _form_schema: formSchema };
       for (const [key, def] of Object.entries(formSchema.properties)) {
         const fieldDef = def as Record<string, any>;
-        initial[key] = prefill[key] ?? fieldDef.default ?? '';
+        // The zero value follows the declared type: an object field (e.g. a
+        // checklist) starts as {} — never '' — so its value round-trips as
+        // an object from the first interaction.
+        const zero = fieldDef.type === 'object' ? {} : '';
+        initial[key] = prefill[key] ?? fieldDef.default ?? zero;
       }
       initialJsonRef.current = JSON.stringify(initial, null, 2);
       // A saved draft (typed input from an earlier visit or a lapsed claim)

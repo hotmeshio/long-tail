@@ -59,15 +59,31 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   }
 
   // Custom widget via x-lt-widget.
-  // String fields pass the value directly. Object fields (e.g. checklist) are
-  // JSON-serialized into the widget and parsed back on change — the widget
-  // interface always deals in strings; FieldRow owns the object ↔ string boundary.
+  // The widget interface always deals in strings; FieldRow owns the
+  // object ↔ string boundary, decided by the DECLARED type — never the
+  // runtime value. An object-typed field (checklist) stores an object in
+  // the form data on every change, so a stray string value (an old draft,
+  // an empty init) heals on the next interaction instead of sticking.
   if (widgetName && widgetName in WIDGET_MAP) {
     const Widget = WIDGET_MAP[widgetName];
     // A require-all checklist is required by definition — its label carries
     // the asterisk like any other required input.
     const widgetRequired = isRequired || fieldSchema?.['x-lt-require-all'] === true;
     const widgetProps = { fieldKey, schema: fieldSchema, escalationContext, isRequired: widgetRequired, submitAttempted, error };
+    if (fieldSchema?.type === 'object') {
+      const raw = typeof value === 'string'
+        ? value
+        : typeof value === 'object' && value !== null && !Array.isArray(value)
+          ? JSON.stringify(value)
+          : '';
+      return (
+        <Widget
+          {...widgetProps}
+          value={raw}
+          onChange={(next) => { try { onChange(JSON.parse(next) as JsonValue); } catch { onChange(next); } }}
+        />
+      );
+    }
     if (typeof value === 'string') {
       return <Widget {...widgetProps} value={value} onChange={(v) => onChange(v)} />;
     }

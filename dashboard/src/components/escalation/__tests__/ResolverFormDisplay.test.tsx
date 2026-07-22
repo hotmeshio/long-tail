@@ -115,6 +115,56 @@ describe('widget labeling', () => {
   });
 });
 
+describe('object-typed widget values', () => {
+  const chipSchema = {
+    properties: {
+      reasons: {
+        type: 'object',
+        title: 'What went wrong',
+        'x-lt-widget': 'checklist',
+        'x-lt-source': 'envelope.reject_reason_items',
+        'x-lt-variant': 'chips',
+      },
+    },
+  };
+  const ctx = {
+    escalation: null,
+    metadata: null,
+    envelope: { reject_reason_items: [{ id: 'warping', label: 'Warping' }] } as unknown as Record<string, unknown>,
+    payload: null,
+    resolver: null,
+  };
+
+  it('a chip click stores an object even when the value arrives as a string', () => {
+    const onChange = vi.fn();
+    render(
+      <ResolverForm
+        value={formJson({ reasons: '' }, chipSchema)}
+        onChange={onChange}
+        escalationContext={ctx}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('checklist-item-warping'));
+    const emitted = JSON.parse(onChange.mock.calls[0][0] as string) as Record<string, unknown>;
+    expect(emitted.reasons).toEqual({ warping: true });
+  });
+
+  it('a string-stuck value renders its selections and heals on the next click', () => {
+    const onChange = vi.fn();
+    render(
+      <ResolverForm
+        value={formJson({ reasons: '{"warping":true}' }, chipSchema)}
+        onChange={onChange}
+        escalationContext={ctx}
+      />,
+    );
+    expect(screen.getByTestId('checklist-item-warping')).toBeChecked();
+    fireEvent.click(screen.getByTestId('checklist-item-warping'));
+    const emitted = JSON.parse(onChange.mock.calls[0][0] as string) as Record<string, unknown>;
+    expect(emitted.reasons).toEqual({ warping: false });
+  });
+});
+
 describe('help icon', () => {
   it('opens instructions when the schema carries x-lt-help', () => {
     const onOpenHelp = vi.fn();
