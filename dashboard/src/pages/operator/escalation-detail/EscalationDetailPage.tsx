@@ -316,6 +316,7 @@ export function EscalationDetailPage() {
         onRefresh={() => refetch()}
         isFetching={isFetching}
         apiPath={`/escalations/${esc.id}`}
+        standalone
       />
       <button
         onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}

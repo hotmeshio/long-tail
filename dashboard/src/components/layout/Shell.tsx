@@ -10,12 +10,8 @@ import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
 import { ShellPanelProvider, useShellPanel } from '../../hooks/useShellPanel';
 import { SlidePanel } from '../common/layout/SlidePanel';
 import { Header } from './Header';
-import { ChoreographySidebar } from './ChoreographySidebar';
-import { PinnedViewsSidebar } from './PinnedViewsSidebar';
-import { OrchestrationSidebar } from './OrchestrationSidebar';
-import { DesignSidebar } from './DesignSidebar';
-import { StorageSidebar } from './StorageSidebar';
-import { AdminSidebar } from './AdminSidebar';
+import { ShellNavSections } from './ShellNavSections';
+import { NavDrawer } from './NavDrawer';
 import { EventFeed } from './EventFeed';
 import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
@@ -44,6 +40,7 @@ function ShellLayout() {
   const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [feedConfigOpen, setFeedConfigOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(() => window.location.hash.startsWith('#docs'));
   const location = useLocation();
@@ -70,24 +67,23 @@ function ShellLayout() {
   return (
     <div className="h-screen bg-surface flex flex-col">
       {/* Full-width header */}
-      <Header onToggleEventFeed={() => setFeedOpen((v) => !v)} onToggleDocs={() => setDocsOpen((v) => !v)} />
+      <Header
+        onToggleEventFeed={() => setFeedOpen((v) => !v)}
+        onToggleDocs={() => setDocsOpen((v) => !v)}
+        onToggleNav={() => setNavOpen((v) => !v)}
+      />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar — the rail lives at lg+; below lg the NavDrawer is the nav. */}
         <aside
           className={`${
             collapsed ? 'w-16' : 'w-60'
-          } shrink-0 bg-surface-raised border-r border-surface-border flex flex-col transition-[width] duration-200 ease-out overflow-hidden relative z-20`}
+          } shrink-0 bg-surface-raised border-r border-surface-border hidden lg:flex flex-col transition-[width] duration-200 ease-out overflow-hidden relative z-20`}
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
-            <PinnedViewsSidebar />
-            {isBuilder && <OrchestrationSidebar />}
-            {isBuilder && aiEnabled && <DesignSidebar />}
-            {isBuilder && <StorageSidebar />}
-            {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} isOps={isOps} />}
+            <ShellNavSections aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
           </nav>
 
           {/* Collapse / Expand toggle */}
@@ -121,7 +117,9 @@ function ShellLayout() {
         {/* Main content */}
         <main className="flex-1 min-w-0 overflow-y-auto">
           {/* Full width — pages get all the room the window offers */}
-          <div ref={contentRef} className="w-full px-page-x py-8 pb-16 animate-page-in h-full flex flex-col">
+          {/* The page-level container: page grids use @split/@wall/@table
+              variants against THIS width, which shrinks when panels open. */}
+          <div ref={contentRef} className="w-full px-page-x py-8 pb-16 animate-page-in h-full flex flex-col @container">
             <Outlet />
           </div>
         </main>
@@ -131,6 +129,17 @@ function ShellLayout() {
             viewport narrows rather than being covered. */}
         <ShellRightPanel />
       </div>
+
+      {/* Below-lg navigation drawer */}
+      <NavDrawer
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        aiEnabled={aiEnabled}
+        isBuilder={isBuilder}
+        isOps={isOps}
+        viewAs={viewAs}
+        canSeePaceBoard={canSeePaceBoard}
+      />
 
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} configOpen={feedConfigOpen} onToggleConfig={() => setFeedConfigOpen((v) => !v)} />

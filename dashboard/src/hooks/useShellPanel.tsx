@@ -75,3 +75,8 @@ export function useShellPanel(): ShellPanelContextValue {
   if (!ctx) throw new Error('useShellPanel must be used within ShellPanelProvider');
   return ctx;
 }
+
+/** Null outside the shell (tests, standalone surfaces) — callers degrade. */
+export function useShellPanelOptional(): ShellPanelContextValue | null {
+  return useContext(ShellPanelContext);
+}

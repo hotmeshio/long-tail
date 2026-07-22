@@ -70,7 +70,7 @@ export function EscalationChainsPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 @wall:grid-cols-3 gap-12">
           {/* Left — role list */}
           <div>
             <SectionLabel className="mb-4">Roles</SectionLabel>

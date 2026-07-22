@@ -168,7 +168,7 @@ export function WorkflowConfigDetailPage() {
       </div>
 
       {/* Three-column form */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 gap-y-10">
+      <div className="grid grid-cols-1 @wall:grid-cols-3 gap-x-14 gap-y-10">
 
         {/* ── Identity ─────────────────────────────────────────────────── */}
         <div>

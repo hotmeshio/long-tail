@@ -133,7 +133,7 @@ export function TestResultsComparison({
 
       {/* Row 1: Inputs */}
       <SectionHeading>Input</SectionHeading>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8 mb-6">
         <div>
           {originalEnvelope ? (
             <JsonViewer data={originalEnvelope} defaultMode="tree" />
@@ -159,7 +159,7 @@ export function TestResultsComparison({
 
       {/* Row 2: Outputs */}
       <SectionHeading>Output</SectionHeading>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8 mb-6">
         <div>
           {originalOutput ? (
             <JsonViewer data={originalOutput} defaultMode="tree" />

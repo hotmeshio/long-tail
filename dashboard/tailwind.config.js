@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
+import containerQueries from '@tailwindcss/container-queries';
+
 /*
  * Themed tokens resolve through CSS variables declared in src/styles/globals.css.
  * The active theme is selected by `data-theme` on <html> (violet | red | orange | blue).
@@ -68,6 +70,19 @@ export default {
         /* The readable measure for generated forms. */
         form: 'var(--lt-measure-form)',
       },
+      /* Named container thresholds — the responsive doctrine's tokens.
+       * Geometry follows the CONTAINER, not the viewport: components use
+       * these variants (@dict-pairs:, @table:, …) and never hardcode rem. */
+      containers: {
+        'dict-inline': '22rem', /* label sits beside value (one pair per row) */
+        'grp-cols': '26rem',    /* x-lt-column-group renders 2-up */
+        'form-cols': '34rem',   /* section two-column grid splits */
+        filters: '36rem',       /* filter bar shows inline selects */
+        'dict-pairs': '38rem',  /* dictionary renders two pairs per row */
+        table: '48rem',         /* tables render as tables; below, console cards */
+        split: '54rem',         /* two-pane page grids split */
+        wall: '64rem',          /* 3–4-up card walls spread */
+      },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'monospace'],
@@ -87,5 +102,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [containerQueries],
 };

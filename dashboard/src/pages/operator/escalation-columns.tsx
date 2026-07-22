@@ -141,6 +141,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'description',
       label: 'Summary',
+      priority: 1,
       render: (row) => (
         <div className="flex items-center gap-2 overflow-hidden">
           <span className="shrink-0"><StatusDot row={row} /></span>
@@ -154,6 +155,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'role',
       label: 'Role',
+      priority: 2,
       render: (row) => (
         <span className={CELL_TEXT}>
           <RolePill role={row.role} size="md" tone="inherit" />
@@ -164,6 +166,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'priority',
       label: 'Priority',
+      priority: 2,
       render: (row) => (
         <span className={CELL_TEXT}>
           <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
@@ -174,12 +177,14 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'workflow_type',
       label: 'Workflow Type',
+      priority: 2,
       render: (row) => <WorkflowPill type={row.workflow_type || row.type} />,
       className: 'w-40 whitespace-nowrap',
     },
     {
       key: 'metadata',
       label: 'Metadata',
+      priority: 2,
       render: (row) => (
         <MetadataCell
           metadata={row.metadata}
@@ -192,6 +197,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'created_time',
       label: 'Created',
+      priority: 3,
       render: (row) => (
         <span className={`text-2xs font-mono whitespace-nowrap ${CELL_TEXT}`} title={row.created_at}>
           {formatDateTime(row.created_at)}
@@ -202,6 +208,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'created_at',
       label: 'Ago',
+      priority: 1,
       render: (row) => (
         <span className={`text-xs tabular-nums ${CELL_TEXT}`} title={row.created_at}>
           {formatAgoCompact(row.created_at)}
@@ -226,6 +233,7 @@ export const TIME_LEFT_COLUMN: Column<LTEscalationRecord> = {
       <span className="text-xs text-text-tertiary">—</span>
     ),
   className: 'w-16 whitespace-nowrap',
+  priority: 1,
 };
 
 /** Status icon column — color-coded filled circle, or bell for ACK/notification escalations. */
@@ -247,6 +255,7 @@ export const STATUS_COLUMN: Column<LTEscalationRecord> = {
     return <Circle className="w-2.5 h-2.5 text-text-tertiary" strokeWidth={2.5} />;
   },
   className: 'w-8',
+  priority: 1,
 };
 
 /** Claimed-only status icon (always orange, or bell for ACK). */
@@ -258,6 +267,7 @@ export const CLAIMED_STATUS_COLUMN: Column<LTEscalationRecord> = {
       ? <Bell className="w-3 h-3 text-status-warning" />
       : <Circle className="w-2.5 h-2.5 text-status-warning" strokeWidth={2.5} />,
   className: 'w-8',
+  priority: 1,
 };
 
 /** Priority filter options shared by both pages. */
@@ -299,8 +309,17 @@ export function EscalationFilterBar({
   showSearch?: boolean;
   actions?: React.ReactNode;
 }) {
+  // Non-default filters power the folded Filters button's badge.
+  const activeFilterCount = [
+    filters.role,
+    filters.type,
+    filters.priority,
+    filters.status && filters.status !== 'all' ? filters.status : '',
+    filters.search ?? '',
+  ].filter(Boolean).length;
+
   return (
-    <FilterBar actions={actions}>
+    <FilterBar actions={actions} activeFilterCount={activeFilterCount}>
       {showStatus && (
         <>
           <FilterSelect

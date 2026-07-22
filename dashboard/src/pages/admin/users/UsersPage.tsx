@@ -184,7 +184,7 @@ function UserAccountsPanel() {
 
       {/* 360px right column — same width as the Service Accounts tab's panel
           (BotsPage), so the two Accounts tabs share one layout rhythm. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
+      <div className="grid grid-cols-1 @split:grid-cols-[1fr_360px] gap-6 items-start">
         {/* Left — users table */}
         <div className="overflow-x-clip">
           <DataTable

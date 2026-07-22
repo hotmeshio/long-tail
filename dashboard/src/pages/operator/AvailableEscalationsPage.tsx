@@ -368,11 +368,13 @@ export function AvailableEscalationsPage() {
         />
       ),
       className: 'w-10',
+      priority: 1,
     } : {
       key: 'spacer',
       label: '',
       render: () => null,
       className: 'w-10',
+      priority: 3,
     },
     ...makeEscalationColumns({ highlightKeys: facetHighlightKeys }),
     {

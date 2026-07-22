@@ -76,7 +76,9 @@ describe('column groups (2×2)', () => {
     const { container } = render(
       <ResolverForm value={formJson({ left_quantity: 1, right_quantity: 1, notes: '' }, schema)} onChange={vi.fn()} />,
     );
-    const inner = container.querySelector('.grid.grid-cols-2');
+    // Container-driven 2×2: the group cell is its own @container and the
+    // inner grid splits at the @grp-cols threshold.
+    const inner = container.querySelector('.\\@container > .grid[class*="@grp-cols:grid-cols-2"]');
     expect(inner).not.toBeNull();
     expect(inner!.querySelector('[data-field-key="left_quantity"]')).not.toBeNull();
     expect(inner!.querySelector('[data-field-key="right_quantity"]')).not.toBeNull();

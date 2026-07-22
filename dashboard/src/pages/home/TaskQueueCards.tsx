@@ -76,7 +76,7 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
       </div>
 
       {roles.length === 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 @grp-cols:grid-cols-2 @wall:grid-cols-4 gap-4">
           <ClaimedCard count={claimedCount} />
           <div className="lg:col-span-3 flex items-center px-4 py-3.5 text-sm text-text-tertiary">
             You are not a member of a role. Task queues appear here once you join one.
@@ -84,7 +84,7 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-fr">
+          <div className="grid grid-cols-1 @grp-cols:grid-cols-2 @wall:grid-cols-4 gap-4 auto-rows-fr">
             <ClaimedCard count={claimedCount} />
             {shownRoles.map((role) => (
               <TaskQueueCard

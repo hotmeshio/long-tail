@@ -41,7 +41,7 @@ export function TaskDetailPage() {
     <div>
       <PageHeader title="Task Detail" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      <div className="grid grid-cols-1 @wall:grid-cols-3 gap-12">
         {/* Left column — metadata */}
         <div className="lg:col-span-2 space-y-10">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">

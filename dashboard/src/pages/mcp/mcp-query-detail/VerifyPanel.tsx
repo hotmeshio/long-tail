@@ -77,7 +77,7 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
       </p>
 
       {/* Row 1: Headers + metadata (aligned) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-4">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8 mb-4">
         <div>
           <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Query Prompt</p>
           <p className="text-2xs text-text-tertiary">
@@ -124,7 +124,7 @@ export function VerifyPanel({ originalWorkflowId, originalPrompt, workflowName, 
       </div>
 
       {/* Row 2: Prompt input + output (aligned) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8">
         {/* Left: editable prompt */}
         <div>
           <textarea

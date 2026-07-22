@@ -41,7 +41,7 @@ export function CronWorkflowsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 @wall:grid-cols-3 gap-12">
           {/* Workflow selector */}
           <CronWorkflowSelector
             workflows={invocable}

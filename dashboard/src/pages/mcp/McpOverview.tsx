@@ -248,7 +248,7 @@ export function McpOverview() {
       )}
 
       {/* ── Server inventory (compact cards) ─────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
         <button
           onClick={() => navigate('/mcp/servers')}
           className="bg-surface-raised border border-surface-border rounded-md p-5 text-left hover:border-accent/40 transition-colors"

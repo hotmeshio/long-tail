@@ -195,8 +195,8 @@ export function HomePage() {
   const builderHome = !persona.showTaskQueueCards;
   // Row 2 width adapts to what the tier can see: pace + both workflow columns
   // (superadmin), workflows only (engineer), or pace only, full-width (admin).
-  const row2GridClass = persona.canSeePaceBoard && persona.canSeeWorkflows ? 'lg:grid-cols-3'
-    : persona.canSeeWorkflows ? 'lg:grid-cols-2' : '';
+  const row2GridClass = persona.canSeePaceBoard && persona.canSeeWorkflows ? '@wall:grid-cols-3'
+    : persona.canSeeWorkflows ? '@split:grid-cols-2' : '';
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
   const stationQ = useStationMetrics('1h', { enabled: persona.canSeePaceBoard });
   const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: persona.canSeeWorkflows });
@@ -322,7 +322,7 @@ export function HomePage() {
       <h1 className="heading-1 mb-10">Recent Activity</h1>
 
       {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 min-h-[35vh]">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap min-h-[35vh]">
 
         {/* Col 1: All Escalations */}
         <div>

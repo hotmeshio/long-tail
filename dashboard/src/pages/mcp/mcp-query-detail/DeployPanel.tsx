@@ -165,7 +165,7 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
   const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || restoreMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending || !!regeneratePending;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6">
+    <div className="grid grid-cols-1 @split:grid-cols-[1fr_240px] gap-6">
       {/* Left: config */}
       <div className="min-w-0 overflow-hidden">
         <div className="flex items-start justify-between mb-6">

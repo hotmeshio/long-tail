@@ -102,7 +102,7 @@ export function ScheduleSection() {
   return (
     <div className="space-y-8">
       {/* Cron schedule + status */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-10">
+      <div className="grid grid-cols-1 @split:grid-cols-[1fr_auto] gap-10">
         <div>
           <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-4">
             Schedule

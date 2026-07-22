@@ -43,10 +43,13 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
       }
       if (cell.kind === 'column-group') {
         // One cell of the outer two-column grid holding its own two columns —
-        // the single extra nesting level (2×2).
+        // the single extra nesting level (2×2). The cell is its own container:
+        // it measures the half-width it actually gets, not the section.
         return (
-          <div key={`group-${cell.name}-${i}`} className="grid grid-cols-2 gap-x-4 gap-y-5">
-            {cell.entries.map((entry) => renderField(entry))}
+          <div key={`group-${cell.name}-${i}`} className="@container">
+            <div className="grid grid-cols-1 @grp-cols:grid-cols-2 gap-x-4 gap-y-5">
+              {cell.entries.map((entry) => renderField(entry))}
+            </div>
           </div>
         );
       }
@@ -71,8 +74,12 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
         </div>
       )}
       {layout === 'two-column' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-col-gap gap-y-5">
-          {renderCells()}
+        // Geometry follows the container: the grid splits when the SECTION
+        // is wide enough, whatever the viewport says.
+        <div className="@container">
+          <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-x-col-gap gap-y-5">
+            {renderCells()}
+          </div>
         </div>
       ) : (
         <div className="space-y-5">

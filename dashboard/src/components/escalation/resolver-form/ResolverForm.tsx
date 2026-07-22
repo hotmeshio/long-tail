@@ -157,7 +157,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
     return (
       <div
         key={key}
-        className={`animate-[field-enter_0.2s_ease-out] ${layout === 'two-column' && span >= 2 ? 'col-span-2' : ''}`}
+        className={`animate-[field-enter_0.2s_ease-out] ${layout === 'two-column' && span >= 2 ? 'col-span-full' : ''}`}
       >
         <FieldRow
           fieldKey={key}

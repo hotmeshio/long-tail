@@ -216,7 +216,7 @@ export function McpRunDetailPage() {
       <div className="space-y-6">
         {/* Details: Input + Result */}
         <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4 mb-6">
             <div>
               <JsonViewer data={triggerInput ?? {}} label="Input" />
             </div>

@@ -203,7 +203,7 @@ export function AgentDetailPage() {
       )}
 
       {/* ── 3-column grid ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 gap-y-10">
+      <div className="grid grid-cols-1 @wall:grid-cols-3 gap-x-14 gap-y-10">
 
         {/* Col 1: Subscriptions */}
         <div>

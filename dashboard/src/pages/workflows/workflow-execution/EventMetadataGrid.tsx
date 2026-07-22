@@ -179,7 +179,7 @@ export function ChildWorkflowSection({ event, childTask }: {
         </div>
 
         {(childInput != null || childOutput != null) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
             {childInput != null ? (
               <JsonViewer data={childInput} label="Input (Envelope)" variant="panel" />
             ) : <div />}
@@ -210,7 +210,7 @@ export function EventPayloadSection({ event, childTask }: {
 
   if (hasInput || hasResult) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
         {hasInput ? (
           <JsonViewer data={input} label="Input" variant="panel" />
         ) : <div />}

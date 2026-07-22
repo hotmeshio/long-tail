@@ -27,7 +27,7 @@ export function OriginalQueryPanel({
     <div>
       <PanelTitle title="Describe" subtitle="Dynamic LLM-orchestrated execution — the discovery run" icon={MessageSquare} iconClass="text-accent" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8">
         {/* Left: Input */}
         <div>
           <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Input</p>

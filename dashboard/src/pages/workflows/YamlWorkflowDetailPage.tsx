@@ -140,7 +140,7 @@ export function YamlWorkflowDetailPage() {
       )}
 
       {/* Three columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 gap-y-10 mb-12">
+      <div className="grid grid-cols-1 @wall:grid-cols-3 gap-x-14 gap-y-10 mb-12">
         {/* Overview */}
         <div>
           <SectionHeader icon={Info} color="text-accent">Overview</SectionHeader>

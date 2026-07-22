@@ -160,11 +160,42 @@ Nothing loops, nothing floats.
 - Disabled forms use `inert` — out of the tab order, not just grayed.
 - `color-scheme` follows the theme so native controls match the surface.
 
-## 10. Never
+## 10. Responsive — geometry follows the container
+
+1. **Geometry follows the container, not the viewport.** Side panels, the
+   facet drawer, and the nav rail narrow containers below any viewport
+   breakpoint — a `md:`/`lg:` variant on a content grid is a defect.
+   Viewport variants are lawful only in the shell frame (header, nav rail),
+   where the viewport is the container.
+2. **Thresholds are named container tokens** (tailwind `containers`):
+   `@dict-inline` 22rem · `@grp-cols` 26rem · `@form-cols` 34rem ·
+   `@filters` 36rem · `@dict-pairs` 38rem · `@table` 48rem. Components use
+   the names, never raw rem values.
+3. **The dictionary reflow ladder** — the poster child. The same
+   label/value pairs render as: two pairs per row at `@dict-pairs`; one
+   label|value pair per row at `@dict-inline`; label stacked over value
+   below. Pairing order never changes across geometries.
+4. **A table row IS a dictionary.** Below `@table`, tables fold into dense
+   console-style cards — identity columns become the title line, the rest
+   fold into label/value pairs on the dictionary ladder. **Tables never
+   scroll horizontally.**
+5. **Disclosure order**: drop priority-3 columns, fold priority-2 into
+   pairs, keep priority-1 always.
+6. **Touch parity**: every hover-only affordance has a tap equivalent —
+   the iPad floor has no hover.
+7. **The header diet ladder** (below lg): mark-only logo, icon+count links,
+   secondary actions fold into the user menu, the nav rail becomes a
+   drawer behind a menu button.
+8. **Sticky elements are never containers** — `container-type` breaks
+   `position: sticky` on the same element; wrap the geometry element
+   instead.
+
+## 11. Never
 
 Raw hex in components. Chroma on large surfaces. Theme-colored labels.
 Text below 11px. Decisions as checkboxes. Implicit select defaults.
 Full-width one-word inputs. Tag lists stacked as rows. Unmarked required
-fields. Inputs without instruction lines. Passive voice or system-voice copy. Cards and gradient fades.
-"Back to X" links. Polling. Preachy copy. Customer names — the showcase
-brand is always Acme.
+fields. Inputs without instruction lines. Passive voice or system-voice
+copy. Horizontal scroll. Viewport breakpoints on content grids. Cards and
+gradient fades. "Back to X" links. Polling. Preachy copy. Customer names —
+the showcase brand is always Acme.

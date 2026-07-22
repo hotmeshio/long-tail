@@ -72,7 +72,7 @@ export async function reviewContent(
       content,
       analysis,
     } satisfies ReviewContentEscalationData,
-    message: `Content review — ${contentId}`,
+    message: `Content review — ${contentId ?? 'untitled content'}`,
     role: 'reviewer',
   };
 }

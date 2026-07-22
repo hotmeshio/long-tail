@@ -118,7 +118,7 @@ export function ConfigurationSection({
         )}
 
         {/* Input + Output Schemas */}
-        <div className={schemasGrid ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'space-y-6'}>
+        <div className={schemasGrid ? 'grid grid-cols-1 @split:grid-cols-2 gap-6' : 'space-y-6'}>
           {/* Input Schema */}
           <div>
             {configEditing && hasFieldMeta && !advancedMode ? (

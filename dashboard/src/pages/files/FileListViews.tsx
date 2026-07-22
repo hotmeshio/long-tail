@@ -133,7 +133,7 @@ export function GridView({ directories, files, onNavigate, onSelect, selectedFil
       )}
 
       {/* Files as thumbnail grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 @grp-cols:grid-cols-3 @split:grid-cols-4 @wall:grid-cols-5 gap-3">
         {files.map((file) => {
           const isImg = isImagePath(file.path);
           return (

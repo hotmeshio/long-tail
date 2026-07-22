@@ -167,7 +167,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
         />
       </FilterBar>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
+      <div className="grid grid-cols-1 @split:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="overflow-x-clip">
           <DataTable
             columns={columns}
