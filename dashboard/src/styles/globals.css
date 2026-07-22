@@ -68,9 +68,10 @@
     --lt-status-claimed-graphic: 249 115 22;  /* #F97316 */
 
     /* The universal field: a well a shade DARKER than the white surface it
-       sits on, with a light neutral border. Themes keep their tint on the
+       sits on, carrying the THEME'S hue at whisper saturation (each theme
+       overrides) with a light neutral border. Themes keep their tint on the
        focus fill (--lt-field-focus). */
-    --lt-field-bg: 238 241 245;         /* #EEF1F5 */
+    --lt-field-bg: 241 244 248;         /* #F1F4F8 — neutral fallback */
     --lt-field-border: 203 213 225;     /* #CBD5E1 */
 
     /* Select chevron — the whole url() is the token because an SVG data URI
@@ -112,6 +113,7 @@
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
     --lt-surface: 240 245 251;      /* #F0F5FB — the page wash */
     --lt-surface-hover: 232 239 247;  /* #E8EFF7 */
+    --lt-field-bg: 240 244 251;         /* #F0F4FB — the themed field well */
     --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
     --lt-surface-border: 208 217 231; /* #D0D9E7 */
   }
@@ -130,6 +132,7 @@
     --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
     --lt-surface: 243 241 249;      /* #F3F1F9 — the page wash */
     --lt-surface-hover: 236 234 245;  /* #ECEAF5 */
+    --lt-field-bg: 243 241 250;         /* #F3F1FA — the themed field well */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
     --lt-surface-border: 215 210 228; /* #D7D2E4 */
   }
@@ -141,6 +144,7 @@
     --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
     --lt-surface: 249 244 242;      /* #F9F4F2 — the page wash */
     --lt-surface-hover: 244 236 233;  /* #F4ECE9 */
+    --lt-field-bg: 249 243 241;         /* #F9F3F1 — the themed field well */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
     --lt-surface-border: 226 211 208; /* #E2D3D0 */
   }
@@ -152,6 +156,7 @@
     --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
     --lt-surface: 241 247 243;      /* #F1F7F3 — the page wash */
     --lt-surface-hover: 234 242 237;  /* #EAF2ED */
+    --lt-field-bg: 240 247 243;         /* #F0F7F3 — the themed field well */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
     --lt-surface-border: 205 223 211; /* #CDDFD3 */
   }
@@ -163,6 +168,7 @@
     --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
     --lt-surface: 249 243 245;      /* #F9F3F5 — the page wash */
     --lt-surface-hover: 244 235 239;  /* #F4EBEF */
+    --lt-field-bg: 249 242 245;         /* #F9F2F5 — the themed field well */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
     --lt-surface-border: 228 209 218; /* #E4D1DA */
   }
@@ -174,6 +180,7 @@
     --lt-accent-faint: 255 247 237;   /* #FFF7ED */
     --lt-surface: 249 245 240;      /* #F9F5F0 — the page wash */
     --lt-surface-hover: 244 237 230;  /* #F4EDE6 */
+    --lt-field-bg: 249 244 238;         /* #F9F4EE — the themed field well */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
     --lt-surface-border: 228 216 202; /* #E4D8CA */
   }
