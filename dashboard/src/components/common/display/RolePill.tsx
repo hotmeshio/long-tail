@@ -20,9 +20,9 @@ export function RolePill({ role, size = 'sm', tone = 'default' }: RolePillProps)
   const colorClass = tone === 'inherit' ? 'text-inherit' : 'text-text-secondary';
 
   return (
-    <span className={`inline-flex items-center whitespace-nowrap ${sizeClass} ${colorClass}`}>
+    <span className={`inline-flex items-center max-w-full min-w-0 ${sizeClass} ${colorClass}`} title={role}>
       <Inbox className={`${iconClass} shrink-0 text-accent/75`} />
-      {role}
+      <span className="truncate">{role}</span>
     </span>
   );
 }

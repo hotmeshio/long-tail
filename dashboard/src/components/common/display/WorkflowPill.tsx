@@ -38,9 +38,9 @@ export function WorkflowPill({ type, size = 'sm', certified, variant }: Workflow
   const s = SIZE_CONFIG[size];
 
   return (
-    <span className={`inline-flex items-center ${s.pill} font-mono text-text-secondary bg-surface-sunken/50 rounded-md`}>
+    <span className={`inline-flex items-center max-w-full min-w-0 ${s.pill} font-mono text-text-secondary bg-surface-sunken/50 rounded-md`} title={type}>
       <Icon className={`${s.icon} shrink-0 text-text-quaternary`} strokeWidth={1.5} />
-      {type}
+      <span className="truncate">{type}</span>
     </span>
   );
 }

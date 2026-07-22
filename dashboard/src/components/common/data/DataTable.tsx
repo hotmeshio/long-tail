@@ -268,7 +268,7 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={`px-6 py-2.5 text-sm ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''}`}
+                  className={`px-6 py-2.5 text-sm overflow-hidden ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''}`}
                 >
                   {col.render(row, index)}
                 </td>

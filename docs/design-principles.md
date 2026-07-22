@@ -185,7 +185,11 @@ Nothing loops, nothing floats.
    console-style cards — identity columns become the title line, the rest
    fold into label/value pairs on the dictionary ladder. **Tables never
    scroll horizontally** — master lists use `layout="fixed"` so a table
-   physically cannot outgrow its container.
+   physically cannot outgrow its container. Fixed columns cut both ways:
+   **cell content never bleeds into a neighbor** — every cell clips
+   (`overflow-hidden` on the `td`) and every text-bearing pill or label
+   truncates with an ellipsis (`max-w-full` + `truncate`), carrying the
+   full value in `title` for hover reveal.
 5. **The column budget, disclosed both ways.** The floor set — identity,
    owner, urgency, age — always renders. Enrichment columns (workflow,
    metadata facets) return only when the table's container has room
