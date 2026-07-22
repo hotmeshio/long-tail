@@ -8,8 +8,13 @@ export function FieldLabel({ children, isRequired, htmlFor }: {
   isRequired?: boolean;
   htmlFor?: string;
 }) {
+  // `block` is load-bearing: a <label> is inline by default, and the
+  // label→instruction→control anatomy would then hold only by accident —
+  // a full-width control wraps below, but a narrow control (number,
+  // max-w-48) with no instruction line sits flush BESIDE the label. The
+  // anatomy is a column; the label declares it.
   return (
-    <label htmlFor={htmlFor} className="text-2xs font-semibold uppercase tracking-wider text-text-secondary">
+    <label htmlFor={htmlFor} className="block text-2xs font-semibold uppercase tracking-wider text-text-secondary">
       {children}
       {isRequired && <span className="text-status-error ml-0.5">*</span>}
     </label>

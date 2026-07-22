@@ -127,7 +127,10 @@ The reference implementation is `examples/workflows/acme-stations` — mimic it.
    clicks are the record. `x-lt-require-all` guards completion.
 6. **Every input carries a `title` and one instructional `description`
    line — no input goes without.** The anatomy is fixed and identical for
-   every input kind: label, instruction, control, in that order. Inputs that
+   every input kind: label, instruction, control, in that order. The
+   anatomy is a declared column, never an accident of width — the label is
+   a block, so a narrow control (a number, a short select) can never ride
+   sideways beside it when the instruction line is absent. Inputs that
    share a row carry instructions of similar length so their controls align
    across the row; a bare input beside an instructed one is a consistency
    defect, in both content and alignment. The WHY — reference tables,
