@@ -59,13 +59,13 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
         // Sections sit on the sunken band — a shade DARKER than the field
         // fill, so embedded inputs pop against the group the same way they
         // pop against the filter bars. Theme-driven, never a hardcoded hex.
-        ? 'border-l-2 border-accent/30 bg-surface-sunken/80 rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
+        ? 'border border-surface-border/60 border-l-2 border-l-accent/30 bg-surface-sunken/80 rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
         : ''}
     >
       {name && (
         <div className="mb-4 flex items-center gap-2">
           <Layers className="w-4 h-4 text-accent/60 shrink-0" strokeWidth={1.5} />
-          <p className="text-[0.9375rem] font-semibold uppercase tracking-widest text-heading">
+          <p className="text-[0.9375rem] font-semibold tracking-wider text-heading [font-variant-caps:small-caps]">
             {name}
           </p>
         </div>

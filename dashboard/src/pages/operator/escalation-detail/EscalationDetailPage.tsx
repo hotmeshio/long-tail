@@ -22,7 +22,7 @@ import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { getAiOverride } from '../../../lib/view-as';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
-import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
+import { HelpCircle, PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
 import { EscalationSidePanel, ESCALATION_PANEL_VIEWS } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
@@ -293,8 +293,25 @@ export function EscalationDetailPage() {
     goBack();
   };
 
+  const hasAuthoredHelp =
+    typeof (effectiveSchema as Record<string, unknown> | null)?.['x-lt-help'] === 'string' ||
+    typeof (effectiveSchema as Record<string, unknown> | null)?.['x-lt-context'] === 'string';
+
   const headerActions = (
     <div className="flex items-center gap-2">
+      {hasAuthoredHelp && (
+        <button
+          onClick={() => {
+            setSidePanelOpen(true);
+            savePanelOpen(true);
+            setPanelActiveView(ESCALATION_PANEL_VIEWS.HELP);
+          }}
+          className="text-text-tertiary hover:text-accent transition-colors"
+          title="Open instructions"
+        >
+          <HelpCircle className="w-5 h-5" strokeWidth={1.5} />
+        </button>
+      )}
       <ListToolbar
         onRefresh={() => refetch()}
         isFetching={isFetching}
@@ -317,12 +334,12 @@ export function EscalationDetailPage() {
     // independently and the side panel keeps its own scroll. Negative margins
     // let the panel span the full middle row (header to event feed, flush
     // right); the left column re-adds those gutters for its own content.
-    <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-10 -mr-10 -mb-16">
+    <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-8 -mr-page-x -mb-16">
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         {isIframeMode ? (
-          // Full-bleed iframe mode: no header, no padding, -ml-10 cancels shell's pl-10.
+          // Full-bleed iframe mode: no header, no padding, -ml-page-x cancels the shell gutter.
           // Release, Cancel, and panel toggle float at top-right over the iframe.
-          <div className="relative flex-1 min-h-0 -ml-10">
+          <div className="relative flex-1 min-h-0 -ml-page-x">
             <div className="absolute top-3 right-3 z-50 flex items-center gap-0.5 bg-surface/90 backdrop-blur-sm rounded-lg px-1.5 py-1 shadow-sm border border-surface-border/40">
               {[
                 {
@@ -378,12 +395,12 @@ export function EscalationDetailPage() {
             {/* The description IS the title — the page opens with what to do. It
                 shares the row with the toolbar and panel toggle, truncating to
                 make room. */}
-            <div className="shrink-0 pt-10 pr-10">
+            <div className="shrink-0 pt-8 pr-page-x">
               <PageHeader title={esc.description || 'Escalation'} actions={headerActions} />
             </div>
 
             {/* Independently scrolling form column */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-10">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-page-x">
               <EscalationContextBlocks
                 isRoundsExhausted={isRoundsExhausted}
                 payloadObj={payloadObj}

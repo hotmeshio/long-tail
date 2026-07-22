@@ -132,6 +132,10 @@ The reference implementation is `examples/workflows/acme-stations` — mimic it.
 
 ## 7. Copy — the economist tone
 
+The escalation `description` is the detail page's title: a short noun
+phrase naming the artifact — "Post-print QA — ACME-1042 · ord-8127" —
+never a sentence, never an instruction, never a status report.
+
 Say what to do. Speak to the actor, in the imperative, always: "Pick Reject
 to file a report" — never "Reject files a report." The system is never the
 subject of an instruction, and passive voice never appears. One line per

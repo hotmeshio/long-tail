@@ -178,7 +178,7 @@ export function EscalationFormSection({
       ? { ...mapPayloadToForm(payload, formSchema), _form_schema: formSchema }
       : payload;
     return (
-      <div className="mt-8 pt-6">
+      <div className="mt-3">
         <ResolverForm
           value={JSON.stringify(value, null, 2)}
           onChange={() => {}}
@@ -210,7 +210,7 @@ export function EscalationFormSection({
   const resolvedSrc = isIframeViewport ? expandViewportSrc(viewport!.src!, esc) : '';
 
   return (
-    <div className="mt-8 pt-6">
+    <div className="mt-3">
       {isIframeViewport ? (
         <IframeViewport
           src={resolvedSrc}

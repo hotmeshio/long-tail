@@ -84,7 +84,7 @@ export async function kitchenSink(envelope: LTEnvelope): Promise<any> {
     return {
       type: 'escalation' as const,
       data: { greeting, result },
-      message: `Kitchen sink workflow needs approval (name: ${name})`,
+      message: `Kitchen sink approval — ${name}`,
       role: 'reviewer',
     };
   }

@@ -184,11 +184,9 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
       inert={disabled || undefined}
       aria-disabled={disabled || undefined}
     >
-      {(schemaTitle || (hasAuthoredHelp && onOpenHelp)) && (
+      {schemaTitle && (
         <div className="mb-1 flex items-center gap-1.5">
-          {schemaTitle && (
-            <h3 className="heading-3">{schemaTitle}</h3>
-          )}
+          <h3 className="heading-3">{schemaTitle}</h3>
           {hasAuthoredHelp && onOpenHelp && (
             <button
               type="button"
