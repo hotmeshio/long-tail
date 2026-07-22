@@ -67,8 +67,8 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
     >
       {name && (
         <div className="mb-4 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-accent/60 shrink-0" strokeWidth={1.5} />
-          <p className="text-[0.9375rem] font-semibold tracking-wider text-heading [font-variant-caps:small-caps]">
+          <Layers className="w-5 h-5 text-accent/60 shrink-0" strokeWidth={1.5} />
+          <p className="text-[1.40625rem] font-semibold tracking-wider text-heading [font-variant-caps:small-caps]">
             {name}
           </p>
         </div>
