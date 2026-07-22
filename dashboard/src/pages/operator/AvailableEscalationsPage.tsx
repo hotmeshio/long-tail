@@ -592,6 +592,7 @@ export function AvailableEscalationsPage() {
           <DataTable
             columns={columns}
             data={escalations}
+            layout="fixed"
             keyFn={(row) => row.id}
             onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
             isLoading={isLoading}

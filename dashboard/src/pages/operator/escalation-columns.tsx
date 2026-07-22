@@ -5,9 +5,8 @@ import type { Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect, FilterInput, FilterDivider } from '../../components/common/data/FilterBar';
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
-import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { CountdownTimer } from '../../components/common/display/CountdownTimer';
-import { formatAgoCompact, formatDateTime } from '../../lib/format';
+import { formatAgoCompact } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
@@ -136,7 +135,7 @@ export function MetadataCell({
 }
 
 /** Build the shared column set, optionally wiring metadata filter callbacks. */
-export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<LTEscalationRecord>[] {
+export function makeEscalationColumns(_opts: EscalationColumnOpts = {}): Column<LTEscalationRecord>[] {
   return [
     {
       key: 'description',
@@ -150,8 +149,9 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       ),
       className: 'max-w-0',
     },
-    // Facet columns mirror the filter bar's order (Role · Priority ·
-    // Workflow Type) so the eye maps a filter straight onto its column.
+    // The manufacturing-floor column budget: identity, owner, urgency, age.
+    // Everything else (workflow type, metadata, exact timestamps) lives in
+    // the facet drawer and the detail page — never as a scrolling column.
     {
       key: 'role',
       label: 'Role',
@@ -172,38 +172,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
           <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
         </span>
       ),
-      className: 'w-14',
-    },
-    {
-      key: 'workflow_type',
-      label: 'Workflow Type',
-      priority: 2,
-      render: (row) => <WorkflowPill type={row.workflow_type || row.type} />,
-      className: 'w-40 whitespace-nowrap',
-    },
-    {
-      key: 'metadata',
-      label: 'Metadata',
-      priority: 2,
-      render: (row) => (
-        <MetadataCell
-          metadata={row.metadata}
-          role={row.role}
-          highlightKeys={opts.highlightKeys}
-        />
-      ),
-      className: 'w-80 max-w-[19rem] align-top',
-    },
-    {
-      key: 'created_time',
-      label: 'Created',
-      priority: 3,
-      render: (row) => (
-        <span className={`text-2xs font-mono whitespace-nowrap ${CELL_TEXT}`} title={row.created_at}>
-          {formatDateTime(row.created_at)}
-        </span>
-      ),
-      className: 'w-40 whitespace-nowrap',
+      className: 'w-20',
     },
     {
       key: 'created_at',
@@ -214,7 +183,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
           {formatAgoCompact(row.created_at)}
         </span>
       ),
-      className: 'w-12 whitespace-nowrap',
+      className: 'w-14 whitespace-nowrap',
     },
   ];
 }

@@ -169,7 +169,7 @@ Nothing loops, nothing floats.
    where the viewport is the container.
 2. **Thresholds are named container tokens** (tailwind `containers`):
    `@dict-inline` 22rem · `@grp-cols` 26rem · `@form-cols` 34rem ·
-   `@filters` 36rem · `@dict-pairs` 38rem · `@table` 48rem. Components use
+   `@filters` 56rem · `@dict-pairs` 38rem · `@table` 48rem. Components use
    the names, never raw rem values.
 3. **The dictionary reflow ladder** — the poster child. The same
    label/value pairs render as: two pairs per row at `@dict-pairs`; one
@@ -178,15 +178,20 @@ Nothing loops, nothing floats.
 4. **A table row IS a dictionary.** Below `@table`, tables fold into dense
    console-style cards — identity columns become the title line, the rest
    fold into label/value pairs on the dictionary ladder. **Tables never
-   scroll horizontally.**
-5. **Disclosure order**: drop priority-3 columns, fold priority-2 into
+   scroll horizontally** — master lists use `layout="fixed"` so a table
+   physically cannot outgrow its container.
+5. **The column budget.** A master list carries at most: identity, owner,
+   urgency, age. Everything else lives in the facet drawer and the detail
+   page. The floor reads a list at a glance — above the fold, no scrolling
+   for information.
+6. **Disclosure order**: drop priority-3 columns, fold priority-2 into
    pairs, keep priority-1 always.
-6. **Touch parity**: every hover-only affordance has a tap equivalent —
+7. **Touch parity**: every hover-only affordance has a tap equivalent —
    the iPad floor has no hover.
-7. **The header diet ladder** (below lg): mark-only logo, icon+count links,
+8. **The header diet ladder** (below lg): mark-only logo, icon+count links,
    secondary actions fold into the user menu, the nav rail becomes a
    drawer behind a menu button.
-8. **Sticky elements are never containers** — `container-type` breaks
+9. **Sticky elements are never containers** — `container-type` breaks
    `position: sticky` on the same element; wrap the geometry element
    instead.
 

@@ -77,7 +77,7 @@ export default {
         'dict-inline': '22rem', /* label sits beside value (one pair per row) */
         'grp-cols': '26rem',    /* x-lt-column-group renders 2-up */
         'form-cols': '34rem',   /* section two-column grid splits */
-        filters: '36rem',       /* filter bar shows inline selects */
+        filters: '56rem',       /* filters inline only when ONE line fits; below, the fold */
         'dict-pairs': '38rem',  /* dictionary renders two pairs per row */
         table: '48rem',         /* tables render as tables; below, console cards */
         split: '54rem',         /* two-pane page grids split */
