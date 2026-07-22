@@ -9,6 +9,7 @@ import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS } from './seed-data
 import { seedOrthoRoles } from './seed-ortho';
 import { seedTwinRoles } from './seed-twin';
 import { seedRichFormRole } from './seed-rich-form';
+import { seedAcmeRoles } from './seed-acme';
 import { seedPolicyDocumentRole } from './seed-policy-document';
 import { seedWorkbenchRole, seedWorkbenchEscalation } from './seed-workbench';
 import { seedChecklistRole } from './seed-checklist';
@@ -77,6 +78,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedOrthoRoles();
   await seedTwinRoles();
   await seedRichFormRole();
+  await seedAcmeRoles();
   await seedPolicyDocumentRole();
   await seedWorkbenchRole();
   await seedWorkbenchEscalation();

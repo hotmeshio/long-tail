@@ -129,6 +129,10 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
     const helperText = fieldSchema?.description as string | undefined;
 
     if (enumValues?.length) {
+      // An empty value on an enum whose options don't include '' renders an
+      // explicit "Choose…" placeholder: the decision is the user's, never an
+      // implicit first option. Once chosen there is no way back to unchosen.
+      const needsPlaceholder = value === '' && !enumValues.includes('');
       return (
         <div>
           <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
@@ -141,6 +145,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
             className={selectClass(!!error)}
             {...ariaProps}
           >
+            {needsPlaceholder && <option value="" disabled>Choose…</option>}
             {enumValues.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}

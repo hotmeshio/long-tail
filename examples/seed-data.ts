@@ -83,7 +83,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeOrder';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -219,6 +219,34 @@ export const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'rich-form',
         description: 'Showcases every HITL form feature: date pickers, email, file upload, two-column layout, required fields, and ordering.',
+      },
+    },
+  },
+
+  // -- Process 7b: Acme Order (the perfect-form pair)
+  {
+    label: 'Process 7b — Acme Order',
+    workflowName: 'acmeOrder',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: {
+        po: 'ACME-1042',
+        orderId: 'ord-8127',
+        leftQuantity: 2,
+        rightQuantity: 2,
+        orthoticType: 'Functional',
+        shoeSize: 'M10',
+        material: 'polymax',
+        certified: false,
+        addons: [
+          { id: 'wedge_medial', label: 'Wedge — medial, left — verified on the piece' },
+          { id: 'met_pad', label: 'Met pad — standard — verified on the piece' },
+        ],
+      },
+      metadata: {
+        source: 'seed',
+        process: 'acme-order',
+        description: 'The perfect-form pair: dictionary facts, one explicit Choose… decision, linear reveals, pre-checked standard checks beside clickable custom work, and the rejection report.',
       },
     },
   },
