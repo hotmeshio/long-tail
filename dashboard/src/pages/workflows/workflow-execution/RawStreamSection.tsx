@@ -61,7 +61,7 @@ export function RawStreamSection({ jid, appId, event }: RawStreamSectionProps) {
     <div className="space-y-2">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary hover:text-text-secondary transition-colors"
+        className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-widest text-text-tertiary hover:text-text-secondary transition-colors"
       >
         <span className={`transition-transform duration-300 ${open ? 'rotate-90' : ''}`}>&#9654;</span>
         Raw stream message (audit)
@@ -69,7 +69,7 @@ export function RawStreamSection({ jid, appId, event }: RawStreamSectionProps) {
       <Collapsible open={open}>
         {open && (
           <div className="pt-1">
-            {!ref && <p className="text-[11px] text-text-tertiary">No raw stream row maps to this activity.</p>}
+            {!ref && <p className="text-2xs text-text-tertiary">No raw stream row maps to this activity.</p>}
             {ref?.kind === 'proxyIndex' && <ProxyBody namespace={appId || 'durable'} jid={jid} index={ref.index} />}
             {ref?.kind === 'path' && <PathBody namespace={appId || 'durable'} jid={jid} aid={ref.aid} dad={ref.dad} />}
           </div>
@@ -129,7 +129,7 @@ function PathBody({ namespace, jid, aid, dad }: { namespace: string; jid: string
 function Record({ note, messages }: { note: string; messages: StreamMessage[] }) {
   return (
     <div className="space-y-3">
-      <p className="text-[10px] text-text-tertiary">{note}</p>
+      <p className="text-2xs text-text-tertiary">{note}</p>
       {messages.map((m) => (
         <div key={m.id} className="rounded-md bg-surface p-3">
           <StreamMessageDetail message={m} />
@@ -139,8 +139,8 @@ function Record({ note, messages }: { note: string; messages: StreamMessage[] })
   );
 }
 
-const Loading = () => <p className="text-[11px] text-text-tertiary">Loading stream message…</p>;
-const LoadError = () => <p className="text-[11px] text-status-error">Failed to load stream message.</p>;
+const Loading = () => <p className="text-2xs text-text-tertiary">Loading stream message…</p>;
+const LoadError = () => <p className="text-2xs text-status-error">Failed to load stream message.</p>;
 const NotFound = ({ label }: { label: string }) => (
-  <p className="text-[11px] text-text-tertiary">No stream row found for <span className="font-mono">{label}</span>.</p>
+  <p className="text-2xs text-text-tertiary">No stream row found for <span className="font-mono">{label}</span>.</p>
 );

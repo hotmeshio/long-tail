@@ -168,7 +168,7 @@ export function WorkflowConfigDetailPage() {
       </div>
 
       {/* Three-column form */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-14 gap-y-10">
+      <div className="grid grid-cols-1 @wall:grid-cols-3 gap-x-14 gap-y-10">
 
         {/* ── Identity ─────────────────────────────────────────────────── */}
         <div>
@@ -193,7 +193,7 @@ export function WorkflowConfigDetailPage() {
                     ))}
                   </div>
                   <div className="flex items-center gap-2 pt-1">
-                    <span className="text-[10px] text-text-tertiary">or</span>
+                    <span className="text-2xs text-text-tertiary">or</span>
                     <input
                       type="text"
                       onChange={(e) => set('workflow_type', e.target.value)}
@@ -215,7 +215,7 @@ export function WorkflowConfigDetailPage() {
                   {isNew && form.workflow_type && unregisteredTypes.length > 0 && (
                     <button
                       onClick={() => set('workflow_type', '')}
-                      className="text-[10px] text-accent hover:underline mt-1"
+                      className="text-2xs text-accent hover:underline mt-1"
                     >
                       Choose from durable workflows
                     </button>
@@ -287,12 +287,12 @@ export function WorkflowConfigDetailPage() {
                     spellCheck={false}
                   />
                   {form.envelope_schema.trim() && !jsonValid(form.envelope_schema) && (
-                    <p className="text-[10px] text-status-error mt-1">Invalid JSON</p>
+                    <p className="text-2xs text-status-error mt-1">Invalid JSON</p>
                   )}
                 </Field>
               </>
             ) : (
-              <p className="text-[11px] text-text-tertiary py-2">
+              <p className="text-2xs text-text-tertiary py-2">
                 Enable <span className="font-medium text-text-secondary">Invocable</span> to configure invocation roles and an input template.
               </p>
             )}
@@ -308,7 +308,7 @@ export function WorkflowConfigDetailPage() {
             <SectionHeader icon={ShieldOff} color="text-text-tertiary">Registration</SectionHeader>
             <button
               onClick={() => setConfirmUnregister(true)}
-              className="flex items-center gap-1.5 text-[11px] text-status-warning hover:underline"
+              className="flex items-center gap-1.5 text-2xs text-status-warning hover:underline"
               title="Delete this registration — the workflow returns to plain durable"
             >
               <ShieldOff className="w-3 h-3" /> Unregister workflow

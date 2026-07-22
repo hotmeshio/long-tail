@@ -102,14 +102,14 @@ export function ScheduleSection() {
   return (
     <div className="space-y-8">
       {/* Cron schedule + status */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-10">
+      <div className="grid grid-cols-1 @split:grid-cols-[1fr_auto] gap-10">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-4">
             Schedule
           </p>
           <div className="flex items-end gap-4">
             <div>
-              <label className="block text-[10px] text-text-tertiary mb-1">Cron Expression</label>
+              <label className="block text-2xs text-text-tertiary mb-1">Cron Expression</label>
               <input
                 type="text"
                 value={schedule}
@@ -138,7 +138,7 @@ export function ScheduleSection() {
                 key={preset.value}
                 type="button"
                 onClick={() => setSchedule(preset.value)}
-                className={`px-2.5 py-1 text-[10px] rounded-full transition-colors ${
+                className={`px-2.5 py-1 text-2xs rounded-full transition-colors ${
                   schedule === preset.value
                     ? 'bg-accent/10 text-accent font-medium'
                     : 'bg-surface-sunken text-text-tertiary hover:text-text-secondary'
@@ -151,12 +151,12 @@ export function ScheduleSection() {
         </div>
 
         <div className="lg:w-72">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-4">
             How It Works
           </p>
           <div className="flex items-start gap-2 px-3 py-2 rounded bg-surface-sunken">
             <Info className="w-3.5 h-3.5 text-text-tertiary shrink-0 mt-0.5" />
-            <p className="text-[10px] text-text-tertiary leading-relaxed">
+            <p className="text-2xs text-text-tertiary leading-relaxed">
               Rules execute sequentially on each cron cycle. Engine streams can be pruned aggressively
               since they only contain internal routing data. Worker streams should be retained longer
               to preserve execution playback and input enrichment.
@@ -174,7 +174,7 @@ export function ScheduleSection() {
           {isDirty && (
             <button
               onClick={handleRevert}
-              className="text-[10px] text-text-tertiary hover:text-text-primary transition-colors"
+              className="text-2xs text-text-tertiary hover:text-text-primary transition-colors"
             >
               Revert changes
             </button>

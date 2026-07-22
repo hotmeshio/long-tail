@@ -115,7 +115,7 @@ export function JsonViewer({
     ? 'border border-accent-muted/40 rounded-lg p-3 bg-surface-hover/30'
     : '';
   const contentClass = isPanel
-    ? 'font-mono text-xs leading-relaxed bg-white rounded-md p-4 overflow-x-auto break-all'
+    ? 'font-mono text-xs leading-relaxed bg-surface-raised rounded-md p-4 overflow-x-auto break-all'
     : 'font-mono text-xs leading-relaxed bg-surface-sunken rounded-md p-4 overflow-x-auto break-all';
 
   return (

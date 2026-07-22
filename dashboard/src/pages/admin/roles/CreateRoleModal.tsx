@@ -31,7 +31,7 @@ export function CreateRoleModal({
     <Modal open={open} onClose={onClose} title="Create Role">
       <div className="space-y-4">
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Role Name (required)
           </label>
           <input
@@ -44,7 +44,7 @@ export function CreateRoleModal({
               if (e.key === 'Enter') handleCreate();
             }}
           />
-          <p className="text-[10px] text-text-tertiary mt-1">
+          <p className="text-2xs text-text-tertiary mt-1">
             Lowercase letters, numbers, hyphens, and underscores only.
           </p>
         </div>

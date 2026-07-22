@@ -12,7 +12,7 @@ function renderTable(block: string): string {
   const headers = parseRow(rows[0]);
   const dataRows = rows.slice(2);
 
-  const ths = headers.map(h => `<th class="px-3 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">${h}</th>`).join('');
+  const ths = headers.map(h => `<th class="px-3 py-1.5 text-left text-2xs font-semibold uppercase tracking-wider text-text-tertiary">${h}</th>`).join('');
   const trs = dataRows.map(row => {
     const cells = parseRow(row);
     const tds = cells.map(c => `<td class="px-3 py-1.5 text-xs text-text-secondary">${c}</td>`).join('');
@@ -31,7 +31,7 @@ export function renderMarkdownToHtml(md: string): string {
   const codeBlocks: string[] = [];
   let processed = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
     const idx = codeBlocks.length;
-    codeBlocks.push(`<pre class="bg-surface-sunken rounded p-3 my-2 overflow-x-auto text-[11px] leading-relaxed"><code>${code}</code></pre>`);
+    codeBlocks.push(`<pre class="bg-surface-sunken rounded p-3 my-2 overflow-x-auto text-2xs leading-relaxed"><code>${code}</code></pre>`);
     return `\x00CODE${idx}\x00`;
   });
 
@@ -43,7 +43,7 @@ export function renderMarkdownToHtml(md: string): string {
 
   // 3. Inline code
   processed = processed
-    .replace(/`([^`]+)`/g, '<code class="bg-surface-sunken px-1 py-0.5 rounded text-[11px]">$1</code>');
+    .replace(/`([^`]+)`/g, '<code class="bg-surface-sunken px-1 py-0.5 rounded text-2xs">$1</code>');
 
   // 4. Headings
   processed = processed

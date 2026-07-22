@@ -16,7 +16,7 @@ describe('NatsStatus', () => {
     render(<NatsStatus />);
 
     const dot = screen.getByTestId('nats-status-dot');
-    expect(dot.className).toContain('bg-emerald-500');
+    expect(dot.className).toContain('bg-status-success-graphic');
   });
 
   it('renders gray dot when disconnected', () => {

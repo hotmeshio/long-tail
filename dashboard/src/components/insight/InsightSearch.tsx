@@ -67,7 +67,7 @@ export function InsightSearch() {
               onFocus={() => setSuggestionsOpen(true)}
               placeholder="Do something with tools..."
               className="w-[22rem] pl-8 pr-3 py-1.5 rounded-md bg-surface-sunken border border-surface-border
-                         text-[11px] text-text-primary placeholder:text-text-tertiary
+                         text-2xs text-text-primary placeholder:text-text-tertiary
                          focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent/40 focus:border-accent
                          transition-colors"
             />
@@ -77,14 +77,14 @@ export function InsightSearch() {
         {/* Suggestion dropdown */}
         {suggestionsOpen && !input.trim() && (
           <div className="absolute top-full right-0 mt-1 w-[28rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100] py-1">
-            <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">
+            <div className="px-3 py-1.5 text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
               Try something
             </div>
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => submit(s)}
-                className="w-full text-left px-3 py-2 text-[11px] text-text-secondary
+                className="w-full text-left px-3 py-2 text-2xs text-text-secondary
                            hover:bg-surface-hover transition-colors leading-relaxed"
               >
                 {s}

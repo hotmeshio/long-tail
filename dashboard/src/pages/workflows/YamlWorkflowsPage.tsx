@@ -105,16 +105,16 @@ export function YamlWorkflowsPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b">
-              <th className="px-6 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              <th className="px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
                 Flow
               </th>
-              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-40">
+              <th className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary w-40">
                 Namespace
               </th>
-              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-20">
+              <th className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary w-20">
                 Version
               </th>
-              <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-text-tertiary w-28">
+              <th className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary w-28">
                 Status
               </th>
             </tr>
@@ -129,13 +129,13 @@ export function YamlWorkflowsPage() {
                 <td className="px-6 py-2.5">
                   <ToolPill name={flow.graph_topic} size="md" />
                   {flow.description && (
-                    <p className="text-[11px] leading-snug text-text-quaternary mt-0.5">{flow.description}</p>
+                    <p className="text-2xs leading-snug text-text-quaternary mt-0.5">{flow.description}</p>
                   )}
                 </td>
                 <td className="px-4 py-2.5">
                   <NamespacePill namespace={flow.app_id} />
                 </td>
-                <td className="px-4 py-2.5 text-[10px] text-text-quaternary font-mono whitespace-nowrap">
+                <td className="px-4 py-2.5 text-2xs text-text-quaternary font-mono whitespace-nowrap">
                   v{flow.content_version}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap">

@@ -32,9 +32,9 @@ function TargetPill({ target }: { target: ThrottleTarget }) {
     : target.guid ? 'guid' : target.topic ? 'topic' : 'mesh';
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium rounded-lg ${color}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-2xs font-medium rounded-lg ${color}`}>
       {target.label}
-      <span className="text-[8px] opacity-50">{scopeLabel}</span>
+      <span className="text-2xs opacity-50">{scopeLabel}</span>
     </span>
   );
 }
@@ -46,7 +46,7 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
     <Modal open={open} onClose={onClose} title="Adjust Throttle">
       <div className="space-y-4">
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Targets</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Targets</p>
           <div className="flex flex-wrap gap-1.5">
             {targets.map((t, i) => (
               <TargetPill key={t.guid || t.topic || i} target={t} />
@@ -55,7 +55,7 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
         </div>
 
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Presets</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Presets</p>
           <div className="flex flex-wrap gap-2">
             {PRESETS.map((p) => (
               <button
@@ -77,7 +77,7 @@ export function ThrottleModal({ open, onClose, targets, onApply, isPending }: Th
         </div>
 
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
             Custom delay (seconds)
           </p>
           <div className="flex items-center gap-3">

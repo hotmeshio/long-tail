@@ -42,7 +42,7 @@ function SectionHeader({ icon: Icon, color, docsHash, count, children, actions }
         <Icon className={`w-4.5 h-4.5 ${color || 'text-accent/60'}`} strokeWidth={1.5} />
         <h2 className="section-h2">{children}</h2>
         {count !== undefined && count > 0 && (
-          <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-semibold tabular-nums">
+          <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-semibold tabular-nums">
             {formatCountCompact(count)}
           </span>
         )}
@@ -75,7 +75,10 @@ function midEllipsis(s: string, maxLen = 37): string {
   return `${s.slice(0, keep)}...${s.slice(-keep)}`;
 }
 
-/** Consistent row for all execution lists in row 1 */
+/** Consistent console row for all execution lists. The COLUMN is the
+ *  container: with room (@dict-inline) the date shares the id line; in a
+ *  tight half column it drops below beside the pill — the row condenses,
+ *  the pair of columns never stacks. */
 function ExecutionRow({ dot, pill, id, date, onClick }: {
   dot: string;
   pill: React.ReactNode;
@@ -87,10 +90,36 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
         <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${dot}`} />
-        <span className="text-[12px] text-text-primary font-mono truncate max-w-[60%]">{midEllipsis(id)}</span>
-        <span className="text-[10px] text-text-quaternary shrink-0 ml-auto whitespace-nowrap"><DateValue date={date} /></span>
+        <span className="text-xs text-text-primary font-mono truncate flex-1 min-w-0">{midEllipsis(id)}</span>
+        <span className="hidden @dict-inline:inline text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
       </div>
-      <div className="pl-3.5 flex items-center gap-1 overflow-hidden">{pill}</div>
+      <div className="pl-3.5 flex items-center gap-1 overflow-hidden">
+        {pill}
+        <span className="flex-1 min-w-0" />
+        <span className="@dict-inline:hidden text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
+      </div>
+    </button>
+  );
+}
+
+/** Console row for the escalation firehose lists — same condensing law.
+ *  The workflow pill is enrichment (the column budget): it returns when the
+ *  column has room; the floor is priority, title, role, age. */
+function EscalationRow({ esc, onClick }: { esc: any; onClick: () => void }) {
+  const date = <DateValue date={esc.updated_at ?? esc.created_at} />;
+  return (
+    <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
+        <span className="text-xs text-text-primary truncate flex-1 min-w-0">{esc.description || esc.subtype || esc.type}</span>
+        <span className="hidden @dict-inline:inline text-2xs text-text-quaternary shrink-0">{date}</span>
+      </div>
+      <div className="flex items-center gap-2 pl-5 overflow-hidden">
+        <span className="hidden @dict-inline:inline-flex min-w-0"><WorkflowPill type={esc.type || 'unknown'} size="xs" /></span>
+        <span className="flex-1 min-w-0" />
+        <RolePill role={esc.role} />
+        <span className="@dict-inline:hidden text-2xs text-text-quaternary shrink-0">{date}</span>
+      </div>
     </button>
   );
 }
@@ -133,7 +162,7 @@ function AppPicker({ appIds, selected, onSelect }: {
     <div className="relative mb-3 -mt-2" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+        className="flex items-center gap-1 px-2 py-0.5 text-2xs rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
       >
         {selected}
         <svg className={`w-2.5 h-2.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -146,7 +175,7 @@ function AppPicker({ appIds, selected, onSelect }: {
             <button
               key={id}
               onClick={() => { onSelect(id); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+              className={`w-full text-left px-3 py-1.5 text-2xs transition-colors ${
                 selected === id ? 'text-accent bg-accent/5' : 'text-text-secondary hover:bg-surface-hover'
               }`}
             >
@@ -183,26 +212,24 @@ export function HomePage() {
   useWorkflowListEvents();
   useStationMetricsEvents();
 
-  // The home page renders one of two layouts (see the return below): the
-  // operator's task-queue cards, or the builder home shared by admin, engineer,
-  // and superadmin. Gate each data source to the tiers that render it, so no one
-  // fires a request they can't access (403 on control-plane apps → empty
-  // namespace → 400 on jobs):
-  // - All/My escalation firehose → the builder home (everyone except operator)
-  // - Pace Board                 → admin, superadmin only
-  // - Procedural/Graph workflows  → builders (engineer, superadmin)
-  // - Task-queue cards fetch their own scoped metrics inside TaskQueueCards.
+  // The home page renders one of three layouts (see the return below):
+  // - operator: their own lanes as task-queue cards, nothing else
+  // - admin/superadmin: escalations left|right, then the Pace Board FULL WIDTH
+  //   (the chart is the story; full width is what scales it)
+  // - engineer: a 2×2 console — escalations on the upper row, the workflow
+  //   execution columns on the lower row
+  // Gate each data source to the tiers that render it, so no one fires a
+  // request they can't access (403 on control-plane apps → empty namespace →
+  // 400 on jobs). Superadmins reach the execution surfaces from the sidebar;
+  // their home stays the operational story.
   const builderHome = !persona.showTaskQueueCards;
-  // Row 2 width adapts to what the tier can see: pace + both workflow columns
-  // (superadmin), workflows only (engineer), or pace only, full-width (admin).
-  const row2GridClass = persona.canSeePaceBoard && persona.canSeeWorkflows ? 'lg:grid-cols-3'
-    : persona.canSeeWorkflows ? 'lg:grid-cols-2' : '';
+  const showWorkflowColumns = persona.canSeeWorkflows && !persona.canSeePaceBoard;
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
   const stationQ = useStationMetrics('1h', { enabled: persona.canSeePaceBoard });
-  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: persona.canSeeWorkflows });
+  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: showWorkflowColumns });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
-  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: persona.canSeeWorkflows });
+  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: showWorkflowColumns });
   const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
   const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
 
@@ -244,7 +271,7 @@ export function HomePage() {
   // engineer layout below and the superadmin Row 2). Defined once so the JSX
   // has a single source of truth.
   const proceduralColumn = (
-    <div>
+    <div className="@container min-w-0">
       <SectionHeader icon={Code2} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:procedural-executions" actions={
         <div className="flex items-center gap-2">
           <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
@@ -274,7 +301,7 @@ export function HomePage() {
   );
 
   const graphColumn = (
-    <div>
+    <div className="@container min-w-0">
       <SectionHeader icon={Workflow} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:graph-executions" actions={
         <div className="flex items-center gap-2">
           <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
@@ -308,24 +335,27 @@ export function HomePage() {
   if (persona.showTaskQueueCards) {
     return (
       <div>
-        <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
+        <h1 className="heading-1 mb-10">Recent Activity</h1>
         <TaskQueueCards maxRows={2} />
       </div>
     );
   }
 
-  // ── Builder home (admin, engineer, superadmin): the All/My firehose, plus the
-  //    Pace Board (admin/superadmin) and the workflow columns (engineer/
-  //    superadmin). Engineers see everything here except the Pace Board.
+  // ── Builder home. Admin/superadmin: escalations left|right, Pace Board full
+  //    width beneath — the operational story in two rows. Engineer: a 2×2
+  //    console — escalations up top, the workflow execution columns below.
+  //    The pairs stay side by side at EVERY width — the pair IS the console.
+  //    Each COLUMN is a container: its rows condense (date drops below, the
+  //    enrichment pill yields) when the column narrows, and the pair holds.
   return (
     <div>
-      <h1 className="text-3xl font-light text-text-primary mb-10">Recent Activity</h1>
+      <h1 className="heading-1 mb-10">Recent Activity</h1>
 
       {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-14 min-h-[35vh]">
+      <div className="grid grid-cols-2 gap-x-4 @split:gap-x-col-gap">
 
         {/* Col 1: All Escalations */}
-        <div>
+        <div className="@container min-w-0">
           <SectionHeader icon={Inbox} color="text-accent" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
@@ -339,29 +369,14 @@ export function HomePage() {
           ) : (
             <div className="space-y-1">
               {allEscalations.map((esc: any) => (
-                <button
-                  key={esc.id}
-                  onClick={() => navigate(`/escalations/detail/${esc.id}`)}
-                  className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[9px] text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-[12px] text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-5">
-                    <WorkflowPill type={esc.type || 'unknown'} size="xs" />
-                    <span className="flex-1" />
-                    <RolePill role={esc.role} />
-                  </div>
-                </button>
+                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
               ))}
             </div>
           )}
         </div>
 
         {/* Col 2: My Escalations */}
-        <div>
+        <div className="@container min-w-0">
           <SectionHeader icon={Inbox} color="text-accent" count={myEscTotal} docsHash="#docs:dashboard.md:escalations-overview" actions={
             <div className="flex items-center gap-2">
               <ListToolbar onRefresh={() => myEscQ.refetch()} isFetching={myEscQ.isFetching} apiPath={`/escalations?assigned_to=${user?.userId ?? ''}&status=pending&limit=5&sort_by=created_at&order=desc`} />
@@ -375,61 +390,44 @@ export function HomePage() {
           ) : (
             <div className="space-y-1">
               {myEscalations.map((esc: any) => (
-                <button
-                  key={esc.id}
-                  onClick={() => navigate(`/escalations/detail/${esc.id}`)}
-                  className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[9px] text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-[12px] text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-[10px] text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-5">
-                    <WorkflowPill type={esc.type || 'unknown'} size="xs" />
-                    <span className="flex-1" />
-                    <RolePill role={esc.role} />
-                  </div>
-                </button>
+                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Row 2: Pace Board (admin/superadmin) | Procedural | Graph (builders).
-          Engineers get the workflow columns but no Pace Board; admins get the
-          Pace Board full-width. */}
-      {(persona.canSeePaceBoard || persona.canSeeWorkflows) && (
-        <div className={`grid grid-cols-1 ${row2GridClass} gap-x-14 mt-14`}>
-
-          {/* Pace Board — the story being told, at a glance */}
-          {persona.canSeePaceBoard && (
-            <div>
-              <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
-                <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
-              }>
-                Pace Board
-              </SectionHeader>
-              {paceStations.length === 0 ? (
-                <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
-              ) : (
-                <div className={`${isBuilder ? 'h-64' : 'h-80'} cursor-pointer`} onClick={() => navigate('/operations')}>
-                  <PaceChart
-                    stations={paceStations}
-                    selectedRole={null}
-                    onSelect={() => navigate('/operations')}
-                    onUpstreamSelect={() => navigate('/operations')}
-                    periodHours={1}
-                  />
-                </div>
-              )}
+      {/* ── Row 2 (admin/superadmin): the Pace Board — 100% width, half the
+          viewport tall. The chart is the story; this is the space it earns. */}
+      {persona.canSeePaceBoard && (
+        <div className="mt-14">
+          <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
+            <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
+          }>
+            Pace Board
+          </SectionHeader>
+          {paceStations.length === 0 ? (
+            <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
+          ) : (
+            <div className="h-[50vh] cursor-pointer" onClick={() => navigate('/operations')}>
+              <PaceChart
+                stations={paceStations}
+                selectedRole={null}
+                onSelect={() => navigate('/operations')}
+                onUpstreamSelect={() => navigate('/operations')}
+                periodHours={1}
+              />
             </div>
           )}
+        </div>
+      )}
 
-          {/* Workflow executions — builders (engineer, superadmin) */}
-          {persona.canSeeWorkflows && proceduralColumn}
-          {persona.canSeeWorkflows && graphColumn}
+      {/* ── Row 2 (engineer): Procedural | Graph — the lower half of the 2×2,
+          side by side at every width like the row above. */}
+      {showWorkflowColumns && (
+        <div className="grid grid-cols-2 gap-x-4 @split:gap-x-col-gap mt-14">
+          {proceduralColumn}
+          {graphColumn}
         </div>
       )}
     </div>

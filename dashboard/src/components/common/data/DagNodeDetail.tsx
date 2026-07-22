@@ -15,11 +15,11 @@ export function DagNodeDetail({ entry, onClose }: DagNodeDetailProps) {
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono font-medium text-sm text-text-primary truncate">{entry.title}</p>
-          <p className="font-mono text-[10px] text-text-tertiary mt-0.5 truncate">{entry.activity_id}</p>
+          <p className="font-mono text-2xs text-text-tertiary mt-0.5 truncate">{entry.activity_id}</p>
         </div>
         <button
           onClick={onClose}
-          className="text-text-tertiary hover:text-text-primary text-[10px] shrink-0"
+          className="text-text-tertiary hover:text-text-primary text-2xs shrink-0"
         >
           Close
         </button>
@@ -39,7 +39,7 @@ export function DagNodeDetail({ entry, onClose }: DagNodeDetailProps) {
       {/* Input mappings */}
       {hasMappings && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
             Input Mappings
           </p>
           <div className="grid gap-1">
@@ -59,7 +59,7 @@ export function DagNodeDetail({ entry, onClose }: DagNodeDetailProps) {
       {/* Output fields */}
       {hasOutputFields && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
             Output Fields
           </p>
           <p className="font-mono text-text-secondary leading-relaxed">
@@ -71,10 +71,10 @@ export function DagNodeDetail({ entry, onClose }: DagNodeDetailProps) {
       {/* Prompt template (LLM only) */}
       {entry.prompt_template && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
             Prompt Template
           </p>
-          <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-words leading-relaxed max-h-48 overflow-y-auto">
+          <pre className="text-2xs font-mono text-text-secondary whitespace-pre-wrap break-words leading-relaxed max-h-48 overflow-y-auto">
             {entry.prompt_template}
           </pre>
         </div>
@@ -86,7 +86,7 @@ export function DagNodeDetail({ entry, onClose }: DagNodeDetailProps) {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
         {label}
       </p>
       <p className="font-mono text-text-primary">{value}</p>

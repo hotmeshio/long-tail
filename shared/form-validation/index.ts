@@ -4,6 +4,7 @@
  * the API layer enforces the same contract on every resolve surface. Pure
  * functions only — no React, no DOM, no database.
  */
+export * from './derive-field-label';
 export * from './x-lt-bind';
 export * from './x-lt-help';
 export * from './x-lt-show-if';

@@ -49,7 +49,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
 
   return (
     <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px]">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-4">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-4">
         Role Membership
       </p>
 
@@ -61,7 +61,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
         <div className="space-y-4">
           <div>
             <p className="text-sm text-text-primary">{user.display_name || user.external_id}</p>
-            <p className="text-[10px] text-text-tertiary mt-0.5">Member of:</p>
+            <p className="text-2xs text-text-tertiary mt-0.5">Member of:</p>
           </div>
 
           {currentRoles.length === 0 ? (
@@ -79,7 +79,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                   <span className="flex-1 min-w-0 truncate" title={r.role}>
                     <RolePill role={r.role} tone="inherit" />
                   </span>
-                  <span className="w-14 shrink-0 text-[9px] uppercase tracking-wide text-text-tertiary">{r.type}</span>
+                  <span className="w-14 shrink-0 text-2xs uppercase tracking-wide text-text-tertiary">{r.type}</span>
                   {r.type === 'member' && (
                     <>
                       <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
@@ -100,7 +100,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
 
           {available.length > 0 && (
             <div className="pt-3 border-t border-surface-border space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
                 Add Role
               </p>
               {/* Stacked, label-over-control fields (the app's form pattern) —
@@ -119,7 +119,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
               </select>
               <div className="grid grid-cols-2 gap-2">
                 <div className="min-w-0">
-                  <label className="block text-[10px] text-text-tertiary mb-1">Type</label>
+                  <label className="block text-2xs text-text-tertiary mb-1">Type</label>
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as LTRoleType)}
@@ -133,7 +133,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                 </div>
                 {newType === 'member' && (
                   <div className="min-w-0">
-                    <label className="block text-[10px] text-text-tertiary mb-1">Scope</label>
+                    <label className="block text-2xs text-text-tertiary mb-1">Scope</label>
                     <select
                       value={newScope}
                       onChange={(e) => setNewScope(e.target.value)}
@@ -157,7 +157,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                 </button>
               </div>
               {addRole.error && (
-                <p className="text-[10px] text-status-error">{(addRole.error as Error).message}</p>
+                <p className="text-2xs text-status-error">{(addRole.error as Error).message}</p>
               )}
             </div>
           )}

@@ -7,7 +7,7 @@ function ResultCard({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <p className="text-lg font-light text-text-primary">{value.toLocaleString()}</p>
-      <p className="text-[10px] text-text-tertiary">{label}</p>
+      <p className="text-2xs text-text-tertiary">{label}</p>
     </div>
   );
 }
@@ -46,7 +46,7 @@ export function PruneSection() {
 
       {/* Action bar */}
       <div className="flex items-center justify-between pt-2 border-t border-surface-border">
-        <p className="text-[10px] text-text-tertiary">
+        <p className="text-2xs text-text-tertiary">
           {!hasSelection(fields)
             ? 'Select at least one operation to enable pruning.'
             : 'This action permanently deletes data and cannot be undone.'}
@@ -54,7 +54,7 @@ export function PruneSection() {
         <button
           onClick={() => setShowConfirm(true)}
           disabled={!hasSelection(fields) || prune.isPending}
-          className="bg-status-error text-white px-4 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
+          className="bg-status-error text-text-inverse px-4 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
         >
           {prune.isPending ? 'Pruning...' : 'Prune Now'}
         </button>
@@ -63,7 +63,7 @@ export function PruneSection() {
       {/* Results */}
       {result && (
         <div className="bg-surface-sunken rounded-md px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
             Results
           </p>
           <div className="flex flex-wrap gap-6">
@@ -102,7 +102,7 @@ export function PruneSection() {
             <button onClick={() => setShowConfirm(false)} className="btn-secondary text-xs">Cancel</button>
             <button
               onClick={handlePrune}
-              className="bg-status-error text-white px-3 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity"
+              className="bg-status-error text-text-inverse px-3 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity"
               disabled={prune.isPending}
             >
               {prune.isPending ? 'Pruning...' : 'Confirm Prune'}

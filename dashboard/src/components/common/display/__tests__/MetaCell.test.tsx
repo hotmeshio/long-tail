@@ -20,8 +20,8 @@ describe('MetaCell', () => {
   it('steps type down for nested tiers', () => {
     const { container: c1 } = render(<MetaCell label="A" tier={1}>x</MetaCell>);
     const { container: c3 } = render(<MetaCell label="B" tier={3}>y</MetaCell>);
-    // tier 1 value is text-xs; tier 3 is the smaller text-[10px]
+    // tier 1 value is text-xs; deeper tiers sit on the 11px floor (text-2xs)
     expect(c1.querySelector('.text-xs')).toBeTruthy();
-    expect(c3.querySelector('.text-\\[10px\\]')).toBeTruthy();
+    expect(c3.querySelector('.text-2xs')).toBeTruthy();
   });
 });

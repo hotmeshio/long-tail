@@ -83,7 +83,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeWidget';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -219,6 +219,34 @@ export const SEED_ENVELOPES: Array<{
         source: 'seed',
         process: 'rich-form',
         description: 'Showcases every HITL form feature: date pickers, email, file upload, two-column layout, required fields, and ordering.',
+      },
+    },
+  },
+
+  // -- Process 7b: Acme Widget (the perfect-form pair)
+  {
+    label: 'Process 7b — Acme Widget',
+    workflowName: 'acmeWidget',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: {
+        po: 'ACME-1042',
+        widgetId: 'wgt-8127',
+        leftQuantity: 2,
+        rightQuantity: 2,
+        widgetType: 'Standard',
+        sizeCode: 'S2',
+        material: 'alloy',
+        certified: false,
+        addons: [
+          { id: 'mount_front', label: 'Mount — front, left — verified on the widget' },
+          { id: 'gasket_std', label: 'Gasket — standard — verified on the widget' },
+        ],
+      },
+      metadata: {
+        source: 'seed',
+        process: 'acme-widget',
+        description: 'The perfect-form pair: dictionary facts, one explicit Choose… decision, linear reveals, pre-checked standard checks beside clickable custom work, and the rejection report.',
       },
     },
   },

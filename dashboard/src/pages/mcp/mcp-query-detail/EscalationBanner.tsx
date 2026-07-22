@@ -66,7 +66,7 @@ export function EscalationBanner({ escalation, isRoundsExhausted, diagnosis, onR
 
         {originalDiagnosis && (
           <div className="px-4 py-2 mx-4 mb-2 rounded bg-surface-sunken">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">What went wrong</p>
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">What went wrong</p>
             <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">{originalDiagnosis}</p>
           </div>
         )}
@@ -93,7 +93,7 @@ export function EscalationBanner({ escalation, isRoundsExhausted, diagnosis, onR
             </button>
             <Link
               to={`/escalations/detail/${escalation.id}`}
-              className="text-[10px] text-text-tertiary hover:text-accent hover:underline ml-auto"
+              className="text-2xs text-text-tertiary hover:text-accent hover:underline ml-auto"
             >
               Details
             </Link>
@@ -118,7 +118,7 @@ export function EscalationBanner({ escalation, isRoundsExhausted, diagnosis, onR
             </p>
             <div className="flex items-center gap-3 mt-2">
               {escalation && (
-                <Link to={`/escalations/detail/${escalation.id}`} className="text-[10px] text-accent hover:underline">
+                <Link to={`/escalations/detail/${escalation.id}`} className="text-2xs text-accent hover:underline">
                   View escalation
                 </Link>
               )}
@@ -157,7 +157,7 @@ export function EscalationBanner({ escalation, isRoundsExhausted, diagnosis, onR
               </button>
             )}
             {escalation && (
-              <Link to={`/escalations/detail/${escalation.id}`} className="text-[10px] text-accent hover:underline">
+              <Link to={`/escalations/detail/${escalation.id}`} className="text-2xs text-accent hover:underline">
                 View escalation
               </Link>
             )}

@@ -54,18 +54,18 @@ export function ServerRow({
             <span className="flex items-center gap-1.5">
               <ServerName name={server.name} serverId={server.id} short={false} />
               {allTools.length > 0 && (
-                <sup className="text-[9px] font-normal text-accent/70">{allTools.length}</sup>
+                <sup className="text-2xs font-normal text-accent/70">{allTools.length}</sup>
               )}
             </span>
             {tags.length > 0 && (
               <div className="flex gap-1 ml-auto shrink-0">
                 {tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="inline-block px-1.5 py-0 text-[9px] text-text-tertiary bg-surface-sunken rounded">
+                  <span key={tag} className="inline-block px-1.5 py-0 text-2xs text-text-tertiary bg-surface-sunken rounded">
                     {tag}
                   </span>
                 ))}
                 {tags.length > 3 && (
-                  <span className="text-[9px] text-text-quaternary" title={tags.slice(3).join(', ')}>&hellip;</span>
+                  <span className="text-2xs text-text-quaternary" title={tags.slice(3).join(', ')}>&hellip;</span>
                 )}
               </div>
             )}
@@ -124,7 +124,7 @@ export function ServerRow({
           <td className="pl-14 pr-6 py-2.5">
             <ToolPill name={tool.name} size="md" />
             {tool.description && (
-              <p className="text-[11px] leading-snug text-text-quaternary mt-0.5">{tool.description}</p>
+              <p className="text-2xs leading-snug text-text-quaternary mt-0.5">{tool.description}</p>
             )}
           </td>
 

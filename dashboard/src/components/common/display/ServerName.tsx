@@ -21,7 +21,7 @@ export function ServerName({ name, serverId, short = true }: ServerNameProps) {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); navigate(`/mcp/servers/${serverId}`); }}
-        className="group/srv inline-flex items-center gap-1 text-[11px] font-mono text-text-tertiary hover:text-accent transition-colors"
+        className="group/srv inline-flex items-center gap-1 text-2xs font-mono text-text-tertiary hover:text-accent transition-colors"
         title={name}
       >
         <Server className="w-2.5 h-2.5 shrink-0 text-text-quaternary group-hover/srv:text-accent" strokeWidth={1.5} />
@@ -32,7 +32,7 @@ export function ServerName({ name, serverId, short = true }: ServerNameProps) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-mono text-text-tertiary" title={name}>
+    <span className="inline-flex items-center gap-1 text-2xs font-mono text-text-tertiary" title={name}>
       <Server className="w-2.5 h-2.5 shrink-0 text-text-quaternary" strokeWidth={1.5} />
       {display}
     </span>

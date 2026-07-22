@@ -59,10 +59,10 @@ export function CronScheduleEditor({
         </div>
 
         {setCron.isSuccess && (
-          <p className="text-[10px] text-status-success mt-2">Schedule updated</p>
+          <p className="text-2xs text-status-success mt-2">Schedule updated</p>
         )}
         {setCron.error && (
-          <p className="text-[10px] text-status-error mt-2">{setCron.error.message}</p>
+          <p className="text-2xs text-status-error mt-2">{setCron.error.message}</p>
         )}
       </div>
 
@@ -80,10 +80,10 @@ export function CronScheduleEditor({
               }}
               className="flex items-center gap-2 text-left py-0.5 group"
             >
-              <code className="font-mono text-[11px] text-accent group-hover:text-accent-hover">
+              <code className="font-mono text-2xs text-accent group-hover:text-accent-hover">
                 {expr}
               </code>
-              <span className="text-[10px] text-text-tertiary">{desc}</span>
+              <span className="text-2xs text-text-tertiary">{desc}</span>
             </button>
           ))}
         </div>

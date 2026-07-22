@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { deriveFieldLabel } from '../../../lib/derive-field-label';
+import { FieldLabel } from '../resolver-form/FieldChrome';
 
 interface SignatureWidgetProps {
   fieldKey: string;
   value: string;
   onChange: (v: string) => void;
   schema?: Record<string, unknown>;
+  isRequired?: boolean;
 }
 
 /**
  * HTML5 Canvas signature pad. Outputs a PNG data URL.
  */
-export function SignatureWidget({ fieldKey, value, onChange, schema }: SignatureWidgetProps) {
+export function SignatureWidget({ fieldKey, value, onChange, schema, isRequired }: SignatureWidgetProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const label = fieldKey.replace(/[_-]/g, ' ');
+  const label = deriveFieldLabel(fieldKey, schema);
   const helperText = schema?.description as string | undefined;
 
   useEffect(() => {
@@ -23,6 +26,8 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
     if (!ctx) return;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
+    // Deliberately unthemed: the signature is a captured document artifact —
+    // the exported PNG must read like ink on paper regardless of theme.
     ctx.strokeStyle = '#1E1535';
 
     if (value && value.startsWith('data:')) {
@@ -35,10 +40,18 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
   const getPos = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
+    // The backing store is a fixed 400×150 document; the element may display
+    // at any width. Scale pointer coordinates into store space so the ink
+    // lands under the cursor at every display size.
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
     if ('touches' in e) {
-      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
+      };
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }, []);
 
   const startDraw = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -78,11 +91,15 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
 
   return (
     <div>
-      <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+      <FieldLabel isRequired={isRequired}>
         {label}
-      </label>
-      {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
-      <div className="mt-1 border border-surface-border rounded-md overflow-hidden bg-white">
+      </FieldLabel>
+      {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
+      {/* The pad holds its natural document proportion (25rem = the 400px
+          backing store), never stretched to the measure — the exported PNG
+          is the artifact. Narrower cells shrink it; the scaling in getPos
+          keeps the ink under the cursor either way. */}
+      <div className="mt-1 max-w-[25rem] border border-surface-border rounded-md overflow-hidden bg-white">
         <canvas
           ref={canvasRef}
           width={400}
@@ -100,7 +117,7 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
       <button
         type="button"
         onClick={clear}
-        className="mt-1 text-[10px] text-text-tertiary hover:text-accent transition-colors"
+        className="mt-1 text-2xs text-text-tertiary hover:text-accent transition-colors"
       >
         Clear
       </button>

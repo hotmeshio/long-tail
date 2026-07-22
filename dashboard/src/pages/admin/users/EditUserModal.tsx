@@ -52,7 +52,7 @@ export function EditUserModal({
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Display Name
           </label>
           <input
@@ -63,7 +63,7 @@ export function EditUserModal({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Email
           </label>
           <input
@@ -74,7 +74,7 @@ export function EditUserModal({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Status
           </label>
           <select

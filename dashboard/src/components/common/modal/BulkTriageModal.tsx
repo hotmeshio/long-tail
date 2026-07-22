@@ -41,7 +41,7 @@ export function BulkTriageModal({
             placeholder="e.g., image_orientation"
             className="input text-xs font-mono w-full"
           />
-          <p className="text-[10px] text-text-tertiary mt-1">
+          <p className="text-2xs text-text-tertiary mt-1">
             Guides the triage workflow on what remediation to apply
           </p>
         </div>

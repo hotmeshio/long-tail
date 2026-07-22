@@ -21,12 +21,12 @@ export function IdentitySummary({
     <div className="bg-surface-sunken rounded-lg px-4 py-3 space-y-3">
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium">Running as</span>
+          <span className="text-2xs text-text-tertiary uppercase tracking-wider font-medium">Running as</span>
           {effectiveBot && !overrideBot && (
-            <span className="text-[9px] text-text-tertiary">configured default</span>
+            <span className="text-2xs text-text-tertiary">configured default</span>
           )}
           {overrideBot && (
-            <span className="text-[9px] text-accent">admin override</span>
+            <span className="text-2xs text-accent">admin override</span>
           )}
         </div>
         {/* Read-only identity, styled as a field so it reads consistently with
@@ -49,7 +49,7 @@ export function IdentitySummary({
       </div>
       {showOverride && onOverrideChange && (
         <div>
-          <label className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mb-1 block">Override identity</label>
+          <label className="text-2xs text-text-tertiary uppercase tracking-wider font-medium mb-1 block">Override identity</label>
           <BotPicker
             selected={overrideBot ?? ''}
             onChange={onOverrideChange}

@@ -240,10 +240,36 @@ export interface LTStartConfig {
   /**
    * White-label branding. The `appName` replaces "LongTail" in the dashboard
    * header. Defaults to "LongTail" when omitted.
+   *
+   * `customCss` and `themes` give the deployment full control of the design
+   * system: every color, type, and spacing knob in the dashboard flows through
+   * a `--lt-*` CSS variable, so a registered stylesheet restyles the entire
+   * product — the built-in pages and the generated x-lt-* forms alike. The
+   * CSS is served at `GET /api/settings/custom.css` and loaded before first
+   * paint.
    */
   branding?: {
     /** Product name shown in the dashboard header. Default: "LongTail". */
     appName?: string;
+    /** Raw CSS appended to the dashboard stylesheet (served at /api/settings/custom.css). */
+    customCss?: string;
+    /**
+     * Registered themes — each appears in the header theme picker alongside
+     * the built-ins. Author the css under a `[data-theme='<id>']` selector
+     * overriding the `--lt-*` variables.
+     */
+    themes?: Array<{
+      /** Theme id — the `data-theme` attribute value. */
+      id: string;
+      /** Label shown in the theme picker. */
+      label: string;
+      /** Swatch color (hex) for the picker chip. */
+      swatch: string;
+      /** CSS block scoped to `[data-theme='<id>']`. */
+      css: string;
+      /** Marks a dark-surface theme. */
+      dark?: boolean;
+    }>;
   };
 
   /** Authentication. Defaults to the built-in JWT adapter using JWT_SECRET. */

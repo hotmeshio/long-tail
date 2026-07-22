@@ -44,7 +44,7 @@ export function CronWorkflowSelector({
                 )}
               </div>
               {hasCron ? (
-                <p className="text-[11px] font-mono text-text-tertiary mt-1">
+                <p className="text-2xs font-mono text-text-tertiary mt-1">
                   {config.cron_schedule}
                   {describeCron(config.cron_schedule!) && (
                     <span className="font-sans ml-2 text-text-tertiary/60">
@@ -53,10 +53,10 @@ export function CronWorkflowSelector({
                   )}
                 </p>
               ) : (
-                <p className="text-[11px] text-text-tertiary/50 mt-1">No schedule</p>
+                <p className="text-2xs text-text-tertiary/50 mt-1">No schedule</p>
               )}
               {config.description && (
-                <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
+                <p className="text-2xs text-text-tertiary mt-1 leading-relaxed">
                   {config.description}
                 </p>
               )}

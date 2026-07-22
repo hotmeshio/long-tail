@@ -35,7 +35,7 @@ export function SimpleMarkdown({ content, compact }: { content: string; compact?
   }
 
   const sizeClasses = compact
-    ? { text: 'text-xs', heading: 'text-xs', list: 'text-xs', code: 'text-[11px]' }
+    ? { text: 'text-xs', heading: 'text-xs', list: 'text-xs', code: 'text-2xs' }
     : { text: 'text-sm', heading: 'text-sm', list: 'text-sm', code: 'text-xs' };
 
   const allParts: string[] = [];

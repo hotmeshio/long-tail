@@ -210,7 +210,7 @@ export function StreamMessagesPage() {
           <button
             key={f.key}
             onClick={() => setFilter(f.key as any, '')}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-mono rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
             title={`Clear ${f.label} filter: ${f.value}`}
           >
             {f.label}: {truncateMiddle(f.value, 12)}

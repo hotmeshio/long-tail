@@ -39,7 +39,7 @@ export function PlanSidebar({ plan, namespaces, yamlStatuses, activeWorkflow, is
   return (
     <nav className="w-56 shrink-0 overflow-y-auto sticky top-0 self-start">
       <div className="flex items-center justify-between px-3 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Pipeline Tools
         </p>
         {onAdd && (
@@ -63,7 +63,7 @@ export function PlanSidebar({ plan, namespaces, yamlStatuses, activeWorkflow, is
         {namespaces.map((ns) => (
           <div key={ns}>
             {showNsHeaders && (
-              <p className="px-3 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">{ns}</p>
+              <p className="px-3 pt-3 pb-1 text-2xs font-semibold uppercase tracking-widest text-text-tertiary">{ns}</p>
             )}
             {(grouped[ns] || []).map((item) => {
               const isActive = activeWorkflow === item.name;
@@ -80,7 +80,7 @@ export function PlanSidebar({ plan, namespaces, yamlStatuses, activeWorkflow, is
                   {statusIcon(yamlStatuses[item.name])}
                   <div className="min-w-0 text-left">
                     <span className="text-sm block truncate">{item.name}</span>
-                    <span className="text-[10px] text-text-tertiary block truncate">{item.description}</span>
+                    <span className="text-2xs text-text-tertiary block truncate">{item.description}</span>
                   </div>
                 </button>
               );

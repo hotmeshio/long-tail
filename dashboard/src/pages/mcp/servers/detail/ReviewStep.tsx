@@ -46,7 +46,7 @@ export function ReviewStep({ form }: Props) {
           <label className={labelCls}>Tags</label>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {form.tags.map((t) => (
-              <span key={t} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-medium">
+              <span key={t} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-medium">
                 {t}
               </span>
             ))}
@@ -59,7 +59,7 @@ export function ReviewStep({ form }: Props) {
           <label className={labelCls}>Credential Providers</label>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {form.credential_providers.map((p) => (
-              <span key={p} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-medium">
+              <span key={p} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-medium">
                 {p}
               </span>
             ))}

@@ -1,17 +1,20 @@
 import { useCallback } from 'react';
+import { deriveFieldLabel } from '../../../lib/derive-field-label';
+import { FieldLabel } from '../resolver-form/FieldChrome';
 
 interface CodeEditorWidgetProps {
   fieldKey: string;
   value: string;
   onChange: (v: string) => void;
   schema?: Record<string, unknown>;
+  isRequired?: boolean;
 }
 
 /**
  * Monospace textarea with tab-key support for code input.
  */
-export function CodeEditorWidget({ fieldKey, value, onChange, schema }: CodeEditorWidgetProps) {
-  const label = fieldKey.replace(/[_-]/g, ' ');
+export function CodeEditorWidget({ fieldKey, value, onChange, schema, isRequired }: CodeEditorWidgetProps) {
+  const label = deriveFieldLabel(fieldKey, schema);
   const helperText = schema?.description as string | undefined;
   const language = (schema?.['x-lt-language'] as string) ?? '';
 
@@ -31,13 +34,13 @@ export function CodeEditorWidget({ fieldKey, value, onChange, schema }: CodeEdit
 
   return (
     <div>
-      <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+      <FieldLabel isRequired={isRequired}>
         {label}
         {language && (
           <span className="ml-2 text-text-tertiary/60 normal-case font-normal">{language}</span>
         )}
-      </label>
-      {helperText && <p className="text-[10px] text-text-tertiary mt-0.5">{helperText}</p>}
+      </FieldLabel>
+      {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

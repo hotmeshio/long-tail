@@ -28,7 +28,7 @@ export function EscalationDetailPanel({
           <StatusBadge status={escalation.status} />
           <RolePill role={escalation.role} />
           {escalation.type && (
-            <span className="text-[10px] text-text-tertiary">
+            <span className="text-2xs text-text-tertiary">
               {escalation.type}
               {escalation.subtype ? ` / ${escalation.subtype}` : ''}
             </span>
@@ -44,7 +44,7 @@ export function EscalationDetailPanel({
             {escalation.claimed_at ? (
               <>
                 <TimestampCell date={escalation.claimed_at} />
-                <p className="text-[10px] text-text-tertiary mt-0.5">
+                <p className="text-2xs text-text-tertiary mt-0.5">
                   after <DurationValue ms={claimedMs} />
                   {escalation.assigned_to && (
                     <>
@@ -65,7 +65,7 @@ export function EscalationDetailPanel({
             {escalation.resolved_at ? (
               <>
                 <TimestampCell date={escalation.resolved_at} />
-                <p className="text-[10px] text-text-tertiary mt-0.5">
+                <p className="text-2xs text-text-tertiary mt-0.5">
                   <DurationValue ms={resolvedMs} /> total
                 </p>
               </>
@@ -77,10 +77,10 @@ export function EscalationDetailPanel({
 
         {escalation.description && (
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
               Description
             </p>
-            <p className="text-[11px] text-text-secondary leading-relaxed">
+            <p className="text-2xs text-text-secondary leading-relaxed">
               {escalation.description}
             </p>
           </div>
@@ -92,14 +92,14 @@ export function EscalationDetailPanel({
         {escalation.workflow_id && (
           <Link
             to={`/workflows/executions/${encodeURIComponent(escalation.workflow_id)}`}
-            className="block text-[11px] text-accent hover:underline"
+            className="block text-2xs text-accent hover:underline"
           >
             Execution Details
           </Link>
         )}
         <Link
           to={`/escalations/detail/${escalation.id}`}
-          className="block text-[11px] text-accent hover:underline"
+          className="block text-2xs text-accent hover:underline"
         >
           Escalation Details
         </Link>

@@ -33,7 +33,7 @@ export function BotPicker({ selected, onChange, placeholder }: BotPickerProps) {
         className="field flex items-center gap-1.5 text-left cursor-pointer hover:border-accent"
       >
         {selected && selectedBot ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/[0.08] text-text-secondary text-[11px]">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/[0.08] text-text-secondary text-2xs">
             <Bot className="w-2.5 h-2.5 shrink-0 text-accent/75" />
             {selectedBot.display_name || selectedBot.external_id}
             <span

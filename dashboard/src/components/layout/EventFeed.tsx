@@ -61,9 +61,9 @@ function EventRow({ event, forceExpanded = false }: { event: FeedEvent; forceExp
   useEffect(() => { setExpanded(forceExpanded); }, [forceExpanded]);
 
   const isFullsize = forceExpanded;
-  const timeSize = isFullsize ? 'text-xs' : 'text-[9px]';
-  const typeSize = isFullsize ? 'text-xs' : 'text-[9px]';
-  const idSize = isFullsize ? 'text-xs' : 'text-[9px]';
+  const timeSize = isFullsize ? 'text-xs' : 'text-2xs';
+  const typeSize = isFullsize ? 'text-xs' : 'text-2xs';
+  const idSize = isFullsize ? 'text-xs' : 'text-2xs';
   const chevronSize = isFullsize ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5';
   const rowPad = isFullsize ? 'py-2 px-4' : 'py-1 px-3';
   const detailPad = isFullsize ? 'pb-4 px-4' : 'pb-2 px-3';
@@ -161,16 +161,16 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
         className="flex items-center gap-2 w-full px-4 py-1.5 text-left hover:bg-surface-hover transition-colors"
       >
         {open ? <ChevronDown className="w-3 h-3 text-text-tertiary" /> : <ChevronUp className="w-3 h-3 text-text-tertiary" />}
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Event Stream
         </span>
         {events.length > 0 && (
-          <span className="text-[9px] text-text-tertiary">
+          <span className="text-2xs text-text-tertiary">
             {events.length} events
           </span>
         )}
         {events.length > 0 && !open && (
-          <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${TYPE_COLORS[eventColorKey(events[0].type)] || 'text-text-tertiary'} bg-surface-sunken`}>
+          <span className={`text-2xs font-medium px-1 py-0.5 rounded ${TYPE_COLORS[eventColorKey(events[0].type)] || 'text-text-tertiary'} bg-surface-sunken`}>
             {events[0].type}
           </span>
         )}
@@ -207,10 +207,10 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
       {configOpen && (
         <div className="px-4 py-2 border-t border-surface-border/50 bg-surface-sunken/30">
           <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-            <span className="text-[9px] text-text-quaternary uppercase tracking-wider shrink-0">Subscribed:</span>
-            <span className="text-[9px] font-mono text-accent px-1.5 py-0.5 bg-accent/10 rounded">{pagePattern.replace('lt.events.', '')}</span>
+            <span className="text-2xs text-text-quaternary uppercase tracking-wider shrink-0">Subscribed:</span>
+            <span className="text-2xs font-mono text-accent px-1.5 py-0.5 bg-accent/10 rounded">{pagePattern.replace('lt.events.', '')}</span>
             {userPatterns.map((p) => (
-              <span key={p} className="inline-flex items-center gap-1 text-[9px] font-mono text-text-secondary px-1.5 py-0.5 bg-surface-sunken rounded">
+              <span key={p} className="inline-flex items-center gap-1 text-2xs font-mono text-text-secondary px-1.5 py-0.5 bg-surface-sunken rounded">
                 {p.replace('lt.events.', '')}
                 <button onClick={() => removePattern(p)} className="text-text-quaternary hover:text-status-error"><X className="w-2 h-2" /></button>
               </span>
@@ -223,11 +223,11 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
               onChange={(e) => setNewPattern(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && newPattern.trim()) { addPattern(newPattern.trim()); setNewPattern(''); } }}
               placeholder="task.> or file.stored"
-              className="input text-[10px] font-mono flex-1 py-1"
+              className="input text-2xs font-mono flex-1 py-1"
             />
             <button
               onClick={() => { if (newPattern.trim()) { addPattern(newPattern.trim()); setNewPattern(''); } }}
-              className="text-[10px] text-accent hover:text-accent-hover flex items-center gap-0.5"
+              className="text-2xs text-accent hover:text-accent-hover flex items-center gap-0.5"
             >
               <Plus className="w-2.5 h-2.5" /> Add
             </button>
@@ -239,7 +239,7 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
       <Collapsible open={open}>
         <div ref={scrollRef} className="h-48 overflow-y-auto">
           {events.length === 0 ? (
-            <p className="text-[10px] text-text-tertiary py-4 text-center">Waiting for events...</p>
+            <p className="text-2xs text-text-tertiary py-4 text-center">Waiting for events...</p>
           ) : (
             events.map((evt) => <EventRow key={evt.id} event={evt} />)
           )}

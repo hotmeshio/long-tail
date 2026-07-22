@@ -30,8 +30,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   return (
     <div className="border-t border-surface-border/50 py-3 first:border-t-0 first:pt-1">
       <div className="mb-1.5 flex items-baseline justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-tertiary">{title}</span>
-        {hint && <span className="text-[10px] font-mono text-text-tertiary/70">{hint}</span>}
+        <span className="text-2xs font-medium uppercase tracking-wide text-text-tertiary">{title}</span>
+        {hint && <span className="text-2xs font-mono text-text-tertiary/70">{hint}</span>}
       </div>
       {children}
     </div>

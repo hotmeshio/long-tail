@@ -211,10 +211,11 @@ describe('EscalationActionBar', () => {
       required: ['notes'],
       properties: { notes: { type: 'string' } },
     }});
-    renderBar({ mode: 'claimed_by_me', workflowType: null, json, onResolve });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', workflowType: null, json, onResolve, onValidationErrors });
     fireEvent.click(screen.getAllByText('Acknowledge').slice(-1)[0]);
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/Required: notes/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'notes')).toBe(true);
   });
 
   // ── Claimed by me: escalate ──
@@ -294,11 +295,12 @@ describe('EscalationActionBar — required field submit validation', () => {
       required: ['notes'],
       properties: { notes: { type: 'string' } },
     });
-    renderBar({ mode: 'claimed_by_me', json, onResolve, onSubmitAttempt });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onSubmitAttempt, onValidationErrors });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
     expect(onSubmitAttempt).toHaveBeenCalled();
-    expect(screen.getByText(/Required: notes/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'notes')).toBe(true);
   });
 
   it('allows submit when visible required string field has a value', () => {
@@ -360,14 +362,16 @@ describe('EscalationActionBar — required field submit validation', () => {
     const onResolve = vi.fn();
     // A and B both true → C visible and required
     const json = makeJson({ needs_review: true, escalate: true, escalation_notes: '' }, CHAIN_PROPS);
-    renderBar({ mode: 'claimed_by_me', json, onResolve, escalationContext: { metadata: {} } });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors, escalationContext: { metadata: {} } });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/Required: escalation.notes/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'escalation_notes')).toBe(true);
   });
 
   it('blocks submit when required field IS visible (x-lt-showIf truthy) and empty', () => {
     const onResolve = vi.fn();
+    const onValidationErrors = vi.fn();
     const json = makeJson({ action: '' }, {
       required: ['action'],
       properties: {
@@ -379,10 +383,11 @@ describe('EscalationActionBar — required field submit validation', () => {
       json,
       onResolve,
       escalationContext: { metadata: { crew_pill: true } },
+      onValidationErrors,
     });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/Required: action/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'action')).toBe(true);
   });
 
   it('blocks submit when required object (checklist) field has all-falsy values', () => {
@@ -394,10 +399,11 @@ describe('EscalationActionBar — required field submit validation', () => {
         properties: { checks: { type: 'object' } },
       },
     );
-    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/Required: checks/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'checks')).toBe(true);
   });
 
   it('allows submit when required object (checklist) field has at least one truthy value', () => {
@@ -419,10 +425,11 @@ describe('EscalationActionBar — required field submit validation', () => {
     const json = makeJson({ code: 'ab' }, {
       properties: { code: { type: 'string', minLength: 5 } },
     });
-    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/minimum 5 characters/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0][0].message).toMatch(/minimum 5 characters/i);
   });
 
   it('blocks submit when a number field violates maximum', () => {
@@ -430,10 +437,11 @@ describe('EscalationActionBar — required field submit validation', () => {
     const json = makeJson({ score: 150 }, {
       properties: { score: { type: 'number', maximum: 100 } },
     });
-    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/maximum value is 100/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0][0].message).toMatch(/maximum value is 100/i);
   });
 
   it('blocks submit when a string field violates pattern', () => {
@@ -441,10 +449,11 @@ describe('EscalationActionBar — required field submit validation', () => {
     const json = makeJson({ code: 'abc' }, {
       properties: { code: { type: 'string', pattern: '^[0-9]+$', 'x-lt-pattern-error': 'Digits only' } },
     });
-    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/digits only/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0][0].message).toMatch(/digits only/i);
   });
 
   it('allows submit when all field constraints pass', () => {
@@ -477,10 +486,11 @@ describe('EscalationActionBar — required field submit validation', () => {
       required: ['approved'],
       properties: { approved: { type: 'boolean' } },
     });
-    renderBar({ mode: 'claimed_by_me', json, onResolve });
+    const onValidationErrors = vi.fn();
+    renderBar({ mode: 'claimed_by_me', json, onResolve, onValidationErrors });
     fireEvent.click(screen.getByText('Submit'));
     expect(onResolve).not.toHaveBeenCalled();
-    expect(screen.getByText(/Required: approved/i)).toBeInTheDocument();
+    expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'approved')).toBe(true);
   });
 
   it('allows submit when an optional string field is empty', () => {
@@ -512,7 +522,7 @@ describe('EscalationActionBar — required field submit validation', () => {
     expect(onResolve).not.toHaveBeenCalled();
     const errors = onValidationErrors.mock.calls[0][0] as { field: string; message: string }[];
     expect(errors.length).toBeGreaterThanOrEqual(2);
-    expect(errors.some((e) => e.field === 'name')).toBe(true);
-    expect(errors.some((e) => e.field === 'score')).toBe(true);
+    expect(errors.some((e: { field: string }) => e.field === 'name')).toBe(true);
+    expect(errors.some((e: { field: string }) => e.field === 'score')).toBe(true);
   });
 });

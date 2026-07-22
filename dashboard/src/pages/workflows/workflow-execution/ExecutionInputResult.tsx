@@ -28,7 +28,7 @@ export function ExecutionInputResult({ execution }: ExecutionInputResultProps) {
   if (!input && !result) return null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4 mb-6">
       {input !== null && (
         <div>
           <JsonViewer data={input} label="Input Envelope" />

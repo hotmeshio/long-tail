@@ -47,7 +47,7 @@ export function WorkflowPicker({ options, selected, onChange, placeholder }: Wor
         {selected.map((wfType) => (
           <span
             key={wfType}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/[0.08] text-text-secondary text-[11px] font-mono"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/[0.08] text-text-secondary text-2xs font-mono"
           >
             <Workflow className="w-2.5 h-2.5 shrink-0 text-accent/75" />
             {wfType}
@@ -64,7 +64,7 @@ export function WorkflowPicker({ options, selected, onChange, placeholder }: Wor
       </button>
 
       {open && (
-        <div className="absolute z-[100] mt-1 w-full bg-white border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-[100] mt-1 w-full bg-surface-raised border border-surface-border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {options.length === 0 ? (
             <p className="px-3 py-2 text-xs text-text-tertiary">No registered workflows</p>
           ) : (

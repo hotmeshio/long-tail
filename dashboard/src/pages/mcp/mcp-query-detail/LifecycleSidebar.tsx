@@ -57,11 +57,11 @@ export function LifecycleSidebar({
       {/* Out-of-sync warning */}
       {needsRedeploy && effectiveStatus !== 'draft' && effectiveStatus !== 'archived' && (
         <div className="mb-4 px-3 py-2 rounded-md bg-status-pending/10 border border-status-pending/30">
-          <p className="text-[10px] font-semibold text-status-pending mb-1">Graph modified</p>
-          <p className="text-[10px] text-text-secondary leading-relaxed">
+          <p className="text-2xs font-semibold text-status-pending mb-1">Graph modified</p>
+          <p className="text-2xs text-text-secondary leading-relaxed">
             v{contentVersion} edited since deploy (v{deployedContentVersion}). Redeploy to apply changes.
           </p>
-          <button onClick={onDeploy} disabled={isPending} className="mt-1.5 text-[10px] font-medium text-status-pending hover:underline">
+          <button onClick={onDeploy} disabled={isPending} className="mt-1.5 text-2xs font-medium text-status-pending hover:underline">
             {isPending ? 'Deploying...' : 'Deploy now'}
           </button>
         </div>
@@ -100,21 +100,21 @@ export function LifecycleSidebar({
                 {/* Show the next-step action */}
                 {isCurrent && step === 'draft' && (
                   <div className="mt-2">
-                    <button onClick={onDeploy} disabled={isPending} className="btn-primary text-[11px] px-3 py-1">
+                    <button onClick={onDeploy} disabled={isPending} className="btn-primary text-2xs px-3 py-1">
                       {isPending ? 'Deploying...' : 'Deploy & Activate'}
                     </button>
                   </div>
                 )}
                 {isCurrent && step === 'active' && (
                   <div className="mt-2">
-                    <button onClick={onArchive} disabled={isPending} className="text-[11px] text-text-tertiary hover:text-status-error">
+                    <button onClick={onArchive} disabled={isPending} className="text-2xs text-text-tertiary hover:text-status-error">
                       Archive
                     </button>
                   </div>
                 )}
                 {isCurrent && step === 'archived' && onRestore && (
                   <div className="mt-2">
-                    <button onClick={onRestore} disabled={isPending} className="text-[11px] font-medium text-accent hover:text-accent/80">
+                    <button onClick={onRestore} disabled={isPending} className="text-2xs font-medium text-accent hover:text-accent/80">
                       {isPending ? 'Restoring...' : 'Restore to Draft'}
                     </button>
                   </div>
@@ -128,17 +128,17 @@ export function LifecycleSidebar({
       {/* App namespace info */}
       {appId && (
         <div className="mt-4 pt-4 border-t border-surface-border">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">App Namespace</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">App Namespace</p>
           <p className="text-xs font-mono text-text-primary">{appId}</p>
           <div className="flex items-center gap-3 mt-1.5">
             {appVersion != null && (
-              <span className="text-[10px] text-text-secondary">
+              <span className="text-2xs text-text-secondary">
                 app v{appVersion} {'\u2192'} <span className="text-accent">v{appVersion + 1}</span> on deploy
               </span>
             )}
           </div>
           {siblingCount != null && siblingCount > 1 && (
-            <p className="text-[10px] text-text-tertiary mt-1">
+            <p className="text-2xs text-text-tertiary mt-1">
               {siblingCount} tool{siblingCount === 1 ? '' : 's'} in this namespace
             </p>
           )}
@@ -148,7 +148,7 @@ export function LifecycleSidebar({
       {/* Content version */}
       {contentVersion != null && (
         <div className="mt-4 pt-4 border-t border-surface-border">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Content</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool Content</p>
           <p className="text-xs font-mono text-text-primary">
             v{contentVersion}
             {deployedContentVersion != null && (
@@ -161,14 +161,14 @@ export function LifecycleSidebar({
       {/* Delete -- only for draft/archived */}
       {(status === 'draft' || status === 'archived') && (
         <div className="mt-4 pt-4 border-t border-surface-border">
-          <button onClick={onDelete} disabled={isPending} className="inline-flex items-center gap-1.5 text-[11px] text-status-error/70 hover:text-status-error transition-colors hover:underline">
+          <button onClick={onDelete} disabled={isPending} className="inline-flex items-center gap-1.5 text-2xs text-status-error/70 hover:text-status-error transition-colors hover:underline">
             <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
             Delete Compiled Workflow
           </button>
         </div>
       )}
 
-      {error && <p className="mt-3 text-[11px] text-status-error">{error}</p>}
+      {error && <p className="mt-3 text-2xs text-status-error">{error}</p>}
     </div>
   );
 }

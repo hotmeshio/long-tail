@@ -7,19 +7,31 @@ import { usePersona } from '../../hooks/usePersona';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
+import { ShellPanelProvider, useShellPanel } from '../../hooks/useShellPanel';
+import { SlidePanel } from '../common/layout/SlidePanel';
 import { Header } from './Header';
-import { ChoreographySidebar } from './ChoreographySidebar';
-import { PinnedViewsSidebar } from './PinnedViewsSidebar';
-import { OrchestrationSidebar } from './OrchestrationSidebar';
-import { DesignSidebar } from './DesignSidebar';
-import { StorageSidebar } from './StorageSidebar';
-import { AdminSidebar } from './AdminSidebar';
+import { ShellNavSections } from './ShellNavSections';
+import { NavDrawer } from './NavDrawer';
 import { EventFeed } from './EventFeed';
 import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
 import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 
+/**
+ * The canonical container layout. Every authenticated page renders inside it:
+ *
+ *   ┌──────────────── Header (full width) ────────────────┐
+ *   │ left nav │        main viewport        │ right panel │
+ *   └──────────────── EventFeed (full width) ─────────────┘
+ *
+ * - Header and EventFeed span the full width.
+ * - The left nav and the global right SlidePanel are flex siblings of the
+ *   main viewport — content narrows when either opens, nothing overlays it.
+ *   Pages fill the right panel via useShellPanel().
+ * - DocsDrawer is the full-screen overlay for markdown docs (#docs hash).
+ * - Pages exempt from the shell: Login and OAuth connect flows only.
+ */
 function ShellLayout() {
   const { isBuilder, isOps, viewAs } = useAccess();
   const { canSeePaceBoard } = usePersona();
@@ -28,6 +40,7 @@ function ShellLayout() {
   const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [feedConfigOpen, setFeedConfigOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(() => window.location.hash.startsWith('#docs'));
   const location = useLocation();
@@ -54,24 +67,23 @@ function ShellLayout() {
   return (
     <div className="h-screen bg-surface flex flex-col">
       {/* Full-width header */}
-      <Header onToggleEventFeed={() => setFeedOpen((v) => !v)} onToggleDocs={() => setDocsOpen((v) => !v)} />
+      <Header
+        onToggleEventFeed={() => setFeedOpen((v) => !v)}
+        onToggleDocs={() => setDocsOpen((v) => !v)}
+        onToggleNav={() => setNavOpen((v) => !v)}
+      />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar — the rail lives at lg+; below lg the NavDrawer is the nav. */}
         <aside
           className={`${
             collapsed ? 'w-16' : 'w-60'
-          } shrink-0 bg-surface-raised border-r border-surface-border flex flex-col transition-[width] duration-200 ease-out overflow-hidden relative z-20`}
+          } shrink-0 bg-surface-raised border-r border-surface-border hidden lg:flex flex-col transition-[width] duration-200 ease-out overflow-hidden relative z-20`}
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
-            <PinnedViewsSidebar />
-            {isBuilder && <OrchestrationSidebar />}
-            {isBuilder && aiEnabled && <DesignSidebar />}
-            {isBuilder && <StorageSidebar />}
-            {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} isOps={isOps} />}
+            <ShellNavSections aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
           </nav>
 
           {/* Collapse / Expand toggle */}
@@ -92,7 +104,7 @@ function ShellLayout() {
           {/* Version line — long-tail + HotMesh SDK, shown when expanded. Single line. */}
           {!collapsed && settings?.environment && (
             <div
-              className="shrink-0 px-5 pb-3 text-[10px] leading-tight text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis"
+              className="shrink-0 px-5 pb-3 text-2xs leading-tight text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis"
               title={`long-tail v${settings.environment.longTailVersion} · HotMesh v${settings.environment.hotmeshVersion} · Node ${settings.environment.nodeVersion} · ${settings.environment.nodeEnv}`}
             >
               long-tail v{settings.environment.longTailVersion}
@@ -103,13 +115,31 @@ function ShellLayout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           {/* Full width — pages get all the room the window offers */}
-          <div ref={contentRef} className="w-full px-10 py-10 pb-16 animate-page-in h-full flex flex-col">
+          {/* The page-level container: page grids use @split/@wall/@table
+              variants against THIS width, which shrinks when panels open. */}
+          <div ref={contentRef} className="w-full px-page-x py-8 pb-16 animate-page-in h-full flex flex-col @container">
             <Outlet />
           </div>
         </main>
+
+        {/* Global right panel — the mirror of the left nav. Pages populate it
+            via useShellPanel(); it animates as a flex sibling so the main
+            viewport narrows rather than being covered. */}
+        <ShellRightPanel />
       </div>
+
+      {/* Below-lg navigation drawer */}
+      <NavDrawer
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        aiEnabled={aiEnabled}
+        isBuilder={isBuilder}
+        isOps={isOps}
+        viewAs={viewAs}
+        canSeePaceBoard={canSeePaceBoard}
+      />
 
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} configOpen={feedConfigOpen} onToggleConfig={() => setFeedConfigOpen((v) => !v)} />
@@ -117,6 +147,15 @@ function ShellLayout() {
       {aiEnabled && <HelpButton />}
       {aiEnabled && <HelpPanel />}
     </div>
+  );
+}
+
+function ShellRightPanel() {
+  const { node, width, open } = useShellPanel();
+  return (
+    <SlidePanel open={open} width={width} className="border-l border-surface-border bg-surface-raised">
+      {node}
+    </SlidePanel>
   );
 }
 
@@ -130,9 +169,11 @@ export function Shell() {
 
   return (
     <SidebarProvider>
-      <HelpAssistantProvider>
-        <ShellLayout />
-      </HelpAssistantProvider>
+      <ShellPanelProvider>
+        <HelpAssistantProvider>
+          <ShellLayout />
+        </HelpAssistantProvider>
+      </ShellPanelProvider>
     </SidebarProvider>
   );
 }

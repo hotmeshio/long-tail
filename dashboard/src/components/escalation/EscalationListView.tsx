@@ -139,7 +139,7 @@ function ActiveCard({ esc, card, onOpen }: {
     <div>
       <div className="flex items-start justify-between gap-6">
         <button onClick={onOpen} className="text-left group min-w-0">
-          <h3 className="text-2xl font-light text-text-primary group-hover:text-accent transition-colors leading-tight">
+          <h3 className="heading-2 group-hover:text-accent transition-colors leading-tight">
             {title}
           </h3>
           {card.subtitle && (
@@ -163,7 +163,7 @@ function ActiveCard({ esc, card, onOpen }: {
         <dl className="flex flex-wrap gap-x-10 gap-y-4 mt-6">
           {card.fields.map((f, i) => (
             <div key={i}>
-              <dt className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">{f.label}</dt>
+              <dt className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">{f.label}</dt>
               <dd className="text-xs text-text-primary mt-1"><FieldValue raw={interpolateHelp(f.value, ctx)} /></dd>
             </div>
           ))}
@@ -238,20 +238,20 @@ function HistoryColumn({ role, def, onRowClick }: {
                   {rowDef.title ? interpolateHelp(rowDef.title, ctx) : e.type}
                 </span>
                 {rowDef.subtitle && (
-                  <span className="block text-[10px] text-text-tertiary truncate">
+                  <span className="block text-2xs text-text-tertiary truncate">
                     {interpolateHelp(rowDef.subtitle, ctx)}
                   </span>
                 )}
               </span>
               {rowDef.meta
-                ? <span className="text-[10px] text-text-tertiary shrink-0">{interpolateHelp(rowDef.meta, ctx)}</span>
-                : e.resolved_at && <DateValue date={e.resolved_at} format="relative" className="text-[10px] text-text-tertiary shrink-0 whitespace-nowrap" />}
+                ? <span className="text-2xs text-text-tertiary shrink-0">{interpolateHelp(rowDef.meta, ctx)}</span>
+                : e.resolved_at && <DateValue date={e.resolved_at} format="relative" className="text-2xs text-text-tertiary shrink-0 whitespace-nowrap" />}
             </button>
           );
         })}
       </div>
       {total > rows.length && (
-        <p className="text-[10px] text-text-quaternary mt-3">Showing {rows.length} of {total}.</p>
+        <p className="text-2xs text-text-quaternary mt-3">Showing {rows.length} of {total}.</p>
       )}
     </div>
   );
@@ -278,7 +278,7 @@ function FacetTable({ schema, rows, onRowClick }: {
             {columns.map((col, i) => (
               <th
                 key={i}
-                className="text-left pb-2 pr-8 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap"
+                className="text-left pb-2 pr-8 text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap"
               >
                 {col.label}
               </th>
@@ -320,7 +320,7 @@ function FacetTable({ schema, rows, onRowClick }: {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-3">{children}</p>
+    <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-3">{children}</p>
   );
 }
 
@@ -423,11 +423,11 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet 
             data-testid="facet-board-card"
           >
             <div className="flex items-center justify-between gap-2 mb-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary truncate">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-text-secondary truncate">
                 {title}
               </span>
               <span
-                className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium"
+                className="shrink-0 px-1.5 py-0.5 rounded text-2xs font-mono font-medium"
                 style={{ color: stateHue.text, backgroundColor: stateHue.bg }}
                 title={state}
               >
@@ -444,8 +444,8 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet 
                   const linkable = bound != null && raw !== undefined && raw !== null && raw !== '';
                   return (
                     <div key={i} className="group/frow flex items-baseline justify-between gap-3">
-                      <dt className="text-[9px] uppercase tracking-wider text-text-quaternary shrink-0">{f.label}</dt>
-                      <dd className="min-w-0 flex items-baseline gap-1 text-[11px] text-text-primary">
+                      <dt className="text-2xs uppercase tracking-wider text-text-quaternary shrink-0">{f.label}</dt>
+                      <dd className="min-w-0 flex items-baseline gap-1 text-2xs text-text-primary">
                         <span className="truncate">
                           <FieldValue raw={interpolateHelp(f.value, ctx)} format={f.format} />
                         </span>
@@ -536,7 +536,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
       <div>
         {header}
         {resolvedTotal > 0 && (
-          <p className="text-[11px] text-text-tertiary mb-3 tabular-nums">
+          <p className="text-2xs text-text-tertiary mb-3 tabular-nums">
             {resolvedTotal.toLocaleString()} result{resolvedTotal !== 1 ? 's' : ''}
           </p>
         )}
@@ -585,7 +585,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
     return (
       <div>
         {header}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-12 items-start">
+        <div className="grid grid-cols-1 @split:grid-cols-[1.6fr_1fr] gap-12 items-start">
           <div>
             <SectionLabel>Active</SectionLabel>
             {activeBlock}

@@ -20,14 +20,14 @@ export function RunAsSelector({ selected, onChange }: RunAsSelectorProps) {
           {selected ? (
             <>
               <Bot className="w-3 h-3 text-accent/75 shrink-0" strokeWidth={1.5} />
-              <span className="text-[10px] text-text-secondary">
+              <span className="text-2xs text-text-secondary">
                 Running as <span className="font-medium text-accent font-mono">{selected}</span>
               </span>
             </>
           ) : (
             <>
               <UserCircle className="w-3 h-3 text-accent/75 shrink-0" strokeWidth={1.5} />
-              <span className="text-[10px] text-text-secondary">
+              <span className="text-2xs text-text-secondary">
                 Running as <span className="font-medium text-accent">{user?.displayName || user?.userId || 'you'}</span>
               </span>
             </>

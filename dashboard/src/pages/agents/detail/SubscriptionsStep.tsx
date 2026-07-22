@@ -65,7 +65,7 @@ export function SubscriptionsStep({ form, set }: Props) {
     return (
       <div className="max-w-xl">
         <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between mb-8">
-          <p className="text-[12px] text-text-secondary italic leading-relaxed">
+          <p className="text-xs text-text-secondary italic leading-relaxed">
             Optional. When a matching event is published, the automation runs the configured workflow with the event payload.
           </p>
           <button onClick={() => { window.location.hash = '#docs:agents.md:subscriptions'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Subscriptions"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
@@ -73,7 +73,7 @@ export function SubscriptionsStep({ form, set }: Props) {
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Radio className="w-8 h-8 text-text-quaternary/40 mb-3" strokeWidth={1} />
           <p className="text-sm text-text-tertiary mb-2">No event subscriptions yet</p>
-          <p className="text-[11px] text-text-quaternary max-w-sm mb-6">
+          <p className="text-2xs text-text-quaternary max-w-sm mb-6">
             Each subscription listens for a topic pattern and runs a workflow when it matches.
           </p>
           <button onClick={addSub} className="flex items-center gap-2 text-xs text-accent hover:text-accent-hover transition-colors">
@@ -87,7 +87,7 @@ export function SubscriptionsStep({ form, set }: Props) {
   return (
     <div>
       <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between mb-6">
-        <p className="text-[12px] text-text-secondary italic leading-relaxed">
+        <p className="text-xs text-text-secondary italic leading-relaxed">
           Optional. When a matching event is published, the automation runs the configured workflow with the event payload.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:subscriptions'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Subscriptions"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
@@ -103,16 +103,16 @@ export function SubscriptionsStep({ form, set }: Props) {
               <button onClick={() => setSelected(i)} className="flex-1 text-left px-3 py-2 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${isComplete(s) ? 'bg-status-success' : 'bg-surface-border'}`} />
-                  <span className="text-[11px] font-mono truncate">{s.topic || 'new subscription'}</span>
+                  <span className="text-2xs font-mono truncate">{s.topic || 'new subscription'}</span>
                 </div>
-                <span className="text-[9px] text-text-quaternary ml-3">→ {s.workflow_type || s.tool_name || s.reaction_type}</span>
+                <span className="text-2xs text-text-quaternary ml-3">→ {s.workflow_type || s.tool_name || s.reaction_type}</span>
               </button>
               <button onClick={(e) => { e.stopPropagation(); if (confirm(`Remove subscription "${s.topic || 'new'}"?\n\nThis takes effect when you save.`)) removeSub(i); }} className="opacity-0 group-hover/sub:opacity-100 px-2 text-text-quaternary hover:text-status-error transition-all" title="Remove">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
           ))}
-          <button onClick={addSub} className="w-full flex items-center gap-1.5 px-3 py-2 text-[11px] text-accent hover:text-accent-hover transition-colors">
+          <button onClick={addSub} className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs text-accent hover:text-accent-hover transition-colors">
             <Plus className="w-3 h-3" /> Add
           </button>
         </div>
@@ -133,12 +133,12 @@ export function SubscriptionsStep({ form, set }: Props) {
               {/* Schema preview when a catalog topic is selected */}
               {selectedCatalogEntry?.payload_schema && (
                 <div className="mt-3 p-3 rounded-md bg-surface-sunken border border-surface-border">
-                  <p className="text-[10px] text-text-quaternary mb-1 uppercase tracking-wider font-medium">Payload Schema</p>
-                  <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap overflow-x-auto max-h-40">
+                  <p className="text-2xs text-text-quaternary mb-1 uppercase tracking-wider font-medium">Payload Schema</p>
+                  <pre className="text-2xs font-mono text-text-secondary whitespace-pre-wrap overflow-x-auto max-h-40">
                     {JSON.stringify(selectedCatalogEntry.payload_schema.properties ?? selectedCatalogEntry.payload_schema, null, 2)}
                   </pre>
                   {selectedCatalogEntry.description && (
-                    <p className="text-[10px] text-text-tertiary mt-2 italic">{selectedCatalogEntry.description}</p>
+                    <p className="text-2xs text-text-tertiary mt-2 italic">{selectedCatalogEntry.description}</p>
                   )}
                 </div>
               )}
@@ -201,7 +201,7 @@ export function SubscriptionsStep({ form, set }: Props) {
                       key={op.label}
                       type="button"
                       onClick={() => updateSub(selected, 'filter', op.value)}
-                      className="px-2 py-0.5 text-[10px] font-mono rounded bg-accent/8 text-accent hover:bg-accent/15 transition-colors"
+                      className="px-2 py-0.5 text-2xs font-mono rounded bg-accent/8 text-accent hover:bg-accent/15 transition-colors"
                     >
                       {op.label}
                     </button>
@@ -294,7 +294,7 @@ function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
       <div>
         {fields.length > 0 && (
           <div className="flex justify-end mb-1">
-            <button type="button" onClick={() => setJsonMode(false)} className="text-[10px] text-accent hover:text-accent-hover transition-colors">Form view</button>
+            <button type="button" onClick={() => setJsonMode(false)} className="text-2xs text-accent hover:text-accent-hover transition-colors">Form view</button>
           </div>
         )}
         <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={8} className={jsonCls} placeholder={'{\n  "domain": "{event.data.name}",\n  "key": "{event.data.path}"\n}'} />
@@ -306,10 +306,10 @@ function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-[11px] text-text-tertiary">
+        <p className="text-2xs text-text-tertiary">
           Map each input to an event field or enter a static value.
         </p>
-        <button type="button" onClick={() => setJsonMode(true)} className="text-[10px] text-text-tertiary hover:text-accent transition-colors">Raw JSON</button>
+        <button type="button" onClick={() => setJsonMode(true)} className="text-2xs text-text-tertiary hover:text-accent transition-colors">Raw JSON</button>
       </div>
 
       <div className="space-y-4">
@@ -324,13 +324,13 @@ function CapabilityMappingForm({ tool, value, onChange, eventSchema }: {
           return (
             <div key={key} className="bg-surface-sunken/30 rounded-md px-4 py-3">
               <div className="flex items-baseline gap-2 mb-0.5">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+                <label className="text-2xs font-semibold uppercase tracking-wider text-text-secondary">
                   {key.replace(/[_-]/g, ' ')}
                   {isReq && <span className="text-status-error ml-0.5">*</span>}
                 </label>
-                {fieldType && <span className="text-[9px] text-text-quaternary">{fieldType}</span>}
+                {fieldType && <span className="text-2xs text-text-quaternary">{fieldType}</span>}
               </div>
-              {desc && <p className="text-[10px] text-text-quaternary mb-2">{desc}</p>}
+              {desc && <p className="text-2xs text-text-quaternary mb-2">{desc}</p>}
               <MappingFieldInput
                 value={currentVal}
                 onChange={(v) => updateField(key, v)}
@@ -401,7 +401,7 @@ function MappingFieldInput({ value, onChange, suggestions, fieldType, placeholde
       <div>
         <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
           {items.map((item, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono bg-accent/10 text-accent rounded-full">
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-mono bg-accent/10 text-accent rounded-full">
               {item}
               <button
                 type="button"
@@ -451,8 +451,8 @@ function MappingFieldInput({ value, onChange, suggestions, fieldType, placeholde
               onClick={() => { onChange(s.value); setOpen(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-surface-hover transition-colors flex items-center gap-3 ${value === s.value ? 'bg-accent/5' : ''}`}
             >
-              <span className="text-[11px] font-mono text-accent shrink-0">{s.value}</span>
-              <span className="text-[10px] text-text-quaternary truncate">{s.label}</span>
+              <span className="text-2xs font-mono text-accent shrink-0">{s.value}</span>
+              <span className="text-2xs text-text-quaternary truncate">{s.label}</span>
             </button>
           ))}
         </div>
@@ -524,10 +524,10 @@ function TopicCombobox({ value, onChange, topics }: {
                   value === t.topic ? 'bg-accent/5' : ''
                 }`}
               >
-                <span className="text-[11px] font-mono text-text-primary shrink-0">{t.topic}</span>
-                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0 ${catCls}`}>{t.category}</span>
+                <span className="text-2xs font-mono text-text-primary shrink-0">{t.topic}</span>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium shrink-0 ${catCls}`}>{t.category}</span>
                 {t.description && (
-                  <span className="text-[10px] text-text-quaternary truncate">{t.description}</span>
+                  <span className="text-2xs text-text-quaternary truncate">{t.description}</span>
                 )}
               </button>
             );

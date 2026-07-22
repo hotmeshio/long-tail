@@ -58,6 +58,25 @@ Sections are ordered by the first field that carries the section name (respects 
 
 ---
 
+## Nested Column Groups (`x-lt-column-group`)
+
+In a two-column layout, consecutive fields sharing an `x-lt-column-group` name render inside a single grid cell as their own two-column pair — a 2×2 arrangement. One nesting level is supported; the token is ignored when the schema layout is not `two-column`.
+
+```json
+{
+  "x-lt-layout": "two-column",
+  "properties": {
+    "left_quantity":  { "type": "number", "title": "Left Qty",  "x-lt-column-group": "quantities" },
+    "right_quantity": { "type": "number", "title": "Right Qty", "x-lt-column-group": "quantities" },
+    "notes":          { "type": "string", "format": "textarea" }
+  }
+}
+```
+
+The two quantities share one cell of the outer grid (each taking half of it) while `notes` occupies a normal cell beside them.
+
+---
+
 ## Payload Binding (`x-lt-bind`)
 
 The form is flat; the payload the workflow consumes rarely is. A field may declare `x-lt-bind` — the path its value occupies in the resolver payload (dot keys, optional `[n]` indices). The dashboard maps the flat form through the binds on submit, and reverse-maps `envelope.formDefaults` through them to prefill. A field with no bind lands at its own name at the payload root.
@@ -89,7 +108,7 @@ Only the form is versioned on the role — the payload shape is the workflow's o
 
 ## Help Panel (`x-lt-help`)
 
-Schema-level `x-lt-help` carries the form's guidance — checklists, tier tables, callouts, links — as markdown. The dashboard renders it in the side panel beside the form, so the form itself stays a clean title-and-fields surface while the SOP sits one glance to the right. The help text versions with the form: it lives in the same `form_schema` snapshot in `lt_role_schemas`.
+Schema-level `x-lt-help` carries the form's guidance — checklists, tier tables, callouts, links — as markdown. The dashboard renders it in the side panel beside the form, so the form itself stays a clean title-and-fields surface while the SOP sits one glance to the right. When a schema carries `x-lt-help` (or `x-lt-context`), a help icon renders beside the form title; it opens the Instructions view of the side panel. The help text versions with the form: it lives in the same `form_schema` snapshot in `lt_role_schemas`.
 
 ```json
 {

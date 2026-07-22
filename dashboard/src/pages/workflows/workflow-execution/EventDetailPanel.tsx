@@ -39,7 +39,7 @@ export function EventDetailPanel({ event, childTask, pending = false, jid, appId
               ?? event.event_type}
           </p>
           {pending && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-status-warning/15 text-status-warning">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-medium bg-status-warning/15 text-status-warning">
               <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-warning animate-pulse" />
               Pending
             </span>

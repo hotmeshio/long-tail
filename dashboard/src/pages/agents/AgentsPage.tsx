@@ -28,7 +28,7 @@ const columns: Column<Agent>[] = [
         <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${row.status === 'active' ? 'bg-status-success' : row.status === 'paused' ? 'bg-status-warning' : row.status === 'error' ? 'bg-status-error' : 'bg-surface-border'}`} />
         <span className="text-xs font-medium text-text-primary whitespace-nowrap">{row.id}</span>
         {row.description && (
-          <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary">{row.description}</p>
+          <p className="flex-1 min-w-0 truncate text-2xs text-text-tertiary">{row.description}</p>
         )}
       </div>
     ),
@@ -37,7 +37,7 @@ const columns: Column<Agent>[] = [
     key: 'knowledge_domain',
     label: 'Knowledge',
     render: (row) => row.knowledge_domain
-      ? <span className="text-[10px] font-mono text-text-secondary whitespace-nowrap">{row.knowledge_domain}</span>
+      ? <span className="text-2xs font-mono text-text-secondary whitespace-nowrap">{row.knowledge_domain}</span>
       : <span className="text-text-quaternary">—</span>,
     className: 'w-28',
   },
@@ -48,7 +48,7 @@ const columns: Column<Agent>[] = [
       const scheds = (row.behaviors as any)?.schedules as any[] | undefined;
       const crons = scheds?.length ? scheds.map((s: any) => s.cron) : row.behaviors?.cron ? [row.behaviors.cron] : [];
       if (!crons.length) return <span className="text-text-quaternary">—</span>;
-      return <span className="text-[10px] font-mono text-text-secondary whitespace-nowrap">{crons[0]}{crons.length > 1 ? ` +${crons.length - 1}` : ''}</span>;
+      return <span className="text-2xs font-mono text-text-secondary whitespace-nowrap">{crons[0]}{crons.length > 1 ? ` +${crons.length - 1}` : ''}</span>;
     },
     className: 'w-28',
   },
@@ -60,7 +60,7 @@ const columns: Column<Agent>[] = [
       const topics = row.sub_topics ?? [];
       if (!count) return <span className="text-text-quaternary">—</span>;
       const first = topics[0]?.replace(/^lt\.events\./, '') ?? '';
-      return <span className="text-[10px] font-mono text-text-secondary whitespace-nowrap">{first}{count > 1 ? ` +${count - 1}` : ''}</span>;
+      return <span className="text-2xs font-mono text-text-secondary whitespace-nowrap">{first}{count > 1 ? ` +${count - 1}` : ''}</span>;
     },
     className: 'w-36',
   },

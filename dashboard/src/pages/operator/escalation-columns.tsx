@@ -7,7 +7,7 @@ import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 import { CountdownTimer } from '../../components/common/display/CountdownTimer';
-import { formatAgoCompact, formatDateTime } from '../../lib/format';
+import { formatAgoCompact } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
@@ -53,7 +53,7 @@ export function MetadataCell({
   const [expanded, setExpanded] = useState(false);
 
   if (!metadata || Object.keys(metadata).length === 0) {
-    return <span className="text-[11px] text-text-tertiary">—</span>;
+    return <span className="text-2xs text-text-tertiary">—</span>;
   }
 
   const hl = highlightKeys ?? [];
@@ -78,18 +78,18 @@ export function MetadataCell({
           return (
             <div key={k} className="group/mrow flex items-center gap-1 min-w-0">
               <span
-                className={`shrink-0 w-14 text-[9px] font-mono uppercase tracking-wide truncate ${isHl ? 'text-accent' : 'text-text-tertiary'}`}
+                className={`shrink-0 w-14 text-2xs font-mono uppercase tracking-wide truncate ${isHl ? 'text-accent' : 'text-text-tertiary'}`}
                 title={k}
               >
                 {k}
               </span>
               <span
-                className={`flex-1 min-w-0 text-[11px] font-medium truncate ${isHl ? 'text-text-primary' : 'text-text-secondary'}`}
+                className={`flex-1 min-w-0 text-2xs font-medium truncate ${isHl ? 'text-text-primary' : 'text-text-secondary'}`}
                 title={sv}
               >
                 {sv}
               </span>
-              <span className="flex items-center gap-px shrink-0 opacity-0 group-hover/mrow:opacity-100 transition-opacity">
+              <span className="flex items-center gap-px shrink-0 opacity-50 group-hover/mrow:opacity-100 transition-opacity">
                 <Link
                   to={metadataFacetUrl(k, metadata[k], role)}
                   className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
@@ -111,7 +111,7 @@ export function MetadataCell({
               {!expanded && hiddenCount > 0 && (
                 <button
                   onClick={(ev) => { ev.stopPropagation(); setExpanded(true); }}
-                  className="shrink-0 text-[9px] text-text-quaternary hover:text-accent transition-colors font-mono"
+                  className="shrink-0 text-2xs text-text-quaternary hover:text-accent transition-colors font-mono"
                   title={`Show ${hiddenCount} more fields`}
                 >
                   +{hiddenCount}
@@ -121,7 +121,7 @@ export function MetadataCell({
               {expanded && isLastShown && hiddenCount > 0 && (
                 <button
                   onClick={(ev) => { ev.stopPropagation(); setExpanded(false); }}
-                  className="shrink-0 text-[9px] text-text-quaternary hover:text-accent transition-colors"
+                  className="shrink-0 text-2xs text-text-quaternary hover:text-accent transition-colors"
                   title="Show less"
                 >
                   ↑
@@ -141,6 +141,7 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'description',
       label: 'Summary',
+      priority: 1,
       render: (row) => (
         <div className="flex items-center gap-2 overflow-hidden">
           <span className="shrink-0"><StatusDot row={row} /></span>
@@ -149,11 +150,13 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       ),
       className: 'max-w-0',
     },
-    // Facet columns mirror the filter bar's order (Role · Priority ·
-    // Workflow Type) so the eye maps a filter straight onto its column.
+    // The manufacturing-floor column budget: identity, owner, urgency, age.
+    // Everything else (workflow type, metadata, exact timestamps) lives in
+    // the facet drawer and the detail page — never as a scrolling column.
     {
       key: 'role',
       label: 'Role',
+      priority: 2,
       render: (row) => (
         <span className={CELL_TEXT}>
           <RolePill role={row.role} size="md" tone="inherit" />
@@ -164,22 +167,32 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     {
       key: 'priority',
       label: 'Priority',
+      priority: 2,
       render: (row) => (
         <span className={CELL_TEXT}>
           <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
         </span>
       ),
-      className: 'w-14',
+      className: 'w-20',
     },
+    // Enrichment columns — the jumping-off facets. The budget governs the
+    // floor: these return only when the table has room (@split / @wall),
+    // and in card mode they fold to pairs. The metadata cell carries the
+    // clickable refine icons: filter within the role, search across roles
+    // (admins), shift+click to AND facets.
     {
       key: 'workflow_type',
-      label: 'Workflow Type',
+      label: 'Workflow',
+      priority: 2,
+      showFrom: 'split',
       render: (row) => <WorkflowPill type={row.workflow_type || row.type} />,
       className: 'w-40 whitespace-nowrap',
     },
     {
       key: 'metadata',
       label: 'Metadata',
+      priority: 2,
+      showFrom: 'wall',
       render: (row) => (
         <MetadataCell
           metadata={row.metadata}
@@ -190,24 +203,15 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
       className: 'w-80 max-w-[19rem] align-top',
     },
     {
-      key: 'created_time',
-      label: 'Created',
-      render: (row) => (
-        <span className={`text-[11px] font-mono whitespace-nowrap ${CELL_TEXT}`} title={row.created_at}>
-          {formatDateTime(row.created_at)}
-        </span>
-      ),
-      className: 'w-40 whitespace-nowrap',
-    },
-    {
       key: 'created_at',
       label: 'Ago',
+      priority: 1,
       render: (row) => (
         <span className={`text-xs tabular-nums ${CELL_TEXT}`} title={row.created_at}>
           {formatAgoCompact(row.created_at)}
         </span>
       ),
-      className: 'w-12 whitespace-nowrap',
+      className: 'w-14 whitespace-nowrap',
     },
   ];
 }
@@ -226,6 +230,7 @@ export const TIME_LEFT_COLUMN: Column<LTEscalationRecord> = {
       <span className="text-xs text-text-tertiary">—</span>
     ),
   className: 'w-16 whitespace-nowrap',
+  priority: 1,
 };
 
 /** Status icon column — color-coded filled circle, or bell for ACK/notification escalations. */
@@ -247,6 +252,7 @@ export const STATUS_COLUMN: Column<LTEscalationRecord> = {
     return <Circle className="w-2.5 h-2.5 text-text-tertiary" strokeWidth={2.5} />;
   },
   className: 'w-8',
+  priority: 1,
 };
 
 /** Claimed-only status icon (always orange, or bell for ACK). */
@@ -258,6 +264,7 @@ export const CLAIMED_STATUS_COLUMN: Column<LTEscalationRecord> = {
       ? <Bell className="w-3 h-3 text-status-warning" />
       : <Circle className="w-2.5 h-2.5 text-status-warning" strokeWidth={2.5} />,
   className: 'w-8',
+  priority: 1,
 };
 
 /** Priority filter options shared by both pages. */
@@ -299,8 +306,17 @@ export function EscalationFilterBar({
   showSearch?: boolean;
   actions?: React.ReactNode;
 }) {
+  // Non-default filters power the folded Filters button's badge.
+  const activeFilterCount = [
+    filters.role,
+    filters.type,
+    filters.priority,
+    filters.status && filters.status !== 'all' ? filters.status : '',
+    filters.search ?? '',
+  ].filter(Boolean).length;
+
   return (
-    <FilterBar actions={actions}>
+    <FilterBar actions={actions} activeFilterCount={activeFilterCount}>
       {showStatus && (
         <>
           <FilterSelect

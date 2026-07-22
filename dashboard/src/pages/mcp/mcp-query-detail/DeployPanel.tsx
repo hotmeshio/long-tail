@@ -165,12 +165,12 @@ export function DeployPanel({ yamlId, onAdvance, onBack, onRegenerate, regenerat
   const isPending = deployMutation.isPending || activateMutation.isPending || archiveMutation.isPending || restoreMutation.isPending || regenerateMutation.isPending || deleteMutation.isPending || !!regeneratePending;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6">
+    <div className="grid grid-cols-1 @split:grid-cols-[1fr_240px] gap-6">
       {/* Left: config */}
       <div className="min-w-0 overflow-hidden">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Deploy</h2>
+            <h2 className="heading-2 mb-1">Deploy</h2>
             <p className="text-base text-text-secondary">
               Review and edit the workflow definition. Re/deploy when ready.
             </p>

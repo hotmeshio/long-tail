@@ -13,6 +13,7 @@ import { CopyableId } from '../common/display/CopyableId';
 import { UserName } from '../common/display/UserName';
 import { TriageContext } from './TriageContext';
 import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
+import { deriveFieldLabel } from '../../lib/derive-field-label';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import type { LTEscalationRecord } from '../../api/types';
 import type { FieldError } from '../../lib/field-validator';
@@ -59,24 +60,24 @@ function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | 
         const globalUrl = metadataFacetUrl(key, value);
         return (
           <div key={key} className="group relative">
-            <dt className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">
-              {key.replace(/[_-]/g, ' ')}
+            <dt className="text-2xs font-medium text-text-secondary uppercase tracking-wide">
+              {deriveFieldLabel(key)}
             </dt>
             <dd className="mt-0.5 flex items-center gap-1">
-              <span className="text-[12px] text-text-primary font-mono break-all flex-1">
+              <span className="text-xs text-text-primary font-mono break-all flex-1">
                 {displayValue}
               </span>
               <Link
                 to={roleUrl}
                 title={`Filter this queue: ${key} = ${displayValue}`}
-                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
+                className="opacity-50 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
               >
                 <ListFilter className="w-3 h-3" />
               </Link>
               <Link
                 to={globalUrl}
                 title={`Search all queues: ${key} = ${displayValue}`}
-                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
+                className="opacity-50 group-hover:opacity-100 transition-opacity shrink-0 p-0.5 text-text-quaternary hover:text-accent"
               >
                 <Search className="w-3 h-3" />
               </Link>
@@ -160,7 +161,7 @@ function DetailsList({ esc, claimed, isTerminal, isBuilder, traceUrl }: {
   );
 }
 
-function ErrorsPanel({ errors }: { errors: FieldError[] }) {
+function ErrorsPanel({ errors, schema }: { errors: FieldError[]; schema?: Record<string, unknown> | null }) {
   const focusField = (field: string) => {
     const el = document.querySelector<HTMLElement>(`[data-field-key="${field}"]`);
     if (!el) return;
@@ -174,7 +175,7 @@ function ErrorsPanel({ errors }: { errors: FieldError[] }) {
 
   return (
     <div className="space-y-1" role="alert" aria-live="polite">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-status-error mb-4">
+      <p className="text-2xs font-semibold uppercase tracking-wider text-status-error mb-4">
         {errors.length} {errors.length === 1 ? 'issue' : 'issues'} to resolve
       </p>
       <div className="space-y-1.5">
@@ -186,17 +187,17 @@ function ErrorsPanel({ errors }: { errors: FieldError[] }) {
           >
             <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-status-error/60 group-hover:text-status-error transition-colors" />
             <div>
-              <p className="text-[11px] font-semibold text-text-primary capitalize leading-snug">
-                {field.replace(/[_-]/g, ' ')}
+              <p className="text-2xs font-semibold text-text-primary leading-snug">
+                {deriveFieldLabel(field, (schema?.properties as Record<string, Record<string, unknown>> | undefined)?.[field])}
               </p>
-              <p className="text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors leading-snug mt-0.5">
+              <p className="text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors leading-snug mt-0.5">
                 {message}
               </p>
             </div>
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-text-quaternary mt-4 px-3">
+      <p className="text-2xs text-text-quaternary mt-4 px-3">
         Click an issue to scroll to and focus the field.
       </p>
     </div>
@@ -355,7 +356,7 @@ export function EscalationSidePanel({
             <AlertCircle className={`${className ?? ''} text-status-error`} />
           )) as SlidePanelView['icon'],
           label: 'Errors',
-          content: <ErrorsPanel errors={formErrors} />,
+          content: <ErrorsPanel errors={formErrors} schema={schema} />,
         }]
       : []),
   ];

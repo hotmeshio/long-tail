@@ -87,7 +87,7 @@ export function RestartPanel({ execution, forceOpen, onClose }: RestartPanelProp
       <Collapsible open={open}>
         <div className="py-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
               Restart Workflow
             </p>
             <button onClick={handleClose} className="btn-ghost text-xs">
@@ -97,13 +97,13 @@ export function RestartPanel({ execution, forceOpen, onClose }: RestartPanelProp
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+              <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                 Workflow Type
               </p>
               <WorkflowPill type={workflowType} size="md" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+              <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
                 Task Queue
               </p>
               <p className="text-xs font-mono text-text-primary">

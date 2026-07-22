@@ -19,7 +19,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {event.attributes.activity_type && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Activity
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -28,7 +28,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
         </div>
       )}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Kind
         </p>
         <p className="text-xs font-mono text-text-primary">
@@ -37,14 +37,14 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
       </div>
       {event.duration_ms !== null && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Duration
           </p>
           <DurationValue ms={event.duration_ms} className="font-mono text-text-primary" />
         </div>
       )}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Time
         </p>
         <DateValue date={event.event_time} format="datetime" className="font-mono text-text-primary" />
@@ -52,7 +52,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
 
       {event.attributes.signal_name && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Signal
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -63,7 +63,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
 
       {event.attributes.awaited !== undefined && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Awaited
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -74,7 +74,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
 
       {event.attributes.timeline_key && (
         <div className="col-span-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Timeline Key
           </p>
           <p className="text-xs font-mono text-text-primary truncate" title={event.attributes.timeline_key}>
@@ -85,7 +85,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
 
       {event.attributes.execution_index !== undefined && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Exec Index
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -96,7 +96,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
 
       {event.attributes.scheduled_event_id != null && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Scheduled Event
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -106,7 +106,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
       )}
       {event.attributes.wait_event_id != null && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Wait Started
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -116,7 +116,7 @@ export function EventMetadataGrid({ event }: { event: WorkflowExecutionEvent }) 
       )}
       {event.attributes.initiated_event_id != null && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Initiated Event
           </p>
           <p className="text-xs font-mono text-text-primary">
@@ -140,7 +140,7 @@ export function ChildWorkflowSection({ event, childTask }: {
     return (
       <div className="border-t border-surface-border pt-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Child Workflow
           </span>
           <Link
@@ -160,7 +160,7 @@ export function ChildWorkflowSection({ event, childTask }: {
     return (
       <div className="space-y-3 border-t border-surface-border pt-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Child Workflow
           </span>
           <Link
@@ -172,14 +172,14 @@ export function ChildWorkflowSection({ event, childTask }: {
           </Link>
           <StatusBadge status={childTask.status} />
           {childTask.completed_at && (
-            <span className="text-[10px] text-text-tertiary">
+            <span className="text-2xs text-text-tertiary">
               Completed <DateValue date={childTask.completed_at} format="relative" />
             </span>
           )}
         </div>
 
         {(childInput != null || childOutput != null) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
             {childInput != null ? (
               <JsonViewer data={childInput} label="Input (Envelope)" variant="panel" />
             ) : <div />}
@@ -210,7 +210,7 @@ export function EventPayloadSection({ event, childTask }: {
 
   if (hasInput || hasResult) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
         {hasInput ? (
           <JsonViewer data={input} label="Input" variant="panel" />
         ) : <div />}

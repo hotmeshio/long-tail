@@ -31,7 +31,7 @@ export function EventTopicPill({ topic }: EventTopicPillProps) {
     : parts.slice(-2).join('.');
 
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-mono text-text-secondary">
+    <span className="inline-flex items-center gap-1 text-2xs font-mono text-text-secondary">
       <Radio className={`w-2.5 h-2.5 shrink-0 ${iconColor}`} strokeWidth={1.5} />
       {shortTopic}
     </span>

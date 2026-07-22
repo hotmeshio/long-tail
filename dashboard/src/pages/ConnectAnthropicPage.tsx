@@ -70,7 +70,7 @@ export function ConnectAnthropicPage() {
 
         <div className="flex items-center gap-2 mb-6">
           <OAuthIcon provider="anthropic" className="w-6 h-6" />
-          <h2 className="text-lg font-semibold text-text-primary">
+          <h2 className="heading-3">
             Connect Anthropic
           </h2>
         </div>
@@ -154,7 +154,7 @@ export function ConnectAnthropicPage() {
           <div>
             <span className="font-medium text-text-secondary">Recommended:</span>{' '}
             Run{' '}
-            <code className="px-1 py-0.5 bg-surface-sunken rounded text-[11px]">claude setup-token</code>{' '}
+            <code className="px-1 py-0.5 bg-surface-sunken rounded text-2xs">claude setup-token</code>{' '}
             in your terminal to generate an OAuth token that uses your subscription.
           </div>
           <div>

@@ -74,7 +74,7 @@ export function StreamMessageDetail({ message, filters }: {
   if (!message) return null;
 
   return (
-    <div className="space-y-5 text-[11px]">
+    <div className="space-y-5 text-2xs">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
@@ -91,7 +91,7 @@ export function StreamMessageDetail({ message, filters }: {
           value={message.stream_name}
           onFilter={() => filters?.onFilterStreamName?.(message.stream_name)}
         />
-        <p className="text-[10px] text-text-tertiary mt-0.5">ID: {message.id}</p>
+        <p className="text-2xs text-text-tertiary mt-0.5">ID: {message.id}</p>
       </div>
 
       {/* Timestamps */}

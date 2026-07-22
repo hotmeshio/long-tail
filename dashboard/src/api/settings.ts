@@ -18,6 +18,8 @@ export interface AppSettings {
   };
   branding?: {
     appName?: string;
+    /** Deployment-registered themes (metadata only; CSS arrives via /api/settings/custom.css). */
+    themes?: Array<{ id: string; label: string; swatch: string; dark?: boolean }>;
   };
   environment?: {
     longTailVersion: string;

@@ -54,7 +54,7 @@ export function TriageContext({ triage, payload }: {
           {triage.actions_taken.map((action, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px]
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 text-2xs
                          text-text-secondary"
             >
               <svg className="w-3 h-3 text-status-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -67,7 +67,7 @@ export function TriageContext({ triage, payload }: {
       )}
 
       {triage.recommendation && (
-        <p className="text-[11px] text-text-tertiary italic">
+        <p className="text-2xs text-text-tertiary italic">
           {triage.recommendation}
         </p>
       )}
@@ -121,12 +121,14 @@ function DiffRow({ diff }: { diff: Diff }) {
   const origStr = renderValue(diff.original);
   const corrStr = renderValue(diff.corrected);
 
-  // Both are primitives — side by side with subtle separator
+  // Both are primitives — side by side when the container allows. This view
+  // renders inside the side panel, so the container is what matters.
   if (origStr !== null && corrStr !== null) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+      <div className="@container">
+      <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-x-8 gap-y-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             {diff.label} <span className="normal-case font-normal">(original)</span>
           </p>
           <p className="text-sm text-text-tertiary leading-relaxed line-through decoration-text-tertiary/30">
@@ -134,13 +136,14 @@ function DiffRow({ diff }: { diff: Diff }) {
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             {diff.label} <span className="normal-case font-normal text-status-success">(corrected)</span>
           </p>
           <p className="text-sm text-text-primary leading-relaxed">
             {corrStr}
           </p>
         </div>
+      </div>
       </div>
     );
   }
@@ -149,7 +152,7 @@ function DiffRow({ diff }: { diff: Diff }) {
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
           {diff.label} <span className="normal-case font-normal">(original)</span>
         </p>
         <pre className="text-xs text-text-tertiary font-mono whitespace-pre-wrap leading-relaxed">
@@ -157,7 +160,7 @@ function DiffRow({ diff }: { diff: Diff }) {
         </pre>
       </div>
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
           {diff.label} <span className="normal-case font-normal text-status-success">(corrected)</span>
         </p>
         <pre className="text-xs text-text-primary font-mono whitespace-pre-wrap leading-relaxed">

@@ -63,7 +63,7 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors ${
+              className={`px-2.5 py-1 text-2xs font-mono rounded transition-colors ${
                 period === p
                   ? 'bg-accent/10 text-accent font-semibold'
                   : 'text-text-quaternary hover:text-text-secondary'
@@ -76,7 +76,7 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
       </div>
 
       {roles.length === 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 @grp-cols:grid-cols-2 @wall:grid-cols-4 gap-4">
           <ClaimedCard count={claimedCount} />
           <div className="lg:col-span-3 flex items-center px-4 py-3.5 text-sm text-text-tertiary">
             You are not a member of a role. Task queues appear here once you join one.
@@ -84,7 +84,7 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-fr">
+          <div className="grid grid-cols-1 @grp-cols:grid-cols-2 @wall:grid-cols-4 gap-4 auto-rows-fr">
             <ClaimedCard count={claimedCount} />
             {shownRoles.map((role) => (
               <TaskQueueCard
@@ -98,7 +98,7 @@ export function TaskQueueCards({ maxRows }: { maxRows: 1 | 2 }) {
             ))}
           </div>
           {overflow > 0 && (
-            <p className="mt-3 text-[11px] text-text-quaternary">
+            <p className="mt-3 text-2xs text-text-quaternary">
               +{overflow} more {overflow === 1 ? 'lane' : 'lanes'} in the Task Queues sidebar.
             </p>
           )}

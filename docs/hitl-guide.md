@@ -88,6 +88,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |
 | Role routing, RBAC, scope, chains | [roles.md](hitl/roles.md) |
 | Pinned views, user preferences, role default pins | [pinned-views.md](hitl/pinned-views.md) |
+| Design principles, error display, instruction copy, custom stylesheets | [design.md](hitl/design.md) |
 
 ---
 

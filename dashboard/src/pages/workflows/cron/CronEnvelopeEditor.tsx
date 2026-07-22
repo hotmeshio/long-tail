@@ -58,7 +58,7 @@ export function CronEnvelopeEditor({
             <button
               type="button"
               onClick={onResetEnvelope}
-              className="text-[10px] text-status-warning hover:text-status-warning/80 transition-colors"
+              className="text-2xs text-status-warning hover:text-status-warning/80 transition-colors"
             >
               Reset to default
             </button>
@@ -68,7 +68,7 @@ export function CronEnvelopeEditor({
               <button
                 type="button"
                 onClick={() => setViewMode('form')}
-                className={`px-2 py-0.5 text-[10px] transition-colors ${
+                className={`px-2 py-0.5 text-2xs transition-colors ${
                   viewMode === 'form'
                     ? 'bg-accent/10 text-accent'
                     : 'text-text-tertiary hover:text-text-secondary'
@@ -79,7 +79,7 @@ export function CronEnvelopeEditor({
               <button
                 type="button"
                 onClick={() => setViewMode('json')}
-                className={`px-2 py-0.5 text-[10px] transition-colors ${
+                className={`px-2 py-0.5 text-2xs transition-colors ${
                   viewMode === 'json'
                     ? 'bg-accent/10 text-accent'
                     : 'text-text-tertiary hover:text-text-secondary'
@@ -91,7 +91,7 @@ export function CronEnvelopeEditor({
           )}
         </div>
       </div>
-      <p className="text-[10px] text-text-tertiary mb-3">
+      <p className="text-2xs text-text-tertiary mb-3">
         This envelope is sent as the workflow input on each cron invocation. Edit to customize.
       </p>
 
@@ -99,7 +99,7 @@ export function CronEnvelopeEditor({
         <div className="space-y-3">
           {formFields.map(({ key, value, type }) => (
             <div key={key}>
-              <label className="block text-[11px] text-text-secondary mb-1 font-mono">
+              <label className="block text-2xs text-text-secondary mb-1 font-mono">
                 {key}
               </label>
               {type === 'boolean' ? (
@@ -122,7 +122,7 @@ export function CronEnvelopeEditor({
             </div>
           ))}
           {parsedEnvelope?.metadata != null && typeof parsedEnvelope.metadata === 'object' && Object.keys(parsedEnvelope.metadata as Record<string, unknown>).length > 0 && (
-            <p className="text-[10px] text-text-tertiary mt-2">
+            <p className="text-2xs text-text-tertiary mt-2">
               Metadata fields are editable in JSON view.
             </p>
           )}
@@ -141,10 +141,10 @@ export function CronEnvelopeEditor({
       )}
 
       {envelopeError && (
-        <p className="text-[10px] text-status-error mt-2">{envelopeError}</p>
+        <p className="text-2xs text-status-error mt-2">{envelopeError}</p>
       )}
       {isEnvelopeModified && (
-        <p className="text-[10px] text-accent mt-1.5">
+        <p className="text-2xs text-accent mt-1.5">
           Envelope has been customized. Changes will be saved with the schedule.
         </p>
       )}

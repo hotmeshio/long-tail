@@ -136,11 +136,11 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
     <div>
       <div className="px-6 py-4 border-b border-surface-border flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
             Events ({filtered.length})
           </p>
           {filtered.length > 0 && (
-            <button onClick={toggleAll} className="text-[10px] text-accent hover:underline">
+            <button onClick={toggleAll} className="text-2xs text-accent hover:underline">
               {allExpanded ? 'Collapse all' : 'Expand all'}
             </button>
           )}
@@ -189,7 +189,7 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
                 >
                   {/* Expand chevron */}
                   <span
-                    className={`text-[10px] text-text-tertiary transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`}
+                    className={`text-2xs text-text-tertiary transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`}
                   >
                     &#9654;
                   </span>
@@ -215,7 +215,7 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
                       '--'
                     )}
                   </span>
-                  <time className="text-[10px] font-mono text-text-tertiary shrink-0">
+                  <time className="text-2xs font-mono text-text-tertiary shrink-0">
                     {new Date(evt.event_time).toLocaleTimeString()}
                   </time>
                 </div>

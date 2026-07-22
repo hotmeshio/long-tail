@@ -10,7 +10,7 @@ interface CronLabelProps {
  */
 export function CronLabel({ cron }: CronLabelProps) {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-mono text-text-secondary">
+    <span className="inline-flex items-center gap-1 text-2xs font-mono text-text-secondary">
       <Clock className="w-2.5 h-2.5 shrink-0 text-text-quaternary" strokeWidth={1.5} />
       {cron}
     </span>

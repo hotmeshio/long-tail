@@ -43,7 +43,7 @@ export function ControlPlaneContent({
   bridgeActive,
 }: ControlPlaneContentProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+    <div className="grid grid-cols-1 @split:grid-cols-[1fr_340px] gap-6">
       <div className="flex flex-col gap-12 mt-10">
         {/* Stream Volume */}
         <CollapsibleSection
@@ -90,7 +90,7 @@ export function ControlPlaneContent({
           ) : (
             <>
               <div className="flex justify-end mb-2">
-                <button onClick={toggleAllQueues} className="text-[10px] text-accent hover:underline">
+                <button onClick={toggleAllQueues} className="text-2xs text-accent hover:underline">
                   {allQueuesExpanded ? 'Collapse all' : 'Expand all'}
                 </button>
               </div>

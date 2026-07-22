@@ -173,3 +173,4 @@ CLAUDE.md
 
 # Bambu farm-manager config / credentials — local only, NEVER checked in
 /examples/workflows/printer-twin/bambu_config/
+.smoke/

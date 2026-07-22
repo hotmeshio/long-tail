@@ -51,10 +51,18 @@ describe('ESCALATION_COLUMNS', () => {
     expect(screen.queryByText('quality-check')).not.toBeInTheDocument();
   });
 
-  // ── Workflow column (the workflow_type name, e.g. richForm) ──
-  it('renders the workflow name (workflow_type) as a pill', () => {
-    renderColumn('workflow_type', makeEscalation({ type: 'intake', workflow_type: 'richForm' }));
-    expect(screen.getByText('richForm')).toBeInTheDocument();
+  // ── The column budget: identity, owner, urgency, age — nothing else ──
+  it('holds the floor budget with enrichment columns gated behind room', () => {
+    expect(ESCALATION_COLUMNS.map((c) => c.key)).toEqual(['description', 'role', 'priority', 'workflow_type', 'metadata', 'created_at']);
+    const byKey = Object.fromEntries(ESCALATION_COLUMNS.map((c) => [c.key, c]));
+    // The always-on floor: identity, owner, urgency, age.
+    expect(byKey.description.showFrom).toBeUndefined();
+    expect(byKey.role.showFrom).toBeUndefined();
+    expect(byKey.priority.showFrom).toBeUndefined();
+    expect(byKey.created_at.showFrom).toBeUndefined();
+    // Enrichment returns with room.
+    expect(byKey.workflow_type.showFrom).toBe('split');
+    expect(byKey.metadata.showFrom).toBe('wall');
   });
 
   // ── Role column ──
@@ -76,14 +84,14 @@ describe('ESCALATION_COLUMNS', () => {
     expect(screen.getByText(/^(now|\d+(s|m|h|d|w|mo|y))$/)).toBeInTheDocument();
   });
 
-  // ── Metadata column (compact preview, expands to JSON) ──
+  // ── MetadataCell (the standalone key/value primitive) ──
   it('renders a dash when metadata is empty', () => {
-    renderColumn('metadata', makeEscalation({ metadata: null }));
+    render(<MemoryRouter><MetadataCell metadata={null} role="reviewer" /></MemoryRouter>);
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
   it('shows first key/value with inline +N indicator, expands on click', () => {
-    renderColumn('metadata', makeEscalation({ metadata: { confidence: 0.65, flags: 'x', extra: 1 } }));
+    render(<MemoryRouter><MetadataCell metadata={{ confidence: 0.65, flags: 'x', extra: 1 }} role="reviewer" /></MemoryRouter>);
     // First entry always shown
     expect(screen.getByText('confidence')).toBeInTheDocument();
     expect(screen.getByText('0.65')).toBeInTheDocument();

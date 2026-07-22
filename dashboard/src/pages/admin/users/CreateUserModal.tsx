@@ -43,7 +43,7 @@ export function CreateUserModal({
     <Modal open={open} onClose={onClose} title="Create User">
       <div className="space-y-4">
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             External ID (required)
           </label>
           <input
@@ -55,7 +55,7 @@ export function CreateUserModal({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Display Name
           </label>
           <input
@@ -67,7 +67,7 @@ export function CreateUserModal({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Email
           </label>
           <input
@@ -79,7 +79,7 @@ export function CreateUserModal({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
             Password
           </label>
           <input

@@ -61,8 +61,8 @@ export function WorkersPage() {
       key: 'registered',
       label: 'Status',
       render: (row) => row.registered
-        ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>
-        : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-sunken text-text-tertiary">Durable</span>,
+        ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-medium bg-accent/10 text-accent"><ShieldCheck className="w-3 h-3" />Certified</span>
+        : <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-surface-sunken text-text-tertiary">Durable</span>,
       className: 'whitespace-nowrap',
     },
     {
@@ -107,7 +107,7 @@ export function WorkersPage() {
           placeholder="Search workers..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="input text-[11px] py-1 px-2 w-56"
+          className="input text-2xs py-1 px-2 w-56"
         />
         <FilterSelect
           label="Queue"

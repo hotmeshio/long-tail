@@ -57,7 +57,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
 
   return (
     <div>
-      <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Profile</h2>
+      <h2 className="heading-2 mb-1">Profile</h2>
       <p className="text-base text-text-secondary mb-6">
         Name the MCP server and tool, add tags for discovery, and describe what this pipeline does.
       </p>
@@ -65,7 +65,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
       {/* Original prompt — context for filling in the profile fields */}
       {originalPrompt && (
         <div className="mb-6">
-          <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Original Prompt</label>
+          <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Original Prompt</label>
           <div className="rounded-md bg-surface-sunken/50 px-4 py-3">
             <p className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap">
               {originalPrompt}
@@ -77,7 +77,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
       <div className="grid grid-cols-[300px_1fr] gap-4 mb-6">
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Server Name</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Server Name</label>
             {editable ? (
               <input
                 value={appId}
@@ -89,7 +89,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             )}
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Tool Name</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">MCP Tool Name</label>
             {editable ? (
               <input
                 value={name}
@@ -101,7 +101,7 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
             )}
           </div>
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
+            <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags</label>
             {editable ? (
               <TagInput tags={tags} onChange={setTags} compact />
             ) : (
@@ -115,11 +115,11 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
         </div>
         <div className="flex flex-col">
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
+            <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
             {isCreated && !isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 transition-colors"
+                className="flex items-center gap-1 text-2xs text-accent hover:text-accent/80 transition-colors"
               >
                 <Pencil className="w-3 h-3" strokeWidth={1.5} />
                 Edit
@@ -137,11 +137,11 @@ export function BuilderProfilePanel({ builderData, resolvedYamlId, originalPromp
           )}
           {isEditing && (
             <div className="flex justify-end gap-2 mt-2">
-              <button onClick={() => setIsEditing(false)} className="text-[10px] text-text-tertiary hover:text-text-primary">Cancel</button>
+              <button onClick={() => setIsEditing(false)} className="text-2xs text-text-tertiary hover:text-text-primary">Cancel</button>
               <button
                 onClick={handleSave}
                 disabled={updateYaml.isPending}
-                className="text-[10px] text-accent hover:text-accent/80 font-medium"
+                className="text-2xs text-accent hover:text-accent/80 font-medium"
               >
                 {updateYaml.isPending ? 'Saving...' : 'Save Changes'}
               </button>

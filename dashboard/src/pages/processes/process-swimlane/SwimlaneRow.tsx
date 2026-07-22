@@ -111,7 +111,7 @@ export function SwimlaneRow({
           >
             {/* Duration text inside bar (show only when fully revealed) */}
             {anim.width > 8 && animDone && (
-              <span className="absolute inset-0 flex items-center px-1.5 text-[9px] font-mono text-white truncate">
+              <span className="absolute inset-0 flex items-center px-1.5 text-2xs font-mono text-text-inverse truncate">
                 {formatDuration(lane.durationMs)}
               </span>
             )}
@@ -119,7 +119,7 @@ export function SwimlaneRow({
             {/* Claim marker (vertical dashed line) — show after animation */}
             {lane.claimPct != null && animDone && (
               <div
-                className="absolute top-0 bottom-0 w-px border-l border-dashed border-white/70"
+                className="absolute top-0 bottom-0 w-px border-l border-dashed border-text-inverse/70"
                 style={{ left: `${lane.claimPct}%` }}
                 title={
                   lane.escalation?.assigned_to
@@ -128,7 +128,7 @@ export function SwimlaneRow({
                 }
               >
                 {/* Claim dot */}
-                <div className="absolute -top-1 -left-[3px] w-[7px] h-[7px] rounded-full bg-white border border-status-warning" />
+                <div className="absolute -top-1 -left-[3px] w-[7px] h-[7px] rounded-full bg-text-inverse border border-status-warning" />
               </div>
             )}
           </div>

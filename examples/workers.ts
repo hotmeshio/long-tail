@@ -10,6 +10,8 @@ import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
+import * as acmeStationsWorkflow from './workflows/acme-stations';
+import { ACME_ADDONS_ROLE } from './workflows/acme-stations/forms';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
 import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as policyDocumentWorkflow from './workflows/policy-document';
@@ -159,6 +161,30 @@ const richFormConfig: LTWorkerConfig = {
   defaultRole: INTAKE_REVIEWER,
   envelopeSchema: {
     data: { role: INTAKE_REVIEWER },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const acmeWidgetConfig: LTWorkerConfig = {
+  description: 'Acme widget — the reference two-station fabrication flow behind the perfect-form pair: a dictionary of widget facts, one explicit Choose… decision, linear conditional reveals, pre-checked standard checks beside clickable custom work, and the rejection report. The acme-addons and acme-final-qa roles own the versioned forms.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: ACME_ADDONS_ROLE,
+  envelopeSchema: {
+    data: {
+      po: 'ACME-1042',
+      widgetId: 'wgt-8127',
+      leftQuantity: 1,
+      rightQuantity: 1,
+      widgetType: 'Standard',
+      sizeCode: 'S2',
+      material: 'alloy',
+      certified: false,
+      addons: [
+        { id: 'mount_front', label: 'Mount — front, left — verified on the widget' },
+        { id: 'gasket_std', label: 'Gasket — standard — verified on the widget' },
+      ],
+    },
     metadata: { source: 'dashboard' },
   },
 };
@@ -415,6 +441,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
+  { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },

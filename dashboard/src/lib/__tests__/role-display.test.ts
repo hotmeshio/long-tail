@@ -8,7 +8,7 @@ describe('deriveRoleTitle', () => {
 
   it('reads kebab-case as spaced Title Case', () => {
     expect(deriveRoleTitle('print-farm')).toBe('Print Farm');
-    expect(deriveRoleTitle('post-print-qa')).toBe('Post Print Qa');
+    expect(deriveRoleTitle('final-qa-review')).toBe('Final Qa Review');
   });
 
   it('reads snake_case as spaced Title Case', () => {

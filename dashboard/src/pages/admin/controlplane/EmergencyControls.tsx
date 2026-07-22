@@ -45,7 +45,7 @@ export function EmergencyControls() {
         <button
           onClick={() => applyAll(confirming.ms, confirming.scope)}
           disabled={inflight}
-          className="px-2.5 py-1 text-xs rounded-md bg-status-error text-white hover:bg-status-error/90 transition-colors disabled:opacity-50"
+          className="px-2.5 py-1 text-xs rounded-md bg-status-error text-text-inverse hover:bg-status-error/90 transition-colors disabled:opacity-50"
         >
           {inflight ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Confirm'}
         </button>

@@ -59,7 +59,7 @@ export function ListView({ directories, files, onNavigate, onSelect, selectedFil
   return (
     <table className="w-full mt-2">
       <thead>
-        <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary">
+        <tr className="text-left text-2xs uppercase tracking-wider text-text-tertiary">
           <th className="pb-2 pl-2 font-medium">Name</th>
           <th className="pb-2 font-medium w-24 text-right">Size</th>
           <th className="pb-2 pr-2 font-medium w-40 text-right">Modified</th>
@@ -133,7 +133,7 @@ export function GridView({ directories, files, onNavigate, onSelect, selectedFil
       )}
 
       {/* Files as thumbnail grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 @grp-cols:grid-cols-3 @split:grid-cols-4 @wall:grid-cols-5 gap-3">
         {files.map((file) => {
           const isImg = isImagePath(file.path);
           return (
@@ -157,7 +157,7 @@ export function GridView({ directories, files, onNavigate, onSelect, selectedFil
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-text-tertiary">
                     {fileIcon(file.path)}
-                    <span className="text-[10px] uppercase tracking-wider">
+                    <span className="text-2xs uppercase tracking-wider">
                       {file.path.split('.').pop()?.toUpperCase()}
                     </span>
                   </div>
@@ -167,7 +167,7 @@ export function GridView({ directories, files, onNavigate, onSelect, selectedFil
                 <p className="text-xs text-text-primary truncate" title={fileNameFromPath(file.path)}>
                   {fileNameFromPath(file.path)}
                 </p>
-                <p className="text-[10px] text-text-tertiary tabular-nums">
+                <p className="text-2xs text-text-tertiary tabular-nums">
                   {formatSize(file.size)}
                 </p>
               </div>

@@ -111,7 +111,7 @@ export function ProcessDetailPage() {
       />
 
       {hasMessages && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+        <div className="grid grid-cols-1 @split:grid-cols-2 gap-8 mb-10">
           <div>
             {rootEnvelope ? (
               <JsonViewer data={rootEnvelope} label="Input" defaultMode="json" defaultCollapsed />

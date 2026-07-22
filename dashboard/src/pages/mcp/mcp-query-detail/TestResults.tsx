@@ -36,11 +36,11 @@ export function TestResultsBuilder({
       {/* Run selector */}
       {jobs.length > 0 && selectedRunId && (
         <div className="flex items-center justify-between mb-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Pipeline Run</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Pipeline Run</p>
           <select
             value={selectedRunId}
             onChange={(e) => onSelectRun(e.target.value)}
-            className="bg-transparent border-none text-[10px] text-accent hover:text-accent/80 cursor-pointer focus:outline-none p-0 text-right"
+            className="bg-transparent border-none text-2xs text-accent hover:text-accent/80 cursor-pointer focus:outline-none p-0 text-right"
           >
             {jobs.map((job) => <option key={job.workflow_id} value={job.workflow_id}>{jobLabel(job)}</option>)}
           </select>
@@ -72,7 +72,7 @@ export function TestResultsBuilder({
           <p className="text-xs text-text-tertiary italic">No runs yet</p>
         )}
         {selectedRunExecution?.duration_ms != null && (
-          <p className="text-[10px] text-text-tertiary mt-2">{(selectedRunExecution.duration_ms / 1000).toFixed(1)}s</p>
+          <p className="text-2xs text-text-tertiary mt-2">{(selectedRunExecution.duration_ms / 1000).toFixed(1)}s</p>
         )}
       </div>
     </>
@@ -113,27 +113,27 @@ export function TestResultsComparison({
       {/* Grid-aligned comparison: column headers */}
       <div className="grid grid-cols-2 gap-8 mb-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Original MCP Query</p>
-          <p className="text-[10px] text-text-tertiary mt-0.5">Dynamic LLM orchestration</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Original MCP Query</p>
+          <p className="text-2xs text-text-tertiary mt-0.5">Dynamic LLM orchestration</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Compiled Pipeline Run</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Compiled Pipeline Run</p>
           {jobs.length > 0 && selectedRunId && (
             <select
               value={selectedRunId}
               onChange={(e) => onSelectRun(e.target.value)}
-              className="mt-0.5 bg-transparent border-none text-[10px] text-accent hover:text-accent/80 cursor-pointer focus:outline-none p-0 text-right direction-rtl"
+              className="mt-0.5 bg-transparent border-none text-2xs text-accent hover:text-accent/80 cursor-pointer focus:outline-none p-0 text-right direction-rtl"
             >
               {jobs.map((job) => <option key={job.workflow_id} value={job.workflow_id}>{jobLabel(job)}</option>)}
             </select>
           )}
-          {!selectedRunId && <p className="text-[10px] text-text-tertiary mt-0.5">No runs yet</p>}
+          {!selectedRunId && <p className="text-2xs text-text-tertiary mt-0.5">No runs yet</p>}
         </div>
       </div>
 
       {/* Row 1: Inputs */}
       <SectionHeading>Input</SectionHeading>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8 mb-6">
         <div>
           {originalEnvelope ? (
             <JsonViewer data={originalEnvelope} defaultMode="tree" />
@@ -148,7 +148,7 @@ export function TestResultsComparison({
             <JsonViewer data={deterministicInput} defaultMode="tree" />
           ) : selectedRunId && inputSchema ? (
             <div>
-              <p className="text-[10px] text-text-tertiary italic mb-1">Stored defaults</p>
+              <p className="text-2xs text-text-tertiary italic mb-1">Stored defaults</p>
               <JsonViewer data={inputSchema} defaultMode="tree" />
             </div>
           ) : (
@@ -159,7 +159,7 @@ export function TestResultsComparison({
 
       {/* Row 2: Outputs */}
       <SectionHeading>Output</SectionHeading>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-8 mb-6">
         <div>
           {originalOutput ? (
             <JsonViewer data={originalOutput} defaultMode="tree" />
@@ -167,7 +167,7 @@ export function TestResultsComparison({
             <p className="text-xs text-text-tertiary italic">No output</p>
           )}
           {originalDurationMs != null && (
-            <p className="text-[10px] text-text-tertiary mt-2">{(originalDurationMs / 1000).toFixed(1)}s</p>
+            <p className="text-2xs text-text-tertiary mt-2">{(originalDurationMs / 1000).toFixed(1)}s</p>
           )}
         </div>
         <div>
@@ -183,7 +183,7 @@ export function TestResultsComparison({
             <p className="text-xs text-text-tertiary italic">No runs yet</p>
           )}
           {selectedRunExecution?.duration_ms != null && (
-            <p className="text-[10px] text-text-tertiary mt-2">{(selectedRunExecution.duration_ms / 1000).toFixed(1)}s</p>
+            <p className="text-2xs text-text-tertiary mt-2">{(selectedRunExecution.duration_ms / 1000).toFixed(1)}s</p>
           )}
         </div>
       </div>

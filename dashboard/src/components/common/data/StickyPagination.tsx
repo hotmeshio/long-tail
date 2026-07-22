@@ -13,7 +13,7 @@ export function StickyPagination(props: StickyPaginationProps) {
   if (props.total === 0) return null;
 
   return (
-    <div className="sticky bottom-0 z-20 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 pt-2 pb-4">
+    <div className="sticky bottom-0 z-20 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-page-x px-page-x pt-2 pb-4">
       <Pagination {...props} />
     </div>
   );

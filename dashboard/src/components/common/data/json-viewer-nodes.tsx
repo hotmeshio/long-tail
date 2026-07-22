@@ -133,7 +133,7 @@ export function TreeNode({ data, depth = 0 }: { data: unknown; depth?: number })
       <div className="space-y-2">
         {data.map((item, i) => (
           <div key={i} className="flex items-baseline gap-2">
-            <span className="text-text-tertiary text-[10px] shrink-0">{i + 1}.</span>
+            <span className="text-text-tertiary text-2xs shrink-0">{i + 1}.</span>
             <div className="flex-1">
               <TreeNode data={item} depth={depth + 1} />
             </div>
@@ -152,7 +152,7 @@ export function TreeNode({ data, depth = 0 }: { data: unknown; depth?: number })
           const isLeaf = value === null || typeof value !== 'object';
           return (
             <div key={key}>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">
+              <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">
                 {key.replace(/[_-]/g, ' ')}
               </p>
               {isLeaf ? (

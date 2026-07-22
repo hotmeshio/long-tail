@@ -128,14 +128,12 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
       const fieldErrors: FieldError[] = validateResolverForm(schema, payload, escalationContext);
 
       if (fieldErrors.length > 0) {
+        // Field errors live in ONE surface: the errors panel, which opens on
+        // the blocked submit and recomputes as the user fixes fields. A
+        // summary here would go stale the moment a field is corrected — the
+        // footer keeps only its own errors (bad JSON, server rejection).
         onSubmitAttempt?.();
         onValidationErrors?.(fieldErrors);
-        const first = fieldErrors[0];
-        const labels = fieldErrors.map((e) => e.field.replace(/[_-]/g, ' '));
-        const display = labels.length <= 2
-          ? labels.join(', ')
-          : `${labels.slice(0, 2).join(', ')}...`;
-        setParseError(first.message === 'Required' ? `Required: ${display}` : `${first.message} — ${display}`);
         return;
       }
     }

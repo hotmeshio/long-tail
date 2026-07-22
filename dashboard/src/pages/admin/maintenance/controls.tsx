@@ -28,12 +28,12 @@ export function RetentionRow({ checked, onToggle, label, hint, safety, value, on
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-primary">{label}</span>
-            <span className={`flex items-center gap-0.5 text-[9px] ${safetyColor}`}>
+            <span className={`flex items-center gap-0.5 text-2xs ${safetyColor}`}>
               <SafetyIcon className="w-3 h-3" strokeWidth={1.5} />
               {safetyLabel}
             </span>
           </div>
-          <p className="text-[10px] text-text-tertiary">{hint}</p>
+          <p className="text-2xs text-text-tertiary">{hint}</p>
         </div>
       </label>
       <select
@@ -74,12 +74,12 @@ export function CleanupCheck({ checked, onChange, label, description, safety }: 
       <div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-primary">{label}</span>
-          <span className={`flex items-center gap-0.5 text-[9px] ${safetyColor}`}>
+          <span className={`flex items-center gap-0.5 text-2xs ${safetyColor}`}>
             <SafetyIcon className="w-3 h-3" strokeWidth={1.5} />
             {safetyLabel}
           </span>
         </div>
-        <p className="text-[10px] text-text-tertiary">{description}</p>
+        <p className="text-2xs text-text-tertiary">{description}</p>
       </div>
     </label>
   );
@@ -91,7 +91,7 @@ export function CleanupCallout() {
   return (
     <div className="flex items-start gap-2 mt-2 px-3 py-2 rounded bg-surface-sunken">
       <Info className="w-3.5 h-3.5 text-text-tertiary shrink-0 mt-0.5" />
-      <p className="text-[10px] text-text-tertiary leading-relaxed">
+      <p className="text-2xs text-text-tertiary leading-relaxed">
         Stripping preserves workflow results and timeline data needed for the execution detail view.
         Transient jobs are internal bookkeeping that accumulates over time.
       </p>
@@ -140,10 +140,10 @@ export function PruneFieldsEditor({ fields, onChange }: {
     <div className="space-y-8">
       {/* Stream messages — always safe to prune */}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
           Stream Messages
         </p>
-        <p className="text-[10px] text-text-tertiary mb-4">
+        <p className="text-2xs text-text-tertiary mb-4">
           Processed routing messages. Already consumed — safe to remove after a short retention window.
         </p>
         <div className="space-y-3">
@@ -164,10 +164,10 @@ export function PruneFieldsEditor({ fields, onChange }: {
 
       {/* Workflow data — mutually exclusive: reduce OR delete */}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
           Completed Workflows
         </p>
-        <p className="text-[10px] text-text-tertiary mb-4">
+        <p className="text-2xs text-text-tertiary mb-4">
           Choose how to handle completed workflow records. Reducing strips step-level detail
           but keeps the workflow and its results. Deleting removes the record entirely.
         </p>
@@ -182,7 +182,7 @@ export function PruneFieldsEditor({ fields, onChange }: {
             />
             <div>
               <span className="text-xs text-text-primary">Keep as-is</span>
-              <p className="text-[10px] text-text-tertiary">No changes to completed workflow records.</p>
+              <p className="text-2xs text-text-tertiary">No changes to completed workflow records.</p>
             </div>
           </label>
 
@@ -198,12 +198,12 @@ export function PruneFieldsEditor({ fields, onChange }: {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-text-primary">Reduce completed workflows</span>
-                  <span className="flex items-center gap-0.5 text-[9px] text-status-warning">
+                  <span className="flex items-center gap-0.5 text-2xs text-status-warning">
                     <ShieldAlert className="w-3 h-3" strokeWidth={1.5} />
                     Careful
                   </span>
                 </div>
-                <p className="text-[10px] text-text-tertiary">
+                <p className="text-2xs text-text-tertiary">
                   Strips step-level execution detail (activity inputs/outputs, internal state).
                   Workflow results and timeline are preserved.
                 </p>
@@ -233,12 +233,12 @@ export function PruneFieldsEditor({ fields, onChange }: {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-text-primary">Delete completed workflows</span>
-                  <span className="flex items-center gap-0.5 text-[9px] text-status-error">
+                  <span className="flex items-center gap-0.5 text-2xs text-status-error">
                     <ShieldOff className="w-3 h-3" strokeWidth={1.5} />
                     Permanent
                   </span>
                 </div>
-                <p className="text-[10px] text-text-tertiary">
+                <p className="text-2xs text-text-tertiary">
                   Permanently removes workflow records. Results, timeline, and all
                   execution data are deleted and cannot be recovered.
                 </p>

@@ -23,7 +23,7 @@ function Section({ icon: Icon, color, title, children }: { icon: React.ElementTy
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3 py-0.5">
-      <span className="text-[10px] text-text-quaternary w-20 shrink-0">{label}</span>
+      <span className="text-2xs text-text-quaternary w-20 shrink-0">{label}</span>
       <span className="text-xs text-text-primary">{children}</span>
     </div>
   );
@@ -52,13 +52,13 @@ export function ReviewStep({ form }: Props) {
       <div className="grid grid-cols-2 gap-x-10">
         <Section icon={Radio} color="text-accent" title={`Subscriptions (${form.subscriptions.length})`}>
           {form.subscriptions.length === 0 ? (
-            <span className="text-[11px] text-text-quaternary">None configured</span>
+            <span className="text-2xs text-text-quaternary">None configured</span>
           ) : (
             <div className="divide-y divide-surface-border/30">
               {form.subscriptions.map((sub, i) => (
                 <div key={i} className="flex items-center py-1.5">
                   <div className="flex-1 min-w-0"><EventTopicPill topic={sub.topic || 'unset'} /></div>
-                  <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span>{sub.workflow_type ? <WorkflowPill type={sub.workflow_type} /> : <span className="text-[11px] text-text-quaternary">{sub.reaction_type}</span>}</div>
+                  <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-2xs">→</span>{sub.workflow_type ? <WorkflowPill type={sub.workflow_type} /> : <span className="text-2xs text-text-quaternary">{sub.reaction_type}</span>}</div>
                 </div>
               ))}
             </div>
@@ -67,13 +67,13 @@ export function ReviewStep({ form }: Props) {
 
         <Section icon={Clock} color="text-accent" title={`Schedules (${form.schedules.length})`}>
           {form.schedules.length === 0 ? (
-            <span className="text-[11px] text-text-quaternary">None configured</span>
+            <span className="text-2xs text-text-quaternary">None configured</span>
           ) : (
             <div className="divide-y divide-surface-border/30">
               {form.schedules.map((s, i) => (
                 <div key={i} className="flex items-center py-1.5">
                   <div className="flex-1 min-w-0"><CronLabel cron={s.cron} /></div>
-                  <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-[10px]">→</span>{s.workflow_type ? <WorkflowPill type={s.workflow_type} /> : <span className="text-[11px] text-text-quaternary">no workflow</span>}</div>
+                  <div className="flex items-center gap-1.5 shrink-0"><span className="text-text-quaternary text-2xs">→</span>{s.workflow_type ? <WorkflowPill type={s.workflow_type} /> : <span className="text-2xs text-text-quaternary">no workflow</span>}</div>
                 </div>
               ))}
             </div>
@@ -82,7 +82,7 @@ export function ReviewStep({ form }: Props) {
       </div>
 
       <div className="border-l-2 border-status-success/30 pl-3 py-2 mt-6">
-        <p className="text-[11px] text-text-tertiary leading-relaxed">
+        <p className="text-2xs text-text-tertiary leading-relaxed">
           After saving, subscriptions and schedules activate immediately. You can pause the automation anytime.
         </p>
       </div>

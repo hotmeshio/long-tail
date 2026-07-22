@@ -16,7 +16,7 @@ const CLASSIFICATION_STYLES: Record<string, { bg: string; text: string; label: s
 function ClassificationBadge({ classification }: { classification: string }) {
   const style = CLASSIFICATION_STYLES[classification] || CLASSIFICATION_STYLES.fixed;
   return (
-    <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${style.bg} ${style.text}`}>
+    <span className={`px-1.5 py-0.5 text-2xs font-medium rounded ${style.bg} ${style.text}`}>
       {style.label}
     </span>
   );
@@ -59,7 +59,7 @@ export function InputSchemaEditor({ fields, onChange, editing }: InputSchemaEdit
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className="flex items-center gap-3 text-[10px] text-text-tertiary">
+      <div className="flex items-center gap-3 text-2xs text-text-tertiary">
         <span>{dynamicFields.length} dynamic (user provides)</span>
         <span>{fixedFields.length} fixed (defaults from execution)</span>
       </div>
@@ -67,7 +67,7 @@ export function InputSchemaEditor({ fields, onChange, editing }: InputSchemaEdit
       {/* Dynamic fields */}
       {dynamicFields.length > 0 && (
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-status-success/70 mb-2">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-status-success/70 mb-2">
             Dynamic Inputs (required at invocation)
           </p>
           <div className="space-y-1">
@@ -94,7 +94,7 @@ export function InputSchemaEditor({ fields, onChange, editing }: InputSchemaEdit
       {/* Fixed fields */}
       {fixedFields.length > 0 && (
         <div>
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
             Fixed Defaults (from execution)
           </p>
           <div className="space-y-1">
@@ -148,14 +148,14 @@ function FieldRow({
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-hover/50 transition-colors"
       >
         <span className="font-mono text-xs text-text-primary">{field.key}</span>
-        <span className="text-[9px] text-text-tertiary">{field.type}</span>
+        <span className="text-2xs text-text-tertiary">{field.type}</span>
         <ClassificationBadge classification={field.classification} />
         {field.default !== undefined && (
-          <span className="text-[9px] font-mono text-text-tertiary truncate max-w-[120px]">
+          <span className="text-2xs font-mono text-text-tertiary truncate max-w-[120px]">
             = {JSON.stringify(field.default)}
           </span>
         )}
-        <span className="text-[9px] text-text-tertiary ml-auto truncate max-w-[150px]">
+        <span className="text-2xs text-text-tertiary ml-auto truncate max-w-[150px]">
           {field.source_tool}
         </span>
         <svg
@@ -168,25 +168,25 @@ function FieldRow({
 
       {expanded && (
         <div className="px-3 pb-3 pt-1 border-t border-surface-border/50 space-y-2">
-          <p className="text-[10px] text-text-tertiary">{field.description}</p>
+          <p className="text-2xs text-text-tertiary">{field.description}</p>
 
           {editing && (
             <div className="space-y-2">
               {/* Description */}
               <div>
-                <label className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
+                <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Description</label>
                 <input
                   type="text"
                   value={field.description}
                   onChange={(e) => onUpdate({ description: e.target.value })}
-                  className="input text-[11px] w-full mt-0.5"
+                  className="input text-2xs w-full mt-0.5"
                 />
               </div>
 
               {/* Default value (for fixed fields) */}
               {field.classification === 'fixed' && (
                 <div>
-                  <label className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">Default Value</label>
+                  <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Default Value</label>
                   <input
                     type="text"
                     value={field.default !== undefined ? (typeof field.default === 'string' ? field.default : JSON.stringify(field.default)) : ''}
@@ -197,7 +197,7 @@ function FieldRow({
                       else { try { val = JSON.parse(val as string); } catch { /* keep as string */ } }
                       onUpdate({ default: val });
                     }}
-                    className="input text-[11px] font-mono w-full mt-0.5"
+                    className="input text-2xs font-mono w-full mt-0.5"
                   />
                 </div>
               )}
@@ -207,14 +207,14 @@ function FieldRow({
                 <button
                   type="button"
                   onClick={onToggleClassification}
-                  className="text-[10px] text-accent hover:underline"
+                  className="text-2xs text-accent hover:underline"
                 >
                   {field.classification === 'dynamic' ? 'Make fixed (add default)' : 'Make dynamic (require input)'}
                 </button>
                 <button
                   type="button"
                   onClick={onRemove}
-                  className="text-[10px] text-status-error hover:underline ml-auto"
+                  className="text-2xs text-status-error hover:underline ml-auto"
                 >
                   Remove
                 </button>

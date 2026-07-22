@@ -129,16 +129,16 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
 
   const textColor = (cat: string) => {
     if (outline) return CATEGORY_COLORS[cat]?.text ?? 'text-text-tertiary';
-    return 'text-white';
+    return 'text-text-inverse';
   };
 
   return (
     <div className="px-6 py-6 mb-6">
       <div className="flex items-center gap-4 mb-4 flex-wrap">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Execution Timeline
         </p>
-        <button onClick={toggleAll} className="text-[10px] text-accent hover:underline">
+        <button onClick={toggleAll} className="text-2xs text-accent hover:underline">
           {allExpanded ? 'Collapse all' : 'Expand all'}
         </button>
 
@@ -147,7 +147,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
           {activeCategories.map((cat) => (
             <div key={cat} className="flex items-center gap-1">
               <span className={`w-2 h-2 rounded-full dot-ring ${outline ? `border ${CATEGORY_COLORS[cat]?.outline ?? 'border-text-tertiary'}` : CATEGORY_COLORS[cat]?.bar ?? 'bg-text-tertiary'}`} />
-              <span className="text-[9px] text-text-tertiary">
+              <span className="text-2xs text-text-tertiary">
                 {CATEGORY_COLORS[cat]?.label ?? cat}
               </span>
             </div>
@@ -155,7 +155,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
           {spans.some((s) => s.pending) && (
             <div className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full dot-ring bg-status-warning animate-pulse" />
-              <span className="text-[9px] text-text-tertiary">Pending</span>
+              <span className="text-2xs text-text-tertiary">Pending</span>
             </div>
           )}
         </div>
@@ -168,7 +168,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
           {ticks.map((tick) => (
             <span
               key={tick.pct}
-              className="absolute text-[9px] font-mono text-text-tertiary -translate-x-1/2 bottom-1"
+              className="absolute text-2xs font-mono text-text-tertiary -translate-x-1/2 bottom-1"
               style={{ left: `${tick.pct}%` }}
             >
               {tick.label}
@@ -241,7 +241,7 @@ export function SwimlaneTimeline({ events, childTasks, outline, jid, appId }: Sw
                       onMouseLeave={() => setHoveredEvent(null)}
                     >
                       {seg.widthPct > 8 && (
-                        <span className={`absolute inset-0 flex items-center px-1.5 text-[9px] font-mono ${textColor(lane.category)} truncate`}>
+                        <span className={`absolute inset-0 flex items-center px-1.5 text-2xs font-mono ${textColor(lane.category)} truncate`}>
                           {seg.duration !== null ? formatDuration(seg.duration) : 'pending'}
                         </span>
                       )}

@@ -16,7 +16,7 @@ export function KnowledgeStep({ form, set }: Props) {
   return (
     <div className="space-y-6">
       <div className="border-l-2 border-accent/30 pl-3 py-1 flex items-start justify-between">
-        <p className="text-[12px] text-text-secondary italic leading-relaxed">
+        <p className="text-xs text-text-secondary italic leading-relaxed">
           Assign a knowledge domain — the automation's memory. It stores context here over time.
         </p>
         <button onClick={() => { window.location.hash = '#docs:agents.md:knowledge'; }} className="text-text-quaternary hover:text-accent transition-colors shrink-0 ml-3" title="Docs: Knowledge"><BookOpen className="w-3 h-3" strokeWidth={1.5} /></button>
@@ -53,8 +53,8 @@ export function KnowledgeStep({ form, set }: Props) {
               >
                 <Brain className="w-3.5 h-3.5 text-text-quaternary shrink-0" strokeWidth={1.5} />
                 <span className="text-sm text-text-primary flex-1">{d.domain}</span>
-                <span className="text-[10px] text-text-quaternary">{d.count} entries</span>
-                <span className="text-[9px] text-text-quaternary"><DateValue date={d.latest} /></span>
+                <span className="text-2xs text-text-quaternary">{d.count} entries</span>
+                <span className="text-2xs text-text-quaternary"><DateValue date={d.latest} /></span>
               </button>
             ))}
           </div>

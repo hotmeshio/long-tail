@@ -109,6 +109,7 @@ export function OperatorDashboard() {
       <DataTable
         columns={columns}
         data={activeClaims}
+        layout="fixed"
         keyFn={(row) => row.id}
         onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/queue' } })}
         isLoading={isLoading}

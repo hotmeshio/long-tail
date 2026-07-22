@@ -171,12 +171,12 @@ export function TestPanel({ yamlId, originalWorkflowId, originalResult, original
 
   return (
     <div>
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8 min-w-0">
+    <div className="grid grid-cols-1 @split:grid-cols-[1fr_400px] gap-8 min-w-0">
       {/* Left: results */}
       <div className="min-w-0 overflow-hidden">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-extralight tracking-wide text-accent/75 mb-1">Test</h2>
+            <h2 className="heading-2 mb-1">Test</h2>
             <p className="text-base text-text-secondary">
               {builderMode
                 ? 'Run the pipeline with test inputs and review the results.'

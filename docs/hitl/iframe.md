@@ -54,7 +54,7 @@ const WORKBENCH_FORM_SCHEMA = {
 // Workflow side — the wait is a normal conditionLT; the iframe submits the payload
 const design = await conditionLT<{ stl_url: string }>(signalId, {
   role: 'cad-designer',
-  description: 'Design the orthotic insole for this order.',
+  description: 'Design the widget for this order.',
   escalation_payload: JSON.stringify({ workbenchId, companyId }),
 });
 if (design) {

@@ -144,6 +144,29 @@ The field type must be `"object"`. The submitted value is `Record<string, boolea
 - `"envelope"` — for item definitions that are render data only (no query cost). The workflow puts them in `conditionLT`'s `envelope` parameter.
 - `"metadata"` — only when items need to be GIN-indexed and searchable as facets. Adds index cost.
 
+### Geometry (`x-lt-variant`)
+
+Item length and selection mode decide the checklist's shape:
+
+| Variant | Shape | The shape for |
+|---------|-------|---------------|
+| `"rows"` | One item per line | Rituals — sentence-length confirmations, read top-down and ticked deliberately |
+| `"chips"` | A wrapping cloud of selectable pills | Tags — short pick-any items (reject reasons, categories); selection shows in solid accent |
+
+Set `"x-lt-variant"` explicitly, or let the renderer decide: `x-lt-require-all` always renders rows; otherwise chips when every label is 28 characters or fewer. The submitted value is identical in both shapes.
+
+```json
+{
+  "rejectReasons": {
+    "type": "object",
+    "description": "Check every reason that applies",
+    "x-lt-widget": "checklist",
+    "x-lt-source": "envelope.reject_reason_items",
+    "x-lt-variant": "chips"
+  }
+}
+```
+
 A checklist enforces one of three completion levels:
 
 | Level | Declaration | Blocks submission until |

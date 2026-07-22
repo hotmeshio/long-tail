@@ -56,7 +56,7 @@ export function ReactionSelector({
               key={rt}
               type="button"
               onClick={() => onReactionTypeChange(rt)}
-              className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+              className={`px-3 py-1.5 text-2xs font-medium rounded-md transition-colors ${
                 active
                   ? 'bg-accent/10 text-accent'
                   : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'

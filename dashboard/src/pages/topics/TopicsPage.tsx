@@ -140,20 +140,20 @@ function TopicRow({ topic, onClick }: { topic: TopicCatalogEntry; onClick: () =>
       <div className="flex items-center gap-3">
         <Radio className="w-3 h-3 shrink-0 text-text-quaternary group-hover:text-text-tertiary transition-colors" strokeWidth={1.5} />
         <span className="text-xs font-mono text-text-primary truncate shrink-0 max-w-[24rem]">{topic.topic}</span>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 bg-accent/10 text-accent">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium shrink-0 bg-accent/10 text-accent">
           {topic.category}
         </span>
         {(topic.subscriber_count ?? 0) > 0 && (
-          <span className="inline-flex items-center justify-center min-w-[18px] px-1 py-0.5 rounded-full text-[10px] font-medium bg-accent/15 text-accent shrink-0">
+          <span className="inline-flex items-center justify-center min-w-[18px] px-1 py-0.5 rounded-full text-2xs font-medium bg-accent/15 text-accent shrink-0">
             {topic.subscriber_count}
           </span>
         )}
         {topic.description && (
-          <p className="flex-1 min-w-0 truncate text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+          <p className="flex-1 min-w-0 truncate text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors">
             {topic.description}
           </p>
         )}
-        <span className="ml-auto text-[10px] font-mono text-text-quaternary shrink-0">{topic.source}</span>
+        <span className="ml-auto text-2xs font-mono text-text-quaternary shrink-0">{topic.source}</span>
       </div>
     </div>
   );

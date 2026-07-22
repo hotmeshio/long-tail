@@ -78,7 +78,7 @@ export function CreateEntryModal({ open, onClose, onCreated, prefillData, prefil
           <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
             {/* Domain */}
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Domain</label>
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Domain</label>
               <input
                 type="text"
                 list="domain-list"
@@ -94,7 +94,7 @@ export function CreateEntryModal({ open, onClose, onCreated, prefillData, prefil
 
             {/* Key */}
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Key</label>
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Key</label>
               <input
                 type="text"
                 value={key}
@@ -106,7 +106,7 @@ export function CreateEntryModal({ open, onClose, onCreated, prefillData, prefil
 
             {/* Data */}
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Data (JSON)</label>
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Data (JSON)</label>
               <textarea
                 value={dataInput}
                 onChange={(e) => setDataInput(e.target.value)}
@@ -117,7 +117,7 @@ export function CreateEntryModal({ open, onClose, onCreated, prefillData, prefil
 
             {/* Tags */}
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags (comma-separated)</label>
+              <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tags (comma-separated)</label>
               <input
                 type="text"
                 value={tags}

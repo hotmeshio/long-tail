@@ -70,7 +70,7 @@ export function EscalationChainsPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 @wall:grid-cols-3 gap-12">
           {/* Left — role list */}
           <div>
             <SectionLabel className="mb-4">Roles</SectionLabel>
@@ -98,13 +98,13 @@ export function EscalationChainsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-mono">{role}</span>
                         {isSuperAdminRole && (
-                          <span className="text-[10px] text-text-tertiary">
+                          <span className="text-2xs text-text-tertiary">
                             — all roles
                           </span>
                         )}
                       </div>
                       {!isSuperAdminRole && count > 0 && (
-                        <span className="text-[10px] text-text-tertiary bg-surface-sunken px-1.5 py-0.5 rounded-full">
+                        <span className="text-2xs text-text-tertiary bg-surface-sunken px-1.5 py-0.5 rounded-full">
                           {count}
                         </span>
                       )}

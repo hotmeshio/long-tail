@@ -68,7 +68,7 @@ export function GraphFlowSelector({
                 <div className="flex items-center gap-3">
                   <ToolPill name={flow.graph_topic} size="md" />
                   {flow.description && (
-                    <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+                    <p className="flex-1 min-w-0 truncate text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors">
                       {flow.description}
                     </p>
                   )}

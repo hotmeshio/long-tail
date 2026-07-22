@@ -19,10 +19,10 @@ import type { DiscoveredWorkflow } from '../../../api/types';
 
 function TierBadge({ tier }: { tier: string }) {
   if (tier === 'certified')
-    return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-status-success"><ShieldCheck className="w-3 h-3" />Certified</span>;
+    return <span className="inline-flex items-center gap-1 text-2xs font-medium text-status-success"><ShieldCheck className="w-3 h-3" />Certified</span>;
   if (tier === 'registered')
-    return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary"><Settings className="w-3 h-3" />Registered</span>;
-  return <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-quaternary"><Wrench className="w-3 h-3" />Durable</span>;
+    return <span className="inline-flex items-center gap-1 text-2xs font-medium text-text-secondary"><Settings className="w-3 h-3" />Registered</span>;
+  return <span className="inline-flex items-center gap-1 text-2xs font-medium text-text-quaternary"><Wrench className="w-3 h-3" />Durable</span>;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -197,9 +197,9 @@ const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_7rem_13rem_4.5rem] gap-x-6';
 function WorkflowTableHeader() {
   return (
     <div className={`${ROW_GRID} px-3 pb-2 pt-1`}>
-      <span className="text-[10px] font-medium text-text-quaternary">Workflow</span>
-      <span className="text-[10px] font-medium text-text-quaternary">Tier</span>
-      <span className="text-[10px] font-medium text-text-quaternary">Access</span>
+      <span className="text-2xs font-medium text-text-quaternary">Workflow</span>
+      <span className="text-2xs font-medium text-text-quaternary">Tier</span>
+      <span className="text-2xs font-medium text-text-quaternary">Access</span>
       <span />
     </div>
   );
@@ -237,7 +237,7 @@ function WorkflowRow({
           variant={wf.tier === 'certified' ? 'certified' : wf.tier === 'registered' ? 'registered' : 'durable'}
         />
         {wf.description && (
-          <p className="flex-1 min-w-0 truncate text-[10px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+          <p className="flex-1 min-w-0 truncate text-2xs text-text-tertiary group-hover:text-text-secondary transition-colors">
             {wf.description}
           </p>
         )}

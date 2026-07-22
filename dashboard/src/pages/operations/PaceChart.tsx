@@ -99,19 +99,25 @@ function last<T>(a: T[]): T | undefined {
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 // Shared queue-state palette — the chart bands and the station table columns
-// use the same hues so the two views read as one.
-export const ACTIVE_COLOR = '#f97316';   // claimed, being worked right now — orange
-export const QUEUED_COLOR = '#0ea5e9';   // pending and unclaimed, waiting in the queue — sky
-export const RESOLVED_COLOR = '#16a34a'; // done — green
-export const TARGET_COLOR = '#94a3b8';   // target pace line — slate gray
+// use the same hues so the two views read as one. Each hue resolves through
+// a --lt-* theme token so registered themes (including dark) restyle the
+// chart; the navy default keeps the original sky/orange/green/slate look.
+export const ACTIVE_COLOR = 'rgb(var(--lt-status-claimed-graphic))';   // claimed, being worked right now — orange
+export const QUEUED_COLOR = 'rgb(var(--lt-status-queued-graphic))';    // pending and unclaimed, waiting in the queue — sky
+export const RESOLVED_COLOR = 'rgb(var(--lt-status-success-graphic))'; // done — green
+export const TARGET_COLOR = 'rgb(var(--lt-text-quaternary))';          // target pace line — muted gray
 
 // Priority — unclaimed items past the role's age threshold, the count the
-// floor pulls to the front of the rack. Powder blue for the badge circle;
-// the count text uses the same hue deepened enough to read at chart sizes.
+// floor pulls to the front of the rack.
 // Jeopardy shares one red across the product (the pill, the table sub-row,
 // this chart's badge) — the hard-limit alarm, distinct from every pace hue.
-export const PRIORITY_COLOR = '#DC2626';
-export const PRIORITY_TEXT_COLOR = '#DC2626';
+export const PRIORITY_COLOR = 'rgb(var(--lt-status-error))';
+export const PRIORITY_TEXT_COLOR = 'rgb(var(--lt-status-error))';
+
+/** Translucent tint of a token-based `rgb(var(--…))` color, for band fills. */
+export function withAlpha(color: string, alpha: number): string {
+  return color.replace(/\)$/, ` / ${alpha})`);
+}
 
 // ── End-label stacking — spread close labels so text doesn't collide ────────────
 
@@ -233,25 +239,25 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         const px = xMap.get(s.parent_role);
         if (px == null) return null;
         const cx = xOf(stations.findIndex((r) => r.role === s.role));
-        return <line key={`dep-${s.role}`} x1={px} y1={bottom} x2={cx} y2={bottom} stroke="#e2e8f0" strokeWidth={0.75} />;
+        return <line key={`dep-${s.role}`} x1={px} y1={bottom} x2={cx} y2={bottom} className="stroke-surface-border" strokeWidth={0.75} />;
       })}
 
       {/* Area under the actual curve */}
-      {areaPath && <path d={areaPath} fill={RESOLVED_COLOR} opacity={0.05} style={{ transition: `d ${EASE}` }} />}
+      {areaPath && <path d={areaPath} opacity={0.05} style={{ fill: RESOLVED_COLOR, transition: `d ${EASE}` }} />}
 
       {/* Queue composition bands — the band heights split each station's
           pending total into claimed-and-worked (indigo, floor→active) and
           waiting-unclaimed (sky, active→pending). */}
       {workedBandPath && (
-        <path d={workedBandPath} fill={ACTIVE_COLOR} opacity={0.12} style={{ transition: `d ${EASE}` }} />
+        <path d={workedBandPath} opacity={0.12} style={{ fill: ACTIVE_COLOR, transition: `d ${EASE}` }} />
       )}
       {queuedBandPath && (
-        <path d={queuedBandPath} fill={QUEUED_COLOR} opacity={0.12} style={{ transition: `d ${EASE}` }} />
+        <path d={queuedBandPath} opacity={0.12} style={{ fill: QUEUED_COLOR, transition: `d ${EASE}` }} />
       )}
 
       {/* Target — dashed reference curve at the window's expected count */}
       {targetLinePath && (
-        <path d={targetLinePath} fill="none" stroke={TARGET_COLOR} strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.7} style={{ transition: `d ${EASE}` }} />
+        <path d={targetLinePath} fill="none" strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.7} style={{ stroke: TARGET_COLOR, transition: `d ${EASE}` }} />
       )}
 
       {/* Per-station target markers — a small emerald dot on the target line
@@ -259,15 +265,15 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
           (target_per_hour × duration) just above it */}
       {targetPts.map((tp) => (
         <g key={`tval-${tp.idx}`} transform={`translate(${tp.x} ${tp.y})`} style={{ transition: `transform ${EASE}` }}>
-          <circle r={2} fill={TARGET_COLOR} opacity={0.8} />
+          <circle r={2} opacity={0.8} style={{ fill: TARGET_COLOR }} />
           <text
             y={-5}
             textAnchor="middle"
             fontSize={6.5}
-            fill={TARGET_COLOR}
             fontFamily="ui-monospace, monospace"
             fontWeight="500"
             opacity={0.7}
+            style={{ fill: TARGET_COLOR }}
           >
             {Math.round(tp.expected as number)}
           </text>
@@ -276,17 +282,17 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
 
       {/* Pending — thin dotted sky edge along the queue total (top of the bands) */}
       {hasQueue && pendingSplinePath && (
-        <path d={pendingSplinePath} fill="none" stroke={QUEUED_COLOR} strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.55} style={{ transition: `d ${EASE}` }} />
+        <path d={pendingSplinePath} fill="none" strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.55} style={{ stroke: QUEUED_COLOR, transition: `d ${EASE}` }} />
       )}
 
       {/* Active — thin dotted indigo, how many are claimed and being worked */}
       {activeSplinePath && (
-        <path d={activeSplinePath} fill="none" stroke={ACTIVE_COLOR} strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.5} style={{ transition: `d ${EASE}` }} />
+        <path d={activeSplinePath} fill="none" strokeWidth={0.75} strokeDasharray="2 3" strokeLinecap="round" opacity={0.5} style={{ stroke: ACTIVE_COLOR, transition: `d ${EASE}` }} />
       )}
 
       {/* Actual — thin solid, primary line */}
       {actualSplinePath && (
-        <path d={actualSplinePath} fill="none" stroke={RESOLVED_COLOR} strokeWidth={0.6} strokeLinejoin="round" strokeLinecap="round" opacity={0.65} style={{ transition: `d ${EASE}` }} />
+        <path d={actualSplinePath} fill="none" strokeWidth={0.6} strokeLinejoin="round" strokeLinecap="round" opacity={0.65} style={{ stroke: RESOLVED_COLOR, transition: `d ${EASE}` }} />
       )}
 
       {/* Queue markers — a dot on the active line per station.
@@ -308,18 +314,17 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
                 y={pendingLabelY}
                 textAnchor="middle"
                 fontSize={7.5}
-                fill={hasWaiting ? QUEUED_COLOR : '#64748b'}
                 fontFamily="ui-monospace, monospace"
                 fontWeight="600"
-                style={{ transition: `y ${EASE}` }}
+                style={{ fill: hasWaiting ? QUEUED_COLOR : 'rgb(var(--lt-text-tertiary))', transition: `y ${EASE}` }}
               >
                 {ap.pending}
               </text>
             )}
             <g transform={`translate(${ap.x} ${ap.y})`} style={{ transition: `transform ${EASE}` }}>
-              <circle r={ar} fill={ACTIVE_COLOR} opacity={0.85} />
+              <circle r={ar} opacity={0.85} style={{ fill: ACTIVE_COLOR }} />
               {ap.active > 0 && (
-                <text y={ar + 9} textAnchor="middle" fontSize={7.5} fill={ACTIVE_COLOR} fontFamily="ui-monospace, monospace" fontWeight="600">
+                <text y={ar + 9} textAnchor="middle" fontSize={7.5} fontFamily="ui-monospace, monospace" fontWeight="600" style={{ fill: ACTIVE_COLOR }}>
                   {ap.active}
                 </text>
               )}
@@ -369,14 +374,14 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
             {/* Animated marker group — slides vertically as the window rescales */}
             <g transform={`translate(${x} ${cy})`} style={{ transition: `transform ${EASE}` }}>
               <circle r={22} fill="transparent" />
-              <circle r={r} fill={RESOLVED_COLOR} opacity={0.9} style={{ transition: `r ${EASE}` }} />
+              <circle r={r} opacity={0.9} style={{ fill: RESOLVED_COLOR, transition: `r ${EASE}` }} />
               {row.expected != null && (
-                <text y={-r - 5} textAnchor="middle" fontSize={9.5} fill={RESOLVED_COLOR} fontFamily="ui-monospace, monospace" fontWeight="500">
+                <text y={-r - 5} textAnchor="middle" fontSize={9.5} fontFamily="ui-monospace, monospace" fontWeight="500" style={{ fill: RESOLVED_COLOR }}>
                   {compact(row.actual)}
                 </text>
               )}
-              {isHovered && !isSelected && <circle r={r + 3} fill="none" stroke={RESOLVED_COLOR} strokeWidth={1} opacity={0.4} />}
-              {isSelected && <circle r={r + 4} fill="none" stroke="#6366f1" strokeWidth={2} />}
+              {isHovered && !isSelected && <circle r={r + 3} fill="none" strokeWidth={1} opacity={0.4} style={{ stroke: RESOLVED_COLOR }} />}
+              {isSelected && <circle r={r + 4} fill="none" className="stroke-accent" strokeWidth={2} />}
             </g>
 
 
@@ -395,9 +400,9 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
               >
                 <title>{`Fed by ${s.upstream_roles!.join(', ')} — click to view that sequence`}</title>
                 <circle r={9} cy={-6} fill="transparent" />
-                <path d="M -7 -14 C -3 -14 -1 -9 0 -2" fill="none" stroke="#94a3b8" strokeWidth={1} strokeDasharray="2 2" strokeLinecap="round" />
-                <path d="M 0 -2 L 8 -2" stroke="#94a3b8" strokeWidth={1} strokeLinecap="round" />
-                <path d="M 8 -2 l -3.5 -2 v 4 z" fill="#94a3b8" />
+                <path d="M -7 -14 C -3 -14 -1 -9 0 -2" fill="none" className="stroke-text-quaternary" strokeWidth={1} strokeDasharray="2 2" strokeLinecap="round" />
+                <path d="M 0 -2 L 8 -2" className="stroke-text-quaternary" strokeWidth={1} strokeLinecap="round" />
+                <path d="M 8 -2 l -3.5 -2 v 4 z" className="fill-text-quaternary" />
               </g>
             )}
 
@@ -410,7 +415,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
               y={bottom + (row.idx % 2 === 0 ? 14 : 27)}
               textAnchor="middle"
               fontSize={9.5}
-              fill="#475569"
+              className="fill-text-tertiary"
               fontFamily="ui-sans-serif, sans-serif"
               fontWeight="500"
             >
@@ -420,8 +425,8 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
             {/* Tooltip */}
             {isHovered && (
               <g>
-                <rect x={tipX - tipW / 2} y={tipY - 16} width={tipW} height={19} rx={3} fill="#0f172a" opacity={0.88} />
-                <text x={tipX} y={tipY - 3} textAnchor="middle" fontSize={8.5} fill="white" fontFamily="ui-monospace, monospace">
+                <rect x={tipX - tipW / 2} y={tipY - 16} width={tipW} height={19} rx={3} className="fill-text-primary" opacity={0.88} />
+                <text x={tipX} y={tipY - 3} textAnchor="middle" fontSize={8.5} className="fill-surface" fontFamily="ui-monospace, monospace">
                   {tooltip}
                 </text>
               </g>
@@ -432,7 +437,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
 
       {/* No-target hint */}
       {!hasTargets && (
-        <text x={ML + chartW / 2} y={bottom + 48} textAnchor="middle" fontSize={8.5} fill="#94a3b8" fontFamily="ui-sans-serif, sans-serif">
+        <text x={ML + chartW / 2} y={bottom + 48} textAnchor="middle" fontSize={8.5} className="fill-text-quaternary" fontFamily="ui-sans-serif, sans-serif">
           Set target_per_hour on each role in Admin → Roles to enable the pace chart
         </text>
       )}
@@ -444,11 +449,10 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
           x={right + 6}
           y={l.labelY}
           fontSize={8}
-          fill={l.color}
           fontFamily="ui-sans-serif, sans-serif"
           fontWeight={l.key === 'actual' ? 700 : 500}
           opacity={l.key === 'active' ? 0.85 : 1}
-          style={{ transition: `y ${EASE}` }}
+          style={{ fill: l.color, transition: `y ${EASE}` }}
         >
           {l.text}
         </text>

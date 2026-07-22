@@ -15,14 +15,14 @@ interface RolePillProps {
 export function RolePill({ role, size = 'sm', tone = 'default' }: RolePillProps) {
   const sizeClass = size === 'md'
     ? 'py-0.5 text-xs gap-1.5'
-    : 'py-0.5 text-[10px] gap-1';
+    : 'py-0.5 text-2xs gap-1';
   const iconClass = size === 'md' ? 'w-3 h-3' : 'w-2.5 h-2.5';
   const colorClass = tone === 'inherit' ? 'text-inherit' : 'text-text-secondary';
 
   return (
-    <span className={`inline-flex items-center whitespace-nowrap ${sizeClass} ${colorClass}`}>
+    <span className={`inline-flex items-center max-w-full min-w-0 ${sizeClass} ${colorClass}`} title={role}>
       <Inbox className={`${iconClass} shrink-0 text-accent/75`} />
-      {role}
+      <span className="truncate">{role}</span>
     </span>
   );
 }

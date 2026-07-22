@@ -13,7 +13,7 @@ export function RoleMembersSection({ role }: { role: string }) {
 
   if (users.length === 0) {
     return (
-      <p className="text-[11px] text-text-tertiary">
+      <p className="text-2xs text-text-tertiary">
         Assign users to this role to staff its queue. Members see and resolve
         escalations here according to their read/write scope; admins manage the
         role itself.
@@ -31,7 +31,7 @@ export function RoleMembersSection({ role }: { role: string }) {
             <span className="text-xs text-text-secondary truncate">
               {u.display_name || u.external_id}
             </span>
-            <span className="text-[10px] text-text-quaternary font-mono shrink-0">
+            <span className="text-2xs text-text-quaternary font-mono shrink-0">
               {describeMembership(membership)}
             </span>
           </div>

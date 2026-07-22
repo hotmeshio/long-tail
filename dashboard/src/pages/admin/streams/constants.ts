@@ -15,7 +15,7 @@ export const STATUS_LABEL: Record<StreamMessageStatus, string> = {
 };
 
 export const SOURCE_BADGE =
-  'inline-block px-1.5 py-0.5 text-[10px] font-mono rounded bg-surface-sunken text-text-secondary';
+  'inline-block px-1.5 py-0.5 text-2xs font-mono rounded bg-surface-sunken text-text-secondary';
 
 export const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending' },

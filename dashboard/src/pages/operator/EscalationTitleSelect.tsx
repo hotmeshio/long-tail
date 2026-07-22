@@ -54,7 +54,7 @@ export function EscalationTitleSelect({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex items-center gap-2 min-w-0 text-3xl font-light text-text-primary hover:text-accent transition-colors"
+        className="group flex items-center gap-2 min-w-0 heading-1 hover:text-accent transition-colors"
       >
         <span className="truncate">{current}</span>
         <ChevronDown
@@ -72,7 +72,7 @@ export function EscalationTitleSelect({
           {options.map((o) => (
             <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }} className={itemCls(role === o.value)}>
               <span className="truncate">{o.label}</span>
-              {o.label !== o.value && <span className="text-[10px] font-mono text-text-quaternary shrink-0">{o.value}</span>}
+              {o.label !== o.value && <span className="text-2xs font-mono text-text-quaternary shrink-0">{o.value}</span>}
             </button>
           ))}
         </div>

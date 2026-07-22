@@ -150,7 +150,7 @@ export function McpOverview() {
     navigate(`/mcp/executions${qs ? `?${qs}` : ''}`);
   };
 
-  const thCls = 'pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary';
+  const thCls = 'pb-2 text-2xs font-semibold uppercase tracking-widest text-text-tertiary';
 
   return (
     <div>
@@ -248,7 +248,7 @@ export function McpOverview() {
       )}
 
       {/* ── Server inventory (compact cards) ─────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
         <button
           onClick={() => navigate('/mcp/servers')}
           className="bg-surface-raised border border-surface-border rounded-md p-5 text-left hover:border-accent/40 transition-colors"
@@ -263,7 +263,7 @@ export function McpOverview() {
               server{servers.length !== 1 ? 's' : ''} · {serverToolCount} tool{serverToolCount !== 1 ? 's' : ''}
             </span>
           </p>
-          <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
+          <p className="text-2xs text-text-tertiary leading-relaxed mt-2">
             Built-in and external MCP servers. Each server exposes tools that workflows and agents can call.
           </p>
         </button>
@@ -282,7 +282,7 @@ export function McpOverview() {
               workflow{yamlWorkflows.length !== 1 ? 's' : ''} · {workflowServerCount} server{workflowServerCount !== 1 ? 's' : ''}
             </span>
           </p>
-          <p className="text-[11px] text-text-tertiary leading-relaxed mt-2">
+          <p className="text-2xs text-text-tertiary leading-relaxed mt-2">
             Compiled from discovery runs. Deterministic tool-to-tool pipelines — no LLM, no token costs.
           </p>
         </button>

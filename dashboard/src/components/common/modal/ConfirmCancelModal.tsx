@@ -38,7 +38,7 @@ export function ConfirmCancelModal({
           <button
             onClick={onConfirm}
             disabled={isPending}
-            className="bg-status-error text-white px-3 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="bg-status-error text-text-inverse px-3 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {isPending ? 'Cancelling...' : 'Yes, Cancel'}
           </button>

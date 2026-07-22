@@ -28,7 +28,7 @@ export function InvokeSidebar({
       {editing.execute_as && (
         <div className="flex items-center gap-1.5 px-3 py-2 mb-4 rounded-md bg-accent/[0.06] border border-accent/20">
           <Bot className="w-3.5 h-3.5 text-accent/75 shrink-0" />
-          <span className="text-[11px] text-text-secondary">
+          <span className="text-2xs text-text-secondary">
             Running as <span className="font-medium text-accent">{editing.execute_as}</span>
           </span>
         </div>
@@ -39,9 +39,9 @@ export function InvokeSidebar({
           <div className="flex items-baseline justify-between mb-2">
             <label className="block text-xs text-text-secondary">Envelope</label>
             {editing?.envelope_schema ? (
-              <span className="text-[10px] text-accent">Pre-filled from config</span>
+              <span className="text-2xs text-accent">Pre-filled from config</span>
             ) : (
-              <span className="text-[10px] text-status-warning">No template</span>
+              <span className="text-2xs text-status-warning">No template</span>
             )}
           </div>
           <textarea
@@ -54,7 +54,7 @@ export function InvokeSidebar({
             rows={10}
             spellCheck={false}
           />
-          <p className="text-[10px] text-text-tertiary mt-1.5">
+          <p className="text-2xs text-text-tertiary mt-1.5">
             <code className="text-accent/80">data</code> holds workflow input; <code className="text-accent/80">metadata</code> is optional context.
           </p>
         </div>

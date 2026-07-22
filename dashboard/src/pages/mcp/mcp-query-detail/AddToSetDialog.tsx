@@ -44,14 +44,14 @@ export function AddToSetDialog({
               <Loader2 className="w-5 h-5 text-accent animate-spin" strokeWidth={1.5} />
               <div>
                 <p className="text-sm font-medium text-text-primary">Building new tools...</p>
-                <p className="text-[11px] text-text-tertiary mt-0.5">Watch the sidebar — new tools will appear as they're built.</p>
+                <p className="text-2xs text-text-tertiary mt-0.5">Watch the sidebar — new tools will appear as they're built.</p>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-text-tertiary">{planCount} tool{planCount === 1 ? '' : 's'} in set</span>
+              <span className="text-2xs text-text-tertiary">{planCount} tool{planCount === 1 ? '' : 's'} in set</span>
               <button
                 onClick={onDismiss}
-                className="text-[10px] text-text-tertiary hover:text-text-primary transition-colors"
+                className="text-2xs text-text-tertiary hover:text-text-primary transition-colors"
               >
                 Dismiss
               </button>
@@ -60,7 +60,7 @@ export function AddToSetDialog({
         ) : (
           <>
             <p className="text-sm font-medium text-text-primary mb-1">Expand this Toolset</p>
-            <p className="text-[11px] text-text-tertiary mb-4">Describe additional activities you would like to add.</p>
+            <p className="text-2xs text-text-tertiary mb-4">Describe additional activities you would like to add.</p>
             <textarea
               value={addSpec}
               onChange={(e) => {
@@ -77,7 +77,7 @@ export function AddToSetDialog({
               <p className="text-xs text-status-error mt-2">{errorMessage}</p>
             )}
             <div className="flex items-center justify-between mt-3">
-              <span className="text-[10px] text-text-tertiary">
+              <span className="text-2xs text-text-tertiary">
                 {planCount} tool{planCount === 1 ? '' : 's'} in set
               </span>
               <div className="flex items-center gap-2">

@@ -129,6 +129,8 @@ interface FormSectionProps {
   submitAttempted?: boolean;
   isCertified?: boolean;
   hasAI?: boolean;
+  /** Opens the Instructions side-panel view (form help icon). */
+  onOpenHelp?: () => void;
 }
 
 /**
@@ -157,6 +159,7 @@ export function EscalationFormSection({
   submitAttempted,
   isCertified,
   hasAI,
+  onOpenHelp,
 }: FormSectionProps) {
   const schema = effectiveSchema;
   const showIfCtx = buildShowIfContext(esc);
@@ -175,7 +178,7 @@ export function EscalationFormSection({
       ? { ...mapPayloadToForm(payload, formSchema), _form_schema: formSchema }
       : payload;
     return (
-      <div className="mt-8 pt-6">
+      <div className="mt-3">
         <ResolverForm
           value={JSON.stringify(value, null, 2)}
           onChange={() => {}}
@@ -207,7 +210,7 @@ export function EscalationFormSection({
   const resolvedSrc = isIframeViewport ? expandViewportSrc(viewport!.src!, esc) : '';
 
   return (
-    <div className="mt-8 pt-6">
+    <div className="mt-3">
       {isIframeViewport ? (
         <IframeViewport
           src={resolvedSrc}
@@ -229,6 +232,7 @@ export function EscalationFormSection({
           submitAttempted={submitAttempted}
           showTriage={!!isCertified && !!hasAI}
           escalationContext={showIfCtx}
+          onOpenHelp={onOpenHelp}
         />
       )}
     </div>

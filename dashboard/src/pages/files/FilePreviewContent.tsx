@@ -28,7 +28,7 @@ export function MetaRow({ label, value, mono, children }: {
 }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-wider text-text-tertiary mb-0.5">{label}</dt>
+      <dt className="text-2xs uppercase tracking-wider text-text-tertiary mb-0.5">{label}</dt>
       <dd className={`text-sm text-text-secondary ${mono ? 'font-mono text-xs break-all' : ''}`}>
         {children || value}
       </dd>
@@ -76,7 +76,7 @@ export function FileMetadataDisplay({ metadata }: {
   return (
     <div className="space-y-3">
       <div>
-        <dt className="text-[10px] uppercase tracking-wider text-text-tertiary mb-0.5">Path</dt>
+        <dt className="text-2xs uppercase tracking-wider text-text-tertiary mb-0.5">Path</dt>
         <dd
           onClick={() => copyToClipboard(metadata.path, 'path')}
           className="group flex items-center gap-1.5 text-xs font-mono text-text-secondary break-all cursor-pointer hover:text-text-primary transition-colors"

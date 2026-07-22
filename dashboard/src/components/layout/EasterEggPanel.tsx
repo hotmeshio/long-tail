@@ -116,7 +116,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
           <div className="text-center">
             <p className="text-2xl font-light text-text-primary tracking-[0.12em]">{appName}</p>
             {version && (
-              <p className="mt-1 text-[11px] text-text-tertiary">
+              <p className="mt-1 text-2xs text-text-tertiary">
                 v{version}
                 {hotmeshVersion && <> · HotMesh v{hotmeshVersion}</>}
                 {nodeEnv && nodeEnv !== 'production' && (
@@ -146,7 +146,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
                   }`}
                 >
                   <s.icon className="w-5 h-5" strokeWidth={1.5} {...(active ? { fill: 'currentColor', fillOpacity: 0.15 } : {})} />
-                  <span className="text-[10px] font-medium">{s.label}</span>
+                  <span className="text-2xs font-medium">{s.label}</span>
                 </button>
               );
             })}
@@ -155,7 +155,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
 
         {section === 'viewas' && hasViewOptions && (
           <div className="space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary mb-4">View As</p>
+            <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-4">View As</p>
             {availableOptions.map((opt) => {
               const isSelected = currentViewAs === opt.id;
               const label = opt.id === null ? `Your view · ${realTierLabel(realTier)}` : opt.label;
@@ -170,7 +170,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
                       isSelected ? 'border-accent bg-accent' : 'border-surface-border group-hover:border-accent/60'
                     }`}
                   >
-                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-text-inverse" />}
                   </span>
                   <span>
                     <span className={`block text-sm font-medium transition-colors ${
@@ -188,7 +188,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
 
         {section === 'ai' && (
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary mb-4">Features</p>
+            <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-4">Features</p>
             <button
               onClick={toggleAi}
               className="w-full text-left flex items-center justify-between py-2.5 px-1 group"
@@ -202,14 +202,14 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
                 </span>
               </span>
               <span className={`shrink-0 ml-4 w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${aiToggle ? 'bg-accent' : 'bg-surface-border'}`}>
-                <span className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${aiToggle ? 'translate-x-4' : 'translate-x-0'}`} />
+                <span className={`w-4 h-4 rounded-full bg-text-inverse shadow-sm transition-transform ${aiToggle ? 'translate-x-4' : 'translate-x-0'}`} />
               </span>
             </button>
           </div>
         )}
 
         <hr className="border-surface-border/50 mt-8" />
-        <p className="mt-4 text-[10px] text-text-quaternary text-center">Esc or click outside to close</p>
+        <p className="mt-4 text-2xs text-text-quaternary text-center">Esc or click outside to close</p>
       </div>
     </div>
   );

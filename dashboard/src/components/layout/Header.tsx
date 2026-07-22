@@ -1,16 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Inbox, User, BookOpen, Radio, X, BookmarkPlus } from 'lucide-react';
+import { Inbox, User, BookOpen, LayoutGrid, Menu, Radio, X, BookmarkPlus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
+import { usePersona } from '../../hooks/usePersona';
 import { useEscalationCounts } from '../../hooks/useEscalationCounts';
 import { useEventStatus } from '../../hooks/useEventContext';
 import { useSettings } from '../../api/settings';
 import { AppLogo } from '../common/display/AppLogo';
 import { EasterEggPanel } from './EasterEggPanel';
 import { clearViewAs } from '../../lib/view-as';
-import { THEMES, THEME_LABELS, THEME_SWATCHES, getTheme, setTheme, type Theme } from '../../lib/theme';
-import { QUEUED_COLOR, ACTIVE_COLOR } from '../../pages/operations/PaceChart';
+import { getAllThemes, registerThemes, getTheme, setTheme, type Theme } from '../../lib/theme';
 
 const BOOKMARKS_KEY = 'lt:bookmarks';
 
@@ -31,10 +31,11 @@ function persistBookmarks(bookmarks: Bookmark[]): void {
   try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks)); } catch {}
 }
 
-export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void }) {
+export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void; onToggleNav?: () => void }) {
   const { user, logout } = useAuth();
   const { isBuilder, isOps, viewAs, realIsBuilder } = useAccess();
   const { available, mine } = useEscalationCounts();
+  const { canSeePaceBoard } = usePersona();
   const { connected } = useEventStatus();
   const { data: settings } = useSettings();
   const location = useLocation();
@@ -45,6 +46,14 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   const menuRef = useRef<HTMLDivElement>(null);
 
   const appName = settings?.branding?.appName;
+
+  // Deployment-registered themes join the picker beside the built-ins; their
+  // CSS is already loaded via /api/settings/custom.css.
+  const brandThemes = settings?.branding?.themes;
+  const allThemes = useMemo(() => {
+    registerThemes(brandThemes ?? []);
+    return getAllThemes();
+  }, [brandThemes]);
 
   const selectTheme = (next: Theme) => {
     setTheme(next);
@@ -83,50 +92,80 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
   return (
     <>
       {/* The header is its own stacking context, so its children's z is capped
-          by the header's z against page-level fixed layers (facet drawer z-40,
-          help panel z-[45], docs drawer z-50). At rest it sits at z-30 so those
-          drawers may cover it; while the user menu is open it lifts to the menu
-          tier (z-[100]) so an open menu is never occluded. */}
+          by the header's z against page-level fixed layers (help panel z-[45],
+          docs drawer z-50). At rest it sits at z-30 so those overlays may cover
+          it; while the user menu is open it lifts to the menu tier (z-[100])
+          so an open menu is never occluded. */}
       <header className={`h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between pl-2 pr-5 relative ${menuOpen ? 'z-[100]' : 'z-30'}`}>
-        <Link
-          to="/"
-          aria-label="Home"
-          onClick={(e) => {
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault();
-              setSettingsPanelOpen(true);
-            }
-          }}
-        >
-          <AppLogo appName={appName} />
-        </Link>
+        <div className="flex items-center gap-1 min-w-0">
+          {/* Below lg the nav rail is a drawer behind this button. */}
+          {onToggleNav && (
+            <button
+              onClick={onToggleNav}
+              className="lg:hidden p-2 text-text-secondary hover:text-text-primary transition-colors"
+              aria-label="Open navigation"
+            >
+              <Menu className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+          )}
+          <Link
+            to="/"
+            aria-label="Home"
+            className="shrink-0"
+            onClick={(e) => {
+              if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                setSettingsPanelOpen(true);
+              }
+            }}
+          >
+            {/* Header diet: the mark IS the brand below lg. */}
+            <AppLogo appName={appName} className="hidden lg:flex" />
+            <AppLogo appName={appName} variant="mark" className="flex lg:hidden pl-1" />
+          </Link>
+          {/* Promoted below lg: the floor worker's one-tap destination. */}
+          {canSeePaceBoard && (
+            <Link
+              to="/operations"
+              className="lg:hidden p-2 text-text-quaternary hover:text-accent transition-colors"
+              title="Pace Board"
+              aria-label="Pace Board"
+            >
+              <LayoutGrid className="w-4 h-4" strokeWidth={1.5} />
+            </Link>
+          )}
+        </div>
 
         <div className="flex items-center gap-5">
           {/* Escalations: all */}
           <Link
             to="/escalations/available"
-            className="flex items-center gap-1.5 text-[11px] transition-colors text-text-quaternary hover:text-text-secondary"
-            style={available > 0 ? { color: QUEUED_COLOR } : undefined}
+            className={`flex items-center gap-1.5 text-2xs transition-colors ${
+              available > 0 ? 'text-status-queued' : 'text-text-quaternary hover:text-text-secondary'
+            }`}
             title="All escalations"
           >
             <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
-            all{available > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{available}</sup>}
+            <span className="hidden lg:inline">all</span>
+            {available > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{available}</sup>}
           </Link>
 
           {/* Escalations: mine */}
           <Link
             to="/escalations/queue"
-            className="flex items-center gap-1.5 text-[11px] transition-colors text-text-quaternary hover:text-text-secondary"
-            style={mine > 0 ? { color: ACTIVE_COLOR } : undefined}
+            className={`flex items-center gap-1.5 text-2xs transition-colors ${
+              mine > 0 ? 'text-status-claimed' : 'text-text-quaternary hover:text-text-secondary'
+            }`}
             title="My escalation queue"
           >
             <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
-            mine{mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
+            <span className="hidden lg:inline">mine</span>
+            {mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
           </Link>
 
           {(isBuilder || isOps) && (
             <>
-              <div className="w-px h-4 bg-surface-border" />
+              <div className="hidden lg:block w-px h-4 bg-surface-border" />
 
               {/* Events — admins run the floor from live events, same as builders */}
               <button
@@ -138,7 +177,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                     onToggleEventFeed?.();
                   }
                 }}
-                className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+                className={`hidden lg:flex items-center gap-1.5 text-2xs transition-colors ${
                   connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
                 }`}
                 title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
@@ -154,7 +193,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
               {/* Docs */}
               <button
                 onClick={onToggleDocs}
-                className="flex items-center gap-1.5 text-[11px] text-text-quaternary hover:text-text-secondary transition-colors"
+                className="hidden lg:flex items-center gap-1.5 text-2xs text-text-quaternary hover:text-text-secondary transition-colors"
                 title="Documentation"
               >
                 <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -166,7 +205,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
           {/* View-as indicator — visible when simulating a lower role */}
           {viewAs && (
             <>
-              <span className="flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-[10px] text-accent select-none">
+              <span className="hidden lg:flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-2xs text-accent select-none">
                 <span className="capitalize font-medium tracking-wide">{viewAs} View</span>
                 <button
                   onClick={clearViewAs}
@@ -179,7 +218,7 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
             </>
           )}
 
-          <div className="w-px h-4 bg-surface-border" />
+          <div className="hidden lg:block w-px h-4 bg-surface-border" />
 
           {/* User menu */}
           {user && (
@@ -188,9 +227,12 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                 onClick={() => setMenuOpen((o) => !o)}
                 className="btn-ghost text-xs flex items-center gap-1"
               >
-                <User className="w-3.5 h-3.5 text-accent/75" strokeWidth={1.5} />
-                {user.displayName || user.username || user.userId}
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <span className="relative">
+                  <User className="w-3.5 h-3.5 text-accent/75" strokeWidth={1.5} />
+                  {viewAs && <span className="lg:hidden absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent" />}
+                </span>
+                <span className="hidden lg:inline whitespace-nowrap">{user.displayName || user.username || user.userId}</span>
+                <svg className="hidden lg:block w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
@@ -203,20 +245,44 @@ export function Header({ onToggleEventFeed, onToggleDocs }: { onToggleEventFeed?
                   >
                     Credentials
                   </Link>
+                  {(isBuilder || isOps) && (
+                    <button
+                      onClick={() => { setMenuOpen(false); if (!connected) window.location.reload(); else onToggleEventFeed?.(); }}
+                      className="lg:hidden block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                    >
+                      {connected ? 'Events' : 'Reconnect events'}
+                    </button>
+                  )}
+                  {realIsBuilder && (
+                    <button
+                      onClick={() => { setMenuOpen(false); onToggleDocs?.(); }}
+                      className="lg:hidden block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                    >
+                      Docs
+                    </button>
+                  )}
+                  {viewAs && (
+                    <button
+                      onClick={() => { setMenuOpen(false); clearViewAs(); }}
+                      className="lg:hidden block w-full text-left px-3 py-2 text-xs text-accent hover:bg-surface-hover capitalize"
+                    >
+                      Exit {viewAs} view
+                    </button>
+                  )}
                   <div className="px-3 py-2 border-t border-surface-border/60">
-                    <p className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Theme</p>
-                    <div className="flex items-center gap-2">
-                      {THEMES.map((t) => (
+                    <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Theme</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {allThemes.map((t) => (
                         <button
-                          key={t}
+                          key={t.id}
                           type="button"
-                          onClick={() => selectTheme(t)}
-                          title={THEME_LABELS[t]}
-                          aria-label={`${THEME_LABELS[t]} theme`}
+                          onClick={() => selectTheme(t.id)}
+                          title={t.label}
+                          aria-label={`${t.label} theme`}
                           className={`w-4 h-4 rounded-full transition-transform hover:scale-110 ${
-                            theme === t ? 'ring-2 ring-offset-1 ring-surface-border' : ''
+                            theme === t.id ? 'ring-2 ring-offset-1 ring-surface-border' : ''
                           }`}
-                          style={{ backgroundColor: THEME_SWATCHES[t] }}
+                          style={{ backgroundColor: t.swatch }}
                         />
                       ))}
                     </div>

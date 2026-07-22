@@ -107,13 +107,13 @@ function QuorumEventRow({ event }: { event: QuorumEvent }) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 py-1.5 w-full text-left hover:bg-surface-hover/50 transition-colors"
       >
-        <span className="text-[9px] font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0">
+        <span className="text-2xs font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0">
           {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
-        <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${EVENT_TYPE_COLORS[event.type] || 'text-text-tertiary'} bg-surface-sunken whitespace-nowrap shrink-0`}>
+        <span className={`text-2xs font-medium px-1 py-0.5 rounded ${EVENT_TYPE_COLORS[event.type] || 'text-text-tertiary'} bg-surface-sunken whitespace-nowrap shrink-0`}>
           {EVENT_TYPE_LABELS[event.type] || event.type}
         </span>
-        <span className="text-[9px] text-text-secondary flex-1 min-w-0 truncate">
+        <span className="text-2xs text-text-secondary flex-1 min-w-0 truncate">
           {humanizeEvent(event)}
         </span>
         <svg
@@ -144,13 +144,13 @@ function QuorumGroupRow({ group }: { group: DisplayGroup }) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 py-1.5 w-full text-left hover:bg-surface-hover/50 transition-colors"
       >
-        <span className="text-[9px] font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0">
+        <span className="text-2xs font-mono text-text-tertiary whitespace-nowrap tabular-nums shrink-0">
           {new Date(group.lastTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
-        <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${EVENT_TYPE_COLORS.pong} bg-surface-sunken whitespace-nowrap shrink-0`}>
+        <span className={`text-2xs font-medium px-1 py-0.5 rounded ${EVENT_TYPE_COLORS.pong} bg-surface-sunken whitespace-nowrap shrink-0`}>
           roll call
         </span>
-        <span className="text-[9px] text-text-secondary flex-1 min-w-0 truncate">
+        <span className="text-2xs text-text-secondary flex-1 min-w-0 truncate">
           {group.count} nodes responded
           {engines > 0 && workers > 0
             ? ` (${engines} engine${engines !== 1 ? 's' : ''}, ${workers} worker${workers !== 1 ? 's' : ''})`
@@ -189,10 +189,10 @@ function ConfigPanel({ channels, onToggle, customFilter, onCustomFilterChange }:
   return (
     <div className="space-y-3 pb-3 border-b border-surface-border mb-3">
       <div className="flex items-center gap-2 mb-1">
-        <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Channels
         </p>
-        <p className="text-[9px] text-text-tertiary">
+        <p className="text-2xs text-text-tertiary">
           Unchecked channels are dropped before buffering
         </p>
       </div>
@@ -205,14 +205,14 @@ function ConfigPanel({ channels, onToggle, customFilter, onCustomFilterChange }:
               onChange={() => onToggle(ch.key)}
               className="w-3 h-3 rounded border-border accent-accent"
             />
-            <span className="text-[10px] text-text-secondary" title={ch.description}>
+            <span className="text-2xs text-text-secondary" title={ch.description}>
               {ch.label}
             </span>
           </label>
         ))}
       </div>
       <div>
-        <p className="text-[9px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">
           Text Filter
         </p>
         <input
@@ -220,9 +220,9 @@ function ConfigPanel({ channels, onToggle, customFilter, onCustomFilterChange }:
           value={customFilter}
           onChange={(e) => onCustomFilterChange(e.target.value)}
           placeholder="pong"
-          className="input text-[10px] font-mono py-1 px-2 w-full"
+          className="input text-2xs font-mono py-1 px-2 w-full"
         />
-        <p className="text-[9px] text-text-tertiary mt-1">
+        <p className="text-2xs text-text-tertiary mt-1">
           Filter by event type, e.g. <span className="font-mono">pong</span>, <span className="font-mono">throttle</span>, or any text in the event data.
         </p>
       </div>
@@ -291,11 +291,11 @@ export function QuorumFeed({ bridgeActive }: QuorumFeedProps) {
     <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px] sticky top-14 self-start max-h-[calc(100vh-8rem)] flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           Event Stream
         </p>
         <Radio className={`w-3 h-3 ${bridgeActive ? 'text-status-success animate-pulse' : 'text-text-tertiary'}`} />
-        <span className="text-[9px] text-text-tertiary">
+        <span className="text-2xs text-text-tertiary">
           {bridgeActive ? 'Live' : '...'}
         </span>
 
@@ -339,7 +339,7 @@ export function QuorumFeed({ bridgeActive }: QuorumFeedProps) {
       {/* Raw JSON view */}
       <Collapsible open={showRaw}>
         <div className="pb-3 border-b border-surface-border mb-3">
-          <pre className="text-[9px] font-mono text-text-tertiary bg-surface-sunken rounded-lg p-3 max-h-[50vh] overflow-auto whitespace-pre-wrap">
+          <pre className="text-2xs font-mono text-text-tertiary bg-surface-sunken rounded-lg p-3 max-h-[50vh] overflow-auto whitespace-pre-wrap">
             {JSON.stringify(events.slice(0, 50), null, 2)}
           </pre>
         </div>
@@ -347,7 +347,7 @@ export function QuorumFeed({ bridgeActive }: QuorumFeedProps) {
 
       {/* Event count */}
       {events.length > 0 && (
-        <p className="text-[9px] text-text-tertiary mb-2">
+        <p className="text-2xs text-text-tertiary mb-2">
           {events.length} events
         </p>
       )}

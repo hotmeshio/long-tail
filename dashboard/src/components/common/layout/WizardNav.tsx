@@ -9,7 +9,7 @@ interface WizardNavProps {
 
 export function WizardNav({ children }: WizardNavProps) {
   return (
-    <div className="sticky bottom-0 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-10 px-10 pt-3 pb-5 z-20 flex justify-between items-center mt-8">
+    <div className="sticky bottom-0 bg-surface/95 backdrop-blur-sm border-t border-surface-border -mx-page-x px-page-x pt-3 pb-5 z-20 flex justify-between items-center mt-8">
       {children}
     </div>
   );

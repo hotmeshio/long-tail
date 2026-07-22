@@ -2,22 +2,24 @@ import type { LTTaskStatus, LTEscalationStatus } from '../../../api/types';
 
 type Status = LTTaskStatus | LTEscalationStatus | string;
 
-/** Status → dot background class, for bare outlined-dot status indicators. */
+/** Status → dot background class, for bare outlined-dot status indicators.
+ * Dots use the -graphic status variants: brighter hues sized for 3:1 graphic
+ * contrast, while text-status-* stays on the darker text-safe values. */
 export const STATUS_DOT_STYLES: Record<string, string> = {
-  pending: 'bg-status-pending',
+  pending: 'bg-status-pending-graphic',
   in_progress: 'bg-status-active animate-pulse',
-  completed: 'bg-status-success',
-  resolved: 'bg-status-success',
+  completed: 'bg-status-success-graphic',
+  resolved: 'bg-status-success-graphic',
   needs_intervention: 'bg-status-error',
   failed: 'bg-status-error',
   cancelled: 'bg-status-error',
   expired: 'bg-text-tertiary',
-  draft: 'bg-status-draft',
+  draft: 'bg-status-draft-graphic',
   deployed: 'bg-status-active',
-  active: 'bg-status-success',
+  active: 'bg-status-success-graphic',
   archived: 'bg-text-tertiary',
-  connected: 'bg-status-success',
-  registered: 'bg-status-pending',
+  connected: 'bg-status-success-graphic',
+  registered: 'bg-status-pending-graphic',
   disconnected: 'bg-text-tertiary',
   error: 'bg-status-error',
 };

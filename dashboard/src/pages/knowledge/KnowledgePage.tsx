@@ -194,7 +194,7 @@ export function KnowledgePage() {
             ) : (
               <table className="w-full mt-2">
                 <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary">
+                  <tr className="text-left text-2xs uppercase tracking-wider text-text-tertiary">
                     <th className="pb-2 pl-2 font-medium">Domain</th>
                     <th className="pb-2 font-medium w-24 text-right">Entries</th>
                     <th className="pb-2 pr-2 font-medium w-40 text-right">Latest</th>
@@ -235,7 +235,7 @@ export function KnowledgePage() {
               <>
                 <table className="w-full mt-2">
                   <thead>
-                    <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary">
+                    <tr className="text-left text-2xs uppercase tracking-wider text-text-tertiary">
                       <th className="pb-2 pl-2 font-medium w-[200px]">Key</th>
                       <th className="pb-2 font-medium">Tags</th>
                       <th className="pb-2 font-medium w-16 text-right">Fields</th>
@@ -262,13 +262,13 @@ export function KnowledgePage() {
                             {entry.tags?.slice(0, 5).map((tag) => (
                               <span
                                 key={tag}
-                                className="inline-flex items-center px-1.5 py-0 rounded-full text-[10px] font-medium bg-accent/10 text-accent"
+                                className="inline-flex items-center px-1.5 py-0 rounded-full text-2xs font-medium bg-accent/10 text-accent"
                               >
                                 {tag}
                               </span>
                             ))}
                             {entry.tags && entry.tags.length > 5 && (
-                              <span className="text-[10px] text-text-tertiary">
+                              <span className="text-2xs text-text-tertiary">
                                 +{entry.tags.length - 5}
                               </span>
                             )}

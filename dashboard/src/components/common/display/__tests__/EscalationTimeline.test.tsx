@@ -16,12 +16,12 @@ const esc = (over: Record<string, unknown>) =>
     ...over,
   } as any);
 
-// Matches COLORS in EscalationTimeline.tsx
+// Matches COLORS in EscalationTimeline.tsx (token-based so themes restyle the bar)
 const C = {
-  pending:   '#0ea5e9',
-  claimed:   '#f97316',
-  resolved:  '#16a34a',
-  cancelled: '#ef4444',
+  pending:   'rgb(var(--lt-status-queued-graphic))',
+  claimed:   'rgb(var(--lt-status-claimed-graphic))',
+  resolved:  'rgb(var(--lt-status-success-graphic))',
+  cancelled: 'rgb(var(--lt-status-error))',
 };
 
 function segmentWithColor(container: HTMLElement, color: string): HTMLElement | null {

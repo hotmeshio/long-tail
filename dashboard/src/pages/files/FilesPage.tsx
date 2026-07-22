@@ -264,7 +264,7 @@ export function FilesPage() {
             </div>
             <div className="px-5 py-4 space-y-3">
               <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">Destination folder</label>
+                <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Destination folder</label>
                 <input
                   type="text"
                   value={uploadPrefix}
@@ -273,7 +273,7 @@ export function FilesPage() {
                   className="input text-xs w-full font-mono"
                 />
               </div>
-              <div className="text-[10px] text-text-quaternary space-y-0.5">
+              <div className="text-2xs text-text-quaternary space-y-0.5">
                 {pendingFiles.map((f, i) => (
                   <p key={i} className="truncate">{uploadPrefix}{f.name} <span className="text-text-tertiary">({(f.size / 1024).toFixed(1)} KB)</span></p>
                 ))}

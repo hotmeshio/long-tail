@@ -38,7 +38,7 @@ function LiveTimeline({ steps, manifest, isComplete }: {
 
   return (
     <div>
-      <p className="text-[11px] text-text-secondary mb-3">
+      <p className="text-2xs text-text-secondary mb-3">
         {isComplete
           ? `All ${totalSteps} steps completed`
           : `Running step ${merged.filter((s) => s.status === 'completed').length + 1} of ${totalSteps}...`}
@@ -62,17 +62,17 @@ function LiveTimeline({ steps, manifest, isComplete }: {
                 )}
               </div>
               <div className={isLast ? '' : 'pb-3'}>
-                <p className={`text-[11px] font-medium ${
+                <p className={`text-2xs font-medium ${
                   step.status === 'running' ? 'text-text-primary'
                   : step.status === 'completed' ? 'text-text-secondary'
                   : step.status === 'failed' ? 'text-status-error'
                   : 'text-text-tertiary'
                 }`}>{step.title}</p>
                 {step.toolName && (
-                  <span className="text-[9px] text-text-tertiary font-mono">{step.toolName}</span>
+                  <span className="text-2xs text-text-tertiary font-mono">{step.toolName}</span>
                 )}
                 {step.error && (
-                  <p className="text-[9px] text-status-error mt-0.5">{step.error}</p>
+                  <p className="text-2xs text-status-error mt-0.5">{step.error}</p>
                 )}
               </div>
             </div>
@@ -159,7 +159,7 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">
         <div className="min-w-0">
           <p className="text-xs font-medium text-text-primary truncate">{workflow.app_id}</p>
-          <code className="text-[11px] font-mono text-accent truncate block">{workflow.graph_topic}</code>
+          <code className="text-2xs font-mono text-accent truncate block">{workflow.graph_topic}</code>
         </div>
         <button onClick={() => { if (!isRunning) onClose(); }} className="p-1 text-text-tertiary hover:text-text-primary shrink-0 ml-2">
           <X className="w-4 h-4" />
@@ -198,14 +198,14 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
             <RunAsSelector selected={executeAs} onChange={setExecuteAs} />
 
             {workflow.description && (
-              <p className="text-[11px] text-text-secondary leading-relaxed">{workflow.description}</p>
+              <p className="text-2xs text-text-secondary leading-relaxed">{workflow.description}</p>
             )}
 
             {/* Form / JSON toggle input */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Input</label>
-                <button onClick={toggleMode} className="text-[10px] text-accent hover:underline">
+                <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Input</label>
+                <button onClick={toggleMode} className="text-2xs text-accent hover:underline">
                   {jsonMode ? 'Form view' : 'JSON view'}
                 </button>
               </div>
@@ -214,7 +214,7 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
                 <textarea
                   value={argsJson}
                   onChange={(e) => setArgsJson(e.target.value)}
-                  className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-[11px] text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
+                  className="w-full bg-surface-sunken border border-surface-border rounded-md px-3 py-2 font-mono text-2xs text-text-primary focus:outline-none focus:ring-1 focus:ring-inset focus:ring-accent-primary resize-y"
                   rows={6}
                   spellCheck={false}
                 />
@@ -222,7 +222,7 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
                   {Object.entries(fields).map(([key, value]) => (
                     <div key={key}>
-                      <label className="block text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
+                      <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">{key}</label>
                       {typeof value === 'boolean' ? (
                         <select
                           value={String(value)}
@@ -249,16 +249,16 @@ export function WorkflowTestPanel({ workflow, onClose }: WorkflowTestPanelProps)
                     </div>
                   ))}
                   {Object.keys(fields).length === 0 && (
-                    <p className="text-[11px] text-text-tertiary italic">No input fields defined</p>
+                    <p className="text-2xs text-text-tertiary italic">No input fields defined</p>
                   )}
                 </div>
               )}
-              {jsonError && <p className="text-[11px] text-status-error mt-1">{jsonError}</p>}
+              {jsonError && <p className="text-2xs text-status-error mt-1">{jsonError}</p>}
             </div>
 
             {invokeMutation.isError && (
               <div className="bg-status-error/10 border border-status-error/20 rounded-md px-3 py-2">
-                <p className="text-[11px] text-status-error">
+                <p className="text-2xs text-status-error">
                   {invokeMutation.error instanceof Error ? invokeMutation.error.message : 'Invocation failed'}
                 </p>
               </div>

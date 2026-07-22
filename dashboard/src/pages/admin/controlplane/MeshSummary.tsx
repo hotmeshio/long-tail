@@ -50,7 +50,7 @@ function StatCard({ icon: Icon, label, value, muted }: {
         <p className={`text-sm font-mono tabular-nums ${muted ? 'text-text-tertiary/60' : 'text-text-primary'}`}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
-        <p className="text-[9px] text-text-tertiary uppercase tracking-widest">{label}</p>
+        <p className="text-2xs text-text-tertiary uppercase tracking-widest">{label}</p>
       </div>
     </div>
   );
@@ -76,7 +76,7 @@ export function MeshSummary({
           <HealthIcon className={`w-5 h-5 ${cfg.color}`} strokeWidth={1.5} />
           <div>
             <p className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</p>
-            <p className="text-[10px] text-text-tertiary max-w-[200px]">{cfg.desc}</p>
+            <p className="text-2xs text-text-tertiary max-w-[200px]">{cfg.desc}</p>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export function MeshSummary({
 
       {/* Connection sharing note */}
       {engineCount > 1 && (
-        <p className="text-[9px] text-text-tertiary mt-3 ml-7">
+        <p className="text-2xs text-text-tertiary mt-3 ml-7">
           All {engineCount} engines share a pooled database connection. Workload distribution is handled by Postgres
           row-level locking (SKIP LOCKED) — each engine dequeues independently from the same stream.
         </p>

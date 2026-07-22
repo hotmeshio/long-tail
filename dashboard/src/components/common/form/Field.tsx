@@ -32,7 +32,7 @@ export function Field({ label, required, hint, error, htmlFor, className = '', c
       )}
       {children}
       {error ? (
-        <p id={msgId} className="text-[10px] text-status-error mt-1" role="alert">{error}</p>
+        <p id={msgId} className="text-2xs text-status-error mt-1" role="alert">{error}</p>
       ) : hint ? (
         <p id={msgId} className="hint">{hint}</p>
       ) : null}

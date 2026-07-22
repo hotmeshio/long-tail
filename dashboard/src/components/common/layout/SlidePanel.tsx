@@ -43,10 +43,10 @@ export function SlidePanel({ open, width = 380, children, className = '' }: {
 export function PanelField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">
+      <dt className="text-2xs font-medium text-text-secondary uppercase tracking-wide">
         {label}
       </dt>
-      <dd className="text-[12px] text-text-primary mt-0.5">{children}</dd>
+      <dd className="text-xs text-text-primary mt-0.5">{children}</dd>
     </div>
   );
 }
@@ -132,7 +132,7 @@ export function SlidePanelViews({ views, activeId, onViewChange, onClose, header
           )}
         </div>
       </div>
-      <p className="px-5 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-widest text-text-secondary shrink-0">
+      <p className="px-5 pt-2 pb-1 text-2xs font-semibold uppercase tracking-widest text-text-secondary shrink-0">
         {active.label}
       </p>
       <div className="flex-1 overflow-y-auto px-5 pb-5 pt-1">

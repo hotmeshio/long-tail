@@ -21,6 +21,32 @@ describe('Settings routes', () => {
       expect(body.escalation).toHaveProperty('claimDurations');
       expect(Array.isArray(body.escalation.claimDurations)).toBe(true);
     });
+
+    it('includes branding with theme metadata', async () => {
+      const res = await fetch(`${ctx.BASE}/settings`);
+      const body = await res.json() as any;
+      expect(body).toHaveProperty('branding');
+      expect(body.branding).toHaveProperty('appName');
+      expect(Array.isArray(body.branding.themes)).toBe(true);
+    });
+  });
+
+  describe('GET /api/settings/custom.css', () => {
+    it('always returns 200 text/css with an ETag', async () => {
+      const res = await fetch(`${ctx.BASE}/settings/custom.css`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('text/css');
+      expect(res.headers.get('etag')).toBeTruthy();
+    });
+
+    it('returns 304 when If-None-Match matches', async () => {
+      const first = await fetch(`${ctx.BASE}/settings/custom.css`);
+      const etag = first.headers.get('etag')!;
+      const second = await fetch(`${ctx.BASE}/settings/custom.css`, {
+        headers: { 'If-None-Match': etag },
+      });
+      expect(second.status).toBe(304);
+    });
   });
 });
 

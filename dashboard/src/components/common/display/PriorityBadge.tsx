@@ -28,7 +28,7 @@ export function PriorityBadge({
   /** `severity` colours by priority; `inherit` takes the surrounding text colour. */
   tone?: 'severity' | 'inherit';
 }) {
-  const sizeClass = size === 'sm' ? 'text-[11px]' : 'text-xs';
+  const sizeClass = size === 'sm' ? 'text-2xs' : 'text-xs';
   const toneClass =
     tone === 'inherit'
       ? `text-inherit ${priorityWeight[priority] ?? ''}`

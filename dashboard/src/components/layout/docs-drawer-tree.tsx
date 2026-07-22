@@ -105,7 +105,7 @@ export function DocTree({
   function renderDir(dir: DocDir, depth: number) {
     return (
       <details key={dir.label} open>
-        <summary className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary cursor-pointer">
+        <summary className="flex items-center gap-1.5 px-3 py-1 text-2xs font-semibold uppercase tracking-widest text-text-tertiary cursor-pointer">
           <Folder className="w-3 h-3" strokeWidth={1.5} />
           {dir.label}
         </summary>

@@ -9,6 +9,12 @@ interface AppLogoProps {
   className?: string;
   /** Override the wordmark text. Defaults to "LongTail". */
   appName?: string;
+  /**
+   * `mark` renders the pineapple alone at header scale — no wordmark, no
+   * rotation, no watermark bleed. The header-diet variant for narrow
+   * viewports where the mark IS the brand.
+   */
+  variant?: 'full' | 'mark';
 }
 
 /**
@@ -21,8 +27,21 @@ interface AppLogoProps {
  * - `sm` (default) — toolbar height
  * - `lg` — login page hero
  */
-export function AppLogo({ size = 'sm', hideLabel = false, className = '', appName = 'LongTail' }: AppLogoProps) {
+export function AppLogo({ size = 'sm', hideLabel = false, className = '', appName = 'LongTail', variant = 'full' }: AppLogoProps) {
   const isLarge = size === 'lg';
+
+  if (variant === 'mark') {
+    return (
+      <div className={`flex items-center ${className}`}>
+        <span
+          role="img"
+          aria-label={appName}
+          className="logo-mark shrink-0 w-7 h-7"
+          style={{ '--logo-url': `url(${LT_BASE}/logo512.png)` } as CSSProperties}
+        />
+      </div>
+    );
+  }
 
   const imgClass = isLarge
     ? 'w-[16rem] h-[16rem] -rotate-[120deg] opacity-40 -ml-10'
