@@ -69,8 +69,10 @@ Chroma is spent, not spread.
     monitor gets margin, never a 2000px input.
   - Selects size to their content, floored at 16rem for presence — a
     one-word choice never stretches across the page.
-  - Number inputs hold a hand-sized 12rem.
-  - Text and textarea fill their cell — prose deserves the measure.
+  - Number and date inputs hold a hand-sized width (12rem; datetimes
+    16rem) — fixed-length values never stretch to the measure.
+  - Text, textarea, email, and url fill their cell — prose-length content
+    deserves the measure.
 - **Decisions are never checkboxes.** A decision is an enum opening on an
   explicit disabled **Choose…** placeholder. The user picks; nothing is an
   implicit first option, and there is no way back to unchosen.

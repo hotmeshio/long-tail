@@ -201,13 +201,19 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
       );
     }
 
-    // Format-based input types
+    // Format-based input types. Width follows the content the format expects:
+    // emails and urls are prose-length and fill the cell; dates are fixed-
+    // length values and hold a hand-sized width, like numbers.
     const format = fieldSchema?.format as string | undefined;
     const FORMAT_INPUT_TYPES: Record<string, string> = {
       date: 'date',
       'date-time': 'datetime-local',
       email: 'email',
       uri: 'url',
+    };
+    const FORMAT_WIDTH: Record<string, string> = {
+      date: 'max-w-48',
+      'date-time': 'max-w-64',
     };
     if (format && format in FORMAT_INPUT_TYPES) {
       return (
@@ -220,7 +226,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             data-field-key={fieldKey}
-            className={inputClass(!!error)}
+            className={`${inputClass(!!error)} ${FORMAT_WIDTH[format] ?? ''}`}
             {...ariaProps}
           />
           <FieldError error={error} id={errorId} />
