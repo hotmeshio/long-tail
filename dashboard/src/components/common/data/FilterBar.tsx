@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { useShellPanelOptional } from '../../../hooks/useShellPanel';
 
@@ -24,35 +32,71 @@ interface FilterBarProps {
  * right panel. The outer div stays sticky — sticky elements are never
  * containers, so the container sits on the inner band.
  */
+/** Shell-panel ownership key — the slot is shared with page panels. */
+const FILTERS_PANEL_KEY = 'filter-bar';
+
+/**
+ * Live-children bridge. The stacked panel renders in the shell's subtree, so
+ * a snapshot node would go stale the moment a URL-driven filter changes..
+ * Re-invoking setPanel every render to freshen it is worse: it loops (each
+ * setPanel re-renders the provider, which re-creates children) and the loop
+ * races the close click — a stale pass re-opens the panel just closed. So the
+ * slot is claimed ONCE with a subscriber that pulls the latest children.
+ */
+interface LiveChildrenStore {
+  children: ReactNode;
+  listeners: Set<() => void>;
+}
+
+function LiveChildren({ store }: { store: { current: LiveChildrenStore } }) {
+  const children = useSyncExternalStore(
+    (onChange) => {
+      store.current.listeners.add(onChange);
+      return () => store.current.listeners.delete(onChange);
+    },
+    () => store.current.children,
+  );
+  return <>{children}</>;
+}
+
 export function FilterBar({ children, actions, activeFilterCount }: FilterBarProps) {
   // Outside the shell (tests, standalone surfaces) there is no panel to fold
   // into — the fold button becomes inert and inline mode carries the day.
   const shellPanel = useShellPanelOptional();
   const setPanel = shellPanel?.setPanel;
   const closePanel = shellPanel?.closePanel;
-  const panelOpen = shellPanel?.open ?? false;
+  const ownsPanel = (shellPanel?.open ?? false) && shellPanel?.ownerKey === FILTERS_PANEL_KEY;
   const [foldOpen, setFoldOpen] = useState(false);
 
-  // Keep the panel content live while it is open — the children are
-  // controlled by URL params, so each change re-renders the stacked copy.
+  // Publish the freshest children to the mounted panel after every commit.
+  const liveStore = useRef<LiveChildrenStore>({ children, listeners: new Set() });
   useEffect(() => {
-    if (!foldOpen || !setPanel) return;
-    setPanel(
-      <StackedFilterPanel onClose={() => setFoldOpen(false)}>{children}</StackedFilterPanel>,
-      { width: 320 },
-    );
-  }, [foldOpen, children, setPanel]);
+    liveStore.current.children = children;
+    liveStore.current.listeners.forEach((notify) => notify());
+  }, [children]);
 
-  // The shell panel can close from anywhere (route change, its own X) —
-  // follow it so the button state never lies.
-  useEffect(() => {
-    if (!panelOpen && foldOpen) setFoldOpen(false);
-  }, [panelOpen, foldOpen]);
+  const closeFold = () => {
+    setFoldOpen(false);
+    closePanel?.(FILTERS_PANEL_KEY);
+  };
 
+  // The slot is shared: when it closes from anywhere (route change, its own
+  // X) or another claimant takes it, stand down so the button never lies.
+  const ownedRef = useRef(false);
   useEffect(() => {
-    if (!foldOpen || !closePanel) return;
-    return () => closePanel();
-  }, [foldOpen, closePanel]);
+    if (ownsPanel) {
+      ownedRef.current = true;
+      return;
+    }
+    if (ownedRef.current) {
+      ownedRef.current = false;
+      setFoldOpen(false);
+    }
+  }, [ownsPanel]);
+
+  // Unmount: release the slot if it is still ours (keyed — never yanks a
+  // panel another claimant owns).
+  useEffect(() => () => closePanel?.(FILTERS_PANEL_KEY), [closePanel]);
 
   return (
     <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
@@ -62,8 +106,24 @@ export function FilterBar({ children, actions, activeFilterCount }: FilterBarPro
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
           <div className="hidden @filters/filters:contents">{children}</div>
           <button
-            onClick={() => setFoldOpen((v) => !v)}
+            onClick={() => {
+              // Claim the slot on click — a click is intent, and it wins even
+              // when a page panel (e.g. the faceted query) currently holds it.
+              if (foldOpen) {
+                closeFold();
+              } else {
+                setFoldOpen(true);
+                setPanel?.(
+                  <StackedFilterPanel onClose={closeFold}>
+                    <LiveChildren store={liveStore} />
+                  </StackedFilterPanel>,
+                  { width: 320, key: FILTERS_PANEL_KEY },
+                );
+              }
+            }}
             className="@filters/filters:hidden inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+            aria-expanded={foldOpen}
+            aria-label="Filters"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Filters

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
 import { useAccess } from '../../hooks/useAccess';
@@ -83,10 +83,13 @@ export function AvailableEscalationsPage() {
 
   // Faceted query editor rides the shell's global right panel. Re-invoked on
   // every dependency change so the panel content always reflects live state.
-  const { setPanel, closePanel } = useShellPanel();
+  // The slot is shared (the folded FilterBar claims it too), so every call is
+  // keyed: claiming is intentional, closing only closes our own content.
+  const FACET_PANEL_KEY = 'facet-query';
+  const { setPanel, closePanel, open: panelOpen, ownerKey } = useShellPanel();
   useEffect(() => {
     if (!facetDrawerOpen) {
-      closePanel();
+      closePanel(FACET_PANEL_KEY);
       return;
     }
     setPanel(
@@ -100,9 +103,24 @@ export function AvailableEscalationsPage() {
         onClear={() => { setFacetFilters({}); setFilter('search', ''); }}
         onClose={() => setFacetDrawerOpen(false)}
       />,
-      { width: 420 },
+      { width: 420, key: FACET_PANEL_KEY },
     );
   }, [facetDrawerOpen, facetFilters, setFacetFilters, facetKeysData, filters.search, setFilter, activeFacetCount, setPanel, closePanel]);
+
+  // Stand down when another claimant takes the slot — drop the drawer flag so
+  // the live-update effect above doesn't reclaim on its next dependency change.
+  const ownsFacetPanel = panelOpen && ownerKey === FACET_PANEL_KEY;
+  const ownedFacetRef = useRef(false);
+  useEffect(() => {
+    if (ownsFacetPanel) {
+      ownedFacetRef.current = true;
+      return;
+    }
+    if (ownedFacetRef.current) {
+      ownedFacetRef.current = false;
+      setFacetDrawerOpen(false);
+    }
+  }, [ownsFacetPanel]);
   const [triageModalOpen, setTriageModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);

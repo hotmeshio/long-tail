@@ -28,11 +28,13 @@ interface ShellPanelState {
   node: ReactNode | null;
   width: number;
   open: boolean;
+  /** Which claimant set the current content — the slot is shared. */
+  ownerKey: string | null;
 }
 
 interface ShellPanelContextValue extends ShellPanelState {
-  setPanel: (node: ReactNode, opts?: { width?: number }) => void;
-  closePanel: () => void;
+  setPanel: (node: ReactNode, opts?: { width?: number; key?: string }) => void;
+  closePanel: (key?: string) => void;
 }
 
 const ShellPanelContext = createContext<ShellPanelContextValue | null>(null);
@@ -42,24 +44,35 @@ export function ShellPanelProvider({ children }: { children: ReactNode }) {
     node: null,
     width: DEFAULT_WIDTH,
     open: false,
+    ownerKey: null,
   });
   const location = useLocation();
   const lastPath = useRef(location.pathname);
 
-  const setPanel = useCallback((node: ReactNode, opts?: { width?: number }) => {
-    setState({ node, width: opts?.width ?? DEFAULT_WIDTH, open: true });
+  // ONE slot, keyed ownership: setPanel with a key claims the slot (last
+  // claim wins — a click is intent); a keyed closePanel only closes content
+  // the caller still owns, so one claimant's teardown can never yank another
+  // claimant's live panel. Claimants watch `ownerKey` and stand down when
+  // the slot is taken from them.
+  const setPanel = useCallback((node: ReactNode, opts?: { width?: number; key?: string }) => {
+    setState({ node, width: opts?.width ?? DEFAULT_WIDTH, open: true, ownerKey: opts?.key ?? null });
   }, []);
 
   // Keep the node mounted while the width animates closed; SlidePanel
-  // unmounts children itself when the transition ends.
-  const closePanel = useCallback(() => {
-    setState((prev) => ({ ...prev, open: false }));
+  // unmounts children itself when the transition ends. Callers may pass
+  // closePanel directly as an event handler, so only a string arg is a key.
+  const closePanel = useCallback((key?: unknown) => {
+    setState((prev) =>
+      typeof key === 'string' && prev.ownerKey !== key ? prev : { ...prev, open: false },
+    );
   }, []);
 
   useEffect(() => {
     if (location.pathname !== lastPath.current) {
       lastPath.current = location.pathname;
-      setState((prev) => (prev.open || prev.node ? { ...prev, node: null, open: false } : prev));
+      setState((prev) =>
+        prev.open || prev.node ? { ...prev, node: null, open: false, ownerKey: null } : prev,
+      );
     }
   }, [location.pathname]);
 
