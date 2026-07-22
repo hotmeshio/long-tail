@@ -1,12 +1,13 @@
 import { config } from './modules/config';
 import { loggerRegistry } from './lib/logger';
-import { midnightTheme } from './examples/themes/midnight';
+import { midnightTheme } from './themes/midnight';
 
 import { start } from './start';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
 export { start } from './start';
+export { midnightTheme } from './themes/midnight';
 export { registerLT, createLTInterceptor } from './services/interceptor';
 export { createLTActivityInterceptor } from './services/interceptor/activity-interceptor';
 export { executeLT } from './services/orchestrator';
