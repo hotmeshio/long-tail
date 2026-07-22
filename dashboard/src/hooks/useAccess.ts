@@ -30,7 +30,10 @@ export function useAccess() {
   // admin (pace board) vs engineer (work queue).
   const isBuilder = viewAs ? false : realIsBuilder;
   const isOps = viewAs ? (viewAs === 'admin' || viewAs === 'engineer') : realIsOps;
-  const canBulk = viewAs ? false : realCanBulk;
+  // Bulk actions belong to the admin tiers (superadmin, admin) — never
+  // engineer or operator. View-as simulates the target tier faithfully:
+  // an admin view keeps the bulk tools a real admin has.
+  const canBulk = viewAs ? viewAs === 'admin' : realCanBulk;
 
   return { isBuilder, isOps, canBulk, viewAs, realIsBuilder };
 }
