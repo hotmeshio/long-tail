@@ -11,85 +11,9 @@
  * data-theme selectors on specificity, so source order decides the winner.
  */
 @layer base {
-  /* The value discipline (Midnight's, inverted): surfaces stay near-neutral —
-   * paper with a whisper of the theme hue — so the saturated accent appears
-   * only in small doses (links, buttons, checks, section labels) and every
-   * callout pops against a quiet field. Chroma never lands on large bands. */
-  :root,
-  [data-theme='blue'] {
-    --lt-accent: 37 99 235;           /* electric blue #2563EB */
-    --lt-accent-hover: 29 78 216;     /* #1D4ED8 */
-    --lt-accent-muted: 147 197 253;   /* #93C5FD */
-    --lt-accent-faint: 219 234 254;   /* #DBEAFE */
-    --lt-surface: 228 236 246;      /* #E4ECF6 — the page wash */
-    --lt-surface-hover: 218 228 241;  /* #DAE4F1 */
-    --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
-    --lt-surface-border: 208 217 231; /* #D0D9E7 */
-  }
-
-  /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
-     the UI accent. Scoped to this theme so every other theme's logo keeps
-     tinting to its own accent (via the --lt-logo fallback in .logo-mark). */
-  [data-theme='blue'] {
-    --lt-logo: 24 116 240;            /* #1874F0 */
-  }
-
-  [data-theme='violet'] {
-    --lt-accent: 123 59 224;          /* violet at Redis-logo intensity #7B3BE0 */
-    --lt-accent-hover: 98 41 190;     /* #6229BE */
-    --lt-accent-muted: 187 156 239;   /* #BB9CEF */
-    --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
-    --lt-surface: 232 229 242;      /* #E8E5F2 — the page wash */
-    --lt-surface-hover: 224 220 237;  /* #E0DCED */
-    --lt-field-focus: 244 238 252;    /* #F4EEFC */
-    --lt-surface-border: 215 210 228; /* #D7D2E4 */
-  }
-
-  [data-theme='red'] {
-    --lt-accent: 220 56 45;           /* Redis logo red #DC382D */
-    --lt-accent-hover: 179 42 34;     /* #B32A22 */
-    --lt-accent-muted: 236 154 147;   /* #EC9A93 */
-    --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
-    --lt-surface: 242 233 230;      /* #F2E9E6 — the page wash */
-    --lt-surface-hover: 235 224 220;  /* #EBE0DC */
-    --lt-field-focus: 252 242 240;    /* #FCF2F0 */
-    --lt-surface-border: 226 211 208; /* #E2D3D0 */
-  }
-
-  [data-theme='green'] {
-    --lt-accent: 22 163 74;           /* vivid green #16A34A */
-    --lt-accent-hover: 15 118 55;     /* #0F7637 */
-    --lt-accent-muted: 74 222 128;    /* #4ADE80 */
-    --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
-    --lt-surface: 229 240 233;      /* #E5F0E9 — the page wash */
-    --lt-surface-hover: 220 234 226;  /* #DCEAE2 */
-    --lt-field-focus: 240 253 244;    /* #F0FDF4 */
-    --lt-surface-border: 205 223 211; /* #CDDFD3 */
-  }
-
-  [data-theme='rose'] {
-    --lt-accent: 236 72 153;          /* hot pink #EC4899 */
-    --lt-accent-hover: 219 39 119;    /* #DB2777 */
-    --lt-accent-muted: 249 168 212;   /* #F9A8D4 */
-    --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
-    --lt-surface: 242 232 236;      /* #F2E8EC — the page wash */
-    --lt-surface-hover: 235 222 228;  /* #EBDEE4 */
-    --lt-field-focus: 253 242 248;    /* #FDF2F8 */
-    --lt-surface-border: 228 209 218; /* #E4D1DA */
-  }
-
-  [data-theme='orange'] {
-    --lt-accent: 249 115 22;          /* vivid orange #F97316 */
-    --lt-accent-hover: 234 88 12;     /* #EA580C */
-    --lt-accent-muted: 254 215 170;   /* #FED7AA */
-    --lt-accent-faint: 255 247 237;   /* #FFF7ED */
-    --lt-surface: 242 235 226;      /* #F2EBE2 — the page wash */
-    --lt-surface-hover: 235 226 214;  /* #EBE2D6 */
-    --lt-field-focus: 255 247 237;    /* #FFF7ED */
-    --lt-surface-border: 228 216 202; /* #E4D8CA */
-  }
-
-  /* Structural tokens (hue-independent). Every color, size, and spacing knob
+  /* Structural tokens — the DEFAULTS. This block must come FIRST:
+   * :root ties [data-theme] selectors on specificity, so source order
+   * decides the winner, and theme overrides below must win. Every color, size, and spacing knob
    * the dashboard uses flows through a --lt-* variable so a registered custom
    * stylesheet (see branding.customCss / branding.themes in start()) can
    * restyle the entire product — including dark themes — with zero source
@@ -175,6 +99,85 @@
        2000px select. */
     --lt-measure-form: 56rem;
   }
+
+  /* The value discipline (Midnight's, inverted): surfaces stay near-neutral —
+   * paper with a whisper of the theme hue — so the saturated accent appears
+   * only in small doses (links, buttons, checks, section labels) and every
+   * callout pops against a quiet field. Chroma never lands on large bands. */
+  :root,
+  [data-theme='blue'] {
+    --lt-accent: 37 99 235;           /* electric blue #2563EB */
+    --lt-accent-hover: 29 78 216;     /* #1D4ED8 */
+    --lt-accent-muted: 147 197 253;   /* #93C5FD */
+    --lt-accent-faint: 219 234 254;   /* #DBEAFE */
+    --lt-surface: 228 236 246;      /* #E4ECF6 — the page wash */
+    --lt-surface-hover: 218 228 241;  /* #DAE4F1 */
+    --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
+    --lt-surface-border: 208 217 231; /* #D0D9E7 */
+  }
+
+  /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
+     the UI accent. Scoped to this theme so every other theme's logo keeps
+     tinting to its own accent (via the --lt-logo fallback in .logo-mark). */
+  [data-theme='blue'] {
+    --lt-logo: 24 116 240;            /* #1874F0 */
+  }
+
+  [data-theme='violet'] {
+    --lt-accent: 123 59 224;          /* violet at Redis-logo intensity #7B3BE0 */
+    --lt-accent-hover: 98 41 190;     /* #6229BE */
+    --lt-accent-muted: 187 156 239;   /* #BB9CEF */
+    --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
+    --lt-surface: 232 229 242;      /* #E8E5F2 — the page wash */
+    --lt-surface-hover: 224 220 237;  /* #E0DCED */
+    --lt-field-focus: 244 238 252;    /* #F4EEFC */
+    --lt-surface-border: 215 210 228; /* #D7D2E4 */
+  }
+
+  [data-theme='red'] {
+    --lt-accent: 220 56 45;           /* Redis logo red #DC382D */
+    --lt-accent-hover: 179 42 34;     /* #B32A22 */
+    --lt-accent-muted: 236 154 147;   /* #EC9A93 */
+    --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
+    --lt-surface: 242 233 230;      /* #F2E9E6 — the page wash */
+    --lt-surface-hover: 235 224 220;  /* #EBE0DC */
+    --lt-field-focus: 252 242 240;    /* #FCF2F0 */
+    --lt-surface-border: 226 211 208; /* #E2D3D0 */
+  }
+
+  [data-theme='green'] {
+    --lt-accent: 22 163 74;           /* vivid green #16A34A */
+    --lt-accent-hover: 15 118 55;     /* #0F7637 */
+    --lt-accent-muted: 74 222 128;    /* #4ADE80 */
+    --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
+    --lt-surface: 229 240 233;      /* #E5F0E9 — the page wash */
+    --lt-surface-hover: 220 234 226;  /* #DCEAE2 */
+    --lt-field-focus: 240 253 244;    /* #F0FDF4 */
+    --lt-surface-border: 205 223 211; /* #CDDFD3 */
+  }
+
+  [data-theme='rose'] {
+    --lt-accent: 236 72 153;          /* hot pink #EC4899 */
+    --lt-accent-hover: 219 39 119;    /* #DB2777 */
+    --lt-accent-muted: 249 168 212;   /* #F9A8D4 */
+    --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
+    --lt-surface: 242 232 236;      /* #F2E8EC — the page wash */
+    --lt-surface-hover: 235 222 228;  /* #EBDEE4 */
+    --lt-field-focus: 253 242 248;    /* #FDF2F8 */
+    --lt-surface-border: 228 209 218; /* #E4D1DA */
+  }
+
+  [data-theme='orange'] {
+    --lt-accent: 249 115 22;          /* vivid orange #F97316 */
+    --lt-accent-hover: 234 88 12;     /* #EA580C */
+    --lt-accent-muted: 254 215 170;   /* #FED7AA */
+    --lt-accent-faint: 255 247 237;   /* #FFF7ED */
+    --lt-surface: 242 235 226;      /* #F2EBE2 — the page wash */
+    --lt-surface-hover: 235 226 214;  /* #EBE2D6 */
+    --lt-field-focus: 255 247 237;    /* #FFF7ED */
+    --lt-surface-border: 228 216 202; /* #E4D8CA */
+  }
+
 
   body {
     @apply bg-surface text-text-primary antialiased;
