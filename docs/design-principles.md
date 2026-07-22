@@ -68,11 +68,17 @@ Chroma is spent, not spread.
   - Generated forms hold a readable measure (`max-w-form`, 56rem). A wide
     monitor gets margin, never a 2000px input.
   - Selects size to their content, floored at 16rem for presence — a
-    one-word choice never stretches across the page.
+    one-word choice never stretches across the page. The floor yields to
+    the cell (`min(16rem, 100%)`): CSS lets min-width beat max-width, so
+    a bare floor would overflow a narrow column.
   - Number and date inputs hold a hand-sized width (12rem; datetimes
     16rem) — fixed-length values never stretch to the measure.
   - Text, textarea, email, and url fill their cell — prose-length content
     deserves the measure.
+  - Widgets follow the same split. Prose surfaces (code editor, markdown,
+    rich text, uploads) fill the cell. The signature pad holds its natural
+    document proportion (25rem, the 400×150 export) — the PNG is the
+    artifact, and stretching the pad stretches the document.
 - **Decisions are never checkboxes.** A decision is an enum opening on an
   explicit disabled **Choose…** placeholder. The user picks; nothing is an
   implicit first option, and there is no way back to unchosen.

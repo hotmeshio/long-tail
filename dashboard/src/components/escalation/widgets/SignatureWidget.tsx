@@ -40,10 +40,18 @@ export function SignatureWidget({ fieldKey, value, onChange, schema, isRequired 
   const getPos = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
+    // The backing store is a fixed 400×150 document; the element may display
+    // at any width. Scale pointer coordinates into store space so the ink
+    // lands under the cursor at every display size.
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
     if ('touches' in e) {
-      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
+      };
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }, []);
 
   const startDraw = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -87,7 +95,11 @@ export function SignatureWidget({ fieldKey, value, onChange, schema, isRequired 
         {label}
       </FieldLabel>
       {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
-      <div className="mt-1 border border-surface-border rounded-md overflow-hidden bg-white">
+      {/* The pad holds its natural document proportion (25rem = the 400px
+          backing store), never stretched to the measure — the exported PNG
+          is the artifact. Narrower cells shrink it; the scaling in getPos
+          keeps the ink under the cursor either way. */}
+      <div className="mt-1 max-w-[25rem] border border-surface-border rounded-md overflow-hidden bg-white">
         <canvas
           ref={canvasRef}
           width={400}

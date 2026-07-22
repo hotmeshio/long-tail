@@ -46,9 +46,11 @@ export function inputClass(hasError?: boolean): string {
 
 // Select shares the field recipe but adds the unified chevron (via .select).
 // Width follows the content, floored for presence and capped by the cell —
-// a one-word choice never stretches across the measure.
+// a one-word choice never stretches across the measure. The floor is
+// min(16rem, 100%): CSS lets min-width beat max-width, so a bare min-w-64
+// would overflow a cell narrower than 16rem — the cell always wins.
 export function selectClass(hasError?: boolean): string {
   return hasError
-    ? 'select text-sm mt-1 min-w-64 max-w-full border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
-    : 'select text-sm mt-1 min-w-64 max-w-full';
+    ? 'select text-sm mt-1 min-w-[min(16rem,100%)] max-w-full border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
+    : 'select text-sm mt-1 min-w-[min(16rem,100%)] max-w-full';
 }
