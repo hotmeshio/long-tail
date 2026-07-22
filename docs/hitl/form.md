@@ -66,7 +66,7 @@ Use `format` on any `string` field to get a specialized input:
 
 ## Required Fields
 
-Fields listed in `required` show a red asterisk and block submission when empty:
+Every required input — text, select, number, upload, or checklist group — shows a red asterisk at its label and blocks submission when empty. A checklist with `x-lt-require-all` is required by definition and carries the asterisk too. Required or optional is never a guess.
 
 ```json
 {

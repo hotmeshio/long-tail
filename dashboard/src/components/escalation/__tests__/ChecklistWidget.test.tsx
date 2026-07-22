@@ -106,7 +106,7 @@ describe('ChecklistWidget', () => {
     expect(parsed['item_0']).toBe(true);
   });
 
-  it('shows "X / N confirmed" counter reflecting current state', () => {
+  it('shows "X / N confirmed" counter reflecting current state (rows)', () => {
     const ctx = makeContext();
     const value = JSON.stringify({ item_0: true, item_1: true, item_2: false });
     render(
@@ -114,7 +114,7 @@ describe('ChecklistWidget', () => {
         fieldKey="items"
         value={value}
         onChange={vi.fn()}
-        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-variant': 'rows' }}
         escalationContext={ctx}
       />,
     );
@@ -137,14 +137,14 @@ describe('ChecklistWidget', () => {
     expect(screen.queryByText(/at least one required/i)).not.toBeInTheDocument();
   });
 
-  it('shows "at least one required" hint after a submit attempt when nothing is checked', () => {
+  it('shows "at least one required" hint after a submit attempt when nothing is checked (rows)', () => {
     const ctx = makeContext();
     render(
       <ChecklistWidget
         fieldKey="items"
         value=""
         onChange={vi.fn()}
-        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-variant': 'rows' }}
         escalationContext={ctx}
         isRequired
         submitAttempted
@@ -297,5 +297,128 @@ describe('ChecklistWidget', () => {
       />,
     );
     expect(screen.getByTestId('checklist-item-item_0')).toBeInTheDocument();
+  });
+});
+
+describe('ChecklistWidget geometry', () => {
+  const TAGS = [
+    { id: 'strings', label: 'Strings or burrs' },
+    { id: 'warping', label: 'Warping' },
+    { id: 'fill', label: 'Incomplete fill' },
+  ];
+
+  it('renders short pick-any items as chips automatically', () => {
+    const { container } = render(
+      <ChecklistWidget
+        fieldKey="reasons"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={makeContext(TAGS)}
+      />,
+    );
+    // Chips: sr-only inputs inside pill labels, no visible checkbox squares
+    expect(container.querySelectorAll('input.sr-only')).toHaveLength(3);
+    expect(screen.getByText('0 selected')).toBeInTheDocument();
+  });
+
+  it('require-all always renders rows, even with short labels', () => {
+    const { container } = render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-require-all': true }}
+        escalationContext={makeContext(TAGS)}
+      />,
+    );
+    expect(container.querySelectorAll('input.sr-only')).toHaveLength(0);
+    expect(screen.getByText(/0 \/ 3 confirmed/)).toBeInTheDocument();
+  });
+
+  it('a long label keeps the list in rows', () => {
+    const items = [
+      { id: 'a', label: 'Short' },
+      { id: 'b', label: 'A confirmation sentence far longer than a tag label would ever be' },
+    ];
+    const { container } = render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={makeContext(items)}
+      />,
+    );
+    expect(container.querySelectorAll('input.sr-only')).toHaveLength(0);
+  });
+
+  it('x-lt-variant overrides the automatic choice both ways', () => {
+    const { container: forcedRows } = render(
+      <ChecklistWidget
+        fieldKey="reasons"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-variant': 'rows' }}
+        escalationContext={makeContext(TAGS)}
+      />,
+    );
+    expect(forcedRows.querySelectorAll('input.sr-only')).toHaveLength(0);
+
+    const longItems = [{ id: 'a', label: 'A confirmation sentence far longer than a tag label would ever be' }];
+    const { container: forcedChips } = render(
+      <ChecklistWidget
+        fieldKey="reasons"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', 'x-lt-variant': 'chips' }}
+        escalationContext={makeContext(longItems)}
+      />,
+    );
+    expect(forcedChips.querySelectorAll('input.sr-only')).toHaveLength(1);
+  });
+
+  it('chip toggle updates state through the hidden input', () => {
+    const onChange = vi.fn();
+    render(
+      <ChecklistWidget
+        fieldKey="reasons"
+        value=""
+        onChange={onChange}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={makeContext(TAGS)}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('checklist-item-warping'));
+    const parsed = JSON.parse(onChange.mock.calls[0][0] as string) as Record<string, boolean>;
+    expect(parsed['warping']).toBe(true);
+  });
+
+  it('chips counter reads "n selected" and hints imperatively when required and empty', () => {
+    render(
+      <ChecklistWidget
+        fieldKey="reasons"
+        value={JSON.stringify({ strings: true })}
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={makeContext(TAGS)}
+      />,
+    );
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+  });
+
+  it('renders the group label with an asterisk when required', () => {
+    render(
+      <ChecklistWidget
+        fieldKey="reasons"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': 'envelope.checklist_items', title: 'What went wrong' }}
+        escalationContext={makeContext(TAGS)}
+        isRequired
+      />,
+    );
+    const label = screen.getByText('What went wrong');
+    expect(label.textContent).toContain('*');
   });
 });

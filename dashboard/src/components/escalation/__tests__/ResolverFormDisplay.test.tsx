@@ -84,6 +84,37 @@ describe('column groups (2×2)', () => {
   });
 });
 
+describe('widget labeling', () => {
+  it('a require-all checklist renders its label with the required asterisk', () => {
+    const schema = {
+      properties: {
+        checks: {
+          type: 'object',
+          title: 'Fixed review',
+          'x-lt-widget': 'checklist',
+          'x-lt-source': 'envelope.checklist_items',
+          'x-lt-require-all': true,
+        },
+      },
+    };
+    render(
+      <ResolverForm
+        value={formJson({ checks: {} }, schema)}
+        onChange={vi.fn()}
+        escalationContext={{
+          escalation: null,
+          metadata: null,
+          envelope: { checklist_items: [{ id: 'a', label: 'Confirm the piece is clean' }] } as unknown as Record<string, unknown>,
+          payload: null,
+          resolver: null,
+        }}
+      />,
+    );
+    const label = screen.getByText('Fixed review');
+    expect(label.textContent).toContain('*');
+  });
+});
+
 describe('help icon', () => {
   it('opens instructions when the schema carries x-lt-help', () => {
     const onOpenHelp = vi.fn();

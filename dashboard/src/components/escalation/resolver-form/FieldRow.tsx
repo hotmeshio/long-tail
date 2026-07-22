@@ -64,7 +64,10 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   // interface always deals in strings; FieldRow owns the object ↔ string boundary.
   if (widgetName && widgetName in WIDGET_MAP) {
     const Widget = WIDGET_MAP[widgetName];
-    const widgetProps = { fieldKey, schema: fieldSchema, escalationContext, isRequired, submitAttempted, error };
+    // A require-all checklist is required by definition — its label carries
+    // the asterisk like any other required input.
+    const widgetRequired = isRequired || fieldSchema?.['x-lt-require-all'] === true;
+    const widgetProps = { fieldKey, schema: fieldSchema, escalationContext, isRequired: widgetRequired, submitAttempted, error };
     if (typeof value === 'string') {
       return <Widget {...widgetProps} value={value} onChange={(v) => onChange(v)} />;
     }

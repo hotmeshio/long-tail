@@ -127,9 +127,9 @@ export const ACME_ADDONS_FORM_SCHEMA = {
     '',
     '**Custom work — this order** names exactly what it carries. The facts carry the angles and values.',
     '',
-    'Done: set **Outcome → Complete**, confirm each custom item on the piece, Resolve. The order moves to post-print QA.',
+    'Done: set **Outcome → Complete**, confirm each custom item on the piece, Resolve — the order moves on to post-print QA.',
     '',
-    'Problem: set **Outcome → Reject** — reasons, description, destination, photo. The report routes to the manager’s review.',
+    'Problem: set **Outcome → Reject** — check the reasons, describe what you see, pick the destination, attach a photo. Resolve to send the report to the manager’s review.',
     '',
     '**The facts on this item** — the side panel’s Metadata view carries the order’s work facts. Hover any value to find every order that shares it.',
   ].join('\n'),
@@ -145,7 +145,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
     'sendBackTo', 'rejectPhoto',
     'notes',
   ],
-  required: ['outcome', 'rejectReason'],
+  required: ['outcome', 'rejectReasons', 'rejectReason'],
   properties: {
     po: ORDER_FACTS.po,
     orderId: ORDER_FACTS.orderId,
@@ -162,7 +162,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-span': 2,
       'x-lt-bind': 'outcome',
       'x-lt-section': 'The decision',
-      description: 'Complete moves the order to post-print QA; Reject files a report',
+      description: 'Pick Complete to send the order to post-print QA; pick Reject to file a report',
     },
     // ── Complete: the standard ritual (arrives pre-checked) + the custom work ──
     checks: {
@@ -175,7 +175,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-bind': 'checks',
       'x-lt-section': 'Fixed review — every order',
       'x-lt-showIf': 'resolver.outcome=Complete',
-      description: 'The standard confirmations — pre-checked; uncheck anything not true',
+      description: 'Uncheck anything that is not true — the standard arrives confirmed',
     },
     customChecks: {
       type: 'object',
@@ -187,7 +187,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-bind': 'customChecks',
       'x-lt-section': 'Custom work — this order',
       'x-lt-showIf': 'resolver.outcome=Complete',
-      description: 'What this order carries beyond the standard — confirm each on the piece',
+      description: 'Confirm each item on the piece — this is what the order carries beyond the standard',
     },
     // ── Reject: the report (fades in with the choice) ──
     rejectReasons: {
@@ -195,6 +195,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       title: 'What went wrong',
       'x-lt-widget': 'checklist',
       'x-lt-source': 'envelope.reject_reason_items',
+      'x-lt-variant': 'chips',
       'x-lt-span': 2,
       'x-lt-bind': 'report.reasons',
       'x-lt-section': 'Report the problem',
@@ -212,7 +213,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-bind': 'report.reason',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'What you see and where — the manager reads this first',
+      description: 'Say what you see and where — the manager reads this first',
     },
     sendBackTo: {
       type: 'string',
@@ -222,7 +223,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-bind': 'report.sendBackTo',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Printing remakes it; Design returns it to the designer',
+      description: 'Pick Printing to remake it, or Design to return it to the designer',
     },
     rejectPhoto: {
       type: 'string',
@@ -233,7 +234,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-bind': 'report.photos[0]',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Travels with the report',
+      description: 'Attach a photo — it travels with the report',
     },
     // ── Sign-off — appears once the decision is made ──
     notes: {
@@ -246,7 +247,7 @@ export const ACME_ADDONS_FORM_SCHEMA = {
       'x-lt-bind': 'notes',
       'x-lt-section': 'Sign-off',
       'x-lt-showIf': 'resolver.outcome',
-      description: 'Anything worth recording (audit trail)',
+      description: 'Record anything worth keeping (audit trail)',
     },
   },
 } as const;
@@ -274,11 +275,11 @@ export const ACME_QA_FORM_SCHEMA = {
     '| Incomplete fill | Light shows through where it shouldn’t |',
     '| Wrong material | Certified orders must match the spool tag |',
     '',
-    'Pass: set **Outcome → Pass**, complete the checklist, Resolve. The order moves to gluing.',
+    'Pass: set **Outcome → Pass**, complete the checklist, Resolve — the order moves on to gluing.',
     '',
     'Problem: set **Outcome → Reject** — reasons, description, counts (max {{envelope.maxRejectLeft}} left · {{envelope.maxRejectRight}} right — the order’s own quantities), destination, photo.',
     '',
-    'The report routes to the manager’s review; the verdict moves the order.',
+    'Resolve to send the report to the manager’s review; the verdict moves the order.',
     '',
     '**The facts on this item** — the side panel’s Metadata view carries the order’s work facts. Hover any value to find every order that shares it.',
   ].join('\n'),
@@ -296,7 +297,7 @@ export const ACME_QA_FORM_SCHEMA = {
     'rejectPhoto',
     'notes',
   ],
-  required: ['outcome', 'rejectReason'],
+  required: ['outcome', 'rejectReasons', 'rejectReason'],
   properties: {
     po: ORDER_FACTS.po,
     orderId: ORDER_FACTS.orderId,
@@ -315,7 +316,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-span': 2,
       'x-lt-bind': 'outcome',
       'x-lt-section': 'The decision',
-      description: 'Pass moves the order to gluing; Reject files a report',
+      description: 'Pick Pass to send the order to gluing; pick Reject to file a report',
     },
     // ── Pass: the inspection ritual ──
     checks: {
@@ -336,6 +337,7 @@ export const ACME_QA_FORM_SCHEMA = {
       title: 'What went wrong',
       'x-lt-widget': 'checklist',
       'x-lt-source': 'envelope.reject_reason_items',
+      'x-lt-variant': 'chips',
       'x-lt-span': 2,
       'x-lt-bind': 'report.reasons',
       'x-lt-section': 'Report the problem',
@@ -353,7 +355,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.reason',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'What you see and where — the manager reads this first',
+      description: 'Say what you see and where — the manager reads this first',
     },
     // The affected pair shares one cell (a 2×2 nested column group) so the
     // counts read as one unit beside the destination.
@@ -367,7 +369,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.left',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Never past the order’s left count',
+      description: 'Enter how many left units are affected — no more than the order carries',
     },
     rejectRightQuantity: {
       type: 'number',
@@ -379,7 +381,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.right',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Never past the order’s right count',
+      description: 'Enter how many right units are affected — no more than the order carries',
     },
     sendBackTo: {
       type: 'string',
@@ -389,7 +391,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.sendBackTo',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Printing remakes it; Design returns it to the designer',
+      description: 'Pick Printing to remake it, or Design to return it to the designer',
     },
     rejectPhoto: {
       type: 'string',
@@ -401,7 +403,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.photos[0]',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Travels with the report',
+      description: 'Attach a photo — it travels with the report',
     },
     // ── Sign-off — appears once the decision is made ──
     notes: {
@@ -414,7 +416,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'notes',
       'x-lt-section': 'Sign-off',
       'x-lt-showIf': 'resolver.outcome',
-      description: 'Anything worth recording (audit trail)',
+      description: 'Record anything worth keeping (audit trail)',
     },
   },
 } as const;

@@ -1,20 +1,23 @@
 import { useCallback, useRef } from 'react';
+import { deriveFieldLabel } from '../../../lib/derive-field-label';
+import { FieldLabel } from '../resolver-form/FieldChrome';
 
 interface FileUploadWidgetProps {
   fieldKey: string;
   value: string;
   onChange: (v: string) => void;
   schema?: Record<string, unknown>;
+  isRequired?: boolean;
 }
 
 /**
  * File upload widget that reads a file via FileReader and stores
  * its base64 data URL in the form value.
  */
-export function FileUploadWidget({ fieldKey, value, onChange, schema }: FileUploadWidgetProps) {
+export function FileUploadWidget({ fieldKey, value, onChange, schema, isRequired }: FileUploadWidgetProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const accept = (schema?.accept as string) ?? undefined;
-  const label = fieldKey.replace(/[_-]/g, ' ');
+  const label = deriveFieldLabel(fieldKey, schema);
   const helperText = schema?.description as string | undefined;
 
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,9 +36,9 @@ export function FileUploadWidget({ fieldKey, value, onChange, schema }: FileUplo
 
   return (
     <div>
-      <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
+      <FieldLabel isRequired={isRequired}>
         {label}
-      </label>
+      </FieldLabel>
       {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       <div className="mt-1">
         <input

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { deriveFieldLabel } from '../../../lib/derive-field-label';
+import { FieldLabel } from '../resolver-form/FieldChrome';
 import { MarkdownRenderer } from '../../common/display/MarkdownRenderer';
 
 interface MarkdownWidgetProps {
@@ -6,6 +8,7 @@ interface MarkdownWidgetProps {
   value: string;
   onChange: (v: string) => void;
   schema?: Record<string, unknown>;
+  isRequired?: boolean;
 }
 
 /**
@@ -18,9 +21,9 @@ interface MarkdownWidgetProps {
  * - editable → a Write/Preview source editor. The submitted value is the
  *   markdown source.
  */
-export function MarkdownWidget({ fieldKey, value, onChange, schema }: MarkdownWidgetProps) {
+export function MarkdownWidget({ fieldKey, value, onChange, schema, isRequired }: MarkdownWidgetProps) {
   const [tab, setTab] = useState<'write' | 'preview'>('write');
-  const label = fieldKey.replace(/[_-]/g, ' ');
+  const label = deriveFieldLabel(fieldKey, schema);
   const helperText = schema?.description as string | undefined;
   const isReadOnly = schema?.readOnly === true;
 
@@ -32,9 +35,9 @@ export function MarkdownWidget({ fieldKey, value, onChange, schema }: MarkdownWi
   return (
     <div>
       <div className="flex items-center justify-between">
-        <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
+        <FieldLabel isRequired={isRequired}>
           {label}
-        </label>
+        </FieldLabel>
         <div className="flex items-center gap-0.5">
           {(['write', 'preview'] as const).map((t) => (
             <button

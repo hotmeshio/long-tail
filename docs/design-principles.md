@@ -70,6 +70,16 @@ Chroma is spent, not spread.
   implicit first option, and there is no way back to unchosen.
 - Checkboxes exist only inside checklists — confirmations of work, not
   choices.
+- **Item length and selection mode determine list geometry.**
+  Sentence-length require-all *rituals* read top-down, one per row — the
+  vertical stack is deliberate. Short pick-any *tags* (reasons, categories)
+  flow horizontally as selectable chips: thumb-sized pills that wrap,
+  selection in solid accent. Never stack six two-word items into six
+  full-width rows — endless y with an empty x is a dead layout.
+- **Required is marked, everywhere.** Every required input — text, select,
+  number, upload, checkbox, or checkbox group — carries the red asterisk at
+  its label. A require-all checklist is required by definition and marked
+  like the rest. Required or optional is never a guess.
 
 ## 5. Layout — the canonical shell
 
@@ -118,11 +128,13 @@ The reference implementation is `examples/workflows/acme-stations` — mimic it.
 
 ## 7. Copy — the economist tone
 
-Say what to do. One line per instruction. Consequences stated plainly
-("Complete moves the order to post-print QA; Reject files a report").
-Reference tables over paragraphs. Never preachy, never motivational, never
-"you're the first human — do well." State what a thing is and does, never
-what it lacks.
+Say what to do. Speak to the actor, in the imperative, always: "Pick Reject
+to file a report" — never "Reject files a report." The system is never the
+subject of an instruction, and passive voice never appears. One line per
+instruction; consequences ride the same sentence ("Resolve — the order moves
+on to gluing"). Reference tables over paragraphs. Never preachy, never
+motivational, never "you're the first human — do well." State what a thing is
+and does, never what it lacks.
 
 ## 8. Motion
 
@@ -144,5 +156,7 @@ Nothing loops, nothing floats.
 
 Raw hex in components. Chroma on large surfaces. Theme-colored labels.
 Text below 11px. Decisions as checkboxes. Implicit select defaults.
-Full-width one-word inputs. Cards and gradient fades. "Back to X" links.
-Polling. Preachy copy. Customer names — the showcase brand is always Acme.
+Full-width one-word inputs. Tag lists stacked as rows. Unmarked required
+fields. Passive voice or system-voice copy. Cards and gradient fades.
+"Back to X" links. Polling. Preachy copy. Customer names — the showcase
+brand is always Acme.

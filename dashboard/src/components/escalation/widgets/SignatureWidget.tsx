@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { deriveFieldLabel } from '../../../lib/derive-field-label';
+import { FieldLabel } from '../resolver-form/FieldChrome';
 
 interface SignatureWidgetProps {
   fieldKey: string;
   value: string;
   onChange: (v: string) => void;
   schema?: Record<string, unknown>;
+  isRequired?: boolean;
 }
 
 /**
  * HTML5 Canvas signature pad. Outputs a PNG data URL.
  */
-export function SignatureWidget({ fieldKey, value, onChange, schema }: SignatureWidgetProps) {
+export function SignatureWidget({ fieldKey, value, onChange, schema, isRequired }: SignatureWidgetProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const label = fieldKey.replace(/[_-]/g, ' ');
+  const label = deriveFieldLabel(fieldKey, schema);
   const helperText = schema?.description as string | undefined;
 
   useEffect(() => {
@@ -80,9 +83,9 @@ export function SignatureWidget({ fieldKey, value, onChange, schema }: Signature
 
   return (
     <div>
-      <label className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
+      <FieldLabel isRequired={isRequired}>
         {label}
-      </label>
+      </FieldLabel>
       {helperText && <p className="text-2xs text-text-tertiary mt-0.5">{helperText}</p>}
       <div className="mt-1 border border-surface-border rounded-md overflow-hidden bg-white">
         <canvas

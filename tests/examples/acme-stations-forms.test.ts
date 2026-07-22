@@ -71,6 +71,7 @@ describe('acme-print-qa form', () => {
     const form = {
       ...QA_FACTS,
       outcome: 'Reject',
+      rejectReasons: { warping: true },
       rejectReason: 'short',
       rejectLeftQuantity: 3,
       rejectRightQuantity: 1,
@@ -81,6 +82,21 @@ describe('acme-print-qa form', () => {
     expect(fields).toContain('rejectReason');
     expect(fields).toContain('rejectLeftQuantity');
     expect(fields).not.toContain('rejectRightQuantity');
+  });
+
+  it('Reject path: a report with zero reasons blocks — at least one is required', () => {
+    const form = {
+      ...QA_FACTS,
+      outcome: 'Reject',
+      rejectReasons: {},
+      rejectReason: 'Warping across the medial edge on both pieces.',
+      rejectLeftQuantity: 1,
+      rejectRightQuantity: 0,
+      sendBackTo: 'Printing',
+      notes: '',
+    };
+    const fields = validateResolverForm(QA, form, { ...qaCtx, resolver: form }).map((e) => e.field);
+    expect(fields).toContain('rejectReasons');
   });
 
   it('maps the flat submission into the nested resolver contract', () => {
