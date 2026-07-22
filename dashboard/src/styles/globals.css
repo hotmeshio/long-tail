@@ -45,8 +45,8 @@
        Dark themes override with a light ramp. */
     --lt-text-primary: 23 23 23;        /* #171717 */
     --lt-text-secondary: 55 55 55;      /* #373737 — labels */
-    --lt-text-tertiary: 100 100 100;    /* #646464 — 5.9:1 helper text */
-    --lt-text-quaternary: 140 140 140;  /* #8C8C8C — 3.4:1, large/meta only */
+    --lt-text-tertiary: 88 88 88;       /* #585858 — 6.9:1 helper text */
+    --lt-text-quaternary: 122 122 122;  /* #7A7A7A — 4.2:1, large/meta only */
 
     /* Status family — text-safe values, ≥4.5:1 on the light surface.
        The -graphic variants keep the traditional brighter hues for dots,
@@ -110,8 +110,8 @@
     --lt-accent-hover: 29 78 216;     /* #1D4ED8 */
     --lt-accent-muted: 147 197 253;   /* #93C5FD */
     --lt-accent-faint: 219 234 254;   /* #DBEAFE */
-    --lt-surface: 228 236 246;      /* #E4ECF6 — the page wash */
-    --lt-surface-hover: 218 228 241;  /* #DAE4F1 */
+    --lt-surface: 235 241 248;      /* #EBF1F8 — the page wash */
+    --lt-surface-hover: 226 234 244;  /* #E2EAF4 */
     --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
     --lt-surface-border: 208 217 231; /* #D0D9E7 */
   }
@@ -128,8 +128,8 @@
     --lt-accent-hover: 98 41 190;     /* #6229BE */
     --lt-accent-muted: 187 156 239;   /* #BB9CEF */
     --lt-accent-faint: 229 217 249;   /* #E5D9F9 */
-    --lt-surface: 232 229 242;      /* #E8E5F2 — the page wash */
-    --lt-surface-hover: 224 220 237;  /* #E0DCED */
+    --lt-surface: 239 237 246;      /* #EFEDF6 — the page wash */
+    --lt-surface-hover: 231 228 241;  /* #E7E4F1 */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
     --lt-surface-border: 215 210 228; /* #D7D2E4 */
   }
@@ -139,8 +139,8 @@
     --lt-accent-hover: 179 42 34;     /* #B32A22 */
     --lt-accent-muted: 236 154 147;   /* #EC9A93 */
     --lt-accent-faint: 247 218 214;   /* #F7DAD6 */
-    --lt-surface: 242 233 230;      /* #F2E9E6 — the page wash */
-    --lt-surface-hover: 235 224 220;  /* #EBE0DC */
+    --lt-surface: 246 240 238;      /* #F6F0EE — the page wash */
+    --lt-surface-hover: 240 231 228;  /* #F0E7E4 */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
     --lt-surface-border: 226 211 208; /* #E2D3D0 */
   }
@@ -150,8 +150,8 @@
     --lt-accent-hover: 15 118 55;     /* #0F7637 */
     --lt-accent-muted: 74 222 128;    /* #4ADE80 */
     --lt-accent-faint: 187 247 208;   /* #BBF7D0 */
-    --lt-surface: 229 240 233;      /* #E5F0E9 — the page wash */
-    --lt-surface-hover: 220 234 226;  /* #DCEAE2 */
+    --lt-surface: 236 244 239;      /* #ECF4EF — the page wash */
+    --lt-surface-hover: 227 238 231;  /* #E3EEE7 */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
     --lt-surface-border: 205 223 211; /* #CDDFD3 */
   }
@@ -161,8 +161,8 @@
     --lt-accent-hover: 219 39 119;    /* #DB2777 */
     --lt-accent-muted: 249 168 212;   /* #F9A8D4 */
     --lt-accent-faint: 252 231 243;   /* #FCE7F3 */
-    --lt-surface: 242 232 236;      /* #F2E8EC — the page wash */
-    --lt-surface-hover: 235 222 228;  /* #EBDEE4 */
+    --lt-surface: 246 239 242;      /* #F6EFF2 — the page wash */
+    --lt-surface-hover: 240 229 234;  /* #F0E5EA */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
     --lt-surface-border: 228 209 218; /* #E4D1DA */
   }
@@ -172,8 +172,8 @@
     --lt-accent-hover: 234 88 12;     /* #EA580C */
     --lt-accent-muted: 254 215 170;   /* #FED7AA */
     --lt-accent-faint: 255 247 237;   /* #FFF7ED */
-    --lt-surface: 242 235 226;      /* #F2EBE2 — the page wash */
-    --lt-surface-hover: 235 226 214;  /* #EBE2D6 */
+    --lt-surface: 246 241 235;      /* #F6F1EB — the page wash */
+    --lt-surface-hover: 240 232 223;  /* #F0E8DF */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
     --lt-surface-border: 228 216 202; /* #E4D8CA */
   }
