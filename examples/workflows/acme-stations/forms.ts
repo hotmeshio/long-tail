@@ -369,7 +369,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.left',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Enter how many left units are affected — no more than the order carries',
+      description: 'Count the left units affected',
     },
     rejectRightQuantity: {
       type: 'number',
@@ -381,7 +381,7 @@ export const ACME_QA_FORM_SCHEMA = {
       'x-lt-bind': 'report.right',
       'x-lt-section': 'Report the problem',
       'x-lt-showIf': 'resolver.outcome=Reject',
-      description: 'Enter how many right units are affected — no more than the order carries',
+      description: 'Count the right units affected',
     },
     sendBackTo: {
       type: 'string',

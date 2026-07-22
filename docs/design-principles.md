@@ -120,8 +120,12 @@ The reference implementation is `examples/workflows/acme-stations` — mimic it.
    what isn't true. The order's own custom work arrives unchecked; those
    clicks are the record. `x-lt-require-all` guards completion.
 6. **Every input carries a `title` and one instructional `description`
-   line.** The WHY — reference tables, consequences, vocabulary — lives in
-   `x-lt-help` beside the form.
+   line — no input goes without.** The anatomy is fixed and identical for
+   every input kind: label, instruction, control, in that order. Inputs that
+   share a row carry instructions of similar length so their controls align
+   across the row; a bare input beside an instructed one is a consistency
+   defect, in both content and alignment. The WHY — reference tables,
+   consequences, vocabulary — lives in `x-lt-help` beside the form.
 7. **Sign-off last.** A short audit note with a live counter.
 8. Hidden conditional fields still submit their defaults; resolver contracts
    treat empty as absent.
@@ -157,6 +161,6 @@ Nothing loops, nothing floats.
 Raw hex in components. Chroma on large surfaces. Theme-colored labels.
 Text below 11px. Decisions as checkboxes. Implicit select defaults.
 Full-width one-word inputs. Tag lists stacked as rows. Unmarked required
-fields. Passive voice or system-voice copy. Cards and gradient fades.
+fields. Inputs without instruction lines. Passive voice or system-voice copy. Cards and gradient fades.
 "Back to X" links. Polling. Preachy copy. Customer names — the showcase
 brand is always Acme.

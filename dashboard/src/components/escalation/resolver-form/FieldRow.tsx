@@ -30,7 +30,12 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   const fieldId = `lt-field-${fieldKey}`;
   const errorId = `${fieldId}-error`;
   const helpId = `${fieldId}-help`;
-  const hasHelper = typeof fieldSchema?.description === 'string' && fieldSchema.description.length > 0;
+  // The instruction line renders on EVERY editable input, in one fixed
+  // anatomy: label, instruction, control. No input goes without.
+  const helperText = typeof fieldSchema?.description === 'string' && fieldSchema.description.length > 0
+    ? fieldSchema.description
+    : undefined;
+  const hasHelper = helperText !== undefined;
   const describedBy = error ? errorId : hasHelper ? helpId : undefined;
   const ariaProps = {
     id: fieldId,
@@ -116,6 +121,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
             {isRequired && <span className="text-status-error ml-0.5">*</span>}
           </span>
         </label>
+        {helperText && <FieldHelper id={helpId}>{helperText}</FieldHelper>}
         <FieldError error={error} id={errorId} />
       </div>
     );
@@ -127,6 +133,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
     return (
       <div>
         <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+        {helperText && <FieldHelper id={helpId}>{helperText}</FieldHelper>}
         <input
           type="number"
           value={value}
@@ -146,7 +153,6 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   if (typeof value === 'string') {
     const isPassword = fieldSchema?.format === 'password';
     const enumValues = fieldSchema?.enum as string[] | undefined;
-    const helperText = fieldSchema?.description as string | undefined;
 
     if (enumValues?.length) {
       // An empty value on an enum whose options don't include '' renders an
