@@ -64,6 +64,10 @@ export default {
         'field-y': 'var(--lt-space-field-y)',
         'col-gap': 'var(--lt-space-col-gap)',
       },
+      maxWidth: {
+        /* The readable measure for generated forms. */
+        form: 'var(--lt-measure-form)',
+      },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'monospace'],

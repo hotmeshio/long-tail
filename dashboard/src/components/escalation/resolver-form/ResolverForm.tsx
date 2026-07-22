@@ -178,8 +178,9 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   return (
     // `inert` (not just pointer-events) locks a disabled form for keyboard and
     // assistive-tech users too — fields leave the tab order entirely.
+    // max-w-form: the form holds a readable measure on any monitor.
     <div
-      className={`pb-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
+      className={`pb-8 max-w-form ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
       inert={disabled || undefined}
       aria-disabled={disabled || undefined}
     >

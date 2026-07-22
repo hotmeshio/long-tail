@@ -102,7 +102,8 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
     );
   }
 
-  // Number
+  // Number — numbers are short; the input holds a hand-sized width instead
+  // of stretching to the measure.
   if (typeof value === 'number') {
     return (
       <div>
@@ -114,7 +115,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
           onBlur={onBlur}
           step="any"
           data-field-key={fieldKey}
-          className={inputClass(!!error)}
+          className={`${inputClass(!!error)} max-w-48`}
           {...ariaProps}
         />
         <FieldError error={error} id={errorId} />

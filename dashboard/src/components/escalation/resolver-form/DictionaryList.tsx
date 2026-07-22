@@ -11,7 +11,12 @@ export interface DictionaryItem {
  * Dense definition-list display for read-only label/value facts — the compact
  * alternative to full-height field rows. Labels sit beside values in a
  * max-content column so a run of short facts reads like a spec sheet, not a
- * form. Two-column mode splits the run across a responsive pair of lists.
+ * form.
+ *
+ * Two-column mode fills ROW BY ROW: consecutive items share a row, so the
+ * author's ordering controls pairing — Left Qty and Right Qty declared
+ * together render side by side, Left first (the left/right law). Below md
+ * the same order stacks one pair per row.
  */
 export function DictionaryList({ items, columns = 1 }: {
   items: DictionaryItem[];
@@ -19,22 +24,12 @@ export function DictionaryList({ items, columns = 1 }: {
 }) {
   if (items.length === 0) return null;
 
-  if (columns >= 2 && items.length > 1) {
-    const mid = Math.ceil(items.length / 2);
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-col-gap gap-y-1.5 items-start">
-        <DictionaryColumn items={items.slice(0, mid)} />
-        <DictionaryColumn items={items.slice(mid)} />
-      </div>
-    );
-  }
+  const gridCols = columns >= 2 && items.length > 1
+    ? 'grid-cols-[max-content_1fr] md:grid-cols-[max-content_1fr_max-content_1fr]'
+    : 'grid-cols-[max-content_1fr]';
 
-  return <DictionaryColumn items={items} />;
-}
-
-function DictionaryColumn({ items }: { items: DictionaryItem[] }) {
   return (
-    <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-6 gap-y-1.5">
+    <dl className={`grid ${gridCols} items-baseline gap-x-6 md:gap-x-8 gap-y-1.5`}>
       {items.map(({ key, label, value }) => (
         <Fragment key={key}>
           <dt className="text-2xs font-semibold uppercase tracking-wide text-text-secondary">

@@ -45,6 +45,8 @@ Per-section display settings live at the schema root, keyed by section name:
 | `display` | `"dictionary"` | Read-only fields in the section render as dictionary rows |
 | `columns` | `1` \| `2` | Dictionary column count; defaults to 2 in two-column layouts, 1 otherwise |
 
+Two-column dictionaries fill **row by row**: consecutive items share a row, so ordering controls pairing — declare `left_quantity` and `right_quantity` together and they render side by side, Left first.
+
 ## Value formatting
 
 Strings and numbers render as-is. Booleans render as Yes / No. Objects and arrays render as compact JSON. Empty values (`null`, `""`) render as an em dash.

@@ -39,10 +39,11 @@ export function inputClass(hasError?: boolean): string {
     : 'input text-sm w-full mt-1';
 }
 
-// Select shares the field recipe but adds the unified chevron (via .select), so
-// generated dropdowns match every other select in the product.
+// Select shares the field recipe but adds the unified chevron (via .select).
+// Width follows the content, floored for presence and capped by the cell —
+// a one-word choice never stretches across the measure.
 export function selectClass(hasError?: boolean): string {
   return hasError
-    ? 'select text-sm w-full mt-1 border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
-    : 'select text-sm w-full mt-1';
+    ? 'select text-sm mt-1 min-w-64 max-w-full border-status-error/50 focus:border-status-error animate-[field-shake_0.4s_ease-in-out]'
+    : 'select text-sm mt-1 min-w-64 max-w-full';
 }

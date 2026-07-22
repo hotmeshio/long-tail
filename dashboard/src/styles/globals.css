@@ -163,6 +163,11 @@
     --lt-space-page-y: 2rem;
     --lt-space-field-y: 1.25rem;
     --lt-space-col-gap: clamp(1.5rem, 3vw, 3.5rem);
+
+    /* The form measure — generated forms never stretch past a readable
+       width, whatever the monitor. A wide viewport gets margin, not a
+       2000px select. */
+    --lt-measure-form: 56rem;
   }
 
   body {
