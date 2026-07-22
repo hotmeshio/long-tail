@@ -75,7 +75,9 @@ function midEllipsis(s: string, maxLen = 37): string {
   return `${s.slice(0, keep)}...${s.slice(-keep)}`;
 }
 
-/** Consistent row for all execution lists in row 1 */
+/** Consistent console row for all execution lists — the title takes whatever
+ *  width the container gives it (flex-1 min-w-0 + truncate), so the same row
+ *  reads clean in a half column, a quarter column, or full width. */
 function ExecutionRow({ dot, pill, id, date, onClick }: {
   dot: string;
   pill: React.ReactNode;
@@ -87,10 +89,28 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
         <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${dot}`} />
-        <span className="text-xs text-text-primary font-mono truncate max-w-[60%]">{midEllipsis(id)}</span>
-        <span className="text-2xs text-text-quaternary shrink-0 ml-auto whitespace-nowrap"><DateValue date={date} /></span>
+        <span className="text-xs text-text-primary font-mono truncate flex-1 min-w-0">{midEllipsis(id)}</span>
+        <span className="text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
       </div>
       <div className="pl-3.5 flex items-center gap-1 overflow-hidden">{pill}</div>
+    </button>
+  );
+}
+
+/** Console row for the escalation firehose lists — same scaling law. */
+function EscalationRow({ esc, onClick }: { esc: any; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
+        <span className="text-xs text-text-primary truncate flex-1 min-w-0">{esc.description || esc.subtype || esc.type}</span>
+        <span className="text-2xs text-text-quaternary shrink-0"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
+      </div>
+      <div className="flex items-center gap-2 pl-5 overflow-hidden">
+        <WorkflowPill type={esc.type || 'unknown'} size="xs" />
+        <span className="flex-1 min-w-0" />
+        <RolePill role={esc.role} />
+      </div>
     </button>
   );
 }
@@ -183,26 +203,24 @@ export function HomePage() {
   useWorkflowListEvents();
   useStationMetricsEvents();
 
-  // The home page renders one of two layouts (see the return below): the
-  // operator's task-queue cards, or the builder home shared by admin, engineer,
-  // and superadmin. Gate each data source to the tiers that render it, so no one
-  // fires a request they can't access (403 on control-plane apps → empty
-  // namespace → 400 on jobs):
-  // - All/My escalation firehose → the builder home (everyone except operator)
-  // - Pace Board                 → admin, superadmin only
-  // - Procedural/Graph workflows  → builders (engineer, superadmin)
-  // - Task-queue cards fetch their own scoped metrics inside TaskQueueCards.
+  // The home page renders one of three layouts (see the return below):
+  // - operator: their own lanes as task-queue cards, nothing else
+  // - admin/superadmin: escalations left|right, then the Pace Board FULL WIDTH
+  //   (the chart is the story; full width is what scales it)
+  // - engineer: a 2×2 console — escalations on the upper row, the workflow
+  //   execution columns on the lower row
+  // Gate each data source to the tiers that render it, so no one fires a
+  // request they can't access (403 on control-plane apps → empty namespace →
+  // 400 on jobs). Superadmins reach the execution surfaces from the sidebar;
+  // their home stays the operational story.
   const builderHome = !persona.showTaskQueueCards;
-  // Row 2 width adapts to what the tier can see: pace + both workflow columns
-  // (superadmin), workflows only (engineer), or pace only, full-width (admin).
-  const row2GridClass = persona.canSeePaceBoard && persona.canSeeWorkflows ? '@wall:grid-cols-3'
-    : persona.canSeeWorkflows ? '@split:grid-cols-2' : '';
+  const showWorkflowColumns = persona.canSeeWorkflows && !persona.canSeePaceBoard;
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
   const stationQ = useStationMetrics('1h', { enabled: persona.canSeePaceBoard });
-  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: persona.canSeeWorkflows });
+  const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: showWorkflowColumns });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
-  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: persona.canSeeWorkflows });
+  const mcpQ = useMcpRuns({ limit: 5, app_id: pipelineNs, sort_by: 'updated_at', order: 'desc' }, { enabled: showWorkflowColumns });
   const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
   const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
 
@@ -314,15 +332,17 @@ export function HomePage() {
     );
   }
 
-  // ── Builder home (admin, engineer, superadmin): the All/My firehose, plus the
-  //    Pace Board (admin/superadmin) and the workflow columns (engineer/
-  //    superadmin). Engineers see everything here except the Pace Board.
+  // ── Builder home. Admin/superadmin: escalations left|right, Pace Board full
+  //    width beneath — the operational story in two rows. Engineer: a 2×2
+  //    console — escalations up top, the workflow execution columns below.
+  //    Every grid follows the CONTAINER (@split), so each layout folds to one
+  //    clean column when a panel narrows it.
   return (
     <div>
       <h1 className="heading-1 mb-10">Recent Activity</h1>
 
       {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
-      <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap min-h-[35vh]">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap gap-y-10">
 
         {/* Col 1: All Escalations */}
         <div>
@@ -339,22 +359,7 @@ export function HomePage() {
           ) : (
             <div className="space-y-1">
               {allEscalations.map((esc: any) => (
-                <button
-                  key={esc.id}
-                  onClick={() => navigate(`/escalations/detail/${esc.id}`)}
-                  className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-xs text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-2xs text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-5">
-                    <WorkflowPill type={esc.type || 'unknown'} size="xs" />
-                    <span className="flex-1" />
-                    <RolePill role={esc.role} />
-                  </div>
-                </button>
+                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
               ))}
             </div>
           )}
@@ -375,61 +380,43 @@ export function HomePage() {
           ) : (
             <div className="space-y-1">
               {myEscalations.map((esc: any) => (
-                <button
-                  key={esc.id}
-                  onClick={() => navigate(`/escalations/detail/${esc.id}`)}
-                  className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-2xs text-text-quaternary font-medium shrink-0">P{esc.priority ?? 2}</span>
-                    <span className="text-xs text-text-primary truncate flex-1 max-w-[65%]">{esc.description || esc.subtype || esc.type}</span>
-                    <span className="text-2xs text-text-quaternary shrink-0 ml-auto"><DateValue date={esc.updated_at ?? esc.created_at} /></span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-5">
-                    <WorkflowPill type={esc.type || 'unknown'} size="xs" />
-                    <span className="flex-1" />
-                    <RolePill role={esc.role} />
-                  </div>
-                </button>
+                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Row 2: Pace Board (admin/superadmin) | Procedural | Graph (builders).
-          Engineers get the workflow columns but no Pace Board; admins get the
-          Pace Board full-width. */}
-      {(persona.canSeePaceBoard || persona.canSeeWorkflows) && (
-        <div className={`grid grid-cols-1 ${row2GridClass} gap-x-14 mt-14`}>
-
-          {/* Pace Board — the story being told, at a glance */}
-          {persona.canSeePaceBoard && (
-            <div>
-              <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
-                <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
-              }>
-                Pace Board
-              </SectionHeader>
-              {paceStations.length === 0 ? (
-                <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
-              ) : (
-                <div className={`${isBuilder ? 'h-64' : 'h-80'} cursor-pointer`} onClick={() => navigate('/operations')}>
-                  <PaceChart
-                    stations={paceStations}
-                    selectedRole={null}
-                    onSelect={() => navigate('/operations')}
-                    onUpstreamSelect={() => navigate('/operations')}
-                    periodHours={1}
-                  />
-                </div>
-              )}
+      {/* ── Row 2 (admin/superadmin): the Pace Board, full width. The chart is
+          the story being told — the whole line at a glance. */}
+      {persona.canSeePaceBoard && (
+        <div className="mt-14">
+          <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
+            <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
+          }>
+            Pace Board
+          </SectionHeader>
+          {paceStations.length === 0 ? (
+            <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
+          ) : (
+            <div className="h-80 cursor-pointer" onClick={() => navigate('/operations')}>
+              <PaceChart
+                stations={paceStations}
+                selectedRole={null}
+                onSelect={() => navigate('/operations')}
+                onUpstreamSelect={() => navigate('/operations')}
+                periodHours={1}
+              />
             </div>
           )}
+        </div>
+      )}
 
-          {/* Workflow executions — builders (engineer, superadmin) */}
-          {persona.canSeeWorkflows && proceduralColumn}
-          {persona.canSeeWorkflows && graphColumn}
+      {/* ── Row 2 (engineer): Procedural | Graph — the lower half of the 2×2. */}
+      {showWorkflowColumns && (
+        <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap gap-y-10 mt-14">
+          {proceduralColumn}
+          {graphColumn}
         </div>
       )}
     </div>
