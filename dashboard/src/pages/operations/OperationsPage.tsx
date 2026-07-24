@@ -211,16 +211,16 @@ function StationRow({
 
         {/* ── 5 colored columns in one touching flex group ── */}
         <div className="self-stretch flex items-stretch">
-          {/* Target/h — editable, slate band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-1.5" style={{ backgroundColor: TARGET_BAND }}>
+          {/* Target/h — editable */}
+          <div className={`${COLORED_COLS[0].w} shrink-0 flex items-center justify-end ${COLORED_COLS[0].px}`} style={{ backgroundColor: TARGET_BAND }}>
             <EditableNumber value={role.target_per_hour ?? null} onSave={saveTarget} />
           </div>
-          {/* SLA/m — editable, amber band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-1.5" style={{ backgroundColor: SLA_BAND }}>
+          {/* SLA/m — editable */}
+          <div className={`${COLORED_COLS[1].w} shrink-0 flex items-center justify-end ${COLORED_COLS[1].px}`} style={{ backgroundColor: SLA_BAND }}>
             <EditableNumber value={role.sla_minutes ?? null} onSave={saveSla} />
           </div>
-          {/* Pending — sky band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: PENDING_BAND }}>
+          {/* Pending */}
+          <div className={`${COLORED_COLS[2].w} shrink-0 flex items-center justify-end ${COLORED_COLS[2].px}`} style={{ backgroundColor: PENDING_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -231,8 +231,8 @@ function StationRow({
               {pending}
             </Link>
           </div>
-          {/* Claimed — orange band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: ACTIVE_BAND }}>
+          {/* Claimed */}
+          <div className={`${COLORED_COLS[3].w} shrink-0 flex items-center justify-end ${COLORED_COLS[3].px}`} style={{ backgroundColor: ACTIVE_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -244,8 +244,8 @@ function StationRow({
               {claimed}
             </Link>
           </div>
-          {/* Resolved — green band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: RESOLVED_BAND }}>
+          {/* Resolved */}
+          <div className={`${COLORED_COLS[4].w} shrink-0 flex items-center justify-end ${COLORED_COLS[4].px}`} style={{ backgroundColor: RESOLVED_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -431,19 +431,23 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
   );
 }
 
+// ── Colored column specs — widths shared by header and rows ──────────────────
+// Widths sized to the longest label in each column at text-2xs + tracking-wider.
+
+const COLORED_COLS = [
+  { label: 'TARGET/H', band: TARGET_BAND,   hue: TARGET_COLOR,   w: 'w-[4.5rem]', px: 'px-1.5' },
+  { label: 'SLA/M',    band: SLA_BAND,      hue: SLA_COLOR,      w: 'w-14',        px: 'px-1.5' },
+  { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-20',        px: 'px-2' },
+  { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-20',        px: 'px-2' },
+  { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-20',        px: 'px-2' },
+] as const;
+
 // ── Table header ──────────────────────────────────────────────────────────────
 
 function TableHead() {
-  const coloredCols = [
-    { label: 'TARGET/H', band: TARGET_BAND, hue: TARGET_COLOR, w: 'w-16' },
-    { label: 'SLA/M',    band: SLA_BAND,    hue: SLA_COLOR,    w: 'w-16' },
-    { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-16', px: 'px-3' },
-    { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-16', px: 'px-3' },
-    { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-16', px: 'px-3' },
-  ];
   return (
     <div
-      className="grid items-center gap-4 px-3 border-b border-surface-border mb-0.5"
+      className="grid items-center gap-4 px-3 border-b border-surface-border"
       style={{ gridTemplateColumns: STATION_GRID_COLS }}
     >
       <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">NAME</span>
@@ -451,10 +455,10 @@ function TableHead() {
 
       {/* Touching colored column group */}
       <div className="self-stretch flex items-stretch">
-        {coloredCols.map((col) => (
+        {COLORED_COLS.map((col) => (
           <div
             key={col.label}
-            className={`${col.w} shrink-0 flex items-center justify-end ${'px' in col ? col.px : 'px-1.5'}`}
+            className={`${col.w} shrink-0 flex items-center justify-end ${col.px}`}
             style={{ backgroundColor: col.band }}
           >
             <span className="text-2xs font-semibold uppercase tracking-wider" style={{ color: col.hue }}>
