@@ -13,8 +13,11 @@ interface AppLogoProps {
    * `mark` renders the pineapple alone at header scale — no wordmark, no
    * rotation, no watermark bleed. The header-diet variant for narrow
    * viewports where the mark IS the brand.
+   *
+   * `comet` renders a large tilted pineapple bleeding above/behind the header
+   * — no wordmark, motion energy at the smallest breakpoint.
    */
-  variant?: 'full' | 'mark';
+  variant?: 'full' | 'mark' | 'comet';
 }
 
 /**
@@ -29,6 +32,39 @@ interface AppLogoProps {
  */
 export function AppLogo({ size = 'sm', hideLabel = false, className = '', appName = 'LongTail', variant = 'full' }: AppLogoProps) {
   const isLarge = size === 'lg';
+
+  if (variant === 'comet') {
+    // Pineapple watermark behind the hamburger area: 202° rotation (180° from
+    // the naive upright) puts the crown downward and the leafy base streaming
+    // upward — the same motion logic as the full-logo's -rotate-[120deg]
+    // watermark. z-index: -1 keeps it behind hamburger / back-fwd siblings
+    // within the header's stacking context while remaining visible above the
+    // header's own background paint. Negative left pulls the mark back over
+    // the hamburger button; top bleeds slightly above the header top edge so
+    // the leaf tips clip at the viewport boundary (tail of the comet).
+    return (
+      <div
+        className={`relative overflow-visible ${className}`}
+        style={{ width: '2.5rem', height: '2.5rem', flexShrink: 0 }}
+      >
+        <span
+          role="img"
+          aria-label={appName}
+          className="logo-mark absolute pointer-events-none select-none"
+          style={{
+            '--logo-url': `url(${LT_BASE}/logo512.png)`,
+            width: '120px',
+            height: '120px',
+            top: '-25px',
+            left: '-90px',
+            transform: 'rotate(232deg)',
+            zIndex: -1,
+            opacity: 0.55,
+          } as CSSProperties}
+        />
+      </div>
+    );
+  }
 
   if (variant === 'mark') {
     return (

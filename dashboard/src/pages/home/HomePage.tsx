@@ -173,7 +173,7 @@ function PanelCol({ icon: Icon, title, count, actions, children }: {
 }) {
   return (
     <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-      <div className="flex items-center justify-between pt-4 pb-2 shrink-0 border-b border-surface-border">
+      <div className="flex items-center justify-between pt-4 pb-2 px-5 shrink-0 border-b border-surface-border">
         <div className="flex items-center gap-2">
           <Icon className="w-3.5 h-3.5 text-accent/60" strokeWidth={1.5} />
           <h2 className="section-h2">{title}</h2>
@@ -185,7 +185,7 @@ function PanelCol({ icon: Icon, title, count, actions, children }: {
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto py-2 @container">
+      <div className="flex-1 min-h-0 overflow-y-auto py-2 px-5 @container">
         {children}
       </div>
     </div>
@@ -279,7 +279,7 @@ export function HomePage() {
 
         {/* Pace Board — never scrolls ──────────────────────────────────────── */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center justify-between pb-3 shrink-0 border-b border-surface-border">
+          <div className="flex items-center justify-between pb-3 px-5 shrink-0 border-b border-surface-border">
             <div className="flex items-center gap-2">
               <LayoutDashboard className="w-3.5 h-3.5 text-accent/60" strokeWidth={1.5} />
               <h2 className="section-h2">Pace Board</h2>
