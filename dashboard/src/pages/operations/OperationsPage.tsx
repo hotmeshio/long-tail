@@ -31,7 +31,7 @@ const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.08);
 
 // Station table grid. The 5 colored columns are grouped into a single auto
 // cell rendered as a flex row with no internal gap so they touch each other.
-const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) auto 72px 72px 104px 36px';
+const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) auto 72px 72px 104px 52px';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -285,20 +285,9 @@ function StationRow({
           </span>
         </div>
 
-        {/* Actions — jeopardy first (the hard-limit alarm, hover names the
-            count, click opens the exact counted set oldest-first), then the
-            full-queue view. */}
-        <div className="flex items-center justify-center gap-2 py-1.5">
-          {priorityCount > 0 && (
-            <Link
-              to={jeopardyQueueLink(role)}
-              className="text-status-error hover:opacity-70 transition-opacity"
-              title={`${priorityCount} item${priorityCount === 1 ? '' : 's'} in jeopardy — pull oldest first`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <TriangleAlert className="w-3.5 h-3.5" strokeWidth={2} />
-            </Link>
-          )}
+        {/* Actions — eye always anchored first; jeopardy occupies a fixed-width
+            slot after it so the eye never shifts when the alert appears. */}
+        <div className="flex items-center justify-center gap-1.5 py-1.5">
           <Link
             to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=all`}
             className="text-text-quaternary hover:text-accent transition-colors"
@@ -307,6 +296,19 @@ function StationRow({
           >
             <Eye className="w-3.5 h-3.5" />
           </Link>
+          {/* Fixed-width slot — always occupies space so the eye never shifts */}
+          <span className="w-3.5 flex items-center justify-center">
+            {priorityCount > 0 && (
+              <Link
+                to={jeopardyQueueLink(role)}
+                className="text-status-error hover:opacity-70 transition-opacity"
+                title={`${priorityCount} item${priorityCount === 1 ? '' : 's'} in jeopardy — pull oldest first`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <TriangleAlert className="w-3.5 h-3.5" strokeWidth={2} />
+              </Link>
+            )}
+          </span>
         </div>
       </div>
     </>
