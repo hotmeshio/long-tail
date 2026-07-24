@@ -1,21 +1,29 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { formatAgoCompact } from '../../../lib/format';
 import { rowContext } from '../EscalationListView';
-import { useEscalations } from '../../../api/escalations';
+import { useEscalations, useResolveEscalation } from '../../../api/escalations';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
+import { resolveQueryFacets, type EmbedQuery } from '../../../lib/x-lt-query';
 import type { WidgetProps } from './index';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import type { LTEscalationRecord } from '../../../api/types';
 
 interface ColumnDef { label: string; value: string; format?: string }
 
-interface EmbedQuery {
-  role?: string;
-  status?: string;
-  facets?: Record<string, string>;
-  limit?: number;
-  available?: boolean;
+/**
+ * An inline row action: fires a canned resolve against the row through the
+ * standard resolve endpoint — RBAC and enforce_schema validation apply
+ * server-side exactly as a full-form resolve. String leaves inside
+ * `resolverPayload` (and `confirm`) interpolate `{{domain.path}}` tokens
+ * against the row's own context; booleans and numbers pass through typed.
+ */
+interface ActionDef {
+  label: string;
+  resolverPayload: Record<string, unknown>;
+  /** Optional confirm prompt shown before firing; tokens interpolate per row. */
+  confirm?: string;
 }
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
@@ -26,19 +34,6 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
 const EM_DASH = '—';
 
-/** Interpolate `{{domain.path}}` tokens in every string value of the facets map. */
-function resolveQueryFacets(
-  facets: Record<string, string> | undefined,
-  ctx: ShowIfContext,
-): Record<string, unknown> {
-  if (!facets) return {};
-  const resolved: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(facets)) {
-    resolved[k] = typeof v === 'string' ? interpolateHelp(v, ctx) : v;
-  }
-  return resolved;
-}
-
 function renderValue(raw: string, format?: string): string {
   if (!raw || raw === EM_DASH) return EM_DASH;
   if (format === 'age') {
@@ -46,6 +41,19 @@ function renderValue(raw: string, format?: string): string {
     return Number.isNaN(d.getTime()) ? raw : formatAgoCompact(raw);
   }
   return raw;
+}
+
+/** Deep-walk a payload template: string leaves interpolate `{{domain.path}}`
+ *  tokens against the row context; every other type passes through typed. */
+function interpolatePayload(value: unknown, ctx: ShowIfContext): unknown {
+  if (typeof value === 'string') return interpolateHelp(value, ctx);
+  if (Array.isArray(value)) return value.map((v) => interpolatePayload(v, ctx));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, interpolatePayload(v, ctx)]),
+    );
+  }
+  return value;
 }
 
 /**
@@ -67,6 +75,11 @@ function renderValue(raw: string, format?: string): string {
  *   ]
  *   "title": "List heading"
  *   "description": "One-line instruction text"
+ *   "x-lt-actions": [                              (optional)
+ *     { "label": "Bagged ✓",
+ *       "resolverPayload": { "approved": true, "checks": { "bagged": true } },
+ *       "confirm": "Bag {{metadata.orderId}}?" }
+ *   ]
  *
  * Column `value` strings use the same `{{domain.path}}` token convention as
  * `x-lt-active.fields` and `x-lt-columns` in list schemas — tokens resolve
@@ -75,11 +88,16 @@ function renderValue(raw: string, format?: string): string {
  * When `x-lt-columns` is absent, falls back to three default columns:
  * description, role, age.
  *
- * Display-only — produces no resolver payload and must not appear in `required`.
+ * Produces no resolver payload for the PARENT form and must not appear in
+ * `required`. `x-lt-actions` buttons resolve the ROW through the standard
+ * resolve endpoint — server-side RBAC and enforce_schema apply; a rejected
+ * canned resolve surfaces its message inline and the row's detail link
+ * remains the full-form path.
  */
 export function EscalationListWidget({ fieldKey, schema, escalationContext }: WidgetProps) {
   const rawQuery = (schema?.['x-lt-query'] as EmbedQuery | undefined) ?? {};
   const columns = (schema?.['x-lt-columns'] as ColumnDef[] | undefined) ?? DEFAULT_COLUMNS;
+  const actions = (schema?.['x-lt-actions'] as ActionDef[] | undefined) ?? [];
   const label = (schema?.title as string | undefined) ?? 'Related items';
   const helperText = schema?.description as string | undefined;
 
@@ -97,6 +115,27 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
 
   const escalations = data?.escalations ?? [];
 
+  const resolve = useResolveEscalation();
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [pendingRow, setPendingRow] = useState<string | null>(null);
+
+  const fireAction = async (esc: LTEscalationRecord, action: ActionDef) => {
+    const rowCtx = rowContext(esc);
+    if (action.confirm && !window.confirm(interpolateHelp(action.confirm, rowCtx))) return;
+    setPendingRow(esc.id);
+    setRowErrors((prev) => ({ ...prev, [esc.id]: '' }));
+    try {
+      await resolve.mutateAsync({
+        id: esc.id,
+        resolverPayload: interpolatePayload(action.resolverPayload, rowCtx) as Record<string, unknown>,
+      });
+    } catch (err) {
+      setRowErrors((prev) => ({ ...prev, [esc.id]: (err as Error).message }));
+    } finally {
+      setPendingRow(null);
+    }
+  };
+
   return (
     <div data-field-key={fieldKey}>
       <FieldLabel>{label}</FieldLabel>
@@ -105,7 +144,15 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
         {isLoading ? (
           <ListSkeleton columns={columns.length} />
         ) : (
-          <EmbedTable escalations={escalations} columns={columns} fieldKey={fieldKey} />
+          <EmbedTable
+            escalations={escalations}
+            columns={columns}
+            fieldKey={fieldKey}
+            actions={actions}
+            onAction={fireAction}
+            pendingRow={pendingRow}
+            rowErrors={rowErrors}
+          />
         )}
       </div>
     </div>
@@ -116,10 +163,18 @@ function EmbedTable({
   escalations,
   columns,
   fieldKey,
+  actions,
+  onAction,
+  pendingRow,
+  rowErrors,
 }: {
   escalations: LTEscalationRecord[];
   columns: ColumnDef[];
   fieldKey: string;
+  actions: ActionDef[];
+  onAction: (esc: LTEscalationRecord, action: ActionDef) => void;
+  pendingRow: string | null;
+  rowErrors: Record<string, string>;
 }) {
   if (escalations.length === 0) {
     return (
@@ -141,12 +196,14 @@ function EmbedTable({
               {col.label}
             </th>
           ))}
+          {actions.length > 0 && <th className="w-px" />}
           <th className="w-4" />
         </tr>
       </thead>
       <tbody>
         {escalations.map((esc) => {
           const ctx = rowContext(esc);
+          const error = rowErrors[esc.id];
           return (
             <tr
               key={esc.id}
@@ -161,6 +218,27 @@ function EmbedTable({
                   </td>
                 );
               })}
+              {actions.length > 0 && (
+                <td className="py-1 pr-2 align-top whitespace-nowrap">
+                  {actions.map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={() => onAction(esc, action)}
+                      disabled={pendingRow === esc.id}
+                      className="px-2 py-0.5 text-2xs font-medium text-accent border border-accent/40 rounded hover:bg-accent/10 disabled:opacity-40 disabled:cursor-default transition-colors ml-1 first:ml-0"
+                      data-testid={`escalation-list-action-${esc.id}`}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                  {error && (
+                    <p className="text-2xs text-status-error mt-0.5 whitespace-normal max-w-[16rem]" data-testid={`escalation-list-action-error-${esc.id}`}>
+                      {error}
+                    </p>
+                  )}
+                </td>
+              )}
               <td className="py-1 align-top">
                 <Link
                   to={`/escalations/detail/${esc.id}`}

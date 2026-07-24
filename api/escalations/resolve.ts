@@ -1,4 +1,5 @@
 import * as escalationService from '../../services/escalation';
+import * as userService from '../../services/user';
 import * as taskService from '../../services/task';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
@@ -74,7 +75,15 @@ export async function resolveEscalation(
     // workflow's contract, formed by the caller (the React app maps the form to
     // the payload via x-lt-bind before submitting). No server-side transform.
 
-    // `metadata` (the outcome patch) is never written separately — it rides WITH the
+    // Resolution provenance, both surfaces at once: `resolvedBy` rides the
+    // signal to the waiting workflow ($resolution — see conditionLT), and
+    // `resolved_by` merges into the row's GIN-indexed metadata inside the same
+    // atomic resolve, making "who resolved it" `@>`-queryable without a
+    // follow-up read.
+    const resolvedBy = await resolverIdentity(auth);
+    const outcome = { ...metadata, resolved_by: auth.userId };
+
+    // `outcome` (the outcome patch) is never written separately — it rides WITH the
     // resolverPayload to whichever path performs the resolve, so it merges inside the
     // single status='pending'-guarded UPDATE (HotMesh `resolve(metadata)`). Paths that
     // resolve here pass it as the 3rd arg; paths that resume a workflow carry it on the
@@ -83,13 +92,13 @@ export async function resolveEscalation(
     // Path A: conditionLT signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
     if (metadataSignalId && escalation.workflow_id && escalation.task_queue && escalation.workflow_type) {
-      return resolveViaConditionSignal(escalation, resolverPayload, metadata);
+      return resolveViaConditionSignal(escalation, resolverPayload, outcome, resolvedBy);
     }
 
     // Path B: waitFor signal routing
     const signalRouting = (escalation.metadata as any)?.signal_routing;
     if (signalRouting?.signalId) {
-      return resolveViaSignalRouting(escalation, resolverPayload, metadata);
+      return resolveViaSignalRouting(escalation, resolverPayload, outcome, resolvedBy);
     }
 
     // Path 0: efficient (atomic) escalation — signal_key resumes in place.
@@ -97,7 +106,7 @@ export async function resolveEscalation(
     // `condition(signalId, config)`. The SDK's resolve marks it resolved AND
     // delivers the signal to `signal_key`, resuming THIS job — no re-run.
     if (escalation.signal_key) {
-      return resolveViaSignalKey(escalation, resolverPayload, metadata, auth.userId);
+      return resolveViaSignalKey(escalation, resolverPayload, outcome, auth.userId, resolvedBy);
     }
 
     // Path C: escalation strategy may redirect to triage
@@ -106,14 +115,14 @@ export async function resolveEscalation(
     if (strategy) {
       const directive = await strategy.onResolution({ escalation, resolverPayload, envelope });
       if (directive.action === 'triage') {
-        return resolveViaTriage(escalation, resolverPayload, directive.triageEnvelope, metadata);
+        return resolveViaTriage(escalation, resolverPayload, directive.triageEnvelope, outcome);
       }
     }
 
     // Path D: notification-only — no workflow to restart. One atomic resolve.
     if (!escalation.workflow_type || !escalation.task_queue) {
       const resolved = await escalationService.resolveEscalation(
-        escalation.id, resolverPayload, metadata, auth.userId,
+        escalation.id, resolverPayload, outcome, auth.userId,
       );
       if (!resolved) {
         return { status: 409, error: 'Escalation not available for resolution' };
@@ -122,7 +131,7 @@ export async function resolveEscalation(
     }
 
     // Path E: standard re-run
-    return resolveViaRerun(escalation, envelope, resolverPayload, metadata);
+    return resolveViaRerun(escalation, envelope, resolverPayload, outcome);
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -158,7 +167,11 @@ export async function resolveBySignalKey(
 
     // The payload is delivered as the signal the parked workflow's condition()
     // receives — stored exactly as submitted (the caller formed its shape).
-    return resolveViaSignalKey(escalation, resolverPayload, metadata);
+    // Same provenance contract as the interactive path: identity on the signal,
+    // resolved_by in the row metadata.
+    const resolvedBy = await resolverIdentity(auth);
+    const outcome = { ...metadata, resolved_by: auth.userId };
+    return resolveViaSignalKey(escalation, resolverPayload, outcome, undefined, resolvedBy);
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -227,7 +240,9 @@ export async function resolveByIds(
       }
     }
 
-    const resolved = await escalationService.resolveEscalationsByIds(ids, resolverPayload, metadata);
+    const resolved = await escalationService.resolveEscalationsByIds(
+      ids, resolverPayload, { ...metadata, resolved_by: auth.userId },
+    );
     return { status: 200, data: { resolved: resolved.length, escalationIds: resolved.map((e) => e.id) } };
   } catch (err: any) {
     return { status: 500, error: err.message };
@@ -349,8 +364,9 @@ export async function resolveAllOrNone(
 
     const result = await escalationService.resolveEscalationsAllOrNone(
       serviceItems,
-      metadata,
+      { ...metadata, resolved_by: auth.userId },
       requireClaimed ? auth.userId : undefined,
+      await resolverIdentity(auth),
     );
     if (!result.ok) {
       const error = 'One or more escalations blocked the batch; nothing was resolved';
@@ -376,6 +392,7 @@ async function resolveViaConditionSignal(
   escalation: any,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
+  resolvedBy?: { id: string; email?: string },
 ): Promise<LTApiResult> {
   const signalId = (escalation.metadata as any).signal_id;
   const client = createClient();
@@ -387,10 +404,13 @@ async function resolveViaConditionSignal(
   // The row is resolved downstream by the workflow's `conditionLT` → `ltResolveEscalation`.
   // Carry the outcome patch on the signal ($escalation_metadata, symmetric to $escalation_id)
   // so it merges inside that single atomic resolve — never a separate write here.
+  // $resolution (provenance) is surfaced to the workflow by conditionLT and stripped
+  // from the stored resolver_payload, same as the other $-control keys.
   await handle.signal(signalId, {
     ...resolverPayload,
     $escalation_id: escalation.id,
     ...(metadata ? { $escalation_metadata: metadata } : {}),
+    ...(resolvedBy ? { $resolution: resolutionOf(escalation.id, resolvedBy) } : {}),
   });
 
   // Event published by service layer (services/escalation/crud.ts)
@@ -408,13 +428,17 @@ async function resolveViaSignalKey(
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
   assertClaim?: string,
+  resolvedBy?: { id: string; email?: string },
 ): Promise<LTApiResult> {
   const signalPayload = await redactPasswords(resolverPayload, (escalation.metadata as any)?.form_schema);
   // One atomic call: status→resolved, signal delivered, and the outcome patch merged
   // into the GIN-indexed metadata — all inside the single WHERE-guarded UPDATE.
   // `assertClaim` (interactive path only) makes the claim-liveness gate part of
   // that same UPDATE; the webhook path (resolveBySignalKey) stays claim-agnostic.
-  const resolved = await escalationService.resolveEscalation(escalation.id, signalPayload, metadata, assertClaim);
+  // `resolvedBy` rides the SDK signal as $resolution — never the stored payload.
+  const resolved = await escalationService.resolveEscalation(
+    escalation.id, signalPayload, metadata, assertClaim, resolvedBy,
+  );
   if (!resolved) {
     return { status: 409, error: 'Escalation not available for resolution' };
   }
@@ -427,6 +451,7 @@ async function resolveViaSignalRouting(
   escalation: any,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
+  resolvedBy?: { id: string; email?: string },
 ): Promise<LTApiResult> {
   const signalRouting = (escalation.metadata as any).signal_routing;
   const signalPayload = await redactPasswords(resolverPayload, (escalation.metadata as any)?.form_schema);
@@ -446,7 +471,11 @@ async function resolveViaSignalRouting(
     const handle = await client.workflow.getHandle(
       signalRouting.taskQueue, signalRouting.workflowType, signalRouting.workflowId,
     );
-    await handle.signal(signalRouting.signalId, signalPayload);
+    // Provenance rides the SIGNAL only — the resolve below persists the clean payload.
+    await handle.signal(signalRouting.signalId, {
+      ...signalPayload,
+      ...(resolvedBy ? { $resolution: resolutionOf(escalation.id, resolvedBy) } : {}),
+    });
   }
 
   // Durable resolves here — one atomic call carries the outcome patch.
@@ -546,6 +575,32 @@ async function resolveViaRerun(
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────
+
+/**
+ * The resolving principal's identity for `$resolution` delivery. The email is
+ * best-effort (one indexed read, tolerated failure) — the id alone satisfies
+ * the provenance contract.
+ */
+async function resolverIdentity(auth: LTApiAuth): Promise<{ id: string; email?: string }> {
+  try {
+    const user = await userService.getUser(auth.userId);
+    return { id: auth.userId, ...(user?.email ? { email: user.email } : {}) };
+  } catch {
+    return { id: auth.userId };
+  }
+}
+
+/** The `$resolution` provenance object injected into legacy-path signals. */
+function resolutionOf(
+  escalationId: string,
+  resolvedBy: { id: string; email?: string },
+): Record<string, unknown> {
+  return {
+    escalationId,
+    resolvedBy: resolvedBy.id,
+    ...(resolvedBy.email ? { resolvedByEmail: resolvedBy.email } : {}),
+  };
+}
 
 function signaledResult(escalation: any, workflowId: string): LTApiResult {
   return {

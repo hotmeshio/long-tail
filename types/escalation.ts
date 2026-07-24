@@ -1,3 +1,13 @@
+import type { Types } from '@hotmeshio/hotmesh';
+
+/**
+ * Resolution provenance delivered to a waiting workflow under the reserved
+ * `$resolution` signal key — who resolved the escalation and which row
+ * delivered it. Declare it in the `conditionLT` payload generic to consume it.
+ * Re-exported from the HotMesh SDK so workflow authors import one package.
+ */
+export type EscalationResolution = Types.EscalationResolution;
+
 /**
  * Reserved keys inside `lt_escalations.metadata`. Everything else in the bag
  * is caller-owned. These ride the GIN-indexed surface so they survive the

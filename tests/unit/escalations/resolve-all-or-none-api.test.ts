@@ -20,6 +20,9 @@ vi.mock('../../../api/escalations/helpers', () => ({
 
 vi.mock('../../../workers', () => ({ createClient: vi.fn() }));
 vi.mock('../../../services/task', () => ({ getTask: vi.fn() }));
+vi.mock('../../../services/user', () => ({
+  getUser: vi.fn(async () => ({ email: 'b1@example.com' })),
+}));
 vi.mock('../../../services/escalation-strategy', () => ({
   escalationStrategyRegistry: { current: null },
 }));
@@ -145,13 +148,16 @@ describe('resolveAllOrNone — path guard and delegation', () => {
     const result = await resolveAllOrNone({ items: items('e-1', 'e-2') }, AUTH);
     expect(result.status).toBe(200);
     expect(result.data).toEqual({ resolved: 2, escalationIds: ['e-1', 'e-2'] });
+    // provenance rides both surfaces: resolved_by merged into every row's
+    // outcome metadata, resolvedBy identity delivered via each row's $resolution
     expect(mockResolve).toHaveBeenCalledWith(
       [
         { id: 'e-1', resolverPayload: { unit: 'e-1' } },
         { id: 'e-2', resolverPayload: { unit: 'e-2' } },
       ],
+      { resolved_by: 'broker-1' },
       undefined,
-      undefined,
+      { id: 'broker-1', email: 'b1@example.com' },
     );
   });
 
@@ -159,7 +165,9 @@ describe('resolveAllOrNone — path guard and delegation', () => {
     mockRows.mockResolvedValue([makeRow('e-1')]);
     mockResolve.mockResolvedValue({ ok: true, escalations: [{ id: 'e-1' }] as any });
     await resolveAllOrNone({ items: items('e-1'), requireClaimed: true }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith(expect.anything(), undefined, 'broker-1');
+    expect(mockResolve).toHaveBeenCalledWith(
+      expect.anything(), { resolved_by: 'broker-1' }, 'broker-1', expect.anything(),
+    );
   });
 
   it('maps a blocked batch to 409 with failedIds and reasons; error rides in the body', async () => {
@@ -198,8 +206,9 @@ describe('resolveAllOrNone — path guard and delegation', () => {
         { id: 'e-1', resolverPayload: { apiKey: 'eph:uuid-1:apiKey', unit: 'left' } },
         { id: 'e-2', resolverPayload: { apiKey: 'kept-as-is' } },
       ],
+      { resolved_by: 'broker-1' },
       undefined,
-      undefined,
+      { id: 'broker-1', email: 'b1@example.com' },
     );
   });
 });

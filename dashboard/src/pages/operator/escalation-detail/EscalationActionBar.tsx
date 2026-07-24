@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { mapFormToPayload } from '../../../lib/x-lt-bind';
 import { type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { validateResolverForm, type FieldError } from '../../../lib/field-validator';
@@ -6,6 +6,7 @@ import { CountdownTimer } from '../../../components/common/display/CountdownTime
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
+import { useSubmitGuard, type SubmitGuardDef } from '../../../hooks/useSubmitGuard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,6 +86,20 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
 
   const isCustom = duration === 'custom';
   const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
+
+  // x-lt-submit-guard rides the embedded form schema. The gate applies to the
+  // form resolve only — triage stays available as the escape hatch when the
+  // guarded work itself is the problem.
+  const guardDef = useMemo<SubmitGuardDef | undefined>(() => {
+    try {
+      const schema = JSON.parse(json)?._form_schema as Record<string, unknown> | undefined;
+      return schema?.['x-lt-submit-guard'] as SubmitGuardDef | undefined;
+    } catch {
+      return undefined;
+    }
+  }, [json]);
+  const guard = useSubmitGuard(guardDef, escalationContext);
+  const guardBlocksSubmit = guard.blocked && !requestTriage;
 
   if (mode === 'terminal') return null;
 
@@ -246,9 +261,14 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 <div className="flex-1" />
                 {parseError && <span className="text-xs text-status-error">{parseError}</span>}
                 {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
+                {guardBlocksSubmit && (
+                  <span className="text-xs text-status-pending" data-testid="submit-guard-message">
+                    {guard.message}
+                  </span>
+                )}
                 <button
                   onClick={handleSubmitResolve}
-                  disabled={resolvePending}
+                  disabled={resolvePending || guardBlocksSubmit}
                   className="btn-primary text-xs"
                 >
                   {resolvePending

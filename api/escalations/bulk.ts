@@ -92,37 +92,83 @@ export async function bulkClaim(
 }
 
 /**
- * Assign multiple escalations to a specific user.
+ * Assign multiple escalations to a specific user — by id-set OR by query
+ * (exactly one).
+ *
+ * The query form (`{ role, facets? }`) is one atomic statement: selection and
+ * claim happen in the same UPDATE, so a row that re-parks between a search and
+ * an ids-assign is still captured. Use it whenever the population is
+ * describable by filter (e.g. a walk's plates by `walkId` facet).
  *
  * Non-superadmin callers must verify the target user holds each
- * escalation's role. Publishes claim events for assigned items.
+ * escalation's role (the query form requires exactly the declared role).
+ * Publishes claim events for assigned items.
  *
- * @param input.ids — array of escalation UUIDs
+ * @param input.ids — array of escalation UUIDs (ids form)
+ * @param input.query — `{ role, facets? }` selector (query form)
  * @param input.targetUserId — user to assign to
  * @param input.durationMinutes — assignment duration (default: 30)
  * @param auth — authenticated user context
  * @returns `{ status: 200, data: { assigned, skipped } }`
  */
 export async function bulkAssign(
-  input: { ids: string[]; targetUserId: string; durationMinutes?: number },
+  input: {
+    ids?: string[];
+    query?: { role: string; facets?: Record<string, unknown> };
+    targetUserId: string;
+    durationMinutes?: number;
+  },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { ids, targetUserId, durationMinutes } = input;
-    if (!validateIds(ids)) {
-      return { status: 400, error: 'ids must be a non-empty array' };
-    }
+    const { ids, query, targetUserId, durationMinutes } = input;
     if (!targetUserId || typeof targetUserId !== 'string') {
       return { status: 400, error: 'targetUserId is required' };
     }
+    const hasIds = Array.isArray(ids) && ids.length > 0;
+    const hasQuery = !!query && typeof query === 'object';
+    if (hasIds === hasQuery) {
+      return { status: 400, error: 'provide exactly one of ids or query' };
+    }
 
-    const perm = await checkBulkPermission(auth.userId, ids);
+    if (hasQuery) {
+      if (!query!.role || typeof query!.role !== 'string') {
+        return { status: 400, error: 'query.role is required' };
+      }
+      // RBAC, query form: the caller must hold the queried role (or global),
+      // and the target user must hold it — one role check instead of per-id.
+      const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
+      if (!hasGlobal) {
+        const callerHasRole = await userService.hasRole(auth.userId, query!.role);
+        if (!callerHasRole) {
+          return { status: 404, error: 'One or more escalations not found' };
+        }
+        const targetHasRole = await userService.hasRole(targetUserId, query!.role);
+        if (!targetHasRole) {
+          return { status: 400, error: `Target user does not hold the "${query!.role}" role` };
+        }
+      }
+
+      const result = await escalationService.bulkAssignEscalationsByQuery(
+        { role: query!.role, facets: query!.facets },
+        targetUserId,
+        durationMinutes ?? 30,
+      );
+      if (result.assigned > 0) publishBulkClaimEvents(result.ids, targetUserId);
+      return { status: 200, data: { assigned: result.assigned, skipped: 0 } };
+    }
+
+    if (!validateIds(ids!)) {
+      return { status: 400, error: 'ids must be a non-empty array' };
+    }
+
+    const perm = await checkBulkPermission(auth.userId, ids!);
     if (!perm.allowed) return perm;
 
     // Non-superadmin: target user must hold each escalation's role
     const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
     if (!hasGlobal) {
-      const roles = await escalationService.getEscalationRoles(ids);
+      const roles = await escalationService.getEscalationRoles(ids!);
       for (const role of roles) {
         const targetHasRole = await userService.hasRole(targetUserId, role);
         if (!targetHasRole) {
@@ -132,12 +178,12 @@ export async function bulkAssign(
     }
 
     const result = await escalationService.bulkAssignEscalations(
-      ids,
+      ids!,
       targetUserId,
       durationMinutes ?? 30,
     );
 
-    if (result.assigned > 0) publishBulkClaimEvents(ids, targetUserId);
+    if (result.assigned > 0) publishBulkClaimEvents(ids!, targetUserId);
 
     return { status: 200, data: result };
   } catch (err: any) {

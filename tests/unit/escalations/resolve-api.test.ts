@@ -31,6 +31,12 @@ vi.mock('../../../services/task', () => ({
   getTask: vi.fn(),
 }));
 
+// Resolver identity: the orchestrator reads the caller's email (best-effort)
+// to deliver $resolution provenance to the waiting workflow.
+vi.mock('../../../services/user', () => ({
+  getUser: vi.fn(async () => ({ email: 'u1@example.com' })),
+}));
+
 vi.mock('../../../services/escalation-strategy', () => ({
   escalationStrategyRegistry: { current: null },
 }));
@@ -174,7 +180,12 @@ describe('resolveEscalation — claim-liveness gate', () => {
     mockResolve.mockResolvedValue(esc);
     const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { ok: true } }, AUTH);
     expect(mockLiveClaimant).toHaveBeenCalledWith('user-1', esc);
-    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, 'user-1');
+    // Provenance rides both surfaces: resolved_by in the outcome metadata
+    // merge, resolvedBy identity for $resolution signal delivery.
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-1', expect.any(Object), { resolved_by: 'user-1' }, 'user-1',
+      { id: 'user-1', email: 'u1@example.com' },
+    );
     expect(result.status).toBe(200);
   });
 });
@@ -187,7 +198,9 @@ describe('resolveEscalation — Path D (notification-only)', () => {
     mockGet.mockResolvedValue(esc);
     mockResolve.mockResolvedValue(esc);
     const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { acknowledged: true } }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, 'user-1');
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-1', expect.any(Object), { resolved_by: 'user-1' }, 'user-1',
+    );
     expect(result.status).toBe(200);
     expect((result.data as any).acknowledged).toBe(true);
   });
@@ -209,7 +222,10 @@ describe('resolveEscalation — Path 0 (signal_key)', () => {
     mockGet.mockResolvedValue(esc);
     mockResolve.mockResolvedValue(esc);
     const result = await resolveEscalation({ id: 'esc-1', resolverPayload: { approved: true } }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, 'user-1');
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-1', expect.any(Object), { resolved_by: 'user-1' }, 'user-1',
+      { id: 'user-1', email: 'u1@example.com' },
+    );
     expect(result.status).toBe(200);
     expect((result.data as any).signaled).toBe(true);
   });
@@ -249,7 +265,13 @@ describe('resolveEscalation — Path A (metadata.signal_id)', () => {
     await resolveEscalation({ id: 'esc-1', resolverPayload: { approved: true } }, AUTH);
 
     expect(mockCreateClient).toHaveBeenCalled();
-    expect(mockSignal).toHaveBeenCalledWith('sig-abc', expect.objectContaining({ $escalation_id: 'esc-1' }));
+    expect(mockSignal).toHaveBeenCalledWith('sig-abc', expect.objectContaining({
+      $escalation_id: 'esc-1',
+      // provenance rides the signal; conditionLT strips it from the stored payload
+      $resolution: { escalationId: 'esc-1', resolvedBy: 'user-1', resolvedByEmail: 'u1@example.com' },
+      // resolved_by always merges into the outcome patch the workflow commits atomically
+      $escalation_metadata: { resolved_by: 'user-1' },
+    }));
     // Path A does NOT call the resolveEscalation service — the workflow resolves the row itself
     expect(mockResolve).not.toHaveBeenCalled();
   });
@@ -301,8 +323,12 @@ describe('resolveBySignalKey', () => {
     mockGetBySignal.mockResolvedValue(esc);
     mockResolve.mockResolvedValue(esc);
     const result = await resolveBySignalKey({ signalKey: 'sig-xyz', resolverPayload: { ok: true } }, AUTH);
-    // Webhook path stays claim-agnostic — no assertClaim forwarded
-    expect(mockResolve).toHaveBeenCalledWith('esc-1', expect.any(Object), undefined, undefined);
+    // Webhook path stays claim-agnostic (no assertClaim) but carries the same
+    // provenance contract: resolved_by metadata + resolvedBy identity.
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-1', expect.any(Object), { resolved_by: 'user-1' }, undefined,
+      { id: 'user-1', email: 'u1@example.com' },
+    );
     expect(result.status).toBe(200);
   });
 });

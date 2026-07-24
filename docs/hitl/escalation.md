@@ -53,6 +53,27 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 - `false` — SLA timeout (omit `timeout` for an open-ended wait)
 - `null` — cancellation (workflow terminated or explicit cancel)
 
+### Resolution provenance — `$resolution`
+
+Interactive and webhook resolves deliver the resolver's identity alongside the payload under the reserved `$resolution` key. Declare it in the generic to consume it — the standard pattern for assigning follow-on work to whoever resolved:
+
+```typescript
+import type { EscalationResolution } from '@hotmeshio/long-tail';
+
+const decision = await conditionLT<{
+  approved: boolean;
+  $resolution?: EscalationResolution;
+}>(signalId, { role: 'print-operator', metadata: { orderId } });
+
+if (decision && decision.$resolution) {
+  const { escalationId, resolvedBy, resolvedByEmail } = decision.$resolution;
+  // e.g. claim the follow-on rows for the same person, atomically:
+  // POST /api/escalations/bulk-assign { query: {...}, targetUserId: resolvedBy }
+}
+```
+
+`$resolution` carries `escalationId`, `resolvedBy` (user id), and `resolvedByEmail` when known. It rides the signal only — the stored `resolver_payload` audit column receives the form payload untouched. The same resolve also merges `resolved_by` into the row's GIN-indexed `metadata`, so "who resolved it" is `@>`-queryable without a follow-up read. The `$`-prefixed key namespace is reserved for control data; consumer form fields never collide with it.
+
 ### Row completeness guarantee
 
 Every field of the config — including all `metadata` facets — commits inside the Leg1 checkpoint. A claim-by-metadata router or a version-pinned facet reads a complete row from its first visible moment; there is no window where a row is visible but its metadata is still en route.

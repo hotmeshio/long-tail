@@ -113,19 +113,25 @@ export async function claimEscalation(
  * results) into the `@>`-queryable surface alongside the creation metadata
  * ("what was intended"). Distinct from `resolverPayload`, which is delivered to
  * the waiting workflow as `condition()`'s return value and is not GIN-indexed.
+ *
+ * `resolvedBy` (optional) is delivered to the waiting workflow under the
+ * reserved `$resolution` signal key — resolution provenance for the workflow's
+ * next step (e.g. assign follow-on work to whoever resolved). Never written to
+ * the stored `resolver_payload`.
  */
 export async function resolveEscalation(
   id: string,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
   assertClaim?: string,
+  resolvedBy?: { id: string; email?: string },
 ): Promise<LTEscalationRecord | null> {
   const client = await escalations();
   // `assertClaim` rides the SDK's guarded UPDATE: no active claim lock may
   // stand against this assignee, or the resolve blocks (claim-expired /
   // claimed-by-other). The API layer's advisory pre-check (assertLiveClaimant)
   // rejects early; this assertion is the atomic arbiter.
-  const result = await client.resolve({ id, resolverPayload, metadata, assertClaim });
+  const result = await client.resolve({ id, resolverPayload, metadata, assertClaim, resolvedBy });
   if (!result.ok) return null;
 
   const escalation = toEscalationRecord(result.entry);
@@ -202,13 +208,14 @@ export async function resolveEscalationsAllOrNone(
   items: Array<{ id: string; resolverPayload: Record<string, any> }>,
   metadata?: Record<string, any>,
   assertAssignee?: string,
+  resolvedBy?: { id: string; email?: string },
 ): Promise<
   | { ok: true; escalations: LTEscalationRecord[] }
   | { ok: false; failed: Array<{ id: string; reason: string }> }
 > {
   if (items.length === 0) return { ok: true, escalations: [] };
   const client = await escalations();
-  const result = await client.resolveAllOrNone({ items, metadata, assertAssignee });
+  const result = await client.resolveAllOrNone({ items, metadata, assertAssignee, resolvedBy });
   if (!result.ok) return { ok: false, failed: result.failed };
 
   const records = toEscalationRecords(result.entries);

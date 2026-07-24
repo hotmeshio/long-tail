@@ -53,6 +53,34 @@ describe('conditionLT', () => {
     });
   });
 
+  it('legacy path: $resolution is stripped from the stored payload and re-attached to the return', async () => {
+    const mockResolve = vi.fn().mockResolvedValue(undefined);
+    (Durable.workflow.proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });
+
+    const resolution = { escalationId: 'esc-123', resolvedBy: 'user-1', resolvedByEmail: 'u1@example.com' };
+    mockCondition.mockResolvedValue({
+      approved: true,
+      $escalation_id: 'esc-123',
+      $resolution: resolution,
+    });
+    const result = await conditionLT<{ approved: boolean; $resolution?: typeof resolution }>('sig-1');
+
+    // the audit column stays clean — provenance never persists
+    expect(mockResolve).toHaveBeenCalledWith({
+      escalationId: 'esc-123',
+      resolverPayload: { approved: true },
+    });
+    // ...but the caller receives it alongside the payload
+    expect(result).toEqual({ approved: true, $resolution: resolution });
+  });
+
+  it('efficient path: $resolution passes through untouched (already resolved server-side)', async () => {
+    const resolution = { escalationId: 'esc-9', resolvedBy: 'user-2' };
+    mockCondition.mockResolvedValue({ approved: true, $resolution: resolution });
+    const result = await conditionLT<{ approved: boolean; $resolution?: typeof resolution }>('sig-1');
+    expect(result).toEqual({ approved: true, $resolution: resolution });
+  });
+
   it('does not call ltResolveEscalation when result is null', async () => {
     const mockResolve = vi.fn();
     (Durable.workflow.proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });

@@ -95,9 +95,13 @@ describe('resolveBySignalKey (api)', () => {
     expect(result.status).toBe(200);
     expect((result.data as any).signaled).toBe(true);
     expect((result.data as any).escalationId).toBe('esc-uuid');
-    // No metadata patch → 3rd arg is undefined; still ONE atomic resolve call.
-    // The webhook path is claim-agnostic: no assertClaim (4th arg undefined).
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined, undefined);
+    // No caller patch → the outcome carries only the provenance merge; still
+    // ONE atomic resolve call. The webhook path is claim-agnostic: no
+    // assertClaim (4th arg undefined). resolvedBy identity rides as the 5th
+    // arg for $resolution signal delivery.
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-uuid', { approved: true }, { resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' },
+    );
   });
 
   it('returns 409 when the atomic resolve loses the race (no double-resolve)', async () => {
@@ -119,14 +123,21 @@ describe('resolveBySignalKey (api)', () => {
     expect(result.status).toBe(200);
     // The patch rides as the 3rd arg of resolve → merged in the same guarded UPDATE.
     // It is NEVER written via a separate, non-transactional metadata update
-    // (no separate-write method exists on the service surface).
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, { outcome: 'approved', durationMs: 1200 }, undefined);
+    // (no separate-write method exists on the service surface). The provenance
+    // merge (resolved_by) joins the caller's patch in that same arg.
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-uuid', { approved: true },
+      { outcome: 'approved', durationMs: 1200, resolved_by: 'user-uuid' },
+      undefined, { id: 'user-uuid' },
+    );
   });
 
-  it('omits the patch (3rd arg undefined) when none is given — backward compatible', async () => {
+  it('carries only the provenance merge (resolved_by) when no caller patch is given', async () => {
     mockGetBySignalKey.mockResolvedValue(makeEscalation());
     mockResolve.mockResolvedValue(makeEscalation({ status: 'resolved' }));
     await resolveBySignalKey({ signalKey: 'station-done-wf-1', resolverPayload: { approved: true } }, AUTH);
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined, undefined);
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-uuid', { approved: true }, { resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' },
+    );
   });
 });

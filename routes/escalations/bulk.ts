@@ -28,6 +28,7 @@ export function registerBulkRoutes(router: Router): void {
     const result = await api.bulkAssign(
       {
         ids: req.body?.ids,
+        query: req.body?.query,
         targetUserId: req.body?.targetUserId,
         durationMinutes: req.body?.durationMinutes,
       },
