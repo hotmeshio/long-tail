@@ -30,8 +30,8 @@ interface PaceChartProps {
 
 const W = 800;
 const H = 270;
-const ML = 40;
-const MR = 76;
+const ML = 28;
+const MR = 60;
 const MT = 24;
 const MB = 72;
 
@@ -253,7 +253,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
   );
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: 'block', height: 'auto' }}>
       {/* Y-axis reference lines — very faint horizontal marks that communicate
           the scale. Log mode uses dashed lines at round values; linear uses
           solid hairlines at even fractions. */}

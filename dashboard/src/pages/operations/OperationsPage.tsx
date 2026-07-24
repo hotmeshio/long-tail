@@ -725,7 +725,7 @@ export function OperationsPage() {
           {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
           <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
             {/* SVG chart — scales to fill available space */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden p-4">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden px-2 py-4">
               <PaceChart
                 stations={chartStations}
                 selectedRole={selectedRole}
