@@ -10,6 +10,7 @@ import { seedOrthoRoles } from './seed-ortho';
 import { seedTwinRoles } from './seed-twin';
 import { seedRichFormRole } from './seed-rich-form';
 import { seedAcmeRoles } from './seed-acme';
+import { seedRelatedEscalationsRoles } from './seed-related-escalations';
 import { seedPolicyDocumentRole } from './seed-policy-document';
 import { seedWorkbenchRole, seedWorkbenchEscalation } from './seed-workbench';
 import { seedChecklistRole } from './seed-checklist';
@@ -79,6 +80,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedTwinRoles();
   await seedRichFormRole();
   await seedAcmeRoles();
+  await seedRelatedEscalationsRoles();
   await seedPolicyDocumentRole();
   await seedWorkbenchRole();
   await seedWorkbenchEscalation();

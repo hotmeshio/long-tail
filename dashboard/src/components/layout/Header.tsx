@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Inbox, User, BookOpen, LayoutGrid, Menu, Radio, X, BookmarkPlus } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Inbox, User, BookOpen, Menu, Radio, X, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
@@ -32,10 +32,11 @@ function persistBookmarks(bookmarks: Bookmark[]): void {
 }
 
 export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void; onToggleNav?: () => void }) {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { isBuilder, isOps, viewAs, realIsBuilder } = useAccess();
   const { available, mine } = useEscalationCounts();
-  const { canSeePaceBoard } = usePersona();
+  usePersona();
   const { connected } = useEventStatus();
   const { data: settings } = useSettings();
   const location = useLocation();
@@ -108,6 +109,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               <Menu className="w-5 h-5" strokeWidth={1.5} />
             </button>
           )}
+          {/* Brand — full watermark on desktop, comet mark on small screens. */}
           <Link
             to="/"
             aria-label="Home"
@@ -119,33 +121,40 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               }
             }}
           >
-            {/* Header diet: the mark IS the brand below lg. */}
             <AppLogo appName={appName} className="hidden lg:flex" />
-            <AppLogo appName={appName} variant="mark" className="flex lg:hidden pl-1" />
+            <AppLogo appName={appName} variant="comet" className="flex lg:hidden" />
           </Link>
-          {/* Promoted below lg: the floor worker's one-tap destination. */}
-          {canSeePaceBoard && (
-            <Link
-              to="/operations"
-              className="lg:hidden p-2 text-text-quaternary hover:text-accent transition-colors"
-              title="Pace Board"
-              aria-label="Pace Board"
-            >
-              <LayoutGrid className="w-4 h-4" strokeWidth={1.5} />
-            </Link>
-          )}
+          {/* Separator groups back/forward away from the logo on desktop. */}
+          <div className="hidden lg:block w-px h-4 bg-surface-border mx-1" />
+          {/* Back / Forward — accent-colored, all breakpoints. The theme color
+              signals "navigation" clearly; the header's 56px height satisfies
+              the 44px touch-target floor without extra vertical padding. */}
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 text-accent/60 hover:text-accent transition-colors"
+            aria-label="Go back"
+          >
+            <ChevronLeft className="w-5 h-5" strokeWidth={2} />
+          </button>
+          <button
+            onClick={() => navigate(1)}
+            className="p-2 text-accent/60 hover:text-accent transition-colors"
+            aria-label="Go forward"
+          >
+            <ChevronRight className="w-5 h-5" strokeWidth={2} />
+          </button>
         </div>
 
         <div className="flex items-center gap-5">
           {/* Escalations: all */}
           <Link
             to="/escalations/available"
-            className={`flex items-center gap-1.5 text-2xs transition-colors ${
+            className={`flex items-center gap-1.5 text-xs transition-colors ${
               available > 0 ? 'text-status-queued' : 'text-text-quaternary hover:text-text-secondary'
             }`}
             title="All escalations"
           >
-            <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Inbox className="w-4 h-4" strokeWidth={1.5} />
             <span className="hidden lg:inline">all</span>
             {available > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{available}</sup>}
           </Link>
@@ -153,12 +162,12 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           {/* Escalations: mine */}
           <Link
             to="/escalations/queue"
-            className={`flex items-center gap-1.5 text-2xs transition-colors ${
+            className={`flex items-center gap-1.5 text-xs transition-colors ${
               mine > 0 ? 'text-status-claimed' : 'text-text-quaternary hover:text-text-secondary'
             }`}
             title="My escalation queue"
           >
-            <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Inbox className="w-4 h-4" strokeWidth={1.5} />
             <span className="hidden lg:inline">mine</span>
             {mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
           </Link>
@@ -177,12 +186,12 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                     onToggleEventFeed?.();
                   }
                 }}
-                className={`hidden lg:flex items-center gap-1.5 text-2xs transition-colors ${
+                className={`hidden lg:flex items-center gap-1.5 text-xs transition-colors ${
                   connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
                 }`}
                 title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
               >
-                <Radio className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Radio className="w-4 h-4" strokeWidth={1.5} />
                 events
               </button>
             </>
@@ -193,10 +202,10 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               {/* Docs */}
               <button
                 onClick={onToggleDocs}
-                className="hidden lg:flex items-center gap-1.5 text-2xs text-text-quaternary hover:text-text-secondary transition-colors"
+                className="hidden lg:flex items-center gap-1.5 text-xs text-text-quaternary hover:text-text-secondary transition-colors"
                 title="Documentation"
               >
-                <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <BookOpen className="w-4 h-4" strokeWidth={1.5} />
                 docs
               </button>
             </>
@@ -225,10 +234,10 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((o) => !o)}
-                className="btn-ghost text-xs flex items-center gap-1"
+                className="btn-ghost flex items-center gap-1"
               >
                 <span className="relative">
-                  <User className="w-3.5 h-3.5 text-accent/75" strokeWidth={1.5} />
+                  <User className="w-4 h-4 text-accent/75" strokeWidth={1.5} />
                   {viewAs && <span className="lg:hidden absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent" />}
                 </span>
                 <span className="hidden lg:inline whitespace-nowrap">{user.displayName || user.username || user.userId}</span>

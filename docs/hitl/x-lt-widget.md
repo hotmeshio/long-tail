@@ -11,6 +11,9 @@ For rich inputs beyond standard HTML types, set `x-lt-widget` on any field:
 | `"markdown"` | Markdown source rendered with headings, tables, lists, code blocks. Editable by default; set `readOnly: true` for a pure content block. |
 | `"checklist"` | Dynamic labeled checkboxes driven by runtime data. Items come from a `"domain.path"` declared in `x-lt-source`. |
 | `"attachment"` | ReadOnly display of a captured binary (data URL or fetchable URL): images inline with click-to-full-size, everything else as a safe open/download link. `"image"` is an accepted alias. |
+| `"link"` | ReadOnly navigation link. URL is an `x-lt-href` template with `{{domain.path}}` tokens. See [x-lt-embed.md](x-lt-embed.md). |
+| `"escalation"` | ReadOnly embedded escalation card. ID sourced from `x-lt-source`; optional `x-lt-fields` surfaces any metadata or resolver detail. See [x-lt-embed.md](x-lt-embed.md). |
+| `"escalation-list"` | ReadOnly embedded escalation list. Driven by an `x-lt-query` facet object; columns from `x-lt-columns`. See [x-lt-embed.md](x-lt-embed.md). |
 
 ---
 

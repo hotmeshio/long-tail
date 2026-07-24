@@ -162,18 +162,18 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
           <RolePill role={row.role} size="md" tone="inherit" />
         </span>
       ),
-      className: 'w-28',
+      className: 'w-44 min-w-[11rem]',
     },
     {
       key: 'priority',
-      label: 'Priority',
+      label: 'Pri',
       priority: 2,
       render: (row) => (
         <span className={CELL_TEXT}>
           <PriorityBadge priority={row.priority} size="sm" tone="inherit" />
         </span>
       ),
-      className: 'w-20',
+      className: 'w-10',
     },
     // Enrichment columns — the jumping-off facets. The budget governs the
     // floor: these return only when the table has room (@split / @wall),

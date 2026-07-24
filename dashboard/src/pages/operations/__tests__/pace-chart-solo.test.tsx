@@ -49,7 +49,7 @@ describe('PaceChart — single station', () => {
     const nums = target.match(/-?\d+(\.\d+)?/g)!.map(Number);
     const [x1, y1, x2, y2] = nums;
     expect(y1).toBe(y2);
-    expect((x1 + x2) / 2).toBeCloseTo(382, 0);
+    expect((x1 + x2) / 2).toBeCloseTo(384, 0);
     expect(x2 - x1).toBe(18); // slightly longer than an em dash
   });
 });

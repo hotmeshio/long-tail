@@ -15,6 +15,13 @@ export interface AppSettings {
   features?: {
     /** DB Maintenance admin page is shown. Default: true (omitted treated as true). */
     dbMaintenance?: boolean;
+    /**
+     * Graph workflow section visibility.
+     * true  → always shown.
+     * false → always hidden (easter egg toggle suppressed).
+     * absent → user-controlled via easter egg (default off).
+     */
+    graphWorkflows?: boolean;
   };
   branding?: {
     appName?: string;

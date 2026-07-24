@@ -6,6 +6,7 @@ import {
 import { useAgent, useCreateAgent, useUpdateAgent } from '../../../api/agents';
 import { useAgentSubscriptions, useCreateSubscription, useUpdateSubscription, useDeleteSubscription } from '../../../api/agent-subscriptions';
 import { useSettings } from '../../../api/settings';
+import { getAiOverride } from '../../../lib/view-as';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import {
   EMPTY_FORM,
@@ -35,7 +36,8 @@ export function AgentConfigPage() {
   const isNew = !id;
   const navigate = useNavigate();
   const { data: settings } = useSettings();
-  const aiEnabled = !!settings?.ai?.enabled;
+  const aiOverride = getAiOverride();
+  const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const noun = aiEnabled ? 'Agent' : 'Automation';
   const { data: existing, isLoading } = useAgent(isNew ? null : id!);
   const { data: subsData } = useAgentSubscriptions(isNew ? null : id!);

@@ -21,17 +21,19 @@ import { jeopardyQueueLink } from './priority-link';
 import { displayRoleTitle } from '../../lib/role-display';
 
 // Column band tints — same hues as the chart bands (~8% alpha).
-// Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, sla=amber.
-const SLA_COLOR  = TARGET_COLOR;
+// Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, workers=accent.
+const SLA_COLOR     = TARGET_COLOR;
+const WORKERS_COLOR = 'rgb(var(--lt-accent))';
 const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.09);
 const SLA_BAND      = withAlpha(TARGET_COLOR, 0.09);
+const WORKERS_BAND  = withAlpha(WORKERS_COLOR, 0.07);
 const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.08);
 const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.08);
 const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.08);
 
 // Station table grid. The 5 colored columns are grouped into a single auto
 // cell rendered as a flex row with no internal gap so they touch each other.
-const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) auto 72px 72px 104px 36px';
+const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) auto 72px 72px 104px 52px';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -161,11 +163,13 @@ function StationRow({
   role,
   metric,
   selected,
+  periodHours,
   onClick,
 }: {
   role: RoleDetail;
   metric: StationMetric | undefined;
   selected: boolean;
+  periodHours: number;
   onClick: () => void;
 }) {
   const updateRole = useUpdateRole();
@@ -176,6 +180,8 @@ function StationRow({
   const target = role.target_per_hour ?? null;
   const { pct, color } = loadBar(pending, target);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
+
+  const workers = calcWorkers(role.target_per_hour ?? null, role.sla_minutes ?? null, pending, periodHours);
 
   const saveTarget = (n: number | null) => updateRole.mutate({ role: role.role, target_per_hour: n });
   const saveSla    = (n: number | null) => updateRole.mutate({ role: role.role, sla_minutes: n });
@@ -211,16 +217,26 @@ function StationRow({
 
         {/* ── 5 colored columns in one touching flex group ── */}
         <div className="self-stretch flex items-stretch">
-          {/* Target/h — editable, slate band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-1.5" style={{ backgroundColor: TARGET_BAND }}>
+          {/* Target/h — editable */}
+          <div className={`${COLORED_COLS[0].w} shrink-0 flex items-center justify-end ${COLORED_COLS[0].px}`} style={{ backgroundColor: TARGET_BAND }}>
             <EditableNumber value={role.target_per_hour ?? null} onSave={saveTarget} />
           </div>
-          {/* SLA/m — editable, amber band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-1.5" style={{ backgroundColor: SLA_BAND }}>
+          {/* SLA/m — editable */}
+          <div className={`${COLORED_COLS[1].w} shrink-0 flex items-center justify-end ${COLORED_COLS[1].px}`} style={{ backgroundColor: SLA_BAND }}>
             <EditableNumber value={role.sla_minutes ?? null} onSave={saveSla} />
           </div>
-          {/* Pending — sky band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: PENDING_BAND }}>
+          {/* Workers — calculated (Little's Law + backlog) */}
+          <div
+            className={`${COLORED_COLS[2].w} shrink-0 flex items-center justify-end ${COLORED_COLS[2].px}`}
+            style={{ backgroundColor: WORKERS_BAND }}
+            title={workers != null ? `~${workers} concurrent worker${workers === 1 ? '' : 's'} to sustain ${role.target_per_hour}/h within ${role.sla_minutes}m SLA` : undefined}
+          >
+            <span className={`text-xs font-mono tabular-nums ${workers != null ? '' : 'text-text-quaternary'}`} style={workers != null ? { color: WORKERS_COLOR } : undefined}>
+              {workers ?? '—'}
+            </span>
+          </div>
+          {/* Pending */}
+          <div className={`${COLORED_COLS[3].w} shrink-0 flex items-center justify-end ${COLORED_COLS[3].px}`} style={{ backgroundColor: PENDING_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -231,8 +247,8 @@ function StationRow({
               {pending}
             </Link>
           </div>
-          {/* Claimed — orange band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: ACTIVE_BAND }}>
+          {/* Claimed */}
+          <div className={`${COLORED_COLS[4].w} shrink-0 flex items-center justify-end ${COLORED_COLS[4].px}`} style={{ backgroundColor: ACTIVE_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -244,8 +260,8 @@ function StationRow({
               {claimed}
             </Link>
           </div>
-          {/* Resolved — green band */}
-          <div className="w-16 shrink-0 flex items-center justify-end px-3" style={{ backgroundColor: RESOLVED_BAND }}>
+          {/* Resolved */}
+          <div className={`${COLORED_COLS[5].w} shrink-0 flex items-center justify-end ${COLORED_COLS[5].px}`} style={{ backgroundColor: RESOLVED_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -285,20 +301,9 @@ function StationRow({
           </span>
         </div>
 
-        {/* Actions — jeopardy first (the hard-limit alarm, hover names the
-            count, click opens the exact counted set oldest-first), then the
-            full-queue view. */}
-        <div className="flex items-center justify-center gap-2 py-1.5">
-          {priorityCount > 0 && (
-            <Link
-              to={jeopardyQueueLink(role)}
-              className="text-status-error hover:opacity-70 transition-opacity"
-              title={`${priorityCount} item${priorityCount === 1 ? '' : 's'} in jeopardy — pull oldest first`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <TriangleAlert className="w-3.5 h-3.5" strokeWidth={2} />
-            </Link>
-          )}
+        {/* Actions — eye always anchored first; jeopardy occupies a fixed-width
+            slot after it so the eye never shifts when the alert appears. */}
+        <div className="flex items-center justify-center gap-1.5 py-1.5">
           <Link
             to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=all`}
             className="text-text-quaternary hover:text-accent transition-colors"
@@ -307,6 +312,19 @@ function StationRow({
           >
             <Eye className="w-3.5 h-3.5" />
           </Link>
+          {/* Fixed-width slot — always occupies space so the eye never shifts */}
+          <span className="w-3.5 flex items-center justify-center">
+            {priorityCount > 0 && (
+              <Link
+                to={jeopardyQueueLink(role)}
+                className="text-status-error hover:opacity-70 transition-opacity"
+                title={`${priorityCount} item${priorityCount === 1 ? '' : 's'} in jeopardy — pull oldest first`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <TriangleAlert className="w-3.5 h-3.5" strokeWidth={2} />
+              </Link>
+            )}
+          </span>
         </div>
       </div>
     </>
@@ -431,19 +449,47 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
   );
 }
 
+// ── Colored column specs — widths shared by header and rows ──────────────────
+// Widths sized to the longest label in each column at text-2xs + tracking-wider.
+
+const COLORED_COLS = [
+  { label: 'TARGET/H', band: TARGET_BAND,   hue: TARGET_COLOR,   w: 'w-[4.5rem]', px: 'px-1.5' },
+  { label: 'SLA/M',    band: SLA_BAND,      hue: SLA_COLOR,      w: 'w-14',        px: 'px-1.5' },
+  { label: 'WORKERS',  band: WORKERS_BAND,  hue: WORKERS_COLOR,  w: 'w-20',        px: 'px-2' },
+  { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-20',        px: 'px-2' },
+  { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-20',        px: 'px-2' },
+  { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-20',        px: 'px-2' },
+] as const;
+
+/**
+ * Little's Law staffing estimate: how many concurrent workers are needed to
+ * sustain the target throughput within the SLA, accounting for any current
+ * backlog that must be cleared within the selected period.
+ *
+ *   steady-state  = target_per_hour × sla_minutes / 60
+ *   backlog_extra = pending × sla_minutes / (60 × period_hours)
+ *
+ * Shorter periods with a backlog require more concurrency. The result is
+ * rounded up — you can't staff 1.3 workers.
+ */
+function calcWorkers(
+  targetPerHour: number | null,
+  slaMinutes: number | null,
+  pending: number,
+  periodHours: number,
+): number | null {
+  if (!targetPerHour || !slaMinutes) return null;
+  const steadyState = (targetPerHour * slaMinutes) / 60;
+  const backlogExtra = pending > 0 ? (pending * slaMinutes) / (60 * periodHours) : 0;
+  return Math.ceil(steadyState + backlogExtra);
+}
+
 // ── Table header ──────────────────────────────────────────────────────────────
 
 function TableHead() {
-  const coloredCols = [
-    { label: 'TARGET/H', band: TARGET_BAND, hue: TARGET_COLOR, w: 'w-16' },
-    { label: 'SLA/M',    band: SLA_BAND,    hue: SLA_COLOR,    w: 'w-16' },
-    { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-16', px: 'px-3' },
-    { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-16', px: 'px-3' },
-    { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-16', px: 'px-3' },
-  ];
   return (
     <div
-      className="grid items-center gap-4 px-3 border-b border-surface-border mb-0.5"
+      className="grid items-center gap-4 px-3 border-b border-surface-border"
       style={{ gridTemplateColumns: STATION_GRID_COLS }}
     >
       <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">NAME</span>
@@ -451,10 +497,10 @@ function TableHead() {
 
       {/* Touching colored column group */}
       <div className="self-stretch flex items-stretch">
-        {coloredCols.map((col) => (
+        {COLORED_COLS.map((col) => (
           <div
             key={col.label}
-            className={`${col.w} shrink-0 flex items-center justify-end ${'px' in col ? col.px : 'px-1.5'}`}
+            className={`${col.w} shrink-0 flex items-center justify-end ${col.px}`}
             style={{ backgroundColor: col.band }}
           >
             <span className="text-2xs font-semibold uppercase tracking-wider" style={{ color: col.hue }}>
@@ -481,6 +527,7 @@ export function OperationsPage() {
   const [period, setPeriod] = useState<Period>('1h');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [logScale, setLogScale] = useState(false);
 
   // Push-driven refresh: every escalation event invalidates ['stationMetrics']
   // through the central event system (debounced, transport-agnostic). The
@@ -645,23 +692,40 @@ export function OperationsPage() {
         /* Console layout: fixed header (above) → chart row (min 40vh) → table row (max 30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
-          {/* Sequence menu — the active segment named large with its aggregate
-              story; the caret opens the full segment list. Compact at any
-              segment count. Only rendered when there is more than one story
-              to tell. */}
-          {fragments.length > 1 && (
-            <SequenceMenu
-              fragments={fragments}
-              aggregates={fragmentAggregates}
-              activeOrigin={activeFragment?.origin.role ?? null}
-              onSelect={selectFragment}
-            />
-          )}
+          {/* Top strip: segment selector (left) + scale toggle (right) */}
+          <div className="flex items-end justify-between">
+            <div className="flex-1">
+              {fragments.length > 1 && (
+                <SequenceMenu
+                  fragments={fragments}
+                  aggregates={fragmentAggregates}
+                  activeOrigin={activeFragment?.origin.role ?? null}
+                  onSelect={selectFragment}
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 px-4 pt-2 pb-0.5">
+              {(['lin', 'log'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setLogScale(mode === 'log')}
+                  className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
+                    (logScale ? 'log' : 'lin') === mode
+                      ? 'text-accent font-semibold'
+                      : 'text-text-quaternary hover:text-text-secondary'
+                  }`}
+                  title={mode === 'lin' ? 'Linear Y axis' : 'Logarithmic Y axis — reveals shape across wide value ranges'}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
           <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
             {/* SVG chart — scales to fill available space */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden p-4">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden px-2 py-4">
               <PaceChart
                 stations={chartStations}
                 selectedRole={selectedRole}
@@ -669,6 +733,7 @@ export function OperationsPage() {
                 onUpstreamSelect={handleUpstreamSelect}
                 onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
                 periodHours={PERIOD_HOURS[period]}
+                logScale={logScale}
               />
             </div>
             {/* Vertical divider */}
@@ -693,6 +758,7 @@ export function OperationsPage() {
                   role={role}
                   metric={metrics.find((m) => m.role === role.role)}
                   selected={selectedRole === role.role}
+                  periodHours={PERIOD_HOURS[period]}
                   onClick={() => handleSelect(role.role)}
                 />
               ))}

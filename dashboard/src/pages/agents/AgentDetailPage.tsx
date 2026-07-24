@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useDeleteAgent } from '../../api/agents';
 import { useSettings } from '../../api/settings';
+import { getAiOverride } from '../../lib/view-as';
 import { useAgentSubscriptions } from '../../api/agent-subscriptions';
 import { useAgentEvents } from '../../hooks/useEventHooks';
 import { useEventSubscription } from '../../hooks/useEventContext';
@@ -79,7 +80,8 @@ export function AgentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: settings } = useSettings();
-  const aiEnabled = !!settings?.ai?.enabled;
+  const aiOverride = getAiOverride();
+  const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const label = aiEnabled ? 'Agent' : 'Automation';
   const { data: agent, isLoading } = useAgent(id ?? null);
   const { data: subsData } = useAgentSubscriptions(id ?? null);
