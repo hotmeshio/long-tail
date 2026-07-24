@@ -12,6 +12,8 @@ import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as acmeStationsWorkflow from './workflows/acme-stations';
 import { ACME_ADDONS_ROLE } from './workflows/acme-stations/forms';
+import * as relatedEscalationsWorkflow from './workflows/related-escalations';
+import { REL_ORIGINATOR_ROLE } from './workflows/related-escalations/forms';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
 import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as policyDocumentWorkflow from './workflows/policy-document';
@@ -161,6 +163,21 @@ const richFormConfig: LTWorkerConfig = {
   defaultRole: INTAKE_REVIEWER,
   envelopeSchema: {
     data: { role: INTAKE_REVIEWER },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const relatedEscalationsConfig: LTWorkerConfig = {
+  description: 'Related Escalations — the reference workflow for x-lt-embed widgets. Two roles demonstrate a two-stage review chain: rel-originator processes items and escalates to rel-reviewer, whose form embeds a deep-link, the originating escalation card, and a live sibling-item list using the three new embed widgets.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REL_ORIGINATOR_ROLE,
+  envelopeSchema: {
+    data: {
+      orderId: 'ORD-0001',
+      customerId: 'CUST-0001',
+      amount: '249.99',
+    },
     metadata: { source: 'dashboard' },
   },
 };
@@ -442,6 +459,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
   { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
+  { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relatedEscalationsWorkflow, config: relatedEscalationsConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },

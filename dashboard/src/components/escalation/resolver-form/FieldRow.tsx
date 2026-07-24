@@ -45,13 +45,15 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   } as const;
 
   // Some widgets dispatch ahead of the read-only branch: a readOnly markdown
-  // field is a CONTENT BLOCK (renders its source as HTML), and a readOnly
-  // attachment/image renders the captured binary — never static text.
+  // field is a CONTENT BLOCK (renders its source as HTML), a readOnly
+  // attachment/image renders the captured binary, and embed widgets (link,
+  // escalation, escalation-list) render their own display — never static text.
   const isMarkdown = widgetName === 'markdown' && typeof value === 'string';
   const isAttachment = (widgetName === 'attachment' || widgetName === 'image') && typeof value === 'string';
+  const hasRegisteredWidget = !!(widgetName && widgetName in WIDGET_MAP);
 
-  // Read-only fields display as static text
-  if (isReadOnly && !isMarkdown && !isAttachment) {
+  // Read-only fields display as static text, unless a widget handles the rendering.
+  if (isReadOnly && !isMarkdown && !isAttachment && !hasRegisteredWidget) {
     const displayValue = value === null ? 'null'
       : typeof value === 'object' ? JSON.stringify(value, null, 2)
       : String(value);

@@ -6,6 +6,9 @@ import { RichTextWidget } from './RichTextWidget';
 import { MarkdownWidget } from './MarkdownWidget';
 import { ChecklistWidget } from './ChecklistWidget';
 import { AttachmentWidget } from './AttachmentWidget';
+import { LinkWidget } from './LinkWidget';
+import { EscalationWidget } from './EscalationWidget';
+import { EscalationListWidget } from './EscalationListWidget';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 
 export interface WidgetProps {
@@ -40,4 +43,8 @@ export const WIDGET_MAP: Record<string, ComponentType<WidgetProps>> = {
   // so schemas can name the constrained intent.
   'attachment': AttachmentWidget,
   'image': AttachmentWidget,
+  // Embed and navigation — display-only; produce no resolver payload.
+  'link': LinkWidget,
+  'escalation': EscalationWidget,
+  'escalation-list': EscalationListWidget,
 };
