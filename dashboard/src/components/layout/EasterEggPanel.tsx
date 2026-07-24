@@ -6,7 +6,7 @@ import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearA
 import { LT_BASE } from '../../lib/base-path';
 
 type RealTier = 'superadmin' | 'admin' | 'engineer' | 'operator';
-type Section = 'viewas' | 'ai';
+type Section = 'viewas' | 'features';
 
 interface ViewOption {
   id: ViewAsRole | null;
@@ -80,7 +80,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
   // "Role declination" (view-as) only appears when relevant.
   const sections: { id: Section; label: string; icon: typeof Eye }[] = [
     ...(hasViewOptions ? [{ id: 'viewas' as const, label: 'View As', icon: Eye }] : []),
-    { id: 'ai' as const, label: 'AI', icon: Sparkles },
+    { id: 'features' as const, label: 'Features', icon: Sparkles },
   ];
   const [section, setSection] = useState<Section>(sections[0].id);
 
@@ -200,7 +200,7 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {section === 'ai' && (
+        {section === 'features' && (
           <div>
             <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-4">Features</p>
             <button

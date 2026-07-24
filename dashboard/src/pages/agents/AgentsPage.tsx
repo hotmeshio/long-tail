@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useAgents, type Agent } from '../../api/agents';
 import { useSettings } from '../../api/settings';
+import { getAiOverride } from '../../lib/view-as';
 import { useAgentEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { buildApiPath } from '../../lib/api-path';
@@ -77,7 +78,8 @@ const columns: Column<Agent>[] = [
 export function AgentsPage() {
   const navigate = useNavigate();
   const { data: settings } = useSettings();
-  const aiEnabled = !!settings?.ai?.enabled;
+  const aiOverride = getAiOverride();
+  const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const label = aiEnabled ? 'Agent' : 'Automation';
   const labelPlural = aiEnabled ? 'Agents' : 'Automations';
   useAgentEvents();
