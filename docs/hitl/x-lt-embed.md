@@ -160,10 +160,70 @@ When `x-lt-columns` is absent, three default columns are used: Description, Role
 
 Each row links to the escalation's detail page.
 
+### `x-lt-actions` (optional)
+
+Inline row actions: each row gains a button that fires a canned resolve against that escalation through the standard resolve endpoint. RBAC and `enforce_schema` validation apply server-side exactly as a full-form resolve — the button is a shortcut, not a bypass.
+
+```json
+"x-lt-actions": [
+  {
+    "label": "Bagged ✓",
+    "resolverPayload": {
+      "approved": true,
+      "checks": { "bagged": true, "labeled": true },
+      "orderId": "{{metadata.orderId}}"
+    },
+    "confirm": "Bag {{metadata.orderId}} {{metadata.side}}?"
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `label` | `string` | Button text |
+| `resolverPayload` | `object` | The canned payload. String leaves interpolate `{{domain.path}}` tokens against the row's own context; booleans and numbers pass through typed |
+| `confirm` | `string` | Optional confirm prompt shown before firing; tokens interpolate per row |
+
+On success the row updates in place through the standard query invalidation — no navigation. A rejected resolve (validation failure, lost claim) shows the server's message inline in the row; the detail link stays available, so the full form remains the path for rejects and anything the canned payload can't express.
+
+Declare one action for the happy path and leave the exception path to the form. A "walk" of N sibling items collapses from N navigations to N clicks on one page.
+
 ### Empty and loading states
 
 - **Loading** — three skeleton rows are displayed.
 - **Empty** — a muted "No items found" message replaces the table.
+
+---
+
+## Submit guard (`x-lt-submit-guard`)
+
+A top-level form_schema token (a peer of `x-lt-help`) that keeps the resolve button honest while related work is still open. The submit stays disabled while the declared query returns rows; the message renders beside it with the live count. When the last row resolves, the socket-driven invalidation refires the query and the button lights up — no polling, no submit-and-get-rejected round trip.
+
+```json
+{
+  "x-lt-submit-guard": {
+    "query": {
+      "role": "print-harvest",
+      "status": "pending",
+      "facets": { "walkId": "{{metadata.walkId}}" }
+    },
+    "mustBeEmpty": true,
+    "message": "{{count}} plates still pending — bag them before closing the walk."
+  },
+  "type": "object",
+  "properties": { ... }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `query` | `object` | Same shape as `x-lt-query`; facet string values interpolate against the host escalation's context |
+| `mustBeEmpty` | `boolean` | The gate condition (default `true`) |
+| `message` | `string` | Shown beside the disabled submit; `{{count}}` carries the live row count, `{{domain.path}}` tokens also interpolate |
+
+Pair it with an `escalation-list` embed on the same query so the operator sees exactly which rows are holding the gate.
+
+The guard is a UI layer: it makes the form honest, it does not enforce. A resolve arriving through the raw API bypasses it by design — the consuming workflow's own verification (reject and re-park with the remainder) is the durable backstop. Triage is never gated: when the guarded work itself is the problem, "Send to Triage" stays available.
 
 ---
 

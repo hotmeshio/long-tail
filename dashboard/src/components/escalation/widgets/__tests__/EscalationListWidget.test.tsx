@@ -7,6 +7,7 @@ const mockUseEscalations = vi.fn();
 
 vi.mock('../../../../api/escalations', () => ({
   useEscalations: (...args: unknown[]) => mockUseEscalations(...args),
+  useResolveEscalation: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock('../../../../lib/x-lt-help', () => ({

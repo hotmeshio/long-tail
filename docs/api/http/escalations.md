@@ -619,20 +619,29 @@ Claim multiple escalations for the authenticated user. Requires admin or superad
 POST /api/escalations/bulk-assign
 ```
 
-Assign multiple escalations to a specific user. Superadmins can assign anyone. Admins can only assign to users who hold the escalation's role.
+Assign multiple escalations to a specific user, by id-set or by query (exactly one). Superadmins can assign anyone. Admins can only assign to users who hold the escalation's role.
+
+The query form is one atomic statement: selection and claim happen in the same UPDATE, so a row that re-parks between a search and an ids-assign is still captured. Use it whenever the population is describable by role + facets.
 
 **Request body:**
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `ids` | `string[]` | | Escalation UUIDs to assign |
+| `ids` | `string[]` | | Escalation UUIDs to assign (ids form) |
+| `query` | `object` | | `{ role, facets? }` selector (query form); `role` is required, `facets` filter by metadata containment |
 | `targetUserId` | `string` | | User ID to assign the escalations to |
 | `durationMinutes` | `integer` | 30 | How long each assignment lasts |
 
-**Example request:**
+**Example request (ids form):**
 
 ```json
 { "ids": ["esc-a1b2c3d4-..."], "targetUserId": "user-x1y2z3", "durationMinutes": 60 }
+```
+
+**Example request (query form):**
+
+```json
+{ "query": { "role": "harvester", "facets": { "walkId": "walk-7" } }, "targetUserId": "user-x1y2z3", "durationMinutes": 60 }
 ```
 
 **Response 200:** Result object with assignment outcomes.

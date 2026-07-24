@@ -96,7 +96,10 @@ describe('resolveEscalation (by-id) — RBAC parity', () => {
 
     expect(result.status).toBe(200);
     // The interactive by-id path forwards the caller as assertClaim (4th arg)
-    expect(mockResolve).toHaveBeenCalledWith('esc-uuid', { approved: true }, undefined, 'user-uuid');
+    // and merges resolved_by provenance into the outcome patch (3rd arg).
+    expect(mockResolve).toHaveBeenCalledWith(
+      'esc-uuid', { approved: true }, { resolved_by: 'user-uuid' }, 'user-uuid',
+    );
   });
 });
 

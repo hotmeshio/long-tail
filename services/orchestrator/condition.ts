@@ -98,6 +98,26 @@ function toEngineConfig(
  * }
  * ```
  *
+ * **Resolution provenance — the reserved `$resolution` key.** When the resolve
+ * carries the resolver's identity (the API layer supplies it for interactive
+ * and webhook resolves), the payload delivered here includes
+ * `$resolution: { escalationId, resolvedBy, resolvedByEmail? }`. Declare it in
+ * the generic to consume it — e.g. assign follow-on work to whoever resolved:
+ *
+ * ```typescript
+ * import type { EscalationResolution } from '@hotmeshio/hotmesh/types';
+ *
+ * const decision = await conditionLT<{
+ *   approved: boolean;
+ *   $resolution?: EscalationResolution;
+ * }>(signalId, { role: 'print-operator' });
+ * const resolver = decision && decision.$resolution?.resolvedBy;
+ * ```
+ *
+ * `$resolution` never lands in the stored `resolver_payload` audit column —
+ * on the legacy path below it is stripped before the durable resolve and
+ * re-attached to the returned payload.
+ *
  * **Legacy (two-step) — no config.** Create the escalation first (e.g. via
  * `ltCreateEscalation`) with `signal_id`/`signal_routing` metadata, then wait.
  * On resume the signal payload carries an injected `$escalation_id`; this helper
@@ -132,19 +152,23 @@ export async function conditionLT<T = Record<string, any>>(
       retry: { maximumAttempts: 3 },
     });
 
-    // Strip the injected control keys ($escalation_id, $escalation_metadata) before the
-    // payload is returned to the caller. The outcome patch ($escalation_metadata, set by
-    // the resolve orchestrator's signal paths) rides INTO the single atomic resolve below
-    // so it merges in the same guarded UPDATE — never a separate write.
-    const { $escalation_id: _id, $escalation_metadata: metadata, ...resolverPayload } = raw as
-      typeof raw & { $escalation_metadata?: Record<string, any> };
+    // Strip the injected control keys ($escalation_id, $escalation_metadata,
+    // $resolution) before the payload is stored. The outcome patch
+    // ($escalation_metadata, set by the resolve orchestrator's signal paths)
+    // rides INTO the single atomic resolve below so it merges in the same
+    // guarded UPDATE — never a separate write. $resolution is provenance for
+    // the CALLER, not the audit column: it re-attaches to the returned payload.
+    const { $escalation_id: _id, $escalation_metadata: metadata, $resolution: resolution, ...resolverPayload } = raw as
+      typeof raw & { $escalation_metadata?: Record<string, any>; $resolution?: Record<string, any> };
     await ltResolveEscalation({
       escalationId,
       resolverPayload: resolverPayload as Record<string, any>,
       metadata: metadata as Record<string, any> | undefined,
     });
 
-    return resolverPayload as unknown as T;
+    return (resolution
+      ? { ...resolverPayload, $resolution: resolution }
+      : resolverPayload) as unknown as T;
   }
 
   return raw as T;

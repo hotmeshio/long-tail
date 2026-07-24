@@ -37,6 +37,27 @@ export async function bulkAssignEscalations(
 }
 
 /**
+ * Bulk assign by query: one atomic UPDATE selects and claims every pending,
+ * claimable row matching role + facet containment — no search-then-assign
+ * window. A row that re-parks between a search and an ids-assign is invisible
+ * to the ids form but claimed by this one. Returns the assigned row ids so
+ * callers can publish per-row events.
+ */
+export async function bulkAssignEscalationsByQuery(
+  query: { role: string; facets?: Record<string, unknown> },
+  targetUserId: string,
+  durationMinutes: number = 30,
+): Promise<{ assigned: number; ids: string[] }> {
+  const client = await escalations();
+  const { claimed, entries } = await client.claimManyByQuery({
+    query: { role: query.role, metadata: query.facets },
+    assignee: targetUserId,
+    durationMinutes,
+  });
+  return { assigned: claimed, ids: entries.map((e) => e.id) };
+}
+
+/**
  * Bulk reassign escalations to a different role.
  * Clears assignment on all affected rows.
  */
