@@ -18,11 +18,12 @@ interface PaceChartProps {
   onSelect: (role: string) => void;
   /** Merge-glyph click — jump to the sequence that feeds this station. */
   onUpstreamSelect?: (upstreamRole: string) => void;
-  /** Priority-badge click — open the station's queue oldest-first by its age facet. */
   /** Cmd/meta+click on a resolved dot — navigate to the role's full queue. */
   onCmdClick?: (role: string) => void;
   /** Selected window length in hours — target count = target_per_hour × this. */
   periodHours: number;
+  /** Use a logarithmic Y axis. Reveals shape across a wide dynamic range (7d/30d). */
+  logScale?: boolean;
 }
 
 // ── SVG layout ────────────────────────────────────────────────────────────────
@@ -96,6 +97,18 @@ function last<T>(a: T[]): T | undefined {
   return a.length > 0 ? a[a.length - 1] : undefined;
 }
 
+/** Nice round tick values for a logarithmic Y axis up to maxVal. */
+function logTicks(maxVal: number): number[] {
+  const candidates = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+  return candidates.filter((v) => v > 0 && v < maxVal * 0.98);
+}
+
+/** Nice round tick values for a linear Y axis up to maxVal. */
+function linearTicks(maxVal: number): number[] {
+  const raw = [0.25, 0.5, 0.75].map((f) => Math.round(f * maxVal));
+  return raw.filter((v) => v > 0);
+}
+
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 // Shared queue-state palette — the chart bands and the station table columns
@@ -142,7 +155,7 @@ function spreadLabels<T extends { y: number }>(labels: T[], maxY: number): (T & 
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
-export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onCmdClick, periodHours }: PaceChartProps) {
+export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onCmdClick, periodHours, logScale = false }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const n = stations.length;
@@ -178,7 +191,15 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
     ...rows.map((r) => (r.expected != null ? r.pending : 0)),
   );
   const maxVal = dataMax * 1.15;
-  const yScale = (v: number) => MT + chartH * (1 - Math.max(0, Math.min(v, maxVal)) / maxVal);
+
+  const yScale = logScale
+    ? (v: number) => {
+        const logMax = Math.log(1 + maxVal);
+        return MT + chartH * (1 - Math.log(1 + Math.max(0, v)) / logMax);
+      }
+    : (v: number) => MT + chartH * (1 - Math.max(0, Math.min(v, maxVal)) / maxVal);
+
+  const gridTicks = logScale ? logTicks(maxVal) : linearTicks(maxVal);
 
   const withTarget = rows.filter((r) => r.expected != null);
   const targetPts = withTarget.map((r) => ({ ...r, y: yScale(r.expected as number) }));
@@ -233,6 +254,39 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
+      {/* Y-axis reference lines — very faint horizontal marks that communicate
+          the scale. Log mode uses dashed lines at round values; linear uses
+          solid hairlines at even fractions. */}
+      {gridTicks.map((v) => {
+        const gy = yScale(v);
+        return (
+          <g key={`grid-${v}`}>
+            <line
+              x1={ML}
+              y1={gy}
+              x2={right}
+              y2={gy}
+              className="stroke-surface-border"
+              strokeWidth={0.5}
+              opacity={logScale ? 0.45 : 0.3}
+              strokeDasharray={logScale ? '2 5' : undefined}
+              style={{ transition: `y1 ${EASE}, y2 ${EASE}` }}
+            />
+            <text
+              x={ML - 4}
+              y={gy + 2.5}
+              textAnchor="end"
+              fontSize={6}
+              fontFamily="ui-monospace, monospace"
+              opacity={0.35}
+              className="fill-text-quaternary"
+            >
+              {compact(v)}
+            </text>
+          </g>
+        );
+      })}
+
       {/* Dependency connector lines (parent → child), drawn at chart floor */}
       {stations.map((s) => {
         if (!s.parent_role) return null;

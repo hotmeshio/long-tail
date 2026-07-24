@@ -527,6 +527,7 @@ export function OperationsPage() {
   const [period, setPeriod] = useState<Period>('1h');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [logScale, setLogScale] = useState(false);
 
   // Push-driven refresh: every escalation event invalidates ['stationMetrics']
   // through the central event system (debounced, transport-agnostic). The
@@ -691,18 +692,35 @@ export function OperationsPage() {
         /* Console layout: fixed header (above) → chart row (min 40vh) → table row (max 30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
-          {/* Sequence menu — the active segment named large with its aggregate
-              story; the caret opens the full segment list. Compact at any
-              segment count. Only rendered when there is more than one story
-              to tell. */}
-          {fragments.length > 1 && (
-            <SequenceMenu
-              fragments={fragments}
-              aggregates={fragmentAggregates}
-              activeOrigin={activeFragment?.origin.role ?? null}
-              onSelect={selectFragment}
-            />
-          )}
+          {/* Top strip: segment selector (left) + scale toggle (right) */}
+          <div className="flex items-end justify-between">
+            <div className="flex-1">
+              {fragments.length > 1 && (
+                <SequenceMenu
+                  fragments={fragments}
+                  aggregates={fragmentAggregates}
+                  activeOrigin={activeFragment?.origin.role ?? null}
+                  onSelect={selectFragment}
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 px-4 pt-2 pb-0.5">
+              {(['lin', 'log'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setLogScale(mode === 'log')}
+                  className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
+                    (logScale ? 'log' : 'lin') === mode
+                      ? 'text-accent font-semibold'
+                      : 'text-text-quaternary hover:text-text-secondary'
+                  }`}
+                  title={mode === 'lin' ? 'Linear Y axis' : 'Logarithmic Y axis — reveals shape across wide value ranges'}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
           <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
@@ -715,6 +733,7 @@ export function OperationsPage() {
                 onUpstreamSelect={handleUpstreamSelect}
                 onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
                 periodHours={PERIOD_HOURS[period]}
+                logScale={logScale}
               />
             </div>
             {/* Vertical divider */}
