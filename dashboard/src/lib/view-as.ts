@@ -1,5 +1,6 @@
 const VIEW_AS_KEY = 'lt_view_as';
 const AI_OVERRIDE_KEY = 'lt_ai_override';
+const GRAPH_ENABLED_KEY = 'lt_graph_enabled';
 
 /** Returns the local AI override, or null if no override is set (falls back to server setting). */
 export function getAiOverride(): boolean | null {
@@ -37,4 +38,16 @@ export function setViewAs(role: ViewAsRole): void {
 export function clearViewAs(): void {
   try { localStorage.removeItem(VIEW_AS_KEY); } catch {}
   window.location.reload();
+}
+
+/** Graph workflow section visibility — off by default, opt-in via easter egg. */
+export function getGraphEnabled(): boolean {
+  try { return localStorage.getItem(GRAPH_ENABLED_KEY) === 'true'; } catch { return false; }
+}
+
+export function setGraphEnabled(enabled: boolean): void {
+  try {
+    if (enabled) localStorage.setItem(GRAPH_ENABLED_KEY, 'true');
+    else localStorage.removeItem(GRAPH_ENABLED_KEY);
+  } catch {}
 }

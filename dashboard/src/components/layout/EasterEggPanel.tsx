@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { X, Eye, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../api/settings';
-import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, type ViewAsRole } from '../../lib/view-as';
+import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, getGraphEnabled, setGraphEnabled, type ViewAsRole } from '../../lib/view-as';
 import { LT_BASE } from '../../lib/base-path';
 
 type RealTier = 'superadmin' | 'admin' | 'engineer' | 'operator';
@@ -44,6 +44,13 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
   const aiOverride = getAiOverride();
   const effectiveAiEnabled = aiOverride !== null ? aiOverride : serverAiEnabled;
   const [aiToggle, setAiToggle] = useState(effectiveAiEnabled);
+
+  const serverGraph = settings?.features?.graphWorkflows;
+  // Toggle is only user-controllable when server hasn't pinned it.
+  const graphUserControlled = serverGraph === undefined || serverGraph === null;
+  const [graphToggle, setGraphToggle] = useState(
+    serverGraph === true || (graphUserControlled && getGraphEnabled()),
+  );
 
   const realTier: RealTier = isSuperAdmin
     ? 'superadmin'
@@ -87,6 +94,13 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
     setAiToggle(next);
     if (next === serverAiEnabled) clearAiOverride();
     else setAiOverride(next);
+    window.location.reload();
+  };
+
+  const toggleGraph = () => {
+    const next = !graphToggle;
+    setGraphToggle(next);
+    setGraphEnabled(next);
     window.location.reload();
   };
 
@@ -205,6 +219,24 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
                 <span className={`w-4 h-4 rounded-full bg-text-inverse shadow-sm transition-transform ${aiToggle ? 'translate-x-4' : 'translate-x-0'}`} />
               </span>
             </button>
+            {graphUserControlled && (
+              <button
+                onClick={toggleGraph}
+                className="w-full text-left flex items-center justify-between py-2.5 px-1 group"
+              >
+                <span>
+                  <span className="block text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
+                    Graph workflows
+                  </span>
+                  <span className="block text-xs text-text-secondary mt-0.5">
+                    {graphToggle ? 'Visible — Graph section shown in Orchestrate sidebar' : 'Hidden — use Procedural workflows instead'}
+                  </span>
+                </span>
+                <span className={`shrink-0 ml-4 w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${graphToggle ? 'bg-accent' : 'bg-surface-border'}`}>
+                  <span className={`w-4 h-4 rounded-full bg-text-inverse shadow-sm transition-transform ${graphToggle ? 'translate-x-4' : 'translate-x-0'}`} />
+                </span>
+              </button>
+            )}
           </div>
         )}
 
