@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Inbox, Code2, Workflow, LayoutDashboard, ExternalLink, BookOpen,
+  Inbox, Code2, Workflow, LayoutDashboard, ExternalLink,
 } from 'lucide-react';
 import { formatCountCompact } from '../../lib/format';
 import { useAvailableEscalations, useEscalations, useStationMetrics } from '../../api/escalations';
@@ -31,32 +31,6 @@ const STATUS_DOT: Record<string, string> = {
 };
 function statusDotClass(status: string): string {
   return STATUS_DOT[status] ?? 'bg-text-tertiary';
-}
-
-// ── Section header ──────────────────────────────────────────────────────────
-
-function SectionHeader({ icon: Icon, color, docsHash, count, children, actions }: { icon: React.ElementType; color?: string; docsHash?: string; count?: number; children: React.ReactNode; actions?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between mb-4 pb-2 border-b border-surface-border">
-      <div className="flex items-center gap-2">
-        <Icon className={`w-4.5 h-4.5 ${color || 'text-accent/60'}`} strokeWidth={1.5} />
-        <h2 className="section-h2">{children}</h2>
-        {count !== undefined && count > 0 && (
-          <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-semibold tabular-nums">
-            {formatCountCompact(count)}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        {docsHash && (
-          <button onClick={() => { window.location.hash = docsHash; }} className="text-text-quaternary hover:text-accent transition-colors" title="Docs">
-            <BookOpen className="w-2.5 h-2.5" strokeWidth={1.5} />
-          </button>
-        )}
-        {actions}
-      </div>
-    </div>
-  );
 }
 
 function EmptyPanel({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
@@ -188,6 +162,36 @@ function AppPicker({ appIds, selected, onSelect }: {
   );
 }
 
+// ── Panel column — titled, independently-scrolling console pane ──────────────
+
+function PanelCol({ icon: Icon, title, count, actions, children }: {
+  icon: React.ElementType;
+  title: string;
+  count?: number;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+      <div className="flex items-center justify-between pt-4 pb-2 shrink-0 border-b border-surface-border">
+        <div className="flex items-center gap-2">
+          <Icon className="w-3.5 h-3.5 text-accent/60" strokeWidth={1.5} />
+          <h2 className="section-h2">{title}</h2>
+          {count !== undefined && count > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-semibold tabular-nums">
+              {formatCountCompact(count)}
+            </span>
+          )}
+        </div>
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto py-2 @container">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function HomePage() {
@@ -212,16 +216,7 @@ export function HomePage() {
   useWorkflowListEvents();
   useStationMetricsEvents();
 
-  // The home page renders one of three layouts (see the return below):
-  // - operator: their own lanes as task-queue cards, nothing else
-  // - admin/superadmin: escalations left|right, then the Pace Board FULL WIDTH
-  //   (the chart is the story; full width is what scales it)
-  // - engineer: a 2×2 console — escalations on the upper row, the workflow
-  //   execution columns on the lower row
-  // Gate each data source to the tiers that render it, so no one fires a
-  // request they can't access (403 on control-plane apps → empty namespace →
-  // 400 on jobs). Superadmins reach the execution surfaces from the sidebar;
-  // their home stays the operational story.
+  // Gate each data source to the tiers that render it.
   const builderHome = !persona.showTaskQueueCards;
   const showWorkflowColumns = persona.canSeeWorkflows && !persona.canSeePaceBoard;
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
@@ -233,8 +228,6 @@ export function HomePage() {
   const allEscQ = useAvailableEscalations({ limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
   const myEscQ = useEscalations({ assigned_to: user?.userId, status: 'pending', limit: 5, sort_by: 'created_at', order: 'desc', enabled: builderHome });
 
-  // Delayed refetch — allows signal-routed escalation resolutions
-  // (durable activity) time to commit before refreshing the list
   useEffect(() => {
     const timer = setTimeout(() => {
       myEscQ.refetch();
@@ -243,7 +236,6 @@ export function HomePage() {
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pace Board mini — the primary sequence (longest line) at the 1h window.
   const paceStations = useMemo((): ChartStation[] => {
     const fragments = buildFragments(rolesQ.data?.roles ?? []);
     const primary = fragments[0]?.stations ?? [];
@@ -267,167 +259,225 @@ export function HomePage() {
   const myEscalations = myEscQ.data?.escalations ?? [];
   const myEscTotal = myEscQ.data?.total;
 
-  // The two workflow execution columns, shared by the builder branches (the
-  // engineer layout below and the superadmin Row 2). Defined once so the JSX
-  // has a single source of truth.
-  const proceduralColumn = (
-    <div className="@container min-w-0">
-      <SectionHeader icon={Code2} color="text-accent" count={jobsTotal} docsHash="#docs:dashboard.md:procedural-executions" actions={
-        <div className="flex items-center gap-2">
-          <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
-          <NavIcon to="/workflows/executions" icon={ExternalLink} title="All procedural executions" />
-        </div>
-      }>
-        Procedural
-      </SectionHeader>
-      <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
-      {jobs.length === 0 ? (
-        <EmptyPanel icon={Code2} text="No recent procedural runs" />
-      ) : (
-        <div className="space-y-1">
-          {jobs.map((job: any) => (
-            <ExecutionRow
-              key={job.workflow_id}
-              dot={statusDotClass(job.status)}
-              pill={<WorkflowPill type={job.entity || job.type || 'workflow'} size="xs" />}
-              id={job.workflow_id}
-              date={job.updated_at ?? job.created_at}
-              onClick={() => navigate(`/workflows/executions/${job.workflow_id}`)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  const graphColumn = (
-    <div className="@container min-w-0">
-      <SectionHeader icon={Workflow} color="text-accent" count={mcpTotal} docsHash="#docs:dashboard.md:graph-executions" actions={
-        <div className="flex items-center gap-2">
-          <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
-          <NavIcon to="/mcp/executions" icon={ExternalLink} title="All graph executions" />
-        </div>
-      }>
-        Graph
-      </SectionHeader>
-      <AppPicker appIds={pipelineAppIds} selected={pipelineNs} onSelect={(ns) => setNs('pipelinenamespace', ns)} />
-      {mcpRuns.length === 0 ? (
-        <EmptyPanel icon={Workflow} text="No recent graph runs" />
-      ) : (
-        <div className="space-y-1">
-          {mcpRuns.map((run: any) => (
-            <ExecutionRow
-              key={run.workflow_id}
-              dot={statusDotClass(run.status)}
-              pill={<WorkflowPill type={run.entity || run.workflow_name || 'pipeline'} variant="pipeline" size="xs" />}
-              id={run.workflow_id}
-              date={run.updated_at ?? run.created_at}
-              onClick={() => navigate(`/mcp/executions/${run.workflow_id}?namespace=${pipelineNs}`)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Operator: their own lanes as Task Queue cards, nothing else. Scoped to
-  //    the roles they belong to; no firehose, no Pace Board, no workflows.
+  // ── Operator: task queue cards, scrolling page ─────────────────────────────
   if (persona.showTaskQueueCards) {
     return (
       <div>
-        <h1 className="heading-1 mb-10">Recent Activity</h1>
+        <h1 className="heading-1 mb-6">Console</h1>
         <TaskQueueCards maxRows={2} />
       </div>
     );
   }
 
-  // ── Builder home. Admin/superadmin: escalations left|right, Pace Board full
-  //    width beneath — the operational story in two rows. Engineer: a 2×2
-  //    console — escalations up top, the workflow execution columns below.
-  //    The pairs stay side by side at EVERY width — the pair IS the console.
-  //    Each COLUMN is a container: its rows condense (date drops below, the
-  //    enrichment pill yields) when the column narrows, and the pair holds.
-  return (
-    <div>
-      <h1 className="heading-1 mb-10">Recent Activity</h1>
+  // ── Admin / superadmin: Pace Board console ─────────────────────────────────
+  // Top half: Pace Board anchored — the operational heartbeat, always visible.
+  // Bottom half: escalation panels, each with its own scrollbar.
+  // On small screens (phone) the bottom half collapses — chart fills the view.
+  if (persona.canSeePaceBoard) {
+    return (
+      <div className="flex-1 min-h-0 flex flex-col">
 
-      {/* ── Row 1: All Escalations | My Escalations ──────────────────────── */}
-      <div className="grid grid-cols-2 gap-x-4 @split:gap-x-col-gap">
-
-        {/* Col 1: All Escalations */}
-        <div className="@container min-w-0">
-          <SectionHeader icon={Inbox} color="text-accent" count={allEscTotal} docsHash="#docs:dashboard.md:all-escalations" actions={
+        {/* Pace Board — never scrolls ──────────────────────────────────────── */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center justify-between pb-3 shrink-0 border-b border-surface-border">
             <div className="flex items-center gap-2">
-              <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
-              <NavIcon to="/escalations/available" icon={ExternalLink} title="All escalations" />
+              <LayoutDashboard className="w-3.5 h-3.5 text-accent/60" strokeWidth={1.5} />
+              <h2 className="section-h2">Pace Board</h2>
+              {paceStations.length > 0 && (
+                <span className="text-2xs text-text-quaternary">
+                  {paceStations.length} {paceStations.length === 1 ? 'station' : 'stations'} · 1h
+                </span>
+              )}
             </div>
-          }>
-            All Escalations
-          </SectionHeader>
-          {allEscalations.length === 0 ? (
-            <EmptyPanel icon={Inbox} text="No pending escalations" />
-          ) : (
-            <div className="space-y-1">
-              {allEscalations.map((esc: any) => (
-                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Col 2: My Escalations */}
-        <div className="@container min-w-0">
-          <SectionHeader icon={Inbox} color="text-accent" count={myEscTotal} docsHash="#docs:dashboard.md:escalations-overview" actions={
-            <div className="flex items-center gap-2">
-              <ListToolbar onRefresh={() => myEscQ.refetch()} isFetching={myEscQ.isFetching} apiPath={`/escalations?assigned_to=${user?.userId ?? ''}&status=pending&limit=5&sort_by=created_at&order=desc`} />
-              <NavIcon to="/escalations/queue" icon={ExternalLink} title="My escalation queue" />
-            </div>
-          }>
-            My Escalations
-          </SectionHeader>
-          {myEscalations.length === 0 ? (
-            <EmptyPanel icon={Inbox} text="No assigned escalations" />
-          ) : (
-            <div className="space-y-1">
-              {myEscalations.map((esc: any) => (
-                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 2 (admin/superadmin): the Pace Board — 100% width, half the
-          viewport tall. The chart is the story; this is the space it earns. */}
-      {persona.canSeePaceBoard && (
-        <div className="mt-14">
-          <SectionHeader icon={LayoutDashboard} color="text-accent" docsHash="#docs:dashboard.md:pace-board" actions={
-            <NavIcon to="/operations" icon={ExternalLink} title="Open the Pace Board" />
-          }>
-            Pace Board
-          </SectionHeader>
-          {paceStations.length === 0 ? (
-            <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
-          ) : (
-            <div className="h-[50vh] cursor-pointer" onClick={() => navigate('/operations')}>
+            <NavIcon to="/operations" icon={ExternalLink} title="Open the full Pace Board" />
+          </div>
+          <div className="flex-1 min-h-0 cursor-pointer" onClick={() => navigate('/operations')}>
+            {paceStations.length === 0 ? (
+              <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
+            ) : (
               <PaceChart
                 stations={paceStations}
                 selectedRole={null}
                 onSelect={() => navigate('/operations')}
                 onUpstreamSelect={() => navigate('/operations')}
                 periodHours={1}
+                fill
               />
+            )}
+          </div>
+        </div>
+
+        {/* Escalation panels — hidden on phone, each scrolls independently ── */}
+        <div className="hidden sm:flex flex-1 min-h-0 border-t border-surface-border">
+          <PanelCol
+            icon={Inbox}
+            title="All Escalations"
+            count={allEscTotal}
+            actions={
+              <>
+                <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
+                <NavIcon to="/escalations/available" icon={ExternalLink} title="All escalations" />
+              </>
+            }
+          >
+            {allEscalations.length === 0 ? (
+              <EmptyPanel icon={Inbox} text="No pending escalations" />
+            ) : (
+              <div className="space-y-0.5">
+                {allEscalations.map((esc: any) => (
+                  <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
+                ))}
+              </div>
+            )}
+          </PanelCol>
+
+          <div className="w-px bg-surface-border shrink-0" />
+
+          <PanelCol
+            icon={Inbox}
+            title="My Escalations"
+            count={myEscTotal}
+            actions={
+              <>
+                <ListToolbar onRefresh={() => myEscQ.refetch()} isFetching={myEscQ.isFetching} apiPath={`/escalations?assigned_to=${user?.userId ?? ''}&status=pending&limit=5&sort_by=created_at&order=desc`} />
+                <NavIcon to="/escalations/queue" icon={ExternalLink} title="My escalation queue" />
+              </>
+            }
+          >
+            {myEscalations.length === 0 ? (
+              <EmptyPanel icon={Inbox} text="No assigned escalations" />
+            ) : (
+              <div className="space-y-0.5">
+                {myEscalations.map((esc: any) => (
+                  <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
+                ))}
+              </div>
+            )}
+          </PanelCol>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Engineer: 4-quadrant console ──────────────────────────────────────────
+  // Top row: All Escalations | My Escalations — each scrolls independently.
+  // Bottom row: Procedural | Graph — each scrolls independently.
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+
+      {/* Top row: escalations ───────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 flex border-b border-surface-border">
+        <PanelCol
+          icon={Inbox}
+          title="All Escalations"
+          count={allEscTotal}
+          actions={
+            <>
+              <ListToolbar onRefresh={() => allEscQ.refetch()} isFetching={allEscQ.isFetching} apiPath="/escalations?status=pending&limit=5&sort_by=created_at&order=desc" />
+              <NavIcon to="/escalations/available" icon={ExternalLink} title="All escalations" />
+            </>
+          }
+        >
+          {allEscalations.length === 0 ? (
+            <EmptyPanel icon={Inbox} text="No pending escalations" />
+          ) : (
+            <div className="space-y-0.5">
+              {allEscalations.map((esc: any) => (
+                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
+              ))}
             </div>
           )}
-        </div>
-      )}
+        </PanelCol>
 
-      {/* ── Row 2 (engineer): Procedural | Graph — the lower half of the 2×2,
-          side by side at every width like the row above. */}
+        <div className="w-px bg-surface-border shrink-0" />
+
+        <PanelCol
+          icon={Inbox}
+          title="My Escalations"
+          count={myEscTotal}
+          actions={
+            <>
+              <ListToolbar onRefresh={() => myEscQ.refetch()} isFetching={myEscQ.isFetching} apiPath={`/escalations?assigned_to=${user?.userId ?? ''}&status=pending&limit=5&sort_by=created_at&order=desc`} />
+              <NavIcon to="/escalations/queue" icon={ExternalLink} title="My escalation queue" />
+            </>
+          }
+        >
+          {myEscalations.length === 0 ? (
+            <EmptyPanel icon={Inbox} text="No assigned escalations" />
+          ) : (
+            <div className="space-y-0.5">
+              {myEscalations.map((esc: any) => (
+                <EscalationRow key={esc.id} esc={esc} onClick={() => navigate(`/escalations/detail/${esc.id}`)} />
+              ))}
+            </div>
+          )}
+        </PanelCol>
+      </div>
+
+      {/* Bottom row: workflow executions ────────────────────────────────────── */}
       {showWorkflowColumns && (
-        <div className="grid grid-cols-2 gap-x-4 @split:gap-x-col-gap mt-14">
-          {proceduralColumn}
-          {graphColumn}
+        <div className="flex-1 min-h-0 flex">
+          <PanelCol
+            icon={Code2}
+            title="Procedural"
+            count={jobsTotal}
+            actions={
+              <>
+                <ListToolbar onRefresh={() => jobsQ.refetch()} isFetching={jobsQ.isFetching} apiPath={`/workflow-states/jobs?namespace=${durableNs}&limit=5`} />
+                <NavIcon to="/workflows/executions" icon={ExternalLink} title="All procedural executions" />
+              </>
+            }
+          >
+            <AppPicker appIds={durableAppIds} selected={durableNs} onSelect={(ns) => setNs('durablenamespace', ns)} />
+            {jobs.length === 0 ? (
+              <EmptyPanel icon={Code2} text="No recent procedural runs" />
+            ) : (
+              <div className="space-y-0.5">
+                {jobs.map((job: any) => (
+                  <ExecutionRow
+                    key={job.workflow_id}
+                    dot={statusDotClass(job.status)}
+                    pill={<WorkflowPill type={job.entity || job.type || 'workflow'} size="xs" />}
+                    id={job.workflow_id}
+                    date={job.updated_at ?? job.created_at}
+                    onClick={() => navigate(`/workflows/executions/${job.workflow_id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </PanelCol>
+
+          <div className="w-px bg-surface-border shrink-0" />
+
+          <PanelCol
+            icon={Workflow}
+            title="Graph"
+            count={mcpTotal}
+            actions={
+              <>
+                <ListToolbar onRefresh={() => mcpQ.refetch()} isFetching={mcpQ.isFetching} apiPath={`/pipelines?app_id=${pipelineNs}&limit=5`} />
+                <NavIcon to="/mcp/executions" icon={ExternalLink} title="All graph executions" />
+              </>
+            }
+          >
+            <AppPicker appIds={pipelineAppIds} selected={pipelineNs} onSelect={(ns) => setNs('pipelinenamespace', ns)} />
+            {mcpRuns.length === 0 ? (
+              <EmptyPanel icon={Workflow} text="No recent graph runs" />
+            ) : (
+              <div className="space-y-0.5">
+                {mcpRuns.map((run: any) => (
+                  <ExecutionRow
+                    key={run.workflow_id}
+                    dot={statusDotClass(run.status)}
+                    pill={<WorkflowPill type={run.entity || run.workflow_name || 'pipeline'} variant="pipeline" size="xs" />}
+                    id={run.workflow_id}
+                    date={run.updated_at ?? run.created_at}
+                    onClick={() => navigate(`/mcp/executions/${run.workflow_id}?namespace=${pipelineNs}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </PanelCol>
         </div>
       )}
     </div>

@@ -24,6 +24,9 @@ interface PaceChartProps {
   periodHours: number;
   /** Use a logarithmic Y axis. Reveals shape across a wide dynamic range (7d/30d). */
   logScale?: boolean;
+  /** Fill the parent container — SVG uses h-full + preserveAspectRatio meet.
+      Default: auto-height (scales by width). Use when the parent has a defined height. */
+  fill?: boolean;
 }
 
 // ── SVG layout ────────────────────────────────────────────────────────────────
@@ -155,7 +158,7 @@ function spreadLabels<T extends { y: number }>(labels: T[], maxY: number): (T & 
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 
-export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onCmdClick, periodHours, logScale = false }: PaceChartProps) {
+export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onCmdClick, periodHours, logScale = false, fill = false }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const n = stations.length;
@@ -253,7 +256,12 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
   );
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: 'block', height: 'auto' }}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className={fill ? 'w-full h-full' : 'w-full'}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', ...(fill ? {} : { height: 'auto' }) }}
+    >
       {/* Y-axis reference lines — very faint horizontal marks that communicate
           the scale. Log mode uses dashed lines at round values; linear uses
           solid hairlines at even fractions. */}
