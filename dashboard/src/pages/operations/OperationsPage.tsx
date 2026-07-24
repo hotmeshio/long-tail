@@ -21,10 +21,12 @@ import { jeopardyQueueLink } from './priority-link';
 import { displayRoleTitle } from '../../lib/role-display';
 
 // Column band tints — same hues as the chart bands (~8% alpha).
-// Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, sla=amber.
-const SLA_COLOR  = TARGET_COLOR;
+// Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, workers=accent.
+const SLA_COLOR     = TARGET_COLOR;
+const WORKERS_COLOR = 'rgb(var(--lt-accent))';
 const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.09);
 const SLA_BAND      = withAlpha(TARGET_COLOR, 0.09);
+const WORKERS_BAND  = withAlpha(WORKERS_COLOR, 0.07);
 const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.08);
 const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.08);
 const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.08);
@@ -161,11 +163,13 @@ function StationRow({
   role,
   metric,
   selected,
+  periodHours,
   onClick,
 }: {
   role: RoleDetail;
   metric: StationMetric | undefined;
   selected: boolean;
+  periodHours: number;
   onClick: () => void;
 }) {
   const updateRole = useUpdateRole();
@@ -176,6 +180,8 @@ function StationRow({
   const target = role.target_per_hour ?? null;
   const { pct, color } = loadBar(pending, target);
   const barWidth = pct != null ? Math.min(100, pct) : 0;
+
+  const workers = calcWorkers(role.target_per_hour ?? null, role.sla_minutes ?? null, pending, periodHours);
 
   const saveTarget = (n: number | null) => updateRole.mutate({ role: role.role, target_per_hour: n });
   const saveSla    = (n: number | null) => updateRole.mutate({ role: role.role, sla_minutes: n });
@@ -219,8 +225,18 @@ function StationRow({
           <div className={`${COLORED_COLS[1].w} shrink-0 flex items-center justify-end ${COLORED_COLS[1].px}`} style={{ backgroundColor: SLA_BAND }}>
             <EditableNumber value={role.sla_minutes ?? null} onSave={saveSla} />
           </div>
+          {/* Workers — calculated (Little's Law + backlog) */}
+          <div
+            className={`${COLORED_COLS[2].w} shrink-0 flex items-center justify-end ${COLORED_COLS[2].px}`}
+            style={{ backgroundColor: WORKERS_BAND }}
+            title={workers != null ? `~${workers} concurrent worker${workers === 1 ? '' : 's'} to sustain ${role.target_per_hour}/h within ${role.sla_minutes}m SLA` : undefined}
+          >
+            <span className={`text-xs font-mono tabular-nums ${workers != null ? '' : 'text-text-quaternary'}`} style={workers != null ? { color: WORKERS_COLOR } : undefined}>
+              {workers ?? '—'}
+            </span>
+          </div>
           {/* Pending */}
-          <div className={`${COLORED_COLS[2].w} shrink-0 flex items-center justify-end ${COLORED_COLS[2].px}`} style={{ backgroundColor: PENDING_BAND }}>
+          <div className={`${COLORED_COLS[3].w} shrink-0 flex items-center justify-end ${COLORED_COLS[3].px}`} style={{ backgroundColor: PENDING_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -232,7 +248,7 @@ function StationRow({
             </Link>
           </div>
           {/* Claimed */}
-          <div className={`${COLORED_COLS[3].w} shrink-0 flex items-center justify-end ${COLORED_COLS[3].px}`} style={{ backgroundColor: ACTIVE_BAND }}>
+          <div className={`${COLORED_COLS[4].w} shrink-0 flex items-center justify-end ${COLORED_COLS[4].px}`} style={{ backgroundColor: ACTIVE_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -245,7 +261,7 @@ function StationRow({
             </Link>
           </div>
           {/* Resolved */}
-          <div className={`${COLORED_COLS[4].w} shrink-0 flex items-center justify-end ${COLORED_COLS[4].px}`} style={{ backgroundColor: RESOLVED_BAND }}>
+          <div className={`${COLORED_COLS[5].w} shrink-0 flex items-center justify-end ${COLORED_COLS[5].px}`} style={{ backgroundColor: RESOLVED_BAND }}>
             <Link
               to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
               className={`text-xs font-mono tabular-nums hover:underline ${
@@ -439,10 +455,34 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
 const COLORED_COLS = [
   { label: 'TARGET/H', band: TARGET_BAND,   hue: TARGET_COLOR,   w: 'w-[4.5rem]', px: 'px-1.5' },
   { label: 'SLA/M',    band: SLA_BAND,      hue: SLA_COLOR,      w: 'w-14',        px: 'px-1.5' },
+  { label: 'WORKERS',  band: WORKERS_BAND,  hue: WORKERS_COLOR,  w: 'w-20',        px: 'px-2' },
   { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-20',        px: 'px-2' },
   { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-20',        px: 'px-2' },
   { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-20',        px: 'px-2' },
 ] as const;
+
+/**
+ * Little's Law staffing estimate: how many concurrent workers are needed to
+ * sustain the target throughput within the SLA, accounting for any current
+ * backlog that must be cleared within the selected period.
+ *
+ *   steady-state  = target_per_hour × sla_minutes / 60
+ *   backlog_extra = pending × sla_minutes / (60 × period_hours)
+ *
+ * Shorter periods with a backlog require more concurrency. The result is
+ * rounded up — you can't staff 1.3 workers.
+ */
+function calcWorkers(
+  targetPerHour: number | null,
+  slaMinutes: number | null,
+  pending: number,
+  periodHours: number,
+): number | null {
+  if (!targetPerHour || !slaMinutes) return null;
+  const steadyState = (targetPerHour * slaMinutes) / 60;
+  const backlogExtra = pending > 0 ? (pending * slaMinutes) / (60 * periodHours) : 0;
+  return Math.ceil(steadyState + backlogExtra);
+}
 
 // ── Table header ──────────────────────────────────────────────────────────────
 
@@ -699,6 +739,7 @@ export function OperationsPage() {
                   role={role}
                   metric={metrics.find((m) => m.role === role.role)}
                   selected={selectedRole === role.role}
+                  periodHours={PERIOD_HOURS[period]}
                   onClick={() => handleSelect(role.role)}
                 />
               ))}
