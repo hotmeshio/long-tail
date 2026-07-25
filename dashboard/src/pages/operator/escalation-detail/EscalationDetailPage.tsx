@@ -67,11 +67,20 @@ function safeParse(value: string | null | undefined): unknown {
 // ---------------------------------------------------------------------------
 
 export function EscalationDetailPage() {
+  // The detail route reuses this element across navigations to other
+  // escalations (same route pattern, different :id). Keying the view by id
+  // tears down and rebuilds ALL local state — the seeded form json, the
+  // one-shot init ref, submit flags — so nothing rendered for one escalation
+  // can survive into, or act on, another.
   const { id } = useParams<{ id: string }>();
+  return <EscalationDetailView key={id} id={id!} />;
+}
+
+function EscalationDetailView({ id }: { id: string }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: esc, isLoading, refetch, isFetching } = useEscalation(id!);
+  const { data: esc, isLoading, refetch, isFetching } = useEscalation(id);
   useEscalationDetailEvents(id);
   const claim = useClaimEscalation();
   const resolve = useResolveEscalation();
@@ -234,8 +243,12 @@ export function EscalationDetailPage() {
         ? 'claimed_by_other'
         : 'available';
 
+  // Every mutation below targets the mount-fixed route id, never esc.id.
+  // The two are equal for the life of this keyed view, but binding to the
+  // prop makes it impossible for an in-flight render against refreshed
+  // query data to redirect an action at a different escalation.
   const handleClaim = (durationMinutes: number) => {
-    claim.mutate({ id: esc.id, durationMinutes });
+    claim.mutate({ id, durationMinutes });
   };
 
   const goBack = () => {
@@ -246,7 +259,7 @@ export function EscalationDetailPage() {
 
   const handleResolve = async (payload: Record<string, unknown>) => {
     try {
-      await resolve.mutateAsync({ id: esc.id, resolverPayload: payload });
+      await resolve.mutateAsync({ id, resolverPayload: payload });
     } catch (err) {
       // Server-side schema enforcement (enforce_schema roles) — the 422 body
       // carries the same field-error list the pre-submission pass produces;
@@ -259,36 +272,36 @@ export function EscalationDetailPage() {
       }
       throw err;
     }
-    clearDraft(esc.id);
+    clearDraft(id);
     goBack();
   };
 
   const handleEscalate = async (targetRole: string) => {
     if (!targetRole) return;
-    await escalate.mutateAsync({ id: esc.id, targetRole });
+    await escalate.mutateAsync({ id, targetRole });
     goBack();
   };
 
   const handleRetryTriage = async () => {
     if (!claimedByMe) {
-      await claim.mutateAsync({ id: esc.id, durationMinutes: 30 });
+      await claim.mutateAsync({ id, durationMinutes: 30 });
     }
     const diagnosis = (payloadObj?.diagnosis as string) || esc.description || '';
     await resolve.mutateAsync({
-      id: esc.id,
+      id,
       resolverPayload: { _lt: { needsTriage: true }, notes: diagnosis },
     });
     goBack();
   };
 
   const handleRelease = async () => {
-    await claim.mutateAsync({ id: esc.id, durationMinutes: 0 });
+    await claim.mutateAsync({ id, durationMinutes: 0 });
     goBack();
   };
 
   const handleConfirmCancel = async () => {
-    await cancel.mutateAsync(esc.id);
-    clearDraft(esc.id);
+    await cancel.mutateAsync(id);
+    clearDraft(id);
     setCancelModalOpen(false);
     goBack();
   };
@@ -453,7 +466,7 @@ export function EscalationDetailPage() {
           workflowType={esc.workflow_type}
           json={json}
           onResolve={handleResolve}
-          resolvePending={resolve.isPending}
+          resolvePending={resolve.isPending || resolve.isSuccess}
           resolveError={resolve.error as Error | null}
           requestTriage={requestTriage}
           triageNotes={triageNotes}
