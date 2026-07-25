@@ -275,7 +275,7 @@ retired and when.
   fleet larger than this is served by more brokers), and the pacing `tickSeconds` /
   `idleTickSeconds` / `maxIdleRuns`.
 - **It polls, by necessity.** Durable workflows cannot subscribe to events — only Agents can
-  (`services/agent/trigger-registry.ts` arms subscriptions to `system.escalation.*.created`).
+  (`services/agent/trigger-registry.ts` arms subscriptions to `system.escalation.*.*.created`).
   An agent that wakes a broker on each new `ready` advert is the event-driven path that would
   eliminate idle ticks; the polling loop is the portable default.
 

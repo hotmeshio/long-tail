@@ -80,6 +80,10 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
     const map = listenersRef.current;
     if (!map.has(pattern)) {
       map.set(pattern, new Set());
+      // First subscriber for this pattern: scope the server-side delivery.
+      // Emits made before the connection is up are buffered by socket.io,
+      // and every reconnect re-registers the live set (see 'connect').
+      socketRef.current?.emit('lt.subscribe', pattern);
     }
     map.get(pattern)!.add(handler);
 
@@ -87,7 +91,10 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
       const set = map.get(pattern);
       if (set) {
         set.delete(handler);
-        if (set.size === 0) map.delete(pattern);
+        if (set.size === 0) {
+          map.delete(pattern);
+          socketRef.current?.emit('lt.unsubscribe', pattern);
+        }
       }
     };
   }, []);
@@ -127,6 +134,11 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
     socket.on('connect', () => {
       console.log('[lt-socketio] connected, id:', socket.id);
       setConnected(true);
+      // Server-side pattern scope is per-connection state — re-register the
+      // live set on every (re)connect. Repeat adds are idempotent server-side.
+      for (const pattern of listenersRef.current.keys()) {
+        socket.emit('lt.subscribe', pattern);
+      }
     });
 
     socket.on('disconnect', (reason) => {

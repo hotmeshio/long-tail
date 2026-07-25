@@ -82,11 +82,12 @@ describe('efficient escalation (YAML hook escalation: block)', () => {
     expect(esc.type).toBe('factory-station');
     expect(esc.metadata).toMatchObject({ orderId, station: 'qc' });
 
-    // 2. created fired from the YAML engine through the eventManager.
+    // 2. created fired from the YAML engine through the eventManager, mapped
+    //    onto the role-bearing subject by the system-event sink.
     const createdEvt = adapter.events.find(
-      (e: LTEvent) => e.type === `system.escalation.${esc.id}.created`,
+      (e: LTEvent) => e.type === `system.escalation.qc_inspector.${esc.id}.created`,
     );
-    expect(createdEvt, 'system.escalation.*.created should fire from the YAML engine').toBeTruthy();
+    expect(createdEvt, 'system.escalation.{role}.{id}.created should fire from the YAML engine').toBeTruthy();
 
     // 3. Claim, then signal the hook topic → workflow resumes and completes.
     await escalationService.claimEscalation(esc.id, 'qc-bot', 5);

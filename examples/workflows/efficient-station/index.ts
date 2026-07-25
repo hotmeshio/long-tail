@@ -12,7 +12,7 @@
  * This collapses both into ONE atomic expression. The escalation row is
  * written inside the workflow's Leg1 checkpoint (crash-safe, one commit — no
  * create activity, no enrich), `signal_key` is the resume key, and the engine
- * fires `system.escalation.{id}.created` automatically. Resolution via the
+ * fires `system.escalation.{role}.{id}.created` automatically. Resolution via the
  * dashboard (POST /escalations/:id/resolve, Path 0) or a webhook
  * (POST /escalations/resolve-by-signal-key) resumes THIS job in place.
  *

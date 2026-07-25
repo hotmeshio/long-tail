@@ -2,7 +2,7 @@
 
 ## `conditionLT` — Atomic Pattern
 
-Pass an escalation config to `conditionLT`. The escalation row, its metadata, and the resume timer all commit inside the workflow's Leg1 checkpoint — one write, crash-safe. The `signal_key` on the row is the resume key: the dashboard resolve endpoint and `POST /api/escalations/resolve-by-signal-key` both resume this job in place, and the `system.escalation.{id}.created` event fires automatically.
+Pass an escalation config to `conditionLT`. The escalation row, its metadata, and the resume timer all commit inside the workflow's Leg1 checkpoint — one write, crash-safe. The `signal_key` on the row is the resume key: the dashboard resolve endpoint and `POST /api/escalations/resolve-by-signal-key` both resume this job in place, and the `system.escalation.{role}.{id}.created` event fires automatically.
 
 ```typescript
 import { conditionLT } from '@hotmeshio/long-tail';

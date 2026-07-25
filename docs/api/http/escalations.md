@@ -291,7 +291,7 @@ If you use raw `Durable.workflow.condition()` instead, you must resolve the esca
 
 ### Signal-key resolution (efficient/atomic — `signal_key`)
 
-When an escalation was written atomically by `conditionLT(signalId, config)` (or `Durable.workflow.condition(signalId, config)`), the row carries a `signal_key` and no `signal_id`/`signal_routing` metadata. The resolve endpoint detects `signal_key` and resolves it through the SDK: the resolve marks the row resolved **and** delivers the signal to the waiting `condition()` in one transaction, so the original job resumes in place — no re-run, no separate resolve activity. `system.escalation.{id}.resolved` fires.
+When an escalation was written atomically by `conditionLT(signalId, config)` (or `Durable.workflow.condition(signalId, config)`), the row carries a `signal_key` and no `signal_id`/`signal_routing` metadata. The resolve endpoint detects `signal_key` and resolves it through the SDK: the resolve marks the row resolved **and** delivers the signal to the waiting `condition()` in one transaction, so the original job resumes in place — no re-run, no separate resolve activity. `system.escalation.{role}.{id}.resolved` fires.
 
 ```
 POST /api/escalations/resolve-by-signal-key

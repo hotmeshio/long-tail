@@ -20,12 +20,15 @@ import { newPinId } from '../../lib/pinned-views';
 import type { LTEscalationRecord } from '../../api/types';
 
 export function OperatorDashboard() {
-  useEscalationListEvents();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', search: '' },
   });
+  // The personal inbox moves on claims arriving and work leaving — claimed
+  // and resolved. A role filter narrows the subscription to that queue's
+  // subject token; nothing else in the escalation space reaches this page.
+  useEscalationListEvents({ role: filters.role || null, verbs: ['claimed', 'resolved'] });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
   const debouncedSearch = useDebouncedValue(filters.search, 300);
   const release = useReleaseEscalation();

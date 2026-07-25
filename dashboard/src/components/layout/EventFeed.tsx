@@ -138,13 +138,18 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
     });
   }, []);
 
-  // Subscribe to all active patterns — cleanup on pattern change
+  // Subscribe to the active patterns only while the feed is actually being
+  // watched (open, fullscreen, or its config panel). A collapsed feed holds
+  // no subscriptions — the bar shows what was last seen and refills the
+  // moment it opens.
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
+  const watching = open || fullscreen || configOpen;
   useEffect(() => {
+    if (!watching) return;
     const unsubs = patterns.map((p) => subscribe(p, (e) => handlerRef.current(e)));
     return () => unsubs.forEach((u) => u());
-  }, [subscribe, patterns.join(',')]);
+  }, [subscribe, patterns.join(','), watching]);
 
   // Auto-scroll to top on new events when open
   useEffect(() => {

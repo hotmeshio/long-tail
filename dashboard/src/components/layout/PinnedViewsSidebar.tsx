@@ -6,9 +6,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRoleDetails } from '../../api/roles';
 import { usePreferences, usePatchPreferences, type PinnedView } from '../../api/preferences';
 import { useEscalations, useAvailableEscalations } from '../../api/escalations';
-import { useEventSubscription } from '../../hooks/useEventContext';
+import { useEventSubscriptions } from '../../hooks/useEventContext';
+import { useMemberEscalationPatterns } from '../../hooks/useMemberEscalationPatterns';
 import { useQueryClient } from '@tanstack/react-query';
-import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { resolvePins, pinBadgeQuery, newPinId, type ResolvedPin } from '../../lib/pinned-views';
 
 /**
@@ -25,10 +25,11 @@ export function PinnedViewsSidebar() {
   const memberRoles = useMemo(() => new Set((user?.roles ?? []).map((r) => r.role)), [user]);
   const { data: roleData } = useRoleDetails({ enabled: memberRoles.size > 0 });
 
-  // Badge queries key on ['escalations', ...]; one event subscription keeps
-  // every badge current (debounce rides React Query's dedupe).
+  // Badge queries key on ['escalations', ...]; the member-role union keeps
+  // every badge current (debounce rides React Query's dedupe) — pins can
+  // only point at queues the viewer can read.
   const qc = useQueryClient();
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
+  useEventSubscriptions(useMemberEscalationPatterns(), () => {
     qc.invalidateQueries({ queryKey: ['escalations'] });
   });
 

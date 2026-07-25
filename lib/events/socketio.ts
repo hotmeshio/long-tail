@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import type { Server as HttpServer } from 'http';
 
 import { loggerRegistry } from '../logger';
+import { subjectMatchesPattern } from './matching';
 import type { LTEvent, LTEventAdapter } from '../../types';
 
 /**
@@ -13,8 +14,14 @@ export type SocketIOAuthenticator = (token: string) => boolean | Promise<boolean
 /**
  * Socket.IO event adapter for browser clients.
  *
- * Publishes LTEvent payloads to all connected Socket.IO clients
- * on channels following the pattern: `lt.events.{event.type}`
+ * Publishes LTEvent payloads to connected Socket.IO clients on channels
+ * following the pattern: `lt.events.{event.type}`.
+ *
+ * Delivery is scoped per socket: a client registers NATS-style subject
+ * patterns with `lt.subscribe` / `lt.unsubscribe` messages and receives only
+ * matching events — the server filters, the wire carries only what the page
+ * asked for. A socket that never registers a pattern receives every event
+ * (the broadcast contract external consumers may rely on).
  *
  * The HTTP server must be attached via `attachServer()` before
  * `connect()` is called. The startup flow handles this automatically
@@ -88,6 +95,18 @@ export class SocketIOEventAdapter implements LTEventAdapter {
 
     this.io.on('connection', (socket) => {
       loggerRegistry.info(`[lt-events:socketio] client connected (${socket.id})`);
+      // Per-socket subject-pattern scope. Registering the first pattern
+      // switches the socket from broadcast to scoped delivery.
+      const patterns = new Set<string>();
+      socket.data.ltPatterns = patterns;
+      socket.on('lt.subscribe', (pattern: unknown) => {
+        if (typeof pattern === 'string' && pattern.length > 0 && pattern.length <= 256) {
+          patterns.add(pattern);
+        }
+      });
+      socket.on('lt.unsubscribe', (pattern: unknown) => {
+        if (typeof pattern === 'string') patterns.delete(pattern);
+      });
       socket.on('disconnect', () => {
         loggerRegistry.debug(`[lt-events:socketio] client disconnected (${socket.id})`);
       });
@@ -99,7 +118,20 @@ export class SocketIOEventAdapter implements LTEventAdapter {
   async publish(event: LTEvent): Promise<void> {
     if (!this.io) return;
     const channel = `lt.events.${event.type}`;
-    this.io.emit(channel, event);
+    for (const socket of this.io.of('/').sockets.values()) {
+      const patterns = socket.data.ltPatterns as Set<string> | undefined;
+      if (!patterns || patterns.size === 0) {
+        // Legacy scope: a socket with no registered patterns gets everything.
+        socket.emit(channel, event);
+        continue;
+      }
+      for (const pattern of patterns) {
+        if (subjectMatchesPattern(channel, pattern)) {
+          socket.emit(channel, event);
+          break;
+        }
+      }
+    }
   }
 
   async disconnect(): Promise<void> {

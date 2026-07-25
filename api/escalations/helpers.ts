@@ -278,17 +278,57 @@ export async function ensureRoleMembership(
   return true;
 }
 
-export function publishBulkClaimEvents(ids: string[], assignedTo: string): void {
-  for (const id of ids) {
-    publishEscalationEvent({
-      type: 'escalation.claimed',
-      source: 'api',
-      workflowId: '',
-      workflowName: '',
-      taskQueue: '',
-      escalationId: id,
-      status: 'claimed',
-      data: { assigned_to: assignedTo, bulk: true },
-    });
+/**
+ * Publish `reassigned` for a bulk role move: every row publishes under its
+ * departing role AND the target role, so subscribers scoped to either queue
+ * observe the move. Rows already in the target role publish once.
+ */
+export function publishBulkReassignEvents(
+  beforeRows: Array<{ id: string; role: string }>,
+  targetRole: string,
+): void {
+  for (const row of beforeRows) {
+    const roles = row.role && row.role !== targetRole ? [row.role, targetRole] : [targetRole];
+    for (const role of roles) {
+      publishEscalationEvent({
+        type: 'escalation.reassigned',
+        source: 'api',
+        workflowId: '',
+        workflowName: '',
+        taskQueue: '',
+        escalationId: row.id,
+        role,
+        status: 'pending',
+        data: { from_role: row.role, to_role: targetRole, bulk: true },
+      });
+    }
   }
+}
+
+export function publishBulkClaimEvents(ids: string[], assignedTo: string, knownRole?: string): void {
+  // The claimed subject carries each row's role token. Query-form callers
+  // already know the single role; id-form callers resolve roles with one
+  // indexed read. Fire-and-forget, like every event publish.
+  void (async () => {
+    const roleById = new Map<string, string>();
+    if (knownRole) {
+      for (const id of ids) roleById.set(id, knownRole);
+    } else {
+      const rows = await escalationService.getEscalationScopeRows(ids);
+      for (const row of rows) roleById.set(row.id, row.role);
+    }
+    for (const id of ids) {
+      publishEscalationEvent({
+        type: 'escalation.claimed',
+        source: 'api',
+        workflowId: '',
+        workflowName: '',
+        taskQueue: '',
+        escalationId: id,
+        role: roleById.get(id) ?? '',
+        status: 'claimed',
+        data: { assigned_to: assignedTo, bulk: true },
+      });
+    }
+  })().catch(() => {});
 }

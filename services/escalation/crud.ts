@@ -65,6 +65,7 @@ export async function createEscalation(
     workflowName: escalation.workflow_type || '',
     taskQueue: escalation.task_queue || '',
     escalationId: escalation.id,
+    role: escalation.role,
     status: 'pending',
     data: { type: input.type, role: input.role },
   });
@@ -94,6 +95,7 @@ export async function claimEscalation(
     workflowName: escalation.workflow_type || '',
     taskQueue: escalation.task_queue || '',
     escalationId: escalation.id,
+    role: escalation.role,
     status: 'claimed',
     data: { assigned_to: userId },
   });
@@ -142,6 +144,7 @@ export async function resolveEscalation(
     workflowName: escalation.workflow_type || '',
     taskQueue: escalation.task_queue || '',
     escalationId: escalation.id,
+    role: escalation.role,
     status: 'resolved',
     data: {},
   });
@@ -180,6 +183,7 @@ export async function resolveEscalationsByIds(
       workflowName: escalation.workflow_type || '',
       taskQueue: escalation.task_queue || '',
       escalationId: escalation.id,
+    role: escalation.role,
       status: 'resolved',
       data: {},
     });
@@ -227,6 +231,7 @@ export async function resolveEscalationsAllOrNone(
       workflowName: escalation.workflow_type || '',
       taskQueue: escalation.task_queue || '',
       escalationId: escalation.id,
+    role: escalation.role,
       status: 'resolved',
       data: {},
     });
@@ -306,6 +311,7 @@ export async function cancelEscalation(
     workflowName: cancelled.workflow_type || '',
     taskQueue: cancelled.task_queue || '',
     escalationId: cancelled.id,
+    role: cancelled.role,
     status: 'cancelled',
     data: { reason: 'workflow_terminated' },
   });
@@ -374,6 +380,7 @@ export async function releaseEscalation(
     workflowName: released.workflow_type || '',
     taskQueue: released.task_queue || '',
     escalationId: released.id,
+    role: released.role,
     status: 'released',
     data: { released_by: userId },
   });
@@ -402,8 +409,36 @@ export async function escalateToRole(
   targetRole: string,
 ): Promise<LTEscalationRecord | null> {
   const client = await escalations();
+  // The departing role is read before the move: the returned entry already
+  // carries the target role, and role-scoped subscribers of the OLD queue
+  // must see the item leave just as the new queue sees it arrive.
+  const before = await client.get(id);
+  const fromRole = before?.role ?? null;
   const entry = await client.escalateToRole({ id, targetRole });
-  return entry ? toEscalationRecord(entry) : null;
+  if (!entry) return null;
+
+  const escalation = toEscalationRecord(entry);
+  // One reassignment, two subjects: the same event publishes under the
+  // departing role and the arriving role, so a subscriber scoped to either
+  // queue observes the move. `data` names both ends for consumers that
+  // only see one side.
+  const rolesToNotify = fromRole && fromRole !== escalation.role
+    ? [fromRole, escalation.role]
+    : [escalation.role];
+  for (const role of rolesToNotify) {
+    publishEscalationChange({
+      type: 'escalation.reassigned',
+      source: 'service',
+      workflowId: escalation.workflow_id || '',
+      workflowName: escalation.workflow_type || '',
+      taskQueue: escalation.task_queue || '',
+      escalationId: escalation.id,
+      role,
+      status: 'pending',
+      data: { from_role: fromRole, to_role: escalation.role },
+    });
+  }
+  return escalation;
 }
 
 export async function getEscalation(id: string): Promise<LTEscalationRecord | null> {
@@ -454,13 +489,13 @@ export async function cancelEscalationsByWorkflowId(
   const pool = getPool();
   const { rows } = await pool.query<{
     id: string; workflow_id: string | null; workflow_type: string | null;
-    task_queue: string | null;
+    task_queue: string | null; role: string | null;
   }>(
     `UPDATE public.hmsh_escalations
         SET status = 'cancelled', updated_at = NOW()
       WHERE workflow_id = $1
         AND status = 'pending'
-      RETURNING id, workflow_id, workflow_type, task_queue`,
+      RETURNING id, workflow_id, workflow_type, task_queue, role`,
     [workflowId],
   );
 
@@ -472,6 +507,7 @@ export async function cancelEscalationsByWorkflowId(
       workflowName: row.workflow_type || '',
       taskQueue: row.task_queue || '',
       escalationId: row.id,
+      role: row.role || '',
       status: 'cancelled',
       data: { reason: 'workflow_terminated' },
     });
@@ -589,6 +625,7 @@ export async function claimByMetadata(
     workflowName: escalation.workflow_type || '',
     taskQueue: escalation.task_queue || '',
     escalationId: escalation.id,
+    role: escalation.role,
     status: 'claimed',
     data: { assigned_to: userId },
   });
@@ -698,6 +735,7 @@ export async function resolveByMetadataAtomic(
       workflowName: escalation.workflow_type || '',
       taskQueue: escalation.task_queue || '',
       escalationId: escalation.id,
+    role: escalation.role,
       status: 'resolved',
       data: { resolved_by: userId },
     });

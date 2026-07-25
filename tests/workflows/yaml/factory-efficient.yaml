@@ -10,7 +10,7 @@
 #   the hook's Leg1 transaction writes the escalation row atomically with the
 #   job checkpoint (crash-safe, no escalate worker, no resolve worker). A
 #   resolver delivers the signal to the hook topic to resume the workflow, and
-#   system.escalation.{id}.created fires from the engine through the eventManager.
+#   system.escalation.{role}.{id}.created fires from the engine through the eventManager.
 
 app:
   id: longtail-eff-factory

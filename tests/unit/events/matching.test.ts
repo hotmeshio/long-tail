@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { subjectMatchesPattern } from '../../../lib/events/matching';
+import { subjectMatchesPattern, sanitizeSubjectToken } from '../../../lib/events/matching';
+
+describe('sanitizeSubjectToken', () => {
+  it('passes through subject-safe slugs unchanged', () => {
+    expect(sanitizeSubjectToken('order-review')).toBe('order-review');
+    expect(sanitizeSubjectToken('qc_inspector')).toBe('qc_inspector');
+  });
+
+  it('collapses unsafe character runs to a single dash', () => {
+    expect(sanitizeSubjectToken('weird role.name*here')).toBe('weird-role-name-here');
+    expect(sanitizeSubjectToken('a..>..b')).toBe('a-b');
+  });
+
+  it('trims leading and trailing dashes', () => {
+    expect(sanitizeSubjectToken('.role.')).toBe('role');
+  });
+
+  it('empty and missing values become the "none" token', () => {
+    expect(sanitizeSubjectToken('')).toBe('none');
+    expect(sanitizeSubjectToken('...')).toBe('none');
+    expect(sanitizeSubjectToken(null)).toBe('none');
+    expect(sanitizeSubjectToken(undefined)).toBe('none');
+  });
+});
 
 describe('subjectMatchesPattern', () => {
   it('matches exact strings', () => {

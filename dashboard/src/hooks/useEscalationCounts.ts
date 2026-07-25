@@ -2,16 +2,18 @@ import { useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
 import { useEscalations, useAvailableEscalations } from '../api/escalations';
-import { useEventSubscription } from './useEventContext';
-import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
+import { useEventSubscriptions } from './useEventContext';
+import { useMemberEscalationPatterns } from './useMemberEscalationPatterns';
 
 /**
  * Returns counts for the two escalation indicators in the global header:
  * - `available`: pending escalations not yet claimed (pool for all users)
  * - `mine`: escalations actively claimed by the current user (my queue)
  *
- * Counts refresh on escalation events (created, resolved, claimed, released)
- * with a 15-second debounce to avoid hammering the API during bursts.
+ * Counts refresh on escalation events with a 15-second debounce to avoid
+ * hammering the API during bursts. Both indicators only move inside queues
+ * the viewer belongs to, so the subscription is the member-role union
+ * (family-wide for global viewers).
  */
 export function useEscalationCounts(): { available: number; mine: number } {
   const { user } = useAuth();
@@ -27,8 +29,7 @@ export function useEscalationCounts(): { available: number; mine: number } {
     }, 15_000);
   }, [qc]);
 
-  // Listen for escalation lifecycle events
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, invalidate);
+  useEventSubscriptions(useMemberEscalationPatterns(), invalidate);
 
   const { data: availableData } = useAvailableEscalations({ limit: 1 });
   const { data: myData } = useEscalations({

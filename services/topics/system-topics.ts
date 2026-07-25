@@ -1,5 +1,5 @@
 import type { LTTopicConfig } from '../../types';
-import { seedTopic, resetTopic } from './index';
+import { seedTopic, resetTopic, deleteTopic } from './index';
 import { loggerRegistry } from '../../lib/logger';
 
 // ── Shared schema fragments ────────────────────────────────────────────────────
@@ -12,6 +12,8 @@ const WORKFLOW_CONTEXT_PROPS = {
 };
 
 const STATUS_FIELD = { type: 'string', description: 'Status after this event' };
+
+const ROLE_FIELD = { type: 'string', description: 'Escalation role (the queue) — also the third subject token' };
 
 function objectSchema(properties: Record<string, any>): Record<string, any> {
   return { type: 'object', properties };
@@ -88,37 +90,64 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
     tags: ['lifecycle', 'error'],
   },
 
-  // Escalation lifecycle
+  // Escalation lifecycle — subjects are `system.escalation.{role}.{id}.{verb}`.
+  // The role token is the organizing level: subscribe to one queue with
+  // `system.escalation.{role}.>`, one verb across queues with
+  // `system.escalation.*.*.{verb}`, or one item with `system.escalation.*.{id}.>`.
   {
-    topic: 'system.escalation.*.created',
+    topic: 'system.escalation.*.*.created',
     description: 'An escalation has been created.',
     category: 'escalation',
-    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
-    example_payload: { escalationId: 'esc-001', status: 'pending', workflowName: 'processOrder' },
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD, data: { type: 'object' } }),
+    example_payload: { escalationId: 'esc-001', role: 'order-review', status: 'pending', workflowName: 'processOrder' },
     tags: ['lifecycle', 'hitl'],
   },
   {
-    topic: 'system.escalation.*.resolved',
+    topic: 'system.escalation.*.*.resolved',
     description: 'An escalation has been resolved.',
     category: 'escalation',
-    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD, data: { type: 'object' } }),
-    example_payload: { escalationId: 'esc-001', status: 'resolved', workflowName: 'processOrder' },
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD, data: { type: 'object' } }),
+    example_payload: { escalationId: 'esc-001', role: 'order-review', status: 'resolved', workflowName: 'processOrder' },
     tags: ['lifecycle', 'hitl'],
   },
   {
-    topic: 'system.escalation.*.claimed',
+    topic: 'system.escalation.*.*.claimed',
     description: 'An escalation has been claimed.',
     category: 'escalation',
-    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD }),
-    example_payload: { escalationId: 'esc-001', status: 'claimed' },
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD }),
+    example_payload: { escalationId: 'esc-001', role: 'order-review', status: 'claimed' },
     tags: ['lifecycle', 'hitl'],
   },
   {
-    topic: 'system.escalation.*.released',
+    topic: 'system.escalation.*.*.released',
     description: 'An escalation has been returned to the queue.',
     category: 'escalation',
-    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, status: STATUS_FIELD }),
-    example_payload: { escalationId: 'esc-001', status: 'pending' },
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD }),
+    example_payload: { escalationId: 'esc-001', role: 'order-review', status: 'pending' },
+    tags: ['lifecycle', 'hitl'],
+  },
+  {
+    topic: 'system.escalation.*.*.cancelled',
+    description: 'An escalation has been cancelled.',
+    category: 'escalation',
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD, data: { type: 'object' } }),
+    example_payload: { escalationId: 'esc-001', role: 'order-review', status: 'cancelled' },
+    tags: ['lifecycle', 'hitl'],
+  },
+  {
+    topic: 'system.escalation.*.*.reassigned',
+    description: 'An escalation has moved to a different role. Publishes under both the departing and arriving role.',
+    category: 'escalation',
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD, data: { type: 'object', description: 'from_role and to_role' } }),
+    example_payload: { escalationId: 'esc-001', role: 'order-manager', status: 'pending', data: { from_role: 'order-review', to_role: 'order-manager' } },
+    tags: ['lifecycle', 'hitl'],
+  },
+  {
+    topic: 'system.escalation.*.*.expired',
+    description: 'A waiting escalation hit its SLA timeout and the engine transitioned it.',
+    category: 'escalation',
+    payload_schema: objectSchema({ ...WORKFLOW_CONTEXT_PROPS, escalationId: { type: 'string' }, role: ROLE_FIELD, status: STATUS_FIELD, data: { type: 'object' } }),
+    example_payload: { escalationId: 'esc-001', role: 'order-review', status: 'expired' },
     tags: ['lifecycle', 'hitl'],
   },
 
@@ -258,9 +287,19 @@ function inferCategory(topic: string): string {
 }
 
 /**
- * Seed all 22 built-in system topics into the catalog.
+ * Seed the built-in system topics into the catalog.
  * Called once at startup after migrations.
  */
+// Catalog names no longer published. Escalation subjects carry the role token
+// (`system.escalation.{role}.{id}.{verb}`), so the roleless names are retired
+// from the catalog at seed time.
+const RETIRED_TOPICS = [
+  'system.escalation.*.created',
+  'system.escalation.*.resolved',
+  'system.escalation.*.claimed',
+  'system.escalation.*.released',
+];
+
 export async function seedSystemTopics(): Promise<void> {
   for (const def of SYSTEM_TOPICS) {
     try {
@@ -277,6 +316,11 @@ export async function seedSystemTopics(): Promise<void> {
     } catch (err: any) {
       loggerRegistry.warn(`[long-tail] topic seed failed for ${def.topic}: ${err.message}`);
     }
+  }
+  for (const retired of RETIRED_TOPICS) {
+    try {
+      await deleteTopic(retired);
+    } catch { /* absent on a fresh catalog */ }
   }
 }
 

@@ -11,7 +11,7 @@
  *      workflow's Leg1 checkpoint (one atomic commit — crash-safe, no create
  *      activity, no enrich) AND suspends. `client.escalations.resolve()` marks it
  *      resolved, delivers the signal, and resumes THIS job in place (no re-run).
- *      Fires `system.escalation.{id}.created` automatically.
+ *      Fires `system.escalation.{role}.{id}.created` automatically.
  *
  * Never replaces `basic-signal` — it sits beside it so the two can be compared.
  */

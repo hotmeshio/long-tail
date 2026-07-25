@@ -150,6 +150,7 @@ describe('event publish functions', () => {
         taskQueue: 'long-tail',
         taskId: 'task-4',
         escalationId: 'esc-1',
+        role: 'order-review',
         originId: 'origin-2',
         status: 'pending',
         data: { reason: 'needs human review' },
@@ -157,8 +158,9 @@ describe('event publish functions', () => {
 
       expect(adapter.events).toHaveLength(1);
       const evt = adapter.events[0];
-      expect(evt.type).toBe('system.escalation.esc-1.created');
+      expect(evt.type).toBe('system.escalation.order-review.esc-1.created');
       expect(evt.escalationId).toBe('esc-1');
+      expect(evt.role).toBe('order-review');
       expect(evt.status).toBe('pending');
       expect(evt.data).toEqual({ reason: 'needs human review' });
     });
@@ -171,13 +173,46 @@ describe('event publish functions', () => {
         workflowName: 'reviewContent',
         taskQueue: 'long-tail',
         escalationId: 'esc-2',
+        role: 'order-review',
         status: 'resolved',
       });
 
       const evt = adapter.events[0];
-      expect(evt.type).toBe('system.escalation.esc-2.resolved');
+      expect(evt.type).toBe('system.escalation.order-review.esc-2.resolved');
       expect(evt.escalationId).toBe('esc-2');
       expect(evt.status).toBe('resolved');
+    });
+
+    it('sanitizes the role into a single subject token', async () => {
+      await publishEscalationEvent({
+        type: 'escalation.created',
+        source: 'interceptor',
+        workflowId: 'wf-4',
+        workflowName: 'reviewContent',
+        taskQueue: 'long-tail',
+        escalationId: 'esc-9',
+        role: 'weird role.name*here',
+        status: 'pending',
+      });
+
+      const evt = adapter.events[0];
+      expect(evt.type).toBe('system.escalation.weird-role-name-here.esc-9.created');
+      expect(evt.role).toBe('weird role.name*here');
+    });
+
+    it('an empty role publishes under the "none" token', async () => {
+      await publishEscalationEvent({
+        type: 'escalation.created',
+        source: 'interceptor',
+        workflowId: 'wf-4',
+        workflowName: 'reviewContent',
+        taskQueue: 'long-tail',
+        escalationId: 'esc-10',
+        role: '',
+        status: 'pending',
+      });
+
+      expect(adapter.events[0].type).toBe('system.escalation.none.esc-10.created');
     });
   });
 
