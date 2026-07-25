@@ -404,7 +404,8 @@ export function AvailableEscalationsPage() {
             icon={Lock}
             title="Claim escalation"
             onClick={() => setClaimTarget(row)}
-            colorClass="text-accent/75 hover:text-accent"
+            alwaysVisible
+            colorClass="text-accent/40 hover:text-accent"
             size="sm"
           />
         </RowActionGroup>

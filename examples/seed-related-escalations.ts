@@ -19,6 +19,14 @@ import {
   REL_REVIEWER_ROLE,
   REL_REVIEWER_FORM_SCHEMA,
 } from './workflows/related-escalations/forms';
+import {
+  REL_WALKER_ROLE,
+  REL_WALKER_FORM_SCHEMA,
+  REL_PLATE_ROLE,
+  REL_PLATE_FORM_SCHEMA,
+  REL_CLOSER_ROLE,
+  REL_CLOSER_FORM_SCHEMA,
+} from './workflows/related-escalations/forms-walk';
 
 const RELATED_ESCALATIONS_ROLES = [
   {
@@ -32,6 +40,24 @@ const RELATED_ESCALATIONS_ROLES = [
     title: 'Manager Review',
     description: 'Second-stage review queue — the manager approves or rejects the escalated item, with the originator context embedded inline via x-lt-embed widgets.',
     form_schema: REL_REVIEWER_FORM_SCHEMA,
+  },
+  {
+    role: REL_WALKER_ROLE,
+    title: 'Walk Claim',
+    description: 'The walk-claim queue — resolving here starts the walk: every plate for the order assigns to the resolver in one atomic step.',
+    form_schema: REL_WALKER_FORM_SCHEMA,
+  },
+  {
+    role: REL_PLATE_ROLE,
+    title: 'Plates',
+    description: 'One row per plate in a walk — resolved inline from the closeout form via the Bagged ✓ action, or here through the full form.',
+    form_schema: REL_PLATE_FORM_SCHEMA,
+  },
+  {
+    role: REL_CLOSER_ROLE,
+    title: 'Walk Closeout',
+    description: 'The walk closeout — the form embeds the walker\'s own claimed plates (assigned: "me") with inline actions, and the submit stays locked until the last plate is bagged.',
+    form_schema: REL_CLOSER_FORM_SCHEMA,
   },
 ] as const;
 

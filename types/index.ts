@@ -13,6 +13,7 @@ export type {
   LTEscalationStatus,
   LTEscalationPriority,
   LTEscalationRecord,
+  EscalationResolution,
 } from './escalation';
 
 export {

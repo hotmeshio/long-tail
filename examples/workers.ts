@@ -167,8 +167,14 @@ const richFormConfig: LTWorkerConfig = {
   },
 };
 
+const relPlateConfig: LTWorkerConfig = {
+  description: 'Plate — child workflow for a single plate in a claimed walk. Parks one rel-plate row faceted with the walk\'s originId, waits for the inline Bagged ✓ (or full-form) resolve, and signals the parent orchestrator.',
+  invocable: false,
+  defaultRole: 'rel-plate',
+};
+
 const relatedEscalationsConfig: LTWorkerConfig = {
-  description: 'Related Escalations — the reference workflow for x-lt-embed widgets. Two roles demonstrate a two-stage review chain: rel-originator processes items and escalates to rel-reviewer, whose form embeds a deep-link, the originating escalation card, and a live sibling-item list using the three new embed widgets.',
+  description: 'Related Escalations — the reference workflow for x-lt-embed widgets and the ownership-scope query contract. A two-stage review chain (rel-originator escalates to rel-reviewer, whose form embeds a deep-link, the originating escalation card, and a sibling-item list) followed by a claimed walk: rel-walker claims the walk (identity via $resolution), plates bulk-assign atomically, and the rel-closer form embeds the walker\'s own plates (assigned: "me") with inline Bagged ✓ actions and a submit-guard that unlocks when the walk drains.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: REL_ORIGINATOR_ROLE,
@@ -460,6 +466,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
   { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
   { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relatedEscalationsWorkflow, config: relatedEscalationsConfig },
+  { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relPlateWorkflow, config: relPlateConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },

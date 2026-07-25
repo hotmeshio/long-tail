@@ -41,6 +41,9 @@ const FLEET_LIST_SCHEMA = {
       { label: 'Since', value: '{{escalation.created_at}}', format: 'age' },
     ],
   },
+  // One-click claim from the card, held for a full service hour — the demo for
+  // the template-driven row action (label + action + duration all schema-set).
+  'x-lt-row-action': { action: 'claim', label: 'Service', durationMinutes: 60 },
 };
 
 const FLEET_DEFAULT_PINS = [

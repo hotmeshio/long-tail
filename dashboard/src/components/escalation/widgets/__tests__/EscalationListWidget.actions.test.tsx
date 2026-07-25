@@ -11,6 +11,10 @@ vi.mock('../../../../api/escalations', () => ({
   useResolveEscalation: () => ({ mutateAsync: mockMutateAsync }),
 }));
 
+vi.mock('../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { userId: 'viewer-1' } }),
+}));
+
 vi.mock('../../../../lib/x-lt-help', () => ({
   interpolateHelp: (template: string, ctx: Record<string, unknown>) =>
     template.replace(/\{\{(\w+)\.(\w+)\}\}/g, (_: string, domain: string, key: string) => {

@@ -66,7 +66,8 @@ export function OperatorDashboard() {
           icon={LockOpen}
           title="Release escalation"
           onClick={() => release.mutate(row.id)}
-          colorClass="text-text-tertiary hover:text-status-warning"
+          alwaysVisible
+          colorClass="text-status-warning/40 hover:text-status-warning"
         />
       </RowActionGroup>
     ),

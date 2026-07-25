@@ -8,6 +8,10 @@ vi.mock('../../api/escalations', () => ({
   useEscalations: (...args: unknown[]) => mockUseEscalations(...args),
 }));
 
+vi.mock('../useAuth', () => ({
+  useAuth: () => ({ user: { userId: 'viewer-1' } }),
+}));
+
 const GUARD: SubmitGuardDef = {
   query: {
     role: 'print-harvest',
@@ -64,5 +68,28 @@ describe('useSubmitGuard', () => {
       useSubmitGuard({ query: { role: 'print-harvest' } }, CTX),
     );
     expect(result.current.message).toBe('2 related items are still pending');
+  });
+
+  it('assigned:"me" evaluates the viewer-claimed scope — same mapping as the embed', () => {
+    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 2 } });
+    const { result } = renderHook(() =>
+      useSubmitGuard(
+        { query: { role: 'print-harvest', facets: { walkId: '{{metadata.walkId}}' }, assigned: 'me' } },
+        CTX,
+      ),
+    );
+    const call = mockUseEscalations.mock.calls[0][0];
+    expect(call.assigned_to).toBe('viewer-1');
+    expect(call.available).toBe(false);
+    expect(call.facets.walkId).toBe('walk-7');
+    expect(result.current.blocked).toBe(true);
+    expect(result.current.count).toBe(2);
+  });
+
+  it('omitted assigned gates on the available pool (backward compatible)', () => {
+    renderHook(() => useSubmitGuard(GUARD, CTX));
+    const call = mockUseEscalations.mock.calls[0][0];
+    expect(call.available).toBe(true);
+    expect(call.assigned_to).toBeUndefined();
   });
 });

@@ -86,11 +86,13 @@ describe('EscalationListView', () => {
     expect(screen.queryByTestId('load-history')).not.toBeInTheDocument();
   });
 
-  it('shows a Claim button for an open item that navigates to detail', () => {
+  it('shows a Claim button for an open item — it claims first, navigating only on success', () => {
     const onClick = vi.fn();
     render(<EscalationListView role="policy-document" listSchema={SCHEMA} activeEscalations={[ROW]} onRowClick={onClick} />, { wrapper: wrapper() });
     screen.getByRole('button', { name: /Claim/ }).click();
-    expect(onClick).toHaveBeenCalledWith(ROW);
+    // The one-click claim fires the mutation; navigation is deferred to claim
+    // success (covered with a mocked mutation in EscalationListRowAction.test).
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it('hides Claim when the item is already effectively claimed', () => {
