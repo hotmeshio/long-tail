@@ -50,11 +50,14 @@ import { EscalationTimeline } from '../../components/escalation/EscalationTimeli
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
-  useEscalationListEvents();
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available', search: '' },
   });
+  // The queue moves on arrivals and departures-into-work — created and
+  // claimed. A role filter narrows the subscription to that queue's subject
+  // token. Manual refresh covers the long tail of other lifecycle moments.
+  useEscalationListEvents({ role: filters.role || null, verbs: ['created', 'claimed'] });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
   const debouncedSearch = useDebouncedValue(filters.search, 300);
   const claimDurations = useClaimDurations();

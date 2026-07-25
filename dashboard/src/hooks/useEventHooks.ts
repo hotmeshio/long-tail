@@ -1,13 +1,19 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEventSubscription } from './useEventContext';
+import { useEventSubscription, useEventSubscriptions } from './useEventContext';
 import { getInvalidationKeys } from '../lib/events/invalidation';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
+import { escalationPattern, escalationPatterns, type EscalationVerb } from '../lib/events/subjects';
 
 /**
- * Debounced query invalidation. Collects query keys over a window
- * and fires a single batch invalidation, preventing rapid re-renders
- * when multiple events arrive in quick succession.
+ * Throttled query invalidation. Collects query keys over a window and fires
+ * a single batch invalidation per window — at most one refetch per delayMs,
+ * and under a constant event stream at least one per delayMs too.
+ *
+ * The FIRST event opens the window; later events accumulate keys without
+ * touching the timer. Resetting the timer per event (a trailing debounce)
+ * would starve forever under sustained load — the flush would wait for a
+ * quiet gap that high-throughput surfaces never produce.
  */
 function useDebouncedInvalidation(delayMs = 500) {
   const qc = useQueryClient();
@@ -19,15 +25,35 @@ function useDebouncedInvalidation(delayMs = 500) {
       pendingKeys.current.add(JSON.stringify(key));
     }
 
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) return; // window open — the pending flush carries these
     timer.current = setTimeout(() => {
-      for (const raw of pendingKeys.current) {
+      timer.current = null;
+      const batch = [...pendingKeys.current];
+      pendingKeys.current.clear();
+      for (const raw of batch) {
         qc.invalidateQueries({ queryKey: JSON.parse(raw) });
       }
-      pendingKeys.current.clear();
-      timer.current = null;
     }, delayMs);
   }, [qc, delayMs]);
+}
+
+/**
+ * The subject slice a workflow-detail surface needs. Workflow, activity, and
+ * milestone subjects embed the workflowId, so those levels pin exactly; task
+ * and escalation subjects embed their own ids, so those two families arrive
+ * family-wide and the handler's workflowId check filters them. Detail pages
+ * for related/derived jobs (`rerun-<id>`, `triage-<id>`) match by inclusion,
+ * so the workflow family also stays wide.
+ */
+function workflowDetailPatterns(workflowId: string | undefined): string[] {
+  if (!workflowId) return [];
+  return [
+    `${NATS_SUBJECT_PREFIX}.system.workflow.>`,
+    `${NATS_SUBJECT_PREFIX}.system.activity.>`,
+    `${NATS_SUBJECT_PREFIX}.system.milestone.>`,
+    `${NATS_SUBJECT_PREFIX}.system.task.>`,
+    `${NATS_SUBJECT_PREFIX}.system.escalation.>`,
+  ];
 }
 
 /**
@@ -54,7 +80,7 @@ export function useWorkflowListEvents(): void {
 export function useWorkflowDetailEvents(workflowId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(400);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
+  useEventSubscriptions(workflowDetailPatterns(workflowId), (event) => {
     if (!workflowId) return;
 
     const isRelated = event.workflowId === workflowId
@@ -82,7 +108,7 @@ export function useWorkflowDetailEvents(workflowId: string | undefined): void {
 export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(400);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
+  useEventSubscriptions(workflowDetailPatterns(workflowId), (event) => {
     if (!workflowId) return;
 
     const isRelated = event.workflowId === workflowId
@@ -108,7 +134,7 @@ export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
 export function usePlanDetailEvents(plannerWorkflowId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(400);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.>`, (event) => {
+  useEventSubscriptions(workflowDetailPatterns(plannerWorkflowId), (event) => {
     if (!plannerWorkflowId) return;
 
     const isRelated = event.workflowId === plannerWorkflowId
@@ -141,52 +167,77 @@ export function useProcessDetailEvents(originId: string | undefined): void {
 
 /**
  * Invalidate escalation stats (EscalationsOverview) on escalation events.
+ * Stats aggregate every role and verb, so the family-wide pattern is the
+ * honest scope here.
  */
 export function useEscalationStatsEvents(): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
+  useEventSubscription(escalationPattern({}), () => {
     invalidate([['escalationStats']]);
   });
 }
 
 /**
  * Invalidate station metrics (Operations page + station detail) on escalation
- * events. Push-driven only: escalation resolves/claims/creates are the sole
- * things that move the numbers, so the socket event is the complete refresh
- * signal. The 600ms debounce collapses a resolve burst into one refetch.
+ * events. Push-driven only: escalation lifecycle moments are the sole things
+ * that move the numbers, so the event is the complete refresh signal. The
+ * board is a summary surface, so the debounce is generous — a high-throughput
+ * burst collapses into at most one refetch every 1.5s.
  */
 export function useStationMetricsEvents(): void {
-  const invalidate = useDebouncedInvalidation(600);
+  const invalidate = useDebouncedInvalidation(1500);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
+  useEventSubscription(escalationPattern({}), () => {
     invalidate([['stationMetrics']]);
   });
 }
 
 /**
  * Invalidate escalation list queries on escalation events.
+ *
+ * List pages pass the slice they render: `role` narrows to one queue's
+ * subject token, `verbs` to the lifecycle moments that change the list.
+ * Omitted, the subscription spans the escalation family — for summary
+ * surfaces that genuinely aggregate everything.
  */
-export function useEscalationListEvents(): void {
+export function useEscalationListEvents(scope?: {
+  role?: string | null;
+  verbs?: EscalationVerb[];
+}): void {
   const invalidate = useDebouncedInvalidation(300);
+  const role = scope?.role ?? null;
+  const verbsKey = (scope?.verbs ?? []).join(',');
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, () => {
+  const patterns = useMemo(() => {
+    const verbs = verbsKey ? (verbsKey.split(',') as EscalationVerb[]) : null;
+    return verbs
+      ? escalationPatterns({ role, verbs })
+      : [escalationPattern({ role })];
+  }, [role, verbsKey]);
+
+  useEventSubscriptions(patterns, () => {
     invalidate([['escalations']]);
   });
 }
 
 /**
- * Invalidate a single escalation detail on escalation events for that ID.
+ * Invalidate a single escalation detail on that item's own events. The id is
+ * the subject's fourth token, so the broker delivers exactly this item's
+ * lifecycle — across role hops (`system.escalation.*.{id}.>`).
  */
 export function useEscalationDetailEvents(escalationId: string | undefined): void {
   const invalidate = useDebouncedInvalidation(300);
 
-  useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.escalation.>`, (event) => {
-    if (!escalationId) return;
-    if (event.escalationId === escalationId) {
+  useEventSubscription(
+    escalationId
+      ? escalationPattern({ id: escalationId })
+      : escalationPattern({ id: '__none__' }),
+    (event) => {
+      if (!escalationId || event.escalationId !== escalationId) return;
       invalidate([['escalations', escalationId], ['escalations'], ['escalationStats']]);
-    }
-  });
+    },
+  );
 }
 
 /**

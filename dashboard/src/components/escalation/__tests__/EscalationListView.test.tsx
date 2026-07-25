@@ -1,4 +1,15 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, type RenderOptions } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+
+// Metadata-bound columns render router Links — every render gets a router,
+// composed OUTSIDE any wrapper the individual test supplies.
+const render = (ui: React.ReactElement, options?: RenderOptions) => {
+  const Inner = options?.wrapper;
+  const Composed = ({ children }: { children: React.ReactNode }) => (
+    <MemoryRouter>{Inner ? <Inner>{children}</Inner> : children}</MemoryRouter>
+  );
+  return rtlRender(ui, { ...options, wrapper: Composed });
+};
 import { describe, it, expect, vi } from 'vitest';
 import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -151,7 +162,7 @@ describe('EscalationListView — facet-table layout', () => {
       <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[ROW, ROW2]} />,
       { wrapper: wrapper() },
     );
-    expect(screen.getAllByTestId('facet-table-row')).toHaveLength(2);
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(2);
   });
 
   it('calls onRowClick when a row is clicked', () => {
@@ -160,7 +171,7 @@ describe('EscalationListView — facet-table layout', () => {
       <EscalationListView role="policy-document" listSchema={TABLE_SCHEMA} activeEscalations={[ROW, ROW2]} onRowClick={onClick} />,
       { wrapper: wrapper() },
     );
-    screen.getAllByTestId('facet-table-row')[1].click();
+    fireEvent.click(screen.getByText('Terms of Service'));
     expect(onClick).toHaveBeenCalledWith(ROW2);
   });
 

@@ -84,7 +84,11 @@ const sc = StringCodec();
  *
  * Responsibilities:
  * 1. Connect to NATS via WebSocket with auto-reconnect
- * 2. Subscribe to `lt.events.>` and dispatch to per-page subscribers
+ * 2. Hold ONE broker subscription per distinct active pattern, refcounted
+ *    across subscribers — the broker filters, so this client receives only
+ *    the subjects pages actually asked for. A page's pattern opens on first
+ *    use, is shared by every hook asking for the same pattern, and closes
+ *    when the last subscriber leaves.
  *
  * Cache invalidation is handled by per-page hooks in `useEventHooks.ts`.
  */
@@ -98,12 +102,50 @@ interface NatsProviderProps {
 
 export function NatsProvider({ children, url, token }: NatsProviderProps) {
   const ncRef = useRef<NatsConnection | null>(null);
-  const subRef = useRef<Subscription | null>(null);
   const [connected, setConnected] = useState(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Listener registry: pattern → Set<handler>
+  // Listener registry (pattern → handlers) and its live broker subscription
+  // (pattern → NATS subscription). One broker subscription serves every
+  // handler on the same pattern; the broker performs the subject matching.
   const listenersRef = useRef<Map<string, Set<NatsEventHandler>>>(new Map());
+  const brokerSubsRef = useRef<Map<string, Subscription>>(new Map());
+
+  const pumpSubscription = useCallback((pattern: string, sub: Subscription) => {
+    (async () => {
+      for await (const msg of sub) {
+        try {
+          // The broker already filtered by this subscription's pattern; the
+          // re-check is a cheap guard against a misrouted proxy delivery.
+          if (!subjectMatchesPattern(msg.subject, pattern)) continue;
+          const event: NatsLTEvent = JSON.parse(sc.decode(msg.data));
+          const handlers = listenersRef.current.get(pattern);
+          if (!handlers) continue;
+          for (const handler of handlers) {
+            try {
+              handler(event);
+            } catch {
+              // swallow handler errors
+            }
+          }
+        } catch {
+          // ignore malformed messages
+        }
+      }
+    })();
+  }, []);
+
+  const openBrokerSub = useCallback((pattern: string) => {
+    const nc = ncRef.current;
+    if (!nc || nc.isClosed?.() || brokerSubsRef.current.has(pattern)) return;
+    try {
+      const sub = nc.subscribe(pattern);
+      brokerSubsRef.current.set(pattern, sub);
+      pumpSubscription(pattern, sub);
+    } catch {
+      // an unsubscribable pattern gets no broker delivery
+    }
+  }, [pumpSubscription]);
 
   const subscribe = useCallback((pattern: string, handler: NatsEventHandler) => {
     const map = listenersRef.current;
@@ -111,29 +153,23 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
       map.set(pattern, new Set());
     }
     map.get(pattern)!.add(handler);
+    openBrokerSub(pattern);
 
     return () => {
       const set = map.get(pattern);
       if (set) {
         set.delete(handler);
-        if (set.size === 0) map.delete(pattern);
-      }
-    };
-  }, []);
-
-  const dispatchToListeners = useCallback((subject: string, event: NatsLTEvent) => {
-    for (const [pattern, handlers] of listenersRef.current) {
-      if (subjectMatchesPattern(subject, pattern)) {
-        for (const handler of handlers) {
-          try {
-            handler(event);
-          } catch {
-            // swallow handler errors
+        if (set.size === 0) {
+          map.delete(pattern);
+          const sub = brokerSubsRef.current.get(pattern);
+          if (sub) {
+            brokerSubsRef.current.delete(pattern);
+            try { sub.unsubscribe(); } catch { /* already closed */ }
           }
         }
       }
-    }
-  }, []);
+    };
+  }, [openBrokerSub]);
 
   const connectNats = useCallback(async () => {
     try {
@@ -156,20 +192,12 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
       ncRef.current = nc;
       setConnected(true);
 
-      // Subscribe to all Long Tail events and mesh control plane
-      const sub = nc.subscribe('lt.>');
-      subRef.current = sub;
-
-      (async () => {
-        for await (const msg of sub) {
-          try {
-            const event: NatsLTEvent = JSON.parse(sc.decode(msg.data));
-            dispatchToListeners(msg.subject, event);
-          } catch {
-            // ignore malformed messages
-          }
-        }
-      })();
+      // Open broker subscriptions for every pattern registered before the
+      // connection came up. (The nats.ws client re-establishes live
+      // subscriptions itself across reconnects.)
+      for (const pattern of listenersRef.current.keys()) {
+        openBrokerSub(pattern);
+      }
 
       // Monitor connection status
       (async () => {
@@ -185,14 +213,17 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
       setConnected(false);
       reconnectTimer.current = setTimeout(connectNats, 3000);
     }
-  }, [dispatchToListeners]);
+  }, [openBrokerSub]);
 
   useEffect(() => {
     connectNats();
 
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      if (subRef.current) subRef.current.unsubscribe();
+      for (const sub of brokerSubsRef.current.values()) {
+        try { sub.unsubscribe(); } catch { /* already closed */ }
+      }
+      brokerSubsRef.current.clear();
       if (ncRef.current) {
         ncRef.current.close().catch(() => {});
         ncRef.current = null;

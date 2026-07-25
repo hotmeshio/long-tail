@@ -71,13 +71,15 @@ System families declare the fields they populate. Which fields exist is a functi
 |---|---|---|
 | workflow | `system.workflow.{id}.{started\|completed\|failed}` | `workflowId`, `workflowName`, `taskQueue`, `status` |
 | task | `system.task.{taskId}.{created\|started\|completed\|escalated\|failed}` | + `taskId` |
-| escalation | `system.escalation.{id}.{created\|resolved\|claimed\|released}` | `escalationId` (+ workflow context), `status` |
+| escalation | `system.escalation.{role}.{id}.{created\|resolved\|claimed\|released\|cancelled\|reassigned\|expired}` | `escalationId`, `role` (+ workflow context), `status` |
 | activity | `system.activity.{wfId}.{activity}.{started\|completed\|failed}` | `activityName` (+ workflow context) |
 | milestone | `system.milestone.{wfId}` | `milestones` (+ workflow context) |
 | agent | `system.agent.{name}.{started\|completed\|failed\|…}` | `workflowId`=agentId, `workflowName`=agentName |
 | knowledge / file | `system.knowledge.{domain}.*` / `system.file.*` | none — payload only |
 
-`status` is a **per-family vocabulary**, not one global enum: workflow `started|in_progress|running|completed|failed`; task `created|in_progress|completed|needs_intervention|failed`; escalation `pending|claimed|released|resolved|cancelled`.
+`status` is a **per-family vocabulary**, not one global enum: workflow `started|in_progress|running|completed|failed`; task `created|in_progress|completed|needs_intervention|failed`; escalation `pending|claimed|released|resolved|cancelled|expired`.
+
+Escalation subjects carry the **role** (the queue) as the organizing token. Subscribe to one queue (`system.escalation.{role}.>`), one verb across queues (`system.escalation.*.*.created`), or one item across role hops (`system.escalation.*.{id}.>`). The role token is sanitized to subject-safe characters (`[A-Za-z0-9_-]`); a `reassigned` event publishes under **both** the departing and arriving role so either queue's subscribers observe the move.
 
 Consumers (adapters, the agent trigger registry, input_mapping) type against the broad **`LTEvent`** — the base plus every extension as **optional** — since they can't assume any extension is present. Producers (`lib/events/publish.ts`) construct the precise `LT*Event` family types, all assignable to `LTEvent`.
 

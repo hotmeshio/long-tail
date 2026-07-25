@@ -3,6 +3,7 @@ import type { Types } from '@hotmeshio/hotmesh';
 import type { LTEvent } from '../../types';
 
 import { eventRegistry } from './index';
+import { sanitizeSubjectToken } from './matching';
 
 // ---------------------------------------------------------------------------
 // SDK system-event bridge (HotMesh 0.22.4 `EventsConfig.publish`).
@@ -49,9 +50,16 @@ export function mapSystemEvent(event: SystemEvent): LTEvent {
   if (domain === 'escalation') {
     const row = (event.data ?? {}) as Record<string, any>;
     const verb = segments[3] ?? '';
+    // The SDK forms `system.escalation.{id}.{verb}`; long-tail's canonical
+    // subject carries the role as the organizing token. The committed row
+    // rides in `data`, so the role is lifted from it and the subject is
+    // rewritten to `system.escalation.{role}.{id}.{verb}` — the same shape
+    // publishEscalationEvent produces for the service-mediated path.
+    const role = (row.role as string) || undefined;
     return {
-      type: event.type,
+      type: `system.escalation.${sanitizeSubjectToken(role)}.${segments[2]}.${verb}`,
       source: 'sdk',
+      role,
       workflowId: (row.workflow_id as string) || event.workflow_id || undefined,
       workflowName: (row.workflow_type as string) || undefined,
       taskQueue: (row.task_queue as string) || undefined,

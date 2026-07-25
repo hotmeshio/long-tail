@@ -1,6 +1,6 @@
 # List Schema (`x-lt-list-schema`)
 
-The form schema formats one escalation on the detail page. A role can also own a `list_schema` that formats its whole list page — the list-page analog of the resolve form. It is opt-in and applies only when the list is scoped to exactly one role (`/escalations/available?role=<role>`). Absent, the list renders the standard engineer table; present, a rich role-authored view renders with a "Table view" toggle one click away.
+The form schema formats one escalation on the detail page. A role can also own a `list_schema` that formats its whole list page — the list-page analog of the resolve form. It is opt-in and applies only when the list is scoped to exactly one role (`/escalations/available?role=<role>`, and the personal inbox at `/escalations/queue?role=<role>`). Absent, the list renders the standard engineer table; present, a rich role-authored view renders with a "Table view" toggle one click away.
 
 The list schema is versioned independently of the form schema — a list edit never bumps the form version. Edit it at `/admin/roles/:role/list-schema`. The list always renders the latest version.
 
@@ -16,7 +16,7 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 | `x-lt-help` | schema | Optional markdown header, interpolated with the active row |
 | `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{ label, value }] }` |
 | `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
-| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format? }]` |
+| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format?, priority? }]` |
 | `x-lt-group-by` | schema | `facet-board`: the `"domain.path"` whose value identifies each entity |
 | `x-lt-card` | schema | `facet-board`: the per-entity card — `{ title, state?, fields?: [{ label, value, format? }] }` |
 | `x-lt-row-action` | schema | The per-row action button: `{ action?, label?, durationMinutes? }` — see below |
@@ -38,6 +38,8 @@ Every layout carries a persistent action button — the active card's CTA, a tra
 ```
 
 `claim` is one click: the row is claimed for the template's duration and the detail page opens already claimed — the fast path for working a queue. The button appears only on claimable rows (pending, no live claim window), and a rejected claim (someone else won the race) surfaces its message inline. `view` opens the detail page — for read-only templates where claiming from the list is wrong. Row and card clicks continue to navigate; the button is the deliberate gesture.
+
+On My Escalations (`/escalations/queue`) every row is already held by the viewer, so a `claim` template renders as a View action there: the button opens the detail page with the default "View" label. Authored `view` actions keep their label.
 
 ---
 
@@ -91,7 +93,13 @@ Use when the queue contains many concurrent rows and the role's context is best 
 }
 ```
 
-A status dot precedes the first column automatically. ISO datetime values render as a readable relative date with a full-timestamp tooltip. Missing token values render as an em dash. Clicking any row navigates to the detail page. `x-lt-help` and `x-lt-active` are ignored in this layout.
+A status dot precedes the first column automatically. ISO datetime values render as a readable relative date with a full-timestamp tooltip. Missing token values render as an em dash. Clicking any row navigates to the detail page. The table stands alone — `x-lt-help` and `x-lt-active` are ignored in this layout; totals live in the pagination bar.
+
+The table renders through the same engine as the platform's built-in tables: padded cells, a sticky header, and a card fold at narrow widths — **a table never scrolls horizontally, it folds**. Below the fold threshold each row becomes a console card: `priority: 1` columns form the card's title line, `priority: 2` columns fold into label/value pairs, and `priority: 3` columns are dropped. Undeclared, the first column is the identity and the rest fold — declare priorities when the author knows which columns matter at a glance.
+
+The seeded `print` role (ortho pipeline) is the reference example for this layout, including fold priorities.
+
+A column whose `value` is a pure metadata binding (`{{metadata.key}}`) carries the platform's filter/search pair on each cell — the same affordance the engineer table's metadata cells offer. The filter icon opens this role's queue narrowed to that value; the search icon spans every role; ⇧ click merges the value into the live filter set.
 
 ### `"facet-board"` — entity board
 

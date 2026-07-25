@@ -18,13 +18,22 @@ import { loggerRegistry } from '../../../lib/logger';
 const EXPECTED_SYSTEM_TOPICS = [
   'system.task.*.created', 'system.task.*.started', 'system.task.*.completed', 'system.task.*.escalated', 'system.task.*.failed',
   'system.workflow.*.started', 'system.workflow.*.completed', 'system.workflow.*.failed',
-  'system.escalation.*.created', 'system.escalation.*.resolved', 'system.escalation.*.claimed', 'system.escalation.*.released',
+  'system.escalation.*.*.created', 'system.escalation.*.*.resolved', 'system.escalation.*.*.claimed', 'system.escalation.*.*.released',
+  'system.escalation.*.*.cancelled', 'system.escalation.*.*.reassigned', 'system.escalation.*.*.expired',
   'system.activity.*.*.started', 'system.activity.*.*.completed', 'system.activity.*.*.failed',
   'system.knowledge.*.stored', 'system.knowledge.*.deleted',
   'system.file.stored', 'system.file.deleted',
   'system.agent.*.started', 'system.agent.*.completed', 'system.agent.*.failed', 'system.agent.*.status_changed',
   'system.milestone.*',
 ];
+
+// Roleless escalation names retired from the catalog after every seed pass.
+const RETIRED_TOPIC_COUNT = 4;
+
+/** Seed calls carry the full parameter tuple; retirement deletes carry [topic]. */
+function seedCalls(mockQuery: ReturnType<typeof vi.fn>) {
+  return mockQuery.mock.calls.filter((call: any[]) => call[1].length > 1);
+}
 
 describe('seedSystemTopics', () => {
   let mockQuery: ReturnType<typeof vi.fn>;
@@ -35,20 +44,34 @@ describe('seedSystemTopics', () => {
     (getPool as any).mockReturnValue({ query: mockQuery });
   });
 
-  it('seeds all 24 built-in topics', async () => {
+  it('seeds all built-in topics and retires the roleless escalation names', async () => {
     await seedSystemTopics();
-    expect(mockQuery).toHaveBeenCalledTimes(24);
+    expect(mockQuery).toHaveBeenCalledTimes(EXPECTED_SYSTEM_TOPICS.length + RETIRED_TOPIC_COUNT);
+    expect(seedCalls(mockQuery)).toHaveLength(EXPECTED_SYSTEM_TOPICS.length);
   });
 
   it('seeds every expected topic name', async () => {
     await seedSystemTopics();
-    const seededTopics = mockQuery.mock.calls.map((call: any[]) => call[1][0]);
+    const seededTopics = seedCalls(mockQuery).map((call: any[]) => call[1][0]);
     expect(seededTopics.sort()).toEqual(EXPECTED_SYSTEM_TOPICS.sort());
+  });
+
+  it('retires the roleless escalation topic names', async () => {
+    await seedSystemTopics();
+    const deleted = mockQuery.mock.calls
+      .filter((call: any[]) => call[1].length === 1)
+      .map((call: any[]) => call[1][0]);
+    expect(deleted.sort()).toEqual([
+      'system.escalation.*.claimed',
+      'system.escalation.*.created',
+      'system.escalation.*.released',
+      'system.escalation.*.resolved',
+    ]);
   });
 
   it('uses source "system" for all topics', async () => {
     await seedSystemTopics();
-    for (const call of mockQuery.mock.calls) {
+    for (const call of seedCalls(mockQuery)) {
       const source = call[1][5]; // 6th param is source
       expect(source).toBe('system');
     }
@@ -56,7 +79,7 @@ describe('seedSystemTopics', () => {
 
   it('every topic has a description', async () => {
     await seedSystemTopics();
-    for (const call of mockQuery.mock.calls) {
+    for (const call of seedCalls(mockQuery)) {
       const description = call[1][1]; // 2nd param is description
       expect(description).toBeTruthy();
       expect(typeof description).toBe('string');
@@ -66,7 +89,7 @@ describe('seedSystemTopics', () => {
   it('every topic has a valid category', async () => {
     const validCategories = ['task', 'workflow', 'escalation', 'activity', 'knowledge', 'file', 'agent', 'milestone'];
     await seedSystemTopics();
-    for (const call of mockQuery.mock.calls) {
+    for (const call of seedCalls(mockQuery)) {
       const category = call[1][2]; // 3rd param
       expect(validCategories).toContain(category);
     }
@@ -74,7 +97,7 @@ describe('seedSystemTopics', () => {
 
   it('every topic has a payload_schema with properties', async () => {
     await seedSystemTopics();
-    for (const call of mockQuery.mock.calls) {
+    for (const call of seedCalls(mockQuery)) {
       const schemaJson = call[1][3]; // 4th param
       expect(schemaJson).toBeTruthy();
       const schema = JSON.parse(schemaJson);
@@ -83,9 +106,20 @@ describe('seedSystemTopics', () => {
     }
   });
 
+  it('escalation topics carry role in their payload schema', async () => {
+    await seedSystemTopics();
+    const escalationCalls = seedCalls(mockQuery)
+      .filter((call: any[]) => String(call[1][0]).startsWith('system.escalation.'));
+    expect(escalationCalls.length).toBe(7);
+    for (const call of escalationCalls) {
+      const schema = JSON.parse(call[1][3]);
+      expect(schema.properties.role).toBeDefined();
+    }
+  });
+
   it('every topic has tags', async () => {
     await seedSystemTopics();
-    for (const call of mockQuery.mock.calls) {
+    for (const call of seedCalls(mockQuery)) {
       const tags = call[1][6]; // 7th param
       expect(Array.isArray(tags)).toBe(true);
       expect(tags.length).toBeGreaterThan(0);
@@ -94,15 +128,14 @@ describe('seedSystemTopics', () => {
 
   it('logs seeded topics', async () => {
     await seedSystemTopics();
-    expect(loggerRegistry.info).toHaveBeenCalledTimes(24);
+    expect(loggerRegistry.info).toHaveBeenCalledTimes(EXPECTED_SYSTEM_TOPICS.length);
   });
 
   it('continues seeding after individual failure', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db error'));
     mockQuery.mockResolvedValue({ rowCount: 1, rows: [] });
     await seedSystemTopics();
-    // 1 failed + 23 succeeded = 24 calls
-    expect(mockQuery).toHaveBeenCalledTimes(24);
+    expect(mockQuery).toHaveBeenCalledTimes(EXPECTED_SYSTEM_TOPICS.length + RETIRED_TOPIC_COUNT);
     expect(loggerRegistry.warn).toHaveBeenCalledTimes(1);
   });
 });

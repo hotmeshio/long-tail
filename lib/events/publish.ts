@@ -1,5 +1,6 @@
 import type { LTEvent, LTMilestone } from '../../types';
 import { eventRegistry } from './index';
+import { sanitizeSubjectToken } from './matching';
 import { loggerRegistry } from '../logger';
 
 /**
@@ -76,24 +77,31 @@ export function publishTaskEvent(params: {
 
 /**
  * Publish an escalation lifecycle event.
- * Subject: system.escalation.{escalationId}.{action}
+ * Subject: system.escalation.{role}.{escalationId}.{action}
+ *
+ * The role token makes the queue the organizing level of the hierarchy:
+ * subscribers scope to one role (`system.escalation.{role}.>`), one verb
+ * across roles (`system.escalation.*.*.created`), or one item regardless of
+ * role hops (`system.escalation.*.{id}.>`).
  */
 export function publishEscalationEvent(params: {
-  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released' | 'escalation.cancelled';
+  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released' | 'escalation.cancelled' | 'escalation.reassigned';
   source: string;
   workflowId: string;
   workflowName: string;
   taskQueue: string;
   taskId?: string;
   escalationId: string;
+  role: string;
   originId?: string;
   status: string;
   data?: Record<string, any>;
 }): Promise<void> {
   const action = params.type.split('.')[1];
   return fireAndForget({
-    type: `system.escalation.${params.escalationId}.${action}`,
+    type: `system.escalation.${sanitizeSubjectToken(params.role)}.${params.escalationId}.${action}`,
     source: params.source,
+    role: params.role,
     workflowId: params.workflowId,
     workflowName: params.workflowName,
     taskQueue: params.taskQueue,

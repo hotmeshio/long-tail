@@ -19,7 +19,7 @@ import { type FormEntry, type JsonValue } from './form-cells';
  *
  * Calls `onChange` with the full JSON string on every edit.
  */
-export function ResolverForm({ value, onChange, disabled, submitAttempted, escalationContext, onOpenHelp }: {
+export function ResolverForm({ value, onChange, disabled, submitAttempted, escalationContext, onOpenHelp, onDisabledClick }: {
   value: string;
   onChange: (json: string) => void;
   disabled?: boolean;
@@ -27,6 +27,8 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   escalationContext?: ShowIfContext;
   /** Opens the Instructions panel view; renders a help icon when the schema carries authored help. */
   onOpenHelp?: () => void;
+  /** Fires when the user clicks the locked form — the page points them at Claim. */
+  onDisabledClick?: () => void;
 }) {
   const [data, setData] = useState<Record<string, JsonValue>>({});
   const [hidden, setHidden] = useState<Record<string, JsonValue>>({});
@@ -176,14 +178,18 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   };
 
   return (
-    // `inert` (not just pointer-events) locks a disabled form for keyboard and
-    // assistive-tech users too — fields leave the tab order entirely.
+    // A locked form stays fully readable — no fade. `inert` (not just
+    // pointer-events) locks the body for keyboard and assistive-tech users —
+    // fields leave the tab order entirely — and makes it transparent to hit
+    // testing, so a click anywhere on the locked form lands on the outer
+    // wrapper, which reports the interaction (the page points at Claim).
     // max-w-form: the form holds a readable measure on any monitor.
-    <div
-      className={`pb-8 max-w-form ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
-      inert={disabled || undefined}
-      aria-disabled={disabled || undefined}
-    >
+    <div className="pb-8 max-w-form" onClick={disabled ? onDisabledClick : undefined}>
+      <div
+        className={disabled ? 'pointer-events-none' : undefined}
+        inert={disabled || undefined}
+        aria-disabled={disabled || undefined}
+      >
       {schemaTitle && (
         <div className="mb-1 flex items-center gap-1.5">
           <h3 className="heading-3">{schemaTitle}</h3>
@@ -215,6 +221,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
             renderField={renderField}
           />
         ))}
+      </div>
       </div>
     </div>
   );

@@ -168,19 +168,36 @@ describe('ResolverForm', () => {
   });
 
   // ── Disabled mode ──
-  it('applies disabled styling when disabled', () => {
+  it('locks the form body without fading it when disabled', () => {
     const json = formJson({ name: 'Alice' });
     const { container } = render(<ResolverForm value={json} onChange={vi.fn()} disabled />);
-    const wrapper = container.firstElementChild;
-    expect(wrapper!.className).toContain('opacity-60');
-    expect(wrapper!.className).toContain('pointer-events-none');
+    const body = container.firstElementChild!.firstElementChild!;
+    // Full visibility: the lock is inert + pointer-events, never opacity.
+    expect(container.innerHTML).not.toContain('opacity');
+    expect(body.className).toContain('pointer-events-none');
+    expect(body).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('does not apply disabled styling when not disabled', () => {
+  it('reports clicks on the locked form through onDisabledClick', () => {
+    const onDisabledClick = vi.fn();
     const json = formJson({ name: 'Alice' });
-    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} />);
-    const wrapper = container.firstElementChild;
-    expect(wrapper!.className).not.toContain('opacity-60');
+    const { container } = render(
+      <ResolverForm value={json} onChange={vi.fn()} disabled onDisabledClick={onDisabledClick} />,
+    );
+    fireEvent.click(container.firstElementChild!);
+    expect(onDisabledClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not lock the form when not disabled', () => {
+    const json = formJson({ name: 'Alice' });
+    const onDisabledClick = vi.fn();
+    const { container } = render(
+      <ResolverForm value={json} onChange={vi.fn()} onDisabledClick={onDisabledClick} />,
+    );
+    const body = container.firstElementChild!.firstElementChild!;
+    expect(body.className).not.toContain('pointer-events-none');
+    fireEvent.click(container.firstElementChild!);
+    expect(onDisabledClick).not.toHaveBeenCalled();
   });
 
   // ── onChange ──

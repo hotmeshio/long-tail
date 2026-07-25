@@ -78,7 +78,7 @@ describe('bulkAssign — query form', () => {
       'harvester-1',
       45,
     );
-    expect(mockPublish).toHaveBeenCalledWith(['e1', 'e2'], 'harvester-1');
+    expect(mockPublish).toHaveBeenCalledWith(['e1', 'e2'], 'harvester-1', 'harvester');
     expect(result.status).toBe(200);
     expect(result.data).toEqual({ assigned: 2, skipped: 0 });
   });

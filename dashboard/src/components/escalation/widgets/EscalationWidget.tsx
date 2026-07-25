@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { getDeep } from '../../../lib/x-lt-bind';
 import { formatAgoCompact } from '../../../lib/format';
@@ -145,11 +145,10 @@ function EscalationCard({
         </span>
         <Link
           to={`/escalations/detail/${esc.id}`}
-          className="inline-flex items-center gap-0.5 text-2xs text-accent hover:text-accent-hover transition-colors"
+          className="text-2xs text-accent hover:text-accent-hover transition-colors"
           title="Open escalation detail"
         >
           Detail
-          <ArrowRight className="w-3 h-3 shrink-0" strokeWidth={1.5} />
         </Link>
       </div>
     </div>

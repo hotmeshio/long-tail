@@ -38,10 +38,23 @@ const ORTHO_ROLE_DATA = [
   {
     role: 'print',
     title: 'Print',
-    description: 'Queue the design for 3D printing.',
+    description: 'Queue the design for 3D printing. Reference example for the facet-table list view: authored columns, metadata filter/search affordances, and a template-set claim action.',
     parent_role: 'review',
     sla_minutes: 4,
     target_per_hour: 22,
+    // The print farm is the scannable-queue reference: many concurrent rows,
+    // one glance-and-claim gesture. Metadata-bound columns (order, item)
+    // carry the filter/search pair on every cell.
+    list_schema: {
+      'x-lt-layout': 'facet-table',
+      'x-lt-columns': [
+        { label: 'Order', value: '{{metadata.order_id}}' },
+        { label: 'Item', value: '{{metadata.item_type}}', priority: 2 },
+        { label: 'Waiting', value: '{{escalation.created_at}}', format: 'age', priority: 2 },
+        { label: 'Stage', value: '{{metadata.stage}}', priority: 3 },
+      ],
+      'x-lt-row-action': { action: 'claim', label: 'Claim', durationMinutes: 5 },
+    },
     form_schema: {
       properties: {
         filament_type:   { type: 'string', title: 'Filament', enum: ['pla', 'tpu', 'petg', 'nylon'] },
@@ -203,6 +216,9 @@ export async function seedOrthoRoles(): Promise<void> {
           sla_minutes: data.sla_minutes,
           target_per_hour: data.target_per_hour,
           form_schema: data.form_schema,
+          ...('list_schema' in data
+            ? { list_schema: (data as { list_schema: Record<string, unknown> }).list_schema }
+            : {}),
           ...('upstream_roles' in data
             ? { upstream_roles: (data as { upstream_roles: string[] }).upstream_roles }
             : {}),

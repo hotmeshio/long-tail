@@ -131,6 +131,8 @@ interface FormSectionProps {
   hasAI?: boolean;
   /** Opens the Instructions side-panel view (form help icon). */
   onOpenHelp?: () => void;
+  /** Fires when the user clicks the locked (unclaimed) form. */
+  onDisabledClick?: () => void;
 }
 
 /**
@@ -160,6 +162,7 @@ export function EscalationFormSection({
   isCertified,
   hasAI,
   onOpenHelp,
+  onDisabledClick,
 }: FormSectionProps) {
   const schema = effectiveSchema;
   const showIfCtx = buildShowIfContext(esc);
@@ -233,6 +236,7 @@ export function EscalationFormSection({
           showTriage={!!isCertified && !!hasAI}
           escalationContext={showIfCtx}
           onOpenHelp={onOpenHelp}
+          onDisabledClick={onDisabledClick}
         />
       )}
     </div>

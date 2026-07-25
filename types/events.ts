@@ -5,8 +5,13 @@ import type { LTMilestone } from './task';
  *
  * System events use structured subjects with embedded resource IDs:
  *   `system.workflow.{workflowId}.completed`
- *   `system.escalation.{escalationId}.claimed`
+ *   `system.escalation.{role}.{escalationId}.claimed`
  *   `system.activity.{workflowId}.{activityName}.failed`
+ *
+ * Escalation subjects carry the role as the organizing token — the queue is
+ * the unit of subscription. Scope to a role (`system.escalation.{role}.>`),
+ * a verb across roles (`system.escalation.*.*.created`), or one item across
+ * role hops (`system.escalation.*.{id}.>`).
  *
  * On the wire (NATS): `lt.events.system.workflow.abc123.completed`
  * Dashboard subscribes: `lt.events.system.>` for all system events,
@@ -20,10 +25,13 @@ export type LTSystemEventPattern =
   | `system.task.${string}.completed`
   | `system.task.${string}.escalated`
   | `system.task.${string}.failed`
-  | `system.escalation.${string}.created`
-  | `system.escalation.${string}.resolved`
-  | `system.escalation.${string}.claimed`
-  | `system.escalation.${string}.released`
+  | `system.escalation.${string}.${string}.created`
+  | `system.escalation.${string}.${string}.resolved`
+  | `system.escalation.${string}.${string}.claimed`
+  | `system.escalation.${string}.${string}.released`
+  | `system.escalation.${string}.${string}.cancelled`
+  | `system.escalation.${string}.${string}.reassigned`
+  | `system.escalation.${string}.${string}.expired`
   | `system.workflow.${string}.started`
   | `system.workflow.${string}.completed`
   | `system.workflow.${string}.failed`
@@ -93,6 +101,8 @@ export interface LTEvent extends LTEventBase {
   taskId?: string;
   /** Escalation ID — present on escalation events. */
   escalationId?: string;
+  /** Escalation role (the queue) — present on escalation events. */
+  role?: string;
   /** Root process lineage — present on workflow/task/escalation events. */
   originId?: string;
   /** Lifecycle status. Vocabulary is per-family (see the family interfaces). */
@@ -131,9 +141,10 @@ export interface LTTaskEvent extends LTEventBase, LTWorkflowContext {
   milestones?: LTMilestone[];
 }
 
-/** `system.escalation.{escalationId}.{created|resolved|claimed|released}`. status ∈ pending|claimed|released|resolved|cancelled. */
+/** `system.escalation.{role}.{escalationId}.{created|resolved|claimed|released|cancelled|reassigned|expired}`. status ∈ pending|claimed|released|resolved|cancelled|expired. */
 export interface LTEscalationEvent extends LTEventBase, LTWorkflowContext {
   escalationId: string;
+  role: string;
   status: string;
 }
 

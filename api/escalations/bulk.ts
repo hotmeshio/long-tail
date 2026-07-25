@@ -3,7 +3,7 @@ import * as userService from '../../services/user';
 import * as taskService from '../../services/task';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { validateIds, checkBulkPermission, publishBulkClaimEvents, hasGlobalEscalationAccess } from './helpers';
+import { validateIds, checkBulkPermission, publishBulkClaimEvents, publishBulkReassignEvents, hasGlobalEscalationAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Bulk routes ────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ export async function bulkAssign(
         targetUserId,
         durationMinutes ?? 30,
       );
-      if (result.assigned > 0) publishBulkClaimEvents(result.ids, targetUserId);
+      if (result.assigned > 0) publishBulkClaimEvents(result.ids, targetUserId, query!.role);
       return { status: 200, data: { assigned: result.assigned, skipped: 0 } };
     }
 
@@ -215,7 +215,12 @@ export async function bulkEscalate(
     const perm = await checkBulkPermission(auth.userId, ids);
     if (!perm.allowed) return perm;
 
+    // Departing roles are read before the move so each reassignment can
+    // publish under BOTH queues — the one the row leaves and the one it
+    // joins (same contract as the single escalate path).
+    const beforeRows = await escalationService.getEscalationScopeRows(ids);
     const updated = await escalationService.bulkEscalateToRole(ids, targetRole);
+    if (updated > 0) publishBulkReassignEvents(beforeRows, targetRole);
     return { status: 200, data: { updated } };
   } catch (err: any) {
     return { status: 500, error: err.message };

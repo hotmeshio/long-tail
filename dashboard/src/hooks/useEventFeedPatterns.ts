@@ -1,20 +1,27 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { sanitizeSubjectToken } from '../lib/events/subjects';
 
 const STORAGE_KEY = 'lt_event_feed_patterns';
 
 /** Derive a base subscription pattern from the current route. */
-function patternFromRoute(pathname: string): string {
+function patternFromRoute(pathname: string, search: string): string {
   // Topic detail → subscribe to that specific topic
   if (pathname.startsWith('/topics/')) {
     const topic = decodeURIComponent(pathname.replace('/topics/', ''));
     if (topic && !topic.includes('/')) return `lt.events.${topic}`;
   }
-  // Escalation detail → subscribe to that specific escalation
+  // Escalation detail → that item's own lifecycle, across role hops
+  // (the id is the subject's fourth token, after the role).
   const escDetailMatch = pathname.match(/^\/escalations\/detail\/(.+)/);
-  if (escDetailMatch) return `lt.events.system.escalation.${escDetailMatch[1]}.>`;
-  // Escalation pages (list)
-  if (pathname.startsWith('/escalations')) return 'lt.events.system.escalation.>';
+  if (escDetailMatch) return `lt.events.system.escalation.*.${escDetailMatch[1]}.>`;
+  // Escalation pages (list) — a role filter narrows to that queue's token
+  if (pathname.startsWith('/escalations')) {
+    const role = new URLSearchParams(search).get('role');
+    return role
+      ? `lt.events.system.escalation.${sanitizeSubjectToken(role)}.>`
+      : 'lt.events.system.escalation.>';
+  }
   // Workflow execution detail → subscribe to that specific workflow
   const wfDetailMatch = pathname.match(/^\/workflows\/(?:durable\/)?executions\/(.+)/);
   if (wfDetailMatch) return `lt.events.system.workflow.${wfDetailMatch[1]}.>`;
@@ -57,10 +64,10 @@ function saveUserPatterns(patterns: string[]): void {
  * one page-derived pattern + any user-added patterns from localStorage.
  */
 export function useEventFeedPatterns() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [userPatterns, setUserPatterns] = useState<string[]>(loadUserPatterns);
 
-  const pagePattern = useMemo(() => patternFromRoute(pathname), [pathname]);
+  const pagePattern = useMemo(() => patternFromRoute(pathname, search), [pathname, search]);
 
   const allPatterns = useMemo(() => {
     const set = new Set([pagePattern, ...userPatterns]);

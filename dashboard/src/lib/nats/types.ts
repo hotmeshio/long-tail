@@ -26,7 +26,7 @@ export interface NatsLTEvent {
  */
 export type NatsLTEventType =
   | `system.task.${string}.${string}`
-  | `system.escalation.${string}.${string}`
+  | `system.escalation.${string}.${string}.${string}`
   | `system.workflow.${string}.${string}`
   | `system.activity.${string}.${string}.${string}`
   | `system.knowledge.${string}.${string}`

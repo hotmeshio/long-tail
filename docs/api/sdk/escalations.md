@@ -362,7 +362,7 @@ Reach for native `condition(signalId, config)` when you want the leanest path; r
 
 ### Atomic form (recommended)
 
-Pass an escalation config as the second argument. The escalation row is written inside the workflow's Leg1 checkpoint — one commit, crash-safe: no separate `ltCreateEscalation` activity, no enrich step. `signal_key` is set to `signalId`, so the dashboard resolve endpoint (resolve-by-id → Path 0) and `POST /escalations/resolve-by-signal-key` resume *this* job in place, and `system.escalation.{id}.created` fires automatically.
+Pass an escalation config as the second argument. The escalation row is written inside the workflow's Leg1 checkpoint — one commit, crash-safe: no separate `ltCreateEscalation` activity, no enrich step. `signal_key` is set to `signalId`, so the dashboard resolve endpoint (resolve-by-id → Path 0) and `POST /escalations/resolve-by-signal-key` resume *this* job in place, and `system.escalation.{role}.{id}.created` fires automatically.
 
 `conditionLT` returns `T | false | null`:
 - `T` — the resolver's payload (normal resolution)
@@ -393,7 +393,7 @@ export async function stationWorker(envelope: LTEnvelope) {
   if (decision === false) {
     // SLA passed: the workflow resumed on the timer and the engine transitioned
     // the row pending → expired atomically. A late resolve returns
-    // already-expired, and system.escalation.{id}.expired fired for dashboards.
+    // already-expired, and system.escalation.{role}.{id}.expired fired for dashboards.
     return { type: 'return' as const, data: { autoRejected: 'sla' } };
   }
   if (decision === null) {

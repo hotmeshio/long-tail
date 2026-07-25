@@ -46,7 +46,7 @@ function toEngineConfig(
  * written inside this workflow's Leg1 checkpoint (one commit, crash-safe — no
  * separate create activity, no enrich). `signal_key` is the signal id, so the
  * dashboard resolve endpoint (Path 0), `resolveEscalationBySignalKey`, and any
- * webhook resume the SAME job in place. `system.escalation.{id}.created` fires
+ * webhook resume the SAME job in place. `system.escalation.{role}.{id}.created` fires
  * from the engine automatically.
  *
  * ```typescript
