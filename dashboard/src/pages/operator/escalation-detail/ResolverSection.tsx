@@ -13,6 +13,7 @@ export function ResolverSection({
   showTriage = false,
   escalationContext,
   onOpenHelp,
+  onDisabledClick,
 }: {
   json: string;
   onJsonChange: (v: string) => void;
@@ -26,6 +27,8 @@ export function ResolverSection({
   escalationContext?: ShowIfContext;
   /** Opens the Instructions side-panel view (help icon beside the form title). */
   onOpenHelp?: () => void;
+  /** Fires when the user clicks the locked (unclaimed) form. */
+  onDisabledClick?: () => void;
 }) {
   return (
     <>
@@ -71,7 +74,7 @@ export function ResolverSection({
       <div className="relative min-h-[200px]">
         {/* Form controls */}
         <div className={requestTriage ? 'pointer-events-none select-none' : ''}>
-          <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} escalationContext={escalationContext} onOpenHelp={onOpenHelp} />
+          <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} escalationContext={escalationContext} onOpenHelp={onOpenHelp} onDisabledClick={onDisabledClick} />
         </div>
 
         {/* Triage overlay — occludes the form when AI Triage is checked */}

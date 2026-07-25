@@ -171,6 +171,23 @@ describe('EscalationDetailPage — per-id state isolation', () => {
     expect(screen.queryByText('Plate check')).not.toBeInTheDocument();
   });
 
+  it('shows the unclaimed form at full strength and wiggles Claim when it is clicked', async () => {
+    state.byId[CHILD_ID] = makeEsc(CHILD_ID, {
+      workflow_type: 'plate',
+      assigned_to: null,
+      assigned_until: null,
+      form_schema: {
+        properties: { plate_ok: { type: 'string', title: 'Plate check' } },
+      },
+    });
+    const { container } = renderAt([detailPath(CHILD_ID)]);
+    const label = await screen.findByText('Plate check');
+    expect(container.innerHTML).not.toContain('opacity-60');
+
+    fireEvent.click(label);
+    expect(screen.getByTestId('claim-button').className).toContain('field-shake');
+  });
+
   it('keeps Submit locked once a resolve has succeeded', async () => {
     state.resolve.isSuccess = true;
     renderAt([detailPath(CHILD_ID)]);

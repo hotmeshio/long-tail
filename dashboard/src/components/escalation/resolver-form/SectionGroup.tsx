@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { Layers } from 'lucide-react';
 import { deriveFieldLabel } from '../../../lib/derive-field-label';
 import { DictionaryList } from './DictionaryList';
 import {
@@ -62,16 +61,13 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
         // Sections are distinct surfaces on the page wash — white paper in
         // light themes, the deeper well at night — with field wells stepping
         // away from them. Theme-driven, never a hardcoded hex.
-        ? 'border border-surface-border/60 border-l-2 border-l-accent/30 bg-surface-sunken rounded-[0.125em] p-4 animate-[section-enter_0.25s_ease-out]'
+        ? 'border border-surface-border/60 bg-surface-sunken rounded-[0.25em] p-4 animate-[section-enter_0.25s_ease-out]'
         : ''}
     >
       {name && (
-        <div className="mb-4 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-accent/60 shrink-0" strokeWidth={1.5} />
-          <p className="text-[1.40625rem] font-semibold tracking-wider text-heading [font-variant-caps:small-caps]">
-            {name}
-          </p>
-        </div>
+        <p className="mb-4 text-[1.40625rem] font-semibold tracking-wider text-heading [font-variant-caps:small-caps]">
+          {name}
+        </p>
       )}
       {layout === 'two-column' ? (
         // Geometry follows the container: the grid splits when the SECTION

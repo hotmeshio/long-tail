@@ -1,6 +1,6 @@
 # List Schema (`x-lt-list-schema`)
 
-The form schema formats one escalation on the detail page. A role can also own a `list_schema` that formats its whole list page — the list-page analog of the resolve form. It is opt-in and applies only when the list is scoped to exactly one role (`/escalations/available?role=<role>`). Absent, the list renders the standard engineer table; present, a rich role-authored view renders with a "Table view" toggle one click away.
+The form schema formats one escalation on the detail page. A role can also own a `list_schema` that formats its whole list page — the list-page analog of the resolve form. It is opt-in and applies only when the list is scoped to exactly one role (`/escalations/available?role=<role>`, and the personal inbox at `/escalations/queue?role=<role>`). Absent, the list renders the standard engineer table; present, a rich role-authored view renders with a "Table view" toggle one click away.
 
 The list schema is versioned independently of the form schema — a list edit never bumps the form version. Edit it at `/admin/roles/:role/list-schema`. The list always renders the latest version.
 
@@ -38,6 +38,8 @@ Every layout carries a persistent action button — the active card's CTA, a tra
 ```
 
 `claim` is one click: the row is claimed for the template's duration and the detail page opens already claimed — the fast path for working a queue. The button appears only on claimable rows (pending, no live claim window), and a rejected claim (someone else won the race) surfaces its message inline. `view` opens the detail page — for read-only templates where claiming from the list is wrong. Row and card clicks continue to navigate; the button is the deliberate gesture.
+
+On My Escalations (`/escalations/queue`) every row is already held by the viewer, so a `claim` template renders as a View action there: the button opens the detail page with the default "View" label. Authored `view` actions keep their label.
 
 ---
 

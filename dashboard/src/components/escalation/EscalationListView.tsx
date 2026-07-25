@@ -157,15 +157,22 @@ function isClaimable(row: LTEscalationRecord): boolean {
  * working a queue. `view` opens the detail page. Persistent (light accent at
  * rest, saturating on hover); a rejected claim surfaces its message inline.
  */
-function RowActionButton({ row, def, onView, prominent }: {
+function RowActionButton({ row, def, onView, prominent, forceView }: {
   row: LTEscalationRecord;
   def?: RowActionDef;
   onView?: () => void;
   /** Hero treatment for the active-card CTA; default is the compact row button. */
   prominent?: boolean;
+  /** Render claim templates as view actions (see EscalationListView). */
+  forceView?: boolean;
 }) {
-  const action = def?.action ?? 'claim';
-  const label = def?.label ?? (action === 'claim' ? 'Claim' : 'View');
+  const authored = def?.action ?? 'claim';
+  const action = forceView ? 'view' : authored;
+  // The authored label describes the authored gesture. When view is forced
+  // over a claim template, claim wording would mislead — use the view default.
+  const label = authored === action && def?.label
+    ? def.label
+    : action === 'claim' ? 'Claim' : 'View';
   const claim = useClaimEscalation();
   const [error, setError] = useState('');
 
@@ -208,11 +215,12 @@ function RowActionButton({ row, def, onView, prominent }: {
   );
 }
 
-function ActiveCard({ esc, card, rowAction, onOpen }: {
+function ActiveCard({ esc, card, rowAction, onOpen, forceView }: {
   esc: LTEscalationRecord;
   card: CardDef;
   rowAction?: RowActionDef;
   onOpen?: () => void;
+  forceView?: boolean;
 }) {
   const ctx = rowContext(esc);
   const title = card.title ? interpolateHelp(card.title, ctx) : esc.type;
@@ -230,7 +238,7 @@ function ActiveCard({ esc, card, rowAction, onOpen }: {
 
         {/* The row action — one-click claim (then the detail page opens already
             claimed), or view for read-only templates. */}
-        <RowActionButton row={esc} def={rowAction} onView={onOpen} prominent />
+        <RowActionButton row={esc} def={rowAction} onView={onOpen} prominent forceView={forceView} />
       </div>
 
       {card.fields && card.fields.length > 0 && (
@@ -332,10 +340,11 @@ function HistoryColumn({ role, def, onRowClick }: {
 }
 
 /** Multi-row pending queue as a facet table. Columns defined by x-lt-columns. */
-function FacetTable({ schema, rows, onRowClick }: {
+function FacetTable({ schema, rows, onRowClick, forceView }: {
   schema: ListSchema;
   rows: LTEscalationRecord[];
   onRowClick?: (row: LTEscalationRecord) => void;
+  forceView?: boolean;
 }) {
   const columns = schema['x-lt-columns'] ?? [];
   const rowAction = schema['x-lt-row-action'];
@@ -386,7 +395,7 @@ function FacetTable({ schema, rows, onRowClick }: {
                   </td>
                 ))}
                 <td className="py-2.5 text-right">
-                  <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} />
+                  <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} forceView={forceView} />
                 </td>
               </tr>
             );
@@ -449,10 +458,11 @@ export function groupBoardRows(rows: LTEscalationRecord[], groupBy: string): Boa
 /** A field value token that is a pure metadata binding — facet-linkable. */
 const METADATA_TOKEN = /^\{\{\s*metadata\.([a-zA-Z0-9_]+)\s*\}\}$/;
 
-function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet }: {
+function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet, forceView }: {
   schema: ListSchema;
   rows: LTEscalationRecord[];
   role: string;
+  forceView?: boolean;
   /** Plain card click — the group's latest row opens in the detail view. */
   onOpenDetail?: (row: LTEscalationRecord) => void;
   /** History affordances — receive a filtered table/timeline deep link. */
@@ -569,9 +579,9 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet 
               </dl>
             )}
 
-            {((rowAction?.action ?? 'claim') === 'view' || isClaimable(g.latest)) && (
+            {(forceView || (rowAction?.action ?? 'claim') === 'view' || isClaimable(g.latest)) && (
               <div className="mt-3 flex justify-end">
-                <RowActionButton row={g.latest} def={rowAction} onView={() => onOpenDetail?.(g.latest)} />
+                <RowActionButton row={g.latest} def={rowAction} onView={() => onOpenDetail?.(g.latest)} forceView={forceView} />
               </div>
             )}
           </div>
@@ -581,7 +591,7 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet 
   );
 }
 
-export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, onOpenGroup, onAddFacet, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
+export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, onOpenGroup, onAddFacet, forceViewAction, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
   role: string;
   listSchema: ListSchema;
   activeEscalations: LTEscalationRecord[];
@@ -590,6 +600,10 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   onOpenGroup?: (url: string) => void;
   /** facet-board ⇧ click — merge one facet into the live filter set. */
   onAddFacet?: (key: string, value: unknown) => void;
+  /** Render claim row-actions as view actions. For surfaces listing rows the
+   *  viewer already holds (e.g. My Escalations), where a claim gesture is
+   *  inapplicable — the button opens the detail page instead. */
+  forceViewAction?: boolean;
   total?: number;
   page?: number;
   totalPages?: number;
@@ -605,7 +619,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   useAgeTick(schemaUsesAge(listSchema));
 
   const activeBlock = active ? (
-    <ActiveCard esc={active} card={card} rowAction={rowAction} onOpen={() => onRowClick?.(active)} />
+    <ActiveCard esc={active} card={card} rowAction={rowAction} onOpen={() => onRowClick?.(active)} forceView={forceViewAction} />
   ) : (
     <p className="text-xs text-text-tertiary italic">No active item right now.</p>
   );
@@ -626,7 +640,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
             {resolvedTotal.toLocaleString()} result{resolvedTotal !== 1 ? 's' : ''}
           </p>
         )}
-        <FacetTable schema={listSchema} rows={activeEscalations} onRowClick={onRowClick} />
+        <FacetTable schema={listSchema} rows={activeEscalations} onRowClick={onRowClick} forceView={forceViewAction} />
         {page !== undefined && totalPages !== undefined && onPageChange && (
           <StickyPagination
             page={page}
@@ -652,6 +666,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
           onOpenDetail={onRowClick}
           onOpenGroup={onOpenGroup}
           onAddFacet={onAddFacet}
+          forceView={forceViewAction}
         />
         {page !== undefined && totalPages !== undefined && onPageChange && totalPages > 1 && (
           <StickyPagination

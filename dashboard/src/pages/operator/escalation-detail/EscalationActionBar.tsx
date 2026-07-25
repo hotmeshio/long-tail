@@ -28,6 +28,9 @@ export interface EscalationActionBarProps {
   // Claim
   onClaim: (minutes: number) => void;
   claimPending: boolean;
+  /** Bumped when the user clicks the locked form — each bump replays the
+   *  claim button's wiggle to point at the gesture that unlocks it. */
+  claimNudge?: number;
   // Resolve — JSON lives in viewport, bar reads it for submit
   workflowType: string | null;
   json: string;
@@ -66,7 +69,7 @@ export interface EscalationActionBarProps {
 export function EscalationActionBar(props: EscalationActionBarProps) {
   const {
     mode, activeView, onActiveViewChange,
-    onClaim, claimPending,
+    onClaim, claimPending, claimNudge,
     workflowType, json, onResolve, resolvePending, resolveError,
     requestTriage, triageNotes,
     currentRole, escalationTargets, onEscalate, escalatePending, escalateError,
@@ -202,9 +205,13 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 <CustomDurationPicker onChange={onCustomChange} compact autoFocus />
               )}
               <button
+                // Keyed by the nudge count: each locked-form click remounts
+                // the button, restarting the wiggle from the top.
+                key={claimNudge}
                 onClick={handleClaim}
                 disabled={claimPending || (isCustom && customMinutes <= 0)}
-                className="btn-primary text-xs"
+                className={`btn-primary text-xs ${claimNudge ? 'animate-[field-shake_0.4s_ease-in-out]' : ''}`}
+                data-testid="claim-button"
               >
                 {claimPending ? 'Claiming...' : 'Claim'}
               </button>
