@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { interpolateHelp, type HelpTokenContext } from '../../lib/x-lt-help';
-import { ArrowRight, ListFilter, Search } from 'lucide-react';
+import { DataTable, type Column as TableColumn } from '../common/data/DataTable';
+import { ListFilter, Search } from 'lucide-react';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
@@ -45,6 +47,14 @@ export interface ColumnDef {
   value: string;
   /** "age" renders an ISO timestamp as a compact age with an absolute tooltip. */
   format?: string;
+  /**
+   * Card-fold behavior when the table folds at narrow widths (same contract
+   * as the engineer table): 1 = identity — always visible, forms the card's
+   * title line; 2 = folds into the card body as a label/value pair; 3 =
+   * dropped in card mode. Undeclared, the first column is the identity and
+   * the rest fold.
+   */
+  priority?: 1 | 2 | 3;
 }
 
 interface BoardCardDef {
@@ -195,7 +205,7 @@ function RowActionButton({ row, def, onView, prominent, forceView }: {
   };
 
   const classes = prominent
-    ? 'inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-accent text-text-inverse text-xs font-medium hover:bg-accent-hover transition-colors shrink-0 disabled:opacity-50'
+    ? 'btn-primary text-xs shrink-0 disabled:opacity-50'
     : 'px-2 py-0.5 rounded text-2xs font-medium text-accent/70 border border-accent/30 hover:text-accent hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 whitespace-nowrap';
 
   return (
@@ -208,7 +218,6 @@ function RowActionButton({ row, def, onView, prominent, forceView }: {
         data-testid="row-action-button"
       >
         {claim.isPending ? 'Claiming…' : label}
-        {prominent && <ArrowRight className="w-3.5 h-3.5" />}
       </button>
       {error && <span className="text-2xs text-status-error" data-testid="row-action-error">{error}</span>}
     </span>
@@ -340,69 +349,105 @@ function HistoryColumn({ role, def, onRowClick }: {
 }
 
 /** Multi-row pending queue as a facet table. Columns defined by x-lt-columns. */
-function FacetTable({ schema, rows, onRowClick, forceView }: {
+function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
   schema: ListSchema;
   rows: LTEscalationRecord[];
+  role: string;
   onRowClick?: (row: LTEscalationRecord) => void;
+  /** ⇧ click on a metadata column's filter — merge into the live filter set. */
+  onAddFacet?: (key: string, value: unknown) => void;
   forceView?: boolean;
 }) {
-  const columns = schema['x-lt-columns'] ?? [];
+  const columnDefs = schema['x-lt-columns'] ?? [];
   const rowAction = schema['x-lt-row-action'];
 
-  if (rows.length === 0) {
-    return <p className="text-xs text-text-tertiary italic">No pending items.</p>;
-  }
+  // The authored columns render through the SAME table the engineer views
+  // use: padded cells, sticky header, and the card fold at narrow widths —
+  // a table never scrolls horizontally, it folds. Authors steer the fold
+  // with `priority` on each column (1 title line, 2 folds, 3 dropped);
+  // undeclared, the first column is the identity.
+  const columns: TableColumn<LTEscalationRecord>[] = [
+    {
+      key: '_status',
+      label: '',
+      priority: 1,
+      className: 'w-10',
+      render: (row) => (
+        <span
+          className={`w-1.5 h-1.5 inline-block rounded-full dot-ring ${STATUS_DOT_STYLES[row.status] ?? 'bg-status-pending'}`}
+          title={row.status}
+        />
+      ),
+    },
+    ...columnDefs.map((col, i): TableColumn<LTEscalationRecord> => ({
+      key: `col-${i}`,
+      label: col.label,
+      priority: col.priority ?? (i === 0 ? 1 : 2),
+      render: (row) => {
+        const ctx = rowContext(row);
+        // A column the author bound to a pure metadata value gets the
+        // platform's filter/search pair — the same affordance the engineer
+        // table's metadata cells and the facet-board fields carry. Filter
+        // narrows this role's queue; search spans every role; ⇧ click
+        // merges into the live filters.
+        const bound = col.value.match(METADATA_TOKEN)?.[1];
+        const raw = bound ? row.metadata?.[bound] : undefined;
+        const linkable = bound != null && raw !== undefined && raw !== null && raw !== '';
+        const display = <FieldValue raw={interpolateHelp(col.value, ctx)} format={col.format} />;
+        if (!linkable) return display;
+        return (
+          <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
+            <span className="truncate">{display}</span>
+            <span className="inline-flex items-center gap-px shrink-0 opacity-50 group-hover/row:opacity-100 transition-opacity">
+              <Link
+                to={metadataFacetUrl(bound, raw, role)}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  if (ev.shiftKey && onAddFacet) {
+                    ev.preventDefault();
+                    onAddFacet(bound, raw);
+                  }
+                }}
+                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                title={`Filter ${role}: ${bound} = ${String(raw)}${onAddFacet ? ' · ⇧ click adds to current filters' : ''}`}
+                data-testid="facet-column-filter"
+              >
+                <ListFilter className="w-3 h-3" />
+              </Link>
+              <Link
+                to={metadataFacetUrl(bound, raw)}
+                onClick={(ev) => ev.stopPropagation()}
+                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                title={`Search all: ${bound} = ${String(raw)}`}
+                data-testid="facet-column-search"
+              >
+                <Search className="w-3 h-3" />
+              </Link>
+            </span>
+          </span>
+        );
+      },
+    })),
+    {
+      key: '_action',
+      label: '',
+      priority: 1,
+      className: 'w-24 text-right',
+      render: (row) => (
+        <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} forceView={forceView} />
+      ),
+    },
+  ];
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-surface-border/60">
-            <th className="w-4 pb-2 pr-3" aria-label="Status" />
-            {columns.map((col, i) => (
-              <th
-                key={i}
-                className="text-left pb-2 pr-8 text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap"
-              >
-                {col.label}
-              </th>
-            ))}
-            <th className="w-px pb-2" aria-label="Action" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-surface-border/30">
-          {rows.map((row) => {
-            const ctx = rowContext(row);
-            return (
-              <tr
-                key={row.id}
-                onClick={() => onRowClick?.(row)}
-                className={onRowClick ? 'group cursor-pointer hover:bg-surface-hover' : 'group'}
-                data-testid="facet-table-row"
-              >
-                <td className="py-2.5 pr-3">
-                  <span
-                    className={`w-1.5 h-1.5 inline-block rounded-full dot-ring ${STATUS_DOT_STYLES[row.status] ?? 'bg-status-pending'}`}
-                    title={row.status}
-                  />
-                </td>
-                {columns.map((col, i) => (
-                  <td
-                    key={i}
-                    className="py-2.5 pr-8 text-text-secondary group-hover:text-text-primary transition-colors"
-                  >
-                    <FieldValue raw={interpolateHelp(col.value, ctx)} format={col.format} />
-                  </td>
-                ))}
-                <td className="py-2.5 text-right">
-                  <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} forceView={forceView} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      data={rows}
+      layout="fixed"
+      keyFn={(row) => row.id}
+      onRowClick={onRowClick}
+      emptyMessage="No pending items."
+    />
   );
 }
 
@@ -618,10 +663,18 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   const help = listSchema['x-lt-help'];
   useAgeTick(schemaUsesAge(listSchema));
 
-  const activeBlock = active ? (
-    <ActiveCard esc={active} card={card} rowAction={rowAction} onOpen={() => onRowClick?.(active)} forceView={forceViewAction} />
-  ) : (
-    <p className="text-xs text-text-tertiary italic">No active item right now.</p>
+  // The active item is a distinct surface on the page wash — the same card
+  // treatment the detail page gives its form sections. The label heads the
+  // card; the history column beside it stays a quiet chronicle on the wash.
+  const activeBlock = (
+    <div className="border border-surface-border/60 bg-surface-sunken rounded-[0.25em] p-4">
+      <SectionLabel>Active</SectionLabel>
+      {active ? (
+        <ActiveCard esc={active} card={card} rowAction={rowAction} onOpen={() => onRowClick?.(active)} forceView={forceViewAction} />
+      ) : (
+        <p className="text-xs text-text-tertiary italic">No active item right now.</p>
+      )}
+    </div>
   );
 
   const header = help && active ? (
@@ -631,16 +684,12 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
   ) : null;
 
   if (layout === 'facet-table') {
+    // The table stands alone — no header text above it. Instructions belong
+    // in the form's help surfaces; totals live in the pagination bar.
     const resolvedTotal = total ?? activeEscalations.length;
     return (
       <div>
-        {header}
-        {resolvedTotal > 0 && (
-          <p className="text-2xs text-text-tertiary mb-3 tabular-nums">
-            {resolvedTotal.toLocaleString()} result{resolvedTotal !== 1 ? 's' : ''}
-          </p>
-        )}
-        <FacetTable schema={listSchema} rows={activeEscalations} onRowClick={onRowClick} forceView={forceViewAction} />
+        <FacetTable schema={listSchema} rows={activeEscalations} role={role} onRowClick={onRowClick} onAddFacet={onAddFacet} forceView={forceViewAction} />
         {page !== undefined && totalPages !== undefined && onPageChange && (
           <StickyPagination
             page={page}
@@ -686,12 +735,11 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
     return (
       <div>
         {header}
-        <div className="grid grid-cols-1 @split:grid-cols-[1.6fr_1fr] gap-12 items-start">
-          <div>
-            <SectionLabel>Active</SectionLabel>
-            {activeBlock}
-          </div>
-          <div>
+        <div className="grid grid-cols-1 @split:grid-cols-[1.6fr_1fr] gap-8 @split:gap-12 items-start">
+          {activeBlock}
+          {/* pt-4 seats the History label on the Active label's optical line
+              (the card's own padding provides that inset on the left). */}
+          <div className="@split:pt-4">
             <SectionLabel>History</SectionLabel>
             <HistoryColumn role={role} def={listSchema['x-lt-history'] ?? {}} onRowClick={onRowClick} />
           </div>

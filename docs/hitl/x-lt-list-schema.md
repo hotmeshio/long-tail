@@ -16,7 +16,7 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 | `x-lt-help` | schema | Optional markdown header, interpolated with the active row |
 | `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{ label, value }] }` |
 | `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
-| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format? }]` |
+| `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format?, priority? }]` |
 | `x-lt-group-by` | schema | `facet-board`: the `"domain.path"` whose value identifies each entity |
 | `x-lt-card` | schema | `facet-board`: the per-entity card — `{ title, state?, fields?: [{ label, value, format? }] }` |
 | `x-lt-row-action` | schema | The per-row action button: `{ action?, label?, durationMinutes? }` — see below |
@@ -93,7 +93,13 @@ Use when the queue contains many concurrent rows and the role's context is best 
 }
 ```
 
-A status dot precedes the first column automatically. ISO datetime values render as a readable relative date with a full-timestamp tooltip. Missing token values render as an em dash. Clicking any row navigates to the detail page. `x-lt-help` and `x-lt-active` are ignored in this layout.
+A status dot precedes the first column automatically. ISO datetime values render as a readable relative date with a full-timestamp tooltip. Missing token values render as an em dash. Clicking any row navigates to the detail page. The table stands alone — `x-lt-help` and `x-lt-active` are ignored in this layout; totals live in the pagination bar.
+
+The table renders through the same engine as the platform's built-in tables: padded cells, a sticky header, and a card fold at narrow widths — **a table never scrolls horizontally, it folds**. Below the fold threshold each row becomes a console card: `priority: 1` columns form the card's title line, `priority: 2` columns fold into label/value pairs, and `priority: 3` columns are dropped. Undeclared, the first column is the identity and the rest fold — declare priorities when the author knows which columns matter at a glance.
+
+The seeded `print` role (ortho pipeline) is the reference example for this layout, including fold priorities.
+
+A column whose `value` is a pure metadata binding (`{{metadata.key}}`) carries the platform's filter/search pair on each cell — the same affordance the engineer table's metadata cells offer. The filter icon opens this role's queue narrowed to that value; the search icon spans every role; ⇧ click merges the value into the live filter set.
 
 ### `"facet-board"` — entity board
 

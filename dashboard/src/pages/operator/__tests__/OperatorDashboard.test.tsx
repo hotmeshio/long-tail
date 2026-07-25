@@ -102,13 +102,15 @@ describe('OperatorDashboard — My Escalations', () => {
   it('renders the plain table when no single role is filtered', () => {
     state.listSchema = { 'x-lt-layout': 'facet-table', 'x-lt-columns': [{ label: 'Title', value: '{{metadata.title}}' }] };
     renderPage();
-    expect(screen.queryByTestId('facet-table-row')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('row-action-button')).not.toBeInTheDocument();
   });
 
   it('inherits the role list template when that role is filtered, with view-mode actions', () => {
     state.listSchema = { 'x-lt-layout': 'facet-table', 'x-lt-columns': [{ label: 'Title', value: '{{metadata.title}}' }] };
     renderPage('?role=walk-role');
-    expect(screen.getByTestId('facet-table-row')).toBeInTheDocument();
+    // The rich table renders the schema's column and its row action — the
+    // engineer table has neither.
+    expect(screen.getByText('Walk e1')).toBeInTheDocument();
     // Claim gestures don't apply to rows the viewer already holds — the
     // template's default claim action renders as View and never claims.
     const action = screen.getByTestId('row-action-button');
@@ -120,6 +122,6 @@ describe('OperatorDashboard — My Escalations', () => {
   it('?view=table flips the rich view back to the columns', () => {
     state.listSchema = { 'x-lt-layout': 'facet-table', 'x-lt-columns': [{ label: 'Title', value: '{{metadata.title}}' }] };
     renderPage('?role=walk-role&view=table');
-    expect(screen.queryByTestId('facet-table-row')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('row-action-button')).not.toBeInTheDocument();
   });
 });

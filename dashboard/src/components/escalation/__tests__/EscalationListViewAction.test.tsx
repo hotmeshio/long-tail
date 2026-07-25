@@ -1,4 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, type RenderOptions } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+
+// Metadata-bound columns render router Links — every render gets a router.
+const render = (ui: React.ReactElement, options?: RenderOptions) =>
+  rtlRender(ui, { wrapper: MemoryRouter, ...options });
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EscalationListView } from '../EscalationListView';
 import type { LTEscalationRecord } from '../../../api/types';

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Bot, Play, Pause, Trash2, ArrowRight, ArrowUpRight, Pencil, BookOpen,
+  Bot, Play, Pause, Trash2, ArrowUpRight, Pencil, BookOpen,
   Radio, Clock, Brain, Compass,
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useDeleteAgent } from '../../api/agents';
@@ -279,7 +279,6 @@ export function AgentDetailPage() {
               <button onClick={() => navigate(`/knowledge?domain=${agent.knowledge_domain}`)} className="group text-left flex items-center gap-3">
                 <span className="text-sm font-mono text-text-primary group-hover:text-accent transition-colors">{agent.knowledge_domain}</span>
                 <span className="text-2xs text-text-quaternary">{agent.stats?.knowledge_count?.toLocaleString() ?? 0} entries</span>
-                <ArrowRight className="w-3 h-3 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             ) : (
               <EmptyHint text="No knowledge domain" />
