@@ -53,10 +53,10 @@ export function AppLogo({ size = 'sm', hideLabel = false, className = '', appNam
           className="logo-mark absolute pointer-events-none select-none"
           style={{
             '--logo-url': `url(${LT_BASE}/logo512.png)`,
-            width: '120px',
-            height: '120px',
-            top: '-25px',
-            left: '-90px',
+            width: '82px',
+            height: '82px',
+            top: '-12px',
+            left: '-80px',
             transform: 'rotate(232deg)',
             zIndex: -1,
             opacity: 0.55,

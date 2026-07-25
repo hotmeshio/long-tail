@@ -1,6 +1,13 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi } from 'vitest';
+
+// The submit guard (via useSubmitGuard) reads the viewer identity; these tests
+// exercise the bar's own controls, so a static identity suffices.
+vi.mock('../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { userId: 'viewer-1' } }),
+}));
+
 import { EscalationActionBar, type EscalationActionBarProps } from '../EscalationActionBar';
 
 const queryClient = new QueryClient({

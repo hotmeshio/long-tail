@@ -143,12 +143,31 @@ A structured query object. String values inside `facets` support `{{domain.path}
 | Field | Type | Description |
 |-------|------|-------------|
 | `role` | `string` | Role queue to query |
-| `status` | `string` | `"pending"`, `"resolved"`, `"cancelled"`, `"expired"` |
+| `status` | `string` | `"pending"` (default), `"resolved"`, `"cancelled"`, `"expired"` |
 | `facets` | `Record<string, string>` | Metadata containment filter; string values support `{{domain.path}}` tokens |
-| `available` | `boolean` | `true` — unclaimed/expired only |
+| `assigned` | `"me"` \| `"any"` | Ownership scope — see below |
 | `limit` | `number` | Max rows to show (default: 5) |
+| `available` | `boolean` | Legacy availability flag; superseded by `assigned` |
 
 The widget is disabled (shows no list and makes no API call) when neither `role` nor any facet value is set — both are required to avoid broad unbounded queries.
+
+### Ownership scope (`assigned`)
+
+Ownership is one more dimension of the same faceted query language — "claimed" is the implied status the API manages (pending, held, claim window live), not a separate list:
+
+- `"me"` — rows claimed by the **viewing user**. The batch case: an earlier step assigned a set of order items to whoever claimed the batch; the follow-up form shows that person their own items with working inline actions.
+- `"any"` — all matching rows regardless of claim state.
+- omitted — available rows only (unclaimed, or claim window lapsed).
+
+The scope resolves through ONE shared mapping consumed by the escalation-list widget, its `x-lt-actions`, and `x-lt-submit-guard` — a guard and an embed declaring the same query always agree on count and rows. Inline actions on claimed-to-me rows fire the standard resolve endpoint as the claim holder; RBAC and `enforce_schema` apply unchanged.
+
+```json
+"x-lt-query": {
+  "role": "order-items",
+  "facets": { "orderId": "{{metadata.orderId}}" },
+  "assigned": "me"
+}
+```
 
 ### `x-lt-columns` (optional)
 
@@ -167,13 +186,13 @@ Inline row actions: each row gains a button that fires a canned resolve against 
 ```json
 "x-lt-actions": [
   {
-    "label": "Bagged ✓",
+    "label": "Picked ✓",
     "resolverPayload": {
       "approved": true,
-      "checks": { "bagged": true, "labeled": true },
+      "checks": { "picked": true, "scanned": true },
       "orderId": "{{metadata.orderId}}"
     },
-    "confirm": "Bag {{metadata.orderId}} {{metadata.side}}?"
+    "confirm": "Mark {{metadata.sku}} picked for {{metadata.orderId}}?"
   }
 ]
 ```
@@ -186,7 +205,7 @@ Inline row actions: each row gains a button that fires a canned resolve against 
 
 On success the row updates in place through the standard query invalidation — no navigation. A rejected resolve (validation failure, lost claim) shows the server's message inline in the row; the detail link stays available, so the full form remains the path for rejects and anything the canned payload can't express.
 
-Declare one action for the happy path and leave the exception path to the form. A "walk" of N sibling items collapses from N navigations to N clicks on one page.
+Declare one action for the happy path and leave the exception path to the form. A batch of N sibling items collapses from N navigations to N clicks on one page.
 
 ### Empty and loading states
 
@@ -203,12 +222,12 @@ A top-level form_schema token (a peer of `x-lt-help`) that keeps the resolve but
 {
   "x-lt-submit-guard": {
     "query": {
-      "role": "print-harvest",
-      "status": "pending",
-      "facets": { "walkId": "{{metadata.walkId}}" }
+      "role": "order-items",
+      "facets": { "orderId": "{{metadata.orderId}}" },
+      "assigned": "me"
     },
     "mustBeEmpty": true,
-    "message": "{{count}} plates still pending — bag them before closing the walk."
+    "message": "{{count}} item(s) still pending — pick them before closing the order."
   },
   "type": "object",
   "properties": { ... }
@@ -217,9 +236,11 @@ A top-level form_schema token (a peer of `x-lt-help`) that keeps the resolve but
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `query` | `object` | Same shape as `x-lt-query`; facet string values interpolate against the host escalation's context |
+| `query` | `object` | Same shape as `x-lt-query` — including the `assigned` ownership scope; facet string values interpolate against the host escalation's context |
 | `mustBeEmpty` | `boolean` | The gate condition (default `true`) |
 | `message` | `string` | Shown beside the disabled submit; `{{count}}` carries the live row count, `{{domain.path}}` tokens also interpolate |
+
+The guard and an escalation-list embed declaring the same query resolve through one shared mapping — the count and the visible rows always agree, whatever the scope.
 
 Pair it with an `escalation-list` embed on the same query so the operator sees exactly which rows are holding the gate.
 
@@ -270,4 +291,12 @@ The link widget generates a client-side URL; the queue it points to applies its 
 
 ## Example workflow
 
-The `examples/workflows/related-escalations/` workflow demonstrates all three widgets in a realistic two-stage review scenario. See `forms.ts` in that directory for the complete form schema.
+The `examples/workflows/related-escalations/` workflow demonstrates all three widgets in a realistic two-stage review scenario, followed by a claimed walk. See `forms.ts` and `forms-walk.ts` in that directory for the complete form schemas.
+
+The claimed walk (stage 3, after the manager approves) is the ownership-scope reference:
+
+1. Three plate rows park in `rel-plate`, each faceted with the walk's `originId`.
+2. A walk-claim row parks in `rel-walker`. Resolving it IS the "start walk" button — the resolver's identity arrives on the workflow via `$resolution`, and one atomic query-form bulk assign claims every plate for that person.
+3. The closeout row parks in `rel-closer`. Its form declares the walk query ONCE — `{ role: "rel-plate", facets: { originId: "{{metadata.originId}}" }, assigned: "me" }` — consumed by the embedded list, its `Bagged ✓` inline actions, and the submit guard. The walker bags each plate in place; the count beside the locked submit falls with each click; the last plate unlocks the submit.
+
+The whole journey is two form submits and N inline clicks, with zero navigation.

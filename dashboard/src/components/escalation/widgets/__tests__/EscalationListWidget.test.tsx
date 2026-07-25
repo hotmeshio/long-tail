@@ -10,6 +10,10 @@ vi.mock('../../../../api/escalations', () => ({
   useResolveEscalation: () => ({ mutateAsync: vi.fn() }),
 }));
 
+vi.mock('../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { userId: 'viewer-1' } }),
+}));
+
 vi.mock('../../../../lib/x-lt-help', () => ({
   interpolateHelp: (template: string, ctx: Record<string, unknown>) =>
     template.replace(/\{\{(\w+)\.(\w+)\}\}/g, (_: string, domain: string, key: string) => {
@@ -156,6 +160,34 @@ describe('EscalationListWidget', () => {
     });
     const call = mockUseEscalations.mock.calls[0]?.[0];
     expect(call?.status).toBe('pending');
+    expect(call?.available).toBe(true);
+  });
+
+  it('assigned:"me" scopes the query to the viewer\'s live claims', () => {
+    renderWidget({
+      title: 'My plates',
+      'x-lt-query': { role: 'print-harvest', facets: { originId: '{{metadata.originId}}' }, assigned: 'me' },
+    }, { metadata: { originId: 'origin-7' } });
+    const call = mockUseEscalations.mock.calls[0]?.[0];
+    expect(call?.assigned_to).toBe('viewer-1');
+    expect(call?.available).toBe(false);
+    expect(call?.facets?.originId).toBe('origin-7');
+    expect(call?.enabled).toBe(true);
+  });
+
+  it('assigned:"any" queries all matching rows regardless of claim state', () => {
+    renderWidget({
+      title: 'All plates',
+      'x-lt-query': { role: 'print-harvest', assigned: 'any' },
+    });
+    const call = mockUseEscalations.mock.calls[0]?.[0];
+    expect(call?.assigned_to).toBeUndefined();
+    expect(call?.available).toBeUndefined();
+  });
+
+  it('omitted assigned defaults to the available pool', () => {
+    renderWidget({ title: 'Pool', 'x-lt-query': { role: 'print-harvest' } });
+    const call = mockUseEscalations.mock.calls[0]?.[0];
     expect(call?.available).toBe(true);
   });
 

@@ -19,10 +19,25 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 | `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format? }]` |
 | `x-lt-group-by` | schema | `facet-board`: the `"domain.path"` whose value identifies each entity |
 | `x-lt-card` | schema | `facet-board`: the per-entity card — `{ title, state?, fields?: [{ label, value, format? }] }` |
+| `x-lt-row-action` | schema | The per-row action button: `{ action?, label?, durationMinutes? }` — see below |
 
 `format: "age"` on a `facet-table` column or `facet-board` field renders a timestamp as a compact age (`12m`, `3h`, `2d`) with the absolute time as its tooltip, repainted each minute — aging interim states are scannable at a glance.
 
 The **active** item is the first non-terminal escalation. The **history** column is lazy-loaded — a "Load full history" link fetches resolved items on demand (`status` defaults to `"resolved"`, `limit` to 25). Unknown or absent `x-lt-layout` is a safe no-op that falls back to the table.
+
+### Row action (`x-lt-row-action`)
+
+Every layout carries a persistent action button — the active card's CTA, a trailing button on each `facet-table` row, a footer button on each `facet-board` card. The template sets what it does:
+
+```jsonc
+"x-lt-row-action": {
+  "action": "claim",        // "claim" | "view" — default "claim"
+  "label": "Service",       // button text; defaults "Claim" / "View"
+  "durationMinutes": 60     // claim hold time; default 30
+}
+```
+
+`claim` is one click: the row is claimed for the template's duration and the detail page opens already claimed — the fast path for working a queue. The button appears only on claimable rows (pending, no live claim window), and a rejected claim (someone else won the race) surfaces its message inline. `view` opens the detail page — for read-only templates where claiming from the list is wrong. Row and card clicks continue to navigate; the button is the deliberate gesture.
 
 ---
 

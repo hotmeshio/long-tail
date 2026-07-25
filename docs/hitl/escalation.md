@@ -63,7 +63,7 @@ import type { EscalationResolution } from '@hotmeshio/long-tail';
 const decision = await conditionLT<{
   approved: boolean;
   $resolution?: EscalationResolution;
-}>(signalId, { role: 'print-operator', metadata: { orderId } });
+}>(signalId, { role: 'order-reviewer', metadata: { orderId } });
 
 if (decision && decision.$resolution) {
   const { escalationId, resolvedBy, resolvedByEmail } = decision.$resolution;

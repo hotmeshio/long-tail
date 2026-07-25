@@ -641,7 +641,7 @@ The query form is one atomic statement: selection and claim happen in the same U
 **Example request (query form):**
 
 ```json
-{ "query": { "role": "harvester", "facets": { "walkId": "walk-7" } }, "targetUserId": "user-x1y2z3", "durationMinutes": 60 }
+{ "query": { "role": "order-items", "facets": { "orderId": "ORD-1042" } }, "targetUserId": "user-x1y2z3", "durationMinutes": 60 }
 ```
 
 **Response 200:** Result object with assignment outcomes.

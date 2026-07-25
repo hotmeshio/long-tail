@@ -31,10 +31,6 @@ const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.08);
 const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.08);
 const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.08);
 
-// Station table grid. The 5 colored columns are grouped into a single auto
-// cell rendered as a flex row with no internal gap so they touch each other.
-const STATION_GRID_COLS = 'minmax(120px, 1.1fr) minmax(100px, 0.9fr) auto 72px 72px 104px 52px';
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 const PERIODS = ['15m', '1h', '24h', '7d', '30d'] as const;
@@ -187,19 +183,17 @@ function StationRow({
   const saveSla    = (n: number | null) => updateRole.mutate({ role: role.role, sla_minutes: n });
 
   return (
-    <>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onClick}
-        onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
-        className={`grid items-center gap-4 pr-3 cursor-pointer transition-colors ${
-          selected ? 'border-l-2 !border-l-accent pl-2.5' : 'pl-3'
-        }`}
-        style={{ gridTemplateColumns: STATION_GRID_COLS }}
-      >
-        {/* Name — user-set title, or derived from the role id */}
-        <div className="flex items-center gap-1.5 min-w-0 py-1.5">
+    <tr
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
+      className={`cursor-pointer border-b border-surface-border/30 last:border-b-0 transition-colors ${
+        selected ? 'border-l-2 !border-l-accent' : ''
+      }`}
+    >
+      {/* Name — user-set title, or derived from the role id */}
+      <td className="pl-3 pr-2 py-1.5 overflow-hidden">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="font-bold text-text-primary truncate text-xs">
             {displayRoleTitle(role)}
           </span>
@@ -209,84 +203,92 @@ function StationRow({
             </span>
           )}
         </div>
+      </td>
 
-        {/* Role id */}
-        <span className="font-mono text-2xs text-text-tertiary truncate py-1.5">
-          {role.role}
+      {/* Role id */}
+      <td className="hidden xl:table-cell pr-2 py-1.5 overflow-hidden">
+        <span className="block font-mono text-2xs text-text-tertiary truncate">{role.role}</span>
+      </td>
+
+      {/* Target/h — editable */}
+      <td className="px-2 py-1.5" style={{ backgroundColor: TARGET_BAND }}>
+        <EditableNumber value={role.target_per_hour ?? null} onSave={saveTarget} />
+      </td>
+
+      {/* SLA/m — editable */}
+      <td className="px-2 py-1.5" style={{ backgroundColor: SLA_BAND }}>
+        <EditableNumber value={role.sla_minutes ?? null} onSave={saveSla} />
+      </td>
+
+      {/* Workers — calculated (Little's Law + backlog) */}
+      <td
+        className="px-2 py-1.5 text-right"
+        style={{ backgroundColor: WORKERS_BAND }}
+        title={workers != null ? `~${workers} concurrent worker${workers === 1 ? '' : 's'} to sustain ${role.target_per_hour}/h within ${role.sla_minutes}m SLA` : undefined}
+      >
+        <span className={`text-xs font-mono tabular-nums ${workers != null ? '' : 'text-text-quaternary'}`} style={workers != null ? { color: WORKERS_COLOR } : undefined}>
+          {workers ?? '—'}
         </span>
+      </td>
 
-        {/* ── 5 colored columns in one touching flex group ── */}
-        <div className="self-stretch flex items-stretch">
-          {/* Target/h — editable */}
-          <div className={`${COLORED_COLS[0].w} shrink-0 flex items-center justify-end ${COLORED_COLS[0].px}`} style={{ backgroundColor: TARGET_BAND }}>
-            <EditableNumber value={role.target_per_hour ?? null} onSave={saveTarget} />
-          </div>
-          {/* SLA/m — editable */}
-          <div className={`${COLORED_COLS[1].w} shrink-0 flex items-center justify-end ${COLORED_COLS[1].px}`} style={{ backgroundColor: SLA_BAND }}>
-            <EditableNumber value={role.sla_minutes ?? null} onSave={saveSla} />
-          </div>
-          {/* Workers — calculated (Little's Law + backlog) */}
-          <div
-            className={`${COLORED_COLS[2].w} shrink-0 flex items-center justify-end ${COLORED_COLS[2].px}`}
-            style={{ backgroundColor: WORKERS_BAND }}
-            title={workers != null ? `~${workers} concurrent worker${workers === 1 ? '' : 's'} to sustain ${role.target_per_hour}/h within ${role.sla_minutes}m SLA` : undefined}
-          >
-            <span className={`text-xs font-mono tabular-nums ${workers != null ? '' : 'text-text-quaternary'}`} style={workers != null ? { color: WORKERS_COLOR } : undefined}>
-              {workers ?? '—'}
-            </span>
-          </div>
-          {/* Pending */}
-          <div className={`${COLORED_COLS[3].w} shrink-0 flex items-center justify-end ${COLORED_COLS[3].px}`} style={{ backgroundColor: PENDING_BAND }}>
-            <Link
-              to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
-              className={`text-xs font-mono tabular-nums hover:underline ${
-                pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
-              }`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {pending}
-            </Link>
-          </div>
-          {/* Claimed */}
-          <div className={`${COLORED_COLS[4].w} shrink-0 flex items-center justify-end ${COLORED_COLS[4].px}`} style={{ backgroundColor: ACTIVE_BAND }}>
-            <Link
-              to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
-              className={`text-xs font-mono tabular-nums hover:underline ${
-                claimed > 0 ? 'font-semibold' : 'text-text-quaternary'
-              }`}
-              style={claimed > 0 ? { color: ACTIVE_COLOR } : undefined}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {claimed}
-            </Link>
-          </div>
-          {/* Resolved */}
-          <div className={`${COLORED_COLS[5].w} shrink-0 flex items-center justify-end ${COLORED_COLS[5].px}`} style={{ backgroundColor: RESOLVED_BAND }}>
-            <Link
-              to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
-              className={`text-xs font-mono tabular-nums hover:underline ${
-                resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'
-              }`}
-              style={resolved > 0 ? { color: RESOLVED_COLOR } : undefined}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {resolved}
-            </Link>
-          </div>
-        </div>
+      {/* Pending */}
+      <td className="px-2 py-1.5 text-right" style={{ backgroundColor: PENDING_BAND }}>
+        <Link
+          to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=available`}
+          className={`text-xs font-mono tabular-nums hover:underline ${
+            pending > 0 ? 'text-text-primary font-semibold' : 'text-text-quaternary'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {pending}
+        </Link>
+      </td>
 
-        {/* P99 wait */}
-        <span className="text-xs font-mono tabular-nums text-right py-1.5 text-text-secondary">
+      {/* Claimed */}
+      <td className="px-2 py-1.5 text-right" style={{ backgroundColor: ACTIVE_BAND }}>
+        <Link
+          to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=claimed`}
+          className={`text-xs font-mono tabular-nums hover:underline ${
+            claimed > 0 ? 'font-semibold' : 'text-text-quaternary'
+          }`}
+          style={claimed > 0 ? { color: ACTIVE_COLOR } : undefined}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {claimed}
+        </Link>
+      </td>
+
+      {/* Resolved */}
+      <td className="px-2 py-1.5 text-right" style={{ backgroundColor: RESOLVED_BAND }}>
+        <Link
+          to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=resolved`}
+          className={`text-xs font-mono tabular-nums hover:underline ${
+            resolved > 0 ? 'text-text-secondary' : 'text-text-quaternary'
+          }`}
+          style={resolved > 0 ? { color: RESOLVED_COLOR } : undefined}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {resolved}
+        </Link>
+      </td>
+
+      {/* P99 wait */}
+      <td className="hidden xl:table-cell px-2 py-1.5 text-right">
+        <span className="text-xs font-mono tabular-nums text-text-secondary">
           {fmtMin(metric?.wait.p99 ?? null)}
         </span>
+      </td>
 
-        {/* P99 work */}
-        <span className="text-xs font-mono tabular-nums text-right py-1.5 text-text-secondary">
+      {/* P99 work */}
+      <td className="hidden xl:table-cell px-2 py-1.5 text-right">
+        <span className="text-xs font-mono tabular-nums text-text-secondary">
           {fmtMin(metric?.work.p99 ?? null)}
         </span>
+      </td>
 
-        {/* Load mini-bar */}
-        <div className="flex items-center gap-2 py-1.5">
+      {/* Load mini-bar */}
+      <td className="hidden lg:table-cell px-2 py-1.5">
+        <div className="flex items-center gap-2">
           <div className="w-12 h-1.5 bg-surface-sunken rounded-full overflow-hidden shrink-0">
             <div className={`h-full rounded-full ${color}`} style={{ width: `${barWidth}%` }} />
           </div>
@@ -300,10 +302,12 @@ function StationRow({
             {pct != null ? `${pct}%` : '—'}
           </span>
         </div>
+      </td>
 
-        {/* Actions — eye always anchored first; jeopardy occupies a fixed-width
-            slot after it so the eye never shifts when the alert appears. */}
-        <div className="flex items-center justify-center gap-1.5 py-1.5">
+      {/* Actions — eye always anchored first; jeopardy occupies a fixed-width
+          slot after it so the eye never shifts when the alert appears. */}
+      <td className="py-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           <Link
             to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=all`}
             className="text-text-quaternary hover:text-accent transition-colors"
@@ -326,8 +330,8 @@ function StationRow({
             )}
           </span>
         </div>
-      </div>
-    </>
+      </td>
+    </tr>
   );
 }
 
@@ -449,16 +453,17 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
   );
 }
 
-// ── Colored column specs — widths shared by header and rows ──────────────────
-// Widths sized to the longest label in each column at text-2xs + tracking-wider.
-
+// ── Colored column specs — bands shared by header and rows ───────────────────
+// Percentage widths: under `table-fixed` the header row's widths govern every
+// column, so these scale with the window instead of forcing a minimum table
+// width. NAME (widthless) absorbs the remainder.
 const COLORED_COLS = [
-  { label: 'TARGET/H', band: TARGET_BAND,   hue: TARGET_COLOR,   w: 'w-[4.5rem]', px: 'px-1.5' },
-  { label: 'SLA/M',    band: SLA_BAND,      hue: SLA_COLOR,      w: 'w-14',        px: 'px-1.5' },
-  { label: 'WORKERS',  band: WORKERS_BAND,  hue: WORKERS_COLOR,  w: 'w-20',        px: 'px-2' },
-  { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-20',        px: 'px-2' },
-  { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-20',        px: 'px-2' },
-  { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-20',        px: 'px-2' },
+  { label: 'TARGET/H', band: TARGET_BAND,   hue: TARGET_COLOR,   w: 'w-[8%]' },
+  { label: 'SLA/M',    band: SLA_BAND,      hue: SLA_COLOR,      w: 'w-[7%]' },
+  { label: 'WORKERS',  band: WORKERS_BAND,  hue: WORKERS_COLOR,  w: 'w-[8%]' },
+  { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-[8%]' },
+  { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-[8%]' },
+  { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-[8%]' },
 ] as const;
 
 /**
@@ -486,35 +491,33 @@ function calcWorkers(
 
 // ── Table header ──────────────────────────────────────────────────────────────
 
+// Header cells stick inside the table's own scroll container (the bottom
+// console row). Band cells layer their tint over the opaque surface with a
+// gradient so scrolling rows never show through the sticky header.
+const TH_BASE =
+  'sticky top-0 z-10 bg-surface border-b border-surface-border py-1.5 text-2xs font-semibold uppercase tracking-wider whitespace-nowrap';
+
 function TableHead() {
   return (
-    <div
-      className="grid items-center gap-4 px-3 border-b border-surface-border"
-      style={{ gridTemplateColumns: STATION_GRID_COLS }}
-    >
-      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">NAME</span>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">ROLE</span>
-
-      {/* Touching colored column group */}
-      <div className="self-stretch flex items-stretch">
+    <thead>
+      <tr>
+        <th className={`${TH_BASE} pl-3 pr-2 text-left text-text-quaternary`}>NAME</th>
+        <th className={`${TH_BASE} hidden xl:table-cell w-[12%] pr-2 text-left text-text-quaternary`}>ROLE</th>
         {COLORED_COLS.map((col) => (
-          <div
+          <th
             key={col.label}
-            className={`${col.w} shrink-0 flex items-center justify-end ${col.px}`}
-            style={{ backgroundColor: col.band }}
+            className={`${TH_BASE} ${col.w} px-2 text-right`}
+            style={{ color: col.hue, backgroundImage: `linear-gradient(${col.band}, ${col.band})` }}
           >
-            <span className="text-2xs font-semibold uppercase tracking-wider" style={{ color: col.hue }}>
-              {col.label}
-            </span>
-          </div>
+            {col.label}
+          </th>
         ))}
-      </div>
-
-      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WAIT</span>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-right">P99 WORK</span>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5">TREND</span>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-text-quaternary py-1.5 text-center">ACTIONS</span>
-    </div>
+        <th className={`${TH_BASE} hidden xl:table-cell w-[8%] px-2 text-right text-text-quaternary`}>P99 WAIT</th>
+        <th className={`${TH_BASE} hidden xl:table-cell w-[8%] px-2 text-right text-text-quaternary`}>P99 WORK</th>
+        <th className={`${TH_BASE} hidden lg:table-cell w-[11%] px-2 text-left text-text-quaternary`}>TREND</th>
+        <th className={`${TH_BASE} w-14 px-1 text-center text-text-quaternary`}>ACTIONS</th>
+      </tr>
+    </thead>
   );
 }
 
@@ -527,7 +530,9 @@ export function OperationsPage() {
   const [period, setPeriod] = useState<Period>('1h');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [logScale, setLogScale] = useState(false);
+  // Log default: station volumes span orders of magnitude; log keeps every
+  // curve's shape visible instead of flattening the small ones.
+  const [logScale, setLogScale] = useState(true);
 
   // Push-driven refresh: every escalation event invalidates ['stationMetrics']
   // through the central event system (debounced, transport-agnostic). The
@@ -748,21 +753,26 @@ export function OperationsPage() {
             />
           </div>
 
-          {/* Bottom row: sized to its rows up to 30vh — header sticky, rows scroll */}
-          <div className="max-h-[30vh] flex-none flex flex-col border-t border-surface-border overflow-hidden">
-            <TableHead />
-            <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-surface-border/30">
-              {ordered.map(({ role }) => (
-                <StationRow
-                  key={role.role}
-                  role={role}
-                  metric={metrics.find((m) => m.role === role.role)}
-                  selected={selectedRole === role.role}
-                  periodHours={PERIOD_HOURS[period]}
-                  onClick={() => handleSelect(role.role)}
-                />
-              ))}
-            </div>
+          {/* Bottom row: one real table in one scroll container — the platform
+              idiom (see DataTable). `table-fixed w-full` locks columns to the
+              container width (no horizontal scroll at any breakpoint); header
+              cells stick inside the scrolling region. */}
+          <div className="max-h-[30vh] flex-none overflow-y-auto border-t border-surface-border">
+            <table className="w-full table-fixed">
+              <TableHead />
+              <tbody>
+                {ordered.map(({ role }) => (
+                  <StationRow
+                    key={role.role}
+                    role={role}
+                    metric={metrics.find((m) => m.role === role.role)}
+                    selected={selectedRole === role.role}
+                    periodHours={PERIOD_HOURS[period]}
+                    onClick={() => handleSelect(role.role)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
 
         </div>

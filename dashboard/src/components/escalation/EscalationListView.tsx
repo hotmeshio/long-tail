@@ -5,7 +5,7 @@ import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
 import { StickyPagination } from '../common/data/StickyPagination';
-import { useEscalations } from '../../api/escalations';
+import { useEscalations, useClaimEscalation } from '../../api/escalations';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import { formatAgoCompact } from '../../lib/format';
 import { metadataFacetUrl } from '../../lib/facet-url';
@@ -54,6 +54,21 @@ interface BoardCardDef {
   fields?: { label: string; value: string; format?: string }[];
 }
 
+/**
+ * The per-row action button — the queue-working gesture, always available on
+ * every layout. Template-driven: the schema author sets the action, its text,
+ * and (for claim) the hold time.
+ */
+export interface RowActionDef {
+  /** "claim" fires a one-click claim then opens the detail page already
+   *  claimed; "view" just opens it. Default "claim". */
+  action?: 'claim' | 'view';
+  /** Button text. Defaults "Claim" / "View" by action. */
+  label?: string;
+  /** Claim hold time in minutes. Default 30 (the platform claim default). */
+  durationMinutes?: number;
+}
+
 interface ListSchema {
   'x-lt-layout'?: string;
   'x-lt-help'?: string;
@@ -64,6 +79,8 @@ interface ListSchema {
   'x-lt-group-by'?: string;
   /** facet-board: the per-entity card definition. */
   'x-lt-card'?: BoardCardDef;
+  /** The per-row action button (claim | view, label, claim duration). */
+  'x-lt-row-action'?: RowActionDef;
 }
 
 /**
@@ -127,14 +144,78 @@ function FieldValue({ raw, format }: { raw: string; format?: string }) {
   return <>{raw}</>;
 }
 
-function ActiveCard({ esc, card, onOpen }: {
+const DEFAULT_CLAIM_MINUTES = 30;
+
+/** Claim targets pending rows without a live claim window. */
+function isClaimable(row: LTEscalationRecord): boolean {
+  return row.status === 'pending' && !isEffectivelyClaimed(row);
+}
+
+/**
+ * The x-lt-row-action button. `claim` is one click: claim for the template's
+ * duration, then open the detail page already claimed — the fast path for
+ * working a queue. `view` opens the detail page. Persistent (light accent at
+ * rest, saturating on hover); a rejected claim surfaces its message inline.
+ */
+function RowActionButton({ row, def, onView, prominent }: {
+  row: LTEscalationRecord;
+  def?: RowActionDef;
+  onView?: () => void;
+  /** Hero treatment for the active-card CTA; default is the compact row button. */
+  prominent?: boolean;
+}) {
+  const action = def?.action ?? 'claim';
+  const label = def?.label ?? (action === 'claim' ? 'Claim' : 'View');
+  const claim = useClaimEscalation();
+  const [error, setError] = useState('');
+
+  if (action === 'claim' && !isClaimable(row)) return null;
+
+  const fire = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (action === 'view') {
+      onView?.();
+      return;
+    }
+    setError('');
+    claim.mutate(
+      { id: row.id, durationMinutes: def?.durationMinutes ?? DEFAULT_CLAIM_MINUTES },
+      {
+        onSuccess: () => onView?.(),
+        onError: (err) => setError((err as Error).message),
+      },
+    );
+  };
+
+  const classes = prominent
+    ? 'inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-accent text-text-inverse text-xs font-medium hover:bg-accent-hover transition-colors shrink-0 disabled:opacity-50'
+    : 'px-2 py-0.5 rounded text-2xs font-medium text-accent/70 border border-accent/30 hover:text-accent hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 whitespace-nowrap';
+
+  return (
+    <span className="inline-flex flex-col items-end gap-0.5">
+      <button
+        type="button"
+        onClick={fire}
+        disabled={claim.isPending}
+        className={classes}
+        data-testid="row-action-button"
+      >
+        {claim.isPending ? 'Claiming…' : label}
+        {prominent && <ArrowRight className="w-3.5 h-3.5" />}
+      </button>
+      {error && <span className="text-2xs text-status-error" data-testid="row-action-error">{error}</span>}
+    </span>
+  );
+}
+
+function ActiveCard({ esc, card, rowAction, onOpen }: {
   esc: LTEscalationRecord;
   card: CardDef;
+  rowAction?: RowActionDef;
   onOpen?: () => void;
 }) {
   const ctx = rowContext(esc);
   const title = card.title ? interpolateHelp(card.title, ctx) : esc.type;
-  const claimable = esc.status === 'pending' && !isEffectivelyClaimed(esc);
   return (
     <div>
       <div className="flex items-start justify-between gap-6">
@@ -147,16 +228,9 @@ function ActiveCard({ esc, card, onOpen }: {
           )}
         </button>
 
-        {/* Explicit way through to the detail page to claim the open item. */}
-        {claimable && (
-          <button
-            onClick={onOpen}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-accent text-text-inverse text-xs font-medium hover:bg-accent-hover transition-colors shrink-0"
-          >
-            Claim
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        )}
+        {/* The row action — one-click claim (then the detail page opens already
+            claimed), or view for read-only templates. */}
+        <RowActionButton row={esc} def={rowAction} onView={onOpen} prominent />
       </div>
 
       {card.fields && card.fields.length > 0 && (
@@ -264,6 +338,7 @@ function FacetTable({ schema, rows, onRowClick }: {
   onRowClick?: (row: LTEscalationRecord) => void;
 }) {
   const columns = schema['x-lt-columns'] ?? [];
+  const rowAction = schema['x-lt-row-action'];
 
   if (rows.length === 0) {
     return <p className="text-xs text-text-tertiary italic">No pending items.</p>;
@@ -283,6 +358,7 @@ function FacetTable({ schema, rows, onRowClick }: {
                 {col.label}
               </th>
             ))}
+            <th className="w-px pb-2" aria-label="Action" />
           </tr>
         </thead>
         <tbody className="divide-y divide-surface-border/30">
@@ -309,6 +385,9 @@ function FacetTable({ schema, rows, onRowClick }: {
                     <FieldValue raw={interpolateHelp(col.value, ctx)} format={col.format} />
                   </td>
                 ))}
+                <td className="py-2.5 text-right">
+                  <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} />
+                </td>
               </tr>
             );
           })}
@@ -383,6 +462,7 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet 
 }) {
   const groupBy = schema['x-lt-group-by'];
   const card = schema['x-lt-card'] ?? {};
+  const rowAction = schema['x-lt-row-action'];
 
   if (!groupBy) {
     return <p className="text-xs text-text-tertiary italic">facet-board needs an x-lt-group-by path.</p>;
@@ -489,6 +569,11 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet 
               </dl>
             )}
 
+            {((rowAction?.action ?? 'claim') === 'view' || isClaimable(g.latest)) && (
+              <div className="mt-3 flex justify-end">
+                <RowActionButton row={g.latest} def={rowAction} onView={() => onOpenDetail?.(g.latest)} />
+              </div>
+            )}
           </div>
         );
       })}
@@ -514,12 +599,13 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
 }) {
   const layout = listSchema['x-lt-layout'];
   const card = listSchema['x-lt-active'] ?? {};
+  const rowAction = listSchema['x-lt-row-action'];
   const active = activeEscalations[0];
   const help = listSchema['x-lt-help'];
   useAgeTick(schemaUsesAge(listSchema));
 
   const activeBlock = active ? (
-    <ActiveCard esc={active} card={card} onOpen={() => onRowClick?.(active)} />
+    <ActiveCard esc={active} card={card} rowAction={rowAction} onOpen={() => onRowClick?.(active)} />
   ) : (
     <p className="text-xs text-text-tertiary italic">No active item right now.</p>
   );

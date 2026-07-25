@@ -9,6 +9,10 @@ vi.mock('../../../../api/escalations', () => ({
   useEscalations: (...args: unknown[]) => mockUseEscalations(...args),
 }));
 
+vi.mock('../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { userId: 'walker-1' } }),
+}));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });

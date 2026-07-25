@@ -1,6 +1,7 @@
 import { useEscalations } from '../api/escalations';
+import { useAuth } from './useAuth';
 import { interpolateHelp } from '../lib/x-lt-help';
-import { resolveQueryFacets, type EmbedQuery } from '../lib/x-lt-query';
+import { resolveScopedQuery, type EmbedQuery } from '../lib/x-lt-query';
 import type { ShowIfContext } from '../lib/x-lt-show-if';
 
 /**
@@ -36,15 +37,21 @@ export function useSubmitGuard(
   guard: SubmitGuardDef | undefined,
   ctx: ShowIfContext | undefined,
 ): { blocked: boolean; count: number; message: string } {
-  const query = guard?.query;
-  const resolvedFacets = resolveQueryFacets(query?.facets, ctx ?? {});
+  const { user } = useAuth();
+
+  // The SAME mapping the escalation-list embed uses (resolveScopedQuery) —
+  // including the `assigned` ownership scope — so the guard's count always
+  // matches the rows a same-query embed renders.
+  const scoped = resolveScopedQuery(guard?.query ?? {}, ctx ?? {}, user?.userId);
 
   const { data } = useEscalations({
-    role: query?.role,
-    status: query?.status ?? 'pending',
-    facets: resolvedFacets,
+    role: scoped.role,
+    status: scoped.status,
+    facets: scoped.facets,
+    assigned_to: scoped.assigned_to,
+    available: scoped.available,
     limit: 1, // the gate needs only the total; rows are irrelevant
-    enabled: !!guard && !!(query?.role || Object.keys(resolvedFacets).length),
+    enabled: !!guard && scoped.enabled,
   });
 
   const count = data?.total ?? 0;

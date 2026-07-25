@@ -4,8 +4,9 @@ import { interpolateHelp } from '../../../lib/x-lt-help';
 import { formatAgoCompact } from '../../../lib/format';
 import { rowContext } from '../EscalationListView';
 import { useEscalations, useResolveEscalation } from '../../../api/escalations';
+import { useAuth } from '../../../hooks/useAuth';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
-import { resolveQueryFacets, type EmbedQuery } from '../../../lib/x-lt-query';
+import { resolveScopedQuery, type EmbedQuery } from '../../../lib/x-lt-query';
 import type { WidgetProps } from './index';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import type { LTEscalationRecord } from '../../../api/types';
@@ -102,15 +103,21 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
   const helperText = schema?.description as string | undefined;
 
   const ctx = escalationContext ?? {};
-  const resolvedFacets = resolveQueryFacets(rawQuery.facets, ctx);
+  const { user } = useAuth();
+
+  // ONE shared mapping (resolveScopedQuery) turns x-lt-query into concrete
+  // escalation params — the same call x-lt-submit-guard makes, so the visible
+  // rows and the guard's count evaluate the identical scope.
+  const scoped = resolveScopedQuery(rawQuery, ctx, user?.userId);
 
   const { data, isLoading } = useEscalations({
-    role: rawQuery.role,
-    status: rawQuery.status,
-    facets: resolvedFacets,
-    available: rawQuery.available,
-    limit: rawQuery.limit ?? 5,
-    enabled: !!(rawQuery.role || Object.keys(resolvedFacets).length),
+    role: scoped.role,
+    status: scoped.status,
+    facets: scoped.facets,
+    assigned_to: scoped.assigned_to,
+    available: scoped.available,
+    limit: scoped.limit ?? 5,
+    enabled: scoped.enabled,
   });
 
   const escalations = data?.escalations ?? [];
