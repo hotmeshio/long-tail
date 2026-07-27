@@ -41,6 +41,53 @@ Scope makes limited-surface users first-class. A workflow assigns an escalation 
 
 See the [Roles API](api/http/roles.md#work-surface-scope) for the assignment contract and [roles.md](hitl/roles.md#role-based-routing) in the HITL guide for the workflow-side flow.
 
+## Personas
+
+A persona is a named bundle of roles with a per-role **relationship** scope — shorthand for "add this user to these roles with these scoped privileges." Assigning a persona performs the equivalent of adding the user to each linked role at the linked scope; because each role carries its own pins, list schema, and form schema, one assignment composes the member's entire dashboard surface. Personas are a suggestion, the same way a `default_pins` entry is: admins can always hand-tune memberships per user through the existing users/roles surfaces, and the persona is the repeatable 95% path.
+
+The relationship names a point on the member scope lattice (a persona grant is always `type=member`):
+
+| relationship | read_scope | write_scope | Grants |
+|--------------|-----------|-------------|--------|
+| `write-all` | `all` | `all` | Full worker — claim, resolve, submit forms |
+| `write-self` | `all` | `self` | Sees the whole queue, acts only on own assignments |
+| `read-all` | `all` | `none` | Observer — sees the pond, the pins, the counts; cannot act |
+
+`write-none` is accepted everywhere as a synonym for `read-all`.
+
+### Membership stays the source of truth
+
+Personas are not a second authorization path. Assignment fans out to ordinary `lt_user_roles` rows; every RBAC query reads memberships exactly as before. The persona record explains *why* the memberships exist:
+
+- **Provenance.** Each membership carries `granted_by_persona` — the persona sustaining it, or null for a direct grant. Unassigning a persona removes only the rows it sustains. A row a sibling persona still grants is re-homed to that persona instead of being removed. A direct role-add on a persona-sustained row takes the row over (provenance flips to direct), so a later unassign never removes a membership an admin set by hand.
+- **Highest allowance wins.** A user holding several personas (or a direct grant) gets the union per role — the membership row stores the highest scope any grantor supplies. Direct grants are only ever raised toward the persona union, never lowered.
+- **Overlay on re-assign.** Assignment is idempotent: re-assigning a persona reconciles the user's memberships against the persona's *current* role links, so "apply and reapply" is one call. Editing a persona's links (or its link relationships) reconciles every current holder in the same transaction.
+- **Deletion is exact.** Deleting a persona removes the memberships it sustains (re-homing rows a sibling persona still grants) before the persona row goes away; direct grants are untouched.
+
+### Declaring personas
+
+Personas are managed three equivalent ways — dashboard (**Admin → Personas**, visible to admins, superadmins, and engineers, the same audience that manages roles and users), API/SDK, and a declarative seed pass that lives in git beside the role declarations:
+
+```typescript
+await lt.personas.seed([
+  {
+    key: 'production-manager',
+    title: 'Production Manager',
+    description: 'Runs the pipeline: works design and review, watches print and the fleet.',
+    roles: [
+      { role: 'design', relationship: 'write-all' },
+      { role: 'review', relationship: 'write-all' },
+      { role: 'print', relationship: 'read-all' },
+      { role: 'fleet-servicer', relationship: 'read-all' },
+    ],
+  },
+]);
+```
+
+The seed is idempotent and authoritative per spec: title/description are overlaid, role links are synced (links absent from the spec are pruned), linked roles are ensured as FK targets, and every current holder is reconciled — re-running the seed after editing a spec re-applies it to everyone holding the persona.
+
+HTTP surface: `GET/POST /api/personas`, `GET/PATCH/DELETE /api/personas/:key`, `PUT/DELETE /api/personas/:key/roles/:role`, `POST /api/personas/seed`, and per-user `GET/POST /api/users/:id/personas` plus `DELETE /api/users/:id/personas/:key`. `GET /api/users/:id/personas` returns the personas held and the composed role/scope map (each row naming its sustaining persona, or null for a direct grant) — the profile-page view. The same operations exist as `lt.personas.*` in the SDK, `ltc personas` in the CLI, and `*_persona` tools on the `long-tail-admin` MCP server.
+
 ### Enforcement
 
 Scope folds into the SQL, so it is atomic with no TOCTOU window. Read scope becomes part of the escalation search query — a member sees a row when `role ∈ allRoles OR (role ∈ selfRoles AND assigned_to = me)`. Write scope folds into the atomic resolve-by-metadata query and gates the by-id claim/resolve/cancel paths. `assigned_to` is indexed, so `self` scope scales to large queues.

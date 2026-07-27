@@ -1,25 +1,18 @@
-import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Bot, Play, Pause, Trash2, ArrowUpRight, Pencil, BookOpen,
-  Radio, Clock, Brain, Compass,
+  Radio, Clock, Brain,
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useDeleteAgent } from '../../api/agents';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { useAgentSubscriptions } from '../../api/agent-subscriptions';
 import { useAgentEvents } from '../../hooks/useEventHooks';
-import { useEventSubscription } from '../../hooks/useEventContext';
-import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { EventTopicPill } from '../../components/common/display/EventTopicPill';
 import { CronLabel } from '../../components/common/display/CronLabel';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
 
 function SectionHeader({ icon: Icon, color, children, actions }: { icon: React.ElementType; color: string; children: React.ReactNode; actions?: React.ReactNode }) {
   return (
@@ -52,28 +45,6 @@ function SectionViewLink({ to, label }: { to: string; label: string }) {
   );
 }
 
-// ── Live feed ───────────────────────────────────────────────────────────────
-
-interface FeedEvent { id: number; type: string; timestamp: string; label: string; }
-let feedCounter = 0;
-
-function useAgentFeed(agentName?: string) {
-  const [events, setEvents] = useState<FeedEvent[]>([]);
-  const [pulse, setPulse] = useState(false);
-  const handler = useCallback((event: any) => {
-    if (event.type?.startsWith('mesh.')) return;
-    const label = event.activityName || event.data?.domain || event.workflowId?.slice(0, 16) || '';
-    setEvents((prev) => [{ id: ++feedCounter, type: event.type, timestamp: event.timestamp, label }, ...prev].slice(0, 10));
-    setPulse(true);
-    setTimeout(() => setPulse(false), 2000);
-  }, []);
-  useEventSubscription(
-    agentName ? `${NATS_SUBJECT_PREFIX}.system.agent.${agentName}.>` : '',
-    handler,
-  );
-  return { events, pulse };
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function AgentDetailPage() {
@@ -87,7 +58,6 @@ export function AgentDetailPage() {
   const { data: subsData } = useAgentSubscriptions(id ?? null);
   const updateMutation = useUpdateAgent();
   const deleteMutation = useDeleteAgent();
-  const { events: liveEvents, pulse } = useAgentFeed(id);
   useAgentEvents();
 
   if (isLoading) {
@@ -150,7 +120,7 @@ export function AgentDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 mr-2">
-            <span className={`w-2 h-2 rounded-full dot-ring ${statusDot}`} />
+            <span className={`w-2.5 h-2.5 rounded-full dot-ring ${statusDot}`} />
             <span className="text-xs text-text-secondary capitalize">{statusLabel}</span>
           </div>
           <button onClick={() => navigate(`/agents/${agent.id}/edit`)} className="flex items-center gap-1.5 px-4 py-1.5 text-xs rounded-md bg-accent text-text-inverse hover:bg-accent-hover transition-colors">
@@ -176,31 +146,6 @@ export function AgentDetailPage() {
       {agent.description && (
         <div className="border-l-2 border-accent/30 pl-4 py-1 mb-10">
           <p className="text-sm text-text-secondary italic leading-relaxed">{agent.description}</p>
-        </div>
-      )}
-
-      {/* Motivation */}
-      {(agent.goals || agent.rules) && (
-        <div className="mb-10">
-          <SectionHeader
-            icon={Compass}
-            color="text-accent"
-            actions={<SectionViewLink to={`/agents/${agent.id}/edit?step=2`} label="Motivation" />}
-          >Motivation</SectionHeader>
-          <div className="grid grid-cols-2 gap-x-14 bg-surface-sunken/20 rounded-lg px-5 py-4">
-            {agent.goals && (
-              <div>
-                <p className="text-2xs text-text-quaternary uppercase tracking-widest mb-1.5">Goals</p>
-                <p className="text-sm text-text-primary leading-relaxed">{agent.goals}</p>
-              </div>
-            )}
-            {agent.rules && (
-              <div>
-                <p className="text-2xs text-text-quaternary uppercase tracking-widest mb-1.5">Rules</p>
-                <p className="text-sm text-text-primary leading-relaxed">{agent.rules}</p>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -262,56 +207,26 @@ export function AgentDetailPage() {
           )}
         </div>
 
-        {/* Col 3: Knowledge + Activity */}
-        <div className="space-y-10">
-          <div>
-            <SectionHeader
-              icon={Brain}
-              color="text-accent"
-              actions={
-                <SectionViewLink
-                  to={agent.knowledge_domain ? `/knowledge?domain=${agent.knowledge_domain}` : `/agents/${agent.id}/edit?step=3`}
-                  label="Knowledge"
-                />
-              }
-            >Knowledge</SectionHeader>
-            {agent.knowledge_domain ? (
-              <button onClick={() => navigate(`/knowledge?domain=${agent.knowledge_domain}`)} className="group text-left flex items-center gap-3">
-                <span className="text-sm font-mono text-text-primary group-hover:text-accent transition-colors">{agent.knowledge_domain}</span>
-                <span className="text-2xs text-text-quaternary">{agent.stats?.knowledge_count?.toLocaleString() ?? 0} entries</span>
-              </button>
-            ) : (
-              <EmptyHint text="No knowledge domain" />
-            )}
-          </div>
-
-          <div>
-            <SectionHeader icon={Radio} color="text-accent"
-              actions={
-                <div className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full dot-ring transition-colors duration-500 ${pulse ? 'bg-status-success' : 'bg-surface-border'}`} />
-                  <span className="text-2xs text-text-quaternary">live</span>
-                </div>
-              }
-            >
-              Activity
-            </SectionHeader>
-            {liveEvents.length === 0 ? (
-              <EmptyHint text="Events appear here as the agent runs" />
-            ) : (
-              <div className="space-y-1.5">
-                {liveEvents.map((ev) => (
-                  <div key={ev.id}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-2xs text-text-primary font-mono truncate flex-1">{ev.label || '—'}</span>
-                      <span className="text-2xs text-text-quaternary shrink-0 ml-2">{formatTime(ev.timestamp)}</span>
-                    </div>
-                    <EventTopicPill topic={ev.type} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Col 3: Knowledge */}
+        <div>
+          <SectionHeader
+            icon={Brain}
+            color="text-accent"
+            actions={
+              <SectionViewLink
+                to={agent.knowledge_domain ? `/knowledge?domain=${agent.knowledge_domain}` : `/agents/${agent.id}/edit?step=3`}
+                label="Knowledge"
+              />
+            }
+          >Knowledge</SectionHeader>
+          {agent.knowledge_domain ? (
+            <button onClick={() => navigate(`/knowledge?domain=${agent.knowledge_domain}`)} className="group text-left flex items-center gap-3">
+              <span className="text-sm font-mono text-text-primary group-hover:text-accent transition-colors">{agent.knowledge_domain}</span>
+              <span className="text-2xs text-text-quaternary">{agent.stats?.knowledge_count?.toLocaleString() ?? 0} entries</span>
+            </button>
+          ) : (
+            <EmptyHint text="No knowledge domain" />
+          )}
         </div>
       </div>
     </div>

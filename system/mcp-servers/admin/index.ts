@@ -11,6 +11,7 @@
  *   mcp-servers.ts         — routes/mcp.ts
  *   yaml-workflows.ts      — routes/yaml-workflows/
  *   users.ts               — routes/users.ts + routes/roles.ts
+ *   personas.ts            — routes/personas.ts + persona sub-routes on routes/users.ts
  *   maintenance.ts         — routes/dba.ts
  *   agents.ts              — routes/agents.ts
  *   agent-subscriptions.ts — routes/agents.ts (subscription sub-routes)
@@ -41,6 +42,7 @@ import { registerWorkflowTools } from './workflows';
 import { registerMcpServerTools } from './mcp-servers';
 import { registerYamlWorkflowTools } from './yaml-workflows';
 import { registerUserTools } from './users';
+import { registerPersonaTools } from './personas';
 import { registerMaintenanceTools } from './maintenance';
 import { registerAgentTools } from './agents';
 import { registerAgentSubscriptionTools } from './agent-subscriptions';
@@ -54,7 +56,7 @@ import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
 import { registerOrthoTools } from './ortho';
 
-const TOOL_COUNT = 90;
+const TOOL_COUNT = 100;
 
 let server: McpServer | null = null;
 
@@ -78,6 +80,7 @@ export async function createAdminServer(options?: {
   registerMcpServerTools(instance);         //  4 tools
   registerYamlWorkflowTools(instance);      //  5 tools
   registerUserTools(instance);              // 10 tools (users + roles + role schemas)
+  registerPersonaTools(instance);           // 10 tools (persona CRUD + links + assignment)
   registerMaintenanceTools(instance);       //  1 tool
   registerAgentTools(instance);             //  5 tools
   registerAgentSubscriptionTools(instance); //  3 tools
@@ -90,7 +93,7 @@ export async function createAdminServer(options?: {
   registerOverviewTools(instance);          //  1 tool
   registerDiagnosticsTools(instance);       //  3 tools
   registerOrthoTools(instance);             //  4 tools
-  // Total: 90
+  // Total: 100
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
   return instance;

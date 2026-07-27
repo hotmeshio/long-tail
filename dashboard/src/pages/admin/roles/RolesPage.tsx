@@ -77,7 +77,7 @@ function RoleRow({
           title, else Title Case derived from the key) */}
       <div className={`flex items-center gap-2.5 min-w-0 ${ROW_PY}`}>
         <span
-          className={`w-2 h-2 rounded-full dot-ring shrink-0 ${role.ops_visible ? 'bg-status-success' : 'bg-surface-border'}`}
+          className={`w-2.5 h-2.5 rounded-full dot-ring shrink-0 ${role.ops_visible ? 'bg-status-success' : 'bg-surface-border'}`}
           title={role.ops_visible ? 'Visible in Operations' : 'Enable in role settings to show in Operations'}
         />
         <span className={`text-sm truncate ${CELL_TEXT}`}>

@@ -313,6 +313,58 @@ export const listRoleSchemaVersionsSchema = z.object({
   role: z.string().describe('Role whose schema version history to list'),
 });
 
+// ── personas (routes/personas.ts + routes/users.ts persona sub-routes) ──────
+
+const personaRelationship = z.enum(['write-all', 'write-self', 'read-all', 'write-none'])
+  .describe('Membership scope the persona grants on the role: write-all = full worker (claim/resolve), write-self = acts only on own assignments, read-all = observer (sees the pond, cannot act). write-none is a synonym for read-all.');
+
+export const listPersonasSchema = z.object({});
+
+export const getPersonaSchema = z.object({
+  key: z.string().describe('Persona key'),
+});
+
+export const createPersonaSchema = z.object({
+  key: z.string().describe('Stable kebab-case key (a-z, 0-9, hyphens, underscores; letter-first)'),
+  title: z.string().optional().describe('Display title, e.g. "Print Manager"'),
+  description: z.string().optional().describe('The day-in-the-life, one paragraph'),
+});
+
+export const updatePersonaSchema = z.object({
+  key: z.string().describe('Persona key to update'),
+  title: z.string().nullable().optional().describe('New display title (null clears)'),
+  description: z.string().nullable().optional().describe('New description (null clears)'),
+});
+
+export const deletePersonaSchema = z.object({
+  key: z.string().describe('Persona key to delete. Memberships it sustains are removed or re-homed; direct grants are never touched.'),
+});
+
+export const linkPersonaRoleSchema = z.object({
+  key: z.string().describe('Persona key'),
+  role: z.string().describe('Role to link (created if absent)'),
+  relationship: personaRelationship,
+});
+
+export const unlinkPersonaRoleSchema = z.object({
+  key: z.string().describe('Persona key'),
+  role: z.string().describe('Role link to remove'),
+});
+
+export const assignPersonaSchema = z.object({
+  user_id: z.string().describe('User UUID'),
+  key: z.string().describe('Persona key. Idempotent — re-assigning overlays fresh from the persona\'s current role links.'),
+});
+
+export const unassignPersonaSchema = z.object({
+  user_id: z.string().describe('User UUID'),
+  key: z.string().describe('Persona key. Removes only memberships the persona sustains.'),
+});
+
+export const getUserPersonasSchema = z.object({
+  user_id: z.string().describe('User UUID'),
+});
+
 // ── maintenance (routes/dba.ts) ─────────────────────────────────────────────
 
 export const pruneSchema = z.object({

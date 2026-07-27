@@ -60,6 +60,15 @@ export type {
 } from './user';
 
 export type {
+  LTPersonaRelationship,
+  LTPersonaRole,
+  LTPersonaRecord,
+  LTPersonaSpec,
+  LTUserPersona,
+  LTComposedRoleScope,
+} from './persona';
+
+export type {
   LTEvent,
   LTEventType,
   LTAppEventType,

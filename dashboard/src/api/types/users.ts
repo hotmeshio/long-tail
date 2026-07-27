@@ -10,6 +10,8 @@ export interface LTUserRole {
   type: LTRoleType;
   read_scope: LTReadScope;
   write_scope: LTWriteScope;
+  /** Key of the persona sustaining this membership; null/absent = direct grant. */
+  granted_by_persona?: string | null;
   created_at: string;
 }
 

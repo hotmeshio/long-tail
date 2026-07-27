@@ -79,7 +79,7 @@ export function StreamMessagesPage() {
       render: (row) => (
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`w-1.5 h-1.5 shrink-0 rounded-full dot-ring ${STATUS_DOT[row.status]}`}
+            className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${STATUS_DOT[row.status]}`}
             title={STATUS_LABEL[row.status]}
           />
           <span className="font-mono text-xs text-text-secondary truncate" title={row.stream_name}>

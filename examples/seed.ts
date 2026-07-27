@@ -5,7 +5,8 @@ import { loggerRegistry } from '../lib/logger';
 import { getUserByExternalId, createUser } from '../services/user';
 import { addUserRole, getUserRoles } from '../services/user/roles';
 import { addEscalationChain, createRole } from '../services/role';
-import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS } from './seed-data';
+import { seedPersonas as seedPersonaSpecs } from '../services/persona';
+import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS, SEED_PERSONAS } from './seed-data';
 import { seedOrthoRoles } from './seed-ortho';
 import { seedTwinRoles } from './seed-twin';
 import { seedRichFormRole } from './seed-rich-form';
@@ -55,6 +56,23 @@ async function seedUsers(): Promise<void> {
   }
 }
 
+async function seedPersonas(): Promise<void> {
+  try {
+    const specs = SEED_PERSONAS.map((p) => ({
+      ...p,
+      // Aliases ('write-none') normalize to canonical values at the boundary.
+      roles: p.roles.map((r) => ({
+        role: r.role,
+        relationship: r.relationship === 'write-none' ? 'read-all' as const : r.relationship,
+      })),
+    }));
+    const result = await seedPersonaSpecs(specs);
+    loggerRegistry.info(`[examples] personas verified (${result.personas} personas, ${result.links} role links)`);
+  } catch (err: any) {
+    loggerRegistry.warn(`[examples] failed to seed personas: ${err.message}`);
+  }
+}
+
 async function seedEscalationChains(): Promise<void> {
   for (const [source, target] of SEED_CHAINS) {
     try {
@@ -89,6 +107,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedConstraintFormEscalations();
   await seedFleetSimRole();
   await seedFleetSimEscalations();
+  await seedPersonas();
   await seedUsers();
   await seedEscalationChains();
 

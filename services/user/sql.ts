@@ -4,9 +4,13 @@
 export const ENSURE_ROLE_EXISTS =
   'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING';
 
-/** Fetch roles for a single user, ordered by creation time. */
+/** Fetch roles for a single user, ordered by creation time. granted_by_persona
+ *  is the sustaining persona's key (null = direct grant). */
 export const GET_ROLES_BY_USER_ID =
-  'SELECT role, type, read_scope, write_scope, created_at FROM lt_user_roles WHERE user_id = $1 ORDER BY created_at';
+  `SELECT r.role, r.type, r.read_scope, r.write_scope, r.created_at, p.key AS granted_by_persona
+   FROM lt_user_roles r
+   LEFT JOIN lt_personas p ON p.id = r.granted_by_persona
+   WHERE r.user_id = $1 ORDER BY r.created_at`;
 
 /** Fetch a user row by external_id. */
 export const GET_USER_BY_EXTERNAL_ID =
@@ -67,15 +71,21 @@ export const DELETE_USER_BY_ID =
 
 /** Batch-load roles for many users (avoids N+1). */
 export const GET_ROLES_BY_USER_IDS =
-  'SELECT user_id, role, type, read_scope, write_scope, created_at FROM lt_user_roles WHERE user_id = ANY($1) ORDER BY created_at';
+  `SELECT r.user_id, r.role, r.type, r.read_scope, r.write_scope, r.created_at, p.key AS granted_by_persona
+   FROM lt_user_roles r
+   LEFT JOIN lt_personas p ON p.id = r.granted_by_persona
+   WHERE r.user_id = ANY($1) ORDER BY r.created_at`;
 
-/** Upsert a user–role assignment, promoting the type/scope if the row exists. */
+/** Upsert a user–role assignment, promoting the type/scope if the row exists.
+ *  A direct grant takes the row over: granted_by_persona resets to NULL, so a
+ *  later persona unassign can never remove a membership an admin set by hand. */
 export const UPSERT_USER_ROLE =
   `INSERT INTO lt_user_roles (user_id, role, type, read_scope, write_scope) VALUES ($1, $2, $3, $4, $5)
    ON CONFLICT (user_id, role) DO UPDATE SET
      type = EXCLUDED.type,
      read_scope = EXCLUDED.read_scope,
-     write_scope = EXCLUDED.write_scope
+     write_scope = EXCLUDED.write_scope,
+     granted_by_persona = NULL
    RETURNING role, type, read_scope, write_scope, created_at`;
 
 export const DELETE_USER_ROLE =

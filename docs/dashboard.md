@@ -57,6 +57,7 @@ The LLM authoring add-on. Appears when an Anthropic key is configured.
 |------|-------|---------|
 | **Accounts** | `/admin/users` | User accounts and service accounts (bots). Create, edit, assign roles, manage API keys. |
 | **Roles** | `/admin/roles` | Define roles — the queues, forms, and membership that connect workflows to people. Escalation chains, capacity settings, and versioned schemas live here. |
+| **Personas** | `/admin/personas` | Bundle roles into named, one-step assignments. Each linked role carries a relationship scope (write-all, write-self, read-all); assigning a persona composes the member's whole surface from its roles' pins and schemas. |
 
 ### Infrastructure
 
@@ -210,8 +211,9 @@ User Accounts and Service Accounts live on the same page, separated by a tab tog
 - **User Accounts** — human operators. Create users, assign display names, and grant roles. Roles determine which escalations a user can see and claim, and which workflows they can invoke from the dashboard. A `member` grant carries a work-surface scope (read/write breadth) chosen from the Scope picker; the five named profiles are documented under [Role Detail](#role-detail).
 - **Service Accounts** — programmatic callers (bots, CI pipelines, external systems). Each service account has an API key for authentication. Assign roles to control access just like human users. Service accounts with the `reviewer` role can claim and resolve escalations programmatically.
 - **Role assignment** — both account types participate in the same role system. Click any account to edit roles, change display name, or manage credentials.
+- **Personas** — the role panel also assigns [personas](#personas): pick one to add the account to every linked role at the linked scope in one step. Memberships a persona sustains show a mask icon; direct grants show none and survive persona unassignment.
 
-**API:** `GET /api/users` lists accounts. `POST /api/users` creates. `PUT /api/users/:id/roles` assigns roles.
+**API:** `GET /api/users` lists accounts. `POST /api/users` creates. `PUT /api/users/:id/roles` assigns roles. `GET/POST /api/users/:id/personas` reads and assigns personas.
 
 ### Roles
 
@@ -275,6 +277,19 @@ Accessible at `/admin/roles/:role/list-schema`. The versioned rich view for the 
 - The list always renders the latest version — no pinning (a display template, not a payload contract).
 
 **API:** `GET /api/roles/:role/list-schema` (latest or `?version=`), `GET /api/roles/:role/list-schema/versions`, and `PATCH /api/roles/:role` with `list_schema` (+ optional `change_summary`).
+
+### Personas
+
+Accessible at `/admin/personas` for admins, superadmins, and engineers — the same audience that manages [Accounts](#accounts) and [Roles](#roles). A persona is a named bundle of roles with a per-role relationship scope: assigning it adds a user to every linked role at the linked scope in one step, and each role's own pins and schemas compose the member's sidebar and forms — the composition ("this human runs the floor, which means these roles") is a first-class, auditable record. Full semantics — provenance, highest-allowance union, overlay-on-reassign — are in [iam.md](iam.md#personas).
+
+**Master list** — the working surface. One row per persona: display title, key, description, a preview of the linked role pills, and the holder count; search matches all of them. Select a row to target the **Assignees** panel on the right — assign a user there and they join every linked role in one step, sidebar pins and forms composing from the roles. Unassign from the same panel, or from the account's role panel on [Accounts](#accounts). The row's pencil opens configuration.
+
+**Configuration** (`/admin/personas/:key`) —
+
+- **Identity** — title and description, PATCH-saved.
+- **Roles** — the bundle's rules. Each link shows the role pill, its scope badge, and a relationship picker (`Write · act on all`, `Write · act on self`, `Read-only observer`); changing a relationship or unlinking reconciles every holder immediately. Link new roles from the role picker.
+
+**API:** `GET /api/personas` lists. `POST /api/personas` creates; `PATCH`/`DELETE /api/personas/:key` edit and remove. `PUT`/`DELETE /api/personas/:key/roles/:role` manage links. `POST /api/personas/seed` applies a declarative spec set idempotently.
 
 ### DB Maintenance
 

@@ -1,6 +1,7 @@
 import {
   Users,
   Database,
+  Drama,
   Inbox,
   Network,
   Braces,
@@ -23,7 +24,10 @@ export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?:
 
   const identityItems: NavItem[] = [
     { to: '/admin/users', label: 'Accounts', icon: Users },
-    ...(isBuilder || isOps ? [{ to: '/admin/roles', label: 'Roles', icon: Inbox }] : []),
+    ...(isBuilder || isOps ? [
+      { to: '/admin/roles', label: 'Roles', icon: Inbox },
+      { to: '/admin/personas', label: 'Personas', icon: Drama },
+    ] : []),
   ];
 
   const infraItems: NavItem[] = [

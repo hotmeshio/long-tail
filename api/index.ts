@@ -4,6 +4,7 @@ export * as workflows from './workflows';
 export * as yamlWorkflows from './yaml-workflows';
 export * as users from './users';
 export * as roles from './roles';
+export * as personas from './personas';
 export * as auth from './auth';
 export * as mcp from './mcp';
 export * as pipelines from './pipelines';

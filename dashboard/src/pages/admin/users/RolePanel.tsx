@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react';
+import { Drama } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useRoles } from '../../../api/roles';
 import { useAddUserRole, useRemoveUserRole } from '../../../api/users';
+import {
+  usePersonas,
+  useUserPersonas,
+  useAssignPersona,
+  useUnassignPersona,
+} from '../../../api/personas';
 import type { LTUserRecord, LTRoleType } from '../../../api/types';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { ScopeBadge } from '../../../components/common/display/ScopeBadge';
@@ -9,6 +17,98 @@ import {
   DEFAULT_SCOPE_VALUE,
   scopePreset,
 } from '../../../lib/roleScope';
+
+/**
+ * Persona assignment for the selected user. A persona is shorthand for scoped
+ * role memberships — assigning one composes the user's whole surface; the
+ * membership list below reflects the fan-out (rows marked with the sustaining
+ * persona's key).
+ */
+function PersonaBlock({ user }: { user: LTUserRecord }) {
+  const { data: allPersonas } = usePersonas();
+  const { data: held } = useUserPersonas(user.id);
+  const assign = useAssignPersona();
+  const unassign = useUnassignPersona();
+  const [newPersona, setNewPersona] = useState('');
+
+  const heldPersonas = held?.personas ?? [];
+  const available = useMemo(() => {
+    const keys = new Set(heldPersonas.map((p) => p.key));
+    return (allPersonas?.personas ?? []).filter((p) => !keys.has(p.key));
+  }, [allPersonas, heldPersonas]);
+
+  if (heldPersonas.length === 0 && available.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
+        Personas
+      </p>
+      {heldPersonas.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {heldPersonas.map((p) => (
+            <span
+              key={p.key}
+              className="flex items-center gap-2.5 w-full min-w-0 pl-2.5 pr-2 py-1 text-xs bg-surface-sunken rounded-full text-text-secondary"
+            >
+              <Drama className="w-3 h-3 shrink-0 text-text-tertiary" aria-hidden />
+              <Link
+                to={`/admin/personas/${encodeURIComponent(p.key)}`}
+                className="flex-1 min-w-0 truncate transition-colors hover:text-accent"
+                title={p.key}
+              >
+                {p.title || p.key}
+              </Link>
+              <span className="shrink-0 text-2xs text-text-tertiary tabular-nums">
+                {p.roles.length} role{p.roles.length === 1 ? '' : 's'}
+              </span>
+              <button
+                onClick={() => unassign.mutate({ userId: user.id, key: p.key })}
+                className="shrink-0 text-text-tertiary hover:text-status-error transition-colors ml-1"
+                title={`Unassign ${p.title || p.key}`}
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {available.length > 0 && (
+        <div className="flex gap-2">
+          <select
+            value={newPersona}
+            onChange={(e) => setNewPersona(e.target.value)}
+            className="select text-xs w-full min-w-0"
+            aria-label="Persona"
+          >
+            <option value="">Assign a persona...</option>
+            {available.map((p) => (
+              <option key={p.key} value={p.key}>{p.title || p.key}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              if (!newPersona) return;
+              assign.mutate(
+                { userId: user.id, key: newPersona },
+                { onSuccess: () => setNewPersona('') },
+              );
+            }}
+            disabled={!newPersona || assign.isPending}
+            className="btn-primary text-xs shrink-0"
+          >
+            {assign.isPending ? '...' : 'Assign'}
+          </button>
+        </div>
+      )}
+      {(assign.error || unassign.error) && (
+        <p className="text-2xs text-status-error">
+          {((assign.error || unassign.error) as Error).message}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function RolePanel({ user }: { user: LTUserRecord | null }) {
   const { data: allRolesData } = useRoles();
@@ -61,8 +161,11 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
         <div className="space-y-4">
           <div>
             <p className="text-sm text-text-primary">{user.display_name || user.external_id}</p>
-            <p className="text-2xs text-text-tertiary mt-0.5">Member of:</p>
           </div>
+
+          <PersonaBlock user={user} />
+
+          <p className="text-2xs text-text-tertiary">Member of:</p>
 
           {currentRoles.length === 0 ? (
             <p className="text-xs text-text-tertiary">No roles assigned.</p>
@@ -85,6 +188,14 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
                       <span className="w-px h-3 bg-surface-border shrink-0" aria-hidden />
                       <ScopeBadge read={r.read_scope} write={r.write_scope} className="shrink-0" />
                     </>
+                  )}
+                  {r.granted_by_persona && (
+                    <span
+                      className="shrink-0"
+                      title={`Granted by persona ${r.granted_by_persona}`}
+                    >
+                      <Drama className="w-3 h-3 text-text-tertiary" aria-hidden />
+                    </span>
                   )}
                   <button
                     onClick={() => handleRemove(r.role)}

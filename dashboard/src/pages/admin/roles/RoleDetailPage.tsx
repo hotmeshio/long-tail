@@ -79,7 +79,7 @@ function SectionGroup({
 function LiveBadge() {
   return (
     <div className="flex items-center gap-1">
-      <span className="w-1.5 h-1.5 rounded-full dot-ring bg-status-success" />
+      <span className="w-2.5 h-2.5 rounded-full dot-ring bg-status-success" />
       <span className="text-2xs font-semibold uppercase tracking-widest text-status-success">Live</span>
     </div>
   );

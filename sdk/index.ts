@@ -5,6 +5,7 @@ import * as yamlWorkflowsApi from '../api/yaml-workflows';
 import * as usersApi from '../api/users';
 import * as meApi from '../api/me';
 import * as rolesApi from '../api/roles';
+import * as personasApi from '../api/personas';
 import * as authApi from '../api/auth';
 import * as mcpApi from '../api/mcp';
 import * as pipelinesApi from '../api/pipelines';
@@ -205,6 +206,23 @@ export function createClient(options: LTClientOptions = {}) {
       removeEscalationChain: rolesApi.removeEscalationChain,
       getEscalationTargets: rolesApi.getEscalationTargets,
       replaceEscalationTargets: rolesApi.replaceEscalationTargets,
+    },
+
+    // ── Personas — role bundles with per-role relationship scope ───────────
+    personas: {
+      list: personasApi.listPersonas,
+      get: personasApi.getPersona,
+      create: personasApi.createPersona,
+      update: personasApi.updatePersona,
+      delete: personasApi.deletePersona,
+      linkRole: personasApi.linkPersonaRole,
+      unlinkRole: personasApi.unlinkPersonaRole,
+      assign: personasApi.assignPersona,
+      unassign: personasApi.unassignPersona,
+      forUser: personasApi.getUserPersonas,
+      /** Declarative, idempotent seed — the static-config twin of the API surface. */
+      seed: (personas: Parameters<typeof personasApi.seedPersonas>[0]['personas']) =>
+        personasApi.seedPersonas({ personas }),
     },
 
     // ── Auth ───────────────────────────────────────────────────────────────

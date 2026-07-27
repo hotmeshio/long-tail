@@ -321,7 +321,7 @@ function HistoryColumn({ role, def, onRowClick }: {
             >
               {/* Status as a bare outlined dot — colour carries the meaning. */}
               <span
-                className={`w-1.5 h-1.5 shrink-0 rounded-full dot-ring ${STATUS_DOT_STYLES[e.status] ?? 'bg-status-pending'}`}
+                className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${STATUS_DOT_STYLES[e.status] ?? 'bg-status-pending'}`}
                 title={e.status}
               />
               <span className="min-w-0 flex-1">
@@ -374,7 +374,7 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       className: 'w-10',
       render: (row) => (
         <span
-          className={`w-1.5 h-1.5 inline-block rounded-full dot-ring ${STATUS_DOT_STYLES[row.status] ?? 'bg-status-pending'}`}
+          className={`w-2.5 h-2.5 inline-block rounded-full dot-ring ${STATUS_DOT_STYLES[row.status] ?? 'bg-status-pending'}`}
           title={row.status}
         />
       ),

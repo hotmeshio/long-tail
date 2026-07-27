@@ -68,6 +68,7 @@ The client mirrors the REST route structure:
 | `lt.yamlWorkflows` | `/api/yaml-workflows` | `list`, `get`, `create`, `deploy`, `activate`, `invoke`, `archive` |
 | `lt.users` | `/api/users` | `list`, `get`, `create`, `update`, `delete`, `getRoles`, `addRole`, `removeRole` |
 | `lt.roles` | `/api/roles` | `list`, `listWithDetails`, `create`, `delete`, `getEscalationChains` |
+| `lt.personas` | `/api/personas` | `list`, `get`, `create`, `update`, `delete`, `linkRole`, `unlinkRole`, `assign`, `unassign`, `forUser`, `seed` |
 | `lt.auth` | `/api/auth` | `login` |
 | `lt.mcp` | `/api/mcp` | `listServers`, `createServer`, `getServer`, `connectServer`, `listTools`, `callTool` |
 | `lt.pipelines` | `/api/pipelines` | `listEntities`, `listJobs`, `getExecution`, `interrupt` |

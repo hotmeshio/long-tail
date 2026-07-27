@@ -63,7 +63,7 @@ function ExecutionRow({ dot, pill, id, date, onClick }: {
   return (
     <button onClick={onClick} className="w-full text-left hover:bg-surface-hover/50 rounded-md px-1 py-1.5 transition-colors">
       <div className="flex items-center gap-2 mb-0.5">
-        <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${dot}`} />
+        <span className={`w-2.5 h-2.5 rounded-full dot-ring shrink-0 ${dot}`} />
         <span className="text-xs text-text-primary font-mono truncate flex-1 min-w-0">{midEllipsis(id)}</span>
         <span className="hidden @dict-inline:inline text-2xs text-text-quaternary shrink-0 whitespace-nowrap"><DateValue date={date} /></span>
       </div>
@@ -301,6 +301,7 @@ export function HomePage() {
                 onSelect={() => navigate('/operations')}
                 onUpstreamSelect={() => navigate('/operations')}
                 periodHours={1}
+                logScale
                 fill
               />
             )}

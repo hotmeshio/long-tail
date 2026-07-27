@@ -48,7 +48,7 @@ function buildColumns(
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-1.5 h-1.5 shrink-0 rounded-full dot-ring ${dotClass}${pulseClass}`} title={row.status} />
+            <span className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${dotClass}${pulseClass}`} title={row.status} />
             <span className="font-mono text-xs text-text-primary truncate">{row.workflow_id}</span>
           </div>
         );
