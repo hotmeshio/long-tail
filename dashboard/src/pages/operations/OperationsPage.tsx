@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { GitMerge, RefreshCw, Eye, TriangleAlert, ChevronDown } from 'lucide-react';
+import { GitMerge, RefreshCw, Eye, Settings, TriangleAlert, ChevronDown } from 'lucide-react';
 import { useRoleDetails, useUpdateRole, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
@@ -18,6 +18,7 @@ import {
 } from './PaceChart';
 import { StationDetailPanel } from './StationDetailPanel';
 import { jeopardyQueueLink } from './priority-link';
+import { useAccess } from '../../hooks/useAccess';
 import { displayRoleTitle } from '../../lib/role-display';
 
 // Column band tints — same hues as the chart bands (~8% alpha).
@@ -169,6 +170,8 @@ function StationRow({
   onClick: () => void;
 }) {
   const updateRole = useUpdateRole();
+  // Config is a role-manager gesture — members can neither view nor edit roles.
+  const { isBuilder, isOps } = useAccess();
   const pending = metric?.pending ?? 0;
   const claimed = metric?.claimed ?? 0;
   const resolved = metric?.resolved ?? 0;
@@ -310,12 +313,26 @@ function StationRow({
         <div className="flex items-center justify-center gap-1.5">
           <Link
             to={`/escalations/available?role=${encodeURIComponent(role.role)}&status=all`}
-            className="text-text-quaternary hover:text-accent transition-colors"
+            className="icon-link"
             title="View all items in queue"
             onClick={(e) => e.stopPropagation()}
           >
             <Eye className="w-3.5 h-3.5" />
           </Link>
+          {/* Fixed slot — managers get the role config; the column holds its
+              shape for members, who can neither view nor edit roles. */}
+          <span className="w-3.5 flex items-center justify-center">
+            {(isBuilder || isOps) && (
+              <Link
+                to={`/admin/roles/${encodeURIComponent(role.role)}`}
+                className="icon-link"
+                title="Configure this role"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </span>
           {/* Fixed-width slot — always occupies space so the eye never shifts */}
           <span className="w-3.5 flex items-center justify-center">
             {priorityCount > 0 && (
@@ -515,7 +532,7 @@ function TableHead() {
         <th className={`${TH_BASE} hidden xl:table-cell w-[8%] px-2 text-right text-text-quaternary`}>P99 WAIT</th>
         <th className={`${TH_BASE} hidden xl:table-cell w-[8%] px-2 text-right text-text-quaternary`}>P99 WORK</th>
         <th className={`${TH_BASE} hidden lg:table-cell w-[11%] px-2 text-left text-text-quaternary`}>TREND</th>
-        <th className={`${TH_BASE} w-14 px-1 text-center text-text-quaternary`}>ACTIONS</th>
+        <th className={`${TH_BASE} w-20 px-1 text-center text-text-quaternary`}>ACTIONS</th>
       </tr>
     </thead>
   );
@@ -645,7 +662,7 @@ export function OperationsPage() {
           className={`px-2.5 py-1 text-2xs font-mono rounded transition-colors ${
             period === p
               ? 'bg-accent/10 text-accent font-semibold'
-              : 'text-text-quaternary hover:text-text-secondary'
+              : 'icon-link'
           }`}
         >
           {p}
@@ -664,7 +681,7 @@ export function OperationsPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="text-text-quaternary hover:text-text-secondary transition-colors disabled:opacity-40"
+            className="icon-link disabled:opacity-40"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -717,7 +734,7 @@ export function OperationsPage() {
                   className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
                     (logScale ? 'log' : 'lin') === mode
                       ? 'text-accent font-semibold'
-                      : 'text-text-quaternary hover:text-text-secondary'
+                      : 'icon-link'
                   }`}
                   title={mode === 'lin' ? 'Linear Y axis' : 'Logarithmic Y axis — reveals shape across wide value ranges'}
                 >

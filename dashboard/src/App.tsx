@@ -337,15 +337,11 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Operations: overview of active work across stations. Engineer is
-      // included because the sidebar shows Operations to every builder —
-      // the route gate and the nav entry must admit the same audience.
-      {
-        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
-        children: [
-          { path: 'operations', element: <Lazy><OperationsPage /></Lazy> },
-        ],
-      },
+      // Operations: overview of active work across stations. Open to every
+      // login — the board is aggregate counts and trends, readonly by nature.
+      // Station metrics narrow server-side to role membership when the
+      // deployment turns publicPaceBoard off, so the route needs no role gate.
+      { path: 'operations', element: <Lazy><OperationsPage /></Lazy> },
 
       // Admin: Accounts (admin type, superadmin, or engineer — scoped view for non-builders)
       {

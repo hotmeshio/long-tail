@@ -34,7 +34,7 @@ function persistBookmarks(bookmarks: Bookmark[]): void {
 export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void; onToggleNav?: () => void }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { isBuilder, isOps, viewAs, realIsBuilder } = useAccess();
+  const { viewAs, realIsBuilder } = useAccess();
   const { available, mine } = useEscalationCounts();
   usePersona();
   const { connected } = useEventStatus();
@@ -172,30 +172,27 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
             {mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
           </Link>
 
-          {(isBuilder || isOps) && (
-            <>
-              <div className="hidden lg:block w-px h-4 bg-surface-border" />
+          <div className="hidden lg:block w-px h-4 bg-surface-border" />
 
-              {/* Events — admins run the floor from live events, same as builders */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!connected) {
-                    window.location.reload();
-                  } else {
-                    onToggleEventFeed?.();
-                  }
-                }}
-                className={`hidden lg:flex items-center gap-1.5 text-xs transition-colors ${
-                  connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
-                }`}
-                title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
-              >
-                <Radio className="w-4 h-4" strokeWidth={1.5} />
-                events
-              </button>
-            </>
-          )}
+          {/* Events — every login watches the floor live; the stream itself is
+              role-scoped server-side, so members simply receive fewer events. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (!connected) {
+                window.location.reload();
+              } else {
+                onToggleEventFeed?.();
+              }
+            }}
+            className={`hidden lg:flex items-center gap-1.5 text-xs transition-colors ${
+              connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
+            }`}
+            title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
+          >
+            <Radio className="w-4 h-4" strokeWidth={1.5} />
+            events
+          </button>
 
           {realIsBuilder && (
             <>
@@ -254,14 +251,12 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                   >
                     Credentials
                   </Link>
-                  {(isBuilder || isOps) && (
-                    <button
-                      onClick={() => { setMenuOpen(false); if (!connected) window.location.reload(); else onToggleEventFeed?.(); }}
-                      className="lg:hidden block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
-                    >
-                      {connected ? 'Events' : 'Reconnect events'}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => { setMenuOpen(false); if (!connected) window.location.reload(); else onToggleEventFeed?.(); }}
+                    className="lg:hidden block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                  >
+                    {connected ? 'Events' : 'Reconnect events'}
+                  </button>
                   {realIsBuilder && (
                     <button
                       onClick={() => { setMenuOpen(false); onToggleDocs?.(); }}

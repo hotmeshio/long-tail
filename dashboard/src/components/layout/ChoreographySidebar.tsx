@@ -33,10 +33,11 @@ export function ChoreographySidebar({
 }) {
   const paceEntry: NavEntry = { to: '/operations', label: 'Pace Board', icon: LayoutDashboard };
 
-  // Operator or engineer view: no generic work links — the Task Queues section
-  // (shell) and the home Claimed card carry their work.
+  // Operator or engineer view: their work lives in the Task Queues section
+  // (shell) and the home Claimed card — but the Pace Board, when public,
+  // reaches every login.
   if (!isBuilder && (!isOps || viewAs === 'engineer' || viewAs === 'operator')) {
-    return null;
+    return canSeePaceBoard ? <SidebarNav heading="Monitor" entries={[paceEntry]} /> : null;
   }
 
   if (!isBuilder) {

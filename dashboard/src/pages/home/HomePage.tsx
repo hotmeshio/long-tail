@@ -237,8 +237,15 @@ export function HomePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const paceStations = useMemo((): ChartStation[] => {
-    const fragments = buildFragments(rolesQ.data?.roles ?? []);
-    const primary = fragments[0]?.stations ?? [];
+    const roles = rolesQ.data?.roles ?? [];
+    const fragments = buildFragments(roles);
+    // A role flagged ops_home_default picks the segment the home board opens
+    // on; unset anywhere, the first (primary) segment leads as before.
+    const homeRole = roles.find((r) => r.ops_home_default)?.role;
+    const fragment =
+      (homeRole && fragments.find((f) => f.stations.some((s) => s.role.role === homeRole)))
+      || fragments[0];
+    const primary = fragment?.stations ?? [];
     const metrics = stationQ.data?.stations ?? [];
     return primary.map(({ role: r }) => ({
       role: r.role,

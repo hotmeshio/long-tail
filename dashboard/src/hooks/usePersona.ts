@@ -1,4 +1,5 @@
 import { useAuth } from './useAuth';
+import { useSettings } from '../api/settings';
 import { getViewAs } from '../lib/view-as';
 
 /**
@@ -16,8 +17,10 @@ export interface Persona {
   /** Active view-as override, or null when viewing your own tier. */
   viewAs: PersonaTier | null;
   /**
-   * The Pace Board is a cross-role, sequenced view — it only means something to
-   * someone who can see every role. Canonical tiers only.
+   * The Pace Board is aggregate counts and trends — readable by every login
+   * while the deployment's publicPaceBoard feature (default on) stands. With
+   * the flag off it narrows to the canonical tiers (superadmin, admin), whose
+   * membership spans every role.
    */
   canSeePaceBoard: boolean;
   /** Procedural + graph workflow execution surfaces. Builders only. */
@@ -39,6 +42,9 @@ export interface Persona {
  */
 export function usePersona(): Persona {
   const { isSuperAdmin, hasRoleType, hasRole } = useAuth();
+  const { data: settings } = useSettings();
+  // Default-on: the board narrows only when the deployment explicitly opts out.
+  const publicPaceBoard = settings?.features?.publicPaceBoard !== false;
 
   const realTier: PersonaTier = isSuperAdmin
     ? 'superadmin'
@@ -60,8 +66,11 @@ export function usePersona(): Persona {
     tier,
     realTier,
     viewAs,
-    canSeePaceBoard: tier === 'superadmin' || tier === 'admin',
+    canSeePaceBoard: publicPaceBoard || tier === 'superadmin' || tier === 'admin',
     canSeeWorkflows: tier === 'superadmin' || tier === 'engineer',
-    showTaskQueueCards: tier === 'operator',
+    // With the board public, everyone's home is the admin layout (board on
+    // top, escalation panels below); the per-lane cards home remains the
+    // operator's when the deployment scopes the board back down.
+    showTaskQueueCards: tier === 'operator' && !publicPaceBoard,
   };
 }

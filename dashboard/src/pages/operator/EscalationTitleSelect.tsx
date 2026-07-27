@@ -18,10 +18,13 @@ export function EscalationTitleSelect({
   role,
   options,
   onChange,
+  emptyLabel = 'All Escalations',
 }: {
   role: string;
   options: RoleTitleOption[];
   onChange: (role: string) => void;
+  /** The no-role title — the page's generic name ("All Escalations", "My Escalations"). */
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -42,7 +45,7 @@ export function EscalationTitleSelect({
 
   const current = role
     ? (options.find((o) => o.value === role)?.label ?? deriveRoleTitle(role))
-    : 'All Escalations';
+    : emptyLabel;
 
   const itemCls = (active: boolean) =>
     `w-full text-left px-3 py-1.5 text-sm flex items-baseline gap-2 transition-colors ${
@@ -66,7 +69,7 @@ export function EscalationTitleSelect({
       {open && (
         <div className="absolute z-[100] top-full left-0 mt-2 min-w-[16rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1">
           <button type="button" onClick={() => { onChange(''); setOpen(false); }} className={itemCls(!role)}>
-            All Escalations
+            {emptyLabel}
           </button>
           {options.length > 0 && <div className="h-px bg-surface-border my-1" />}
           {options.map((o) => (

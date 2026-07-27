@@ -14,6 +14,8 @@ export interface RoleDetail {
   metadata_schema: Record<string, unknown> | null;
   properties: Record<string, unknown>;
   ops_visible: boolean;
+  /** This role's sequence leads the home Pace Board (single-holder flag). */
+  ops_home_default: boolean;
   /** Server-side resolver schema validation: every resolve surface rejects payloads violating the form schema. */
   enforce_schema: boolean;
   parent_role: string | null;
@@ -93,6 +95,8 @@ export interface UpdateRoleInput {
   default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, unknown> | null;
   ops_visible?: boolean;
+  /** Lead the home Pace Board with this role's sequence (single-holder). */
+  ops_home_default?: boolean;
   /** Turn server-side resolver schema validation on/off for this role. */
   enforce_schema?: boolean;
   parent_role?: string | null;

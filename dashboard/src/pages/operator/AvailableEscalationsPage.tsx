@@ -461,7 +461,7 @@ export function AvailableEscalationsPage() {
             {hasRichView && !showTimeline && (
               <button
                 onClick={() => setViewParam(useRichView ? 'table' : 'rich')}
-                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
+                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
                 title={useRichView ? 'Table view' : 'Rich view'}
               >
                 {useRichView
@@ -472,7 +472,7 @@ export function AvailableEscalationsPage() {
             {activeFacetCount > 0 && (
               <button
                 onClick={() => setViewParam(showTimeline ? 'table' : 'timeline')}
-                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
+                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
                 title={showTimeline ? 'Table view' : 'Timeline view'}
               >
                 {showTimeline
@@ -482,7 +482,7 @@ export function AvailableEscalationsPage() {
             )}
             <button
               onClick={pinCurrentView}
-              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-accent transition-colors"
+              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
               title="Pin this view — save the current filters to your Pinned section"
               data-testid="pin-current-view"
             >
@@ -490,7 +490,7 @@ export function AvailableEscalationsPage() {
             </button>
             <button
               onClick={() => setFacetDrawerOpen((v) => !v)}
-              className="relative ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
+              className="relative ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
               title="Faceted query"
             >
               <SlidersHorizontal className="w-4 h-4" />

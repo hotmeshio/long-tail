@@ -12,7 +12,7 @@ The reactive, event-driven surface — where operations watch the floor and buil
 
 | Page | Route | Purpose |
 |------|-------|---------|
-| **Pace Board** | `/operations` | COO shop-floor view — pace chart of actual-vs-target flow across every station role, station table with live metrics, and the station detail panel. Visible to any user with ops or builder access. |
+| **Pace Board** | `/operations` | COO shop-floor view — pace chart of actual-vs-target flow across every station role, station table with live metrics, and the station detail panel. Readable by every login (aggregate counts and trends) while `features.publicPaceBoard`, default on, stands. |
 | **Event Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
 | **Agents** | `/agents` | Autonomous event-driven automations (labeled **Automations** when AI is not configured). Configure subscriptions, schedules, and knowledge domains. |
 | **Capabilities** | `/capabilities` | Browse MCP tools grouped by capability category, with a live run panel. |
@@ -82,7 +82,7 @@ The top navigation bar contains:
 
 ## Home — Recent Activity
 
-The home page mirrors the navigation. Row 1 reflects the two header escalation links: **All Escalations** and **My Escalations**, each showing the five most recent items. Row 2 reflects the Orchestrate story and is tiered by role: superadmins and engineers see the **Pace Board** chart at a glance (click through to `/operations`) beside the five most recent **Procedural** and **Graph** executions; admins — who don't see workflows — get the Pace Board spanning the full row; operators see row 1 only.
+The home page leads with the **Pace Board** for every login — the operational heartbeat on top, **All Escalations** and **My Escalations** panels below (each server-scoped to what the viewer may see). A role flagged **Home Segment** (Role Detail → Pace Board settings) picks which sequence the home board opens on; unset, the first sequence leads. When a deployment sets `features.publicPaceBoard: false`, homes re-tier: admins keep this layout, engineers see escalation panels beside their recent **Procedural** and **Graph** executions, and operators get their per-lane task-queue cards.
 
 ## Key Pages
 
@@ -331,6 +331,7 @@ Messages are read-only. Status is derived from timestamps: pending (no timestamp
 
 The central queue for all escalation activity across every workflow.
 
+- **Title = queue selector** — the page title reads as the selected role's friendly title, or "All Escalations" when unfiltered; clicking it switches queues over the same `?role=` param the filter bar mirrors. The **My Escalations** personal inbox (`/escalations/queue`) carries the identical control, titling itself "My Escalations" or the filtered role's title.
 - **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
 - **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
 - **Rich list view** — when the list is scoped to exactly one role (`?role=<role>`) and that role owns a [list schema](#escalations-list-schema), a role-authored view renders in place of the table (the live item as a card, plus a load-on-demand history), with a **Table view** toggle back to the columns.

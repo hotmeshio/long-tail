@@ -187,6 +187,8 @@ export async function updateRole(input: {
   default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
+  /** Make this role's sequence the home Pace Board's default segment (single-holder: setting it clears the previous holder). */
+  ops_home_default?: boolean;
   parent_role?: string | null;
   sla_minutes?: number | null;
   target_per_hour?: number | null;
@@ -220,6 +222,9 @@ export async function updateRole(input: {
     }
     if (input.ops_visible !== undefined && typeof input.ops_visible !== 'boolean') {
       return { status: 400, error: 'ops_visible must be a boolean' };
+    }
+    if (input.ops_home_default !== undefined && typeof input.ops_home_default !== 'boolean') {
+      return { status: 400, error: 'ops_home_default must be a boolean' };
     }
     if (input.enforce_schema !== undefined && typeof input.enforce_schema !== 'boolean') {
       return { status: 400, error: 'enforce_schema must be a boolean' };
@@ -260,6 +265,7 @@ export async function updateRole(input: {
       default_pins: input.default_pins,
       properties: input.properties,
       ops_visible: input.ops_visible,
+      ops_home_default: input.ops_home_default,
       parent_role: input.parent_role,
       sla_minutes: input.sla_minutes,
       target_per_hour: input.target_per_hour,

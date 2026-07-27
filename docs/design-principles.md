@@ -35,6 +35,10 @@ Chroma is spent, not spread.
   inverted — never a flat white page with white sections.
 - **The accent appears in small doses**: links, buttons, checks, pills,
   section labels, focus states. Because it is scarce, it reads as "act here."
+  Icon links follow the same rule in every theme: clickable glyphs (toolbar
+  icons, view toggles) render through the `.icon-link` recipe — muted accent
+  at rest, full accent on hover — never a neutral text tone, which reads as
+  a static mark.
 - **Dark themes are the same principle, inverted** — near-black neutral
   surfaces, the identical accent discipline. Midnight is not a different
   design; it is the same design at night.

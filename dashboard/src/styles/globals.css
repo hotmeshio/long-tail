@@ -210,6 +210,14 @@
 }
 
 @layer components {
+  /* Icon links — clickable glyphs (toolbar icons, view toggles) carry the
+     theme's link color in EVERY theme: muted accent at rest, full accent on
+     hover. Neutral-toned glyphs are reserved for static, non-interactive
+     marks — if it's colored, it's clickable. */
+  .icon-link {
+    @apply text-accent/65 hover:text-accent transition-colors;
+  }
+
   /* Buttons share the control radius with fields — one knob rounds every
      interactive rectangle in the product. */
   .btn-primary {

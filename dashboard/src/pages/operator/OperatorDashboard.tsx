@@ -1,18 +1,20 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { LockOpen, Pin, LayoutList, Table } from 'lucide-react';
+import { LockOpen, Pin, LayoutList, Table, BookOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEscalations, useEscalationTypes, useReleaseEscalation } from '../../api/escalations';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
-import { useRoles, useRoleListSchema } from '../../api/roles';
+import { useRoles, useRoleDetails, useRoleListSchema } from '../../api/roles';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { buildApiPath } from '../../lib/api-path';
+import { isSystemTierRole } from '../../lib/task-queues';
+import { displayRoleTitle } from '../../lib/role-display';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
-import { PageHeader } from '../../components/common/layout/PageHeader';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar } from './escalation-columns';
+import { EscalationTitleSelect } from './EscalationTitleSelect';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { EscalationListView } from '../../components/escalation/EscalationListView';
 import { usePatchPreferences, usePreferences } from '../../api/preferences';
@@ -21,7 +23,7 @@ import type { LTEscalationRecord } from '../../api/types';
 
 export function OperatorDashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isSuperAdmin, hasRoleType } = useAuth();
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { role: '', type: '', priority: '', search: '' },
   });
@@ -34,6 +36,22 @@ export function OperatorDashboard() {
   const release = useReleaseEscalation();
   const { data: rolesData } = useRoles();
   const { data: typesData } = useEscalationTypes();
+
+  // The title doubles as the queue selector, reading as the chosen role's
+  // friendly title — the same control the All Escalations page carries, over
+  // the same ?role= param the filter bar mirrors.
+  const { data: roleDetails } = useRoleDetails();
+  const isGlobalViewer = isSuperAdmin || hasRoleType('admin');
+  const memberRoleSet = useMemo(() => new Set((user?.roles ?? []).map((r) => r.role)), [user]);
+  const roleOptions = useMemo(() => {
+    const all = roleDetails?.roles ?? [];
+    const visible = isGlobalViewer
+      ? all
+      : all.filter((r) => memberRoleSet.has(r.role) && !isSystemTierRole(r.role));
+    return visible
+      .map((r) => ({ value: r.role, label: displayRoleTitle(r) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [roleDetails, isGlobalViewer, memberRoleSet]);
 
   // Pin current view — the same gesture as All Escalations: every filter is
   // already deep-linked in the URL, so a pin is just the labeled URL.
@@ -131,7 +149,24 @@ export function OperatorDashboard() {
 
   return (
     <div>
-      <PageHeader title="My Escalations" />
+      {/* The title IS the queue selector: it reads as the chosen role's title,
+          or "My Escalations" — the personal inbox, narrowed the same way the
+          All Escalations page narrows. */}
+      <div className="flex items-center gap-2 mb-10 min-w-0">
+        <EscalationTitleSelect
+          role={filters.role}
+          options={roleOptions}
+          onChange={(v) => setFilter('role', v)}
+          emptyLabel="My Escalations"
+        />
+        <button
+          onClick={() => { window.location.hash = '#docs:dashboard.md:all-escalations'; }}
+          className="text-text-quaternary hover:text-accent transition-colors mt-1 shrink-0"
+          title="Open docs for this page"
+        >
+          <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+        </button>
+      </div>
 
       <EscalationFilterBar
         filters={filters}
@@ -148,7 +183,7 @@ export function OperatorDashboard() {
             {hasRichView && (
               <button
                 onClick={() => setViewParam(useRichView ? 'table' : 'rich')}
-                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-text-primary transition-colors"
+                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
                 title={useRichView ? 'Table view' : 'Rich view'}
               >
                 {useRichView
@@ -158,7 +193,7 @@ export function OperatorDashboard() {
             )}
             <button
               onClick={pinCurrentView}
-              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded text-text-tertiary hover:bg-surface-hover hover:text-accent transition-colors"
+              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
               title="Pin this view — save the current filters to your Pinned section"
               data-testid="pin-current-view"
             >
