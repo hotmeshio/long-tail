@@ -194,6 +194,19 @@
   * {
     @apply border-surface-border;
   }
+
+  /* Scroll chrome — panes scroll clean, with no visible track or gutter.
+     The OS "always show scroll bars" mode (auto-enabled when a mouse is
+     connected) paints a persistent native gutter that light color-scheme
+     themes render pale over dark surfaces; the app opts out entirely and
+     scrolling stays on wheel, trackpad, keys, and drag. */
+  * {
+    scrollbar-width: none;             /* Firefox, Chrome 121+ */
+  }
+  *::-webkit-scrollbar {
+    width: 0;                          /* Safari + older Chromium */
+    height: 0;
+  }
 }
 
 @layer components {

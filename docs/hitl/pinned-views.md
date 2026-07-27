@@ -26,13 +26,13 @@ The merge is a single guarded statement (no read-then-write) and the document is
 
 ## The Pinned Section
 
-Pins render as a **Pinned** nav section: the user's own pins first, in stored order (drag to reorder, ✕ to remove), then role-provided defaults. **Pin this view** on the escalations list captures the live filter set into a new pin, prompting only for a label.
+Pins render as first-class nav sections: each role's pins sit under the role's **display title**, styled exactly like the built-in categories (Monitor, Orchestrate, Storage) — the same composition the persona config screen previews. There is no "Pinned" umbrella; the role names are the categories. The user's own pins, when present, lead as their own **Pinned** section (stored order, drag to reorder, ✕ to remove). A section heading exists only over visible pins (a role whose pins are all hidden or promoted contributes no heading) and pins sit flush at the nav's left edge — the heading labels, it never indents. Every pin carries its full label as a tooltip. **Pin this view** on the escalations list captures the live filter set into a new pin, prompting only for a label.
 
-`badge: true` renders a live count beside the label using the same server-side predicate the pin opens onto (the pin's URL is parsed back into its query and counted with `limit: 1`) — so the badge and the list always agree, including `jeopardy=1` pins. Counts refresh on escalation events, and a pin whose URL isn't a countable escalations list renders without a badge.
+`badge: true` renders a live count as bare superscript digits on the row's right rail — tabular, right-aligned so counts read as a column — using the same server-side predicate the pin opens onto (the pin's URL is parsed back into its query and counted with `limit: 1`), so the badge and the list always agree, including `jeopardy=1` pins. Counts refresh on escalation events, and a pin whose URL isn't a countable escalations list renders without a badge.
 
 ## Role Default Pins
 
-A role may declare `default_pins: [{ label, url, badge? }]` (edited on Role Detail → Default Pins). Members see them in their Pinned section from first login, marked as role-provided, and may:
+A role may declare `default_pins: [{ label, url, badge? }]` (edited on Role Detail → Default Pins). Members see them in their Pinned section from first login, grouped under the role's display title, and may:
 
 - **Promote** — copy into their own pins (an own pin with the same label supersedes the role default)
 - **Hide** — dismiss it (recorded in `hiddenRolePins`)
