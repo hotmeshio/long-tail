@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { interpolateHelp, type HelpTokenContext } from '../../lib/x-lt-help';
 import { DataTable, type Column as TableColumn } from '../common/data/DataTable';
-import { ListFilter, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
@@ -10,9 +10,9 @@ import { StickyPagination } from '../common/data/StickyPagination';
 import { useEscalations, useClaimEscalation } from '../../api/escalations';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import { formatAgoCompact } from '../../lib/format';
-import { metadataFacetUrl } from '../../lib/facet-url';
 import { getDeep } from '../../lib/x-lt-bind';
 import { typeColor } from '../../lib/type-color';
+import { RefineDialog, type RefinePair } from './RefineDialog';
 import type { LTEscalationRecord } from '../../api/types';
 
 /**
@@ -348,24 +348,65 @@ function HistoryColumn({ role, def, onRowClick }: {
   );
 }
 
+/**
+ * The refinable facts one row offers: every column the author bound to a pure
+ * metadata value, with its authored label and the row's raw value. Feeds the
+ * row's RefineDialog.
+ */
+export function rowRefinePairs(row: LTEscalationRecord, columnDefs: ColumnDef[]): RefinePair[] {
+  const pairs: RefinePair[] = [];
+  const seen = new Set<string>();
+  for (const col of columnDefs) {
+    const bound = col.value.match(METADATA_TOKEN)?.[1];
+    if (!bound || seen.has(bound)) continue;
+    const raw = row.metadata?.[bound];
+    if (raw === undefined || raw === null || raw === '') continue;
+    seen.add(bound);
+    pairs.push({ key: bound, label: col.label, value: raw });
+  }
+  return pairs;
+}
+
+/** The always-tappable row/card refine trigger — one magnifier, dialog behind it. */
+function RefineTrigger({ onOpen, className = '' }: { onOpen: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onOpen(); }}
+      className={`p-1.5 rounded text-text-quaternary/70 hover:text-accent hover:bg-surface-hover transition-colors ${className}`}
+      title="Refine — filter or search by this row's values"
+      aria-label="Refine — filter or search by this row's values"
+      data-testid="row-refine"
+    >
+      <Search className="w-3.5 h-3.5" strokeWidth={1.5} />
+    </button>
+  );
+}
+
 /** Multi-row pending queue as a facet table. Columns defined by x-lt-columns. */
 function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
   schema: ListSchema;
   rows: LTEscalationRecord[];
   role: string;
   onRowClick?: (row: LTEscalationRecord) => void;
-  /** ⇧ click on a metadata column's filter — merge into the live filter set. */
+  /** RefineDialog "Add to filters" — merge into the live filter set. */
   onAddFacet?: (key: string, value: unknown) => void;
   forceView?: boolean;
 }) {
+  const navigate = useNavigate();
   const columnDefs = schema['x-lt-columns'] ?? [];
   const rowAction = schema['x-lt-row-action'];
+  const [refineRow, setRefineRow] = useState<LTEscalationRecord | null>(null);
 
   // The authored columns render through the SAME table the engineer views
   // use: padded cells, sticky header, and the card fold at narrow widths —
   // a table never scrolls horizontally, it folds. Authors steer the fold
   // with `priority` on each column (1 title line, 2 folds, 3 dropped);
   // undeclared, the first column is the identity.
+  //
+  // Cells carry DATA only — the full column width belongs to the value, with
+  // the full text on hover. Refining lives on the row: one magnifier opens
+  // the RefineDialog over every metadata-bound value the row carries.
   const columns: TableColumn<LTEscalationRecord>[] = [
     {
       key: '_status',
@@ -385,49 +426,24 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       priority: col.priority ?? (i === 0 ? 1 : 2),
       render: (row) => {
         const ctx = rowContext(row);
-        // A column the author bound to a pure metadata value gets the
-        // platform's filter/search pair — the same affordance the engineer
-        // table's metadata cells and the facet-board fields carry. Filter
-        // narrows this role's queue; search spans every role; ⇧ click
-        // merges into the live filters.
-        const bound = col.value.match(METADATA_TOKEN)?.[1];
-        const raw = bound ? row.metadata?.[bound] : undefined;
-        const linkable = bound != null && raw !== undefined && raw !== null && raw !== '';
-        const display = <FieldValue raw={interpolateHelp(col.value, ctx)} format={col.format} />;
-        if (!linkable) return display;
+        const text = interpolateHelp(col.value, ctx);
         return (
-          <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
-            <span className="truncate">{display}</span>
-            <span className="inline-flex items-center gap-px shrink-0 opacity-50 group-hover/row:opacity-100 transition-opacity">
-              <Link
-                to={metadataFacetUrl(bound, raw, role)}
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  if (ev.shiftKey && onAddFacet) {
-                    ev.preventDefault();
-                    onAddFacet(bound, raw);
-                  }
-                }}
-                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
-                title={`Filter ${role}: ${bound} = ${String(raw)}${onAddFacet ? ' · ⇧ click adds to current filters' : ''}`}
-                data-testid="facet-column-filter"
-              >
-                <ListFilter className="w-3 h-3" />
-              </Link>
-              <Link
-                to={metadataFacetUrl(bound, raw)}
-                onClick={(ev) => ev.stopPropagation()}
-                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
-                title={`Search all: ${bound} = ${String(raw)}`}
-                data-testid="facet-column-search"
-              >
-                <Search className="w-3 h-3" />
-              </Link>
-            </span>
+          <span className="block truncate" title={text && text !== EM_DASH ? text : undefined}>
+            <FieldValue raw={text} format={col.format} />
           </span>
         );
       },
     })),
+    {
+      key: '_refine',
+      label: '',
+      priority: 1,
+      className: 'w-9',
+      render: (row) =>
+        rowRefinePairs(row, columnDefs).length > 0
+          ? <RefineTrigger onOpen={() => setRefineRow(row)} />
+          : null,
+    },
     {
       key: '_action',
       label: '',
@@ -440,14 +456,24 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={rows}
-      layout="fixed"
-      keyFn={(row) => row.id}
-      onRowClick={onRowClick}
-      emptyMessage="No pending items."
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={rows}
+        layout="fixed"
+        keyFn={(row) => row.id}
+        onRowClick={onRowClick}
+        emptyMessage="No pending items."
+      />
+      <RefineDialog
+        open={!!refineRow}
+        onClose={() => setRefineRow(null)}
+        role={role}
+        pairs={refineRow ? rowRefinePairs(refineRow, columnDefs) : []}
+        onNavigate={navigate}
+        onAddFacet={onAddFacet}
+      />
+    </>
   );
 }
 
@@ -515,9 +541,11 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
   /** Shift+click — merge one facet into the live filter set (additive). */
   onAddFacet?: (key: string, value: unknown) => void;
 }) {
+  const navigate = useNavigate();
   const groupBy = schema['x-lt-group-by'];
   const card = schema['x-lt-card'] ?? {};
   const rowAction = schema['x-lt-row-action'];
+  const [refineGroup, setRefineGroup] = useState<BoardGroup | null>(null);
 
   if (!groupBy) {
     return <p className="text-xs text-text-tertiary italic">facet-board needs an x-lt-group-by path.</p>;
@@ -528,6 +556,24 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
     return <p className="text-xs text-text-tertiary italic">No entities in scope.</p>;
   }
 
+  // The card's refinable facts: the entity identity (the group-by facet)
+  // plus every metadata-bound card field — one dialog per card, replacing
+  // hover-revealed per-field icons (hover-only fails the iPad floor).
+  const groupRefinePairs = (g: BoardGroup): RefinePair[] => {
+    const pairs: RefinePair[] = [];
+    if (facetKey) pairs.push({ key: facetKey, label: facetKey, value: g.rawValue });
+    const seen = new Set(pairs.map((p) => p.key));
+    for (const f of card.fields ?? []) {
+      const bound = f.value.match(METADATA_TOKEN)?.[1];
+      if (!bound || seen.has(bound)) continue;
+      const raw = g.latest.metadata?.[bound];
+      if (raw === undefined || raw === null || raw === '') continue;
+      seen.add(bound);
+      pairs.push({ key: bound, label: f.label, value: raw });
+    }
+    return pairs;
+  };
+
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4" data-testid="facet-board">
       {groups.map((g) => {
@@ -535,6 +581,7 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
         const title = card.title ? interpolateHelp(card.title, ctx) : g.key;
         const state = card.state ? interpolateHelp(card.state, ctx) : (g.latest.subtype || g.latest.status);
         const stateHue = typeColor(state);
+        const refinable = groupRefinePairs(g).length > 0;
 
         const activate = (e: { shiftKey: boolean }) => {
           if (e.shiftKey && facetKey && onAddFacet) {
@@ -561,62 +608,29 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
               <span className="text-2xs font-semibold uppercase tracking-wider text-text-secondary truncate">
                 {title}
               </span>
-              <span
-                className="shrink-0 px-1.5 py-0.5 rounded text-2xs font-mono font-medium"
-                style={{ color: stateHue.text, backgroundColor: stateHue.bg }}
-                title={state}
-              >
-                {state}
+              <span className="flex items-center gap-1 shrink-0">
+                <span
+                  className="px-1.5 py-0.5 rounded text-2xs font-mono font-medium"
+                  style={{ color: stateHue.text, backgroundColor: stateHue.bg }}
+                  title={state}
+                >
+                  {state}
+                </span>
+                {refinable && <RefineTrigger onOpen={() => setRefineGroup(g)} className="-my-1 -mr-1" />}
               </span>
             </div>
             {card.fields && card.fields.length > 0 && (
               <dl className="space-y-1">
                 {card.fields.map((f, i) => {
-                  // Pure metadata bindings get the same hover filter affordance
-                  // the table's MetadataCell offers; ⇧ click adds instead of replacing.
-                  const bound = f.value.match(METADATA_TOKEN)?.[1];
-                  const raw = bound ? g.latest.metadata?.[bound] : undefined;
-                  const linkable = bound != null && raw !== undefined && raw !== null && raw !== '';
+                  const text = interpolateHelp(f.value, ctx);
                   return (
-                    <div key={i} className="group/frow flex items-baseline justify-between gap-3">
+                    <div key={i} className="flex items-baseline justify-between gap-3">
                       <dt className="text-2xs uppercase tracking-wider text-text-quaternary shrink-0">{f.label}</dt>
-                      <dd className="min-w-0 flex items-baseline gap-1 text-2xs text-text-primary">
-                        <span className="truncate">
-                          <FieldValue raw={interpolateHelp(f.value, ctx)} format={f.format} />
-                        </span>
-                        {/* Fixed-width trailing slot on EVERY row — linkable rows
-                            fill it with the filter/search pair the table's
-                            metadata cells offer — so all values share one right
-                            rail regardless of linkability. */}
-                        <span className="shrink-0 w-9 self-center flex items-center justify-end gap-px">
-                          {linkable && (onOpenGroup || onAddFacet) && (
-                            <span className="flex items-center gap-px opacity-0 group-hover/frow:opacity-100 transition-opacity">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (e.shiftKey && onAddFacet) onAddFacet(bound, raw);
-                                  else onOpenGroup?.(metadataFacetUrl(bound, raw, role));
-                                }}
-                                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
-                                title={`Filter ${role}: ${bound} = ${String(raw)} · ⇧ click adds to current filters`}
-                                data-testid="facet-field-filter"
-                              >
-                                <ListFilter className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenGroup?.(metadataFacetUrl(bound, raw));
-                                }}
-                                className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
-                                title={`Search all: ${bound} = ${String(raw)}`}
-                                data-testid="facet-field-search"
-                              >
-                                <Search className="w-3 h-3" />
-                              </button>
-                            </span>
-                          )}
-                        </span>
+                      <dd
+                        className="min-w-0 truncate text-2xs text-text-primary"
+                        title={text && text !== EM_DASH ? text : undefined}
+                      >
+                        <FieldValue raw={text} format={f.format} />
                       </dd>
                     </div>
                   );
@@ -632,6 +646,15 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
           </div>
         );
       })}
+
+      <RefineDialog
+        open={!!refineGroup}
+        onClose={() => setRefineGroup(null)}
+        role={role}
+        pairs={refineGroup ? groupRefinePairs(refineGroup) : []}
+        onNavigate={onOpenGroup ?? navigate}
+        onAddFacet={onAddFacet}
+      />
     </div>
   );
 }

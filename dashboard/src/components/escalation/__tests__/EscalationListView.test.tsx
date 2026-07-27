@@ -321,7 +321,7 @@ describe('EscalationListView — facet-board', () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
-  it('metadata-bound fields carry the filter/search pair; ⇧ click is additive', () => {
+  it('the card refine dialog drills by the entity and its metadata-bound fields', () => {
     const onOpenGroup = vi.fn();
     const onAddFacet = vi.fn();
     render(
@@ -334,23 +334,34 @@ describe('EscalationListView — facet-board', () => {
       />,
       { wrapper: wrapper() },
     );
-    // Only PO is a pure {{metadata.*}} binding — the age field is not linkable.
-    const fieldFilters = screen.getAllByTestId('facet-field-filter');
-    expect(fieldFilters).toHaveLength(1);
+    // One always-visible trigger per card — no hover-only affordances.
+    fireEvent.click(screen.getByTestId('row-refine'));
 
-    // Filter — scoped to the current role (same URL the table's metadata cell builds).
-    fireEvent.click(fieldFilters[0]);
+    // The dialog lists the entity identity + PO (the age field is not metadata-bound).
+    const pairs = screen.getAllByTestId('refine-pair');
+    expect(pairs).toHaveLength(2);
+
+    // Select both — the facets AND into one role-scoped filter.
+    fireEvent.click(pairs[0]);
+    fireEvent.click(pairs[1]);
+    fireEvent.click(screen.getByTestId('refine-filter-role'));
     const filterUrl = decodeURIComponent(onOpenGroup.mock.calls[0][0] as string);
     expect(filterUrl).toContain('role=fleet');
+    expect(filterUrl).toContain('"fleetMachine":"M-01"');
     expect(filterUrl).toContain('"po":"PO-9"');
 
-    // Search — across ALL roles (no role in the URL).
-    fireEvent.click(screen.getAllByTestId('facet-field-search')[0]);
+    // Search everywhere — no role in the URL.
+    fireEvent.click(screen.getByTestId('row-refine'));
+    fireEvent.click(screen.getAllByTestId('refine-pair')[1]);
+    fireEvent.click(screen.getByTestId('refine-search-all'));
     const searchUrl = decodeURIComponent(onOpenGroup.mock.calls[1][0] as string);
     expect(searchUrl).not.toContain('role=');
     expect(searchUrl).toContain('"po":"PO-9"');
 
-    fireEvent.click(fieldFilters[0], { shiftKey: true });
+    // Add to filters — merges the selection into the live set.
+    fireEvent.click(screen.getByTestId('row-refine'));
+    fireEvent.click(screen.getAllByTestId('refine-pair')[1]);
+    fireEvent.click(screen.getByTestId('refine-add-filters'));
     expect(onAddFacet).toHaveBeenCalledWith('po', 'PO-9');
   });
 

@@ -99,7 +99,7 @@ The table renders through the same engine as the platform's built-in tables: pad
 
 The seeded `print` role (ortho pipeline) is the reference example for this layout, including fold priorities.
 
-A column whose `value` is a pure metadata binding (`{{metadata.key}}`) carries the platform's filter/search pair on each cell — the same affordance the engineer table's metadata cells offer. The filter icon opens this role's queue narrowed to that value; the search icon spans every role; ⇧ click merges the value into the live filter set.
+Cells carry data only — the full column width belongs to the value, with the full text on hover. Refining is a **row** gesture: every row with at least one pure metadata binding (`{{metadata.key}}`) carries a magnifier that opens the refine dialog — the row's metadata-bound facts as touch-sized rows, each a toggle. Pick one or several (selections AND into one query) and drill: **Filter <role>** narrows this role's queue, **Search everywhere** spans every role, **Add to filters** merges the selection into the live filter set. A row with a single fact arrives preselected — two taps to drill.
 
 ### `"facet-board"` — entity board
 
@@ -127,7 +127,6 @@ Cards are fully interactive (`x-lt-group-by` should be a `metadata.*` path so th
 
 - **Click** opens the group's latest row in the detail view.
 - **⇧ click** adds the entity's facet to the live filter set — additive, so shift-clicking narrows the board in place and the facet chips row shows each condition with its own remove.
-- **Hovering the card footer** reveals the entity's history as the filtered **table** or **timeline** view (the same view modes the queue offers everywhere else).
-- **Fields bound to a pure `{{metadata.KEY}}` token** carry the same hover pair the table's metadata cells offer: **filter** (narrows within the current role; ⇧ click adds to the current filters) and **search** (the facet across all roles).
+- **The header magnifier** opens the card's refine dialog — the entity identity plus every field bound to a pure `{{metadata.KEY}}` token, as touch-sized toggle rows. Selections AND into one query: **Filter <role>**, **Search everywhere**, or **Add to filters** (merge into the live set). The same row gesture the facet table carries, always visible — no hover required.
 
 The reference: `examples/seed-fleet-sim.ts` — one advert per machine, a `format: "age"` "Since" field, and role default pins (see [pinned-views.md](pinned-views.md)).

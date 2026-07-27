@@ -207,11 +207,15 @@ Nothing loops, nothing floats.
    owner, urgency, age — always renders. Enrichment columns (workflow,
    metadata facets) return only when the table's container has room
    (`showFrom: '@split' | '@wall'`); below that they fold into card pairs.
-   The list is a jumping-off spot: the metadata cell carries the refine
-   icons — filter within the role, search across roles, shift+click to AND
-   facets — the ELK-style drill the whole product surfaces.
-6. **Refine icons are always visible enough to tap** — half-opacity at
-   rest, full on hover. Hover-only affordances do not exist on the floor.
+   The list is a jumping-off spot: the ELK-style drill the whole product
+   surfaces.
+6. **Refining is a ROW gesture, never a cell tax.** Cells spend their full
+   width on data. One always-visible magnifier per row (or board card)
+   opens the refine dialog: the row's metadata-bound facts as full-width
+   touch rows, multi-select ANDing facets, with filter-in-role /
+   search-everywhere / add-to-filters actions. Per-cell icon pairs are a
+   defect — twelve columns × two icons starves every value into an
+   ellipsis. Hover-only affordances do not exist on the floor.
 7. **Disclosure order**: drop priority-3 columns, fold priority-2 into
    pairs, keep priority-1 always.
 8. **Touch parity**: every hover-only affordance has a tap equivalent —
