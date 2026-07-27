@@ -11,6 +11,12 @@ vi.mock('../../../../api/users', () => ({
 vi.mock('../../../../api/roles', () => ({
   useRoles: () => ({ data: { roles: ['reviewer', 'customer-triage'] } }),
 }));
+vi.mock('../../../../api/personas', () => ({
+  usePersonas: () => ({ data: { personas: [] } }),
+  useUserPersonas: () => ({ data: { personas: [], roles: [] } }),
+  useAssignPersona: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useUnassignPersona: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
 
 import { RolePanel } from '../RolePanel';
 

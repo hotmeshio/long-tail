@@ -1,7 +1,8 @@
 import { Router } from 'express';
 
-import { requireAdmin, requireBuilder } from '../modules/auth';
+import { requireAdmin, requireBuilder, requireRoleManager } from '../modules/auth';
 import * as api from '../api/users';
+import * as personasApi from '../api/personas';
 
 const router = Router();
 
@@ -123,6 +124,44 @@ router.post('/:id/roles', requireAdmin, async (req, res) => {
  */
 router.delete('/:id/roles/:role', requireAdmin, async (req, res) => {
   const result = await api.removeUserRole({ id: req.params.id as string, role: req.params.role as string });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+// ── Persona assignment ───────────────────────────────────────────────────────
+// A persona assignment is shorthand for scoped role memberships, so the gate is
+// the persona-management gate (admin type, superadmin, engineer).
+
+/**
+ * GET /api/users/:id/personas
+ * The personas a user holds plus the composed role/scope map.
+ */
+router.get('/:id/personas', async (req, res) => {
+  const result = await personasApi.getUserPersonas({ id: req.params.id as string });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * POST /api/users/:id/personas
+ * Assign a persona to a user (idempotent; re-assigning overlays fresh).
+ * Body: { persona: '<key>' }
+ */
+router.post('/:id/personas', requireRoleManager, async (req, res) => {
+  const result = await personasApi.assignPersona({
+    id: req.params.id as string,
+    key: (req.body || {}).persona,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * DELETE /api/users/:id/personas/:key
+ * Unassign a persona — removes only memberships the persona sustains.
+ */
+router.delete('/:id/personas/:key', requireRoleManager, async (req, res) => {
+  const result = await personasApi.unassignPersona({
+    id: req.params.id as string,
+    key: req.params.key as string,
+  });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

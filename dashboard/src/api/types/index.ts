@@ -1,6 +1,7 @@
 export * from './tasks';
 export * from './escalations';
 export * from './users';
+export * from './personas';
 export * from './workflows';
 export * from './yaml-workflows';
 export * from './bots';

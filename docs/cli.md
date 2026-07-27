@@ -140,6 +140,18 @@ ltc roles save-schema reviewer --file schema.json --summary "Added lotNumber"
                                           # Save the escalation form schema (a change creates the next version)
 ```
 
+### Personas
+
+Personas bundle roles into one-step assignments — each link carries a relationship scope (`write-all`, `write-self`, `read-all`). See [iam.md](iam.md#personas) for the semantics.
+
+```bash
+ltc personas list                         # Personas with role and holder counts
+ltc personas get production-manager       # Role links + assignees
+ltc personas assign production-manager USER_ID
+ltc personas unassign production-manager USER_ID
+ltc personas for-user USER_ID             # Personas held + composed role/scope map
+```
+
 ### Compiler
 
 ```bash

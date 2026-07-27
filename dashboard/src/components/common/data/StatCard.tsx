@@ -18,7 +18,7 @@ export function StatCard({
   const content = (
     <>
       <div className="flex items-center gap-2 mb-1">
-        {dotClass && <span className={`w-2 h-2 rounded-full dot-ring ${dotClass}`} />}
+        {dotClass && <span className={`w-2.5 h-2.5 rounded-full dot-ring ${dotClass}`} />}
         <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
           {label}
         </p>

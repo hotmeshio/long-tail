@@ -49,7 +49,7 @@ export function StatusBadge({ status }: { status: Status }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <span className={`w-2 h-2 rounded-full dot-ring ${dotClass}`} />
+      <span className={`w-2.5 h-2.5 rounded-full dot-ring ${dotClass}`} />
       <span className="text-xs text-text-secondary">{label}</span>
     </span>
   );

@@ -63,7 +63,7 @@ export function BotsPage({ embedded = false }: { embedded?: boolean }) {
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <span
-            className={`w-2 h-2 rounded-full dot-ring shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
+            className={`w-2.5 h-2.5 rounded-full dot-ring shrink-0 ${statusDot[row.status] ?? 'bg-status-pending'}`}
             title={row.status}
           />
           <span className="text-sm text-text-primary whitespace-nowrap">

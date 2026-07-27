@@ -1,4 +1,4 @@
-import type { LTEnvelope } from '../types';
+import type { LTEnvelope, LTPersonaSpec } from '../types';
 import type {
   ReviewContentEnvelopeData,
   KitchenSinkEnvelopeData,
@@ -279,4 +279,36 @@ export const SEED_CHAINS = [
   ['admin', 'superadmin'],
   ['engineer', 'admin'],
   ['engineer', 'superadmin'],
+];
+
+// ── Seed personas ────────────────────────────────────────────────────────────
+//
+// Personas bundle the demo roles into one-step assignments. Declared the same
+// way roles and default_pins are — statically, seeded idempotently — so the
+// composition ("this human runs the pipeline") is a first-class record instead
+// of a sequence of manual role-adds. Each role carries its own pins and
+// schemas, so a persona's sidebar and forms compose from its roles with no
+// persona-specific UI.
+export const SEED_PERSONAS: LTPersonaSpec[] = [
+  {
+    key: 'production-manager',
+    title: 'Production Manager',
+    description:
+      'Runs the pipeline: works design and review, watches print and the machine fleet.',
+    roles: [
+      { role: 'design', relationship: 'write-all' },
+      { role: 'review', relationship: 'write-all' },
+      { role: 'print', relationship: 'read-all' },
+      { role: 'fleet-servicer', relationship: 'read-all' },
+    ],
+  },
+  {
+    key: 'fleet-operator',
+    title: 'Fleet Operator',
+    description: 'Services the machine fleet and watches the print queue feeding it.',
+    roles: [
+      { role: 'fleet-servicer', relationship: 'write-all' },
+      { role: 'print', relationship: 'read-all' },
+    ],
+  },
 ];

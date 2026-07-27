@@ -102,7 +102,7 @@ export function SubscriptionsStep({ form, set }: Props) {
             }`}>
               <button onClick={() => setSelected(i)} className="flex-1 text-left px-3 py-2 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full dot-ring shrink-0 ${isComplete(s) ? 'bg-status-success' : 'bg-surface-border'}`} />
+                  <span className={`w-2.5 h-2.5 rounded-full dot-ring shrink-0 ${isComplete(s) ? 'bg-status-success' : 'bg-surface-border'}`} />
                   <span className="text-2xs font-mono truncate">{s.topic || 'new subscription'}</span>
                 </div>
                 <span className="text-2xs text-text-quaternary ml-3">→ {s.workflow_type || s.tool_name || s.reaction_type}</span>

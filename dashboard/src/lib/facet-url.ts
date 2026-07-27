@@ -43,21 +43,30 @@ export function writeFacetParams(p: URLSearchParams, f: FacetFilters): void {
 }
 
 /**
- * Build a metadata facet deep-link URL, preserving the native JS type of
- * `value` (number, boolean, string) so the JSONB containment query is
+ * Build a metadata facet deep-link URL for one or more key/value pairs
+ * (multiple pairs AND together in the JSONB containment query), preserving
+ * each value's native JS type (number, boolean, string) so the query is
  * type-correct. Objects are JSON-stringified; primitives pass through.
  *
- * Single source of truth — use this everywhere a metadata-icon click
- * should navigate to a filtered queue (timeline cards, table rows, detail
- * panel). Never pass the value through String() first.
+ * Single source of truth — use this everywhere a refine gesture should
+ * navigate to a filtered queue (timeline cards, refine dialogs, detail
+ * panel). Never pass values through String() first.
  */
-export function metadataFacetUrl(key: string, value: unknown, role?: string | null): string {
-  const facetValue = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
-  const facets = encodeURIComponent(JSON.stringify({ [key]: facetValue }));
+export function metadataFacetsUrl(pairs: Record<string, unknown>, role?: string | null): string {
+  const facetPairs: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(pairs)) {
+    facetPairs[key] = typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+  }
+  const facets = encodeURIComponent(JSON.stringify(facetPairs));
   if (role) {
     return `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`;
   }
   return `/escalations/available?facets=${facets}&status=all`;
+}
+
+/** Single-pair convenience over metadataFacetsUrl. */
+export function metadataFacetUrl(key: string, value: unknown, role?: string | null): string {
+  return metadataFacetsUrl({ [key]: value }, role);
 }
 
 /** Count of active facet CONDITIONS (for the trigger badge). Sort (orderBy) is

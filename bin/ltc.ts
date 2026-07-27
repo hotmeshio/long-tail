@@ -20,6 +20,7 @@ import * as kb from '../lib/cli/commands/knowledge';
 import * as mcp from '../lib/cli/commands/mcp';
 import * as usr from '../lib/cli/commands/users';
 import * as roles from '../lib/cli/commands/roles';
+import * as personas from '../lib/cli/commands/personas';
 import * as streams from '../lib/cli/commands/streams';
 
 const pkg = require('../package.json');
@@ -334,6 +335,35 @@ rolesCmd.command('save-schema <role>')
   .option('--summary <text>', 'Change summary recorded on the new version')
   .option('--json', 'JSON output')
   .action(wrap(roles.saveRoleSchema));
+
+// ── Personas ─────────────────────────────────────────────────────────────
+
+const personasCmd = program.command('personas').description('Personas — named role bundles with per-role relationship scope');
+
+personasCmd.command('list')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'Keys only')
+  .action(wrap(personas.listPersonas));
+
+personasCmd.command('get <key>')
+  .description('Show a persona with its role links and assignees')
+  .option('--json', 'JSON output')
+  .action(wrap(personas.getPersona));
+
+personasCmd.command('assign <key> <userId>')
+  .description('Assign a persona to a user (idempotent; re-assigning overlays fresh)')
+  .option('--json', 'JSON output')
+  .action(wrap(personas.assignPersona));
+
+personasCmd.command('unassign <key> <userId>')
+  .description('Unassign a persona — removes only the memberships it sustains')
+  .option('--json', 'JSON output')
+  .action(wrap(personas.unassignPersona));
+
+personasCmd.command('for-user <userId>')
+  .description('Show the personas a user holds and the composed role/scope map')
+  .option('--json', 'JSON output')
+  .action(wrap(personas.getUserPersonas));
 
 // ── Streams ─────────────────────────────────────────────────────────────
 
